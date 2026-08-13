@@ -1354,6 +1354,220 @@ def _(
     reveal_type(invalid_subclass_of_literal)  # revealed: <class 'int'>
 ```
 
+### Subscripted generic alias inside `type[…]`
+
+A generic alias can also be specialized inside a `type[…]` annotation.
+
+#### Valid specializations
+
+The PEP 613 spelling and `typing.Type[…]` take the same path:
+
+```py
+from typing import Generic, Type, TypeAlias, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+PairAliasExplicit: TypeAlias = Pair[T, U]
+
+def implicit(x: type[PairAlias[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def pep_613(x: type[PairAliasExplicit[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def uppercase_type(x: Type[PairAlias[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def partially_specialized(x: type[PairAlias[int, T]]):
+    reveal_type(x)  # revealed: type[Pair[int, T@partially_specialized]]
+```
+
+#### Incorrect type-argument counts
+
+A generic alias specialized inside `type[…]` must receive the correct number of type arguments:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+
+def _(
+    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
+    too_few: type[PairAlias[int]],
+    # error: [invalid-type-arguments] "Too many type arguments: expected 2, got 3"
+    too_many: type[PairAlias[int, str, bool]],
+):
+    reveal_type(too_few)  # revealed: type[Pair[Unknown, Unknown]]
+    reveal_type(too_many)  # revealed: type[Pair[Unknown, Unknown]]
+```
+
+#### Type-variable bounds
+
+Specializing an alias inside `type[…]` enforces the upper bound of its type variable:
+
+```py
+from typing import Generic, TypeVar
+
+Bounded = TypeVar("Bounded", bound=int)
+
+class BoundedBox(Generic[Bounded]): ...
+
+BoundedAlias = BoundedBox[Bounded]
+
+def _(
+    # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `Bounded@BoundedAlias`"
+    violated_bound: type[BoundedAlias[str]],
+):
+    reveal_type(violated_bound)  # revealed: type[BoundedBox[Unknown]]
+```
+
+#### Type-variable constraints
+
+Specializing an alias inside `type[…]` also enforces constraints on its type variable:
+
+```py
+from typing import Generic, TypeVar
+
+Constrained = TypeVar("Constrained", int, str)
+
+class ConstrainedBox(Generic[Constrained]): ...
+
+ConstrainedAlias = ConstrainedBox[Constrained]
+
+def _(
+    # error: [invalid-type-arguments] "Type `bytes` does not satisfy constraints `int`, `str` of type variable `Constrained@ConstrainedAlias`"
+    violated_constraint: type[ConstrainedAlias[bytes]],
+):
+    reveal_type(violated_constraint)  # revealed: type[ConstrainedBox[Unknown]]
+```
+
+#### Bounds on union-valued aliases
+
+The upper bound of a type variable is enforced even when its alias resolves to a union:
+
+```py
+from typing import TypeVar
+
+Bounded = TypeVar("Bounded", bound=int)
+BoundedUnionAlias = list[Bounded] | set[Bounded]
+
+def _(
+    # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `Bounded@BoundedUnionAlias`"
+    union_violated_bound: type[BoundedUnionAlias[str]],
+):
+    reveal_type(union_violated_bound)  # revealed: type[list[Unknown] | set[Unknown]]
+```
+
+#### Invalid nested subscripts
+
+Subscripting an already-subscripted alias inside `type[…]` is invalid, just as it is outside it:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+
+def _(
+    # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
+    double_subscript: type[PairAlias[T, U][int, str]],
+):
+    reveal_type(double_subscript)  # revealed: type[Unknown]
+```
+
+#### Assignments to class-backed aliases
+
+An object assigned to a specialized alias inside `type[…]` must match the class it represents:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+
+# error: [invalid-assignment] "Object of type `<class 'int'>` is not assignable to `type[Pair[int, str]]`"
+assigned: type[PairAlias[int, str]] = int
+```
+
+#### Assignments to union-valued aliases
+
+An object assigned to a union-valued alias inside `type[…]` must match one of the union elements:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+UnionAlias = list[T] | set[T]
+
+# error: [invalid-assignment] "Object of type `<class 'str'>` is not assignable to `type[list[int] | set[int]]`"
+assigned_union: type[UnionAlias[int]] = str
+```
+
+#### Other alias representations
+
+An alias does not have to be backed by a class. Stringified, transparent, `Annotated` and
+union-valued aliases all specialize inside `type[…]` the same way they do outside it:
+
+```py
+from __future__ import annotations
+
+from typing import Annotated, TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+StringAlias: TypeAlias = "list[T]"
+TransparentAlias: TypeAlias = T
+AnnotatedAlias = Annotated[list[T], "metadata"]
+UnionAlias = list[T] | set[T]
+
+def _(
+    string: type[StringAlias[int]],
+    transparent: type[TransparentAlias[int]],
+    annotated: type[AnnotatedAlias[int]],
+    union: type[UnionAlias[int]],
+):
+    reveal_type(string)  # revealed: type[list[int]]
+    reveal_type(transparent)  # revealed: type[int]
+    reveal_type(annotated)  # revealed: type[list[int]]
+    reveal_type(union)  # revealed: type[list[int] | set[int]]
+```
+
+#### Callable aliases
+
+A callable is not a class object, so specializing a `Callable` alias inside `type[…]` is rejected,
+just as a directly spelled callable is:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+CallableAlias = Callable[[T], T]
+
+def _(
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    callable_: type[CallableAlias[int]],
+):
+    reveal_type(callable_)  # revealed: type[Unknown]
+```
+
 ### `Type[…]`
 
 The same also works for `typing.Type[…]`:

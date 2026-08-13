@@ -4011,6 +4011,37 @@ class DateTime(Protocol[T]):
         return datetime.now(tz)  # error: [invalid-return-type]
 ```
 
+## Recursive protocol receiver binding with an incompatible override
+
+An incompatible override of a covariant generic protocol method can recursively compare the
+protocol's explicitly annotated receiver with the implementing class. The receiver-binding and
+assignability queries must converge and report the incompatible override instead of panicking.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Result(Generic[T_co]): ...
+
+class SupportsMethod(Protocol[T_co]):
+    def method(self: "SupportsMethod[T]") -> Result[T]: ...
+
+class Compatible(SupportsMethod[T_co]):
+    def method(self: "Compatible[T]") -> Result[T]:
+        raise NotImplementedError
+
+class Incompatible(SupportsMethod[T_co]):
+    def method(self: "Incompatible[T]", value: int) -> Result[T]:  # error: [invalid-method-override]
+        raise NotImplementedError
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
@@ -6148,6 +6179,15 @@ def check(value: Left[int]) -> None:
     expect_right1(value)  # error: [invalid-argument-type]
     # This should be an error
     expect_right2(value)  # error: [invalid-argument-type]
+```
+
+Generic-call inference must also avoid expanding recursive protocol members when checking whether
+its argument constraints are independent:
+
+```py
+def accept[U, V](outer: U, recursive: V) -> None: ...
+def infer[T](outer: T, recursive: C[int]) -> None:
+    accept(outer, recursive)
 ```
 
 ### Recursive legacy generic protocol

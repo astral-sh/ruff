@@ -408,7 +408,9 @@ pub fn validate_inline_snapshot(
                     failures.push(
                         failure_line,
                         vec![Failure::new(
-                            "This code block has a `snapshot` code block but no `# snapshot` assertions. Remove the `snapshot` code block or add a `# snapshot:` assertion.",
+                            "This code block has a `snapshot` code block but no `# snapshot` \
+                            assertions. Remove the `snapshot` code block or add a `# snapshot:` \
+                            assertion.",
                         )],
                     );
                 }
@@ -432,7 +434,8 @@ pub fn validate_inline_snapshot(
                 failures.push(
                     line,
                     vec![Failure::new(format!(
-                        "Add a `snapshot` block for this `# snapshot` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}=1` to insert one automatically",
+                        "Add a `snapshot` block for this `# snapshot` assertion, \
+                        or set `{MDTEST_UPDATE_SNAPSHOTS}=1` to insert one automatically",
                     ))],
                 );
             }
@@ -451,10 +454,14 @@ pub fn validate_inline_snapshot(
         } else {
             failures.push(
                 failure_line,
-                vec![Failure::new(format_args!(
-                        "inline diagnostics snapshot are out of date; set `{MDTEST_UPDATE_SNAPSHOTS}=1` to update the `snapshot` block",
-                    )).with_diff(snapshot_code_block.expected.to_string(), actual)],
-                );
+                vec![
+                    Failure::new(format_args!(
+                        "inline diagnostics snapshot are out of date; \
+                        set `{MDTEST_UPDATE_SNAPSHOTS}=1` to update the `snapshot` block",
+                    ))
+                    .with_diff(snapshot_code_block.expected.to_string(), actual),
+                ],
+            );
         }
     }
 
@@ -674,7 +681,8 @@ pub fn check_panic<C>(test: &MarkdownTest<'_, '_, C>, panic_info: Option<PanicEr
                 let message = panic_info.payload.to_string();
                 assert!(
                     message.contains(expected_message),
-                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                    "Test `{}` is expected to panic with `{expected_message}`, \
+                    but panicked with `{message}` instead.",
                     test.name(),
                 );
             }

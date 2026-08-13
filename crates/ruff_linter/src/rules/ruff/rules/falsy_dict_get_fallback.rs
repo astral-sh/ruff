@@ -48,7 +48,9 @@ impl Violation for FalsyDictGetFallback {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.".to_string()
+        "Avoid providing a falsy fallback to `dict.get()` in boolean test positions. \
+            The default fallback `None` is already falsy."
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

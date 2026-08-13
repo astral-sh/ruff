@@ -266,7 +266,8 @@ impl<'db> ErrorContext<'db> {
             } => {
                 help_messages.insert(HelpMessages::RequiredFieldCouldBeRemoved);
                 format!(
-                    "field \"{field_name}\" is required in {source} but not required and mutable in {target}",
+                    "field \"{field_name}\" is required in {source} \
+                    but not required and mutable in {target}",
                     source = typed_dict_name(source),
                     target = typed_dict_name(target)
                 )
@@ -289,7 +290,8 @@ impl<'db> ErrorContext<'db> {
                 source_field,
                 target_field,
             } => format!(
-                "field \"{field_name}\" on {source} has type `{source_field}` which is not {relation} type `{target_field}` expected by {target}",
+                "field \"{field_name}\" on {source} has type `{source_field}` \
+                which is not {relation} type `{target_field}` expected by {target}",
                 source = typed_dict_name(source),
                 target = typed_dict_name(target),
                 relation = relation.description(),
@@ -374,7 +376,8 @@ impl<'db> ErrorContext<'db> {
             Self::TopCallableAssignedToNonTop { return_type } => {
                 help_messages.insert(HelpMessages::TopCallableExplanation);
                 format!(
-                    "Object of type `Top[(...) -> {}]` is not safe to call; its signature is not known",
+                    "Object of type `Top[(...) -> {}]` is not safe to call; \
+                    its signature is not known",
                     return_type.display(db, env)
                 )
             }
@@ -382,7 +385,8 @@ impl<'db> ErrorContext<'db> {
                 source_name,
                 target_name,
             } => format!(
-                "the parameter named `{source_name}` does not match `{target_name}` (and can be used as a keyword parameter)",
+                "the parameter named `{source_name}` does not match `{target_name}` \
+                (and can be used as a keyword parameter)",
             ),
             Self::ParameterMustAcceptKeywordArguments {
                 source_name,
@@ -390,7 +394,8 @@ impl<'db> ErrorContext<'db> {
             } => {
                 if let Some(source_name) = source_name {
                     format!(
-                        "parameter `{source_name}` is positional-only but must also accept keyword arguments",
+                        "parameter `{source_name}` is positional-only \
+                        but must also accept keyword arguments",
                     )
                 } else {
                     format!("parameter `{target_name}` must accept keyword arguments")
@@ -449,7 +454,8 @@ impl<'db> ErrorContext<'db> {
                 ty.display(db, env),
             ),
             Self::ProtocolMemberClassVarMismatch { member_name, ty } => format!(
-                "protocol member `{member_name}` is an instance variable on type `{}`, but a class variable is required",
+                "protocol member `{member_name}` is an instance variable on type `{}`, \
+                but a class variable is required",
                 ty.display(db, env),
             ),
             Self::ProtocolSpecialMethodNotDefinedOnMetaType => {
@@ -495,9 +501,10 @@ enum HelpMessages {
 impl std::fmt::Display for HelpMessages {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HelpMessages::RequiredFieldCouldBeRemoved => {
-                f.write_str("The required field could be removed through a destructive operation like `del` on the target.")
-            }
+            HelpMessages::RequiredFieldCouldBeRemoved => f.write_str(
+                "The required field could be removed through a destructive operation \
+                like `del` on the target.",
+            ),
             HelpMessages::TypedDictNotAssignableToDict(relation) => {
                 write!(
                     f,
@@ -509,26 +516,37 @@ impl std::fmt::Display for HelpMessages {
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
                 f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
             }
-            HelpMessages::OpenTypedDictNotAssignableToMapping {typed_dict_name, relation} => {
-                let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
+            HelpMessages::OpenTypedDictNotAssignableToMapping {
+                typed_dict_name,
+                relation,
+            } => {
+                let name = typed_dict_name
+                    .as_ref()
+                    .map(|name| format!("`{name}`"))
+                    .unwrap_or_else(|| "this TypedDict".to_string());
                 write!(
                     f,
                     "{name} would be {relation} this `Mapping` type \
-                    if it were declared with `closed=True`, but TypedDicts are open by default.",
+                    if it were declared with `closed=True`, \
+                    but TypedDicts are open by default.",
                     relation = relation.description()
                 )
             }
-            HelpMessages::ExplainOpenTypedDictUnsoundness {typed_dict_name} => {
-                let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
+            HelpMessages::ExplainOpenTypedDictUnsoundness { typed_dict_name } => {
+                let name = typed_dict_name
+                    .as_ref()
+                    .map(|name| format!("`{name}`"))
+                    .unwrap_or_else(|| "this TypedDict".to_string());
                 write!(
                     f,
-                    "A subclass of {name} could validly add a new field of an arbitrary type, \
-                    violating subtyping with the `Mapping` type"
+                    "A subclass of {name} could validly add a new field \
+                    of an arbitrary type, violating subtyping with the `Mapping` type"
                 )
             }
             HelpMessages::TopCallableExplanation => f.write_str(
                 "This type includes all possible parameter sets, \
-                so it cannot safely be called because there is no valid set of arguments for it",
+                so it cannot safely be called \
+                because there is no valid set of arguments for it",
             ),
             HelpMessages::ConsiderAddingADefaultValue { parameter_name } => match parameter_name {
                 Some(name) => write!(f, "Parameter `{name}` must have a default value"),

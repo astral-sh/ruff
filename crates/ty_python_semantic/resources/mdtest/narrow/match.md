@@ -3123,7 +3123,12 @@ def string_pattern(value: str):
 def integer_pattern(value: int):
     match value:
         case 1:
-            reveal_type(value)  # revealed: Literal[1, True]
+            reveal_type(value)  # revealed: Literal[1]
+
+def zero_pattern(value: int):
+    match value:
+        case 0:
+            reveal_type(value)  # revealed: Literal[0]
 
 def bytes_pattern(value: bytes):
     match value:
@@ -3328,6 +3333,30 @@ def test_match_value_sequence(value: object) -> None:
     match value:
         case [1]:
             reveal_type(value[0])  # revealed: object
+```
+
+## String-literal origin in value patterns
+
+A string without literal origin can match a literal value pattern without gaining literal origin.
+
+```py
+from typing import Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
+
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    match value:
+        case "hello":
+            reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+For a known literal-origin string, excluding the same literal makes the value pattern impossible.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    match value:
+        case "hello":
+            reveal_type(value)  # revealed: Never
 ```
 
 ## Enum equality semantics

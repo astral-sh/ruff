@@ -695,6 +695,23 @@ fn evaluate_structural_comparison<'db>(
         (other, Type::Union(union)) => {
             evaluate_union_right(evaluator, other, union.elements(db), branch, operator)
         }
+        // An excluded string literal rules out its runtime value only when the intersection
+        // already proves that the string has literal origin.
+        (Type::Intersection(intersection), Type::LiteralValue(literal))
+        | (Type::LiteralValue(literal), Type::Intersection(intersection))
+            if literal.is_string()
+                && intersection
+                    .positive(db)
+                    .iter()
+                    .any(|element| element.is_subtype_of(db, env, Type::literal_string()))
+                && Type::Intersection(intersection).is_disjoint_from(
+                    db,
+                    env,
+                    Type::LiteralValue(literal),
+                ) =>
+        {
+            operator.result_from_equality(false)
+        }
         (Type::Intersection(intersection), other) => evaluate_intersection_left(
             evaluator,
             Type::Intersection(intersection),
@@ -1301,6 +1318,18 @@ fn evaluate_intersection_left<'db>(
             ComparisonResult::AlwaysTrue => any_true = true,
             ComparisonResult::AlwaysFalse => any_false = true,
             ComparisonResult::CanNarrow(narrowed) => {
+                // Literal-string origin is a static proof, not a runtime object property. An
+                // untrusted string can therefore equal a literal even when their static types
+                // are disjoint. Keep its original proof instead of making that branch unreachable.
+                if operator.condition_expects_equality(branch)
+                    && original.is_disjoint_from(db, &evaluator.env, narrowed)
+                    && original
+                        .identity_comparison_truthiness(db, &evaluator.env, narrowed)
+                        .may_be_true()
+                {
+                    return ComparisonResult::Ambiguous;
+                }
+
                 any_narrowing = true;
                 builder.add_positive_in_place(narrowed);
             }
@@ -1493,17 +1522,16 @@ fn compare_literal_to_other<'db>(
     };
     let condition_expects_equality = operator.condition_expects_equality(branch);
 
-    // Treat broad builtin types as if they exclude subclasses with custom equality. This is
-    // intentionally unsafe: an instance of such a subclass can compare equal to the literal
-    // without inhabiting its literal type. Explicitly typed subclasses do not take this path.
+    // Treat broad builtin types as if only the literal itself can compare equal. This is
+    // intentionally unsafe: subclasses, including `bool` for `int`, can compare equal without
+    // inhabiting the literal type. Explicitly typed subclasses do not take this path.
     if evaluator.soundness_policy.allow_unsafe_equality
         && condition_expects_equality
         && literal_operand == LiteralOperand::Other
-        && let Some(equal_to_literal) = builtin_literals_equal_to(db, env, literal_type, literal)
         && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, other)
     {
         return if literal_semantics == other_semantics {
-            ComparisonResult::CanNarrow(equal_to_literal)
+            ComparisonResult::CanNarrow(literal_type)
         } else {
             operator.result_from_equality(false)
         };
@@ -1734,9 +1762,11 @@ impl KnownComparisonSemantics {
             Type::NominalInstance(instance)
                 if instance.class(db, env).is_final(db)
                     || soundness_policy.allow_unsafe_equality
-                        // `object` can contain values whose classes define their own comparison
-                        // method, so treating it as exact would incorrectly eliminate those values.
-                        && !instance.has_known_class(db, KnownClass::Object) =>
+                        && (
+                            // `object` can contain values whose classes define their own comparison
+                            // method, so treating it as exact would incorrectly eliminate those values.
+                            !instance.has_known_class(db, KnownClass::Object)
+                        ) =>
             {
                 Self::of_instance(db, env, ty, operator)
             }

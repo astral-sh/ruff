@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 use ty_python_semantic::ProgramEnvironment;
@@ -10,7 +11,7 @@ use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef, PySourceType};
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -18,7 +19,7 @@ use rustc_hash::FxHashSet;
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, resolve_real_shadowable_module,
 };
-use ty_python_core::ProgramFile;
+use ty_python_core::{ProgramFile, semantic_index};
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
@@ -525,12 +526,7 @@ impl<'db> CompletionBuilder<'db> {
         let kind = self
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
-        let relevance = Relevance::new(
-            collection_context,
-            query,
-            &self,
-            program_file.file(db).source_type(db),
-        );
+        let relevance = Relevance::new(db, program_file, collection_context, query, &self);
         let (label, insert, insert_text_format, command) =
             if collection_context.should_complete_callable_parentheses(kind) {
                 let label = self.insert.unwrap_or_else(|| self.name.clone());
@@ -838,8 +834,13 @@ impl<'m> Context<'m> {
         settings: &CompletionSettings,
         capabilities: CompletionCapabilities,
     ) -> CollectionContext<'db> {
+        let type_checking_block = Some(TypeCheckingBlock::at_cursor(self.cursor.range));
+
         match self.kind {
-            ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext::none(),
+            ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext {
+                type_checking_block,
+                ..CollectionContext::none()
+            },
             ContextKind::NonImport(_) => {
                 let env = model.program_environment();
                 let exception_ty = self.cursor.exception_ty(db, &env);
@@ -859,6 +860,7 @@ impl<'m> Context<'m> {
                 CollectionContext {
                     exception_ty,
                     is_raising_exception: exception_ty.is_some(),
+                    type_checking_block,
                     complete_class_parentheses: complete_callable_parentheses
                         && existing_class_bases.is_none()
                         && !self.cursor.suppress_class_parentheses(model),
@@ -1630,6 +1632,40 @@ impl UserQuery {
     }
 }
 
+#[derive(Clone, Debug)]
+struct TypeCheckingBlock {
+    range: TextRange,
+    is_inside: OnceCell<bool>,
+}
+
+impl TypeCheckingBlock {
+    fn at_cursor(range: TextRange) -> Self {
+        Self {
+            range,
+            is_inside: OnceCell::new(),
+        }
+    }
+
+    fn is_inside<'db>(&self, db: &'db dyn Db, file: ProgramFile<'db>) -> bool {
+        // Most completions are ranked independently of `TYPE_CHECKING`, so only query the
+        // semantic index when a typing-only completion needs to know the cursor's context.
+        *self.is_inside.get_or_init(|| {
+            let parsed = parsed_module(db, file.python_file(db)).load(db);
+            let index = semantic_index(db, file);
+
+            covering_node(parsed.syntax().into(), self.range)
+                .ancestors()
+                .find_map(|node| {
+                    let ast::AnyNodeRef::StmtIf(statement) = node else {
+                        return None;
+                    };
+                    index.try_expression_scope_id(statement.test.as_ref())
+                })
+                .is_some_and(|scope| index.is_in_type_checking_block(scope, self.range))
+        })
+    }
+}
+
 /// Context used to help filter completions when collecting them.
 #[derive(Clone, Debug, Default)]
 struct CollectionContext<'db> {
@@ -1640,6 +1676,8 @@ struct CollectionContext<'db> {
     exception_ty: Option<Type<'db>>,
     /// Whether we're in an exception context (`raise` or `except`) or not.
     is_raising_exception: bool,
+    /// Whether the cursor is inside a type-checking-only block, if a cursor is available.
+    type_checking_block: Option<TypeCheckingBlock>,
     /// Names of base classes that are already specified in the class definition,
     /// including the class being defined (unless its name was previously bound).
     /// Used to filter out duplicate and self-referential base class suggestions.
@@ -1795,11 +1833,12 @@ impl Relevance {
     ///
     /// A smaller rank means the completion should appear higher in the
     /// results shown to end users.
-    fn new(
-        _ctx: &CollectionContext,
+    fn new<'db>(
+        db: &'db dyn Db,
+        program_file: ProgramFile<'db>,
+        ctx: &CollectionContext,
         query: &UserQuery,
         c: &CompletionBuilder,
-        source_type: PySourceType,
     ) -> Relevance {
         Relevance {
             definitively_usable: if c.is_context_specific {
@@ -1823,10 +1862,9 @@ impl Relevance {
             } else {
                 Sort::Even
             },
+            // We only up-rank top-level modules.
+            // Doing this for sub-modules generates too much noise.
             is_module: if c.kind == Some(CompletionKind::Module)
-                // We only up-rank top-level modules.
-                // Doing this for sub-modules generates too
-                // much noise.
                 && !c
                     .qualified
                     .as_ref()
@@ -1837,7 +1875,13 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            type_check_only: if c.is_type_check_only && !source_type.is_stub() {
+            type_check_only: if c.is_type_check_only
+                && !program_file.file(db).source_type(db).is_stub()
+                && !ctx
+                    .type_checking_block
+                    .as_ref()
+                    .is_some_and(|block| block.is_inside(db, program_file))
+            {
                 Sort::Lower
             } else {
                 Sort::Even

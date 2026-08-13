@@ -41,6 +41,10 @@ use crate::place::{
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
 };
+use crate::place_load::{
+    ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
+    PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
+};
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
@@ -121,7 +125,6 @@ use crate::types::{
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
-use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
@@ -135,10 +138,10 @@ use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
-use ty_python_core::symbol::{ScopedSymbolId, Symbol};
+use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
-    ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, ProgramFile, SemanticIndex,
-    Truthiness, unpack::UnpackPosition,
+    ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness,
+    unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -612,7 +615,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     #[expect(
                         clippy::iter_over_hash_type,
-                        reason = "constraints for distinct collection definitions are merged independently"
+                        reason = "constraints for distinct collection definitions are merged \
+                            independently"
                     )]
                     for (collection_def, constraints) in &extra.collection_use_constraints {
                         self.collection_use_constraints
@@ -1486,7 +1490,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-            let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
+            let value_type = self.try_expression_type(value).unwrap_or_else(|| {
+                self.infer_maybe_standalone_expression(value, TypeContext::default())
+            });
             if let Place::Defined(DefinedPlace {
                 ty,
                 definedness: Definedness::AlwaysDefined,
@@ -1506,9 +1512,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
         ) = node
         {
-            let value_ty = self.infer_expression(value, TypeContext::default());
-            let slice_ty = self.infer_expression(slice, TypeContext::default());
-            Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
+            let value_ty = self.get_or_infer_expression(value, TypeContext::default());
+            let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
+            Some(
+                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
+                    .unwrap_or_else(|recovery_ty| recovery_ty),
+            )
         } else {
             None
         }
@@ -1717,10 +1726,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&INVALID_DECLARATION, node)
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Cannot shadow implicit global attribute `{place}` with declaration of type `{}`",
+                                    "Cannot shadow implicit global attribute `{place}` \
+                                    with declaration of type `{}`",
                                     declared_type.display(db, env)
                                 ));
-                                diagnostic.info(format_args!("The global symbol `{}` must always have a type assignable to `{}`",
+                                diagnostic.info(format_args!(
+                                    "The global symbol `{}` \
+                                    must always have a type assignable to `{}`",
                                     place,
                                     module_type_implicit_declaration.display(db, env)
                                 ));
@@ -1730,11 +1742,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 let declared_type = declared_ty.inner_type();
                 if inferred_ty.is_assignable_to(db, env, declared_type) {
+                    // TODO We currently can't distinguish here between "no declared type" and
+                    // "declared types is `Unknown` (e.g. due to a bad annotation, missing
+                    // import, etc.)". Ideally we would still prefer `Unknown` declared type,
+                    // but use inferred type if there is no declared type.
                     if !should_preserve_inferred_binding_type(inferred_ty)
-                        // TODO We currently can't distinguish here between "no declared type" and
-                        // "declared types is `Unknown` (e.g. due to a bad annotation, missing
-                        // import, etc.)". Ideally we would still prefer `Unknown` declared type,
-                        // but use inferred type if there is no declared type.
                         && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
                         && declared_type.is_assignable_to(db, env, inferred_ty)
                     {
@@ -1888,31 +1900,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         diagnostic::report_undeclared_protocol_attribute(&self.context, target, protocol);
-    }
-
-    /// Returns the implicit `__class__` cell in the current direct method body or
-    /// lazy scope defined directly in a class body.
-    fn dunder_class_cell_type(&self) -> Option<ClassLiteral<'db>> {
-        let current_scope_id = self.scope().file_scope_id(self.db());
-        let class_definition =
-            if let Some(definition) = self.index.class_definition_of_method(current_scope_id) {
-                definition
-            } else {
-                let current_scope = self.index.scope(current_scope_id);
-                if !matches!(
-                    current_scope.node(),
-                    NodeWithScopeKind::Lambda(_) | NodeWithScopeKind::GeneratorExpression(_)
-                ) {
-                    return None;
-                }
-                let class = self
-                    .index
-                    .parent_scope(current_scope_id)?
-                    .node()
-                    .as_class()?;
-                self.index.expect_single_definition(class)
-            };
-        original_class_type(self.db(), class_definition)
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.
@@ -3214,13 +3201,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Subscript(subscript_expr) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
+                    let object_ty =
+                        self.infer_expression(&subscript_expr.value, TypeContext::default());
+                    let mut infer_slice_ty = |builder: &mut Self, tcx| {
+                        builder.infer_expression(&subscript_expr.slice, tcx)
+                    };
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
                         let assigned_ty = infer_assigned_ty(builder, tcx);
                         builder.store_expression_type(target, assigned_ty);
                         assigned_ty
                     };
 
-                    self.validate_subscript_assignment(subscript_expr, value, infer_assigned_ty);
+                    self.validate_subscript_assignment(
+                        subscript_expr,
+                        value,
+                        object_ty,
+                        &mut infer_slice_ty,
+                        infer_assigned_ty,
+                    );
                 }
             }
 
@@ -3926,7 +3924,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
                     {
                         builder.into_diagnostic(format_args!(
-                            "Type parameter `{}` is bound in an outer scope and cannot be used in `type_params`",
+                            "Type parameter `{}` is bound in an outer scope \
+                            and cannot be used in `type_params`",
                             typevar.name(db),
                         ));
                     }
@@ -3972,7 +3971,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         reported_default_order_error = true;
                         builder.into_diagnostic(format_args!(
-                            "Type parameter `{}` without a default cannot follow earlier parameter `{}` with a default",
+                            "Type parameter `{}` without a default \
+                            cannot follow earlier parameter `{}` with a default",
                             typevar.name(db),
                             typevar_with_default.name(db),
                         ));
@@ -4012,7 +4012,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_TYPE_ALIAS_TYPE, &arguments.args[1])
                 {
                     builder.into_diagnostic(format_args!(
-                        "Type parameter `{}` used in the alias value must be included in `type_params`",
+                        "Type parameter `{}` used in the alias value \
+                        must be included in `type_params`",
                         typevar.name(self.db()),
                     ));
                 }
@@ -4081,7 +4082,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
                 {
                     builder.into_diagnostic(format_args!(
-                        "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                        "`{name}.{attr_name}` is only valid \
+                        for annotating `{variadic}` function parameters",
                     ));
                 }
             } else if let ast::Expr::Attribute(attr_expr) = annotation.as_ref()
@@ -4103,7 +4105,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
                     {
                         builder.into_diagnostic(format_args!(
-                            "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                            "`{name}.{attr_name}` is only valid \
+                            for annotating `{variadic}` function parameters",
                         ));
                     }
                 }
@@ -4312,7 +4315,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
                 builder.into_diagnostic(format_args!(
-                    "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                    "`{name}.{attr_name}` is only valid \
+                    for annotating `{variadic}` function parameters",
                 ));
             }
         } else if let ast::Expr::Attribute(attr_expr) = annotation
@@ -4333,7 +4337,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
                     builder.into_diagnostic(format_args!(
-                        "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                        "`{name}.{attr_name}` is only valid \
+                        for annotating `{variadic}` function parameters",
                     ));
                 }
             }
@@ -4590,13 +4595,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(name_expr) = target.as_name_expr()
                     && !name_expr.id.starts_with("__")
                     && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
-                    // Not bare Final (bare Final is allowed on enum members)
-                    && !(declared.qualifiers.contains(TypeQualifiers::FINAL)
-                        && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
-                    // Value type would be an enum member at runtime (exclude callables,
-                    // which are never members)
-                    && !inferred_ty.is_subtype_of(db, env, Type::Callable(CallableType::unknown(self.db()))
-                            .top_materialization(db, env),
+                    && (
+                        // Not bare Final (bare Final is allowed on enum members)
+                        !(declared.qualifiers.contains(TypeQualifiers::FINAL)
+                            && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
+                    )
+                    && (
+                        // Value type would be an enum member at runtime (exclude callables,
+                        // which are never members)
+                        !inferred_ty.is_subtype_of(
+                            db,
+                            env,
+                            Type::Callable(CallableType::unknown(self.db()))
+                                .top_materialization(db, env),
+                        )
                     )
                 {
                     let current_scope_id = self.scope().file_scope_id(self.db());
@@ -4658,23 +4670,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(assignment);
         } else {
             // Non-name assignment targets are inferred as ordinary expressions, not definitions.
-            self.infer_augment_assignment(assignment);
+            if let Ok(result_ty) = self.infer_augment_assignment(assignment) {
+                let target = assignment.target.as_ref();
+                match target {
+                    ast::Expr::Attribute(attribute) => {
+                        let object_ty = self.expression_type(&attribute.value);
+                        self.validate_attribute_assignment(
+                            attribute,
+                            target,
+                            object_ty,
+                            attribute.attr.id(),
+                            &mut |_, _| result_ty,
+                            true,
+                        );
+                    }
+                    ast::Expr::Subscript(subscript) => {
+                        let object_ty = self.expression_type(&subscript.value);
+                        let slice_ty = self.expression_type(&subscript.slice);
+                        self.validate_subscript_assignment(
+                            subscript,
+                            target,
+                            object_ty,
+                            &mut |_, _| slice_ty,
+                            &mut |_, _| result_ty,
+                        );
+                    }
+                    _ => {}
+                }
+            }
 
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
-                let object_ty = self.expression_type(&attr_expr.value);
                 self.report_undeclared_protocol_attribute(attr_expr);
-                self.validate_final_attribute_assignment(attr_expr, object_ty, attr_expr.attr.id());
             }
         }
     }
 
+    /// Infer an augmented operator, returning its recovery type if the operation fails.
     fn infer_augmented_op(
         &mut self,
         assignment: &ast::StmtAugAssign,
         target_type: Type<'db>,
         value_expr: &ast::Expr,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
@@ -4685,7 +4723,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binary_return_ty = |builder: &mut Self, value_ty| {
             builder
                 .infer_binary_expression_type(assignment.into(), false, target_type, value_ty, op)
-                .unwrap_or_else(|| {
+                .ok_or_else(|| {
                     report_unsupported_augmented_assignment(
                         &builder.context,
                         assignment,
@@ -4704,14 +4742,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // equally applicable type contexts for each union member.
                 infer_value_ty.infer_loud(self, TypeContext::default());
 
-                union.map(db, env, |&elem_type| {
-                    self.infer_augmented_op(
+                let mut operation_failed = false;
+                let result_ty = union.map(db, env, |&elem_type| {
+                    match self.infer_augmented_op(
                         assignment,
                         elem_type,
                         value_expr,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
-                    )
-                })
+                    ) {
+                        Ok(ty) => ty,
+                        Err(recovery_ty) => {
+                            operation_failed = true;
+                            recovery_ty
+                        }
+                    }
+                });
+
+                if operation_failed {
+                    Err(result_ty)
+                } else {
+                    Ok(result_ty)
+                }
             }
 
             _ => {
@@ -4723,7 +4774,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         infer_value_ty,
                     )
                 {
-                    return typed_dict_update_ty;
+                    return Ok(typed_dict_update_ty);
                 }
 
                 let ast_arguments = [ArgOrKeyword::Arg(value_expr)];
@@ -4739,7 +4790,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     TypeContext::default(),
                 );
                 match call {
-                    Ok(outcome) => outcome.return_type(db, env),
+                    Ok(outcome) => Ok(outcome.return_type(db, env)),
                     Err(CallDunderError::MethodNotAvailable) => {
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty)
@@ -4748,12 +4799,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         bindings: outcome, ..
                     }) => {
                         let value_ty = outcome.type_for_argument(&call_arguments, 0);
-                        UnionType::from_two_elements(
-                            db,
-                            env,
-                            outcome.return_type(db, env),
-                            binary_return_ty(self, value_ty),
-                        )
+                        match binary_return_ty(self, value_ty) {
+                            Ok(binary_ty) => Ok(UnionType::from_two_elements(
+                                db,
+                                env,
+                                outcome.return_type(db, env),
+                                binary_ty,
+                            )),
+                            Err(recovery_ty) => Err(UnionType::from_two_elements(
+                                db,
+                                env,
+                                outcome.return_type(db, env),
+                                recovery_ty,
+                            )),
+                        }
                     }
                     Err(CallDunderError::CallError(_, bindings, _)) => {
                         let value_ty = bindings.type_for_argument(&call_arguments, 0);
@@ -4763,7 +4822,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             target_type,
                             value_ty,
                         );
-                        bindings.return_type(db, env)
+                        Err(bindings.return_type(db, env))
                     }
                 }
             }
@@ -4775,12 +4834,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'ast ast::StmtAugAssign,
         definition: Definition<'db>,
     ) {
-        let target_ty = self.infer_augment_assignment(assignment);
-        self.add_binding(assignment.into(), definition)
+        let target_ty = self
+            .infer_augment_assignment(assignment)
+            .unwrap_or_else(|recovery_ty| recovery_ty);
+        self.add_binding(assignment.target.as_ref().into(), definition)
             .insert(self, target_ty);
     }
 
-    fn infer_augment_assignment(&mut self, assignment: &ast::StmtAugAssign) -> Type<'db> {
+    fn infer_augment_assignment(
+        &mut self,
+        assignment: &ast::StmtAugAssign,
+    ) -> Result<Type<'db>, Type<'db>> {
         let ast::StmtAugAssign {
             range: _,
             node_index: _,
@@ -4790,28 +4854,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         // Resolve the target type, assuming a load context.
-        let target_type = match &**target {
+        let target_result = match &**target {
             ast::Expr::Name(name) => {
                 let previous_value = self.infer_name_load(name);
                 self.store_expression_type(target, previous_value);
-                previous_value
+                Ok(previous_value)
             }
             ast::Expr::Attribute(attr) => {
-                let previous_value = self.infer_attribute_load(attr);
+                let result = self.infer_attribute_load(attr);
+                let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
                 self.store_expression_type(target, previous_value);
-                previous_value
+                result
             }
             ast::Expr::Subscript(subscript) => {
-                let previous_value = self.infer_subscript_load(subscript);
+                let result = self.infer_subscript_load(subscript);
+                let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
                 self.store_expression_type(target, previous_value);
-                previous_value
+                result
             }
-            _ => self.infer_expression(target, TypeContext::default()),
+            _ => Ok(self.infer_expression(target, TypeContext::default())),
         };
 
-        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-            builder.infer_expression(value, tcx)
-        })
+        let target_type = target_result.unwrap_or_else(|recovery_ty| recovery_ty);
+        let operation_result =
+            self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+                builder.infer_expression(value, tcx)
+            });
+
+        match (target_result, operation_result) {
+            (Ok(_), Ok(result_ty)) => Ok(result_ty),
+            (_, Ok(recovery_ty) | Err(recovery_ty)) => Err(recovery_ty),
+        }
     }
 
     fn infer_dict_key_assignment_definition(
@@ -5114,7 +5187,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diag.set_primary_annotation_message(format_args!(
                 "`{name}` has no declarations or bindings in the global scope"
             ));
-            diag.info("This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols");
+            diag.info(
+                "This limits ty's ability to make accurate inferences \
+                about the boundness and types of global-scope symbols",
+            );
             diag.info(format_args!(
                 "Consider adding a declaration to the global scope, e.g. `{name}: int`"
             ));
@@ -6071,7 +6147,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_expression(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
         debug_assert!(
             !self.index.is_standalone_expression(expression),
-            "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
+            "Calling `self.infer_expression` on a standalone-expression \
+            is not allowed because it can lead to double-inference. \
+            Use `self.infer_standalone_expression` instead."
         );
 
         self.infer_expression_impl(expression, tcx)
@@ -8094,7 +8172,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         for expr in ifs {
-            self.infer_maybe_standalone_expression(expr, TypeContext::default());
+            let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
+
+            if let Err(err) = test_ty.try_bool(db, env) {
+                err.report_diagnostic(&self.context, expr);
+            }
         }
     }
 
@@ -8270,12 +8352,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let in_stub = self.in_stub();
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
 
+        // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
+        // in the union/intersection.
         let callable_tcx = if let Some(tcx) = tcx.annotation
-            // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
-            // in the union/intersection.
-            && let Some(callable) = tcx
-                .filter_union(db, Type::is_callable_type)
-                .as_callable()
+            && let Some(callable) = tcx.filter_union(db, Type::is_callable_type).as_callable()
         {
             match callable.signatures(self.db()).overloads.as_slice() {
                 [signature] => Some(signature),
@@ -8848,13 +8928,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Type::TypedDict(typed_dict_ty) = value_type
                 && matches!(method_name, "get" | "pop" | "setdefault")
                 && !arguments.args.is_empty()
-
-                // Validate the key argument for `TypedDict` methods
-                && let Some(first_arg) = arguments.args.first()
+                && let Some(first_arg) = (
+                    // Validate the key argument for `TypedDict` methods
+                    arguments.args.first()
+                )
                 && let Some(key) = (match first_arg {
                     ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: key_literal,
-                        ..
+                        value: key_literal, ..
                     }) => Some(key_literal.to_str()),
                     _ => self
                         .speculate_without_diagnostics()
@@ -8919,7 +8999,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&INVALID_ARGUMENT_TYPE, first_arg)
                             {
                                 builder.into_diagnostic(format_args!(
-                                    "Cannot {action} read-only extra item \"{key}\" {preposition} TypedDict `{}`",
+                                    "Cannot {action} read-only extra item \
+                                    \"{key}\" {preposition} TypedDict `{}`",
                                     Type::TypedDict(typed_dict_ty).display(db, env),
                                 ));
                             }
@@ -9013,7 +9094,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .report_lint(&INEFFECTIVE_FINAL, call_expression)
                 {
                     let mut diagnostic = builder.into_diagnostic(
-                        "Type checkers will not prevent subclassing when `final()` is called as a function",
+                        "Type checkers will not prevent subclassing \
+                        when `final()` is called as a function",
                     );
                     diagnostic.info("Use `@final` as a decorator on a class or method instead");
                 }
@@ -9221,6 +9303,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let collection_generic_context = collection_literal.generic_context(db);
                 let mut identity_bindings = self
                     .infer_attribute_load_impl(attribute, identity_instance)
+                    .unwrap_or_else(|recovery_ty| recovery_ty)
                     .bindings(db, env)
                     .match_parameters(db, env, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
@@ -9666,531 +9749,234 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         let db = self.db();
-        let ast::ExprName {
-            range: _,
-            node_index: _,
-            id: symbol_name,
-            ctx: _,
-        } = name_node;
         let expr = PlaceExpr::from_expr_name(name_node);
 
-        let (resolved, constraint_keys) =
-            self.infer_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
+        let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node));
         let env = self.program_environment();
 
-        let resolved_after_fallback = resolved
-            // Not found in the module's explicitly declared global symbols?
-            // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
-            // These are looked up as attributes on `types.ModuleType`.
-            .or_fall_back_to(db, env, || {
-                module_type_implicit_global_symbol(db, self.program_file(), symbol_name).map_type(
-                    |ty| {
-                        self.narrow_place_with_applicable_constraints(
-                            PlaceExprRef::from(&expr),
-                            ty,
-                            &constraint_keys,
-                        )
-                    },
-                )
-            })
-            // Not found in globals? Fallback to builtins
-            // (without infinite recursion if we're already in builtins.)
-            .or_fall_back_to(db, env, || {
-                if Some(self.scope()) == builtins_module_scope(db, env) {
-                    Place::Undefined.into()
-                } else {
-                    implicit_builtins_symbol(db, env, symbol_name)
-                }
-            })
-            // Still not found? It might be `reveal_type`...
-            .or_fall_back_to(db, env, || {
-                if symbol_name == "reveal_type" {
-                    if !self.in_stub()
-                        && !self.is_in_type_checking_block(self.scope(), name_node)
-                        && let Some(builder) =
-                            self.context.report_lint(&UNDEFINED_REVEAL, name_node)
-                    {
-                        let mut diag =
-                            builder.into_diagnostic("`reveal_type` used without importing it");
-                        diag.info(
-                            "This is allowed for debugging convenience but will fail at runtime",
-                        );
-                    }
-                    typing_extensions_symbol(db, env, symbol_name)
-                } else {
-                    Place::Undefined.into()
-                }
-            });
-
-        let ty = resolved_after_fallback.unwrap_with_diagnostic(db, env, |lookup_error| {
-            match lookup_error {
-                LookupError::Undefined(qualifiers) => {
-                    self.report_unresolved_reference(name_node);
-                    TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
-                }
-                LookupError::PossiblyUndefined(type_when_bound) => {
-                    report_possibly_unresolved_reference(&self.context, name_node);
-                    type_when_bound
-                }
+        let ty = resolved.unwrap_with_diagnostic(db, env, |lookup_error| match lookup_error {
+            LookupError::Undefined(qualifiers) => {
+                self.report_unresolved_reference(name_node);
+                TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
+            }
+            LookupError::PossiblyUndefined(type_when_bound) => {
+                report_possibly_unresolved_reference(&self.context, name_node);
+                type_when_bound
             }
         });
 
         ty.inner_type()
     }
 
-    fn infer_local_place_load(
-        &self,
-        expr: PlaceExprRef,
-        expr_ref: ast::ExprRef,
-    ) -> (Place<'db>, Option<ScopedUseId>) {
-        let env = self.program_environment();
-        let db = self.db();
-        let scope = self.scope();
-        let file_scope_id = scope.file_scope_id(db);
-        let place_table = self.index.place_table(file_scope_id);
-        let use_def = self.index.use_def_map(file_scope_id);
-
-        // If we're inferring types of deferred expressions, look them up from end-of-scope.
-        if self.is_deferred() {
-            let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings_with_reachability_cache(
-                    db,
-                    env,
-                    use_def.reachable_bindings(place_id),
-                    self.reachability_cache(),
-                )
-                .place
-            } else {
-                assert!(
-                    self.in_string_annotation(),
-                    "Expected the place table to create a place for every valid PlaceExpr node"
-                );
-                Place::Undefined
-            };
-            (place, None)
-        } else {
-            if expr_ref
-                .as_name_expr()
-                .is_some_and(|name| name.is_invalid())
-            {
-                return (Place::Undefined, None);
-            }
-
-            // A named expression can show up here when resolving the parent place of something
-            // like `(foo := bar()).baz`. It binds `foo`, but it is not a normal load site and
-            // therefore has no `ScopedUseId`, so resolve it from its binding definition instead.
-            if let ast::ExprRef::Named(named) = expr_ref {
-                let place = if named.target.is_name_expr() {
-                    let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(self.db(), definition)).with_definition(definition)
-                } else {
-                    Place::Undefined
-                };
-                return (place, None);
-            }
-
-            let use_id = expr_ref.scoped_use_id(db, self.program_file());
-            let place = place_from_bindings_with_reachability_cache(
-                db,
-                env,
-                use_def.bindings_at_use(use_id),
-                self.reachability_cache(),
-            )
-            .place;
-
-            (place, Some(use_id))
-        }
-    }
-
-    /// Resolve a load that has fallen through to the module's explicit global scope.
+    /// Infer the type of a place expression from its ordered load sources.
     ///
-    /// For eager nested scopes, this uses the global enclosing snapshot instead of the completed
-    /// module scope, so a class body cannot see a class name that is bound only after the body
-    /// finishes:
-    ///
-    /// ```python
-    /// class A:
-    ///     A = A
-    /// ```
-    ///
-    /// `symbol_name` is only needed when no snapshot is available: snapshots can resolve complex
-    /// places like `a.x`, but the fallback global query only works for bare symbols. `assume_bound`
-    /// preserves the class-body fallback behavior for names that are also local to the class body.
-    fn infer_explicit_global_symbol_load(
-        &self,
-        place_expr: PlaceExprRef,
-        symbol_name: Option<&str>,
-        current_scope_id: FileScopeId,
-        constraint_keys: &mut Vec<(FileScopeId, ConstraintKey)>,
-        assume_bound: bool,
-    ) -> PlaceAndQualifiers<'db> {
-        let db = self.db();
-        if current_scope_id.is_global() {
-            return Place::Undefined.into();
-        }
-
-        if !self.is_deferred() {
-            match self
-                .index
-                .enclosing_snapshot(FileScopeId::global(), place_expr, current_scope_id)
-            {
-                EnclosingSnapshotResult::FoundConstraint(constraint) => {
-                    constraint_keys.push((
-                        FileScopeId::global(),
-                        ConstraintKey::NarrowingConstraint(constraint),
-                    ));
-                    // Reaching here means that no bindings are found in any scope.
-                    // Since `explicit_global_symbol` may return a cycle initial value, we return `Place::Undefined` here.
-                    return Place::Undefined.into();
-                }
-                EnclosingSnapshotResult::FoundBindings(bindings) => {
-                    let mut place_and_qualifiers = place_from_bindings_with_reachability_cache(
-                        db,
-                        self.program_environment(),
-                        bindings,
-                        self.reachability_cache(),
-                    );
-                    if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
-                        place_and_qualifiers.place =
-                            Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
-                    }
-                    let place = place_and_qualifiers.place.map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(
-                            place_expr,
-                            ty,
-                            constraint_keys,
-                        )
-                    });
-                    constraint_keys.push((
-                        FileScopeId::global(),
-                        ConstraintKey::NestedScope(current_scope_id),
-                    ));
-                    return place.into();
-                }
-                // There are no visible bindings / constraint here.
-                EnclosingSnapshotResult::NotFound => {
-                    return Place::Undefined.into();
-                }
-                EnclosingSnapshotResult::NoLongerInEagerContext => {}
-            }
-        }
-
-        let Some(symbol_name) = symbol_name else {
-            return Place::Undefined.into();
-        };
-
-        explicit_global_symbol(self.db(), self.program_file(), symbol_name).map_type(|ty| {
-            self.narrow_place_with_applicable_constraints(place_expr, ty, constraint_keys)
-        })
-    }
-
-    /// Infer the type of a place expression from definitions, assuming a load context.
-    /// This method also returns the [`ConstraintKey`]s for each scope associated with `expr`,
-    /// which is used to narrow by condition rather than by assignment.
+    /// This also returns the [`ConstraintKey`]s used by expression-level narrowing.
     fn infer_place_load(
         &self,
-        place_expr: PlaceExprRef,
+        place_expr: PlaceExpr,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let env = self.program_environment();
-        let db = self.db();
-        let scope = self.scope();
-        let file_scope_id = scope.file_scope_id(db);
-        let place_table = self.index.place_table(file_scope_id);
+        let mode = if self.is_deferred() && self.in_string_annotation() {
+            PlaceLoadMode::StringAnnotation
+        } else if self.is_deferred() {
+            PlaceLoadMode::Deferred
+        } else {
+            PlaceLoadMode::AtExpression(expr_ref)
+        };
+        let mut resolution =
+            resolve_place_load(self.db(), self.index, self.scope(), place_expr, mode);
+        let mut place = PlaceAndQualifiers::from(Place::Undefined);
+        let mut failure = None;
+        let mut checked_deprecated = false;
 
-        let mut constraint_keys = vec![];
-        let (local_scope_place, use_id) = self.infer_local_place_load(place_expr, expr_ref);
-        if let Some(use_id) = use_id {
-            constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
+        while let Some(step) = resolution.next() {
+            match step {
+                PlaceLoadResolutionStep::Source(source) => {
+                    if !checked_deprecated && source.is_post_lexical() {
+                        // Deprecation diagnostics apply to the result of lexical name resolution,
+                        // before it is combined with implicit module globals or builtins. Hence, we
+                        // check for deprecation here when the first post-lexical source is yielded.
+                        // If resolution stops before this, then the check after the resolution loop
+                        // handles the final lexical result instead.
+                        if let Some(ty) = place.place.ignore_possibly_undefined() {
+                            self.check_deprecated(expr_ref, ty);
+                        }
+                        checked_deprecated = true;
+                    }
+                    let narrowing_constraints = resolution.narrowing_constraints_for(&source);
+                    place = place.or_fall_back_to(self.db(), env, || {
+                        self.infer_place_load_source(
+                            resolution.place_expr(),
+                            source,
+                            narrowing_constraints,
+                        )
+                    });
+                    if place.place.is_definitely_bound() {
+                        break;
+                    }
+                }
+                PlaceLoadResolutionStep::MemberResolutionCondition(prefix_loads) => {
+                    if self.has_bound_place_expr_prefix(&prefix_loads) {
+                        failure = Some(PlaceLoadFailure::NotFound);
+                        break;
+                    }
+                }
+                PlaceLoadResolutionStep::Exhausted(exhaustion_failure) => {
+                    failure = Some(exhaustion_failure);
+                    break;
+                }
+            }
         }
 
-        let fallback = || {
-            let mut symbol_resolves_locally = false;
-            if let Some(symbol) = place_expr.as_symbol()
-                && let Some(symbol_id) = place_table.symbol_id(symbol.name())
-            {
-                // Footgun: `place_expr` and `symbol` were probably constructed with all-zero
-                // flags. We need to read the place table to get correct flags.
-                symbol_resolves_locally = place_table.symbol(symbol_id).is_local();
-                // If we try to access a variable in a class before it has been defined, the
-                // lookup will fall back to global. See the comment on `Symbol::is_local`.
-                let fallback_to_global =
-                    scope.node(db).scope_kind().is_class() && symbol_resolves_locally;
-                if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
-                    return self.infer_explicit_global_symbol_load(
-                        place_expr,
-                        Some(symbol.name()),
-                        file_scope_id,
-                        &mut constraint_keys,
-                        fallback_to_global,
-                    );
-                }
-            }
-
-            // Symbols that are bound or declared in the local scope, and not marked `nonlocal` or
-            // `global`, never refer to an enclosing scope. (If you reference such a symbol before
-            // it's bound, you get an `UnboundLocalError`.) Short-circuit instead of walking
-            // enclosing scopes in this case. The one exception to this rule is the global fallback
-            // in class bodies, which we already handled above.
-            if symbol_resolves_locally {
-                return Place::Undefined.into();
-            }
-
-            if let PlaceExprRef::Symbol(symbol) = place_expr
-                && symbol.name() == "__class__"
-                && let Some(class) = self.dunder_class_cell_type()
-            {
-                return Place::bound(class).into();
-            }
-
-            for parent_id in place_table.parents(place_expr) {
-                let parent_expr = place_table.place(parent_id);
-                let mut expr_ref = expr_ref;
-                for _ in 0..(place_expr.num_member_segments() - parent_expr.num_member_segments()) {
-                    match expr_ref {
-                        ast::ExprRef::Attribute(attribute) => {
-                            expr_ref = ast::ExprRef::from(&attribute.value);
-                        }
-                        ast::ExprRef::Subscript(subscript) => {
-                            expr_ref = ast::ExprRef::from(&subscript.value);
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                let (parent_place, _use_id) = self.infer_local_place_load(parent_expr, expr_ref);
-                if let Place::Defined(_) = parent_place {
-                    return Place::Undefined.into();
-                }
-            }
-
-            // Walk enclosing scopes to resolve a free-variable load (`LOAD_DEREF` at runtime).
-            // There are two main ways we try to model these loads:
-            //
-            // 1. "Snapshots" record the bindings/constraints in the enclosing scope at the point
-            //    just before a nested scope begins. For variables that aren't modified after that
-            //    point, that's the only value that the nested scope can see. If a variable is
-            //    reassigned later, lazy snapshots for that variable can be updated or swept.
-            //
-            // 2. Otherwise, we keep walking until we get to the variable's original defining
-            //    scope, and we use its "public type" there, which respects all reachable bindings,
-            //    not just end-of-scope bindings. That includes the synthetic `NestedBindings`
-            //    definitions that we install after each nested scope is closed, so it has
-            //    a complete view of the nested `global` and `nonlocal` writes beneath it.
-            //
-            // This walk only resolves free variables and explicit `nonlocal`s. A symbol that is
-            // local to the current scope never falls back to an enclosing scope, even if it's only
-            // possibly bound at the current use: Python would raise `UnboundLocalError` instead.
-            //
-            // Note that we only get to this walk via `or_fall_back_to` above. In other words, for
-            // definitely-locally-bound variables, we defer to the current scope's bindings instead
-            // of looking at enclosing scopes. Concretely:
-            //
-            // def f():
-            //     x = None
-            //
-            //     def g():
-            //         nonlocal x
-            //         if flag:
-            //             x = 42
-            //
-            //         # `x` is possibly unbound here, so we walk enclosing scopes and see the
-            //         # public type in `f`.
-            //         reveal_type(x)  # revealed: Literal[42, 99] | None
-            //
-            //         x = 99
-            //         # But now `x` is definitely bound, so we don't do the walk.
-            //         reveal_type(x)  # revealed: Literal[99]
-            //
-            // Importantly, this approach isn't generally sound. The public type could include
-            // nested bindings from sibling scopes, which really could run at any time, and in some
-            // cases we're being too deferential to local bindings. Unfortunately the fully sound
-            // treatment would reveal `Literal[42, 99] | None` even immediately after `x = 99`,
-            // which is too frustrating for users in practice.
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
-                // If the current enclosing scope is global, no place lookup is performed here,
-                // instead falling back to the module's explicit global lookup below.
-                if enclosing_scope_file_id.is_global() {
-                    break;
-                }
-
-                // Class scopes are not visible to nested scopes, and we need to handle global
-                // scope differently (because an unbound name there falls back to builtins), so
-                // check only function-like scopes.
-                // There is one exception to this rule: annotation scopes can see
-                // names defined in an immediately-enclosing class scope.
-                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
-
-                let is_immediately_enclosing_scope = scope.is_annotation(db)
-                    && scope
-                        .scope(db)
-                        .parent()
-                        .is_some_and(|parent| parent == enclosing_scope_file_id);
-
-                let has_root_place_been_reassigned = || {
-                    let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                    enclosing_place_table
-                        .parents(place_expr)
-                        .any(|enclosing_root_place_id| {
-                            enclosing_place_table
-                                .place(enclosing_root_place_id)
-                                .is_bound()
-                        })
-                };
-
-                // If the reference is in a nested eager scope, we need to look for the place at
-                // the point where the previous enclosing scope was defined, instead of at the end
-                // of the scope. (Note that the semantic index builder takes care of only
-                // registering eager bindings for nested scopes that are actually eager, and for
-                // enclosing scopes that actually contain bindings that we should use when
-                // resolving the reference.)
-                let mut eagerly_resolved_place = None;
-                if !self.is_deferred() {
-                    match self.index.enclosing_snapshot(
-                        enclosing_scope_file_id,
-                        place_expr,
-                        file_scope_id,
-                    ) {
-                        EnclosingSnapshotResult::FoundConstraint(constraint) => {
-                            constraint_keys.push((
-                                enclosing_scope_file_id,
-                                ConstraintKey::NarrowingConstraint(constraint),
-                            ));
-                            // If the current scope is eager, it is certain that the place is undefined in the current scope.
-                            // Do not call the `place` query below as a fallback.
-                            if scope.scope(db).is_eager() {
-                                eagerly_resolved_place = Some(Place::Undefined.into());
-                            }
-                        }
-                        EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings_with_reachability_cache(
-                                db,
-                                env,
-                                bindings,
-                                self.reachability_cache(),
-                            )
-                            .place
-                            .map_type(|ty| {
-                                self.narrow_place_with_applicable_constraints(
-                                    place_expr,
-                                    ty,
-                                    &constraint_keys,
-                                )
-                            });
-                            constraint_keys.push((
-                                enclosing_scope_file_id,
-                                ConstraintKey::NestedScope(file_scope_id),
-                            ));
-                            return place.into();
-                        }
-                        // There are no visible bindings / constraint here.
-                        // Don't fall back to non-eager place resolution.
-                        EnclosingSnapshotResult::NotFound => {
-                            if has_root_place_been_reassigned() {
-                                return Place::Undefined.into();
-                            }
-                            continue;
-                        }
-                        EnclosingSnapshotResult::NoLongerInEagerContext => {
-                            if has_root_place_been_reassigned() {
-                                return Place::Undefined.into();
-                            }
-                        }
-                    }
-                }
-
-                if !enclosing_scope.kind().is_function_like() && !is_immediately_enclosing_scope {
-                    continue;
-                }
-
-                let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                let Some(enclosing_place_id) = enclosing_place_table.place_id(place_expr) else {
-                    continue;
-                };
-
-                let enclosing_place = enclosing_place_table.place(enclosing_place_id);
-
-                // Reads of "free" or `nonlocal` variables terminate at any enclosing scope that
-                // marks the variable `global`, whether or not that scope actually binds the
-                // variable. If we see a `global` declaration, stop walking scopes and proceed to
-                // the global handling below. (If we're walking from a prior/inner scope where this
-                // variable is `nonlocal`, then this is a semantic syntax error, but we don't
-                // enforce that here. See `SemanticIndexBuilder::pop_scope`.)
-                if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
-                    break;
-                }
-
-                // Keep walking until we reach the defining scope of the variable. The synthetic
-                // nested bindings definitions installed there will see everything below it.
-                if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
-                    continue;
-                }
-                if !(enclosing_place.is_bound() || enclosing_place.is_declared()) {
-                    // Note that this check includes members like `x.y` and `x[0]`, which aren't
-                    // symbols and can't be explicitly `nonlocal`.
-                    continue;
-                }
-
-                // We've reached the defining scope of the variable. Infer its public type.
-                debug_assert!(enclosing_place.is_bound() || enclosing_place.is_declared());
-                let enclosing_scope_id =
-                    enclosing_scope_file_id.to_scope_id(db, self.program_file());
-                return eagerly_resolved_place.unwrap_or_else(|| {
-                    place_by_id(
-                        self.db(),
-                        enclosing_scope_id,
-                        enclosing_place_id,
-                        RequiresExplicitReExport::No,
-                        ConsideredDefinitions::AllReachable,
-                    )
-                    .map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(
-                            place_expr,
-                            ty,
-                            &constraint_keys,
-                        )
-                    })
-                });
-            }
-
-            PlaceAndQualifiers::default()
-                // If we're in a class body, check for implicit class body symbols first.
-                // These take precedence over globals.
-                .or_fall_back_to(db, env, || {
-                    if scope.node(db).scope_kind().is_class()
-                        && let Some(symbol) = place_expr.as_symbol()
-                    {
-                        let implicit = class_body_implicit_symbol(db, env, symbol.name());
-                        if implicit.place.is_definitely_bound() {
-                            return implicit.map_type(|ty| {
-                                self.narrow_place_with_applicable_constraints(
-                                    place_expr,
-                                    ty,
-                                    &constraint_keys,
-                                )
-                            });
-                        }
-                    }
-                    Place::Undefined.into()
-                })
-                // No nonlocal binding? Check the module's explicit globals.
-                // Avoid infinite recursion if `self.scope` already is the module's global scope.
-                .or_fall_back_to(db, env, || {
-                    self.infer_explicit_global_symbol_load(
-                        place_expr,
-                        place_expr.as_symbol().map(|symbol| symbol.name().as_str()),
-                        file_scope_id,
-                        &mut constraint_keys,
-                        false,
-                    )
-                })
-        };
-        let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, env, fallback);
-
-        if let Some(ty) = place.place.ignore_possibly_undefined() {
+        if !checked_deprecated && let Some(ty) = place.place.ignore_possibly_undefined() {
             self.check_deprecated(expr_ref, ty);
         }
 
+        let place = if failure == Some(PlaceLoadFailure::NotFound) {
+            place.or_fall_back_to(self.db(), env, || {
+                self.infer_unimported_reveal_type_fallback(expr_ref)
+            })
+        } else {
+            place
+        };
+
+        let constraint_keys = resolution.into_constraints();
+
         (place, constraint_keys)
+    }
+
+    fn infer_place_load_source(
+        &self,
+        place_expr: PlaceExprRef,
+        source: PlaceLoadSource<'db>,
+        narrowing_constraints: &[(FileScopeId, ConstraintKey)],
+    ) -> PlaceAndQualifiers<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        let is_class_body_global_fallback = source.is_class_body_global_fallback();
+
+        let place = match source.kind {
+            PlaceLoadSourceKind::Bindings(bindings) => {
+                let mut place = place_from_bindings_with_reachability_cache(
+                    db,
+                    env,
+                    bindings,
+                    self.reachability_cache(),
+                )
+                .place;
+
+                // Compatibility policy: ty historically treats a possibly-bound module snapshot
+                // reached through a class-body global fallback as definitely bound. At runtime,
+                // an unbound snapshot would continue to builtins or produce a name error.
+                if is_class_body_global_fallback && let Place::Defined(defined) = place {
+                    place = Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
+                }
+
+                place.into()
+            }
+            PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => place_by_id(
+                db,
+                scope,
+                id,
+                RequiresExplicitReExport::No,
+                ConsideredDefinitions::AllReachable,
+            ),
+            PlaceLoadSourceKind::Implicit(implicit) => match implicit {
+                ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
+                    .map_or_else(
+                        || Place::Undefined.into(),
+                        |class| Place::bound(class).into(),
+                    ),
+                ImplicitPlaceLoad::ClassBodySymbol(name) => {
+                    let implicit = class_body_implicit_symbol(db, env, &name);
+                    if implicit.place.is_definitely_bound() {
+                        implicit
+                    } else {
+                        Place::Undefined.into()
+                    }
+                }
+                ImplicitPlaceLoad::ExplicitGlobalSymbol { file, name } => {
+                    explicit_global_symbol(db, file, &name)
+                }
+                ImplicitPlaceLoad::ModuleImplicitGlobal { file, name } => {
+                    module_type_implicit_global_symbol(db, file, &name)
+                }
+                ImplicitPlaceLoad::Builtin(name) => {
+                    if Some(self.scope()) == builtins_module_scope(db, env) {
+                        Place::Undefined.into()
+                    } else {
+                        implicit_builtins_symbol(db, env, &name)
+                    }
+                }
+            },
+        };
+
+        if narrowing_constraints.is_empty() {
+            place
+        } else {
+            place.map_type(|ty| {
+                self.narrow_place_with_applicable_constraints(place_expr, ty, narrowing_constraints)
+            })
+        }
+    }
+
+    /// Applies ty's convenience fallback for an unimported `reveal_type`.
+    fn infer_unimported_reveal_type_fallback(
+        &self,
+        expr_ref: ast::ExprRef,
+    ) -> PlaceAndQualifiers<'db> {
+        let Some(name) = expr_ref
+            .as_name_expr()
+            .filter(|name| name.id == "reveal_type")
+        else {
+            return Place::Undefined.into();
+        };
+
+        if !self.in_stub()
+            && !self.is_in_type_checking_block(self.scope(), name)
+            && let Some(builder) = self.context.report_lint(&UNDEFINED_REVEAL, name)
+        {
+            let mut diag = builder.into_diagnostic("`reveal_type` used without importing it");
+            diag.info("This is allowed for debugging convenience but will fail at runtime");
+        }
+
+        typing_extensions_symbol(self.db(), self.program_environment(), "reveal_type")
+    }
+
+    /// Returns whether any tracked place-expression prefix has a definite or possible binding in
+    /// this scope.
+    fn has_bound_place_expr_prefix(&self, prefix_loads: &PlaceExprPrefixLoads<'db>) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+        let file_scope_id = prefix_loads.scope().file_scope_id(db);
+        let use_def = self.index.use_def_map(file_scope_id);
+
+        prefix_loads.iter().any(|prefix| {
+            let place = match prefix {
+                PlaceExprPrefixLoad::AtUse(use_id) => {
+                    place_from_bindings_with_reachability_cache(
+                        db,
+                        env,
+                        use_def.bindings_at_use(use_id),
+                        self.reachability_cache(),
+                    )
+                    .place
+                }
+                PlaceExprPrefixLoad::AllReachable(place_id) => {
+                    place_from_bindings_with_reachability_cache(
+                        db,
+                        env,
+                        use_def.reachable_bindings(place_id),
+                        self.reachability_cache(),
+                    )
+                    .place
+                }
+                PlaceExprPrefixLoad::DefinitelyBound => return true,
+            };
+
+            !place.is_undefined()
+        })
     }
 
     fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
@@ -10314,19 +10100,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
-    fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
+    /// Infer an attribute load, returning its recovery type if lookup fails.
+    fn infer_attribute_load(
+        &mut self,
+        attribute: &ast::ExprAttribute,
+    ) -> Result<Type<'db>, Type<'db>> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
-    /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
+    /// Infer an attribute load on a known receiver, returning its recovery type if lookup fails.
     fn infer_attribute_load_impl(
         &mut self,
         attribute: &ast::ExprAttribute,
         mut value_type: Type<'db>,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         fn union_elements_missing_attribute<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -10364,10 +10153,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut assigned_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
-            let (resolved, keys) = self.infer_place_load(
-                PlaceExprRef::from(&place_expr),
-                ast::ExprRef::Attribute(attribute),
-            );
+            let (resolved, keys) =
+                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
             constraint_keys.extend(keys);
             if let Place::Defined(DefinedPlace {
                 ty,
@@ -10389,8 +10176,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         let attr_name = &attr.id;
-        let resolved_type =
-            fallback_place.unwrap_with_diagnostic(db, env, |lookup_err| match lookup_err {
+        let lookup_result = fallback_place.into_lookup_result(db, env);
+        let resolved_type = lookup_result.unwrap_or_else(|lookup_err| {
+            match lookup_err {
                 LookupError::Undefined(_) => {
                     let fallback = || {
                         TypeAndQualifiers::new(
@@ -10402,16 +10190,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let bound_on_instance = match value_type {
                         Type::ClassLiteral(class) => {
-                            !class
-                                .instance_member(db, env, None, attr)
-                                .is_undefined()
+                            !class.instance_member(db, env, None, attr).is_undefined()
                         }
                         Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                             match subclass_of.subclass_of() {
                                 SubclassOfInner::Class(class) => {
-                                    !class
-                                        .instance_member(db, env, attr)
-                                        .is_undefined()
+                                    !class.instance_member(db, env, attr).is_undefined()
                                 }
                                 SubclassOfInner::Dynamic(_) => unreachable!(
                                     "Attribute lookup on a dynamic `SubclassOf` type \
@@ -10465,14 +10249,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let mut diag = builder.into_diagnostic(format_args!(
                                 "Special form `{special_form}` has no attribute `{attr_name}`",
                             ));
-                            if let Ok(defined_type) = value_type.in_type_expression(db,
+                            if let Ok(defined_type) = value_type.in_type_expression(
+                                db,
                                 self.scope(),
                                 self.typevar_binding_context,
-                                self.inference_flags()
-                            ) && !defined_type
-                                .member(db, env, attr_name)
-                                .place
-                                .is_undefined()
+                                self.inference_flags(),
+                            ) && !defined_type.member(db, env, attr_name).place.is_undefined()
                             {
                                 diag.help(format_args!(
                                     "Objects with type `{ty}` have a{maybe_n} `{attr_name}` \
@@ -10608,7 +10390,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut elements_missing_the_attribute = FxIndexSet::default();
                         for element in union.elements(db) {
                             union_elements_missing_attribute(
-                                db, env,
+                                db,
+                                env,
                                 *element,
                                 attr_name,
                                 &mut elements_missing_the_attribute,
@@ -10621,17 +10404,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 let missing_types = elements_missing_the_attribute
                                     .iter()
-                                    .map(|ty| {
-                                        format!("`{}`", ty.display(db, env))
-                                    })
+                                    .map(|ty| format!("`{}`", ty.display(db, env)))
                                     .collect::<Vec<_>>()
                                     .join(", ");
 
                                 builder.into_diagnostic(format_args!(
-                                    "Attribute `{attr_name}` is not defined on {} in union `{union_like_type}`",
+                                    "Attribute `{attr_name}` is not defined on {} \
+                                    in union `{union_like_type}`",
                                     missing_types,
-                                    union_like_type =
-                                        union_like_type.display(db, env),
+                                    union_like_type = union_like_type.display(db, env),
                                 ));
                             }
                             return type_when_bound;
@@ -10647,7 +10428,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     type_when_bound
                 }
-            });
+            }
+        });
 
         let resolved_type = resolved_type.inner_type();
 
@@ -10655,7 +10437,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).
-        assigned_type.unwrap_or(resolved_type)
+        let inferred_type = assigned_type.unwrap_or(resolved_type);
+        lookup_result
+            .map(|_| inferred_type)
+            .map_err(|_| inferred_type)
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -10668,13 +10453,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = attribute;
 
         match ctx {
-            ExprContext::Load => self.infer_attribute_load(attribute),
+            ExprContext::Load => self
+                .infer_attribute_load(attribute)
+                .unwrap_or_else(|recovery_ty| recovery_ty),
             ExprContext::Store => {
                 self.infer_expression(value, TypeContext::default());
                 Type::Never
             }
             ExprContext::Del => {
-                self.infer_attribute_load(attribute);
+                let _ = self.infer_attribute_load(attribute);
                 self.validate_attribute_deletion(
                     attribute,
                     self.expression_type(value),
@@ -11291,7 +11078,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if bindings.len() > 20 {
             tracing::debug!(
-                "Inferred statement region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                "Inferred statement region `{:?}` contains {} bindings. \
+                Lookups by linear scan might be slow.",
                 self.region,
                 bindings.len(),
             );
@@ -11299,7 +11087,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if declarations.len() > 20 {
             tracing::debug!(
-                "Inferred statement region `{:?}` contains {} declarations. Lookups by linear scan might be slow.",
+                "Inferred statement region `{:?}` contains {} declarations. \
+                Lookups by linear scan might be slow.",
                 self.region,
                 declarations.len(),
             );
@@ -11490,7 +11279,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if bindings.len() > 20 {
             tracing::debug!(
-                "Inferred definition region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                "Inferred definition region `{:?}` contains {} bindings. \
+                Lookups by linear scan might be slow.",
                 self.region,
                 bindings.len(),
             );
@@ -11498,7 +11288,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if declarations.len() > 20 {
             tracing::debug!(
-                "Inferred declaration region `{:?}` contains {} declarations. Lookups by linear scan might be slow.",
+                "Inferred declaration region `{:?}` contains {} declarations. \
+                Lookups by linear scan might be slow.",
                 self.region,
                 declarations.len(),
             );
@@ -11868,7 +11659,8 @@ impl<'db> FullExpressionCacheEntry<'db> {
         .then(|| {
             if self.bindings.len() > 20 {
                 tracing::debug!(
-                    "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                    "Inferred expression region `{:?}` contains {} bindings. \
+                    Lookups by linear scan might be slow.",
                     region,
                     self.bindings.len()
                 );

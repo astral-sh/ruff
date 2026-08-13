@@ -227,6 +227,10 @@ impl<'db> ClassBase<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
+                // A class inheriting from a newtype would make intuitive sense, but newtype
+                // wrappers are just identity callables at runtime, so this sort of inheritance
+                // doesn't work and isn't allowed.
+                KnownInstanceType::NewType(_) => None,
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
@@ -242,28 +246,19 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::Sentinel(_)
                 | KnownInstanceType::Range { .. }
-                // A class inheriting from a newtype would make intuitive sense, but newtype
-                // wrappers are just identity callables at runtime, so this sort of inheritance
-                // doesn't work and isn't allowed.
-                | KnownInstanceType::NewType(_)
                 | KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::FunctoolsPartialCall(_) => None,
-                KnownInstanceType::TypeGenericAlias(_) => {
-                    Self::try_from_type(
-                        db, env,
-                        KnownClass::Type.to_class_literal(db, env),
-                        subclass,
-                    )
-                }
-                KnownInstanceType::Annotated(ty) => {
-                    match ty.inner(db) {
-                        Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-                        Type::NominalInstance(instance) => {
-                            Some(Self::Class(instance.class(db, env)))
-                        }
-                        _ => None,
-                    }
-                }
+                KnownInstanceType::TypeGenericAlias(_) => Self::try_from_type(
+                    db,
+                    env,
+                    KnownClass::Type.to_class_literal(db, env),
+                    subclass,
+                ),
+                KnownInstanceType::Annotated(ty) => match ty.inner(db) {
+                    Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+                    Type::NominalInstance(instance) => Some(Self::Class(instance.class(db, env))),
+                    _ => None,
+                },
             },
 
             Type::SpecialForm(special_form) => match special_form {

@@ -104,13 +104,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     // The base path to which all CLI arguments are relative to.
     let cwd = {
         let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
-        SystemPathBuf::from_path_buf(cwd)
-            .map_err(|path| {
-                anyhow!(
-                    "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
-                    path.display()
-                )
-            })?
+        SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+            anyhow!(
+                "The current working directory `{}` contains non-Unicode characters. \
+                ty only supports Unicode paths.",
+                path.display()
+            )
+        })?
     };
 
     let project_path = args
@@ -226,7 +226,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Some("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
         Some(other) => {
             tracing::warn!(
-                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `full`, and `json`."
+                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. \
+                Valid values are `short`, `full`, and `json`."
             );
         }
         None => {}
@@ -400,7 +401,8 @@ impl MainLoop {
                 } => {
                     if check_revision != revision {
                         tracing::debug!(
-                            "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
+                            "Discarding check result for outdated revision: \
+                            current: {revision}, result revision: {check_revision}"
                         );
                         continue;
                     }
@@ -480,7 +482,9 @@ impl MainLoop {
 
                     if exit_status.is_internal_error() {
                         tracing::warn!(
-                            "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
+                            "A fatal error occurred while checking some files. \
+                            Not all project files were analyzed. \
+                            See the diagnostics list above for details."
                         );
                     }
 
@@ -561,7 +565,8 @@ impl MainLoop {
                         let total = fixed + diagnostics_count;
                         writeln!(
                             self.printer.stream_for_failure_summary(),
-                            "Found {total} diagnostic{} ({fixed} fixed, {diagnostics_count} remaining).",
+                            "Found {total} diagnostic{} \
+                            ({fixed} fixed, {diagnostics_count} remaining).",
                             if total == 1 { "" } else { "s" }
                         )?;
                     } else {

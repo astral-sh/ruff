@@ -1297,6 +1297,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(slice, TypeContext::default());
                 KnownClass::NoneType.to_subclass_of(db, env)
             }
+            ast::Expr::Subscript(ast::ExprSubscript { value, .. }) if !is_dotted_name(value) => {
+                infer_type_argument(self, slice)
+            }
             ast::Expr::Subscript(
                 subscript @ ast::ExprSubscript {
                     value,
@@ -1378,9 +1381,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         invalid_type_argument(self, slice)
                     }
                     value_ty @ (Type::SpecialForm(
-                        SpecialFormType::Top | SpecialFormType::Bottom,
+                        SpecialFormType::Top | SpecialFormType::Bottom | SpecialFormType::Annotated,
                     )
-                    | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))) => {
+                    | Type::KnownInstance(_)
+                    | Type::GenericAlias(_)
+                    | Type::Callable(_)) => {
                         let slice_ty = self.infer_subscript_type_expression(subscript, value_ty);
                         subclass_of_type_argument(self, slice, slice_ty)
                     }
@@ -2058,24 +2063,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     std::slice::from_ref(arguments_slice)
                 };
                 let mut has_unpacked_typevartuple = false;
-                let union_ty = UnionType::from_elements_leave_aliases(db, env,
+                let union_ty = UnionType::from_elements_leave_aliases(
+                    db,
+                    env,
                     arguments.iter().map(|argument| {
                         let ty = self.infer_type_expression(argument);
                         if self
                             .type_expression_flags(argument)
                             .contains(TypeExpressionFlags::UNPACK)
                         {
-                            let is_typevartuple = matches!(
-                                ty,
-                                Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                            ) || if let ast::Expr::Subscript(subscript) = argument {
+                            let is_typevartuple =
                                 matches!(
-                                    self.expression_type(&subscript.slice),
+                                    ty,
                                     Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                                )
-                            } else {
-                                false
-                            };
+                                ) || if let ast::Expr::Subscript(subscript) = argument {
+                                    matches!(
+                                        self.expression_type(&subscript.slice),
+                                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                                    )
+                                } else {
+                                    false
+                                };
+
                             if is_typevartuple {
                                 has_unpacked_typevartuple = true;
                                 if !ty.is_unknown()
@@ -2084,7 +2093,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 {
                                     diagnostic::add_type_expression_reference_link(
                                         builder.into_diagnostic(
-                                            "Unpacking a `TypeVarTuple` in `Union` is not supported",
+                                            "Unpacking a `TypeVarTuple` in `Union` \
+                                            is not supported",
                                         ),
                                     );
                                 }
