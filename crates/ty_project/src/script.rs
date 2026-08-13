@@ -248,42 +248,15 @@ impl ScriptMetadata {
 
 #[cfg(test)]
 mod tests {
-    use pep440_rs::VersionSpecifiers;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::PythonVersion;
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
-    use crate::metadata::pyproject::python_version_satisfies_requirement;
     use crate::{Db as _, ProjectMetadata};
 
     use super::{Script, script};
-
-    #[test]
-    fn python_requirement_compares_minor_versions() -> anyhow::Result<()> {
-        for (requirement, python_version, expected) in [
-            (">=3.13", PythonVersion::PY312, false),
-            (">=3.13.0b0", PythonVersion::PY312, false),
-            (">=3.13.0b0", PythonVersion::PY313, true),
-            (">=3.12,<3.13", PythonVersion::PY312, true),
-            (">=3.12.5,<3.13", PythonVersion::PY312, true),
-            (">3.12,<3.13", PythonVersion::PY312, true),
-            ("==3.12.5", PythonVersion::PY312, true),
-            (">=3.12,!=3.12.*", PythonVersion::PY312, false),
-            (">=3.12,<3.13", PythonVersion::PY313, false),
-        ] {
-            let requirement = requirement.parse::<VersionSpecifiers>()?;
-            assert_eq!(
-                python_version_satisfies_requirement(&requirement, python_version),
-                expected,
-                "Python {python_version} and requirement `{requirement}`",
-            );
-        }
-
-        Ok(())
-    }
 
     #[test]
     fn ordinary_files_do_not_depend_on_open_files() -> anyhow::Result<()> {

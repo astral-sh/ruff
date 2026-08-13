@@ -293,7 +293,34 @@ pub(crate) enum InvalidPackageNameError {
 
 #[cfg(test)]
 mod tests {
-    use super::PackageName;
+    use pep440_rs::VersionSpecifiers;
+    use ruff_python_ast::PythonVersion;
+
+    use super::{PackageName, python_version_satisfies_requirement};
+
+    #[test]
+    fn python_requirement_compares_minor_versions() -> anyhow::Result<()> {
+        for (requirement, python_version, expected) in [
+            (">=3.13", PythonVersion::PY312, false),
+            (">=3.13.0b0", PythonVersion::PY312, false),
+            (">=3.13.0b0", PythonVersion::PY313, true),
+            (">=3.12,<3.13", PythonVersion::PY312, true),
+            (">=3.12.5,<3.13", PythonVersion::PY312, true),
+            (">3.12,<3.13", PythonVersion::PY312, true),
+            ("==3.12.5", PythonVersion::PY312, true),
+            (">=3.12,!=3.12.*", PythonVersion::PY312, false),
+            (">=3.12,<3.13", PythonVersion::PY313, false),
+        ] {
+            let requirement = requirement.parse::<VersionSpecifiers>()?;
+            assert_eq!(
+                python_version_satisfies_requirement(&requirement, python_version),
+                expected,
+                "Python {python_version} and requirement `{requirement}`",
+            );
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn normalize() {

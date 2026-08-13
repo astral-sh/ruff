@@ -144,23 +144,59 @@ fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
     ----- stderr -----
     "#);
 
-    case.write_file(
-        "explicit.toml",
-        r#"
-        [environment]
-        python-version = "3.11"
-        "#,
-    )?;
-    let configured = case
-        .command()
-        .arg("--config-file")
-        .arg("explicit.toml")
-        .output()?;
-    assert!(!configured.status.success());
-    let stdout = String::from_utf8(configured.stdout)?;
-    assert!(stdout.contains("--> explicit.toml:3:18"));
-    assert!(stdout.contains("--> script.py:3:21"));
-    assert!(stdout.contains("Python version requirement"));
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_from_explicit_configuration() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # ///
+
+            PythonFinalizationError
+            "#,
+        ),
+        (
+            "explicit.toml",
+            r#"
+            [environment]
+            python-version = "3.11"
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command().arg("--config-file").arg("explicit.toml"),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> script.py:6:1
+      |
+    6 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.11 was assumed when resolving types
+     --> explicit.toml:3:18
+      |
+    3 | python-version = "3.11"
+      |                  ^^^^^^ Python version configuration
+    info: Python 3.11 does not satisfy the `requires-python` constraint `>=3.12`
+     --> script.py:3:21
+      |
+    3 | # requires-python = ">=3.12"
+      |                     ^^^^^^^^ Python version requirement
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#
+    );
 
     Ok(())
 }
@@ -182,29 +218,77 @@ fn python_requirement_mismatch_only_explains_version_sensitive_errors() -> anyho
         "#,
     )?;
 
-    let output = case.command().arg("--python-version=3.12").output()?;
-    assert!(!output.status.success());
-    let stdout = String::from_utf8(output.stdout)?;
-    assert!(stdout.contains("error[unresolved-reference]: Name `PythonFinalizationError`"));
-    assert!(stdout.contains("error[unresolved-reference]: Name `missing`"));
-    assert!(stdout.contains("info[revealed-type]: Revealed type"));
-    assert_eq!(
-        stdout
-            .matches("does not satisfy the `requires-python`")
-            .count(),
-        1
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> script.py:8:1
+      |
+    8 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because it was specified on the command line
+    info: Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`
+     --> script.py:3:21
+      |
+    3 | # requires-python = ">=3.13"
+      |                     ^^^^^^^^ Python version requirement
+
+    error[unresolved-reference]: Name `missing` used when not defined
+     --> script.py:9:7
+      |
+    9 | print(missing)
+      |       ^^^^^^^
+
+    info[revealed-type]: Revealed type
+      --> script.py:10:13
+       |
+    10 | reveal_type(1)
+       |             ^ `Literal[1]`
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_in_concise_output() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # requires-python = ">=3.13"
+        # ///
+
+        PythonFinalizationError
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-version=3.12")
+            .arg("--output-format=concise"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:6:1: error[unresolved-reference] Name `PythonFinalizationError` used when not defined
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
     );
-    assert!(stdout.contains("--> script.py:3:21"));
 
-    let concise = case
-        .command()
-        .arg("--python-version=3.12")
-        .arg("--output-format=concise")
-        .output()?;
-    assert!(!concise.status.success());
-    assert!(!String::from_utf8(concise.stdout)?.contains("does not satisfy"));
+    Ok(())
+}
 
-    let clean = CliTest::with_file(
+#[test]
+fn python_requirement_mismatch_without_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
         "script.py",
         r#"
         # /// script
@@ -214,9 +298,15 @@ fn python_requirement_mismatch_only_explains_version_sensitive_errors() -> anyho
         value = 1
         "#,
     )?;
-    let output = clean.command().arg("--python-version=3.12").output()?;
-    assert!(output.status.success());
-    assert!(!String::from_utf8(output.stdout)?.contains("does not satisfy"));
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -665,18 +755,6 @@ fn cli_arguments_override_script_environment() -> anyhow::Result<()> {
     ----- stderr -----
     "#
     );
-
-    let concise = case
-        .command()
-        .arg("--python-version")
-        .arg("3.12")
-        .arg("--python-platform")
-        .arg("linux")
-        .arg("--output-format")
-        .arg("concise")
-        .output()?;
-    assert!(concise.status.success());
-    assert!(!String::from_utf8(concise.stdout)?.contains("does not satisfy"));
 
     Ok(())
 }

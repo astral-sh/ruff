@@ -145,65 +145,176 @@ def foo() -> str:
 }
 
 #[test]
-fn editor_python_version_override_reports_requirement_as_related_information() -> Result<()> {
-    for (path, content, project_metadata, requirement_path) in [
-        (
-            "src/project.py",
-            "PythonFinalizationError\n",
-            Some("[project]\nrequires-python = \">=3.13\"\n"),
-            "src/pyproject.toml",
-        ),
-        (
-            "src/script.py",
-            "# /// script\n# requires-python = \">=3.13\"\n# ///\n\nPythonFinalizationError\n",
-            None,
-            "src/script.py",
-        ),
-    ] {
-        let workspace_root = SystemPath::new("src");
-        let file = SystemPath::new(path);
-        let mut builder = TestServerBuilder::new()?
-            .enable_diagnostic_related_information(true)
-            .with_workspace(
-                workspace_root,
-                Some(ClientOptions {
-                    workspace: WorkspaceOptions {
-                        configuration: Some(
-                            Map::from_iter([(
-                                "environment".to_string(),
-                                json!({"python-version": "3.12"}),
-                            )])
-                            .into(),
-                        ),
-                        ..WorkspaceOptions::default()
-                    },
-                    ..ClientOptions::default()
-                }),
-            )?
-            .with_file(file, content)?;
+fn editor_python_version_override_reports_project_requirement_as_related_information() -> Result<()>
+{
+    let _filter = filter_result_id();
 
-        if let Some(project_metadata) = project_metadata {
-            builder = builder.with_file("src/pyproject.toml", project_metadata)?;
+    let workspace_root = SystemPath::new("src");
+    let project = SystemPath::new("src/project.py");
+    let project_content = "PythonFinalizationError\n";
+    let project_metadata = r#"[project]
+requires-python = ">=3.13"
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .enable_diagnostic_related_information(true)
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions {
+                workspace: WorkspaceOptions {
+                    configuration: Some(
+                        Map::from_iter([(
+                            "environment".to_string(),
+                            json!({"python-version": "3.12"}),
+                        )])
+                        .into(),
+                    ),
+                    ..WorkspaceOptions::default()
+                },
+                ..ClientOptions::default()
+            }),
+        )?
+        .with_file(project, project_content)?
+        .with_file("src/pyproject.toml", project_metadata)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(project, project_content, 1);
+    let diagnostics = server.document_diagnostic_request(project, None);
+
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "resultId": "[RESULT_ID]",
+      "items": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 0,
+              "character": 23
+            }
+          },
+          "severity": 1,
+          "code": "unresolved-reference",
+          "codeDescription": {
+            "href": "https://ty.dev/rules#unresolved-reference"
+          },
+          "source": "ty",
+          "message": "Name `PythonFinalizationError` used when not defined\n\ninfo: `PythonFinalizationError` was added as a builtin in Python 3.13\ninfo: Python 3.12 was assumed when resolving types because it's the version of the selected Python interpreter in your editor",
+          "relatedInformation": [
+            {
+              "location": {
+                "uri": "file://<temp_dir>/src/pyproject.toml",
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "character": 18
+                  },
+                  "end": {
+                    "line": 1,
+                    "character": 26
+                  }
+                }
+              },
+              "message": "Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`: Python version requirement"
+            }
+          ]
         }
-
-        let mut server = builder.build().wait_until_workspaces_are_initialized();
-        server.open_text_document(file, content, 1);
-        let diagnostics = serde_json::to_value(server.document_diagnostic_request(file, None))?;
-        assert_eq!(diagnostics["items"].as_array().map(Vec::len), Some(1));
-
-        let related = &diagnostics["items"][0]["relatedInformation"];
-        assert_eq!(related.as_array().map(Vec::len), Some(1));
-        assert!(related[0]["message"].as_str().is_some_and(|message| {
-            message
-                .contains("Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`")
-        }));
-        assert!(
-            related[0]["location"]["uri"]
-                .as_str()
-                .is_some_and(|uri| uri.ends_with(requirement_path))
-        );
-        assert_eq!(related[0]["location"]["range"]["start"]["line"], 1);
+      ],
+      "kind": "full"
     }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn editor_python_version_override_reports_script_requirement_as_related_information() -> Result<()>
+{
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let script_content = r#"# /// script
+# requires-python = ">=3.13"
+# ///
+
+PythonFinalizationError
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .enable_diagnostic_related_information(true)
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions {
+                workspace: WorkspaceOptions {
+                    configuration: Some(
+                        Map::from_iter([(
+                            "environment".to_string(),
+                            json!({"python-version": "3.12"}),
+                        )])
+                        .into(),
+                    ),
+                    ..WorkspaceOptions::default()
+                },
+                ..ClientOptions::default()
+            }),
+        )?
+        .with_file(script, script_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, script_content, 1);
+    let diagnostics = server.document_diagnostic_request(script, None);
+
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "resultId": "[RESULT_ID]",
+      "items": [
+        {
+          "range": {
+            "start": {
+              "line": 4,
+              "character": 0
+            },
+            "end": {
+              "line": 4,
+              "character": 23
+            }
+          },
+          "severity": 1,
+          "code": "unresolved-reference",
+          "codeDescription": {
+            "href": "https://ty.dev/rules#unresolved-reference"
+          },
+          "source": "ty",
+          "message": "Name `PythonFinalizationError` used when not defined\n\ninfo: `PythonFinalizationError` was added as a builtin in Python 3.13\ninfo: Python 3.12 was assumed when resolving types because it's the version of the selected Python interpreter in your editor",
+          "relatedInformation": [
+            {
+              "location": {
+                "uri": "file://<temp_dir>/src/script.py",
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "character": 20
+                  },
+                  "end": {
+                    "line": 1,
+                    "character": 28
+                  }
+                }
+              },
+              "message": "Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`: Python version requirement"
+            }
+          ]
+        }
+      ],
+      "kind": "full"
+    }
+    "#);
 
     Ok(())
 }
