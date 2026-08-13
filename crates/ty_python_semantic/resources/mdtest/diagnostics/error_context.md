@@ -796,7 +796,7 @@ error[invalid-assignment]: Object of type `PersonWithAge` is not assignable to `
    |             |
    |             Declared type
 info: field "age" is required in TypedDict `PersonWithAge` but not required and mutable in TypedDict `PersonWithOptionalAge`
-help: The required field could be removed through a destructive operation like `del` on the target.
+help: The required field could be removed through a destructive operation like `del` on the target
 ```
 
 Assigning a `TypedDict` to a `dict`
@@ -815,8 +815,8 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `dict[st
    |             |
    |             Declared type
 info: TypedDict `Person` is not assignable to `dict`
-help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.
-help: Consider using `Mapping[..]` instead of `dict[..]`.
+help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`
+help: Consider using `Mapping[..]` instead of `dict[..]`
 ```
 
 Assigning an open `TypedDict` to a specialized `Mapping`:
@@ -842,7 +842,7 @@ error[invalid-return-type]: Return type does not match returned value
 40 |     return d  # snapshot
    |            ^ expected `Mapping[str, int]`, found `D`
 info: TypedDict `D` is not assignable to `Mapping[str, int]`
-help: `D` would be assignable to `Mapping[str, int]` if it were declared with `closed=True`, but TypedDicts are open by default.
+help: `D` would be assignable to `Mapping[str, int]` if it were declared with `closed=True`, but TypedDicts are open by default
 help: A subclass of `D` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, int]`
 ```
 
@@ -873,9 +873,9 @@ error[invalid-return-type]: Return type does not match returned value
 info: type `Empty` is not assignable to any element of the union `Mapping[str, int] | Mapping[str, str]`
 info: ├── TypedDict `Empty` is not assignable to `Mapping[str, int]`
 info: └── TypedDict `Empty` is not assignable to `Mapping[str, str]`
-help: `Empty` would be assignable to `Mapping[str, int]` if it were declared with `closed=True`, but TypedDicts are open by default.
+help: `Empty` would be assignable to `Mapping[str, int]` if it were declared with `closed=True`, but TypedDicts are open by default
 help: A subclass of `Empty` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, int]`
-help: `Empty` would be assignable to `Mapping[str, str]` if it were declared with `closed=True`, but TypedDicts are open by default.
+help: `Empty` would be assignable to `Mapping[str, str]` if it were declared with `closed=True`, but TypedDicts are open by default
 help: A subclass of `Empty` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, str]`
 ```
 

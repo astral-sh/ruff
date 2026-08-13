@@ -519,18 +519,18 @@ impl<'db> HelpMessages<'db> {
         std::fmt::from_fn(move |f| match self {
             HelpMessages::RequiredFieldCouldBeRemoved => f.write_str(
                 "The required field could be removed through a destructive operation \
-                like `del` on the target.",
+                like `del` on the target",
             ),
             HelpMessages::TypedDictNotAssignableToDict(relation) => {
                 write!(
                     f,
                     "A TypedDict is not usually {} any `dict[..]` type; \
-                    `dict` types allow destructive operations like `clear()`.",
+                    `dict` types allow destructive operations like `clear()`",
                     relation.description()
                 )
             }
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
-                f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
+                f.write_str("Consider using `Mapping[..]` instead of `dict[..]`")
             }
             HelpMessages::OpenTypedDictNotAssignableToMapping {
                 typed_dict_name,
@@ -544,7 +544,7 @@ impl<'db> HelpMessages<'db> {
                     f,
                     "{name} would be {relation} `{mapping}` \
                     if it were declared with `closed=True`, \
-                    but TypedDicts are open by default.",
+                    but TypedDicts are open by default",
                     relation = relation.description(),
                     mapping = mapping_target.display(db, env)
                 )
