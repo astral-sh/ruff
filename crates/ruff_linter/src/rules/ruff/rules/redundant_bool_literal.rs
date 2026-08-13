@@ -87,6 +87,13 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, literal_expr: &'a Ex
         return;
     }
 
+    // Only simplify `Literal` when it is used as a type. A `Literal[...]` in a runtime position
+    // (e.g. `typing.get_args(Literal[True, False])`) is a real value, and rewriting it to `bool`
+    // would change what the program evaluates.
+    if !checker.semantic().in_type_definition() {
+        return;
+    }
+
     let mut seen_expr = BooleanLiteral::empty();
 
     let mut find_bools = |expr: &'a Expr, _parent: &'a Expr| {

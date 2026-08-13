@@ -4,15 +4,15 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
  --> RUF038.py:4:17
   |
-4 | def func1(arg1: Literal[True, False]): 
+4 | def func1(arg1: Literal[True, False]):
   |                 ^^^^^^^^^^^^^^^^^^^^
 5 |     ...
   |
 help: Replace with `bool`
   |
 3 |
-  - def func1(arg1: Literal[True, False]): 
-4 + def func1(arg1: bool): 
+  - def func1(arg1: Literal[True, False]):
+4 + def func1(arg1: bool):
 5 |     ...
   |
 note: This is an unsafe fix and may change runtime behavior
@@ -87,5 +87,16 @@ RUF038 `Literal[True, False, ...]` can be replaced with `Literal[...] | bool`
 24 | def func6(arg1: Literal[True, False, "hello", "world"]):
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 25 |     ...
+   |
+help: Replace with `Literal[...] | bool`
+
+RUF038 `Literal[True, False, ...]` can be replaced with `Literal[...] | bool`
+  --> RUF038.py:46:17
+   |
+44 | # A non-`Literal` member (here a subscript) must not be dropped: the rule may flag the
+45 | # redundancy but must not offer a fix that collapses to `bool` and discards `values[0]`.
+46 | def func7(arg1: Literal[True, False, values[0]]):
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+47 |     ...
    |
 help: Replace with `Literal[...] | bool`

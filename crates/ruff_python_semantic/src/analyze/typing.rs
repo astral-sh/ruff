@@ -614,12 +614,15 @@ where
                         inner(func, semantic, other, Some(expr));
                     }
                 }
+                return;
             }
-        } else {
-            // Otherwise, call the function on expression, if it's not the top-level expression.
-            if let Some(parent) = parent {
-                func(expr, parent);
-            }
+        }
+
+        // Otherwise, call the function on the expression, if it's not the top-level expression.
+        // A non-`Literal` subscript (e.g. `x[0]`) is a leaf member of the enclosing literal and
+        // must be reported like any other member; failing to do so drops it from the caller's view.
+        if let Some(parent) = parent {
+            func(expr, parent);
         }
     }
 
