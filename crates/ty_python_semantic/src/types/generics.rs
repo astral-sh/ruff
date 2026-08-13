@@ -1273,7 +1273,7 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
-/// Collects specialization errors from `ty` and every type nested within it.
+/// Collects errors from the source specialization, `ty`, and every type nested within it.
 ///
 /// Lazy type attributes are visited so that errors introduced while specializing a type alias,
 /// protocol, or typed dictionary body are included. Recursive definitions are guarded by their
@@ -1281,6 +1281,7 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 pub(crate) fn collect_specialization_errors<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    source_specialization: Specialization<'db>,
     ty: Type<'db>,
 ) -> Vec<SpecializationError<'db>> {
     struct SpecializationErrorCollector<'a, 'db> {
@@ -1418,6 +1419,7 @@ pub(crate) fn collect_specialization_errors<'db>(
         visited_specializations: RefCell::default(),
         errors: RefCell::default(),
     };
+    collector.visit_specialization(db, source_specialization);
     collector.visit_type(db, ty);
     collector.errors.into_inner()
 }

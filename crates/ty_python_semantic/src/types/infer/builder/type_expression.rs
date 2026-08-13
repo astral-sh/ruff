@@ -1332,11 +1332,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         } else {
                             match class_literal.generic_context(db) {
                                 Some(generic_context) => {
-                                    let specialize = &|types: &[Option<Type<'db>>]| {
-                                        let class = class_literal.apply_specialization(db, |_| {
-                                            generic_context
-                                                .specialize_partial(db, types.iter().copied())
-                                        });
+                                    let specialize = &|specialization| {
+                                        let class = class_literal
+                                            .apply_specialization(db, |_| specialization);
                                         if class_literal.is_protocol(db) {
                                             match Type::instance(db, env, class) {
                                                 Type::ProtocolInstance(protocol) => {
@@ -1467,11 +1465,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
         }
 
-        let specialize = &|types: &[Option<Type<'db>>]| {
-            let specialized = value_ty.apply_specialization(
-                db,
-                generic_context.specialize_partial(db, types.iter().copied()),
-            );
+        let specialize = &|specialization| {
+            let specialized = value_ty.apply_specialization(db, specialization);
 
             if in_type_expression {
                 specialized

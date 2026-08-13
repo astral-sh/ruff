@@ -16,7 +16,8 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
 use crate::types::generics::{
-    GenericContext, SpecializationError, bind_typevar, collect_specialization_errors,
+    GenericContext, Specialization, SpecializationError, bind_typevar,
+    collect_specialization_errors,
 };
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
@@ -506,10 +507,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let env = self.program_environment();
         let db = self.db();
-        let specialize = &|types: &[Option<Type<'db>>]| {
-            Type::from(generic_class.apply_specialization(db, |_| {
-                generic_context.specialize_partial(db, types.iter().copied())
-            }))
+        let specialize = &|specialization: Specialization<'db>| {
+            Type::from(generic_class.apply_specialization(db, |_| specialization))
         };
 
         // Avoid constructing an identity specialization and a full protocol interface for the
@@ -577,10 +576,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         }
 
-        let specialize = &|types: &[Option<Type<'db>>]| {
-            let type_alias = generic_type_alias.apply_specialization(db, |_| {
-                generic_context.specialize_partial(db, types.iter().copied())
-            });
+        let specialize = &|specialization: Specialization<'db>| {
+            let type_alias = generic_type_alias.apply_specialization(db, |_| specialization);
 
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))
         };
@@ -598,7 +595,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_context: GenericContext<'db>,
-        specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
+        specialize: &dyn Fn(Specialization<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let previously_allowed_paramspec = self
             .context
@@ -622,7 +619,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_context: GenericContext<'db>,
-        specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
+        specialize: &dyn Fn(Specialization<'db>) -> Type<'db>,
     ) -> Type<'db> {
         enum ExplicitSpecializationError {
             InvalidParamSpec,
@@ -1115,34 +1112,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let specialized = match error {
-            Some(ExplicitSpecializationError::NonGeneric) => Type::unknown(),
+        let source_specialization = match error {
+            Some(ExplicitSpecializationError::NonGeneric) => return Type::unknown(),
             Some(
                 ExplicitSpecializationError::MissingTypeVars
                 | ExplicitSpecializationError::TooManyArguments,
-            ) => {
-                let unknowns = generic_context
+            ) => generic_context.specialize(
+                db,
+                generic_context
                     .variables(db)
                     .map(|typevar| {
-                        Some(if typevar.is_paramspec(db) {
+                        if typevar.is_paramspec(db) {
                             Type::paramspec_value_callable(db, Parameters::unknown())
                         } else if typevar.is_typevartuple(db) {
                             Type::homogeneous_tuple(db, env, Type::unknown())
                         } else {
                             Type::unknown()
-                        })
+                        }
                     })
-                    .collect::<Vec<_>>();
-                specialize(&unknowns)
-            }
+                    .collect::<Vec<_>>(),
+            ),
             Some(
                 ExplicitSpecializationError::InvalidParamSpec
                 | ExplicitSpecializationError::ParamSpecForTypeVar,
             )
-            | None => specialize(&specialization_types),
+            | None => generic_context.specialize_partial(db, specialization_types),
         };
+        let specialized = specialize(source_specialization);
 
-        for specialization_error in collect_specialization_errors(db, env, specialized) {
+        for specialization_error in
+            collect_specialization_errors(db, env, source_specialization, specialized)
+        {
             let Some(builder) = self
                 .context
                 .report_lint(&INVALID_TYPE_ARGUMENTS, slice_node)
