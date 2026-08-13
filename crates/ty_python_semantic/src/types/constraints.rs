@@ -107,7 +107,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
@@ -1288,6 +1288,11 @@ impl<'db> ConstraintSetStorage<'db> {
 
             fn notify_skipped_lazy_type_attributes(&self) {
                 self.support.borrow_mut().mark_incomplete();
+            }
+
+            fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
+                // Declaration bounds, constraints, and defaults are not occurrences in the
+                // constraint itself and must not contribute to its support.
             }
 
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
@@ -7006,6 +7011,7 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::types::generics::ApplySpecialization;
+    use crate::types::typevar::{TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation};
     use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
@@ -7061,6 +7067,94 @@ mod tests {
                 .iff(db, &builder, expected)
                 .is_always_satisfied(db, &env)
         );
+    }
+
+    #[test]
+    fn constraint_support_ignores_typevar_declaration_defaults() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let metadata = create_typevar(db, "Metadata");
+        let u = create_typevar(db, "U");
+        let declaration = TypeVarInstance::new(
+            db,
+            u.typevar(db).identity(db),
+            None,
+            Some(TypeVarVariance::Invariant),
+            Some(TypeVarDefaultEvaluation::Eager(Type::TypeVar(metadata))),
+        );
+        let u = BoundTypeVarInstance::new(
+            db,
+            declaration,
+            u.binding_context(db),
+            u.paramspec_attr(db),
+            u.freshness(db),
+        );
+        let actual_bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
+        let mut storage = ConstraintSetStorage::default();
+        let support = storage.intern_constraint_typevars(
+            db,
+            &env,
+            t,
+            ConstraintBounds::new(None, Some(actual_bound)),
+        );
+        let mentioned = support
+            .iter()
+            .map(|typevar| storage.typevar_data(typevar))
+            .collect::<Vec<_>>();
+
+        assert_eq!(mentioned, vec![t.identity(db), u.identity(db)]);
+        assert!(support.is_complete());
+    }
+
+    #[test]
+    fn constraint_support_is_complete_for_lazy_typevar_declaration_metadata() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        for (bound_or_constraints, default) in [
+            (
+                Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
+                None,
+            ),
+            (
+                Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),
+                None,
+            ),
+            (None, Some(TypeVarDefaultEvaluation::Lazy)),
+        ] {
+            let declaration = TypeVarInstance::new(
+                db,
+                u.typevar(db).identity(db),
+                bound_or_constraints,
+                Some(TypeVarVariance::Invariant),
+                default,
+            );
+            let u = BoundTypeVarInstance::new(
+                db,
+                declaration,
+                u.binding_context(db),
+                u.paramspec_attr(db),
+                u.freshness(db),
+            );
+            let mut storage = ConstraintSetStorage::default();
+            let support = storage.intern_constraint_typevars(
+                db,
+                &env,
+                t,
+                ConstraintBounds::new(None, Some(Type::TypeVar(u))),
+            );
+            let mentioned = support
+                .iter()
+                .map(|typevar| storage.typevar_data(typevar))
+                .collect::<Vec<_>>();
+
+            assert_eq!(mentioned, vec![t.identity(db), u.identity(db)]);
+            assert!(support.is_complete());
+        }
     }
 
     #[test]

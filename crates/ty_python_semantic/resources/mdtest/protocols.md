@@ -4069,6 +4069,63 @@ class Container[T](Protocol):
 reveal_type(Container.from_value)  # revealed: Overload[[S](value: S) -> object, [S](value: S, flag: bool) -> object]
 ```
 
+## Recursive protocol receiver binding with a bounded type variable
+
+A class method can recursively bind a protocol receiver through a type variable with a declared
+upper bound. Its declared bound is metadata, not another part of the receiver constraint.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=object)
+
+class Box(Protocol[T]):
+    value: T
+
+    @classmethod
+    def first(cls: type[S]) -> S:
+        return cls()
+
+    def second(self) -> S: ...
+    @classmethod
+    def last(cls: type[S]) -> object: ...
+
+Box.first()
+```
+
+## Recursive protocol receiver binding with a defaulted type variable
+
+A method type variable with a declared default can also appear while recursively binding a protocol
+receiver. Its default is declaration metadata, not a type-variable occurrence in the constraint.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class Box[T](Protocol):
+    value: T
+
+    @classmethod
+    def first[S = int](cls: type[S]) -> S:
+        return cls()
+
+    def second[S = int](self) -> S: ...
+    @classmethod
+    def last[S = int](cls: type[S]) -> object: ...
+
+Box.first()
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
