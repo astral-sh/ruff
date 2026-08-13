@@ -46,7 +46,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -135,6 +135,36 @@ pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
+    infer_definition_types_with_optional_member_context(db, definition, None)
+}
+
+/// Infer a definition while preserving the provisional value of a recursive attribute lookup.
+///
+/// The provisional value is part of the query identity, so local aliases can be resolved through
+/// ordinary definition inference without reusing results inferred under a different assumption.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, definition: Definition<'db>, _: MemberInferenceContext<'db>| {
+        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+    },
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>, _: MemberInferenceContext<'db>| {
+        inference.cycle_normalized(db, previous, cycle, definition)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn infer_definition_types_with_member_context<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    member_context: MemberInferenceContext<'db>,
+) -> DefinitionInference<'db> {
+    infer_definition_types_with_optional_member_context(db, definition, Some(member_context))
+}
+
+fn infer_definition_types_with_optional_member_context<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    member_context: Option<MemberInferenceContext<'db>>,
+) -> DefinitionInference<'db> {
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
@@ -149,7 +179,7 @@ pub(crate) fn infer_definition_types<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let builder = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Definition(definition),
@@ -157,7 +187,13 @@ pub(crate) fn infer_definition_types<'db>(
         program_file,
         index,
         &module,
-    )
+    );
+
+    if let Some(member_context) = member_context {
+        builder.with_member_context(member_context)
+    } else {
+        builder
+    }
     .finish_definition(definition)
 }
 
@@ -198,11 +234,11 @@ pub(crate) fn annotated_assignment_annotation<'db>(
     .infer_annotated_assignment_annotation_only(assignment)
 }
 
-/// Infer an attribute assignment's effect with its recursive reads replaced by `incoming`.
+/// Infer an attribute assignment's effect while assuming its previous value is `incoming`.
 ///
-/// This uses a private inference builder rather than the normal expression or definition queries:
-/// the provisional value is only valid while testing whether the assignment preserves an
-/// independently initialized attribute type.
+/// The assumption is included in expression and definition query identities, allowing ordinary
+/// inference and name resolution to distinguish this provisional result from uncontextualized
+/// inference.
 #[salsa::tracked(
     returns(copy),
     cycle_result=|_, _, _, _| None,
@@ -217,23 +253,27 @@ pub(crate) fn dependent_assignment_transfer<'db>(
         return None;
     };
 
+    if assignment.unpack().is_some() {
+        return None;
+    }
+
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let attribute = assignment.target(&module).as_attribute_expr()?;
     let index = semantic_index(db, program_file);
-    let env = ProgramEnvironment::from_file(program_file);
+    let owner = nearest_enclosing_class(db, index, definition.scope(db))?;
+    let expression = index.try_expression(assignment.value(&module))?;
+    let member_context =
+        MemberInferenceContext::new(db, owner, attribute.attr.id.clone(), incoming);
 
-    TypeInferenceBuilder::new(
+    let inference = infer_expression_types_with_member_context(
         db,
-        &env,
-        InferenceRegion::Definition(definition),
-        python_file.file(db),
-        program_file,
-        index,
-        &module,
-    )
-    .infer_dependent_assignment_transfer(assignment, attribute.attr.id.clone(), incoming)
+        expression,
+        TypeContext::default(),
+        member_context,
+    );
+    Some(inference.expression_type(expression.node_ref(db)))
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
@@ -482,6 +522,17 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
+/// Infer an expression under a query-keyed provisional attribute value.
+pub(crate) fn infer_expression_types_with_member_context<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    tcx: TypeContext<'db>,
+    member_context: MemberInferenceContext<'db>,
+) -> &'db ExpressionInference<'db> {
+    let input = ExpressionWithMemberContext::new(db, expression, tcx, member_context);
+    infer_expression_types_with_member_context_impl(db, input)
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=expression_cycle_initial,
@@ -495,6 +546,38 @@ pub(crate) fn infer_expression_types<'db>(
 pub(super) fn infer_expression_types_impl<'db>(
     db: &'db dyn Db,
     input: InferExpression<'db>,
+) -> ExpressionInference<'db> {
+    infer_expression_types_with_optional_member_context(db, input, None)
+}
+
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, input: ExpressionWithMemberContext<'db>| {
+        ExpressionInference::cycle_initial(input.expression(db).scope(db), Type::divergent(id))
+    },
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: ExpressionWithMemberContext<'db>| {
+        let expression = input.expression(db);
+        let env = ProgramEnvironment::from_scope(expression.scope(db));
+        inference.cycle_normalized(db, &env, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn infer_expression_types_with_member_context_impl<'db>(
+    db: &'db dyn Db,
+    input: ExpressionWithMemberContext<'db>,
+) -> ExpressionInference<'db> {
+    let expression = InferExpression::new(db, input.expression(db), input.tcx(db));
+    infer_expression_types_with_optional_member_context(
+        db,
+        expression,
+        Some(input.member_context(db)),
+    )
+}
+
+fn infer_expression_types_with_optional_member_context<'db>(
+    db: &'db dyn Db,
+    input: InferExpression<'db>,
+    member_context: Option<MemberInferenceContext<'db>>,
 ) -> ExpressionInference<'db> {
     let (expression, tcx) = input.into_inner(db);
 
@@ -513,7 +596,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let builder = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -521,7 +604,13 @@ pub(super) fn infer_expression_types_impl<'db>(
         program_file,
         index,
         &module,
-    )
+    );
+
+    if let Some(member_context) = member_context {
+        builder.with_member_context(member_context)
+    } else {
+        builder
+    }
     .finish_expression()
 }
 
@@ -721,6 +810,34 @@ impl<'db> InferScope<'db> {
         }
     }
 }
+
+/// The provisional value assumed for reads of one recursively inferred attribute.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct MemberInferenceContext<'db> {
+    #[returns(copy)]
+    pub(crate) owner: StaticClassLiteral<'db>,
+    #[returns(ref)]
+    pub(crate) name: Name,
+    #[returns(copy)]
+    pub(crate) incoming: Type<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for MemberInferenceContext<'_> {}
+
+/// An expression inferred under a provisional attribute value.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ExpressionWithMemberContext<'db> {
+    #[returns(copy)]
+    expression: Expression<'db>,
+    #[returns(copy)]
+    tcx: TypeContext<'db>,
+    #[returns(copy)]
+    member_context: MemberInferenceContext<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ExpressionWithMemberContext<'_> {}
 
 /// The type context for a given expression, namely the type annotation
 /// in an annotated assignment.
