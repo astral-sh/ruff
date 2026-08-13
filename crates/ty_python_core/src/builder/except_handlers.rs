@@ -161,35 +161,24 @@ impl ExceptionContextStackManager {
         })
     }
 
-    /// Records the enclosing `try`'s definition cursor when suppression bypasses a terminal body.
-    pub(super) fn record_suppressed_terminal_with_exit(
-        &mut self,
-        next_definition_id: ScopedDefinitionId,
-    ) {
+    /// Records that a manager may have made a terminal `try` path appear to continue.
+    pub(super) fn record_suppressed_terminal_with_exit(&mut self) {
         if let Some(context) = self.current_exception_context_stack().innermost_try() {
-            context.suppressed_terminal_with_exit = Some(next_definition_id);
+            context.has_suppressed_terminal_with_exit = true;
         }
     }
 
-    /// Forwards suspended terminal states through a nested `try` without its own cleanup.
+    /// Forwards gated terminal states to the nearest enclosing `try`.
     pub(super) fn propagate_suppressed_terminal_with_exit(
         &mut self,
-        next_definition_id: ScopedDefinitionId,
         terminal_snapshots: Vec<FlowSnapshot>,
     ) {
         if let Some(context) = self.current_exception_context_stack().innermost_try() {
-            context.suppressed_terminal_with_exit = Some(next_definition_id);
+            context.has_suppressed_terminal_with_exit = true;
             context
                 .terminal_finally_entry_snapshots
                 .extend(terminal_snapshots);
         }
-    }
-
-    /// Removes the suppression marker for the current `try` control-flow branch.
-    pub(super) fn take_suppressed_terminal_with_exit(&mut self) -> Option<ScopedDefinitionId> {
-        self.current_exception_context_stack()
-            .innermost_try()
-            .and_then(|context| context.suppressed_terminal_with_exit.take())
     }
 
     /// Records a terminal entry for the nearest enclosing `try`, skipping `with` contexts.
@@ -317,16 +306,17 @@ pub(super) struct ExceptionContext {
     last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,
-    /// Definition cursor at a possible suppression continuation from a terminal manager body.
-    suppressed_terminal_with_exit: Option<ScopedDefinitionId>,
+    /// Whether a terminal manager body introduced a deferred suppression continuation.
+    has_suppressed_terminal_with_exit: bool,
     terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
 }
 
 impl ExceptionContext {
-    pub(super) fn into_finally_entry_state(self) -> (Vec<FlowSnapshot>, bool) {
+    pub(super) fn into_finally_entry_state(self) -> (Vec<FlowSnapshot>, bool, bool) {
         (
             self.terminal_finally_entry_snapshots,
             self.has_escaping_exception,
+            self.has_suppressed_terminal_with_exit,
         )
     }
 }

@@ -18,6 +18,7 @@ use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
+use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 
@@ -121,6 +122,15 @@ pub enum PredicateNode<'db> {
     ContextManagerSuppresses {
         expression: Expression<'db>,
         is_async: bool,
+    },
+    /// Whether semantic evaluation rules out every normal entry into a `finally` suite.
+    ///
+    /// The continuation is captured before constructing this predicate, so its constraint cannot
+    /// depend on the predicate itself. Deferring evaluation preserves terminal cleanup paths when
+    /// a context manager's suppression behavior is unavailable during semantic indexing.
+    FinallyNormalPathImpossible {
+        scope: ScopeId<'db>,
+        continuation: ScopedReachabilityConstraintId,
     },
     /// These predicates are recorded for statements with call expressions. As part of
     /// reachability constraints, they are used to determine whether control flow can

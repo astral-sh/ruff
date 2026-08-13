@@ -548,6 +548,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
             callable.scope(db)
         }
         PredicateNode::Pattern(pattern) => pattern.scope(db),
+        PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
         PredicateNode::OrPatternAlternative(scope) => scope,
         PredicateNode::SubjectElementPattern(subject_element) => subject_element.pattern.scope(db),
         PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
@@ -1139,6 +1140,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ContextManagerSuppresses { .. }
+                            | PredicateNode::FinallyNormalPathImpossible { .. }
                     ) {
                         actions.push(Action::AnalyzeNonTerminal(id));
                         actions.push(Action::Visit(node.if_uncertain));
@@ -1536,6 +1538,13 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         } => Truthiness::from(
             infer_same_file_expression_type(db, expression, TypeContext::default())
                 .can_suppress_exceptions(db, env, EvaluationMode::from_is_async(is_async)),
+        )
+        .negate_if(!predicate.is_positive),
+        PredicateNode::FinallyNormalPathImpossible {
+            scope,
+            continuation,
+        } => Truthiness::from(
+            evaluate_reachability_constraint(db, scope, continuation).is_always_false(),
         )
         .negate_if(!predicate.is_positive),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {

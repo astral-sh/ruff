@@ -102,6 +102,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             (positive, None)
         }
         PredicateNode::ContextManagerSuppresses { .. }
+        | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
         | PredicateNode::OrPatternAlternative(_)
@@ -1504,6 +1505,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.evaluate_subject_element_pattern(subject_element)
             }
             PredicateNode::ContextManagerSuppresses { .. }
+            | PredicateNode::FinallyNormalPathImpossible { .. }
             | PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
             PredicateNode::OrPatternAlternative(_) => return None,
@@ -3199,6 +3201,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             PredicateNode::Expression(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
+            PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
             PredicateNode::OrPatternAlternative(scope) => scope,
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)

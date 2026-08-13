@@ -613,6 +613,24 @@ finally:
     reveal_type(value)  # revealed: Literal["continuing"]
 ```
 
+## Continuing after a suppressing context manager and `finally`
+
+After an exception is suppressed, assignments in the `finally` block remain visible on the
+continuing path:
+
+```py
+from contextlib import suppress
+
+def continues_after_finally() -> str:
+    try:
+        with suppress(ValueError):
+            raise ValueError
+    finally:
+        value = "cleanup"
+    reveal_type(value)  # revealed: Literal["cleanup"]
+    return value
+```
+
 ## Raising from a context manager inside `try`
 
 A `finally` block remains reachable when a context manager propagates an exception:
@@ -625,6 +643,123 @@ try:
         raise ValueError
 finally:
     missing_name  # error: [unresolved-reference]
+```
+
+## Unreachable assignments after a context manager inside `try`
+
+An assignment after the propagating context manager cannot make the `finally` block unreachable:
+
+```py
+from contextlib import nullcontext
+
+try:
+    with nullcontext():
+        raise ValueError
+    unreachable = 1
+finally:
+    missing_after_unreachable_assignment  # error: [unresolved-reference]
+```
+
+## Unreachable imports after a context manager inside `try`
+
+The same applies to definitions introduced by an unreachable import:
+
+```py
+from contextlib import nullcontext
+
+try:
+    with nullcontext():
+        raise ValueError
+    import sys
+finally:
+    missing_after_unreachable_import  # error: [unresolved-reference]
+```
+
+## Code after a terminal context manager and `finally`
+
+A non-suppressing manager does not allow a raised exception to continue past `finally` or implicitly
+return from an annotated function:
+
+```py
+from contextlib import nullcontext
+
+def does_not_continue() -> int:
+    try:
+        with nullcontext():
+            raise ValueError
+    finally:
+        pass
+    missing_after_finally
+```
+
+## Narrowing after a terminal context manager and `finally`
+
+A branch that raises through a non-suppressing manager remains terminal after its cleanup:
+
+```py
+from contextlib import nullcontext
+
+def narrows_after_finally(value: str | None) -> None:
+    if value is None:
+        try:
+            with nullcontext():
+                raise ValueError
+        finally:
+            pass
+    reveal_type(value)  # revealed: str
+```
+
+## Loop control after a terminal context manager and `finally`
+
+A `break` through a non-suppressing manager and its enclosing cleanup cannot reach a later
+assignment in the loop:
+
+```py
+from contextlib import nullcontext
+
+for _ in [1]:
+    try:
+        with nullcontext():
+            break
+    finally:
+        pass
+    after_break = 1
+
+after_break  # error: [unresolved-reference]
+```
+
+The same applies to `continue`:
+
+```py
+for _ in [1]:
+    try:
+        with nullcontext():
+            continue
+    finally:
+        pass
+    after_continue = 1
+
+after_continue  # error: [unresolved-reference]
+```
+
+## Nested `finally` suites after a terminal context manager
+
+The outer cleanup observes assignments made in the inner cleanup, but execution does not continue
+after either suite:
+
+```py
+from contextlib import nullcontext
+
+def nested_cleanup() -> None:
+    try:
+        try:
+            with nullcontext():
+                raise ValueError
+        finally:
+            value = "cleanup"
+    finally:
+        reveal_type(value)  # revealed: Literal["cleanup"]
+    missing_after_nested_finally
 ```
 
 ## Terminal exception handlers after a context manager
@@ -736,6 +871,23 @@ finally:
     missing_name  # error: [unresolved-reference]
 ```
 
+## Unreachable assignments after a context manager inside `except`
+
+An unreachable assignment in the exception handler does not hide its terminal path:
+
+```py
+from contextlib import nullcontext
+
+try:
+    raise ValueError
+except ValueError:
+    with nullcontext():
+        raise RuntimeError
+    unreachable = 1
+finally:
+    missing_after_unreachable_handler_assignment  # error: [unresolved-reference]
+```
+
 ## Raising from a context manager inside a named exception handler
 
 Clearing a named exception does not hide the terminal path from `finally`:
@@ -771,6 +923,22 @@ def nested_return() -> None:
         missing_name  # error: [unresolved-reference]
 ```
 
+An unreachable assignment in the inner `try` does not prevent its terminal path from reaching the
+outer `finally` block:
+
+```py
+def nested_unreachable_assignment() -> None:
+    try:
+        try:
+            with nullcontext():
+                raise ValueError
+            unreachable = 1
+        except ValueError:
+            return
+    finally:
+        missing_after_nested_unreachable_assignment  # error: [unresolved-reference]
+```
+
 A `break` through an inner handler also reaches the outer `finally` block:
 
 ```py
@@ -802,6 +970,25 @@ else:
         raise RuntimeError
 finally:
     missing_name  # error: [unresolved-reference]
+```
+
+## Unreachable assignments after a context manager inside `else`
+
+An unreachable assignment in the `else` suite does not hide its terminal path:
+
+```py
+from contextlib import nullcontext
+
+try:
+    pass
+except ValueError:
+    pass
+else:
+    with nullcontext():
+        raise RuntimeError
+    unreachable = 1
+finally:
+    missing_after_unreachable_else_assignment  # error: [unresolved-reference]
 ```
 
 ## Possibly unbound names in `finally` after a context manager

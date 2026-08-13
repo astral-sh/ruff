@@ -2177,6 +2177,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::ContextManagerSuppresses { .. }
+                    | PredicateNode::FinallyNormalPathImpossible { .. }
                     | PredicateNode::IsNonEmptyIterable(_)
                     | PredicateNode::OrPatternAlternative(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
@@ -4056,10 +4057,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if let Some(exceptional_entry) = exceptional_entries.next() {
                         let normal_exit = self.flow_snapshot();
                         if normal_exit.is_always_unreachable() {
-                            let next_definition_id =
-                                self.current_use_def_map().next_definition_id();
                             self.exception_context_stack_manager
-                                .record_suppressed_terminal_with_exit(next_definition_id);
+                                .record_suppressed_terminal_with_exit();
                         }
                         let context_expr = &item.context_expr;
                         let expression = self
@@ -4425,12 +4424,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Visit the `try` block!
                 self.visit_body(body);
 
-                // Definitions are allocated for the whole scope, so visiting an unrelated
-                // `except` branch must not invalidate the state of the `try` continuation.
-                let try_suppression_only = self
-                    .exception_context_stack_manager
-                    .take_suppressed_terminal_with_exit()
-                    == Some(self.current_use_def_map().next_definition_id());
                 let mut post_except_states = vec![];
 
                 // Take all checkpoints recorded immediately before operations in the `try` suite
@@ -4497,18 +4490,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         };
 
                         self.visit_body(handler_body);
-                        // Clearing a bound exception creates a definition on this same path, but
-                        // does not make an otherwise terminal handler continue normally.
-                        let handler_suppression_only = self
-                            .exception_context_stack_manager
-                            .take_suppressed_terminal_with_exit()
-                            == Some(self.current_use_def_map().next_definition_id());
                         // The caught exception is cleared at the end of the except clause
                         if let Some(symbol) = symbol {
                             self.delete_binding(symbol.into());
                         }
                         // Each `except` block is mutually exclusive with all other `except` blocks.
-                        post_except_states.push((self.flow_snapshot(), handler_suppression_only));
+                        post_except_states.push(self.flow_snapshot());
 
                         // It's unnecessary to do the `self.flow_restore()` call for the final except handler,
                         // as we'll immediately call `self.flow_restore()` to a different state
@@ -4523,28 +4510,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_restore(post_try_block_state);
                 }
 
-                let pre_else_definition_id = self.current_use_def_map().next_definition_id();
                 self.visit_body(orelse);
-                let post_else_definition_id = self.current_use_def_map().next_definition_id();
-                let else_suppression_only = self
-                    .exception_context_stack_manager
-                    .take_suppressed_terminal_with_exit()
-                    == Some(post_else_definition_id);
-                let normal_suppression_only = else_suppression_only
-                    || (try_suppression_only && pre_else_definition_id == post_else_definition_id);
-                let mut all_continuations_suppression_only =
-                    self.current_use_def_map().reachability
-                        == ScopedReachabilityConstraintId::ALWAYS_FALSE
-                        || normal_suppression_only;
 
-                for (post_except_state, handler_suppression_only) in post_except_states {
-                    all_continuations_suppression_only &=
-                        post_except_state.is_always_unreachable() || handler_suppression_only;
+                for post_except_state in post_except_states {
                     self.flow_merge(post_except_state);
                 }
 
                 let normal_pre_finally_state = self.flow_snapshot();
-                let (terminal_finally_entry_snapshots, has_escaping_exception) = self
+                let (
+                    terminal_finally_entry_snapshots,
+                    has_escaping_exception,
+                    has_suppressed_terminal_with_exit,
+                ) = self
                     .exception_context_stack_manager
                     .pop_context()
                     .into_finally_entry_state();
@@ -4576,20 +4553,52 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.mark_unreachable();
                 } else {
-                    if all_continuations_suppression_only {
-                        if finalbody.is_empty() {
-                            if !terminal_finally_entry_snapshots.is_empty() {
-                                let next_definition_id =
-                                    self.current_use_def_map().next_definition_id();
-                                self.exception_context_stack_manager
-                                    .propagate_suppressed_terminal_with_exit(
-                                        next_definition_id,
-                                        terminal_finally_entry_snapshots,
-                                    );
-                            }
-                        } else {
-                            for snapshot in terminal_finally_entry_snapshots {
+                    let mut post_finally_terminal_predicate = None;
+                    if has_suppressed_terminal_with_exit
+                        && !terminal_finally_entry_snapshots.is_empty()
+                    {
+                        let continuation = self.current_use_def_map().reachability;
+                        self.current_reachability_constraints_mut()
+                            .mark_used(continuation);
+                        let predicate_id =
+                            self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+                                node: PredicateNode::FinallyNormalPathImpossible {
+                                    scope: self.current_scope_id(),
+                                    continuation,
+                                },
+                                is_positive: true,
+                            }));
+
+                        let mut terminal_snapshots = terminal_finally_entry_snapshots.into_iter();
+                        if let Some(snapshot) = terminal_snapshots.next() {
+                            self.flow_restore(snapshot);
+                            for snapshot in terminal_snapshots {
                                 self.flow_merge(snapshot);
+                            }
+
+                            let reachability_constraint = self
+                                .current_reachability_constraints_mut()
+                                .add_atom(predicate_id);
+                            let narrowing_constraint = self
+                                .current_use_def_map_mut()
+                                .narrowing_constraints
+                                .add_atom(predicate_id);
+                            self.current_use_def_map_mut()
+                                .record_non_terminal_call_constraints(
+                                    reachability_constraint,
+                                    narrowing_constraint,
+                                );
+
+                            if finalbody.is_empty() {
+                                let terminal_snapshot = self.flow_snapshot();
+                                self.flow_restore(normal_pre_finally_state);
+                                self.exception_context_stack_manager
+                                    .propagate_suppressed_terminal_with_exit(vec![
+                                        terminal_snapshot,
+                                    ]);
+                            } else {
+                                self.flow_merge(normal_pre_finally_state);
+                                post_finally_terminal_predicate = Some(predicate_id);
                             }
                         }
                     }
@@ -4602,6 +4611,42 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             != ScopedReachabilityConstraintId::ALWAYS_FALSE
                     {
                         self.record_exception_checkpoint();
+                    }
+
+                    if let Some(predicate_id) = post_finally_terminal_predicate
+                        && self.current_use_def_map().reachability
+                            != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                    {
+                        let post_finally_state = self.flow_snapshot();
+                        let terminal_reachability = self
+                            .current_reachability_constraints_mut()
+                            .add_atom(predicate_id);
+                        let terminal_narrowing = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_atom(predicate_id);
+                        self.current_use_def_map_mut()
+                            .record_non_terminal_call_constraints(
+                                terminal_reachability,
+                                terminal_narrowing,
+                            );
+                        let terminal_snapshot = self.flow_snapshot();
+                        self.flow_restore(post_finally_state);
+                        self.exception_context_stack_manager
+                            .propagate_suppressed_terminal_with_exit(vec![terminal_snapshot]);
+
+                        let normal_reachability = self
+                            .current_reachability_constraints_mut()
+                            .add_not_constraint(terminal_reachability);
+                        let normal_narrowing = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_negated_atom(predicate_id);
+                        self.current_use_def_map_mut()
+                            .record_non_terminal_call_constraints(
+                                normal_reachability,
+                                normal_narrowing,
+                            );
                     }
                 }
                 self.in_try = was_in_try;
