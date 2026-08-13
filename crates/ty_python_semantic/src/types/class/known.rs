@@ -1017,30 +1017,14 @@ impl KnownClass {
     }
 
     pub(crate) fn display(self, python_version: PythonVersion) -> impl std::fmt::Display {
-        struct KnownClassDisplay {
-            class: KnownClass,
-            python_version: PythonVersion,
-        }
-
-        impl std::fmt::Display for KnownClassDisplay {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let KnownClassDisplay {
-                    class: known_class,
-                    python_version,
-                } = *self;
-                write!(
-                    f,
-                    "{module}.{class}",
-                    module = known_class.canonical_module(python_version),
-                    class = known_class.name(python_version)
-                )
-            }
-        }
-
-        KnownClassDisplay {
-            class: self,
-            python_version,
-        }
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "{module}.{class}",
+                module = self.canonical_module(python_version),
+                class = self.name(python_version)
+            )
+        })
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing all
@@ -2007,62 +1991,42 @@ impl<'db> KnownClassLookupError<'db> {
     }
 
     fn display<'env>(
-        &self,
+        self,
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
         class: KnownClass,
     ) -> impl std::fmt::Display + 'env {
-        struct ErrorDisplay<'env, 'db> {
-            db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
-            class: KnownClass,
-            error: KnownClassLookupError<'db>,
-        }
+        std::fmt::from_fn(move |f| {
+            let python_version = env.python_version(db);
+            let class = class.display(python_version);
+            let location = if self.is_third_party() {
+                ""
+            } else {
+                " in typeshed"
+            };
 
-        impl std::fmt::Display for ErrorDisplay<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                let ErrorDisplay {
-                    db: _,
-                    env,
-                    class,
-                    error,
-                } = self;
-
-                let python_version = env.python_version(db);
-                let class = class.display(python_version);
-                let location = if error.is_third_party() {
-                    ""
-                } else {
-                    " in typeshed"
-                };
-
-                match error {
-                    KnownClassLookupError::ClassNotFound { .. } => write!(
-                        f,
-                        "Could not find class `{class}`{location} on Python {python_version}",
-                    ),
-                    KnownClassLookupError::SymbolNotAClass { found_type, .. } => write!(
-                        f,
-                        "Error looking up `{class}`{location}: expected to find a class definition \
-                        on Python {python_version}, but found a symbol of type `{found_type}` instead",
-                        found_type = found_type.display(db, env),
-                    ),
-                    KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
-                        f,
-                        "Error looking up `{class}`{location} on Python {python_version}: expected \
-                        to find a fully bound symbol, but found one that is possibly unbound",
-                    ),
-                }
+            match self {
+                KnownClassLookupError::ClassNotFound { .. } => write!(
+                    f,
+                    "Could not find class `{class}`{location} on Python {python_version}",
+                ),
+                KnownClassLookupError::SymbolNotAClass { found_type, .. } => write!(
+                    f,
+                    "Error looking up `{class}`{location}: \
+                    expected to find a class definition \
+                    on Python {python_version}, \
+                    but found a symbol of type `{found_type}` instead",
+                    found_type = found_type.display(db, env),
+                ),
+                KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
+                    f,
+                    "Error looking up `{class}`{location} \
+                    on Python {python_version}: expected \
+                    to find a fully bound symbol, \
+                    but found one that is possibly unbound",
+                ),
             }
-        }
-
-        ErrorDisplay {
-            db,
-            env,
-            class,
-            error: *self,
-        }
+        })
     }
 }
 

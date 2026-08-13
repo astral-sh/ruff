@@ -877,26 +877,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &'c ProgramEnvironment<'db>,
     ) -> impl Display + 'c {
-        struct DisplayConstraintSet<'c, 'db> {
-            node: NodeId,
-            db: &'db dyn Db,
-            env: &'c ProgramEnvironment<'db>,
-            builder: &'c ConstraintSetBuilder<'db>,
-        }
-
-        impl Display for DisplayConstraintSet<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let storage = self.builder.storage.borrow();
-                Display::fmt(&self.node.display(self.db, self.env, &storage), f)
-            }
-        }
-
-        DisplayConstraintSet {
-            node: self.node,
-            db,
-            env,
-            builder: self.builder,
-        }
+        std::fmt::from_fn(move |f| {
+            let storage = self.builder.storage.borrow();
+            self.node.display(db, env, &storage).fmt(f)
+        })
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -910,33 +894,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         'db: 'a,
         'c: 'a,
     {
-        struct DisplayConstraintSet<'a, 'c, 'db> {
-            node: NodeId,
-            prefix: &'a dyn Display,
-            db: &'db dyn Db,
-            env: &'a ProgramEnvironment<'db>,
-            builder: &'c ConstraintSetBuilder<'db>,
-        }
-
-        impl Display for DisplayConstraintSet<'_, '_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let storage = self.builder.storage.borrow();
-                Display::fmt(
-                    &self
-                        .node
-                        .display_graph(self.db, self.env, &storage, self.prefix),
-                    f,
-                )
-            }
-        }
-
-        DisplayConstraintSet {
-            node: self.node,
-            prefix,
-            db,
-            env,
-            builder: self.builder,
-        }
+        std::fmt::from_fn(move |f| {
+            let storage = self.builder.storage.borrow();
+            self.node.display_graph(db, env, &storage, prefix).fmt(f)
+        })
     }
 }
 
@@ -3321,36 +3282,14 @@ impl NodeId {
         // Render the BDD directly as an unsimplified DNF formula. Each root-to-true path becomes
         // one clause, with true, uncertain, and false edges contributing positive, unconstrained,
         // and negative assignments respectively.
-        struct DisplayNode<'db, 'c> {
-            node: NodeId,
-            db: &'db dyn Db,
-            env: &'c ProgramEnvironment<'db>,
-            storage: &'c ConstraintSetStorage<'db>,
-        }
-
-        impl Display for DisplayNode<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.node.node() {
-                    Node::AlwaysTrue => f.write_str("always"),
-                    Node::AlwaysFalse => f.write_str("never"),
-                    Node::Interior(_) => Display::fmt(
-                        &self.node.satisfied_clauses(self.storage).display(
-                            self.db,
-                            self.env,
-                            self.storage,
-                        ),
-                        f,
-                    ),
-                }
-            }
-        }
-
-        DisplayNode {
-            node: self,
-            db,
-            env,
-            storage,
-        }
+        std::fmt::from_fn(move |f| match self.node() {
+            Node::AlwaysTrue => f.write_str("always"),
+            Node::AlwaysFalse => f.write_str("never"),
+            Node::Interior(_) => Display::fmt(
+                &self.satisfied_clauses(storage).display(db, env, storage),
+                f,
+            ),
+        })
     }
 
     /// Displays the full graph structure of this BDD. `prefix` will be output before each line
@@ -3378,15 +3317,6 @@ impl NodeId {
         storage: &'a ConstraintSetStorage<'db>,
         prefix: &'a dyn Display,
     ) -> impl Display + 'a {
-        struct DisplayNode<'a, 'db> {
-            db: &'db dyn Db,
-            env: &'a ProgramEnvironment<'db>,
-            storage: &'a ConstraintSetStorage<'db>,
-            node: NodeId,
-            prefix: &'a dyn Display,
-            seen: RefCell<FxIndexSet<NodeId>>,
-        }
-
         fn format_node<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -3447,29 +3377,9 @@ impl NodeId {
             }
         }
 
-        impl Display for DisplayNode<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                format_node(
-                    db,
-                    self.env,
-                    self.storage,
-                    self.node,
-                    self.prefix,
-                    &self.seen,
-                    f,
-                )
-            }
-        }
-
-        DisplayNode {
-            db,
-            env,
-            storage,
-            node: self,
-            prefix,
-            seen: RefCell::default(),
-        }
+        std::fmt::from_fn(move |f| {
+            format_node(db, env, storage, self, prefix, &RefCell::default(), f)
+        })
     }
 }
 
@@ -4689,91 +4599,61 @@ impl ConstraintAssignment {
         env: &'a ProgramEnvironment<'db>,
         storage: &'a ConstraintSetStorage<'db>,
     ) -> impl Display + 'a {
-        struct DisplayConstraintAssignment<'db, 'c> {
-            assignment: ConstraintAssignment,
-            db: &'db dyn Db,
-            env: &'c ProgramEnvironment<'db>,
-            storage: &'c ConstraintSetStorage<'db>,
-        }
+        let (equality_sign, range_prefix) = match self {
+            ConstraintAssignment::Positive(_) => ("=", ""),
+            ConstraintAssignment::Negative(_) => ("≠", "¬"),
+            ConstraintAssignment::Unconstrained(_) => ("=?", "?"),
+        };
 
-        impl DisplayConstraintAssignment<'_, '_> {
-            fn equality_sign(&self) -> &'static str {
-                match self.assignment {
-                    ConstraintAssignment::Positive(_) => "=",
-                    ConstraintAssignment::Negative(_) => "≠",
-                    ConstraintAssignment::Unconstrained(_) => "=?",
+        std::fmt::from_fn(move |f| {
+            let constraint_data = storage.constraint_data(self.constraint());
+            let lower = constraint_data.bounds.materialized_lower();
+            let upper = constraint_data.bounds.materialized_upper();
+            let typevar = constraint_data.typevar;
+            if lower.is_equivalent_to(db, env, upper) {
+                // If this typevar is equivalent to another, output the constraint in a
+                // consistent alphabetical order, regardless of the salsa ordering that we are
+                // using the in BDD.
+                if let Type::TypeVar(bound) = lower {
+                    let bound = bound.identity(db).display(db).to_string();
+                    let typevar = typevar.identity(db).display(db).to_string();
+                    let (smaller, larger) = if bound < typevar {
+                        (bound, typevar)
+                    } else {
+                        (typevar, bound)
+                    };
+                    return write!(f, "({smaller} {equality_sign} {larger})");
                 }
+
+                return write!(
+                    f,
+                    "({} {} {})",
+                    typevar.identity(db).display(db),
+                    equality_sign,
+                    lower.display(db, env)
+                );
             }
 
-            fn range_prefix(&self) -> &'static str {
-                match self.assignment {
-                    ConstraintAssignment::Positive(_) => "",
-                    ConstraintAssignment::Negative(_) => "¬",
-                    ConstraintAssignment::Unconstrained(_) => "?",
-                }
+            if lower.is_never() && upper.is_object() {
+                return write!(
+                    f,
+                    "({} {} *)",
+                    typevar.identity(db).display(db),
+                    equality_sign
+                );
             }
-        }
 
-        impl Display for DisplayConstraintAssignment<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-
-                let constraint_data = self.storage.constraint_data(self.assignment.constraint());
-                let lower = constraint_data.bounds.materialized_lower();
-                let upper = constraint_data.bounds.materialized_upper();
-                let typevar = constraint_data.typevar;
-                if lower.is_equivalent_to(db, self.env, upper) {
-                    // If this typevar is equivalent to another, output the constraint in a
-                    // consistent alphabetical order, regardless of the salsa ordering that we are
-                    // using the in BDD.
-                    if let Type::TypeVar(bound) = lower {
-                        let bound = bound.identity(db).display(db).to_string();
-                        let typevar = typevar.identity(db).display(db).to_string();
-                        let (smaller, larger) = if bound < typevar {
-                            (bound, typevar)
-                        } else {
-                            (typevar, bound)
-                        };
-                        return write!(f, "({} {} {})", smaller, self.equality_sign(), larger);
-                    }
-
-                    return write!(
-                        f,
-                        "({} {} {})",
-                        typevar.identity(db).display(db),
-                        self.equality_sign(),
-                        lower.display(db, self.env)
-                    );
-                }
-
-                if lower.is_never() && upper.is_object() {
-                    return write!(
-                        f,
-                        "({} {} *)",
-                        typevar.identity(db).display(db),
-                        self.equality_sign()
-                    );
-                }
-
-                f.write_str(self.range_prefix())?;
-                f.write_str("(")?;
-                if !lower.is_never() {
-                    write!(f, "{} ≤ ", lower.display(db, self.env))?;
-                }
-                typevar.identity(db).display(db).fmt(f)?;
-                if !upper.is_object() {
-                    write!(f, " ≤ {}", upper.display(db, self.env))?;
-                }
-                f.write_str(")")
+            f.write_str(range_prefix)?;
+            f.write_str("(")?;
+            if !lower.is_never() {
+                write!(f, "{} ≤ ", lower.display(db, env))?;
             }
-        }
-
-        DisplayConstraintAssignment {
-            assignment: self,
-            db,
-            env,
-            storage,
-        }
+            typevar.identity(db).display(db).fmt(f)?;
+            if !upper.is_object() {
+                write!(f, " ≤ {}", upper.display(db, env))?;
+            }
+            f.write_str(")")
+        })
     }
 }
 
@@ -5932,78 +5812,59 @@ impl SequentMap {
         storage: &'a ConstraintSetStorage<'db>,
         prefix: &'a dyn Display,
     ) -> impl Display + 'a {
-        struct DisplaySequentMap<'a, 'db> {
-            map: &'a SequentMap,
-            prefix: &'a dyn Display,
-            db: &'db dyn Db,
-            env: &'a ProgramEnvironment<'db>,
-            storage: &'a ConstraintSetStorage<'db>,
-        }
-
-        impl Display for DisplaySequentMap<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                let mut first = true;
-                let mut maybe_write_prefix = |f: &mut std::fmt::Formatter<'_>| {
-                    if first {
-                        first = false;
-                        Ok(())
-                    } else {
-                        write!(f, "\n{}", self.prefix)
-                    }
-                };
-
-                for sequent in &self.map.sequents {
-                    match sequent {
-                        Sequent::SingleTautology { .. } => {}
-
-                        Sequent::PairImpossibility { ante1, ante2 } => {
-                            maybe_write_prefix(f)?;
-                            write!(
-                                f,
-                                "{} ∧ {} → false",
-                                ante1.display(db, self.env, self.storage),
-                                ante2.display(db, self.env, self.storage),
-                            )?;
-                        }
-
-                        Sequent::PairImplication { ante1, ante2, post } => {
-                            maybe_write_prefix(f)?;
-                            write!(
-                                f,
-                                "{} ∧ {} → {}",
-                                ante1.display(db, self.env, self.storage),
-                                ante2.display(db, self.env, self.storage),
-                                post.display(db, self.env, self.storage),
-                            )?;
-                        }
-
-                        Sequent::SingleImplication { ante, post } => {
-                            maybe_write_prefix(f)?;
-                            write!(
-                                f,
-                                "{} → {}",
-                                ante.display(db, self.env, self.storage),
-                                post.display(db, self.env, self.storage)
-                            )?;
-                        }
-                    }
-                }
-
+        std::fmt::from_fn(move |f| {
+            let mut first = true;
+            let mut maybe_write_prefix = |f: &mut std::fmt::Formatter<'_>| {
                 if first {
-                    f.write_str("[no sequents]")?;
+                    first = false;
+                    Ok(())
+                } else {
+                    write!(f, "\n{prefix}")
                 }
-                Ok(())
-            }
-        }
+            };
 
-        DisplaySequentMap {
-            map: self,
-            prefix,
-            db,
-            env,
-            storage,
-        }
+            for sequent in &self.sequents {
+                match sequent {
+                    Sequent::SingleTautology { .. } => {}
+
+                    Sequent::PairImpossibility { ante1, ante2 } => {
+                        maybe_write_prefix(f)?;
+                        write!(
+                            f,
+                            "{} ∧ {} → false",
+                            ante1.display(db, env, storage),
+                            ante2.display(db, env, storage),
+                        )?;
+                    }
+
+                    Sequent::PairImplication { ante1, ante2, post } => {
+                        maybe_write_prefix(f)?;
+                        write!(
+                            f,
+                            "{} ∧ {} → {}",
+                            ante1.display(db, env, storage),
+                            ante2.display(db, env, storage),
+                            post.display(db, env, storage),
+                        )?;
+                    }
+
+                    Sequent::SingleImplication { ante, post } => {
+                        maybe_write_prefix(f)?;
+                        write!(
+                            f,
+                            "{} → {}",
+                            ante.display(db, env, storage),
+                            post.display(db, env, storage)
+                        )?;
+                    }
+                }
+            }
+
+            if first {
+                f.write_str("[no sequents]")?;
+            }
+            Ok(())
+        })
     }
 }
 

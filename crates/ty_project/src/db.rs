@@ -325,137 +325,125 @@ fn bytes_to_mb(total: usize) -> f64 {
 
 impl SalsaMemoryDump {
     /// Returns a short report that provides total memory usage information.
-    pub fn display_short(&self) -> impl fmt::Display + '_ {
-        struct DisplayShort<'a>(&'a SalsaMemoryDump);
+    pub fn display_short(self) -> impl fmt::Display {
+        std::fmt::from_fn(move |f| {
+            let SalsaMemoryDump {
+                total_fields,
+                total_metadata,
+                total_memo_fields,
+                total_memo_metadata,
+                ref ingredients,
+                ref memos,
+            } = self;
 
-        impl fmt::Display for DisplayShort<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let SalsaMemoryDump {
-                    total_fields,
-                    total_metadata,
-                    total_memo_fields,
-                    total_memo_metadata,
-                    ref ingredients,
-                    ref memos,
-                } = *self.0;
+            writeln!(f, "=======SALSA SUMMARY=======")?;
 
-                writeln!(f, "=======SALSA SUMMARY=======")?;
+            writeln!(
+                f,
+                "TOTAL MEMORY USAGE: {:.2}MB",
+                bytes_to_mb(
+                    total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                )
+            )?;
 
-                writeln!(
-                    f,
-                    "TOTAL MEMORY USAGE: {:.2}MB",
-                    bytes_to_mb(
-                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
-                    )
-                )?;
+            writeln!(
+                f,
+                "    struct metadata = {:.2}MB",
+                bytes_to_mb(total_metadata),
+            )?;
+            writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
+            writeln!(
+                f,
+                "    memo metadata = {:.2}MB",
+                bytes_to_mb(total_memo_metadata),
+            )?;
+            writeln!(
+                f,
+                "    memo fields = {:.2}MB",
+                bytes_to_mb(total_memo_fields),
+            )?;
 
-                writeln!(
-                    f,
-                    "    struct metadata = {:.2}MB",
-                    bytes_to_mb(total_metadata),
-                )?;
-                writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
-                writeln!(
-                    f,
-                    "    memo metadata = {:.2}MB",
-                    bytes_to_mb(total_memo_metadata),
-                )?;
-                writeln!(
-                    f,
-                    "    memo fields = {:.2}MB",
-                    bytes_to_mb(total_memo_fields),
-                )?;
+            writeln!(f, "QUERY COUNT: {}", memos.len())?;
+            writeln!(f, "STRUCT COUNT: {}", ingredients.len())?;
 
-                writeln!(f, "QUERY COUNT: {}", memos.len())?;
-                writeln!(f, "STRUCT COUNT: {}", ingredients.len())?;
-
-                Ok(())
-            }
-        }
-
-        DisplayShort(self)
+            Ok(())
+        })
     }
 
     /// Returns a short report that provides fine-grained memory usage information per
     /// Salsa ingredient.
-    pub fn display_full(&self) -> impl fmt::Display + '_ {
-        struct DisplayFull<'a>(&'a SalsaMemoryDump);
+    pub fn display_full(self) -> impl fmt::Display {
+        std::fmt::from_fn(move |f| {
+            let SalsaMemoryDump {
+                total_fields,
+                total_metadata,
+                total_memo_fields,
+                total_memo_metadata,
+                ref ingredients,
+                ref memos,
+            } = self;
 
-        impl fmt::Display for DisplayFull<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let SalsaMemoryDump {
-                    total_fields,
-                    total_metadata,
-                    total_memo_fields,
-                    total_memo_metadata,
-                    ref ingredients,
-                    ref memos,
-                } = *self.0;
+            writeln!(f, "=======SALSA STRUCTS=======")?;
 
-                writeln!(f, "=======SALSA STRUCTS=======")?;
-
-                for ingredient in ingredients {
-                    let size_of_fields =
-                        ingredient.size_of_fields() + ingredient.heap_size_of_fields().unwrap_or(0);
-
-                    writeln!(
-                        f,
-                        "{:<50} metadata={:<8} fields={:<8} count={}",
-                        format!("`{}`", ingredient.debug_name()),
-                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
-                        ingredient.count()
-                    )?;
-                }
-
-                writeln!(f, "=======SALSA QUERIES=======")?;
-
-                for (query_fn, memo) in memos {
-                    let size_of_fields =
-                        memo.size_of_fields() + memo.heap_size_of_fields().unwrap_or(0);
-
-                    writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
-
-                    writeln!(
-                        f,
-                        "    metadata={:<8} fields={:<8} count={}",
-                        format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
-                        memo.count()
-                    )?;
-                }
-
-                writeln!(f, "=======SALSA SUMMARY=======")?;
-                writeln!(
-                    f,
-                    "TOTAL MEMORY USAGE: {:.2}MB",
-                    bytes_to_mb(
-                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
-                    )
-                )?;
+            for ingredient in ingredients {
+                let size_of_fields =
+                    ingredient.size_of_fields() + ingredient.heap_size_of_fields().unwrap_or(0);
 
                 writeln!(
                     f,
-                    "    struct metadata = {:.2}MB",
-                    bytes_to_mb(total_metadata),
+                    "{:<50} metadata={:<8} fields={:<8} count={}",
+                    format!("`{}`", ingredient.debug_name()),
+                    format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
+                    format!("{:.2}MB", bytes_to_mb(size_of_fields)),
+                    ingredient.count()
                 )?;
-                writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
-                writeln!(
-                    f,
-                    "    memo metadata = {:.2}MB",
-                    bytes_to_mb(total_memo_metadata),
-                )?;
-                writeln!(
-                    f,
-                    "    memo fields = {:.2}MB",
-                    bytes_to_mb(total_memo_fields),
-                )?;
-
-                Ok(())
             }
-        }
 
-        DisplayFull(self)
+            writeln!(f, "=======SALSA QUERIES=======")?;
+
+            for (query_fn, memo) in memos {
+                let size_of_fields =
+                    memo.size_of_fields() + memo.heap_size_of_fields().unwrap_or(0);
+
+                writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
+
+                writeln!(
+                    f,
+                    "    metadata={:<8} fields={:<8} count={}",
+                    format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
+                    format!("{:.2}MB", bytes_to_mb(size_of_fields)),
+                    memo.count()
+                )?;
+            }
+
+            writeln!(f, "=======SALSA SUMMARY=======")?;
+            writeln!(
+                f,
+                "TOTAL MEMORY USAGE: {:.2}MB",
+                bytes_to_mb(
+                    total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                )
+            )?;
+
+            writeln!(
+                f,
+                "    struct metadata = {:.2}MB",
+                bytes_to_mb(total_metadata),
+            )?;
+            writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
+            writeln!(
+                f,
+                "    memo metadata = {:.2}MB",
+                bytes_to_mb(total_memo_metadata),
+            )?;
+            writeln!(
+                f,
+                "    memo fields = {:.2}MB",
+                bytes_to_mb(total_memo_fields),
+            )?;
+
+            Ok(())
+        })
     }
 
     /// Serializes the memory dump to JSON.
