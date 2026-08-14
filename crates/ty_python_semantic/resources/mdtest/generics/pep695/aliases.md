@@ -772,34 +772,29 @@ type Ok1[T, *Ts] = tuple[T, *Ts]
 
 ## Solving a typevar through a generic union alias
 
-Expanding aliases must not disturb the solver. Here the parameter is a generic union alias whose
-first element is itself a generic alias, and both mention the typevar being solved. Expanding such
-an alias where union elements are filtered for disjointness drops the arms carrying the typevar, and
-the call then infers `Unknown` rather than picking the overload the argument matches.
+Expanding aliases must not disturb the solver. The parameter here is a generic union alias whose
+first arm is itself a generic alias, and both mention the typevar being solved. Expanding such an
+alias where union elements are filtered for disjointness drops the arm carrying the typevar, and the
+call infers `Unknown` instead of selecting the overload the argument matches.
 
 Reduced from `scipy.stats.differential_entropy`, whose parameter is
-`_ToArrayMax1D[InexactT, InexactT]`.
+`_ToArrayMax1D[InexactT, InexactT]`. Every element below is load-bearing: flattening either alias,
+replacing `CanArray1D` with a builtin generic, dropping either overload, dropping the bound, or
+dropping the `PyScalarT` arm all stop reproducing it.
 
 ```py
 from typing import assert_type, overload
 
-class Number: ...
-class Bool: ...
-class Integer(Number): ...
-class Inexact(Number): ...
-class Float64(Inexact): ...
+class Float64: ...
 class CanArray1D[ScalarT]: ...
 
-type Strict1D[PyScalarT, ScalarT] = CanArray1D[ScalarT] | list[PyScalarT | ScalarT]
-type ToArrayStrict1D[PyScalarT, ScalarT] = Strict1D[PyScalarT, ScalarT]
-
-type AsFloat64 = Float64 | Integer | Bool
-type ToArrayMax1D[ScalarT: Number | Bool, PyScalarT] = ToArrayStrict1D[PyScalarT, ScalarT] | PyScalarT | ScalarT
+type ToArrayStrict1D[ScalarT] = CanArray1D[ScalarT]
+type ToArrayMax1D[ScalarT, PyScalarT] = ToArrayStrict1D[ScalarT] | PyScalarT
 
 @overload
-def entropy[InexactT: Inexact](values: ToArrayMax1D[InexactT, InexactT]) -> InexactT: ...
+def entropy[InexactT: Float64](values: ToArrayMax1D[InexactT, InexactT]) -> InexactT: ...
 @overload
-def entropy(values: ToArrayMax1D[AsFloat64, float]) -> Float64: ...
+def entropy(values: ToArrayMax1D[Float64, float]) -> Float64: ...
 def entropy(values: object) -> object:
     raise NotImplementedError
 
