@@ -59,14 +59,14 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    AttributeInferenceScc, ClassLiteral, KnownClass, MethodDecorator, StaticClassLiteral, Type,
-    TypeAndQualifiers, TypeQualifiers,
+    AttributeInferenceScc, ClassBase, ClassLiteral, ClassType, KnownClass, MethodDecorator,
+    StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
@@ -235,10 +235,63 @@ pub(crate) fn annotated_assignment_annotation<'db>(
     .infer_annotated_assignment_annotation_only(assignment)
 }
 
+/// Infer a parameter's annotation without evaluating its function's defaults or decorators.
+///
+/// Recursive attribute components must identify another receiver's class before selecting their
+/// fixed-point query. Inferring the complete function signature here could evaluate a default
+/// that reads one of those attributes and enter its cycle before that selection is complete.
+#[salsa::tracked(returns(copy), heap_size = ruff_memory_usage::heap_size)]
+pub(crate) fn parameter_annotation_only<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) =
+        definition.kind(db)
+    else {
+        return None;
+    };
+
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let annotation = parameter.node(&module).parameter.annotation.as_deref()?;
+    let index = semantic_index(db, program_file);
+    let function = index
+        .scope(definition.file_scope(db))
+        .node()
+        .as_function()?;
+    let function_definition = index.expect_single_definition(function);
+    let annotation_scope = index
+        .expression_scope_id(annotation)
+        .to_scope_id(db, program_file);
+    let region = if annotation_scope == function_definition.scope(db) {
+        InferenceRegion::Deferred(function_definition)
+    } else {
+        InferenceRegion::Scope(annotation_scope, TypeContext::default())
+    };
+    let env = ProgramEnvironment::from_file(program_file);
+
+    Some(
+        TypeInferenceBuilder::new(
+            db,
+            &env,
+            region,
+            python_file.file(db),
+            program_file,
+            index,
+            &module,
+        )
+        .infer_parameter_annotation_only(annotation, function_definition),
+    )
+}
+
 /// Infer an attribute assignment's effect under its component's current attribute values.
 ///
-/// The component owns cycle recovery. Keeping this helper untracked allows recursive expression
-/// inference to reenter that component instead of terminating the cycle at an intermediate query.
+/// The component query is always entered before this helper, so recursive expression inference
+/// reenters that component and leaves it responsible for cycle recovery. Tracking this helper
+/// separately prevents a component spanning several modules from depending directly on the AST
+/// of every assignment it contains.
+#[salsa::tracked(returns(copy), heap_size = ruff_memory_usage::heap_size)]
 pub(crate) fn dependent_assignment_transfer<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -256,13 +309,13 @@ pub(crate) fn dependent_assignment_transfer<'db>(
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let attribute = assignment.target(&module).as_attribute_expr()?;
-    if !member_context.contains(db, attribute.attr.id.as_str()) {
+    if !member_context.contains_name(db, attribute.attr.id.as_str()) {
         return None;
     }
 
     let index = semantic_index(db, program_file);
     let owner = nearest_enclosing_class(db, index, definition.scope(db))?;
-    if owner != member_context.owner(db) {
+    if !member_context.contains_owner(db, owner) {
         return None;
     }
 
@@ -876,32 +929,85 @@ pub(crate) struct MemberInferenceContext<'db> {
 impl get_size2::GetSize for MemberInferenceContext<'_> {}
 
 impl<'db> MemberInferenceContext<'db> {
-    pub(crate) fn owner(self, db: &'db dyn Db) -> StaticClassLiteral<'db> {
-        self.component(db).owner(db)
+    /// Check whether the component includes any attributes assigned on this class.
+    pub(crate) fn contains_owner(self, db: &'db dyn Db, owner: StaticClassLiteral<'db>) -> bool {
+        self.component(db)
+            .members(db)
+            .iter()
+            .any(|member| member.owner == owner)
     }
 
-    pub(crate) fn target_method_decorator(self, db: &'db dyn Db) -> MethodDecorator {
-        self.component(db).target_method_decorator(db)
+    /// Check whether an attribute name could participate in this component.
+    pub(crate) fn contains_name(self, db: &'db dyn Db, name: &str) -> bool {
+        self.component(db)
+            .members(db)
+            .iter()
+            .any(|member| member.name.as_str() == name)
     }
 
     /// Check membership without requesting the component's current approximation.
-    pub(crate) fn contains(self, db: &'db dyn Db, name: &str) -> bool {
-        self.component(db)
-            .members(db)
-            .binary_search_by(|member| member.as_str().cmp(name))
-            .is_ok()
+    pub(crate) fn contains(
+        self,
+        db: &'db dyn Db,
+        owner: StaticClassLiteral<'db>,
+        target_method_decorator: MethodDecorator,
+        name: &str,
+    ) -> bool {
+        self.component(db).members(db).iter().any(|member| {
+            member.owner == owner
+                && member.target_method_decorator == target_method_decorator
+                && member.name.as_str() == name
+        })
     }
 
     /// Read an attribute through the component query that owns its fixed-point iteration.
-    pub(crate) fn incoming(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
-        if !self.contains(db, name) {
+    pub(crate) fn incoming(
+        self,
+        db: &'db dyn Db,
+        owner: StaticClassLiteral<'db>,
+        target_method_decorator: MethodDecorator,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        if !self.contains(db, owner, target_method_decorator, name) {
             return None;
         }
 
         let component = self.component(db);
-        component
-            .owner(db)
-            .attribute_scc_member(db, component, name)
+        owner.attribute_scc_member(db, component, target_method_decorator, name)
+    }
+
+    /// Resolve an inherited component member with its specialization on the actual receiver.
+    pub(crate) fn incoming_for_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver: ClassType<'db>,
+        target_method_decorator: MethodDecorator,
+        name: &str,
+    ) -> Option<(Type<'db>, Option<Specialization<'db>>)> {
+        let (receiver_owner, receiver_specialization) = receiver.static_class_literal(db)?;
+        let (defining_owner, component) = receiver_owner.attribute_inference_scc_for_receiver(
+            db,
+            name,
+            target_method_decorator,
+        )?;
+        if component != self.component(db) {
+            return None;
+        }
+
+        let specialization = receiver_owner
+            .iter_mro(db, receiver_specialization)
+            .find_map(|base| {
+                let ClassBase::Class(base) = base else {
+                    return None;
+                };
+                let (owner, specialization) = base.static_class_literal(db)?;
+                (owner == defining_owner).then_some(specialization)
+            })?;
+
+        Some((
+            self.incoming(db, defining_owner, target_method_decorator, name)?,
+            specialization,
+        ))
     }
 }
 

@@ -1527,13 +1527,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     place_table.place_id(PlaceExprRef::from(&place_expr))
                 && !place_table.member(member).is_instance_attribute()
                 && place_table.member(member).as_direct_attribute().is_some()
-                && let Some((class, target_method_decorator)) =
-                    value_type.member_cycle_receiver(db, self.program_environment())
-                && let Some((owner, _)) = class.static_class_literal(db)
-                && nearest_enclosing_class(db, self.index, self.scope()) == Some(owner)
-                && owner
-                    .attribute_inference_scc(db, attr.id.as_str(), target_method_decorator)
-                    .is_some()
+                && let Some(enclosing_owner) = nearest_enclosing_class(db, self.index, self.scope())
+                && {
+                    let component_member = |receiver: Type<'db>| {
+                        let Some((class, target_method_decorator)) =
+                            receiver.member_cycle_receiver(db, self.program_environment())
+                        else {
+                            return false;
+                        };
+                        let Some((owner, _)) = class.static_class_literal(db) else {
+                            return false;
+                        };
+                        let Some((_, component)) = owner.attribute_inference_scc_for_receiver(
+                            db,
+                            attr.id.as_str(),
+                            target_method_decorator,
+                        ) else {
+                            return false;
+                        };
+
+                        component
+                            .members(db)
+                            .iter()
+                            .any(|member| member.owner == enclosing_owner)
+                    };
+
+                    if let Some(union) = value_type.as_union() {
+                        union
+                            .elements(db)
+                            .iter()
+                            .any(|receiver| component_member(*receiver))
+                            && union.elements(db).iter().all(|receiver| {
+                                component_member(*receiver)
+                                    || receiver
+                                        .try_member_lookup(
+                                            db,
+                                            self.program_environment(),
+                                            attr.id.as_str(),
+                                        )
+                                        .ok()
+                                        .is_some_and(|member| {
+                                            member.place.is_definitely_bound()
+                                                && member.qualifiers.contains(
+                                                    TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
+                                                )
+                                        })
+                            })
+                    } else {
+                        component_member(value_type)
+                    }
+                }
             {
                 // Another instance's inferred attribute is not a declaration for its local write.
                 // Using the component's current value as context would hide the value being written
@@ -4303,6 +4346,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
         (target.is_name_expr() || self.is_valid_receiver_annotation_target(target))
             .then(|| self.infer_annotated_assignment_annotation(assignment))
+    }
+
+    /// Infer one function-parameter annotation without evaluating any other signature expression.
+    pub(super) fn infer_parameter_annotation_only(
+        mut self,
+        annotation: &ast::Expr,
+        function_definition: Definition<'db>,
+    ) -> Type<'db> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+        self.typevar_binding_context = Some(function_definition);
+        self.context
+            .inference_flags
+            .insert(InferenceFlags::IN_PARAMETER_ANNOTATION);
+
+        self.infer_type_expression_with_state(
+            annotation,
+            DeferredExpressionState::from(self.defer_annotations()),
+        )
     }
 
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
@@ -10241,6 +10303,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
+    /// Resolve provisional component values without replacing unrelated union alternatives.
+    fn contextual_attribute_incoming(
+        &self,
+        context: MemberInferenceContext<'db>,
+        receiver: Type<'db>,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+
+        let incoming_for_receiver = |receiver: Type<'db>| {
+            let (class, target_method_decorator) = receiver.member_cycle_receiver(db, env)?;
+            let (incoming, specialization) =
+                context.incoming_for_receiver(db, class, target_method_decorator, name)?;
+            Some(incoming.apply_optional_specialization(db, specialization))
+        };
+
+        let Some(union) = receiver.as_union() else {
+            return incoming_for_receiver(receiver);
+        };
+
+        let mut values = UnionBuilder::new(db, env);
+        let mut has_component_member = false;
+
+        for element in union.elements(db) {
+            if let Some(incoming) = incoming_for_receiver(*element) {
+                has_component_member = true;
+                values.add_in_place(incoming);
+                continue;
+            }
+
+            let member = element.try_member_lookup(db, env, name).ok()?;
+            if !member.place.is_definitely_bound() {
+                return None;
+            }
+            values.add_in_place(member.ignore_possibly_undefined()?);
+        }
+
+        has_component_member.then(|| values.build())
+    }
+
+    /// Select every matching receiver component before ordinary attribute or place lookup.
+    fn preflight_attribute_component(&self, receiver: Type<'db>, name: &str) {
+        let db = self.db();
+        if let Some(union) = receiver.as_union() {
+            for element in union.elements(db) {
+                self.preflight_attribute_component(*element, name);
+            }
+            return;
+        }
+
+        if let Some((class, target_method_decorator)) =
+            receiver.member_cycle_receiver(db, self.program_environment())
+            && let Some((receiver_owner, _)) = class.static_class_literal(db)
+            && let Some((owner, component)) = receiver_owner.attribute_inference_scc_for_receiver(
+                db,
+                name,
+                target_method_decorator,
+            )
+        {
+            let _ = owner.attribute_scc_member(db, component, target_method_decorator, name);
+        }
+    }
+
     /// Infer an attribute load on a known receiver, returning its recovery type if lookup fails.
     fn infer_attribute_load_impl(
         &mut self,
@@ -10264,7 +10390,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(context) = self.member_inference_context
-            && context.contains(self.db(), attribute.attr.id.as_str())
+            && context.contains_name(self.db(), attribute.attr.id.as_str())
             && let Some(place_expr) = PlaceExpr::try_from_expr(attribute)
             && let place_table = self
                 .index
@@ -10272,12 +10398,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(ScopedPlaceId::Member(member)) =
                 place_table.place_id(PlaceExprRef::from(&place_expr))
             && place_table.member(member).as_direct_attribute().is_some()
-            && let Some((class, target_method_decorator)) =
-                value_type.member_cycle_receiver(self.db(), self.program_environment())
-            && context.target_method_decorator(self.db()) == target_method_decorator
-            && let Some((owner, specialization)) = class.static_class_literal(self.db())
-            && owner == context.owner(self.db())
-            && let Some(incoming) = context.incoming(self.db(), attribute.attr.id.as_str())
+            && let Some(incoming) =
+                self.contextual_attribute_incoming(context, value_type, attribute.attr.id.as_str())
         {
             let scope = self.scope().file_scope_id(self.db());
             let use_id = attribute.scoped_use_id(self.db(), self.program_file());
@@ -10307,7 +10429,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             return Ok(self.narrow_place_with_applicable_constraints(
                 PlaceExprRef::from(&place_expr),
-                incoming.apply_optional_specialization(self.db(), specialization),
+                incoming,
                 &constraint_keys,
             ));
         }
@@ -10353,15 +10475,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(ScopedPlaceId::Member(member)) =
                 place_table.place_id(PlaceExprRef::from(&place_expr))
             && place_table.member(member).as_direct_attribute().is_some()
-            && let Some((class, target_method_decorator)) =
-                value_type.member_cycle_receiver(db, env)
-            && let Some((owner, _)) = class.static_class_literal(db)
-            && let Some(component) =
-                owner.attribute_inference_scc(db, attr.id.as_str(), target_method_decorator)
         {
             // Select the canonical component before resolving local bindings, which can otherwise
             // make an individual definition or expression the head of the recursive Salsa cycle.
-            let _ = owner.attribute_scc_member(db, component, attr.id.as_str());
+            self.preflight_attribute_component(value_type, attr.id.as_str());
         }
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type

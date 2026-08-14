@@ -969,7 +969,15 @@ impl Default for MemberLookupPolicy {
     }
 }
 
-/// A strongly connected set of attributes assigned on one class.
+/// One class-owned attribute participating in a recursive inference component.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct AttributeInferenceMember<'db> {
+    pub(crate) owner: StaticClassLiteral<'db>,
+    pub(crate) target_method_decorator: MethodDecorator,
+    pub(crate) name: Name,
+}
+
+/// A strongly connected set of attributes assigned on one or more classes.
 ///
 /// Members are stored in sorted order so that every read entering the same dependency cycle
 /// reaches the same Salsa query, regardless of which attribute was requested first.
@@ -977,10 +985,8 @@ impl Default for MemberLookupPolicy {
 pub(crate) struct AttributeInferenceScc<'db> {
     #[returns(copy)]
     pub(crate) owner: StaticClassLiteral<'db>,
-    #[returns(copy)]
-    pub(crate) target_method_decorator: MethodDecorator,
     #[returns(deref)]
-    pub(crate) members: Box<[Name]>,
+    pub(crate) members: Box<[AttributeInferenceMember<'db>]>,
 }
 
 // The Salsa heap is tracked separately.
