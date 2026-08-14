@@ -625,7 +625,7 @@ enum MemberLookupErrorKind<'db> {
         name: Type<'db>,
     },
 
-    /// An invalid call to a module-level `__getattr__` function.
+    /// An invalid module-level `__getattr__` call, stored without its call bindings.
     ModuleGetAttr {
         callable: Type<'db>,
         name: Type<'db>,
@@ -655,17 +655,10 @@ impl<'db> MemberLookupError<'db> {
         self,
         context: &InferContext<'db, '_>,
         object_type: Type<'db>,
-        target: ast::AnyNodeRef<'_>,
-        attribute: &str,
+        target: &ast::ExprAttribute,
         assigned_type: Option<Type<'db>>,
     ) {
-        if matches!(
-            target,
-            ast::AnyNodeRef::ExprAttribute(ast::ExprAttribute {
-                ctx: ast::ExprContext::Del,
-                ..
-            })
-        ) {
+        if matches!(target.ctx, ast::ExprContext::Del) {
             return;
         }
 
@@ -676,7 +669,6 @@ impl<'db> MemberLookupError<'db> {
             MemberLookupErrorKind::DescriptorGet(call_context)
                 if (assigned_type.is_none()
                     || call_context.descriptor_type(db).is_data_descriptor(db, env))
-                    && let ast::AnyNodeRef::ExprAttribute(target) = target
                     && let Some(failure) = call_context.into_error(db, env) =>
             {
                 report_bad_dunder_get_call(
@@ -713,28 +705,57 @@ impl<'db> MemberLookupError<'db> {
                         context,
                         &failure,
                         object_type,
-                        target,
-                        attribute,
+                        target.into(),
+                        target.attr.as_str(),
                         method,
                     );
                 }
             }
-            MemberLookupErrorKind::ModuleGetAttr { callable, name }
-                if assigned_type.is_none()
-                    && let Err(failure) =
-                        callable.try_call(db, env, &CallArguments::positional([name])) =>
-            {
-                report_bad_attribute_access_call(
+            MemberLookupErrorKind::ModuleGetAttr { .. } if assigned_type.is_none() => {
+                self.report_module_getattr_diagnostic(
                     context,
-                    &failure,
                     object_type,
-                    target,
-                    attribute,
-                    AttributeAccessMethod::GetAttr,
+                    target.into(),
+                    target.attr.as_str(),
                 );
             }
             MemberLookupErrorKind::DescriptorGet(_)
             | MemberLookupErrorKind::ModuleGetAttr { .. } => {}
+        }
+    }
+
+    /// Reports a failed module `__getattr__` call on an attribute access or import.
+    ///
+    /// Imports defer this diagnostic until they have ruled out a real submodule:
+    ///
+    /// ```python
+    /// from package import missing  # Calls package.__getattr__("missing").
+    /// ```
+    fn report_module_getattr_diagnostic(
+        self,
+        context: &InferContext<'db, '_>,
+        module_type: Type<'db>,
+        target: ast::AnyNodeRef<'_>,
+        name: &str,
+    ) {
+        let db = context.db();
+        let env = context.program_environment();
+
+        if let MemberLookupErrorKind::ModuleGetAttr {
+            callable,
+            name: name_type,
+        } = self.kind(db)
+            && let Err(failure) =
+                callable.try_call(db, env, &CallArguments::positional([name_type]))
+        {
+            report_bad_attribute_access_call(
+                context,
+                &failure,
+                module_type,
+                target,
+                name,
+                AttributeAccessMethod::GetAttr,
+            );
         }
     }
 }
@@ -9993,51 +10014,60 @@ impl<'db> ModuleLiteralType<'db> {
         Some(Type::module_literal(db, importing_file, submodule))
     }
 
+    /// Resolves a missing member through the module's `__getattr__` function.
+    ///
+    /// Invalid calls retain their declared return type for recovery while deferring the diagnostic
+    /// until the caller determines whether the fallback actually takes precedence.
+    ///
+    /// ```python
+    /// # example.py
+    /// def __getattr__() -> str: ...
+    ///
+    /// # Another module:
+    /// import example
+    /// example.missing  # Invalid call; the recovery type is str.
+    /// ```
     fn try_module_getattr(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> MemberLookupResult<'db> {
-        // For module literals, we want to try calling the module's own `__getattr__` function
-        // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
-        let module = self.module(db);
-        if let Some(file) = module
+        if let Some(file) = self
+            .module(db)
             .file(db)
             .map(|file| ProgramFile::new(db, file, env.program(db)))
+            && let Place::Defined(place) =
+                imported_symbol(db, env, Some(file), "__getattr__", None).place
         {
-            let getattr_symbol = imported_symbol(db, env, Some(file), "__getattr__", None);
-            // If we found a __getattr__ function, try to call it with the name argument
-            if let Place::Defined(place) = getattr_symbol.place {
-                let name_type = Type::string_literal(db, name);
-                let (return_type, error) =
-                    match place
-                        .ty
-                        .try_call(db, env, &CallArguments::positional([name_type]))
-                    {
-                        Ok(outcome) => (outcome.return_type(db, env), None),
-                        Err(CallError(_, bindings)) => (
-                            bindings.return_type(db, env),
-                            Some(MemberLookupErrorKind::ModuleGetAttr {
-                                callable: place.ty,
-                                name: name_type,
-                            }),
-                        ),
-                    };
-
-                return member_lookup_result(
-                    db,
-                    PlaceAndQualifiers {
-                        place: Place::Defined(DefinedPlace {
-                            ty: return_type,
-                            provenance: Provenance::Unknown,
-                            ..place
+            let name_type = Type::string_literal(db, name);
+            let (return_type, error) =
+                match place
+                    .ty
+                    .try_call(db, env, &CallArguments::positional([name_type]))
+                {
+                    Ok(outcome) => (outcome.return_type(db, env), None),
+                    Err(CallError(_, bindings)) => (
+                        bindings.return_type(db, env),
+                        Some(MemberLookupErrorKind::ModuleGetAttr {
+                            callable: place.ty,
+                            name: name_type,
                         }),
-                        qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
-                    },
-                    error,
-                );
-            }
+                    ),
+                };
+
+            return member_lookup_result(
+                db,
+                PlaceAndQualifiers {
+                    place: Place::Defined(DefinedPlace {
+                        ty: return_type,
+                        provenance: Provenance::Unknown,
+                        ..place
+                    }),
+                    qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
+                },
+                error,
+            );
         }
 
         Place::Undefined.into()
@@ -10055,6 +10085,9 @@ impl<'db> ModuleLiteralType<'db> {
     }
 
     /// Looks up a module member while preserving failed module-level `__getattr__` calls.
+    ///
+    /// Unlike [`Self::static_member`], this retains the failed call and its recovery type so direct
+    /// attribute access and `from` imports can report the error after resolving lookup precedence.
     fn try_static_member(
         self,
         db: &'db dyn Db,

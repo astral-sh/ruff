@@ -471,7 +471,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `__getattr__`.
         if let Some((ty, qualifiers, source_provenance, error)) = from_module_getattr {
             if let Some(error) = error {
-                error.report_diagnostic(&self.context, module_ty, alias.into(), name, None);
+                error.report_module_getattr_diagnostic(
+                    &self.context,
+                    module_ty,
+                    alias.into(),
+                    name,
+                );
             }
             self.add_declaration_with_binding(
                 alias.into(),
