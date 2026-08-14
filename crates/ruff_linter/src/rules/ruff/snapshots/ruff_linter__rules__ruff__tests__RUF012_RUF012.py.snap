@@ -177,7 +177,7 @@ help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 RUF012 Mutable default value for class attribute
    --> RUF012.py:180:12
     |
-179 | class LEU(ctypes.BigEndianUnion):
+179 | class LEU(ctypes.LittleEndianUnion):
 180 |     test = [""]
     |            ^^^^
 181 |     _fields_ = [

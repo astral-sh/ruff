@@ -254,12 +254,15 @@ pub(super) fn is_ctypes_structure_fields(
         analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["ctypes", "Structure"]
-                    | ["ctypes", "BigEndianStructure"]
-                    | ["ctypes", "LittleEndianStructure"]
-                    | ["ctypes", "Union"]
-                    | ["ctypes", "BigEndianUnion"]
-                    | ["ctypes", "LitleEndianUnion"]
+                [
+                    "ctypes",
+                    "Structure"
+                        | "BigEndianStructure"
+                        | "LittleEndianStructure"
+                        | "Union"
+                        | "BigEndianUnion"
+                        | "LittleEndianUnion"
+                ]
             )
         });
 

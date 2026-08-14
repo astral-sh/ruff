@@ -176,7 +176,7 @@ class U(ctypes.Union):
         ("b", BES),
     ]
 
-class LEU(ctypes.BigEndianUnion):
+class LEU(ctypes.LittleEndianUnion):
     test = [""]
     _fields_ = [
         ("a", LES),
