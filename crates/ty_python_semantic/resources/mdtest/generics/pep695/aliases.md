@@ -773,14 +773,11 @@ type Ok1[T, *Ts] = tuple[T, *Ts]
 ## Solving a typevar through a generic union alias
 
 Expanding aliases must not disturb the solver. The parameter here is a generic union alias whose
-first arm is itself a generic alias, and both mention the typevar being solved. Expanding such an
-alias where union elements are filtered for disjointness drops the arm carrying the typevar, and the
-call infers `Unknown` instead of selecting the overload the argument matches.
+first arm is itself a generic alias, and both mention the typevar being solved: the call still
+selects the overload the argument matches, rather than inferring `Unknown`.
 
-Reduced from `scipy.stats.differential_entropy`, whose parameter is
-`_ToArrayMax1D[InexactT, InexactT]`. Every element below is load-bearing: flattening either alias,
-replacing `CanArray1D` with a builtin generic, dropping either overload, dropping the bound, or
-dropping the `PyScalarT` arm all stop reproducing it.
+Reduced from `scipy.stats.differential_entropy`. Simplifying any part of the shape stops exercising
+the case.
 
 ```py
 from typing import assert_type, overload
