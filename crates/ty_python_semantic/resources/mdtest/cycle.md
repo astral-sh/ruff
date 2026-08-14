@@ -1473,6 +1473,33 @@ class Example:
 reveal_type(Example.left)  # revealed: list[str] | list[int | str]
 ```
 
+## Mutually dependent class attributes on a differently specialized receiver
+
+A class method can read a recursive class attribute through a class object with a different generic
+specialization.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Example(Generic[T]):
+    @classmethod
+    def update(cls, other: "type[Example[int]]", flag: bool) -> None:
+        if flag:
+            cls.left = [*other.right]
+        else:
+            cls.right = [*cls.left]
+
+    @classmethod
+    def initialize(cls, value: T) -> None:
+        cls.left = [value]
+        cls.right = [value]
+
+reveal_type(Example[str].left)  # revealed: list[int] | list[str]
+reveal_type(Example[str].right)  # revealed: list[int | str] | list[str]
+```
+
 ## Mutually dependent class attributes with a metaclass data descriptor
 
 A metaclass data descriptor takes precedence over provisional class-attribute values.
@@ -1642,9 +1669,262 @@ class Example:
             self.right = [*self.left]
 
     def get_left(self) -> list[str]:
-        return self.left  # error: [unsound-return-statement]
+        return self.left  # error: [invalid-return-type]
 
-reveal_type(Example().left)  # revealed: list[str] | list[Divergent]
+reveal_type(Example().left)  # revealed: list[str] | list[int]
+```
+
+## Mutually dependent attributes on differently specialized instances, left first
+
+A recursive attribute read through another instance uses that instance's generic specialization,
+even when the attribute on the current instance is checked first.
+
+`left.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Example(Generic[T]):
+    def update(self, other: "Example[int]", flag: bool) -> None:
+        if flag:
+            self.left = [*other.right]
+        else:
+            self.right = [*self.left]
+
+    def __init__(self, item: T) -> None:
+        self.left = [item]
+        self.right = [item]
+
+reveal_type(Example("a").left)  # revealed: list[int] | list[str]
+```
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example("a").right)  # revealed: list[int | str] | list[str]
+```
+
+## Mutually dependent attributes on differently specialized instances, right first
+
+Checking the other attribute first must retain both the current instance's type argument and the
+type argument of the other instance.
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example("a").right)  # revealed: list[int | str] | list[str]
+```
+
+`left.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Example(Generic[T]):
+    def update(self, other: "Example[int]", flag: bool) -> None:
+        if flag:
+            self.left = [*other.right]
+        else:
+            self.right = [*self.left]
+
+    def __init__(self, item: T) -> None:
+        self.left = [item]
+        self.right = [item]
+
+reveal_type(Example("a").left)  # revealed: list[int] | list[str]
+```
+
+## Mutually dependent attributes on an aliased specialized instance
+
+A local alias retains the other instance's specialization while participating in the recursive
+attribute component.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Example(Generic[T]):
+    def update(self, other: "Example[int]", flag: bool) -> None:
+        if flag:
+            source = other
+            self.left = [*source.right]
+        else:
+            self.right = [*self.left]
+
+    def __init__(self, item: T) -> None:
+        self.left = [item]
+        self.right = [item]
+
+reveal_type(Example("a").left)  # revealed: list[int] | list[str]
+reveal_type(Example("a").right)  # revealed: list[int | str] | list[str]
+```
+
+## Mutually dependent attributes captured from a specialized instance
+
+An eager comprehension can capture a receiver other than the enclosing method's first parameter. Its
+recursive attribute read still uses the captured receiver's specialization.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Example(Generic[T]):
+    def update(self, other: "Example[int]", flag: bool) -> None:
+        if flag:
+            self.left = [other.right[0] for _ in [0]]
+        else:
+            self.right = [self.left[0] for _ in [0]]
+
+    def __init__(self, item: T) -> None:
+        self.left = [item]
+        self.right = [item]
+
+reveal_type(Example("a").left)  # revealed: list[int] | list[str]
+reveal_type(Example("a").right)  # revealed: list[int | str] | list[str]
+```
+
+## Mutually dependent attributes preserve assignments on another instance
+
+A value assigned directly to another instance must take precedence over the symbolic component's
+value for that instance.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Example(Generic[T]):
+    def update(self, other: "Example[str]", flag: bool) -> None:
+        if flag:
+            other.right = [1]
+            self.left = [*other.right]
+        else:
+            self.right = [*self.left]
+
+    def __init__(self, item: T) -> None:
+        self.left = [item]
+        self.right = [item]
+
+def accept_string(value: str) -> None: ...
+
+reveal_type(Example("a").left)  # revealed: list[int] | list[str]
+accept_string(Example("a").left[0])  # error: [invalid-argument-type]
+```
+
+## Mutually dependent attributes preserve assignments through receiver aliases
+
+Assigning through a local alias of another instance retains the same concrete value as assigning
+through the original receiver.
+
+```py
+class Example:
+    def update(self, other: "Example", flag: bool) -> None:
+        if flag:
+            source = other
+            source.right = [1]
+            self.left = [*source.right]
+        else:
+            self.right = [*self.left]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+def accept_string(value: str) -> None: ...
+
+reveal_type(Example().left)  # revealed: list[int] | list[str]
+accept_string(Example().left[0])  # error: [invalid-argument-type]
+```
+
+## Captured attributes preserve assignments on another instance
+
+An eager comprehension must retain a value assigned to its captured receiver in the enclosing
+method.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Example(Generic[T]):
+    def update(self, other: "Example[str]", flag: bool) -> None:
+        if flag:
+            other.right = [1]
+            self.left = [other.right[0] for _ in [0]]
+        else:
+            self.right = [self.left[0] for _ in [0]]
+
+    def __init__(self, item: T) -> None:
+        self.left = [item]
+        self.right = [item]
+
+def accept_string(value: str) -> None: ...
+
+reveal_type(Example("a").left)  # revealed: list[int] | list[str]
+accept_string(Example("a").left[0])  # error: [invalid-argument-type]
+```
+
+## Mutually dependent attributes distinguish unrelated receivers
+
+Another class can have an attribute with the same name without its value being replaced by the
+current class's provisional attribute.
+
+```py
+class Other:
+    def __init__(self) -> None:
+        self.right = [b"a"]
+
+class Example:
+    def update(self, other: Other, flag: bool) -> None:
+        if flag:
+            self.left = [*other.right]
+        else:
+            self.right = [*self.left]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[bytes] | list[str]
+reveal_type(Example().right)  # revealed: list[bytes | str] | list[str]
+```
+
+## Finite attributes that read a deeply nested value from another class
+
+A same-named attribute on an unrelated receiver does not prove that the current class has a
+recursively growing attribute. Its finite nested value must remain available to diagnostics.
+
+```py
+class Other:
+    def __init__(self) -> None:
+        self.right = [[[1]]]
+
+class Example:
+    def __init__(self) -> None:
+        self.left = "a"
+        self.right = "a"
+
+    def update(self, other: Other, flag: bool) -> None:
+        if flag:
+            self.left = [other.right]
+        else:
+            self.right = [self.left]
+
+def accept_string(value: str) -> None: ...
+
+reveal_type(Example().left)  # revealed: str | list[list[list[list[int]]]]
+reveal_type(Example().right)  # revealed: str | list[str | list[list[list[list[int]]]]]
+accept_string(Example().right[0])  # error: [invalid-argument-type]
 ```
 
 ## Final annotations that establish an attribute type

@@ -1422,11 +1422,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             match place {
                 ScopedPlaceId::Member(member) => {
                     let member = self.current_place_table().member(member);
-                    if !member.is_instance_attribute() {
+                    let Some((receiver, _)) = member.as_direct_attribute() else {
+                        return;
+                    };
+
+                    if !member.is_instance_attribute()
+                        && (self.is_symbol_bound_in_intermediate_eager_scopes(
+                            receiver,
+                            assignment_scope,
+                        ) || self.place_tables[assignment_scope]
+                            .symbol_id(receiver)
+                            .is_none())
+                    {
                         return;
                     }
 
-                    // Member IDs are scoped. Canonicalize a captured `self.x` or `cls.x` into
+                    // Member IDs are scoped. Canonicalize a captured method-local receiver into
                     // the enclosing method so each dependency belongs to its definition's scope.
                     let member = member.clone();
                     let (place, added) =
@@ -1483,7 +1494,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if self
                     .current_place_table()
                     .member(member)
-                    .is_instance_attribute()
+                    .as_direct_attribute()
+                    .is_some()
                 {
                     dependencies.push(member);
                 }

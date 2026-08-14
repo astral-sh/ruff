@@ -3117,7 +3117,8 @@ impl<'db> StaticClassLiteral<'db> {
                     for member in use_def_map(db, definition.scope(db))
                         .definition_member_dependencies(definition)
                     {
-                        let Some(dependency) = place_table.member(member).as_instance_attribute()
+                        let Some((_, dependency)) =
+                            place_table.member(member).as_direct_attribute()
                         else {
                             continue;
                         };
@@ -3280,12 +3281,18 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             candidates.push(IndependentAttributeCandidate {
-                incoming: has_independent_value.then(|| {
-                    independent_values
-                        .build()
-                        .promote(db, &env)
-                        .promote_singletons(db, &env)
-                }),
+                incoming: if has_independent_value {
+                    Some(
+                        independent_values
+                            .build()
+                            .promote(db, &env)
+                            .promote_singletons(db, &env),
+                    )
+                } else {
+                    component
+                        .owner(db)
+                        .independent_attribute_value(db, attribute)
+                },
                 assignments: assignments.into_boxed_slice(),
                 augmented_bindings: (!augmented_bindings.is_empty())
                     .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
@@ -3335,11 +3342,9 @@ impl<'db> StaticClassLiteral<'db> {
                             for member in use_def_map(db, definition.scope(db))
                                 .definition_member_dependencies(*definition)
                             {
-                                let Some(name) = index
-                                    .place_table(definition.file_scope(db))
-                                    .member(member)
-                                    .as_instance_attribute()
-                                else {
+                                let member =
+                                    index.place_table(definition.file_scope(db)).member(member);
+                                let Some((_, name)) = member.as_direct_attribute() else {
                                     continue;
                                 };
                                 let Ok(source_index) = component
@@ -3365,10 +3370,18 @@ impl<'db> StaticClassLiteral<'db> {
                                     isize::try_from(effect_constructor_depth).unwrap_or(isize::MAX);
                                 let source_depth =
                                     isize::try_from(source_constructor_depth).unwrap_or(isize::MAX);
+                                // Another receiver's attribute can belong to an unrelated class.
+                                // Its name is a possible component edge, but cannot establish
+                                // that constructors grow around a cycle on this instance.
+                                let weight = if member.is_instance_attribute() {
+                                    effect_depth.saturating_sub(source_depth)
+                                } else {
+                                    0
+                                };
                                 constructor_edges.push(AttributeConstructorEdge {
                                     source: source_index,
                                     target: target_index,
-                                    weight: effect_depth.saturating_sub(source_depth),
+                                    weight,
                                 });
                             }
                             ty

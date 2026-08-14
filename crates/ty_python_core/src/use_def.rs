@@ -631,7 +631,7 @@ struct UseDefMapExtra<'db> {
     /// Definitions whose values may depend on an attribute read, including local aliases.
     member_dependent_definitions: ThinVec<Definition<'db>>,
 
-    /// Specific first-parameter attributes that may contribute to each definition's value.
+    /// Specific direct receiver attributes that may contribute to each definition's value.
     ///
     /// Only nonempty dependency sets are retained, ordered by definition and then member.
     member_dependencies_by_definition: Box<[(Definition<'db>, ScopedMemberId)]>,
@@ -922,7 +922,7 @@ impl<'db> UseDefMap<'db> {
         })
     }
 
-    /// First-parameter attributes that this definition's value might read.
+    /// Direct receiver attributes that this definition's value might read.
     ///
     /// A member is included if any reachable assignment branch or local alias could read it.
     /// Member identifiers belong to the same scope as `definition`.
@@ -1858,7 +1858,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Definitions whose values may depend on an attribute read, including local aliases.
     member_dependent_definitions: FxHashSet<Definition<'db>>,
 
-    /// Specific first-parameter attributes that may contribute to a definition's value.
+    /// Specific direct receiver attributes that may contribute to a definition's value.
     member_dependencies_by_definition: FxHashMap<Definition<'db>, SmallVec<[ScopedMemberId; 2]>>,
 
     /// Currently live bindings and declarations for each place.
@@ -2042,7 +2042,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.member_dependent_definitions.insert(definition);
     }
 
-    /// Retain the first-parameter attributes that may contribute to a completed definition.
+    /// Retain the direct receiver attributes that may contribute to a completed definition.
     pub(super) fn record_definition_member_dependencies(
         &mut self,
         definition: Definition<'db>,
@@ -2056,7 +2056,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    /// First-parameter attributes that may contribute to an earlier local definition.
+    /// Direct receiver attributes that may contribute to an earlier local definition.
     pub(super) fn definition_member_dependencies(
         &self,
         definition: Definition<'db>,

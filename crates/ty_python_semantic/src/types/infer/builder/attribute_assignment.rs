@@ -748,7 +748,37 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }
-                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                let context = TypeContext::new(Some(*ty));
+                let mut value_ty = self.infer_value(context, false);
+                if qualifiers.contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                    && !value_ty.is_assignable_to(
+                        self.builder.db(),
+                        self.builder.program_environment(),
+                        *ty,
+                    )
+                    && let Some((class, decorator)) = object_ty.member_cycle_receiver(
+                        self.builder.db(),
+                        self.builder.program_environment(),
+                    )
+                    && let Some((owner, _)) = class.static_class_literal(self.builder.db())
+                    && owner
+                        .attribute_inference_scc(self.builder.db(), self.attribute, decorator)
+                        .is_some()
+                {
+                    // An inferred union of invariant containers is not a declaration. Feeding it
+                    // back into an assignment can widen an otherwise valid collection expression.
+                    let uncontextualized = self.infer_value(TypeContext::default(), false);
+                    if uncontextualized.is_assignable_to(
+                        self.builder.db(),
+                        self.builder.program_environment(),
+                        *ty,
+                    ) {
+                        value_ty = uncontextualized;
+                    } else {
+                        // The final, non-speculative pass must use the original failing context.
+                        value_ty = self.infer_value(context, false);
+                    }
+                }
                 let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
                 if *possibly_missing {
                     self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);

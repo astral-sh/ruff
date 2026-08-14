@@ -29,9 +29,9 @@ use super::{
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
     MemberInferenceContext, OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
-    infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_expression_types_with_member_context, infer_same_file_expression_type,
-    infer_scope_types_with_member_context, infer_unpack_types,
+    dependent_assignment_transfer, infer_deferred_types, infer_definition_types,
+    infer_expression_types, infer_expression_types_with_member_context,
+    infer_same_file_expression_type, infer_scope_types_with_member_context, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -142,8 +142,8 @@ use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
-    ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness,
-    unpack::UnpackPosition,
+    ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, ProgramFile, SemanticIndex,
+    Truthiness, unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -1515,10 +1515,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// normal attribute or subscript lookup on its receiver.
     fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
         let db = self.db();
-        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+        if let AnyNodeRef::ExprAttribute(attribute) = node {
+            let ast::ExprAttribute { value, attr, .. } = attribute;
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
                 self.infer_maybe_standalone_expression(value, TypeContext::default())
             });
+
+            if let Some(place_expr) = PlaceExpr::try_from_expr(attribute)
+                && let place_table = self.index.place_table(self.scope().file_scope_id(db))
+                && let Some(ScopedPlaceId::Member(member)) =
+                    place_table.place_id(PlaceExprRef::from(&place_expr))
+                && !place_table.member(member).is_instance_attribute()
+                && place_table.member(member).as_direct_attribute().is_some()
+                && let Some((class, target_method_decorator)) =
+                    value_type.member_cycle_receiver(db, self.program_environment())
+                && let Some((owner, _)) = class.static_class_literal(db)
+                && nearest_enclosing_class(db, self.index, self.scope()) == Some(owner)
+                && owner
+                    .attribute_inference_scc(db, attr.id.as_str(), target_method_decorator)
+                    .is_some()
+            {
+                // Another instance's inferred attribute is not a declaration for its local write.
+                // Using the component's current value as context would hide the value being written
+                // before that value can contribute to the component.
+                return None;
+            }
+
             if let Place::Defined(DefinedPlace {
                 ty,
                 definedness: Definedness::AlwaysDefined,
@@ -9742,7 +9764,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             DefinitionState::Defined(definition)
                                 if !is_discarded_dict_key_assignment(db, definition) =>
                             {
-                                let binding_ty = binding_type(db, definition);
+                                let binding_ty = if let Some(member_context) =
+                                    self.member_inference_context
+                                    && let ScopedPlaceId::Member(member) = place
+                                    && place_table.member(member).as_direct_attribute().is_some()
+                                    && !place_table.member(member).is_instance_attribute()
+                                    && let Some(ty) = dependent_assignment_transfer(
+                                        db,
+                                        definition,
+                                        member_context,
+                                    ) {
+                                    ty
+                                } else {
+                                    binding_type(db, definition)
+                                };
                                 union.add_in_place(
                                     binding
                                         .narrowing_constraint
@@ -10236,21 +10271,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .place_table(self.scope().file_scope_id(self.db()))
             && let Some(ScopedPlaceId::Member(member)) =
                 place_table.place_id(PlaceExprRef::from(&place_expr))
-            && place_table.member(member).is_instance_attribute()
+            && place_table.member(member).as_direct_attribute().is_some()
             && let Some((class, target_method_decorator)) =
                 value_type.member_cycle_receiver(self.db(), self.program_environment())
             && context.target_method_decorator(self.db()) == target_method_decorator
-            && class
-                .static_class_literal(self.db())
-                .is_some_and(|(owner, _)| owner == context.owner(self.db()))
+            && let Some((owner, specialization)) = class.static_class_literal(self.db())
+            && owner == context.owner(self.db())
             && let Some(incoming) = context.incoming(self.db(), attribute.attr.id.as_str())
         {
             let scope = self.scope().file_scope_id(self.db());
             let use_id = attribute.scoped_use_id(self.db(), self.program_file());
+            let mut constraint_keys = SmallVec::<[(FileScopeId, ConstraintKey); 2]>::new();
+            constraint_keys.push((scope, ConstraintKey::UseId(use_id)));
+
+            for (enclosing_scope, _) in self.index.ancestor_scopes(scope).skip(1) {
+                match self.index.enclosing_snapshot(
+                    enclosing_scope,
+                    PlaceExprRef::from(&place_expr),
+                    scope,
+                ) {
+                    EnclosingSnapshotResult::FoundBindings(_) => {
+                        constraint_keys.push((enclosing_scope, ConstraintKey::NestedScope(scope)));
+                        break;
+                    }
+                    EnclosingSnapshotResult::FoundConstraint(constraint) => {
+                        constraint_keys.push((
+                            enclosing_scope,
+                            ConstraintKey::NarrowingConstraint(constraint),
+                        ));
+                    }
+                    EnclosingSnapshotResult::NoLongerInEagerContext => break,
+                    EnclosingSnapshotResult::NotFound => {}
+                }
+            }
+
             return Ok(self.narrow_place_with_applicable_constraints(
                 PlaceExprRef::from(&place_expr),
-                incoming,
-                &[(scope, ConstraintKey::UseId(use_id))],
+                incoming.apply_optional_specialization(self.db(), specialization),
+                &constraint_keys,
             ));
         }
 
@@ -10294,7 +10352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let place_table = self.index.place_table(self.scope().file_scope_id(db))
             && let Some(ScopedPlaceId::Member(member)) =
                 place_table.place_id(PlaceExprRef::from(&place_expr))
-            && place_table.member(member).is_instance_attribute()
+            && place_table.member(member).as_direct_attribute().is_some()
             && let Some((class, target_method_decorator)) =
                 value_type.member_cycle_receiver(db, env)
             && let Some((owner, _)) = class.static_class_literal(db)
