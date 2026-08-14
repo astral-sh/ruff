@@ -1346,6 +1346,94 @@ def g[T: A](b: B[T]):
     return f(b.x)  # Fine
 ```
 
+## Inferred upper bounds restrict the range of gradual solutions
+
+Gradual lower bounds are intersected with their concrete upper bounds.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def infer[T](lower: T, upper: Callable[[T], None]) -> T:
+    return lower
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int], None]):
+    reveal_type(infer(any_value, upper))  # revealed: int & Any
+    reveal_type(infer(unknown_value, upper))  # revealed: int & Unknown
+```
+
+The inferred upper bound is also retained when an invariant return type triggers promotion:
+
+```py
+def infer_list[T](lower: T, upper: Callable[[T], None]) -> list[T]:
+    return [lower]
+
+def _(any_value: Any, upper: Callable[[int], None]):
+    reveal_type(infer_list(any_value, upper))  # revealed: list[int & Any]
+```
+
+Promotion must also preserve the upper bound when a gradual solution contains promotable literals:
+
+```py
+def infer_promoted[T](static: T, gradual: T, upper: Callable[[T], None]) -> list[T]:
+    return [static, gradual]
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int | str], None]):
+    reveal_type(infer_promoted(1, any_value, upper))  # revealed: list[int | (str & Any)]
+    reveal_type(infer_promoted(1, unknown_value, upper))  # revealed: list[int | (str & Unknown)]
+```
+
+The same restriction applies when a type variable occurs in a callable's parameter and return types:
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+def predicate(value: Derived) -> bool:
+    return True
+
+def gradual_rule(value: Derived) -> Unknown:
+    raise NotImplementedError
+
+def condition[T](predicate: Callable[[T], bool], rule: Callable[[T], T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+reveal_type(condition(predicate, gradual_rule))  # revealed: (Derived & Unknown, /) -> Derived & Unknown
+```
+
+If the upper bound is a union, it is distributed across the gradual lower bound:
+
+```py
+class A: ...
+class B: ...
+class Result(A): ...
+
+def reduce[T](function: Callable[[T, T], T], values: Iterable[T]) -> T:
+    raise NotImplementedError
+
+def combine(left: A | B, right: A | B) -> Result:
+    raise NotImplementedError
+
+def _(values: Iterable[Any]):
+    # revealed: Result | (A & Any) | (B & Any)
+    reveal_type(reduce(combine, values))
+```
+
+Declared upper bounds validate a gradual solution but do not restrict its range:
+
+```py
+def bounded[T: A | B](value: T) -> T:
+    return value
+
+def bounded_with_upper[T: A | B](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, upper: Callable[[object], None]):
+    reveal_type(bounded(any_value))  # revealed: Any
+    reveal_type(bounded_with_upper(any_value, upper))  # revealed: Any
+```
+
 ## Typevars in a union
 
 ```py

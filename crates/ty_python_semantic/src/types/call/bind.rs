@@ -5846,7 +5846,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::default_solve(db, self.env, constraints, path_bound)
+                    PathBounds::preliminary_solve(db, self.env, constraints, path_bound)
                 });
 
                 let Solutions::Constrained(solutions) = solutions else {
@@ -7652,7 +7652,10 @@ impl<'db> Binding<'db> {
                 generic_context.inferable_typevars(db),
             );
 
-            if let Solutions::Constrained(solutions) = path_bounds.solve(db, env, constraints) {
+            let solutions = path_bounds.solve_with(|_variance, path_bound| {
+                PathBounds::preliminary_solve(db, env, constraints, path_bound)
+            });
+            if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(db);

@@ -2966,7 +2966,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.inferable,
             |_variance, path_bound| {
                 let solution =
-                    PathBounds::default_solve(db, self.env, self.constraints, path_bound);
+                    PathBounds::preliminary_solve(db, self.env, self.constraints, path_bound);
                 if solution.is_err() && first_error.is_none() {
                     first_error = self.specialization_error_from_failed_bounds(path_bound);
                 }

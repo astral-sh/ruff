@@ -3537,6 +3537,74 @@ impl<'db> PathBound<'db> {
     fn has_only_gradual_evidence(&self) -> bool {
         self.has_only_gradual_evidence
     }
+
+    /// Restricts the range of a gradual solution by any concrete upper bounds inferred for this
+    /// constraint.
+    fn restrict_gradual_solution(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        solution: Type<'db>,
+    ) -> Type<'db> {
+        if self.lower != Some(solution)
+            || solution.bottom_materialization(db, env) == solution.top_materialization(db, env)
+            || !self.has_upper()
+        {
+            return solution;
+        }
+
+        // Unresolved type-variable relationships must not escape into the specialization.
+        if solution.has_typevar(db, env) || solution.has_unspecialized_type_var(db, env) {
+            return solution;
+        }
+
+        // Constrained type variables select solutions from their own set of constraints.
+        if matches!(
+            self.bound_typevar.typevar(db).bound_or_constraints(db, env),
+            Some(TypeVarBoundOrConstraints::Constraints(_))
+        ) {
+            return solution;
+        }
+
+        // `Divergent` is not safely reflexive, so we cannot intersect identical bounds.
+        if self.upper.clauses.len() == 1 && self.upper.clauses.contains(&solution) {
+            return solution;
+        }
+
+        // Ignore gradual or unresolved upper bounds.
+        if !self.upper.clauses.iter().all(|upper| {
+            upper.is_fully_static(db, env)
+                && !upper.has_typevar(db, env)
+                && !upper.has_unspecialized_type_var(db, env)
+        }) {
+            return solution;
+        }
+
+        // Restrict the range of each gradual solution by the upper bound of this constraint.
+        let restrict = |element: Type<'db>| {
+            if element.bottom_materialization(db, env) == element.top_materialization(db, env) {
+                Some(element)
+            } else {
+                IntersectionType::bounded_from_elements(
+                    db,
+                    env,
+                    self.upper
+                        .clauses
+                        .iter()
+                        .copied()
+                        .chain(iter::once(element)),
+                )
+            }
+        };
+
+        let restricted = match solution {
+            Type::Union(union) => union.try_map(db, env, |element| restrict(*element)),
+            _ => restrict(solution),
+        };
+
+        // Keep the original gradual type if the intersection exceeds the DNF expansion limit.
+        restricted.unwrap_or(solution)
+    }
 }
 
 impl<'db> Type<'db> {
@@ -3894,6 +3962,25 @@ impl<'db> PathBounds<'db> {
     /// - `Ok(None)` if the typevar is unsolved (no solution added)
     /// - `Err(())` if the path is invalid (bounds violate the typevar's declared constraints)
     pub(crate) fn default_solve(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        path_bound: &PathBound<'db>,
+    ) -> Result<Option<Type<'db>>, ()> {
+        let Some(solution) = Self::preliminary_solve(db, env, builder, path_bound)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(
+            path_bound.restrict_gradual_solution(db, env, solution),
+        ))
+    }
+
+    /// Selects a preliminary solution for type-context inference.
+    ///
+    /// Unlike [`Self::default_solve`], the range of a gradual solution is not restricted by inferred
+    /// upper bounds, as the inferred types may not have stabilized yet.
+    pub(crate) fn preliminary_solve(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
