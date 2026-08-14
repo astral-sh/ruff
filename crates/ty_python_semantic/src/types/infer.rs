@@ -59,7 +59,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, KnownClass, MethodDecorator, StaticClassLiteral, Type, TypeAndQualifiers,
+    TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -234,11 +235,11 @@ pub(crate) fn annotated_assignment_annotation<'db>(
     .infer_annotated_assignment_annotation_only(assignment)
 }
 
-/// Infer an attribute assignment's effect while assuming its previous value is `incoming`.
+/// Infer an attribute assignment's effect under a shared set of provisional attribute values.
 ///
-/// The assumption is included in expression and definition query identities, allowing ordinary
+/// The assumptions are included in expression and definition query identities, allowing ordinary
 /// inference and name resolution to distinguish this provisional result from uncontextualized
-/// inference.
+/// inference while retaining independent roots for mutually dependent attributes.
 #[salsa::tracked(
     returns(copy),
     cycle_result=|_, _, _, _| None,
@@ -247,7 +248,7 @@ pub(crate) fn annotated_assignment_annotation<'db>(
 pub(crate) fn dependent_assignment_transfer<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    incoming: Type<'db>,
+    member_context: MemberInferenceContext<'db>,
 ) -> Option<Type<'db>> {
     let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
         return None;
@@ -261,11 +262,15 @@ pub(crate) fn dependent_assignment_transfer<'db>(
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let attribute = assignment.target(&module).as_attribute_expr()?;
+    member_context.incoming(db, attribute.attr.id.as_str())?;
+
     let index = semantic_index(db, program_file);
     let owner = nearest_enclosing_class(db, index, definition.scope(db))?;
+    if owner != member_context.owner(db) {
+        return None;
+    }
+
     let expression = index.try_expression(assignment.value(&module))?;
-    let member_context =
-        MemberInferenceContext::new(db, owner, attribute.attr.id.clone(), incoming);
 
     let inference = infer_expression_types_with_member_context(
         db,
@@ -811,19 +816,30 @@ impl<'db> InferScope<'db> {
     }
 }
 
-/// The provisional value assumed for reads of one recursively inferred attribute.
+/// Provisional values assumed for reads of independently initialized attributes on one class.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct MemberInferenceContext<'db> {
     #[returns(copy)]
     pub(crate) owner: StaticClassLiteral<'db>,
-    #[returns(ref)]
-    pub(crate) name: Name,
     #[returns(copy)]
-    pub(crate) incoming: Type<'db>,
+    pub(crate) target_method_decorator: MethodDecorator,
+    #[returns(deref)]
+    pub(crate) roots: Box<[(Name, Type<'db>)]>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for MemberInferenceContext<'_> {}
+
+impl<'db> MemberInferenceContext<'db> {
+    /// Return the independently established type for a provisionally known attribute.
+    pub(crate) fn incoming(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let roots = self.roots(db);
+        let index = roots
+            .binary_search_by(|(candidate, _)| candidate.as_str().cmp(name))
+            .ok()?;
+        Some(roots[index].1)
+    }
+}
 
 /// An expression inferred under a provisional attribute value.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]

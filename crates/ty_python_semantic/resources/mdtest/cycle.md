@@ -635,6 +635,173 @@ class FinalParent(FinalBase):
         return self.values
 ```
 
+## Mutually dependent attributes when the left attribute is checked first
+
+Independently initialized attributes can depend on each other through different branches.
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+```
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[str]
+```
+
+## Mutually dependent attributes when the right attribute is checked first
+
+Checking the opposite attribute first preserves both independently initialized types.
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[str]
+```
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+```
+
+## Mutually dependent attributes that widen an initial value
+
+Widening one attribute invalidates provisional values for other attributes that depend on it.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = self.right
+        else:
+            self.right = self.left + [1]
+
+    def get_left(self) -> list[str]:
+        return self.left  # error: [invalid-return-type]
+
+reveal_type(Example().left)  # revealed: list[str] | list[int | str]
+reveal_type(Example().right)  # revealed: list[str] | list[int | str]
+```
+
+## Mutually dependent attributes with a class-body declaration
+
+A class-body declaration takes precedence over a provisional instance-attribute value.
+
+```py
+class Example:
+    right: list[int]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]  # error: [invalid-assignment]
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left]  # error: [invalid-assignment]
+
+    def get_left(self) -> list[str]:
+        return self.left  # error: [invalid-return-type]
+
+reveal_type(Example().left)  # revealed: list[str] | list[int]
+reveal_type(Example().right)  # revealed: list[int]
+```
+
+## Mutually dependent attributes with an inherited data descriptor
+
+An inherited data descriptor retains precedence over provisional instance-attribute values.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> list[int]:
+        return [1]
+
+    def __set__(self, instance: object, value: list[int]) -> None:
+        pass
+
+class Base:
+    right = Descriptor()
+
+class Example(Base):
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]  # error: [invalid-assignment]
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left]  # error: [invalid-assignment]
+
+    def get_left(self) -> list[str]:
+        return self.left  # error: [invalid-return-type]
+
+reveal_type(Example().left)  # revealed: list[str] | list[int]
+reveal_type(Example().right)  # revealed: list[int]
+```
+
+## Mutually dependent attributes on different instances of the same class
+
+A provisional value for `self.right` cannot replace a value assigned to another instance.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+    def update(self, other: "Example", flag: bool) -> None:
+        if flag:
+            other.right = [1]
+            self.left = [*other.right]
+        else:
+            self.right = [*self.left]
+
+    def get_left(self) -> list[str]:
+        return self.left  # error: [unsound-return-statement]
+
+reveal_type(Example().left)  # revealed: list[str] | list[Divergent]
+```
+
 ## Final annotations that establish an attribute type
 
 An initialized bare `Final` infers its value, while `Final[T]` retains its explicit declared type.

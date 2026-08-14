@@ -49,7 +49,7 @@ use crate::{
         },
         generics::Specialization,
         infer::{
-            annotated_assignment_annotation, dependent_assignment_transfer,
+            MemberInferenceContext, annotated_assignment_annotation, dependent_assignment_transfer,
             function_known_decorator_flags, infer_unpack_types,
         },
         infer_expression_type, inferred_declaration,
@@ -2994,75 +2994,208 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> Option<Type<'db>> {
-        let class_body_scope = self.body_scope(db);
-        let index = semantic_index(db, class_body_scope.program_file(db));
-        let module = parsed_module(db, class_body_scope.program_file(db).python_file(db)).load(db);
-        let env = ProgramEnvironment::from_scope(class_body_scope);
-        let mut independent_values = UnionBuilder::new(db, &env);
-        let mut has_independent_value = false;
-        let mut dependent_assignments = Vec::new();
+        let class_body_scope = attribute.class_body_scope(db);
+        let has_dependent_assignment =
+            attribute_assignments(db, class_body_scope, attribute.name(db).as_str()).any(
+                |(mut bindings, _)| {
+                    bindings.any(|binding| {
+                        let DefinitionState::Defined(definition) = binding.binding else {
+                            return false;
+                        };
 
-        for (bindings, method_scope_id) in
-            attribute_assignments(db, class_body_scope, attribute.name(db).as_str())
-        {
-            let method_scope = index.scope(method_scope_id);
-            if !implicit_attribute_matches_scope(db, attribute, method_scope)
-                || implicit_attribute_scope_reachability(
-                    db,
-                    index,
-                    class_body_scope,
-                    method_scope,
-                    &module,
-                )
-                .is_always_false()
-            {
-                continue;
-            }
-
-            for binding in bindings {
-                let DefinitionState::Defined(binding) = binding.binding else {
-                    continue;
-                };
-                let DefinitionKind::Assignment(assignment) = binding.kind(db) else {
-                    continue;
-                };
-
-                if use_def_map(db, binding.scope(db))
-                    .definition_may_depend_on_instance_member(binding)
-                {
-                    dependent_assignments.push(binding);
-                    continue;
-                }
-
-                if assignment.unpack().is_none()
-                    && let ty = infer_expression_type(
-                        db,
-                        index.expression(assignment.value(&module)),
-                        TypeContext::default(),
-                    )
-                    && !ty.is_divergent()
-                {
-                    has_independent_value = true;
-                    independent_values.add_in_place(ty);
-                }
-            }
-        }
-
-        if !has_independent_value || dependent_assignments.is_empty() {
+                        matches!(definition.kind(db), DefinitionKind::Assignment(_))
+                            && use_def_map(db, definition.scope(db))
+                                .definition_may_depend_on_instance_member(definition)
+                    })
+                },
+            );
+        if !has_dependent_assignment {
             return None;
         }
 
-        let incoming = independent_values
-            .build()
-            .promote(db, &env)
-            .promote_singletons(db, &env);
-        dependent_assignments
-            .into_iter()
-            .all(|definition| {
-                dependent_assignment_transfer(db, definition, incoming)
-                    .is_some_and(|effect| effect.is_subtype_of(db, &env, incoming))
-            })
-            .then_some(incoming)
+        let group = IndependentAttributeGroup::new(db, self, attribute.target_method_decorator(db));
+        let candidates = Self::independent_own_attribute_candidates(db, group);
+        let candidate_index = candidates
+            .binary_search_by(|candidate| candidate.name.as_str().cmp(attribute.name(db).as_str()))
+            .ok()?;
+        if candidates[candidate_index].dependent_assignments.is_empty() {
+            return None;
+        }
+
+        let roots = Self::independent_own_attribute_values(db, group);
+        roots
+            .binary_search_by(|(name, _)| name.as_str().cmp(attribute.name(db).as_str()))
+            .ok()
+            .map(|index| roots[index].1)
+    }
+
+    /// Collect all provisional class-member roots before evaluating any dependent assignment.
+    ///
+    /// A transfer from `self.left` to `self.right` can participate in the same cycle as a transfer
+    /// in the opposite direction. Discovering one member and validating it before discovering the
+    /// other would re-enter this query without either provisional root being available.
+    #[salsa::tracked(
+        returns(deref),
+        cycle_initial=|_, _, _| Box::default(),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn independent_own_attribute_candidates(
+        db: &'db dyn Db,
+        group: IndependentAttributeGroup<'db>,
+    ) -> Box<[IndependentAttributeCandidate<'db>]> {
+        let class_body_scope = group.owner(db).body_scope(db);
+        let index = semantic_index(db, class_body_scope.program_file(db));
+        let module = parsed_module(db, class_body_scope.program_file(db).python_file(db)).load(db);
+        let env = ProgramEnvironment::from_scope(class_body_scope);
+        let mut candidates = Vec::new();
+
+        for name in implicit_attribute_names(db, class_body_scope) {
+            // Class-body declarations and descriptors take precedence over an instance initializer.
+            // Checking indexed namespace symbols preserves that contract without inferring their
+            // values before every provisional root has been collected.
+            if group.owner(db).iter_mro(db, None).any(|superclass| {
+                let ClassBase::Class(superclass) = superclass else {
+                    return false;
+                };
+                let (class, _) = superclass.class_literal_and_specialization(db);
+                let ClassLiteral::Static(class) = class else {
+                    return false;
+                };
+
+                let class_namespace = place_table(db, class.body_scope(db));
+                class_namespace.symbol_id(name.as_str()).is_some_and(|id| {
+                    let symbol = class_namespace.symbol(id);
+                    symbol.is_bound() || symbol.is_declared()
+                })
+            }) {
+                continue;
+            }
+
+            let attribute = ImplicitAttributeName::new(
+                db,
+                class_body_scope,
+                name,
+                group.target_method_decorator(db),
+            );
+            if implicit_attribute_declaration(db, attribute).0 {
+                continue;
+            }
+
+            let mut independent_values = UnionBuilder::new(db, &env);
+            let mut has_independent_value = false;
+            let mut dependent_assignments = Vec::new();
+
+            for (bindings, method_scope_id) in
+                attribute_assignments(db, class_body_scope, attribute.name(db).as_str())
+            {
+                let method_scope = index.scope(method_scope_id);
+                if !implicit_attribute_matches_scope(db, attribute, method_scope)
+                    || implicit_attribute_scope_reachability(
+                        db,
+                        index,
+                        class_body_scope,
+                        method_scope,
+                        &module,
+                    )
+                    .is_always_false()
+                {
+                    continue;
+                }
+
+                for binding in bindings {
+                    let DefinitionState::Defined(binding) = binding.binding else {
+                        continue;
+                    };
+                    let DefinitionKind::Assignment(assignment) = binding.kind(db) else {
+                        continue;
+                    };
+
+                    if use_def_map(db, binding.scope(db))
+                        .definition_may_depend_on_instance_member(binding)
+                    {
+                        dependent_assignments.push(binding);
+                        continue;
+                    }
+
+                    if assignment.unpack().is_none()
+                        && let ty = infer_expression_type(
+                            db,
+                            index.expression(assignment.value(&module)),
+                            TypeContext::default(),
+                        )
+                        && !ty.is_divergent()
+                    {
+                        has_independent_value = true;
+                        independent_values.add_in_place(ty);
+                    }
+                }
+            }
+
+            if has_independent_value {
+                candidates.push(IndependentAttributeCandidate {
+                    name: name.clone(),
+                    incoming: independent_values
+                        .build()
+                        .promote(db, &env)
+                        .promote_singletons(db, &env),
+                    dependent_assignments: dependent_assignments.into_boxed_slice(),
+                });
+            }
+        }
+
+        candidates.into_boxed_slice()
+    }
+
+    /// Retain only provisional roots preserved by every transfer under the same assumptions.
+    ///
+    /// Every candidate in one round sees the same complete provisional map. A rejected root can
+    /// invalidate transfers for other members, so validation repeats without the rejected roots
+    /// until the remaining map is stable.
+    #[salsa::tracked(
+        returns(deref),
+        cycle_initial=|_, _, _| Box::default(),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn independent_own_attribute_values(
+        db: &'db dyn Db,
+        group: IndependentAttributeGroup<'db>,
+    ) -> Box<[(Name, Type<'db>)]> {
+        let owner = group.owner(db);
+        let env = ProgramEnvironment::from_scope(owner.body_scope(db));
+        let candidates = Self::independent_own_attribute_candidates(db, group);
+        let mut roots: Vec<_> = candidates
+            .iter()
+            .map(|candidate| (candidate.name.clone(), candidate.incoming))
+            .collect();
+
+        while !roots.is_empty() {
+            let context = MemberInferenceContext::new(
+                db,
+                owner,
+                group.target_method_decorator(db),
+                roots.clone().into_boxed_slice(),
+            );
+            let rejected: Vec<_> = candidates
+                .iter()
+                .filter(|candidate| {
+                    context.incoming(db, candidate.name.as_str()).is_some()
+                        && candidate.dependent_assignments.iter().any(|definition| {
+                            dependent_assignment_transfer(db, *definition, context).is_none_or(
+                                |effect| !effect.is_subtype_of(db, &env, candidate.incoming),
+                            )
+                        })
+                })
+                .map(|candidate| &candidate.name)
+                .collect();
+
+            if rejected.is_empty() {
+                break;
+            }
+
+            roots.retain(|(name, _)| rejected.binary_search(&name).is_err());
+        }
+
+        roots.into_boxed_slice()
     }
 
     #[salsa::tracked(
@@ -4136,6 +4269,26 @@ struct ImplicitAttributeName<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
+
+/// All implicit members on one class with the same instance/classmethod interpretation.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct IndependentAttributeGroup<'db> {
+    #[returns(copy)]
+    owner: StaticClassLiteral<'db>,
+    #[returns(copy)]
+    target_method_decorator: MethodDecorator,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for IndependentAttributeGroup<'_> {}
+
+/// An independently initialized member and the assignments that could modify its inferred type.
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct IndependentAttributeCandidate<'db> {
+    name: Name,
+    incoming: Type<'db>,
+    dependent_assignments: Box<[Definition<'db>]>,
+}
 
 fn implicit_attribute_matches_scope<'db>(
     db: &'db dyn Db,

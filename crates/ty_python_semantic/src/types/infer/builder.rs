@@ -137,7 +137,7 @@ use ty_python_core::definition::{
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
-use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
@@ -10193,14 +10193,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(context) = self.member_inference_context
-            && context.name(self.db()) == &attribute.attr.id
+            && let Some(incoming) = context.incoming(self.db(), attribute.attr.id.as_str())
+            && let Some(place_expr) = PlaceExpr::try_from_expr(attribute)
+            && let place_table = self
+                .index
+                .place_table(self.scope().file_scope_id(self.db()))
+            && let Some(ScopedPlaceId::Member(member)) =
+                place_table.place_id(PlaceExprRef::from(&place_expr))
+            && place_table.member(member).is_instance_attribute()
+            && context.target_method_decorator(self.db())
+                == if matches!(value_type, Type::ClassLiteral(_) | Type::GenericAlias(_)) {
+                    MethodDecorator::ClassMethod
+                } else {
+                    MethodDecorator::None
+                }
             && value_type
                 .nominal_class(self.db(), self.program_environment())
                 .or_else(|| value_type.to_class_type(self.db()))
                 .and_then(|class| class.static_class_literal(self.db()))
                 .is_some_and(|(owner, _)| owner == context.owner(self.db()))
         {
-            return Ok(context.incoming(self.db()));
+            return Ok(incoming);
         }
 
         let env = self.program_environment();
