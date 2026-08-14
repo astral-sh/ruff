@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ArgOrKeyword, Arguments, Expr, ExprCall, PythonVersion};
 use ruff_text_size::Ranged;
@@ -186,12 +186,9 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
             format!("{binding}({path_code}).{method}({stat_args})")
         };
 
-        let applicability = Applicability::Unsafe;
-
-        Ok(Fix::applicable_edits(
+        Ok(Fix::unsafe_edits(
             Edit::range_replacement(replacement, range),
             [import_edit],
-            applicability,
         ))
     });
 }
