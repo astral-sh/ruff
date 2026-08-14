@@ -2400,7 +2400,6 @@ fn relation_directions<T: Copy>(
 }
 
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
-    /// Creates a builder that infers only the typevars directly owned by `generic_context`.
     pub(crate) fn new(
         db: &'db dyn Db,
         env: &'c ProgramEnvironment<'db>,

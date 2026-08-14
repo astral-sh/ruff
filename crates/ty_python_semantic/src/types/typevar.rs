@@ -1204,27 +1204,21 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(db, typevar, binding_context, None, TypeVarNonce::NONE)
     }
 
-    /// Applies a specialization to this occurrence's declared domain.
-    ///
-    /// If the domain is unchanged, this preserves the original instance and its lazy domain
-    /// representation.
-    fn apply_specialization_to_domain(
+    /// Applies a specialization to this occurrence's declared upper bound or constraints, if any.
+    fn apply_specialization_to_bound_or_constraints(
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
         env: &ProgramEnvironment<'db>,
     ) -> Self {
-        let typevar = self.typevar(db);
-        let original = typevar.bound_or_constraints(db, env);
-        let mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
-        let visitor = ApplyTypeMappingVisitor::new(env);
-        let mapped = original.map(|domain| domain.apply_type_mapping_impl(db, &mapping, &visitor));
-        if mapped == original {
-            self
-        } else {
-            self.map_bound_or_constraints(db, |_| mapped)
-        }
+        self.map_bound_or_constraints(db, |original| {
+            let original = original?;
+            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                specialization,
+            ));
+            let visitor = ApplyTypeMappingVisitor::new(env);
+            Some(original.apply_type_mapping_impl(db, &mapping, &visitor))
+        })
     }
 
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
@@ -1312,7 +1306,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         && let ApplySpecialization::SpecializationWithSelfDomain(specialization) =
                             specialization
                     {
-                        Type::TypeVar(self.apply_specialization_to_domain(
+                        Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
                             db,
                             *specialization,
                             visitor.env,
@@ -1359,7 +1353,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         && let ApplySpecialization::SpecializationWithSelfDomain(specialization) =
                             specialization
                     {
-                        Type::TypeVar(self.apply_specialization_to_domain(
+                        Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
                             db,
                             *specialization,
                             visitor.env,
