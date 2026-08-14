@@ -78,7 +78,8 @@ jobs:
             # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
             git fetch --no-tags --filter=blob:none --unshallow origin
 
-            MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
+            # The first parent contains any preceding layers in a stacked pull request.
+            MERGE_BASE="$(git rev-parse "${GITHUB_SHA}^1")"
             echo "${MERGE_BASE}" > merge-base.txt
             echo "Merge base: ${MERGE_BASE}"
             echo "PR commit: ${GITHUB_SHA}"
@@ -209,6 +210,7 @@ jobs:
         id: generate-reports
         env:
           REF_NAME: ${{ github.ref_name }}
+          BASE_REF_NAME: ${{ github.event.pull_request.base.ref }}
         run: |
           # Merge shard diagnostics
           jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-*.json > diagnostics-base.json
@@ -222,7 +224,7 @@ jobs:
             generate-diff \
             diagnostics-base.json \
             diagnostics-PR.json \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
             --output-html dist/diff.html
 
@@ -232,7 +234,7 @@ jobs:
             diagnostics-base.json \
             diagnostics-PR.json \
             --fail-on-new-abnormal-exits \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
             --output diff-statistics.md
           DIFF_STATISTICS_EXIT_CODE=$?
@@ -242,7 +244,7 @@ jobs:
             generate-timing-diff \
             diagnostics-base.json \
             diagnostics-PR.json \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
             --output-html dist/timing.html
 

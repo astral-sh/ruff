@@ -10,23 +10,31 @@ use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_linter::settings::LinterSettings;
+use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_options_metadata::OptionsMetadata;
 use ruff_workspace::options::Options;
 
+const DEFAULT_SYMBOL: &str = "✅";
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
 const REMOVED_SYMBOL: &str = "❌";
 const WARNING_SYMBOL: &str = "⚠️";
 const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
-/// Style for the rule's fixability and status icons.
+/// Style for the rule's default selection, fixability, and status icons.
 const SYMBOL_STYLE: &str = "style='width: 1em; display: inline-block;'";
-/// Style for the container wrapping the fixability and status icons.
+/// Style for the container wrapping the default selection, fixability, and status icons.
 const SYMBOLS_CONTAINER: &str = "style='display: flex; gap: 0.5rem; justify-content: end;'";
 
-fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
-    table_out.push_str("| Code { scope='col' } | Name { scope='col' } | Message { scope='col' } | Fix/Status { scope='col' .sr-only } |");
+fn generate_table(
+    table_out: &mut String,
+    rules: impl IntoIterator<Item = Rule>,
+    linter: &Linter,
+    default_rules: &RuleTable,
+) {
+    table_out.push_str("| Code { scope='col' } | Name { scope='col' } | Message { scope='col' } | Status/Fix/Default { scope='col' .sr-only } |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | -: |");
     table_out.push('\n');
@@ -63,6 +71,14 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
             FixAvailability::None => format!("<span {SYMBOL_STYLE}></span>"),
         };
 
+        let default_token = if default_rules.enabled(rule) {
+            format!(
+                "<span aria-hidden='true' {SYMBOL_STYLE} title='Enabled by default'>{DEFAULT_SYMBOL}</span><span class='sr-only'>Enabled by default</span>"
+            )
+        } else {
+            format!("<span {SYMBOL_STYLE}></span>")
+        };
+
         let rule_name = rule.name();
 
         // If the message ends in a bracketed expression (like: "Use {replacement}"), escape the
@@ -89,7 +105,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         #[expect(clippy::or_fun_call)]
         let _ = write!(
             table_out,
-            "| {ss}{prefix}{code}{se} {{ #{prefix}{code} }} | {ss}{explanation}{se} | {ss}{message}{se} | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}</div>|",
+            "| {ss}{prefix}{code}{se} {{ #{prefix}{code} }} | {ss}{explanation}{se} | {ss}{message}{se} | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}{default_token}</div>|",
             prefix = linter.common_prefix(),
             code = linter.code_for_rule(rule).unwrap(),
             explanation = rule
@@ -132,10 +148,17 @@ pub(crate) fn generate() -> String {
         &mut table_out,
         "{SPACER}{FIX_SYMBOL}{SPACER} The rule is automatically fixable by the `--fix` command-line option."
     );
+    table_out.push_str("<br />");
+
+    let _ = write!(
+        &mut table_out,
+        "{SPACER}{DEFAULT_SYMBOL}{SPACER} The rule is enabled by default."
+    );
     table_out.push_str("\n\n");
     table_out.push_str("All rules not marked as preview, deprecated or removed are stable.");
     table_out.push('\n');
 
+    let default_rules = LinterSettings::default().rules;
     for linter in Linter::iter() {
         let codes_csv: String = match linter.common_prefix() {
             "" => linter
@@ -222,10 +245,10 @@ pub(crate) fn generate() -> String {
                 }
                 table_out.push('\n');
                 table_out.push('\n');
-                generate_table(&mut table_out, rules.clone(), &linter);
+                generate_table(&mut table_out, rules.clone(), &linter, &default_rules);
             }
         } else {
-            generate_table(&mut table_out, linter.all_rules(), &linter);
+            generate_table(&mut table_out, linter.all_rules(), &linter, &default_rules);
         }
     }
 

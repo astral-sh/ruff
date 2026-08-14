@@ -17,6 +17,7 @@ use crate::types::{
     class::walk_generic_alias,
     cyclic::ActiveRecursionDetector,
     function::{FunctionType, walk_function_type},
+    generics::walk_specialization_types,
     instance::{walk_nominal_instance_type, walk_protocol_instance_type},
     known_instance::walk_known_instance_type,
     method::{walk_bound_method_type, walk_method_wrapper_type},
@@ -493,6 +494,14 @@ fn dynamic_content_impl<'db>(
             }
 
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+            // Use `walk_specialization_types` rather than `walk_specialization` to avoid walking
+            // the bounds/constraints/defaults of the generic context.
+            // Only the types the class was actually specialized with are relevant to whether
+            // the `GenericAlias` contains a dynamic type.
+            walk_specialization_types(db, alias.specialization(db), self);
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {

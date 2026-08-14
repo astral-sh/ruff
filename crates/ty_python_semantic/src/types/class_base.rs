@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::ProgramEnvironment;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
@@ -306,7 +308,7 @@ impl<'db> ClassBase<'db> {
                             db,
                             env,
                             fields.values().map(|field| field.declared_ty),
-                        )?
+                        )
                         .to_class_type(db)
                         .into(),
                         subclass,
@@ -490,37 +492,18 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
         display_settings: DisplaySettings<'db>,
-    ) -> impl std::fmt::Display + 'env {
-        struct ClassBaseDisplay<'env, 'db> {
-            db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
-            base: ClassBase<'db>,
-            settings: DisplaySettings<'db>,
-        }
-
-        impl std::fmt::Display for ClassBaseDisplay<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                match self.base {
-                    ClassBase::Any => f.write_str("Any"),
-                    ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Divergent(_) => f.write_str("Divergent"),
-                    ClassBase::Class(class) => Type::from(class)
-                        .display_with(db, self.env, self.settings.clone())
-                        .fmt(f),
-                    ClassBase::Protocol => f.write_str("typing.Protocol"),
-                    ClassBase::Generic => f.write_str("typing.Generic"),
-                    ClassBase::TypedDict(_) => f.write_str("typing.TypedDict"),
-                }
-            }
-        }
-
-        ClassBaseDisplay {
-            db,
-            env,
-            base: self,
-            settings: display_settings,
-        }
+    ) -> impl Display + 'env {
+        std::fmt::from_fn(move |f| match self {
+            ClassBase::Any => f.write_str("Any"),
+            ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
+            ClassBase::Divergent(_) => f.write_str("Divergent"),
+            ClassBase::Class(class) => Type::from(class)
+                .display_with(db, env, display_settings.clone())
+                .fmt(f),
+            ClassBase::Protocol => f.write_str("typing.Protocol"),
+            ClassBase::Generic => f.write_str("typing.Generic"),
+            ClassBase::TypedDict(_) => f.write_str("typing.TypedDict"),
+        })
     }
 }
 

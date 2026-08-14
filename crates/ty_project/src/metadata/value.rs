@@ -17,7 +17,7 @@ use crate::glob::{
 /// require different anchoring:
 ///
 /// * CLI: The path is relative to the current working directory
-/// * Configuration file: The path is relative to the project's root.
+/// * Configuration file: The path is relative to the project's or script's configuration root.
 #[derive(
     Debug,
     Clone,
@@ -62,9 +62,9 @@ impl RelativePathBuf {
     }
 
     /// Resolves the absolute path for `self` based on its origin.
-    pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
+    pub fn absolute(&self, configuration_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match self.0.source() {
-            ValueSource::File(_) => project_root,
+            ValueSource::File(_) | ValueSource::ScriptMetadata(_) => configuration_root,
             ValueSource::Cli | ValueSource::Editor | ValueSource::UvWorkspace => {
                 system.current_directory()
             }
@@ -136,7 +136,7 @@ impl RelativeGlobPattern {
         kind: PortableGlobKind,
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match self.0.source() {
-            ValueSource::File(_) => project_root,
+            ValueSource::File(_) | ValueSource::ScriptMetadata(_) => project_root,
             ValueSource::Cli | ValueSource::Editor | ValueSource::UvWorkspace => {
                 system.current_directory()
             }

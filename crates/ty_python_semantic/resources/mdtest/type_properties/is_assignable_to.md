@@ -839,9 +839,9 @@ from typing_extensions import Any, Never, Sequence
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to
 
-# The bottom materialization of `tuple[Any]` is `tuple[Never]`,
-# which simplifies to `Never`, so `tuple[int]` and `tuple[()]` are
-# both assignable to `~tuple[Any]`
+# The bottom materialization of `tuple[Any]` is `tuple[Never]`. Both
+# `tuple[int]` and `tuple[()]` are disjoint from `tuple[Never]`, so they are
+# assignable to `~tuple[Any]`.
 static_assert(is_assignable_to(tuple[int], ~tuple[Any]))
 static_assert(is_assignable_to(tuple[()], ~tuple[Any]))
 

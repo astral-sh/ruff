@@ -58,9 +58,10 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
 };
-use crate::types::tuple::{TupleLength, TupleSpec, TupleType, VariableSegment};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
     walk_type_with_recursion_guard,
@@ -453,7 +454,7 @@ impl<'db> BindingsElement<'db> {
         self.items.iter_mut()
     }
 
-    fn callables(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
+    fn callables(&self) -> impl Iterator<Item = &CallableBinding<'db>> + Clone {
         self.items.iter().map(CallableItem::callable)
     }
 
@@ -889,6 +890,13 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn has_implicit_dunder_init_is_possibly_unbound(&self) -> bool {
         self.implicit_dunder_init_is_possibly_unbound
+    }
+
+    /// Returns the callable bindings for each union element without flattening intersections.
+    pub(crate) fn iter_union_elements(
+        &self,
+    ) -> impl Iterator<Item = impl Iterator<Item = &CallableBinding<'db>> + Clone> + '_ {
+        self.elements.iter().map(BindingsElement::callables)
     }
 
     /// Returns an iterator over all `CallableBinding`s, flattening the two-level structure.
@@ -3807,13 +3815,31 @@ impl<'db> CallableBinding<'db> {
             if is_expandable_type(db, env, argument_type) {
                 continue;
             }
-            let mut is_argument_assignable_to_any_overload = false;
-            'overload: for overload in &self.overloads {
-                for matched_parameter in &overload.argument_matches[argument_index].parameters {
-                    let parameter_type =
-                        overload.signature.parameters()[matched_parameter.index].annotated_type();
-                    let argument_type = argument_types.get_for_declared_type(parameter_type);
-                    if argument_type
+            let is_argument_assignable_to_any_overload = self.overloads.iter().any(|overload| {
+                let matched_parameters = &overload.argument_matches[argument_index].parameters;
+                if matched_parameters.is_empty() {
+                    return matches!(argument, Argument::Variadic)
+                        && argument_type.iterate(db, env).len().minimum() == 0;
+                }
+
+                // A starred argument contributes its individual element types, not the type of
+                // the iterable itself, and each element must match its corresponding parameter.
+                matched_parameters.iter().all(|matched_parameter| {
+                    let parameter = &overload.signature.parameters()[matched_parameter.index];
+                    if parameter.has_starred_annotation()
+                        && matched_parameter.expected_type.is_none()
+                    {
+                        return true;
+                    }
+
+                    let parameter_type = matched_parameter
+                        .expected_type
+                        .unwrap_or_else(|| parameter.annotated_type());
+                    let argument_type = matched_parameter
+                        .argument_type
+                        .unwrap_or_else(|| argument_types.get_for_declared_type(parameter_type));
+
+                    argument_type
                         .when_assignable_to(
                             db,
                             env,
@@ -3822,12 +3848,8 @@ impl<'db> CallableBinding<'db> {
                             overload.inferable_typevars,
                         )
                         .is_always_satisfied(db, env)
-                    {
-                        is_argument_assignable_to_any_overload = true;
-                        break 'overload;
-                    }
-                }
-            }
+                })
+            });
             if !is_argument_assignable_to_any_overload {
                 tracing::debug!(
                     "Argument at {argument_index} (`{}`) is not assignable to any of the \
@@ -6014,6 +6036,239 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.inference = Some(inference);
     }
 
+    /// Infers a variadic type variable tuple from every argument matched to `*args`.
+    ///
+    /// Comparing the complete argument tuple with the declared tuple preserves fixed elements,
+    /// nested type variable tuples, and the unbounded shape of splatted arguments.
+    ///
+    /// ```py
+    /// def collect[*Ts](*args: *Ts) -> tuple[*Ts]: ...
+    /// def nested[*Ts, *Us](*args: *tuple[tuple[*Us], *Ts]) -> tuple[tuple[*Us], tuple[*Ts]]: ...
+    ///
+    /// collect(1, "value")
+    /// nested((1, "value"), True, b"last")
+    /// ```
+    fn infer_typevartuple_argument_constraints<'c>(
+        &self,
+        builder: &mut SpecializationBuilder<'db, 'c>,
+        specialization_errors: &mut Vec<BindingError<'db>>,
+    ) -> Result<(), (SpecializationError<'db>, Option<usize>)> {
+        let db = self.db;
+        let Some((parameter_index, parameter)) = self.signature.parameters().variadic() else {
+            return Ok(());
+        };
+        if !parameter.has_starred_annotation() {
+            return Ok(());
+        }
+
+        let (formal, typevartuple) = match parameter.annotated_type() {
+            Type::TypeVar(typevar) if typevar.is_typevartuple(db) => (
+                Type::tuple(TupleType::unpacked_typevartuple(db, self.env, typevar)),
+                typevar,
+            ),
+            annotation => {
+                let Some(typevartuple) =
+                    annotation.exact_tuple_instance_spec(db).and_then(|tuple| {
+                        match tuple.as_ref() {
+                            TupleSpec::Variable(variable) => variable.variable().typevartuple(),
+                            TupleSpec::Fixed(_) => None,
+                        }
+                    })
+                else {
+                    return Ok(());
+                };
+                (annotation, typevartuple)
+            }
+        };
+
+        if !self.can_infer_typevartuple_arguments(parameter_index, typevartuple) {
+            return Ok(());
+        }
+
+        let Some((actual, argument_indices)) =
+            self.collect_typevartuple_arguments(parameter_index, parameter, formal)
+        else {
+            return Ok(());
+        };
+
+        builder.infer(formal, actual).map_err(|error| {
+            let argument_index =
+                argument_indices.and_then(|(first, last)| (first == last).then_some(first));
+            (error, argument_index)
+        })?;
+
+        if let Some(generic_context) = self.signature.generic_context {
+            let specialization = builder.build_with(generic_context, |_, _| None);
+            let expected_ty = formal.apply_specialization(db, specialization);
+
+            // The legacy solver keeps the first pack when another occurrence has a different length.
+            if let (Some(expected_tuple), Some(actual_tuple)) = (
+                expected_ty.exact_tuple_instance_spec(db),
+                actual.exact_tuple_instance_spec(db),
+            ) && let (TupleLength::Fixed(expected), TupleLength::Fixed(provided)) =
+                (expected_tuple.len(), actual_tuple.len())
+                && expected != provided
+            {
+                specialization_errors.push(BindingError::InvalidArgumentType {
+                    parameter: ParameterContext::new(parameter, parameter_index, false),
+                    argument_index: argument_indices.map(|(first, _)| first),
+                    last_argument_index: argument_indices.map(|(_, last)| last),
+                    expected_ty,
+                    provided_ty: actual,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
+                    parameter_source: None,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns whether a type variable tuple can be inferred from its variadic arguments.
+    ///
+    /// The old solver stores one specialization per pack, so it can merge covariant occurrences
+    /// but cannot combine their lower bounds with the upper bounds from a callable parameter.
+    ///
+    /// ```py
+    /// from collections.abc import Callable
+    ///
+    /// def repeat[*Ts](expected: tuple[*Ts], *args: *Ts) -> tuple[*Ts]: ...
+    /// def invoke[*Ts](callback: Callable[[*Ts], None], *args: *Ts) -> None: ...
+    /// def accepts_str(value: str) -> None: ...
+    ///
+    /// repeat((1, "value"), 1, 2)  # safe to infer `Ts = (int, str | int)`
+    /// invoke(accepts_str, 1)  # do not widen the callback's `str` parameter
+    /// ```
+    ///
+    /// TODO: Remove this guard when the new constraint solver can represent and solve both bounds.
+    fn can_infer_typevartuple_arguments(
+        &self,
+        parameter_index: usize,
+        typevartuple: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let db = self.db;
+        !self
+            .enumerate_argument_types()
+            .any(|(argument_index, _, argument, _)| {
+                !matches!(argument, Argument::Synthetic)
+                    && self.argument_matches[argument_index].iter().any(|matched| {
+                        matched.index != parameter_index
+                            && !self.signature.parameters()[matched.index]
+                                .annotated_type()
+                                .variance_of(db, self.env, typevartuple.identity(db))
+                                .is_covariant()
+                    })
+            })
+    }
+
+    /// Collects arguments matched to a starred parameter into their complete tuple shape.
+    ///
+    /// Direct arguments and splatted values are collected in call order. Values already consumed
+    /// by earlier parameters are removed from splats, and open tuples are resized to expose any
+    /// required fixed prefix or suffix. The returned indices cover all contributing source
+    /// arguments and are used for diagnostics.
+    ///
+    /// ```py
+    /// def tail[*Ts](head: int, *args: *Ts) -> tuple[*Ts]: ...
+    /// def prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]: ...
+    ///
+    /// def example(values: tuple[int, str, bytes], numbers: list[int]) -> None:
+    ///     tail(*values)  # collected `*args`: tuple[str, bytes]
+    ///     prefixed(*numbers)  # collected `*args`: tuple[int, *tuple[int, ...]]
+    /// ```
+    fn collect_typevartuple_arguments(
+        &self,
+        parameter_index: usize,
+        parameter: &Parameter<'db>,
+        formal: Type<'db>,
+    ) -> Option<(Type<'db>, Option<(usize, usize)>)> {
+        let db = self.db;
+        let mut actual = TupleSpecBuilder::with_capacity(self.arguments.len());
+        // Source indices of the first and last arguments matched to the variadic parameter.
+        let mut argument_indices: Option<(usize, usize)> = None;
+        for (argument_index, adjusted_argument_index, argument, argument_types) in
+            self.enumerate_argument_types()
+        {
+            let matches = &self.argument_matches[argument_index];
+            if !matches
+                .iter()
+                .any(|matched| matched.index == parameter_index)
+            {
+                continue;
+            }
+
+            if let Some(index) = adjusted_argument_index {
+                argument_indices =
+                    Some((argument_indices.map_or(index, |(first, _)| first), index));
+            }
+
+            if matches!(argument, Argument::Variadic) {
+                let argument_type = argument_types.get_default()?;
+                let mut argument_tuple = argument_type.iterate(db, self.env);
+                let consumed_prefix = matches
+                    .parameters
+                    .iter()
+                    .take_while(|matched| matched.index != parameter_index)
+                    .count();
+                if consumed_prefix != 0 {
+                    let consumed_prefix = i32::try_from(consumed_prefix).ok()?;
+                    let sliced = argument_tuple
+                        .py_slice_type(db, self.env, Some(consumed_prefix), None, None)
+                        .ok()?;
+                    argument_tuple = sliced.exact_tuple_instance_spec(db)?;
+                }
+                actual = actual.concat(db, self.env, &argument_tuple);
+                continue;
+            }
+
+            for matched in matches
+                .iter()
+                .filter(|matched| matched.index == parameter_index)
+            {
+                let declared_type = matched
+                    .expected_type
+                    .unwrap_or_else(|| parameter.annotated_type());
+                actual.push(
+                    matched
+                        .argument_type
+                        .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type)),
+                );
+            }
+        }
+
+        let mut actual = actual.build();
+        if let Some(formal_tuple) = formal.exact_tuple_instance_spec(db)
+            && let (TupleSpec::Variable(formal), TupleSpec::Variable(provided)) =
+                (formal_tuple.as_ref(), &actual)
+            && provided
+                .variable()
+                .homogeneous_type()
+                .is_some_and(|element| !element.resolve_type_alias(db).is_never())
+        {
+            // Expose required boundaries without discarding fixed values the splat already has.
+            let target_length = TupleLength::Variable(
+                formal
+                    .prefix_elements()
+                    .len()
+                    .max(provided.prefix_elements().len()),
+                formal
+                    .suffix_elements()
+                    .len()
+                    .max(provided.suffix_elements().len()),
+            );
+            if actual.len() != target_length
+                && let Ok(resized) = actual.resize(db, self.env, target_length)
+            {
+                actual = resized;
+            }
+        }
+
+        Some((
+            Type::tuple(TupleType::new(db, self.env, &actual)),
+            argument_indices,
+        ))
+    }
+
     fn infer_argument_constraints<'c>(
         &mut self,
         builder: &mut SpecializationBuilder<'db, 'c>,
@@ -6023,8 +6278,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) -> bool {
         let db = self.db;
         for relation in self.argument_relations() {
-            // TODO: Infer a `TypeVarTuple` from all matched positional arguments as a single
-            // tuple. Fixed elements beside that pack can still infer ordinary type variables.
+            // Fixed elements can infer normally; the complete variadic pack is inferred below.
             if relation.has_starred_annotation
                 && relation.matched_parameter.expected_type.is_none()
                 && (matches!(
@@ -6049,6 +6303,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_index: relation.adjusted_argument_index,
                 });
             }
+        }
+
+        if let Err((error, argument_index)) =
+            self.infer_typevartuple_argument_constraints(builder, specialization_errors)
+            && !specialization_errors.iter().any(|existing| {
+                matches!(
+                    existing,
+                    BindingError::SpecializationError {
+                        error: existing,
+                        ..
+                    } if existing == &error
+                )
+            })
+        {
+            specialization_errors.push(BindingError::SpecializationError {
+                error,
+                argument_index,
+            });
         }
 
         preferred_type_mappings
@@ -6183,6 +6455,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.errors.push(BindingError::InvalidArgumentType {
                 parameter: ParameterContext::new(parameter, parameter_index, positional),
                 argument_index: adjusted_argument_index,
+                last_argument_index: None,
                 expected_ty,
                 provided_ty: argument_type,
                 provenance: matched_parameter.provenance,
@@ -7167,6 +7440,69 @@ impl<'db> Binding<'db> {
         .then_some(parameter_type)
     }
 
+    /// Returns the expected tuple element for an argument matched to a `TypeVarTuple`.
+    ///
+    /// For `result: tuple[Payload, list[int]] = collect({"value": 1}, [])`, the arguments
+    /// receive `Payload` and `list[int]` as context without overriding their inferred types.
+    fn typevartuple_argument_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding: &CallableBinding<'db>,
+        arguments_types: &CallArguments<'_, 'db>,
+        argument_index: usize,
+        expected_return_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let [matched_parameter] = self
+            .matched_argument_for_call_argument(binding, argument_index)?
+            .parameters
+            .as_slice()
+        else {
+            return None;
+        };
+        let parameter = &self.signature.parameters()[matched_parameter.index];
+        let Type::TypeVar(typevartuple) = parameter.annotated_type() else {
+            return None;
+        };
+        if !parameter.is_variadic()
+            || !parameter.has_starred_annotation()
+            || !typevartuple.is_typevartuple(db)
+        {
+            return None;
+        }
+
+        let return_tuple = self.signature.return_ty.exact_tuple_instance_spec(db)?;
+        let TupleSpec::Variable(return_tuple) = return_tuple.as_ref() else {
+            return None;
+        };
+        if return_tuple.variable().typevartuple()?.identity(db) != typevartuple.identity(db)
+            || arguments_types
+                .iter()
+                .take(argument_index)
+                .any(|(argument, types)| {
+                    matches!(argument, Argument::Variadic)
+                        && types
+                            .get_default()
+                            .is_none_or(|ty| ty.iterate(db, env).len().maximum().is_none())
+                })
+        {
+            return None;
+        }
+
+        let tuple_index = return_tuple.prefix_elements().len().checked_add(
+            (0..argument_index)
+                .filter_map(|index| self.matched_argument_for_call_argument(binding, index))
+                .flat_map(MatchedArgument::iter)
+                .filter(|matched| matched.index == matched_parameter.index)
+                .count(),
+        )?;
+        expected_return_ty
+            .exact_tuple_instance_spec(db)?
+            .as_ref()
+            .py_index(db, env, i32::try_from(tuple_index).ok()?)
+            .ok()
+    }
+
     /// Returns the type context to use for bidirectional inference of a source call argument,
     /// using the provided argument specialization.
     ///
@@ -7263,6 +7599,18 @@ impl<'db> Binding<'db> {
             }
 
             parameter_type = parameter_type.apply_optional_specialization(db, specialization);
+            if let Some(expected_return_ty) = call_expression_tcx.annotation
+                && let Some(expected) = self.typevartuple_argument_context(
+                    db,
+                    env,
+                    binding,
+                    arguments_types,
+                    argument_index,
+                    expected_return_ty,
+                )
+            {
+                parameter_type = expected;
+            }
         }
 
         Some(ArgumentTypeContext::standard(
@@ -8152,6 +8500,8 @@ pub(crate) enum BindingError<'db> {
     InvalidArgumentType {
         parameter: ParameterContext,
         argument_index: Option<usize>,
+        /// Last argument when this error describes all arguments matched to a variadic parameter.
+        last_argument_index: Option<usize>,
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
         provenance: InvalidArgumentTypeProvenance,
@@ -8309,8 +8659,16 @@ impl BindingError<'_> {
             *argument_index = map(*argument_index);
         };
         match self {
-            BindingError::InvalidArgumentType { argument_index, .. }
-            | BindingError::InvalidKeyType { argument_index, .. }
+            BindingError::InvalidArgumentType {
+                argument_index,
+                last_argument_index,
+                ..
+            } => {
+                remap(argument_index);
+                remap(last_argument_index);
+            }
+
+            BindingError::InvalidKeyType { argument_index, .. }
             | BindingError::UnknownArgument { argument_index, .. }
             | BindingError::UnknownKeywordVariadicArgument { argument_index }
             | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
@@ -8439,6 +8797,7 @@ impl<'db> BindingError<'db> {
             Self::InvalidArgumentType {
                 parameter,
                 argument_index,
+                last_argument_index,
                 expected_ty,
                 provided_ty,
                 provenance,
@@ -8449,7 +8808,10 @@ impl<'db> BindingError<'db> {
                 // silenced diagnostics during overload evaluation, and rely on the assignability
                 // diagnostic being emitted here.
 
-                let range = context.get_range(node, *argument_index);
+                let mut range = context.get_range(node, *argument_index);
+                if let Some(last) = last_argument_index {
+                    range = range.cover(context.get_range(node, Some(*last)));
+                }
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };

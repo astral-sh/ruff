@@ -384,6 +384,28 @@ fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &
     }
 }
 
+/// A `QuickCheck` input generated without dynamic components, including in nested unions, tuples,
+/// and callables.
+///
+/// Some type properties, such as reflexivity of subtyping, only hold for fully static types. It is
+/// tempting to generate an arbitrary [`Ty`] and express such a property as an implication:
+///
+/// ```text
+/// t.is_fully_static(db, env) => t.is_subtype_of(db, env, t)
+/// ```
+///
+/// However, the property-test macro implements implications as `!premise || conclusion`. Every
+/// non-static input therefore counts as a successful `QuickCheck` iteration even though the property
+/// itself was never checked. If `QUICKCHECK_TESTS=100000`, the test can report 100,000 successful
+/// iterations while checking reflexivity for far fewer types. Properties with two fully static
+/// inputs lose even more coverage because both inputs must satisfy the premise.
+///
+/// Filtering also disproportionately removes nested unions, tuples, and callables: each additional
+/// component gives the generated type another opportunity to contain a dynamic type. Generating
+/// fully static components directly ensures that every `QuickCheck` iteration checks the property
+/// and that complex types remain represented alongside simple ones.
+///
+/// See <https://github.com/astral-sh/ruff/pull/27693> for the discussion of this coverage problem.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FullyStaticTy(Ty);
 
@@ -393,8 +415,34 @@ impl FullyStaticTy {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.0.into_type(db, env)
+        let ty = self.0.into_type(db, env);
+        assert!(
+            ty.is_fully_static(db, env),
+            "FullyStaticTy generated a non-static type: {}",
+            ty.display(db, env),
+        );
+        ty
     }
+}
+
+// A single draw across both groups keeps unrestricted candidates equally likely without
+// allocating a combined list or maintaining a positional boundary between the groups.
+macro_rules! choose_core_type {
+    (
+        $generator:expr,
+        $fully_static:expr,
+        dynamic_types: [$($dynamic:expr),+ $(,)?],
+        fully_static_types: [$($static:expr),+ $(,)?] $(,)?
+    ) => {{
+        if $fully_static {
+            $generator.choose(&[$($static),+]).unwrap().clone()
+        } else {
+            $generator
+                .choose(&[$($dynamic),+, $($static),+])
+                .unwrap()
+                .clone()
+        }
+    }};
 }
 
 fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
@@ -403,84 +451,80 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     let int_lit = Ty::IntLiteral(*g.choose(&[-2, -1, 0, 1, 2]).unwrap());
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
-    // Update this if new non-fully-static types are added below.
-    let fully_static_index = 8;
-    let types = &[
-        Ty::Any,
-        Ty::Unknown,
-        Ty::Divergent,
-        Ty::TopDivergent,
-        Ty::BottomDivergent,
-        Ty::SubclassOfAny,
-        Ty::UnittestMockLiteral,
-        Ty::UnittestMockInstance,
-        // Add fully static types below, dynamic types above.
-        // Update `fully_static_index` above if adding new dynamic types!
-        Ty::Never,
-        Ty::None,
-        int_lit,
-        bool_lit,
-        Ty::StringLiteral(""),
-        Ty::StringLiteral("a"),
-        Ty::LiteralString,
-        Ty::BytesLiteral(""),
-        Ty::BytesLiteral("\x00"),
-        Ty::EnumLiteral("safe"),
-        Ty::EnumLiteral("unsafe"),
-        Ty::EnumLiteral("unknown"),
-        Ty::SingleMemberEnumLiteral,
-        Ty::KnownClassInstance(KnownClass::Object),
-        Ty::KnownClassInstance(KnownClass::Str),
-        Ty::KnownClassInstance(KnownClass::Int),
-        Ty::KnownClassInstance(KnownClass::Float),
-        Ty::KnownClassInstance(KnownClass::Complex),
-        Ty::KnownClassInstance(KnownClass::Bool),
-        Ty::KnownClassInstance(KnownClass::FunctionType),
-        Ty::KnownClassInstance(KnownClass::SpecialForm),
-        Ty::KnownClassInstance(KnownClass::TypeVar),
-        Ty::KnownClassInstance(KnownClass::TypeAliasType),
-        Ty::KnownClassInstance(KnownClass::NoDefaultType),
-        Ty::TypingLiteral,
-        Ty::BuiltinClassLiteral("str"),
-        Ty::BuiltinClassLiteral("int"),
-        Ty::BuiltinClassLiteral("bool"),
-        Ty::BuiltinClassLiteral("object"),
-        Ty::BuiltinInstance("type"),
-        Ty::AbcInstance("ABC"),
-        Ty::AbcInstance("ABCMeta"),
-        Ty::SubclassOfBuiltinClass("object"),
-        Ty::SubclassOfBuiltinClass("str"),
-        Ty::SubclassOfBuiltinClass("type"),
-        Ty::AbcClassLiteral("ABC"),
-        Ty::AbcClassLiteral("ABCMeta"),
-        Ty::SubclassOfAbcClass("ABC"),
-        Ty::SubclassOfAbcClass("ABCMeta"),
-        Ty::AlwaysTruthy,
-        Ty::AlwaysFalsy,
-        Ty::BuiltinsFunction("chr"),
-        Ty::BuiltinsFunction("ascii"),
-        Ty::BuiltinsBoundMethod {
-            class: "str",
-            method: "isascii",
-        },
-        Ty::BuiltinsBoundMethod {
-            class: "int",
-            method: "bit_length",
-        },
-        Ty::IntNewtypeInstance,
-        Ty::StrNewtypeInstance,
-        Ty::FloatNewtypeInstance,
-        Ty::ComplexNewtypeInstance,
-        Ty::SubNewTypeOfIntInstance,
-        Ty::SubSubNewTypeOfIntInstance,
-        Ty::SubNewTypeOfFloatInstance,
-    ];
-    let types = if fully_static {
-        &types[fully_static_index..]
-    } else {
-        types
-    };
-    g.choose(types).unwrap().clone()
+    choose_core_type!(
+        g,
+        fully_static,
+        dynamic_types: [
+            Ty::Any,
+            Ty::Unknown,
+            Ty::Divergent,
+            Ty::TopDivergent,
+            Ty::BottomDivergent,
+            Ty::SubclassOfAny,
+            Ty::UnittestMockLiteral,
+            Ty::UnittestMockInstance,
+        ],
+        fully_static_types: [
+            Ty::Never,
+            Ty::None,
+            int_lit,
+            bool_lit,
+            Ty::StringLiteral(""),
+            Ty::StringLiteral("a"),
+            Ty::LiteralString,
+            Ty::BytesLiteral(""),
+            Ty::BytesLiteral("\x00"),
+            Ty::EnumLiteral("safe"),
+            Ty::EnumLiteral("unsafe"),
+            Ty::EnumLiteral("unknown"),
+            Ty::SingleMemberEnumLiteral,
+            Ty::KnownClassInstance(KnownClass::Object),
+            Ty::KnownClassInstance(KnownClass::Str),
+            Ty::KnownClassInstance(KnownClass::Int),
+            Ty::KnownClassInstance(KnownClass::Float),
+            Ty::KnownClassInstance(KnownClass::Complex),
+            Ty::KnownClassInstance(KnownClass::Bool),
+            Ty::KnownClassInstance(KnownClass::FunctionType),
+            Ty::KnownClassInstance(KnownClass::SpecialForm),
+            Ty::KnownClassInstance(KnownClass::TypeVar),
+            Ty::KnownClassInstance(KnownClass::TypeAliasType),
+            Ty::KnownClassInstance(KnownClass::NoDefaultType),
+            Ty::TypingLiteral,
+            Ty::BuiltinClassLiteral("str"),
+            Ty::BuiltinClassLiteral("int"),
+            Ty::BuiltinClassLiteral("bool"),
+            Ty::BuiltinClassLiteral("object"),
+            Ty::BuiltinInstance("type"),
+            Ty::AbcInstance("ABC"),
+            Ty::AbcInstance("ABCMeta"),
+            Ty::SubclassOfBuiltinClass("object"),
+            Ty::SubclassOfBuiltinClass("str"),
+            Ty::SubclassOfBuiltinClass("type"),
+            Ty::AbcClassLiteral("ABC"),
+            Ty::AbcClassLiteral("ABCMeta"),
+            Ty::SubclassOfAbcClass("ABC"),
+            Ty::SubclassOfAbcClass("ABCMeta"),
+            Ty::AlwaysTruthy,
+            Ty::AlwaysFalsy,
+            Ty::BuiltinsFunction("chr"),
+            Ty::BuiltinsFunction("ascii"),
+            Ty::BuiltinsBoundMethod {
+                class: "str",
+                method: "isascii",
+            },
+            Ty::BuiltinsBoundMethod {
+                class: "int",
+                method: "bit_length",
+            },
+            Ty::IntNewtypeInstance,
+            Ty::StrNewtypeInstance,
+            Ty::FloatNewtypeInstance,
+            Ty::ComplexNewtypeInstance,
+            Ty::SubNewTypeOfIntInstance,
+            Ty::SubSubNewTypeOfIntInstance,
+            Ty::SubNewTypeOfFloatInstance,
+        ],
+    )
 }
 
 /// Constructs an arbitrary type.

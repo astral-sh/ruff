@@ -40,6 +40,99 @@ fn supports_only_plain_text() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn shared_import_hover_uses_each_script_python_version() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let shared = SystemPath::new("src/shared.py");
+    let older = SystemPath::new("src/older.py");
+    let newer = SystemPath::new("src/newer.py");
+    let shared_content = "\
+import sys
+
+if sys.version_info >= (3, 13):
+    value = 13
+else:
+    value = 12
+";
+    let older_content = r#"# /// script
+# requires-python = ">=3.12"
+# [tool.ty.environment]
+# extra-paths = ["."]
+# ///
+
+from shared import value
+value
+"#;
+    let newer_content = r#"# /// script
+# requires-python = ">=3.13"
+# [tool.ty.environment]
+# extra-paths = ["."]
+# ///
+
+from shared import value
+value
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(
+            "src/pyproject.toml",
+            r#"[tool.ty.environment]
+python-version = "3.12"
+"#,
+        )?
+        .with_file(shared, shared_content)?
+        .with_file(older, older_content)?
+        .with_file(newer, newer_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(older, older_content, 1);
+    server.open_text_document(newer, newer_content, 1);
+
+    let older_hover = server.hover_request(older, Position::new(7, 1));
+    insta::assert_json_snapshot!(older_hover, @r#"
+    {
+      "contents": {
+        "kind": "plaintext",
+        "value": "Literal[12]"
+      },
+      "range": {
+        "start": {
+          "line": 7,
+          "character": 0
+        },
+        "end": {
+          "line": 7,
+          "character": 5
+        }
+      }
+    }
+    "#);
+
+    let newer_hover = server.hover_request(newer, Position::new(7, 1));
+    insta::assert_json_snapshot!(newer_hover, @r#"
+    {
+      "contents": {
+        "kind": "plaintext",
+        "value": "Literal[13]"
+      },
+      "range": {
+        "start": {
+          "line": 7,
+          "character": 0
+        },
+        "end": {
+          "line": 7,
+          "character": 5
+        }
+      }
+    }
+    "#);
+
+    Ok(())
+}
+
 fn hover_content_format(formats: Vec<MarkupKind>) -> Result<MarkupKind> {
     let workspace_root = SystemPath::new("src");
     let document_path = SystemPath::new("src/foo.py");

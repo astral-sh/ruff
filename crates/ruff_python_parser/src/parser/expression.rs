@@ -248,9 +248,11 @@ impl<'src> Parser<'src> {
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
-        let start = self.node_start();
-        let lhs = self.parse_lhs_expression(left_precedence, context);
-        self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+        self.with_recursion(|parser| {
+            let start = parser.node_start();
+            let lhs = parser.parse_lhs_expression(left_precedence, context);
+            parser.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+        })
     }
 
     fn parse_binary_expression_or_higher_recursive(
@@ -303,22 +305,7 @@ impl<'src> Parser<'src> {
                 BinaryLikeOperator::Binary(bin_op) => {
                     self.bump(TokenKind::from(bin_op));
 
-                    let right = if new_precedence.is_right_associative() {
-                        // For right-associative operators (`**`), the right
-                        // operand recursion is unbounded in `a**a**a**...`,
-                        // and it bypasses the guard in `parse_lhs_expression`
-                        // (that scope is exited once the atom is parsed).
-                        if let Some(right) = self.with_recursion(|parser| {
-                            parser.parse_binary_expression_or_higher(new_precedence, context)
-                        }) {
-                            right
-                        } else {
-                            self.report_recursion_limit_exceeded(self.current_token_range());
-                            self.recursion_recovery_expr()
-                        }
-                    } else {
-                        self.parse_binary_expression_or_higher(new_precedence, context)
-                    };
+                    let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
                     Expr::BinOp(ast::ExprBinOp {
                         left: Box::new(left.expr),
@@ -349,59 +336,6 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        if !Self::token_starts_recursive_lhs(token) {
-            return self.parse_lhs_expression_inner(left_precedence, context, token);
-        }
-
-        if let Some(result) = self.with_recursion(|parser| {
-            parser.parse_lhs_expression_inner(left_precedence, context, token)
-        }) {
-            result
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
-        }
-    }
-
-    /// Returns whether parsing an expression that starts with `token` can
-    /// immediately recurse through another expression parse.
-    #[inline]
-    fn token_starts_recursive_lhs(token: TokenKind) -> bool {
-        token.as_unary_operator().is_some()
-            || matches!(
-                token,
-                TokenKind::Star
-                    | TokenKind::Await
-                    | TokenKind::Lambda
-                    | TokenKind::Yield
-                    | TokenKind::FStringStart
-                    | TokenKind::TStringStart
-                    | TokenKind::Lpar
-                    | TokenKind::Lsqb
-                    | TokenKind::Lbrace
-            )
-    }
-
-    /// The standard expression-recovery node returned when the recursion
-    /// limit is exceeded: an empty `Name` with the `Invalid` context.
-    fn recursion_recovery_expr(&mut self) -> ParsedExpr {
-        ParsedExpr {
-            expr: Expr::Name(ast::ExprName {
-                range: self.missing_node_range(),
-                id: Name::empty(),
-                ctx: ExprContext::Invalid,
-                node_index: AtomicNodeIndex::NONE,
-            }),
-            is_parenthesized: false,
-        }
-    }
-
-    fn parse_lhs_expression_inner(
-        &mut self,
-        left_precedence: OperatorPrecedence,
-        context: ExpressionContext,
-        token: TokenKind,
-    ) -> ParsedExpr {
         let start = self.node_start();
 
         if let Some(unary_op) = token.as_unary_operator() {
@@ -754,20 +688,8 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
-                TokenKind::Lpar => {
-                    if self.tokens.nesting() > self.max_nesting_depth {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        break lhs;
-                    }
-                    Expr::Call(self.parse_call_expression(lhs, start))
-                }
-                TokenKind::Lsqb => {
-                    if self.tokens.nesting() > self.max_nesting_depth {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        break lhs;
-                    }
-                    Expr::Subscript(self.parse_subscript_expression(lhs, start))
-                }
+                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
+                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => {
                     Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
                 }
@@ -1593,7 +1515,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `String` token.
     ///
-    /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
+    /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
         let range = self.current_token_range();
         let flags = self.tokens.current_flags().as_any_string_flags();
@@ -1899,18 +1821,13 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = if let Some(elements) = self.with_recursion(|parser| {
+            let elements = self.with_recursion(|parser| {
                 parser.parse_interpolated_string_elements(
                     flags,
                     InterpolatedStringElementsKind::FormatSpec(string_kind),
                     string_kind,
                 )
-            }) {
-                elements
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                ast::InterpolatedStringElements::from(vec![])
-            };
+            });
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -2989,15 +2906,8 @@ impl<'src> Parser<'src> {
         // lambda x: yield y
         // lambda x: yield from y
 
-        // `lambda: lambda: lambda: ...` recurses through the lambda body at
-        // the conditional layer, bypassing the `parse_lhs_expression` guard.
-        let body =
-            if let Some(body) = self.with_recursion(Self::parse_conditional_expression_or_higher) {
-                body
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                self.recursion_recovery_expr()
-            };
+        // Lambda bodies recurse through the conditional layer without entering the binary parser.
+        let body = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -3021,17 +2931,8 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
-        // `a if b else a if b else ...` recurses through `orelse` at the
-        // conditional layer, which is not covered by the `parse_lhs_expression`
-        // guard (that scope is released once each atom is parsed). Guard here.
-        let orelse = if let Some(orelse) =
-            self.with_recursion(Self::parse_conditional_expression_or_higher)
-        {
-            orelse
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
-        };
+        // The binary-expression guard has already returned before parsing the `else` branch.
+        let orelse = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
         ast::ExprIf {
             body: Box::new(body),

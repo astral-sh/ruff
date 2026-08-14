@@ -426,23 +426,24 @@ def update(counter: Counter | None) -> None:
     counter.count += 1
 ```
 
-An augmented assignment should not define an otherwise missing instance attribute, because it must
-read an existing value before writing its result. We currently treat it like an ordinary
-self-referential assignment instead.
+An augmented assignment cannot define an otherwise missing instance attribute, because it must read
+an existing value before writing its result.
 
 ```py
 class UninitializedCounter:
     def increment(self) -> None:
-        # TODO: Report an unresolved-attribute error instead of implicitly defining the attribute.
+        # error: [unresolved-attribute]
         self.value += 1
 
-reveal_type(UninitializedCounter().value)  # revealed: Divergent
+# error: [unresolved-attribute]
+reveal_type(UninitializedCounter().value)  # revealed: Unknown
 ```
 
 ## Dynamically provided attributes
 
-A dynamic attribute hook can provide the initial value read by an augmented assignment. The
-assignment currently infers a divergent attribute type instead of preserving the hook's return type.
+A dynamic attribute hook can provide the initial value read by an augmented assignment. Ordinary
+attribute lookup preserves the hook's return type, but the resulting assignment is not yet
+recognized as establishing instance storage.
 
 ```py
 class DynamicCounter:
@@ -450,10 +451,11 @@ class DynamicCounter:
         return 0
 
     def increment(self) -> None:
+        # TODO: Recognize the instance attribute established after reading from a dynamic hook.
+        # error: [unresolved-attribute]
         self.value += 1
 
-# TODO: Infer `int` from the dynamic attribute hook.
-reveal_type(DynamicCounter().value)  # revealed: Divergent
+reveal_type(DynamicCounter().value)  # revealed: int
 ```
 
 The same behavior applies when the attribute is provided by `__getattribute__`.
@@ -464,9 +466,11 @@ class InterceptedCounter:
         return 0
 
     def increment(self) -> None:
+        # TODO: Recognize the instance attribute established after reading from a dynamic hook.
+        # error: [unresolved-attribute]
         self.value += 1
 
-reveal_type(InterceptedCounter().value)  # revealed: Divergent
+reveal_type(InterceptedCounter().value)  # revealed: int
 ```
 
 ## Class-level defaults in diamond inheritance

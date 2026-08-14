@@ -791,7 +791,8 @@ except:
 reveal_type(y)  # revealed: Literal[0, 1]
 ```
 
-A generator expression does not run its body until the generator is consumed:
+Generator expressions are also assumed to run eagerly for exception-flow analysis, since in practice
+they are almost always eagerly consumed in real-world code:
 
 ```py
 z = 0
@@ -800,7 +801,7 @@ try:
 except:
     z = 1
 
-reveal_type(z)  # revealed: Literal[0]
+reveal_type(z)  # revealed: Literal[0, 1]
 ```
 
 A nested function body also runs later, so its exceptions cannot reach the handler surrounding its
@@ -870,22 +871,25 @@ def dict_comprehension_assignment() -> None:
         reveal_type(state)  # revealed: Literal["before"] | int
 ```
 
-## Assignments in lazy generator expressions
+## Assignments in generator expressions
 
-Assignments and calls in a generator expression do not execute when the generator is created, so
-they do not make the surrounding exception handler reachable:
+Generator expressions are assumed to run eagerly, so their assignments and calls can reach the
+surrounding exception handler. Strictly speaking generator expressions *can* be lazy, but in
+practice they are almost always eagerly consumed in real-world code:
 
 ```py
 def generator_may_raise() -> None: ...
-def lazy_generator_assignment() -> None:
+def generator_assignment() -> None:
     state = 0
     caught = False
     try:
         ((state := 1, generator_may_raise()) for _ in [0])
     except:
+        reveal_type(state)  # revealed: int
         caught = True
 
-    reveal_type(caught)  # revealed: Literal[False]
+    reveal_type(caught)  # revealed: bool
+    reveal_type(state)  # revealed: int
 ```
 
 ## Nested comprehension assignments

@@ -97,6 +97,20 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)
 ```
 
+## Redundant casts of tuple classes with unknown elements
+
+A tuple class with an `Unknown` element is not fully static, even when its other element is `object`
+and their union simplifies to `object`. A cast involving that tuple class must not be reported as
+redundant.
+
+```py
+from typing import cast
+from ty_extensions._internal import Unknown
+
+def cast_gradual_tuple_class(value: type[tuple[object, Unknown]]) -> None:
+    cast(type[tuple[object, Unknown]], value)
+```
+
 ## Diagnostic snapshots
 
 ```py
