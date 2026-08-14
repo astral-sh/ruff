@@ -468,6 +468,31 @@ info: Type variable defined here
    |                                 ^^^^^^
 ```
 
+### Union splatted arguments
+
+Equal-length tuple unions preserve their length and combine the types at each position. Different
+lengths produce an open tuple, while direct arguments around the splat keep their known positions.
+
+```py
+def collect[*Ts](*args: *Ts) -> tuple[*Ts]:
+    return args
+
+def check(
+    same_length: tuple[int] | tuple[str],
+    paired: tuple[int, str] | tuple[bytes, bool],
+    different_lengths: tuple[int] | tuple[str, bytes],
+    prefix: bool,
+    suffix: bytes,
+) -> None:
+    reveal_type(collect(*same_length))  # revealed: tuple[int | str]
+    reveal_type(collect(*paired))  # revealed: tuple[int | bytes, str | bool]
+    reveal_type(collect(*different_lengths))  # revealed: tuple[int | str | bytes, ...]
+    reveal_type(collect(prefix, *same_length, suffix))  # revealed: tuple[bool, int | str, bytes]
+
+    # error: [invalid-assignment]
+    wrong: tuple[bytes] = collect(*same_length)
+```
+
 ### Starred variadic arguments without a variadic return
 
 A bounded or constrained element is checked even when the return type does not contain its pack.

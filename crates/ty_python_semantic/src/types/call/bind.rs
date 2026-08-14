@@ -6190,11 +6190,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             if matches!(argument, Argument::Variadic) {
                 let argument_type = argument_types.get_default()?;
-                // Iteration would merge union branches and lose their argument-shape correlations.
-                if matches!(argument_type.resolve_type_alias(db), Type::Union(_)) {
-                    return None;
-                }
-
                 let mut argument_tuple = argument_type.iterate(db, self.env);
                 let consumed_prefix = matches
                     .parameters
