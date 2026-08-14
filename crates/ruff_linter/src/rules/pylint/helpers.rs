@@ -1,7 +1,6 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::ExceptHandler;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Arguments, Expr, Stmt, visitor};
+use ruff_python_ast::{Arguments, ExceptHandler, Expr, Pattern, Stmt, visitor};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::TextRange;
@@ -88,13 +87,15 @@ impl<'a> SequenceIndexVisitor<'a> {
 }
 
 impl SequenceIndexVisitor<'_> {
+    fn is_tracked_name(&self, name: &str) -> bool {
+        name == self.sequence_name || name == self.index_name || name == self.value_name
+    }
+
     fn is_assignment(&self, expr: &Expr) -> bool {
         // If we see the sequence, a subscript, or the index being modified, we'll stop emitting
         // diagnostics.
         match expr {
-            Expr::Name(ast::ExprName { id, .. }) => {
-                id == self.sequence_name || id == self.index_name || id == self.value_name
-            }
+            Expr::Name(ast::ExprName { id, .. }) => self.is_tracked_name(id),
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
                     return false;
@@ -109,6 +110,10 @@ impl SequenceIndexVisitor<'_> {
                 }
                 false
             }
+            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                elts.iter().any(|elt| self.is_assignment(elt))
+            }
+            Expr::Starred(ast::ExprStarred { value, .. }) => self.is_assignment(value),
             _ => false,
         }
     }
@@ -137,12 +142,63 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
                 self.modified = targets.iter().any(|target| self.is_assignment(target));
             }
+            Stmt::For(ast::StmtFor {
+                target,
+                iter,
+                body,
+                orelse,
+                ..
+            }) => {
+                // A nested loop target can rebind the sequence, index, or replacement value.
+                self.visit_expr(iter);
+                if self.modified {
+                    return;
+                }
+                self.modified = self.is_assignment(target);
+                if !self.modified {
+                    self.visit_expr(target);
+                    self.visit_body(body);
+                    self.visit_body(orelse);
+                }
+            }
+            Stmt::With(ast::StmtWith { items, body, .. }) => {
+                for item in items {
+                    self.visit_expr(&item.context_expr);
+                    if self.modified {
+                        return;
+                    }
+                    let Some(target) = item.optional_vars.as_deref() else {
+                        continue;
+                    };
+                    self.modified = self.is_assignment(target);
+                    if self.modified {
+                        return;
+                    }
+                    self.visit_expr(target);
+                    if self.modified {
+                        return;
+                    }
+                }
+                self.visit_body(body);
+            }
             _ => visitor::walk_stmt(self, stmt),
         }
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
         if self.modified {
+            return;
+        }
+        if let Expr::Named(ast::ExprNamed { target, value, .. }) = expr {
+            self.visit_expr(value);
+            if self.modified {
+                return;
+            }
+            self.modified = self.is_assignment(target);
+            if self.modified {
+                return;
+            }
+            self.visit_expr(target);
             return;
         }
         if let Expr::Subscript(ast::ExprSubscript {
@@ -164,6 +220,50 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
         }
 
         visitor::walk_expr(self, expr);
+    }
+
+    fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
+        if self.modified {
+            return;
+        }
+
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            type_, name, body, ..
+        }) = except_handler;
+        if let Some(type_) = type_ {
+            self.visit_expr(type_);
+            if self.modified {
+                return;
+            }
+        }
+        self.modified = name
+            .as_ref()
+            .is_some_and(|name| self.is_tracked_name(name.as_str()));
+        if !self.modified {
+            self.visit_body(body);
+        }
+    }
+
+    fn visit_pattern(&mut self, pattern: &Pattern) {
+        if self.modified {
+            return;
+        }
+
+        self.modified = match pattern {
+            Pattern::MatchAs(ast::PatternMatchAs {
+                name: Some(name), ..
+            })
+            | Pattern::MatchStar(ast::PatternMatchStar {
+                name: Some(name), ..
+            })
+            | Pattern::MatchMapping(ast::PatternMatchMapping {
+                rest: Some(name), ..
+            }) => self.is_tracked_name(name.as_str()),
+            _ => false,
+        };
+        if !self.modified {
+            visitor::walk_pattern(self, pattern);
+        }
     }
 }
 
