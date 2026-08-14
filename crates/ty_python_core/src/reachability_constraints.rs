@@ -263,6 +263,13 @@ impl ReachabilityConstraintsBuilder {
             return root;
         }
 
+        let root_node = self.interiors[root];
+        if let (Some(if_true), Some(if_false)) =
+            (terminal(root_node.if_true), terminal(root_node.if_false))
+        {
+            return narrowing_constraints.add_conditional(root_node.atom, if_true, if_false);
+        }
+
         let mut converted = FxHashMap::default();
         let mut actions = vec![Action::Visit(root)];
 
