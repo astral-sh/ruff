@@ -119,8 +119,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Whether some non-`TypedDict` arm of `annotation` already accepts this `dict(...)` call.
     ///
-    /// `Config | int | dict[str, int]` accepts `dict(other=1)` through its `dict[str, int]` arm,
-    /// so committing to `Config` would report key errors for a call the annotation allows.
+    /// A union of a `TypedDict` and `dict[str, int]` accepts `dict(other=1)` through the latter,
+    /// so committing to the `TypedDict` would report key errors for a call the annotation allows.
     ///
     /// A non-`TypedDict` type context cannot re-enter the fast path, so the recursion terminates.
     fn dict_call_matches_union_fallback(
