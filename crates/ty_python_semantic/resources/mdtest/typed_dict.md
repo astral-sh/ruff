@@ -4165,6 +4165,28 @@ class BadMerge(L[int], R[str]): ...
 class BadMergeGeneric[T](L[int], R[T]): ...
 ```
 
+### Generic `TypedDict` in a generic type alias
+
+A generic `TypedDict` used as a member of a generic type alias must substitute the alias type
+argument into the `TypedDict`. This requires the alias to collect the legacy type variables that the
+`TypedDict` member holds.
+
+```py
+from typing import Generic, TypeVar, TypedDict, Union
+
+T = TypeVar("T")
+
+class Obj(TypedDict, Generic[T]):
+    value: T
+
+Alias = Union[Obj[T], None]
+
+def f(x: Alias[int]) -> None:
+    if x is not None:
+        reveal_type(x)  # revealed: Obj[int]
+        reveal_type(x["value"])  # revealed: int
+```
+
 ## Recursive `TypedDict`
 
 `TypedDict`s can also be recursive, allowing for nested structures:

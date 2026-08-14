@@ -18,9 +18,11 @@ use super::diagnostic::{
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
-    UnionBuilder, definition_expression_annotation, definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
+    IntersectionType, Type, TypeMapping, TypeQualifiers, UnionBuilder,
+    definition_expression_annotation, definition_expression_type, visitor,
 };
+use crate::FxOrderSet;
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
@@ -584,6 +586,50 @@ impl<'db> TypedDictType<'db> {
                 synthesized.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
         }
+    }
+
+    pub(crate) fn find_legacy_typevars_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
+    ) {
+        // `Self` in a `TypedDict` member is bound by the enclosing class scope. It is not a free
+        // legacy typevar that the surrounding alias, function, or base-class list introduces.
+        // Collecting it would turn `Self` into an inference variable of that context. For example,
+        // an overload implementation signature with a parameter type `Pair[Self]` would then treat
+        // `Self` as free and wrongly accept the overload. Gather the members' typevars separately
+        // and drop `Self`, which is never a free typevar here. This matches the other ways `Self`
+        // reaches a signature (a bare `Self` annotation, or a `Self` argument of a generic class),
+        // none of which add `Self` to the collected generic context.
+        let mut members = FxOrderSet::default();
+        match self {
+            Self::Class(defining_class) => {
+                defining_class.find_legacy_typevars_impl(
+                    db,
+                    env,
+                    binding_context,
+                    &mut members,
+                    visitor,
+                );
+            }
+            Self::Synthesized(synthesized) => {
+                synthesized.find_legacy_typevars_impl(
+                    db,
+                    env,
+                    binding_context,
+                    &mut members,
+                    visitor,
+                );
+            }
+        }
+        typevars.extend(
+            members
+                .into_iter()
+                .filter(|bound_typevar| !bound_typevar.typevar(db).is_self(db)),
+        );
     }
 
     pub(crate) fn from_schema_items(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
@@ -3024,6 +3070,25 @@ impl<'db> SynthesizedTypedDictType<'db> {
         match self.kind(db) {
             SynthesizedTypedDictKind::Schema => Self::schema(db, items, openness),
             SynthesizedTypedDictKind::Patch => Self::patch(db, items, openness),
+        }
+    }
+
+    fn find_legacy_typevars_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
+    ) {
+        for field in self.items(db).values() {
+            field.declared_ty.find_legacy_typevars_impl(
+                db,
+                env,
+                binding_context,
+                typevars,
+                visitor,
+            );
         }
     }
 }

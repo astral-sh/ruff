@@ -8250,8 +8250,11 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::LiteralValue(_)
             | Type::BoundSuper(_)
-            | Type::SpecialForm(_)
-            | Type::TypedDict(_) => {}
+            | Type::SpecialForm(_) => {}
+
+            Type::TypedDict(typed_dict) => visitor.visit(db, self, || {
+                typed_dict.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+            }),
         }
     }
 
