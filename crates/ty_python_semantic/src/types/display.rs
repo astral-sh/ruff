@@ -2,7 +2,7 @@
 
 use crate::ProgramEnvironment;
 use std::borrow::{Borrow, Cow};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
@@ -33,10 +33,11 @@ use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType,
-    Protocol, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, TypingModule, UnionType,
+    CallableType, DynamicType, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind,
+    PropertyInstanceType, Protocol, SpecialFormType, StringLiteralType, SubclassOfInner,
+    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType,
+    TypingModule, UnionType,
     WrapperDescriptorKind, visitor, walk_signature,
 };
 use ty_python_core::ProgramFile;
@@ -556,10 +557,41 @@ impl QualificationLevel {
     }
 }
 
+// Intrinsic types have fixed display names rather than class identities. Tracking them in a bitset
+// lets us qualify colliding classes and aliases without allocating for common types like `Any`.
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Default)]
+    struct IntrinsicNames: u8 {
+        const ANY = 1 << 0;
+        const UNKNOWN = 1 << 1;
+        const UNSPECIALIZED_TYPE_VAR = 1 << 2;
+        const DIVERGENT = 1 << 3;
+        const NEVER = 1 << 4;
+        const NO_DEFAULT = 1 << 5;
+    }
+}
+
+impl IntrinsicNames {
+    fn contains_name(self, name: &str) -> bool {
+        let intrinsic = match name {
+            "Any" => Self::ANY,
+            "Unknown" => Self::UNKNOWN,
+            "UnspecializedTypeVar" => Self::UNSPECIALIZED_TYPE_VAR,
+            "Divergent" => Self::DIVERGENT,
+            "Never" => Self::NEVER,
+            "NoDefault" => Self::NO_DEFAULT,
+            _ => return false,
+        };
+
+        self.contains(intrinsic)
+    }
+}
+
 struct AmbiguousNameCollector<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     visited_types: RefCell<FxHashSet<Type<'db>>>,
     names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
+    intrinsic_names: Cell<IntrinsicNames>,
 }
 
 impl<'a, 'db> AmbiguousNameCollector<'a, 'db> {
@@ -568,6 +600,7 @@ impl<'a, 'db> AmbiguousNameCollector<'a, 'db> {
             env,
             visited_types: RefCell::default(),
             names: RefCell::default(),
+            intrinsic_names: Cell::default(),
         }
     }
 
@@ -623,6 +656,10 @@ impl<'a, 'db> AmbiguousNameCollector<'a, 'db> {
         self.record(db, NamedItem::TypeAlias(type_alias));
     }
 
+    fn record_intrinsic_name(&self, name: IntrinsicNames) {
+        self.intrinsic_names.set(self.intrinsic_names.get() | name);
+    }
+
     fn into_display_settings(self) -> DisplaySettings<'db> {
         // The qualification level map for all names.
         //
@@ -631,12 +668,18 @@ impl<'a, 'db> AmbiguousNameCollector<'a, 'db> {
         //
         // Both classes and type aliases use the same qualification map since
         // a class and type alias with the same name need to be disambiguated.
+        let intrinsic_names = self.intrinsic_names.into_inner();
         let qualification_map = self
             .names
             .borrow()
             .iter()
             .filter_map(|(name, ambiguity)| {
-                Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
+                let level = QualificationLevel::from_ambiguity_state(ambiguity).or_else(|| {
+                    intrinsic_names
+                        .contains_name(name)
+                        .then_some(QualificationLevel::ModuleName)
+                })?;
+                Some((*name, level))
             })
             .collect();
 
@@ -677,6 +720,30 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
+            Type::Dynamic(dynamic) => {
+                let name = match dynamic {
+                    DynamicType::Any => IntrinsicNames::ANY,
+                    DynamicType::Unknown
+                    | DynamicType::UnknownGeneric(_)
+                    | DynamicType::InvalidConcatenateUnknown
+                    | DynamicType::AmbiguousOverload => IntrinsicNames::UNKNOWN,
+                    DynamicType::UnspecializedTypeVar => IntrinsicNames::UNSPECIALIZED_TYPE_VAR,
+                    DynamicType::Todo(_) => return,
+                };
+                self.record_intrinsic_name(name);
+            }
+            Type::Divergent(_) => {
+                self.record_intrinsic_name(IntrinsicNames::DIVERGENT);
+            }
+            Type::Never => {
+                self.record_intrinsic_name(IntrinsicNames::NEVER);
+            }
+            Type::NominalInstance(instance)
+                if instance.class(db, self.env).known(db) == Some(KnownClass::NoDefaultType) =>
+            {
+                self.record_intrinsic_name(IntrinsicNames::NO_DEFAULT);
+                return;
+            }
             Type::ClassLiteral(class) => self.record_class(db, class),
             Type::LiteralValue(literal) => {
                 if let LiteralValueTypeKind::Enum(literal) = literal.kind() {

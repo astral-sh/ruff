@@ -2577,6 +2577,10 @@ impl KnownFunction {
                 }
                 if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
                 {
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(
+                        context,
+                        [*actual_ty, Type::Never],
+                    );
                     let mut diagnostic =
                         builder.into_diagnostic("Argument does not have asserted type `Never`");
                     diagnostic.annotate(
@@ -2588,17 +2592,17 @@ impl KnownFunction {
                         )
                         .message(format_args!(
                             "Inferred type of argument is `{}`",
-                            actual_ty.display(db, env)
+                            actual_ty.display_with(db, env, settings.clone())
                         )),
                     );
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
-                        inferred_type = actual_ty.display(db, env),
+                        inferred_type = actual_ty.display_with(db, env, settings.clone()),
                     ));
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` is not equivalent to `Never`",
-                        actual_ty.display(db, env),
+                        actual_ty.display_with(db, env, settings),
                     ));
                 }
             }

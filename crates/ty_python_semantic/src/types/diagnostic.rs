@@ -3502,7 +3502,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
             {
                 report_unsupported_base(context, base_node, base_type, class);
             } else {
-                let Some(mut diagnostic) =
+                let Some((mut diagnostic, settings)) =
                     report_invalid_base(context, base_node, base_type, class)
                 else {
                     return;
@@ -3511,12 +3511,13 @@ pub(crate) fn report_invalid_or_unsupported_base(
                 diagnostic.info(format_args!(
                     "Type `{}` has an `__mro_entries__` method, \
                     but it does not return a tuple of types",
-                    base_type.display(db, env)
+                    base_type.display_with(db, env, settings)
                 ));
             }
         }
         Err(mro_entries_call_error) => {
-            let Some(mut diagnostic) = report_invalid_base(context, base_node, base_type, class)
+            let Some((mut diagnostic, settings)) =
+                report_invalid_base(context, base_node, base_type, class)
             else {
                 return;
             };
@@ -3527,13 +3528,13 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
-                        base_type.display(db, env)
+                        base_type.display_with(db, env, settings.clone())
                     ));
                     if let Some(unbound_on) = unbound_on {
                         for ty in unbound_on {
                             diagnostic.info(format_args!(
                                 "`{}` does not implement `__mro_entries__`",
-                                ty.display(db, env)
+                                ty.display_with(db, env, settings.clone())
                             ));
                         }
                     }
@@ -3542,7 +3543,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
-                        base_type.display(db, env)
+                        base_type.display_with(db, env, settings)
                     ));
                 }
                 CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
@@ -3550,7 +3551,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
                         but it cannot be called with the expected arguments",
-                        base_type.display(db, env)
+                        base_type.display_with(db, env, settings)
                     ));
                     diagnostic.info(
                         "Expected a signature at least as permissive as \
@@ -3562,7 +3563,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
                         but it may not be callable",
-                        base_type.display(db, env)
+                        base_type.display_with(db, env, settings)
                     ));
                 }
             }
@@ -3581,17 +3582,21 @@ pub(crate) fn report_unsupported_base(
     };
     let db = context.db();
     let env = &context.program_environment();
+    let types = [base_type, Type::from(class)];
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
     let mut diagnostic = builder.into_diagnostic("Unsupported class base");
-    diagnostic
-        .set_primary_annotation_message(format_args!("Has type `{}`", base_type.display(db, env)));
+    diagnostic.set_primary_annotation_message(format_args!(
+        "Has type `{}`",
+        base_type.display_with(db, env, settings.clone())
+    ));
     diagnostic.set_concise_message(format_args!(
         "Unsupported class base with type `{}`",
-        base_type.display(db, env)
+        base_type.display_with(db, env, settings.clone())
     ));
     diagnostic.info(format_args!(
         "ty cannot resolve a consistent method resolution order (MRO) for class `{}` \
         due to this base",
-        class.name(db)
+        ClassLiteral::Static(class).display_with(db, settings)
     ));
     diagnostic.info("Only class objects or `Any` are supported as class bases");
 }
@@ -3601,19 +3606,21 @@ fn report_invalid_base<'env, 'db>(
     base_node: &ast::Expr,
     base_type: Type<'db>,
     class: StaticClassLiteral<'db>,
-) -> Option<LintDiagnosticGuard<'env, 'db>> {
+) -> Option<(LintDiagnosticGuard<'env, 'db>, DisplaySettings<'db>)> {
     let db = context.db();
     let builder = context.report_lint(&INVALID_BASE, base_node)?;
     let env = &context.program_environment();
+    let types = [base_type, Type::from(class)];
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Invalid class base with type `{}`",
-        base_type.display(db, env)
+        base_type.display_with(db, env, settings.clone())
     ));
     diagnostic.info(format_args!(
         "Definition of class `{}` will raise `TypeError` at runtime",
-        class.name(context.db())
+        ClassLiteral::Static(class).display_with(db, settings.clone())
     ));
-    Some(diagnostic)
+    Some((diagnostic, settings))
 }
 
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
@@ -5243,9 +5250,6 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
             else {
                 return;
             };
-            let class_name = class.name(db);
-            let mut diagnostic =
-                builder.into_diagnostic(format_args!("Invalid definition of class `{class_name}`"));
             let env = &context.program_environment();
             let class_and_def = class
                 .iter_mro(db, None)
@@ -5262,9 +5266,21 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     }
                     Some((class, place_with_def.first_definition?))
                 });
+            let types = [Type::from(class), bindings.callable_type()]
+                .into_iter()
+                .chain(
+                    class_and_def
+                        .iter()
+                        .map(|(superclass, _)| Type::from(*superclass)),
+                );
+            let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+            let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
+            let mut diagnostic =
+                builder.into_diagnostic(format_args!("Invalid definition of class `{class_name}`"));
 
             if let Some((superclass, definition)) = class_and_def {
-                let superclass_name = superclass.name(db);
+                let superclass_name =
+                    ClassLiteral::Static(superclass).display_with(db, settings.clone());
                 diagnostic.set_primary_annotation_message(format_args!(
                     "Superclass `{superclass_name}` cannot be subclassed",
                 ));
@@ -5280,7 +5296,9 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     annotation = annotation.message(format_args!(
                         "`{superclass_name}.__init_subclass__` has type `{}`, \
                         which is not callable",
-                        bindings.callable_type().display(db, env)
+                        bindings
+                            .callable_type()
+                            .display_with(db, env, settings.clone())
                     ));
                 } else {
                     diagnostic.set_concise_message(format_args!(
@@ -5290,7 +5308,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     annotation = annotation.message(format_args!(
                         "`{superclass_name}.__init_subclass__` has type `{}`, \
                         which may not be callable",
-                        bindings.callable_type().display(db, env)
+                        bindings.callable_type().display_with(db, env, settings)
                     ));
                 }
                 diagnostic.annotate(annotation);

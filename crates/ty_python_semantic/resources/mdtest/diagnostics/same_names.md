@@ -1072,6 +1072,69 @@ def invalid_type_is(value: first.Model) -> TypeIs[second.Model]:
     return True
 ```
 
+## Intrinsic typing names and sentinels
+
+User-defined classes remain distinct from intrinsic typing names and sentinels that share their
+display names.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`custom.py`:
+
+```py
+class Never: ...
+class Any: ...
+class NoDefault: ...
+```
+
+```py
+from typing import Any, Never, NoDefault, assert_never, assert_type
+
+import custom
+
+# error: [invalid-assignment] "Object of type `custom.Never` is not assignable to `Never`"
+never_value: Never = custom.Never()
+
+def expects_never(value: Never) -> None: ...
+
+# error: [invalid-argument-type] "Expected `Never`, found `custom.Never`"
+expects_never(custom.Never())
+
+assert_type(custom.Never(), Never)  # snapshot: type-assertion-failure
+
+# error: [type-assertion-failure] "Type `custom.Any` does not match asserted type `Any`"
+assert_type(custom.Any(), Any)
+
+# error: [invalid-assignment] "Object of type `NoDefault` is not assignable to `custom.NoDefault`"
+no_default: custom.NoDefault = NoDefault
+
+assert_never(custom.Never())  # snapshot: type-assertion-failure
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:13:1
+   |
+13 | assert_type(custom.Never(), Never)  # snapshot: type-assertion-failure
+   | ^^^^^^^^^^^^--------------^^^^^^^^
+   |             |
+   |             Inferred type is `custom.Never`
+info: `Never` and `custom.Never` are not equivalent types
+
+
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:21:1
+   |
+21 | assert_never(custom.Never())  # snapshot: type-assertion-failure
+   | ^^^^^^^^^^^^^--------------^
+   |              |
+   |              Inferred type of argument is `custom.Never`
+info: `Never` and `custom.Never` are not equivalent types
+```
+
 ## Type variable bounds, constraints, and defaults
 
 Diagnostics for explicit specializations, inferred call specializations, and type-variable defaults
@@ -2853,6 +2916,85 @@ error[invalid-argument-type]: Expected `builtins.int` for `start` argument, got 
   |                             ^^^^^^^^^^^^
 ```
 
+## NamedTuple arguments that shadow built-ins
+
+Functional `NamedTuple` constructors distinguish user-defined classes from the built-in types
+required by their names, field names, defaults, and keyword arguments.
+
+`custom.py`:
+
+```py
+class str: ...
+class bool: ...
+class Any: ...
+class Iterable: ...
+```
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+import custom
+
+NamedTuple(custom.str(), [])  # snapshot: invalid-argument-type
+namedtuple(custom.str(), [])  # snapshot: invalid-argument-type
+namedtuple("Value", [], rename=custom.bool())  # snapshot: invalid-argument-type
+namedtuple("Value", [], module=custom.str())  # snapshot: invalid-argument-type
+namedtuple("Value", custom.str())  # snapshot: invalid-argument-type
+namedtuple("Value", [], defaults=custom.Any())  # snapshot: invalid-argument-type
+namedtuple("Value", [], defaults=custom.Iterable())  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid argument to parameter `typename` of `NamedTuple()`
+ --> src/mdtest_snippet.py:6:12
+  |
+6 | NamedTuple(custom.str(), [])  # snapshot: invalid-argument-type
+  |            ^^^^^^^^^^^^ Expected `builtins.str`, found `custom.str`
+
+
+error[invalid-argument-type]: Invalid argument to parameter `typename` of `namedtuple()`
+ --> src/mdtest_snippet.py:7:12
+  |
+7 | namedtuple(custom.str(), [])  # snapshot: invalid-argument-type
+  |            ^^^^^^^^^^^^ Expected `builtins.str`, found `custom.str`
+
+
+error[invalid-argument-type]: Invalid argument to parameter `rename` of `namedtuple()`
+ --> src/mdtest_snippet.py:8:32
+  |
+8 | namedtuple("Value", [], rename=custom.bool())  # snapshot: invalid-argument-type
+  |                                ^^^^^^^^^^^^^ Expected `builtins.bool`, found `custom.bool`
+
+
+error[invalid-argument-type]: Invalid argument to parameter `module` of `namedtuple()`
+ --> src/mdtest_snippet.py:9:32
+  |
+9 | namedtuple("Value", [], module=custom.str())  # snapshot: invalid-argument-type
+  |                                ^^^^^^^^^^^^ Expected `builtins.str | None`, found `custom.str`
+
+
+error[invalid-argument-type]: Invalid argument to parameter `field_names` of `namedtuple()`
+  --> src/mdtest_snippet.py:10:21
+   |
+10 | namedtuple("Value", custom.str())  # snapshot: invalid-argument-type
+   |                     ^^^^^^^^^^^^ Expected `builtins.str` or an iterable of strings, found `custom.str`
+
+
+error[invalid-argument-type]: Invalid argument to parameter `defaults` of `namedtuple()`
+  --> src/mdtest_snippet.py:11:34
+   |
+11 | namedtuple("Value", [], defaults=custom.Any())  # snapshot: invalid-argument-type
+   |                                  ^^^^^^^^^^^^ Expected `Iterable[Any] | None`, found `custom.Any`
+
+
+error[invalid-argument-type]: Invalid argument to parameter `defaults` of `namedtuple()`
+  --> src/mdtest_snippet.py:12:34
+   |
+12 | namedtuple("Value", [], defaults=custom.Iterable())  # snapshot: invalid-argument-type
+   |                                  ^^^^^^^^^^^^^^^^^ Expected `typing.Iterable[Any] | None`, found `custom.Iterable`
+```
+
 ## Method override owners
 
 Method conflicts distinguish a derived class from same-named method owners, both across inherited
@@ -2924,6 +3066,65 @@ info: `mdtest_snippet.Owner.method` is a staticmethod but `first.Owner.method` i
 info: This violates the Liskov Substitution Principle
 ```
 
+## Invalid and unsupported static class bases
+
+Invalid and unsupported static bases remain distinct from the same-named classes inheriting them.
+
+```toml
+[rules]
+unsupported-base = "error"
+```
+
+`first.py`:
+
+```py
+class Invalid: ...
+
+class InvalidMro:
+    def __mro_entries__(self, bases: tuple[type, ...]) -> int:
+        return 1
+
+class Unsupported: ...
+```
+
+```py
+import first
+
+class Invalid(first.Invalid()): ...  # snapshot: invalid-base
+class InvalidMro(first.InvalidMro()): ...  # snapshot: invalid-base
+
+def create(base: type[first.Unsupported]) -> None:
+    class Unsupported(base): ...  # snapshot: unsupported-base
+```
+
+```snapshot
+error[invalid-base]: Invalid class base with type `first.Invalid`
+ --> src/mdtest_snippet.py:3:15
+  |
+3 | class Invalid(first.Invalid()): ...  # snapshot: invalid-base
+  |               ^^^^^^^^^^^^^^^
+info: Definition of class `mdtest_snippet.Invalid` will raise `TypeError` at runtime
+
+
+error[invalid-base]: Invalid class base with type `first.InvalidMro`
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | class InvalidMro(first.InvalidMro()): ...  # snapshot: invalid-base
+  |                  ^^^^^^^^^^^^^^^^^^
+info: Definition of class `mdtest_snippet.InvalidMro` will raise `TypeError` at runtime
+info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
+info: Type `first.InvalidMro` has an `__mro_entries__` method, but it does not return a tuple of types
+
+
+error[unsupported-base]: Unsupported class base
+ --> src/mdtest_snippet.py:7:23
+  |
+7 |     class Unsupported(base): ...  # snapshot: unsupported-base
+  |                       ^^^^ Has type `type[first.Unsupported]`
+info: ty cannot resolve a consistent method resolution order (MRO) for class `mdtest_snippet.<locals of function 'create'>.Unsupported` due to this base
+info: Only class objects or `Any` are supported as class bases
+```
+
 ## Unsupported dynamic class bases
 
 Dynamic-class diagnostics distinguish an unsupported base type from a same-named class created by
@@ -2955,6 +3156,39 @@ error[unsupported-dynamic-base]: Unsupported class base
   |                            ^^^^ Has type `type[first.Model]`
 info: ty cannot determine a MRO for class `mdtest_snippet.<locals of function 'create'>.Model` due to this base
 info: Only class objects or `Any` are supported as class bases
+```
+
+## Non-callable subclass initialization
+
+A derived class remains distinct from a same-named superclass whose `__init_subclass__` attribute
+cannot be called.
+
+`first.py`:
+
+```py
+class Model:
+    __init_subclass__ = 1
+```
+
+```py
+import first
+
+class Model(first.Model): ...  # snapshot: non-callable-init-subclass
+```
+
+```snapshot
+error[non-callable-init-subclass]: Invalid definition of class `mdtest_snippet.Model`
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | class Model(first.Model): ...  # snapshot: non-callable-init-subclass
+  |       ^^^^^^^^^^^^^^^^^^ Superclass `first.Model` cannot be subclassed
+  |
+ ::: src/first.py:2:5
+  |
+2 |     __init_subclass__ = 1
+  |     ----------------- `first.Model.__init_subclass__` has type `int`, which is not callable
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 ```
 
 ## Final-class inheritance
