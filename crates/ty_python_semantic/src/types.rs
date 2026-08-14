@@ -2542,12 +2542,27 @@ impl<'db> Type<'db> {
     /// If the type is a union (or a type alias that resolves to a union), filters union elements
     /// based on the provided predicate.
     ///
-    /// Aliases among the elements are expanded first. An element may itself be an alias for a
-    /// union, which is otherwise left unexpanded so diagnostics can name it, but filtering is a
-    /// set operation and has to see the members rather than the name.
-    ///
     /// Otherwise, returns the type unchanged.
-    fn filter_union(
+    fn filter_union(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
+        if let Type::Union(union) = self.resolve_type_alias(db) {
+            union.filter(db, f)
+        } else {
+            self
+        }
+    }
+
+    /// Like [`Type::filter_union`], but also expands elements that are themselves aliases for a
+    /// union.
+    ///
+    /// Such an element is normally left unexpanded so diagnostics can name it, which hides its
+    /// members from the predicate. Use this when the predicate asks what *shape* an element has —
+    /// whether it is a callable or a `TypedDict` — since an alias standing in for a union of those
+    /// has no shape of its own and would be rejected on its name alone.
+    ///
+    /// Prefer plain [`Type::filter_union`] when the predicate asks whether an element mentions an
+    /// unsolved typevar. Expanding there exposes typevars that inference is still in the middle of
+    /// binding, and the elements holding them get filtered away before they can be solved.
+    fn filter_union_expanding_aliases(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2580,7 +2595,7 @@ impl<'db> Type<'db> {
         inferable: TypeVarSet<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
-        self.filter_union(db, env, |elem| {
+        self.filter_union(db, |elem| {
             !elem
                 .when_disjoint_from(db, env, target, &constraints, inferable)
                 .is_always_satisfied(db, env)
@@ -3581,7 +3596,7 @@ impl<'db> Type<'db> {
         Place::Defined(DefinedPlace {
             ty: declaration
                 .ty
-                .filter_union(db, env, |ty| ty.may_be_data_descriptor(db, env)),
+                .filter_union(db, |ty| ty.may_be_data_descriptor(db, env)),
             definedness: if all_arms_are_possible_data_descriptors {
                 declaration.definedness
             } else {

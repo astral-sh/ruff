@@ -27,7 +27,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // is `TypedDict`-shaped.
         if let Some(tcx) = call_expression_tcx.annotation
             && let Some(typed_dict) = tcx
-                .filter_union(db, self.program_environment(), Type::is_typed_dict)
+                .filter_union_expanding_aliases(db, self.program_environment(), Type::is_typed_dict)
                 .as_typed_dict()
         {
             // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
