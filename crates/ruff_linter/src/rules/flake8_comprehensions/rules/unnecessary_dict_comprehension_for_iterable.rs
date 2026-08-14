@@ -50,7 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
 }

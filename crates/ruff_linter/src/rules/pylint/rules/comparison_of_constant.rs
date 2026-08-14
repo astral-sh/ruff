@@ -29,7 +29,7 @@ use crate::codes::Category;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.221", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.221", category = Category::Complexity)]
 pub(crate) struct ComparisonOfConstant {
     left_constant: String,
     op: CmpOp,

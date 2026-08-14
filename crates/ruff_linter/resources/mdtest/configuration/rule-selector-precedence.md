@@ -28,12 +28,12 @@ assert True  # error: [assert]
 
 ## Categories take precedence over `ALL`
 
-`unused-import` (`F401`) is a `correctness` rule:
+`unused-import` (`F401`) is a `suspicious` rule:
 
 ```toml
 [lint]
 preview = true
-select = ["correctness"]
+select = ["suspicious"]
 ignore = ["ALL"]
 ```
 
@@ -47,7 +47,7 @@ import os  # error: [unused-import]
 [lint]
 preview = true
 select = ["F"]
-ignore = ["correctness"]
+ignore = ["suspicious"]
 ```
 
 ```py
@@ -59,7 +59,7 @@ import os  # error: [unused-import]
 ```toml
 [lint]
 preview = true
-select = ["correctness"]
+select = ["suspicious"]
 ignore = ["F"]
 ```
 
@@ -73,7 +73,7 @@ import os
 [lint]
 preview = true
 select = ["F4"]
-ignore = ["correctness"]
+ignore = ["suspicious"]
 ```
 
 ```py
@@ -86,7 +86,7 @@ import os  # error: [unused-import]
 [lint]
 preview = true
 select = ["F401"]
-ignore = ["correctness"]
+ignore = ["suspicious"]
 ```
 
 ```py
@@ -99,7 +99,7 @@ import os  # error: [unused-import]
 [lint]
 preview = true
 select = ["unused-import"]
-ignore = ["correctness"]
+ignore = ["suspicious"]
 ```
 
 ```py

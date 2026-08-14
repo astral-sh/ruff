@@ -34,7 +34,7 @@ use crate::codes::Category;
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.229", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.229", category = Category::Suspicious)]
 pub(crate) struct ShebangNotFirstLine;
 
 impl Violation for ShebangNotFirstLine {

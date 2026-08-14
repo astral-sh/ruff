@@ -24,7 +24,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// def foo(): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.265", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.265", category = Category::Suspicious)]
 pub(crate) struct ImportSelf {
     name: String,
 }

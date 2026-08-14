@@ -35,7 +35,7 @@ use crate::codes::Category;
 ///         do_something_with_the_group(values)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.260", category = Category::Suspicious)]
 pub(crate) struct ReuseOfGroupbyGenerator;
 
 impl Violation for ReuseOfGroupbyGenerator {

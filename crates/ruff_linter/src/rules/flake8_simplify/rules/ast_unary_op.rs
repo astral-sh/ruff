@@ -115,7 +115,7 @@ impl AlwaysFixableViolation for NegateNotEqualOp {
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.213", category = Category::Complexity)]
+#[violation_metadata(stable_since = "v0.0.213", category = Category::Suspicious)]
 pub(crate) struct DoubleNegation {
     expr: String,
 }

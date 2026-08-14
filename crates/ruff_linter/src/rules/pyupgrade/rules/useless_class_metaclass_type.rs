@@ -30,7 +30,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0", category = Category::Style)]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Correctness)]
 pub(crate) struct UselessClassMetaclassType {
     name: String,
 }

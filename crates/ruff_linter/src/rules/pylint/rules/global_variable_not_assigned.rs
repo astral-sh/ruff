@@ -41,7 +41,7 @@ use crate::codes::Category;
 /// ## References
 /// - [Python documentation: The `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.174", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.174", category = Category::Style)]
 pub(crate) struct GlobalVariableNotAssigned {
     name: String,
 }

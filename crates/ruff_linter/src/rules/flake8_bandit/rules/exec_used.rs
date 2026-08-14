@@ -23,7 +23,7 @@ use crate::codes::Category;
 /// - [Python documentation: `exec`](https://docs.python.org/3/library/functions.html#exec)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.116", category = Category::Suspicious)]
+#[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
 pub(crate) struct ExecBuiltin;
 
 impl Violation for ExecBuiltin {

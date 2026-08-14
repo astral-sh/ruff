@@ -34,7 +34,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `typing.Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Style)]
 pub(crate) struct NoneNotAtEndOfUnion;
 
 impl Violation for NoneNotAtEndOfUnion {

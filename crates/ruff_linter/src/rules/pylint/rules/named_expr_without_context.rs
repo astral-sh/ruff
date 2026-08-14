@@ -26,7 +26,7 @@ use crate::codes::Category;
 /// a = 42
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.270", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.270", category = Category::Complexity)]
 pub(crate) struct NamedExprWithoutContext;
 
 impl Violation for NamedExprWithoutContext {

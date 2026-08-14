@@ -55,7 +55,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [PEP 498 – Literal String Interpolation](https://peps.python.org/pep-0498/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Complexity)]
 pub(crate) struct FStringMissingPlaceholders;
 
 impl AlwaysFixableViolation for FStringMissingPlaceholders {

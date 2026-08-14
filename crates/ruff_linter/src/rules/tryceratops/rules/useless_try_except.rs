@@ -30,7 +30,7 @@ use crate::codes::Category;
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.7.0", category = Category::Correctness)]
+#[violation_metadata(stable_since = "0.7.0", category = Category::Complexity)]
 pub(crate) struct UselessTryExcept;
 
 impl Violation for UselessTryExcept {

@@ -71,7 +71,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.171", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.171", category = Category::Suspicious)]
 pub(crate) struct RedefinedWhileUnused {
     pub name: String,
     pub row: SourceRow,

@@ -55,7 +55,7 @@ use crate::registry::Rule;
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 /// - [Python documentation: `typing.ClassVar`](https://docs.python.org/3/library/typing.html#typing.ClassVar)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.118", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.118", category = Category::Suspicious)]
 pub(crate) struct AbstractBaseClassWithoutAbstractMethod {
     name: String,
 }
@@ -101,7 +101,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 /// ## References
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.118", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.118", category = Category::Style)]
 pub(crate) struct EmptyMethodWithoutAbstractDecorator {
     name: String,
 }

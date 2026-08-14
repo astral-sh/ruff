@@ -47,7 +47,7 @@ use crate::codes::Category;
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [Disallow iterable argument unpacking after a keyword argument?](https://github.com/python/cpython/issues/82741)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.109", category = Category::Style)]
+#[violation_metadata(stable_since = "v0.0.109", category = Category::Suspicious)]
 pub(crate) struct StarArgUnpackingAfterKeywordArg;
 
 impl Violation for StarArgUnpackingAfterKeywordArg {
