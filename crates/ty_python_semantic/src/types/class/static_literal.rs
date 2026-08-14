@@ -2636,7 +2636,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 // Annotation-only declarations in stubs also act as bindings for
                                 // attribute lookup, but they do not supply field defaults.
                                 definition.kind(db).category(false, &module).is_binding()
-                                    && !binding_reachability(db, &use_def, &binding)
+                                    && !binding_reachability(db, use_def, &binding)
                                         .is_always_false()
                             })
                         })
