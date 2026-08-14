@@ -7732,15 +7732,18 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Applies an owner specialization to a class member, including the declared domains of any
-    /// retained synthetic `Self` variables in callable signatures.
-    fn apply_optional_member_specialization(
+    /// Projects a member from its generic owner, applying the owner's specialization to both
+    /// ordinary occurrences and the domain of any retained synthetic `Self` variable.
+    ///
+    /// Rewriting the `Self` domain is specific to this projection boundary. Inference and other
+    /// ordinary specializations must preserve that domain as fixed evidence.
+    fn apply_optional_owner_specialization_to_member(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> Type<'db> {
         if let Some(specialization) = specialization {
-            self.apply_specialization_inner(db, specialization, true)
+            self.apply_specialization_impl(db, specialization, true)
         } else {
             self
         }
@@ -7756,6 +7759,19 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        self.apply_specialization_impl(db, specialization, false)
+    }
+
+    /// Applies either an ordinary specialization or an enclosing-owner specialization.
+    ///
+    /// Both modes share the same leaf fast paths. They differ only in whether a retained synthetic
+    /// `Self` domain is part of the substitution.
+    fn apply_specialization_impl(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        specialize_self_domain: bool,
     ) -> Type<'db> {
         if matches!(
             self,
@@ -7807,7 +7823,7 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.apply_specialization_inner(db, specialization, false)
+        self.apply_specialization_inner(db, specialization, specialize_self_domain)
     }
 
     #[salsa::tracked(
@@ -7825,22 +7841,17 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
-        specialize_self_domains: bool,
+        specialize_self_domain: bool,
     ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
+        let apply_specialization = ApplySpecialization::Specialization {
+            specialization,
+            specialize_self_domain,
+        };
         let type_mapping = match specialization.materialization_kind(db) {
-            None if specialize_self_domains => TypeMapping::ApplySpecialization(
-                ApplySpecialization::SpecializationWithSelfDomain(specialization),
-            ),
-            None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
-                specialization,
-            )),
+            None => TypeMapping::ApplySpecialization(apply_specialization),
             Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: if specialize_self_domains {
-                    ApplySpecialization::SpecializationWithSelfDomain(specialization)
-                } else {
-                    ApplySpecialization::Specialization(specialization)
-                },
+                specialization: apply_specialization,
                 materialization_kind,
             },
         };
@@ -8111,7 +8122,7 @@ impl<'db> Type<'db> {
                         specialization, ..
                     } if matches!(
                         specialization,
-                        ApplySpecialization::Specialization(_)
+                        ApplySpecialization::Specialization { .. }
                             | ApplySpecialization::TypeAlias(_)
                             | ApplySpecialization::Partial { .. }
                     ) =>
@@ -9411,7 +9422,10 @@ impl<'db> TypeMapping<'_, 'db> {
                 }),
             ),
             TypeMapping::ApplySpecialization(
-                specialization @ ApplySpecialization::SpecializationWithSelfDomain(_),
+                specialization @ ApplySpecialization::Specialization {
+                    specialize_self_domain: true,
+                    ..
+                },
             ) => GenericContext::from_typevar_instances(
                 db,
                 env,
@@ -9433,7 +9447,11 @@ impl<'db> TypeMapping<'_, 'db> {
                 }),
             ),
             TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: ApplySpecialization::SpecializationWithSelfDomain(specialization),
+                specialization:
+                    ApplySpecialization::Specialization {
+                        specialization,
+                        specialize_self_domain: true,
+                    },
                 ..
             } => GenericContext::from_typevar_instances(
                 db,
