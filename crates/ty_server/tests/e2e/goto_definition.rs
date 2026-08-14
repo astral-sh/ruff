@@ -59,12 +59,12 @@ from dependency import script_only
 
 #[cfg(feature = "test-uv")]
 mod uv_metadata {
-    use anyhow::Result;
+    use anyhow::{Context, Result, anyhow};
     use lsp_types::{
-        FileChangeType, FileEvent, Position, TextDocumentContentChangeEvent,
-        TextDocumentContentChangeWholeDocument,
+        Definition, DefinitionResponse, FileChangeType, FileEvent, Position,
+        TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
     };
-    use ruff_db::system::{OsSystem, System as _, SystemPath};
+    use ruff_db::system::{OsSystem, System as _, SystemPath, SystemPathBuf};
     use ty_project::UseUv;
 
     use crate::TestServerBuilder;
@@ -103,8 +103,41 @@ mod uv_metadata {
         assert_eq!(end.token, progress.token);
         let _: lsp_types::WorkDoneProgressEnd = serde_json::from_value(end.value)?;
 
-        let definition = server.goto_definition_request(script, Position::new(3, 18));
-        assert!(definition.is_some(), "expected attrs.define to resolve");
+        let definition = server
+            .goto_definition_request(script, Position::new(3, 18))
+            .context("expected attrs.define to resolve")?;
+        let DefinitionResponse::Definition(Definition::LocationList(locations)) = definition else {
+            return Err(anyhow!("expected dependency definition locations"));
+        };
+        let location = locations
+            .first()
+            .context("expected attrs.define definition location")?;
+        let path = location
+            .uri
+            .to_file_path()
+            .map_err(|()| anyhow!("expected dependency definition to have a file URI"))?;
+        let dependency = SystemPathBuf::from_path_buf(path)
+            .map_err(|path| anyhow!("dependency path is not valid UTF-8: {}", path.display()))?;
+        let source = std::fs::read_to_string(dependency.as_std_path())?;
+        let (line, import) = source
+            .lines()
+            .enumerate()
+            .find(|(_, line)| line.starts_with("from attr import Attribute "))
+            .with_context(|| {
+                format!("expected attrs to import attr.Attribute in `{dependency}`")
+            })?;
+        let character = import
+            .find("Attribute")
+            .context("expected attrs to import Attribute")?;
+        let position = Position::new(u32::try_from(line)?, u32::try_from(character)?);
+
+        server.open_text_document(&dependency, &source, 1);
+        assert!(
+            server
+                .goto_definition_request(&dependency, position)
+                .is_some(),
+            "expected imports inside the dependency to use the script's environment"
+        );
 
         Ok(())
     }
