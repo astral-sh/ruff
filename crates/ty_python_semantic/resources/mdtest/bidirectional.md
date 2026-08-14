@@ -771,6 +771,28 @@ x3: IntCallbackOrIntAliasType | str = lambda value: consume(reveal_type(value)) 
 x4: IntCallback = lambda value: consume(reveal_type(value))  # revealed: Unknown
 ```
 
+## Type context behind a pre-PEP-695 type alias
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+Expansion is not tied to the `type` statement. `TypeAliasType` is expanded the same way on versions
+that predate it:
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType
+
+IntCallbackOrInt = TypeAliasType("IntCallbackOrInt", Callable[[int], None] | int)
+
+def consume(value: int) -> None:
+    pass
+
+y1: IntCallbackOrInt | str = lambda value: consume(reveal_type(value))  # revealed: int
+```
+
 ## Generic call argument inference
 
 A function's arguments are also inferred using the type context:

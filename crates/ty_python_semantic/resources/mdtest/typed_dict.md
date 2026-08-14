@@ -1194,6 +1194,33 @@ With no arm to fall back to, the call is validated against the `TypedDict` as be
 no_fallback: PersonOrId = dict(other="x")
 ```
 
+## `TypedDict` behind a pre-PEP-695 type alias
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+Expansion is not tied to the `type` statement. `TypeAliasType` is expanded the same way on versions
+that predate it, and the `TypedDict` behind one is still found and validated:
+
+```py
+from typing import TypedDict
+from typing_extensions import TypeAliasType
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+PersonOrId = TypeAliasType("PersonOrId", Person | int)
+
+union_alias_in_union: PersonOrId | str = {"name": "Alice", "age": 30}
+reveal_type(union_alias_in_union)  # revealed: Person
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
+```
+
 ## Type ignore compatibility issues
 
 Users should be able to ignore TypedDict validation errors with `# type: ignore`
