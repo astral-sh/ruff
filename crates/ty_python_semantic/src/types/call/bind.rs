@@ -6067,12 +6067,73 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         };
 
-        // The old solver stores one specialization per TypeVarTuple, so it can only merge
-        // covariant occurrences as lower bounds. A contravariant occurrence, such as a callable
-        // parameter, instead provides an upper bound that must constrain the variadic arguments.
-        // TODO: Remove this guard when TypeVarTuple uses the new constraint solver, which can
-        // represent and solve lower and upper bounds together.
-        if self
+        if !self.can_infer_typevartuple_arguments(parameter_index, typevartuple) {
+            return Ok(());
+        }
+
+        let Some((actual, argument_indices)) =
+            self.collect_typevartuple_arguments(parameter_index, parameter, formal)
+        else {
+            return Ok(());
+        };
+
+        builder.infer(formal, actual).map_err(|error| {
+            let argument_index =
+                argument_indices.and_then(|(first, last)| (first == last).then_some(first));
+            (error, argument_index)
+        })?;
+
+        if let Some(generic_context) = self.signature.generic_context {
+            let specialization = builder.build_with(generic_context, |_, _| None);
+            let expected_ty = formal.apply_specialization(db, specialization);
+
+            // The legacy solver keeps the first pack when another occurrence has a different length.
+            if let (Some(expected_tuple), Some(actual_tuple)) = (
+                expected_ty.exact_tuple_instance_spec(db),
+                actual.exact_tuple_instance_spec(db),
+            ) && let (TupleLength::Fixed(expected), TupleLength::Fixed(provided)) =
+                (expected_tuple.len(), actual_tuple.len())
+                && expected != provided
+            {
+                specialization_errors.push(BindingError::InvalidArgumentType {
+                    parameter: ParameterContext::new(parameter, parameter_index, false),
+                    argument_index: argument_indices.map(|(first, _)| first),
+                    last_argument_index: argument_indices.map(|(_, last)| last),
+                    expected_ty,
+                    provided_ty: actual,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
+                    parameter_source: None,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns whether a type variable tuple can be inferred from its variadic arguments.
+    ///
+    /// The old solver stores one specialization per pack, so it can merge covariant occurrences
+    /// but cannot combine their lower bounds with the upper bounds from a callable parameter.
+    ///
+    /// ```py
+    /// from collections.abc import Callable
+    ///
+    /// def repeat[*Ts](expected: tuple[*Ts], *args: *Ts) -> tuple[*Ts]: ...
+    /// def invoke[*Ts](callback: Callable[[*Ts], None], *args: *Ts) -> None: ...
+    /// def accepts_str(value: str) -> None: ...
+    ///
+    /// repeat((1, "value"), 1, 2)  # safe to infer `Ts = (int, str | int)`
+    /// invoke(accepts_str, 1)  # do not widen the callback's `str` parameter
+    /// ```
+    ///
+    /// TODO: Remove this guard when the new constraint solver can represent and solve both bounds.
+    fn can_infer_typevartuple_arguments(
+        &self,
+        parameter_index: usize,
+        typevartuple: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let db = self.db;
+        !self
             .enumerate_argument_types()
             .any(|(argument_index, _, argument, _)| {
                 !matches!(argument, Argument::Synthetic)
@@ -6084,10 +6145,30 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                 .is_covariant()
                     })
             })
-        {
-            return Ok(());
-        }
+    }
 
+    /// Collects arguments matched to a starred parameter into their complete tuple shape.
+    ///
+    /// Direct arguments and splatted values are collected in call order. Values already consumed
+    /// by earlier parameters are removed from splats, and open tuples are resized to expose any
+    /// required fixed prefix or suffix. The returned indices cover all contributing source
+    /// arguments and are used for diagnostics.
+    ///
+    /// ```py
+    /// def tail[*Ts](head: int, *args: *Ts) -> tuple[*Ts]: ...
+    /// def prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]: ...
+    ///
+    /// def example(values: tuple[int, str, bytes], numbers: list[int]) -> None:
+    ///     tail(*values)  # collected `*args`: tuple[str, bytes]
+    ///     prefixed(*numbers)  # collected `*args`: tuple[int, *tuple[int, ...]]
+    /// ```
+    fn collect_typevartuple_arguments(
+        &self,
+        parameter_index: usize,
+        parameter: &Parameter<'db>,
+        formal: Type<'db>,
+    ) -> Option<(Type<'db>, Option<(usize, usize)>)> {
+        let db = self.db;
         let mut actual = TupleSpecBuilder::with_capacity(self.arguments.len());
         // Source indices of the first and last arguments matched to the variadic parameter.
         let mut argument_indices: Option<(usize, usize)> = None;
@@ -6108,12 +6189,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             if matches!(argument, Argument::Variadic) {
-                let Some(argument_type) = argument_types.get_default() else {
-                    return Ok(());
-                };
+                let argument_type = argument_types.get_default()?;
                 // Iteration would merge union branches and lose their argument-shape correlations.
                 if matches!(argument_type.resolve_type_alias(db), Type::Union(_)) {
-                    return Ok(());
+                    return None;
                 }
 
                 let mut argument_tuple = argument_type.iterate(db, self.env);
@@ -6123,22 +6202,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .take_while(|matched| matched.index != parameter_index)
                     .count();
                 if consumed_prefix != 0 {
-                    let Ok(consumed_prefix) = i32::try_from(consumed_prefix) else {
-                        return Ok(());
-                    };
-                    let Ok(sliced) = argument_tuple.py_slice_type(
-                        db,
-                        self.env,
-                        Some(consumed_prefix),
-                        None,
-                        None,
-                    ) else {
-                        return Ok(());
-                    };
-                    let Some(sliced) = sliced.exact_tuple_instance_spec(db) else {
-                        return Ok(());
-                    };
-                    argument_tuple = sliced;
+                    let consumed_prefix = i32::try_from(consumed_prefix).ok()?;
+                    let sliced = argument_tuple
+                        .py_slice_type(db, self.env, Some(consumed_prefix), None, None)
+                        .ok()?;
+                    argument_tuple = sliced.exact_tuple_instance_spec(db)?;
                 }
                 actual = actual.concat(db, self.env, &argument_tuple);
                 continue;
@@ -6185,39 +6253,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 actual = resized;
             }
         }
-        let actual = Type::tuple(TupleType::new(db, self.env, &actual));
 
-        builder.infer(formal, actual).map_err(|error| {
-            let argument_index =
-                argument_indices.and_then(|(first, last)| (first == last).then_some(first));
-            (error, argument_index)
-        })?;
-
-        if let Some(generic_context) = self.signature.generic_context {
-            let specialization = builder.build_with(generic_context, |_, _| None);
-            let expected_ty = formal.apply_specialization(db, specialization);
-
-            // The legacy solver keeps the first pack when another occurrence has a different length.
-            if let (Some(expected_tuple), Some(actual_tuple)) = (
-                expected_ty.exact_tuple_instance_spec(db),
-                actual.exact_tuple_instance_spec(db),
-            ) && let (TupleLength::Fixed(expected), TupleLength::Fixed(provided)) =
-                (expected_tuple.len(), actual_tuple.len())
-                && expected != provided
-            {
-                specialization_errors.push(BindingError::InvalidArgumentType {
-                    parameter: ParameterContext::new(parameter, parameter_index, false),
-                    argument_index: argument_indices.map(|(first, _)| first),
-                    last_argument_index: argument_indices.map(|(_, last)| last),
-                    expected_ty,
-                    provided_ty: actual,
-                    provenance: InvalidArgumentTypeProvenance::Argument,
-                    parameter_source: None,
-                });
-            }
-        }
-
-        Ok(())
+        Some((
+            Type::tuple(TupleType::new(db, self.env, &actual)),
+            argument_indices,
+        ))
     }
 
     fn infer_argument_constraints<'c>(
