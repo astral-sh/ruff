@@ -449,23 +449,18 @@ bounded_arguments(
 )
 
 def check_splat_error(values: list[int]) -> None:
-    # TODO: Highlight the splatted argument instead of the whole call.
-    # snapshot: invalid-argument-type
     bounded_arguments(
         b"valid",
-        *values,
+        *values,  # snapshot: invalid-argument-type
     )
 ```
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `bounded_arguments` is incorrect
-  --> src/mdtest_snippet.py:86:5
+  --> src/mdtest_snippet.py:86:9
    |
-86 | /     bounded_arguments(
-87 | |         b"valid",
-88 | |         *values,
-89 | |     )
-   | |_____^ Argument type `int` does not satisfy upper bound `str` of type variable `T`
+86 |         *values,  # snapshot: invalid-argument-type
+   |         ^^^^^^^ Argument type `int` does not satisfy upper bound `str` of type variable `T`
 info: Type variable defined here
   --> src/mdtest_snippet.py:74:33
    |

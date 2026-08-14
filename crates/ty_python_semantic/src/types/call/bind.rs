@@ -6038,7 +6038,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
         specialization_errors: &mut Vec<BindingError<'db>>,
-    ) -> Result<(), SpecializationError<'db>> {
+    ) -> Result<(), (SpecializationError<'db>, Option<usize>)> {
         let db = self.db;
         let Some((parameter_index, parameter)) = self.signature.parameters().variadic() else {
             return Ok(());
@@ -6187,7 +6187,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
         let actual = Type::tuple(TupleType::new(db, self.env, &actual));
 
-        builder.infer(formal, actual)?;
+        builder.infer(formal, actual).map_err(|error| {
+            let argument_index =
+                argument_indices.and_then(|(first, last)| (first == last).then_some(first));
+            (error, argument_index)
+        })?;
 
         if let Some(generic_context) = self.signature.generic_context {
             let specialization = builder.build_with(generic_context, |_, _| None);
@@ -6252,7 +6256,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        if let Err(error) =
+        if let Err((error, argument_index)) =
             self.infer_typevartuple_argument_constraints(builder, specialization_errors)
             && !specialization_errors.iter().any(|existing| {
                 matches!(
@@ -6266,7 +6270,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         {
             specialization_errors.push(BindingError::SpecializationError {
                 error,
-                argument_index: None,
+                argument_index,
             });
         }
 
