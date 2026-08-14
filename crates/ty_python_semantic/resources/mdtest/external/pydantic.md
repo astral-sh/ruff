@@ -789,6 +789,50 @@ LaxFieldModel(value=StringEnum.VALUE)
 LaxFieldModel(value=IntegerEnum.VALUE)
 ```
 
+### Enum values for integer fields
+
+In lax mode, Pydantic accepts enum members as integers by using their underlying values.
+
+```py
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+class IntegerEnum(Enum):
+    VALUE = 1
+
+class LaxModel(BaseModel):
+    value: int
+
+LaxModel(value=IntegerEnum.VALUE)
+```
+
+Strict models and fields reject ordinary enum members because they are not integers.
+
+```py
+class StrictModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: int
+
+class StrictFieldModel(BaseModel):
+    value: int = Field(strict=True)
+
+StrictModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+StrictFieldModel(value=IntegerEnum.VALUE)  # error: [invalid-argument-type]
+```
+
+A field that opts out of model-wide strict mode accepts enum members again.
+
+```py
+class LaxFieldModel(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    value: int = Field(strict=False)
+
+LaxFieldModel(value=IntegerEnum.VALUE)
+```
+
 ### Changing a specific field
 
 Strict mode can also be activated for a specific field only:
