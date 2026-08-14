@@ -794,9 +794,8 @@ def forward_mixed[*Ts](
 
 ### Starred variadic tuple normalization
 
-A fixed provided tuple containing `Never` normalizes to `Never` before tuple-level constraint
-inference. The impossible argument must not become an empty tuple or remain a constructible tuple
-containing `Never`.
+A fixed provided tuple containing `Never` keeps its shape during tuple-level constraint inference.
+Its `Never` element must not be discarded or replaced by an unknown-length tuple.
 
 ```py
 from typing import Never
@@ -808,8 +807,8 @@ def collect_prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
     raise NotImplementedError
 
 def check_never(value: Never) -> None:
-    reveal_type(collect(value))  # revealed: tuple[Unknown, ...]
-    reveal_type(collect_prefixed(1, value))  # revealed: tuple[Unknown, ...]
+    reveal_type(collect(value))  # revealed: tuple[Never]
+    reveal_type(collect_prefixed(1, value))  # revealed: tuple[Never]
 ```
 
 ### Unsupported callable checks are deferred

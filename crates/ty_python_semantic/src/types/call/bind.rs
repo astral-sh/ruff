@@ -6047,9 +6047,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let (formal, typevartuple) = match parameter.annotated_type() {
             Type::TypeVar(typevar) if typevar.is_typevartuple(db) => (
-                Type::tuple(Some(TupleType::unpacked_typevartuple(
-                    db, self.env, typevar,
-                ))),
+                Type::tuple(TupleType::unpacked_typevartuple(db, self.env, typevar)),
                 typevar,
             ),
             annotation => {
