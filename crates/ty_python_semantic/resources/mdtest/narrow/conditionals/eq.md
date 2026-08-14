@@ -2184,6 +2184,59 @@ def gradual_enum_union_inequality(value: Color | Any, other: Color):
         reveal_type(value)  # revealed: Color | Any
 ```
 
+## Unions of gradual string literals
+
+Comparing a union of string literals intersected with `Any` keeps the matching alternative for
+equality and removes it for inequality:
+
+```py
+from typing import Any, Literal
+from ty_extensions import Intersection
+
+def equality(value: Intersection[Any, Literal["a"]] | Intersection[Any, Literal["b"]]):
+    if value == "a":
+        reveal_type(value)  # revealed: Any & Literal["a"]
+    else:
+        reveal_type(value)  # revealed: Any & Literal["b"]
+
+    if value != "a":
+        reveal_type(value)  # revealed: Any & Literal["b"]
+    else:
+        reveal_type(value)  # revealed: Any & Literal["a"]
+```
+
+Larger unions must narrow without expanding the complement of every rejected alternative, which
+would make memory use grow exponentially:
+
+```py
+def larger_union(
+    value: (
+        Intersection[Any, Literal["a"]]
+        | Intersection[Any, Literal["b"]]
+        | Intersection[Any, Literal["c"]]
+        | Intersection[Any, Literal["d"]]
+        | Intersection[Any, Literal["e"]]
+        | Intersection[Any, Literal["f"]]
+        | Intersection[Any, Literal["g"]]
+        | Intersection[Any, Literal["h"]]
+        | Intersection[Any, Literal["i"]]
+        | Intersection[Any, Literal["j"]]
+        | Intersection[Any, Literal["k"]]
+        | Intersection[Any, Literal["l"]]
+        | Intersection[Any, Literal["m"]]
+        | Intersection[Any, Literal["n"]]
+        | Intersection[Any, Literal["o"]]
+        | Intersection[Any, Literal["p"]]
+        | Intersection[Any, Literal["q"]]
+        | Intersection[Any, Literal["r"]]
+        | Intersection[Any, Literal["s"]]
+        | Intersection[Any, Literal["t"]]
+    ),
+):
+    if value == "a":
+        reveal_type(value)  # revealed: Any & Literal["a"]
+```
+
 ## Booleans and integers
 
 ```py

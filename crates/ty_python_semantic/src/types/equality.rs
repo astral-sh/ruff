@@ -1166,7 +1166,13 @@ fn evaluate_target_union<'db>(
         let Some(mut narrowed) = narrowed else {
             continue;
         };
-        if let Some(removed) = removed {
+        // A surviving alternative that is disjoint from every rejected alternative already
+        // satisfies their exclusions. Constructing those redundant exclusions can exponentially
+        // expand intersections such as `Any & Literal["a"]` when the rejected alternatives are
+        // similarly shaped intersections with other string literals.
+        if let Some(removed) = removed
+            && !narrowed.is_disjoint_from(db, env, removed)
+        {
             narrowed = IntersectionBuilder::new(db, env)
                 .add_positive(narrowed)
                 .add_negative(removed)
