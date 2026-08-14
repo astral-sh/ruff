@@ -245,7 +245,7 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.37", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.37", category = Category::Correctness)]
 pub(crate) struct UndefinedLocalWithNestedImportStarUsage {
     pub(crate) name: String,
 }
