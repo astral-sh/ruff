@@ -1,6 +1,9 @@
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
-use crate::{Mode, ParseOptions, RECURSIVE_AST_TEST_DEPTH, parse, parse_expression, parse_module};
+use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
+
+// Keep recursive ASTs shallow enough for Windows's 1 MiB test-thread stacks.
+const RECURSIVE_AST_TEST_DEPTH: usize = 1_000;
 
 #[test]
 fn test_modes() {
@@ -338,50 +341,181 @@ fn test_tstring_fstring_middle_fuzzer() {
     insta::assert_debug_snapshot!(error);
 }
 
-// `stacker` is a no-op on unsupported platforms, so only require stack
-// growth where its native support is well established.
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-mod stack_growth {
-    use super::*;
-
-    #[test]
-    fn parser_entry() {
-        // A standalone expression starts on a stack smaller than the parser's red zone, so the
-        // entry check must grow the stack before parsing the nested expression.
-        let source = format!("{}1{}", "(".repeat(128), ")".repeat(128));
-        let parsed = stacker::grow(32 * 1024, || parse_expression(&source));
-        parsed.unwrap();
-    }
-
-    #[test]
-    fn nested_suites() {
-        // Each nested function crosses the suite boundary where the parser rechecks the stack.
-        let depth = RECURSIVE_AST_TEST_DEPTH;
-        let mut source = String::new();
-        for i in 0..depth {
-            source.push_str(&"\t".repeat(i));
-            source.push_str("def f():\n");
-        }
-        source.push_str(&"\t".repeat(depth));
-        source.push_str("pass\n");
-        parse_module(&source).unwrap();
-    }
+#[test]
+fn nested_parens_grow_stack() {
+    let src = format!("{}1{}", "(".repeat(1_000), ")".repeat(1_000));
+    let parsed = stacker::grow(32 * 1024, || parse_module(&src));
+    assert!(parsed.is_ok());
 }
 
 #[test]
-fn invalid_async_chain_is_iterative() {
-    // Invalid repeated `async` prefixes are recovered iteratively.
+fn normal_python_unaffected() {
+    let src = format!("x = {}1{}", "(".repeat(50), ")".repeat(50));
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn deep_nesting_preserves_surrounding_statements() {
+    let src = format!(
+        "before = 1\n{}1{}\nafter = 2\n",
+        "(".repeat(1_000),
+        ")".repeat(1_000),
+    );
+    let parsed = parse_module(&src).unwrap();
+
+    assert!(matches!(parsed.suite().first(), Some(Stmt::Assign(_))));
+    assert!(matches!(parsed.suite().last(), Some(Stmt::Assign(_))));
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn nested_def_blocks_grow_stack() {
+    // Each nested function crosses the suite boundary where the parser rechecks the stack.
+    let depth = RECURSIVE_AST_TEST_DEPTH;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i));
+        src.push_str("def f():\n");
+    }
+    src.push_str(&"\t".repeat(depth));
+    src.push_str("pass\n");
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn nested_lists_grow_stack() {
+    let src = format!("{}1{}", "[".repeat(1_000), "]".repeat(1_000));
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn nested_calls_grow_stack() {
+    let src = format!("x = {}1{}", "f(".repeat(1_000), ")".repeat(1_000));
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn nested_subscripts_grow_stack() {
+    let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn nested_match_patterns_grow_stack() {
+    // Deeply parenthesised match patterns — exercises pattern-parsing
+    // instrumentation in addition to statement / expression paths.
+    let mut src = String::from("match x:\n case ");
+    for _ in 0..600 {
+        src.push('(');
+    }
+    src.push('y');
+    for _ in 0..600 {
+        src.push(')');
+    }
+    src.push_str(": pass\n");
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn nested_invalid_mapping_pattern_keys_grow_stack() {
+    let depth = 512;
+    let src = format!(
+        "match value:\n    case {}0{}:\n        pass\n",
+        "{".repeat(depth),
+        ": 0}".repeat(depth)
+    );
+    let parsed = crate::parse_unchecked(&src, ParseOptions::from(Mode::Module));
+    assert!(!parsed.errors().is_empty());
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn binary_paren_interplay_grows_stack() {
+    // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
+    // parenthesised sub-expression, exactly like the pattern described in
+    // the tracking issue.
+    let depth = RECURSIVE_AST_TEST_DEPTH;
+    let mut src = String::new();
+    for _ in 0..depth {
+        src.push_str("1+(");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(')');
+    }
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn right_assoc_pow_chain_grows_stack() {
+    // `1**1**1**...**1` — `**` is right-associative, so the right operand
+    // is parsed by a recursive `parse_binary_expression_or_higher` call
+    // *without* any intervening parentheses or atom nesting. This exercises
+    // the binary-expression recursion path directly, unlike the
+    // `1+(1+(...))` interplay test which recurses through parenthesised
+    // atoms.
+    let depth = RECURSIVE_AST_TEST_DEPTH;
+    let mut src = String::with_capacity(depth * 3 + 1);
+    for _ in 0..depth {
+        src.push_str("1**");
+    }
+    src.push('1');
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn ternary_else_chain_grows_stack() {
+    // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
+    // conditional layer (`parse_if_expression` -> `orelse`), which is not
+    // covered by the binary-expression guard.
+    let depth = RECURSIVE_AST_TEST_DEPTH;
+    let mut src = String::with_capacity(depth * 12 + 1);
+    for _ in 0..depth {
+        src.push_str("1 if 1 else ");
+    }
+    src.push('1');
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn nested_lambda_chain_grows_stack() {
+    // `lambda: lambda: lambda: ...` — the lambda body recurses at the
+    // conditional layer (`parse_lambda_expr` -> body), bypassing the
+    // binary-expression guard entirely.
+    let depth = RECURSIVE_AST_TEST_DEPTH;
+    let mut src = String::from("x = ");
+    for _ in 0..depth {
+        src.push_str("lambda: ");
+    }
+    src.push('1');
+    parse_module(&src).unwrap();
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[test]
+fn invalid_async_chain_grows_stack() {
     let source = format!("{}x = 1\n", "async ".repeat(5_000));
     let parsed = crate::parse_unchecked(&source, ParseOptions::from(Mode::Module));
     assert!(!parsed.errors().is_empty());
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 #[test]
-fn nested_equal_precedence_unary_chains_are_iterative() {
-    // Consecutive unary operators sharing precedence do not require stack growth.
-    let source = format!("{}1\n", "-~+".repeat(RECURSIVE_AST_TEST_DEPTH));
+fn nested_unary_chains_grow_stack() {
+    let depth = 300;
+    let source = format!("{}1\n", "-~+".repeat(depth));
     parse_module(&source).unwrap();
 
-    let source = format!("{}True\n", "not ".repeat(RECURSIVE_AST_TEST_DEPTH));
+    let source = format!("{}True\n", "not ".repeat(depth));
     parse_module(&source).unwrap();
 }

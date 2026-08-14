@@ -537,8 +537,17 @@ mod tests {
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
+
     fn parse_suite(source: &str) -> Result<Suite, ParseError> {
         parse_module(source).map(Parsed::into_suite)
+    }
+
+    fn nested_format_spec(prefix: char, depth: usize) -> String {
+        let mut replacement_field = String::from("{spec}");
+        for _ in 0..depth {
+            replacement_field = format!("{{foo:{replacement_field}}}");
+        }
+        format!(r#"{prefix}"{replacement_field}""#)
     }
 
     fn string_parser_escaped_eol(eol: &str) -> Suite {
@@ -576,6 +585,11 @@ mod tests {
         let source = r#"f"{foo:{spec}}""#;
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn parse_fstring_nested_spec_grows_stack() {
+        assert!(parse_suite(&nested_format_spec('f', 200)).is_ok());
     }
 
     #[test]
@@ -688,6 +702,11 @@ mod tests {
         let source = r#"t"{foo:{spec}}""#;
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
+    }
+
+    #[test]
+    fn parse_tstring_nested_spec_grows_stack() {
+        assert!(parse_suite(&nested_format_spec('t', 200)).is_ok());
     }
 
     #[test]

@@ -248,9 +248,11 @@ impl<'src> Parser<'src> {
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
-        let start = self.node_start();
-        let lhs = self.parse_lhs_expression(left_precedence, context);
-        self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+        self.with_recursion(|parser| {
+            let start = parser.node_start();
+            let lhs = parser.parse_lhs_expression(left_precedence, context);
+            parser.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+        })
     }
 
     fn parse_binary_expression_or_higher_recursive(
@@ -334,15 +336,6 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        self.parse_lhs_expression_inner(left_precedence, context, token)
-    }
-
-    fn parse_lhs_expression_inner(
-        &mut self,
-        left_precedence: OperatorPrecedence,
-        context: ExpressionContext,
-        token: TokenKind,
-    ) -> ParsedExpr {
         let start = self.node_start();
 
         if let Some(unary_op) = token.as_unary_operator() {
@@ -1124,36 +1117,11 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::from(op));
 
-        // Consecutive unary operators at the same precedence can be consumed
-        // iteratively and rebuilt after parsing the operand. Operators at
-        // differing precedences must retain the recursive path so binary
-        // expression binding and its diagnostics remain unchanged.
-        let precedence = OperatorPrecedence::from(op);
-        let mut nested_operators = Vec::new();
-        while let Some(nested_op) = self.current_token_kind().as_unary_operator()
-            && OperatorPrecedence::from(nested_op) == precedence
-        {
-            nested_operators.push((nested_op, self.node_start()));
-            self.bump(TokenKind::from(nested_op));
-        }
-
-        let operand = self.parse_binary_expression_or_higher(precedence, context);
-        let operand =
-            nested_operators
-                .into_iter()
-                .rev()
-                .fold(operand.expr, |operand, (op, start)| {
-                    Expr::UnaryOp(ast::ExprUnaryOp {
-                        op,
-                        operand: Box::new(operand),
-                        range: self.node_range(start),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
-                });
+        let operand = self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
 
         ast::ExprUnaryOp {
             op,
-            operand: Box::new(operand),
+            operand: Box::new(operand.expr),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1852,11 +1820,13 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_interpolated_string_elements(
-                flags,
-                InterpolatedStringElementsKind::FormatSpec(string_kind),
-                string_kind,
-            );
+            let elements = self.with_recursion(|parser| {
+                parser.parse_interpolated_string_elements(
+                    flags,
+                    InterpolatedStringElementsKind::FormatSpec(string_kind),
+                    string_kind,
+                )
+            });
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -2935,7 +2905,8 @@ impl<'src> Parser<'src> {
         // lambda x: yield y
         // lambda x: yield from y
 
-        let body = self.parse_conditional_expression_or_higher();
+        // Lambda bodies recurse through the conditional layer without entering the binary parser.
+        let body = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -2959,7 +2930,8 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
-        let orelse = self.parse_conditional_expression_or_higher();
+        // The binary-expression guard has already returned before parsing the `else` branch.
+        let orelse = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
         ast::ExprIf {
             body: Box::new(body),
