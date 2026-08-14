@@ -1442,6 +1442,56 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
     }
 
+    /// Returns whether the receiver can determine a method type variable used elsewhere.
+    ///
+    /// Receiver-only variables cannot affect the rest of the signature, class type variables are
+    /// handled by class or constructor inference, and `typing.Self` is handled by receiver binding.
+    pub(crate) fn has_receiver_determined_method_typevar(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        let Some(receiver) = self
+            .parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+        else {
+            return false;
+        };
+        let Some(generic_context) = self.generic_context else {
+            return false;
+        };
+        let Some(definition) = self.definition else {
+            return false;
+        };
+        let annotation = receiver.annotated_type();
+
+        let mut typevars = match annotation {
+            Type::TypeVar(typevar) => Either::Left(std::iter::once(typevar)),
+            Type::SubclassOf(subclass) if let Some(typevar) = subclass.into_type_var() => {
+                Either::Left(std::iter::once(typevar))
+            }
+            _ => Either::Right(generic_context.variables(db)),
+        };
+
+        typevars.any(|typevar| {
+            let variable = typevar.typevar(db);
+            let identity = variable.identity(db);
+
+            typevar.binding_context(db).definition() == Some(definition)
+                && !variable.is_self(db)
+                && annotation.references_typevar_through_aliases(db, env, identity)
+                && (self
+                    .return_ty
+                    .references_typevar_through_aliases(db, env, identity)
+                    || self.parameters.iter().skip(1).any(|parameter| {
+                        parameter
+                            .annotated_type()
+                            .references_typevar_through_aliases(db, env, identity)
+                    }))
+        })
+    }
+
     pub(crate) fn has_implicit_positional_receiver_annotation(&self) -> bool {
         self.parameters
             .get(0)

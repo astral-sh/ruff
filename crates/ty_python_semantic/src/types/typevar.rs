@@ -61,6 +61,28 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Inspects type-alias arguments without evaluating lazy alias bodies or other metadata.
+    pub(crate) fn references_typevar_through_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar_id: TypeVarIdentity<'db>,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| match ty {
+            Type::TypeVar(typevar) => typevar_id == typevar.typevar(db).identity(db),
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                typevar_id == typevar.identity(db)
+            }
+            Type::TypeAlias(alias) => alias.specialization(db).is_some_and(|specialization| {
+                specialization
+                    .types(db)
+                    .iter()
+                    .any(|ty| ty.references_typevar_through_aliases(db, env, typevar_id))
+            }),
+            _ => false,
+        })
+    }
+
     pub(crate) fn has_non_self_typevar(
         self,
         db: &'db dyn Db,

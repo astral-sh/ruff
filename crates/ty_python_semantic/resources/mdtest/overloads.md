@@ -316,6 +316,51 @@ reveal_type(ReceiverGeneric[str]().single)
 reveal_type(ReceiverGeneric[str]().single(1))  # revealed: tuple[str, Literal[1]]
 ```
 
+Type aliases in the receiver, return type, or another parameter must not conceal a method type
+variable determined by the receiver.
+
+```py
+type ReceiverAlias[T] = ReceiverGeneric[T]
+type ValueAlias[T] = T
+
+class AliasedReceiver[T](ReceiverGeneric[T]):
+    def aliased_return[S](self: ReceiverAlias[S]) -> tuple[ValueAlias[S]]:
+        return (self.value,)
+
+    def aliased_argument[S](self: ReceiverGeneric[S], value: ValueAlias[S]) -> None: ...
+
+value = AliasedReceiver[str]()
+
+# revealed: bound method AliasedReceiver[str].aliased_return() -> tuple[ValueAlias[str]]
+reveal_type(value.aliased_return)
+
+# revealed: bound method AliasedReceiver[str].aliased_argument(value: ValueAlias[str]) -> None
+reveal_type(value.aliased_argument)
+# error: [invalid-argument-type] "Expected `ValueAlias[str]`, found `Literal[1]`"
+value.aliased_argument(1)
+```
+
+## Method type variables used only in the receiver
+
+A method type variable that appears only in the receiver does not affect argument inference or the
+return type, so binding the method does not need to specialize it.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Factory:
+    @classmethod
+    def describe[Receiver](cls: type[Receiver], value: int) -> str:
+        return str(value)
+
+# revealed: bound method <class 'Factory'>.describe[Receiver](value: int) -> str
+reveal_type(Factory.describe)
+reveal_type(Factory.describe(1))  # revealed: str
+```
+
 ## Constrained method type variables inferred from `self`
 
 Matching a receiver against a value-constrained method type variable must reject values outside that
