@@ -252,7 +252,18 @@ pub(super) fn is_ctypes_structure_fields(
 ) -> bool {
     let is_ctypes_structure =
         analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
-            matches!(qualified_name.segments(), ["ctypes", "Structure"])
+            matches!(
+                qualified_name.segments(),
+                [
+                    "ctypes",
+                    "Structure"
+                        | "BigEndianStructure"
+                        | "LittleEndianStructure"
+                        | "Union"
+                        | "BigEndianUnion"
+                        | "LittleEndianUnion"
+                ]
+            )
         });
 
     let is_fields = matches!(
