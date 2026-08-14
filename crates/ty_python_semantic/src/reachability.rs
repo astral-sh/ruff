@@ -1151,19 +1151,20 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         Option<NarrowingConstraint<'db>>,
         Option<NarrowingConstraint<'db>>,
     ) {
+        if !self
+            .predicate_narrowing_targets
+            .contains(predicate_id, self.place)
+        {
+            return (None, None);
+        }
+
         let db = self.db;
         if let Some(cached) = self.graph.predicate_constraints_cache.get(&predicate_id) {
             return cached.clone();
         }
 
-        let constraints = if !self
-            .predicate_narrowing_targets
-            .contains(predicate_id, self.place)
-        {
-            (None, None)
-        } else {
-            infer_narrowing_constraints(db, self.predicates[predicate_id], self.place)
-        };
+        let constraints =
+            infer_narrowing_constraints(db, self.predicates[predicate_id], self.place);
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());
