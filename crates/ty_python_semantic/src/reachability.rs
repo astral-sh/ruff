@@ -880,19 +880,16 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         env,
         evaluator.narrowing_constraints(),
         evaluator.predicates(),
-        Some(predicate_narrowing_targets),
+        has_place_specific_narrowing.then_some(predicate_narrowing_targets),
         place,
     );
-    if !has_place_specific_narrowing {
-        return if projector.project_control_flow_only(id) == ProjectedNarrowingNodeId::ALWAYS_FALSE
-        {
-            Type::Never
-        } else {
-            base_ty
-        };
+    let projected_root = projector.project(id);
+    match projected_root {
+        ProjectedNarrowingNodeId::ALWAYS_TRUE => return base_ty,
+        ProjectedNarrowingNodeId::ALWAYS_FALSE => return Type::Never,
+        _ => {}
     }
 
-    let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
         db,
         env,
@@ -1124,12 +1121,6 @@ struct NarrowingProjector<'a, 'db> {
     graph: ProjectedNarrowingGraph<'db>,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum NarrowingProjectionMode {
-    Full,
-    ControlFlowOnly,
-}
-
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
     /// Creates a projector for narrowing `place`.
     fn new(
@@ -1181,22 +1172,6 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
     /// Projects one constraint node into the graph for this place.
     fn project(&mut self, root: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
-        self.project_with_mode(root, NarrowingProjectionMode::Full)
-    }
-
-    /// Resolves control-flow gates without inferring unrelated expression predicates.
-    fn project_control_flow_only(
-        &mut self,
-        root: ScopedNarrowingConstraint,
-    ) -> ProjectedNarrowingNodeId {
-        self.project_with_mode(root, NarrowingProjectionMode::ControlFlowOnly)
-    }
-
-    fn project_with_mode(
-        &mut self,
-        root: ScopedNarrowingConstraint,
-        mode: NarrowingProjectionMode,
-    ) -> ProjectedNarrowingNodeId {
         type Id = ScopedNarrowingConstraint;
         enum Action {
             Visit(Id),
@@ -1225,19 +1200,6 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             | PredicateNode::FinallyNormalPathImpossible { .. }
                     );
 
-                    if mode == NarrowingProjectionMode::ControlFlowOnly
-                        && (node.if_uncertain == ScopedNarrowingConstraint::ALWAYS_TRUE
-                            || (!is_control_flow_gate
-                                && (node.if_true == ScopedNarrowingConstraint::ALWAYS_TRUE
-                                    || node.if_false == ScopedNarrowingConstraint::ALWAYS_TRUE)))
-                    {
-                        // One surviving branch is enough, so do not infer a call on another
-                        // branch merely to confirm that the binding remains possible.
-                        self.project_cache
-                            .insert(id, ProjectedNarrowingNodeId::ALWAYS_TRUE);
-                        continue;
-                    }
-
                     if is_control_flow_gate {
                         actions.push(Action::AnalyzeNonTerminal(id));
                         actions.push(Action::Visit(node.if_uncertain));
@@ -1251,21 +1213,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 Action::AnalyzeNonTerminal(id) => {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
-                    let truthiness = if mode == NarrowingProjectionMode::ControlFlowOnly
-                        && let PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
-                            callable,
-                            call_expr,
-                            is_await,
-                        }) = predicate.node
-                    {
-                        analyze_non_terminal_call_without_generic_arguments(
-                            db, callable, call_expr, is_await,
-                        )
-                        .negate_if(!predicate.is_positive)
-                    } else {
-                        analyze_single(db, self.env, &predicate)
-                    };
-                    let branch = match truthiness {
+                    let branch = match analyze_single(db, self.env, &predicate) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Ambiguous => {
@@ -1290,23 +1238,26 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let if_true = self.projected_node(node.if_true);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let if_false = self.projected_node(node.if_false);
+                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
-                    let projected = if mode == NarrowingProjectionMode::ControlFlowOnly {
-                        // This predicate cannot narrow the requested place. Preserve both of its
-                        // possible branches without inferring an unrelated expression, which can
-                        // otherwise introduce a cycle through a deferred annotation.
-                        let either = self.graph.or(if_true, if_false);
-                        self.graph.or(either, if_uncertain)
-                    } else if let (None, None) = self.predicate_constraints(node.atom) {
-                        // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
-                        // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
-                        // Including a statically unreachable branch could erase narrowing from the reachable branch.
-                        match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
-                            Truthiness::AlwaysTrue => self.graph.or(if_true, if_uncertain),
-                            Truthiness::AlwaysFalse => self.graph.or(if_false, if_uncertain),
-                            Truthiness::Ambiguous => {
-                                let either = self.graph.or(if_true, if_false);
-                                self.graph.or(either, if_uncertain)
+                    let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
+                        if self.predicate_narrowing_targets.is_none() {
+                            // Scope-wide call gates can eliminate this binding even though no
+                            // ordinary predicate narrows it. Preserve both branches without
+                            // inferring an unrelated predicate's truthiness.
+                            let either = self.graph.or(if_true, if_false);
+                            self.graph.or(either, if_uncertain)
+                        } else {
+                            // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
+                            // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
+                            // Including a statically unreachable branch could erase narrowing from the reachable branch.
+                            match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
+                                Truthiness::AlwaysTrue => self.graph.or(if_true, if_uncertain),
+                                Truthiness::AlwaysFalse => self.graph.or(if_false, if_uncertain),
+                                Truthiness::Ambiguous => {
+                                    let either = self.graph.or(if_true, if_false);
+                                    self.graph.or(either, if_uncertain)
+                                }
                             }
                         }
                     } else {
@@ -1636,49 +1587,6 @@ fn analyze_non_terminal_call<'db>(
         } else {
             Truthiness::AlwaysTrue
         }
-    }
-}
-
-/// Resolves terminal calls without inferring arguments solely for a generic return type.
-///
-/// Inferring a generic call expression can depend on the same binding whose control-flow gate is
-/// being evaluated. Treat generic calls as non-terminal unless an overload explicitly returns
-/// `Never`; overload selection remains necessary when some, but not all, overloads are terminal.
-fn analyze_non_terminal_call_without_generic_arguments<'db>(
-    db: &'db dyn Db,
-    callable: Expression<'db>,
-    call_expr: Expression<'db>,
-    is_await: bool,
-) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(callable.scope(db));
-    let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
-
-    if matches!(ty, Type::Dynamic(_)) {
-        return Truthiness::AlwaysTrue;
-    }
-
-    let Some(callable_ty) = ty
-        .try_upcast_to_callable(db, &env)
-        .and_then(CallableTypes::exactly_one)
-    else {
-        return Truthiness::AlwaysTrue;
-    };
-
-    let mut any_overload_returns_never = false;
-    let mut all_overloads_return_never = true;
-
-    for overload in &callable_ty.signatures(db).overloads {
-        let returns_never = overload.return_ty.is_equivalent_to(db, &env, Type::Never);
-        any_overload_returns_never |= returns_never;
-        all_overloads_return_never &= returns_never;
-    }
-
-    if all_overloads_return_never {
-        Truthiness::AlwaysFalse
-    } else if any_overload_returns_never {
-        analyze_non_terminal_call(db, callable, call_expr, is_await)
-    } else {
-        Truthiness::AlwaysTrue
     }
 }
 

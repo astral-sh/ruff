@@ -1915,10 +1915,13 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Is this a class scope?
     is_class_scope: bool,
+
+    /// Whether reachability predicates should also preserve narrowing across branches.
+    is_function_scope: bool,
 }
 
 impl<'db> UseDefMapBuilder<'db> {
-    pub(super) fn new(is_class_scope: bool) -> Self {
+    pub(super) fn new(scope_kind: ScopeKind) -> Self {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionEntry::Undefined]),
             predicates: PredicatesBuilder::default(),
@@ -1940,7 +1943,8 @@ impl<'db> UseDefMapBuilder<'db> {
             reachable_symbol_definitions: IndexVec::new(),
             enclosing_snapshots: EnclosingSnapshots::default(),
             loop_headers: IndexVec::new(),
-            is_class_scope,
+            is_class_scope: scope_kind.is_class(),
+            is_function_scope: matches!(scope_kind, ScopeKind::Function | ScopeKind::Lambda),
         }
     }
 
@@ -2408,9 +2412,12 @@ impl<'db> UseDefMapBuilder<'db> {
         self.checkpoint_flow = self
             .reachability_constraints
             .add_and_constraint(self.checkpoint_flow, reachability_constraint);
-        let narrowing_constraint = self
-            .reachability_constraints
-            .narrowing_gate(reachability_constraint, &mut self.narrowing_constraints);
+        let narrowing_constraint = if self.is_function_scope {
+            self.reachability_constraints
+                .narrowing_gate(reachability_constraint, &mut self.narrowing_constraints)
+        } else {
+            ScopedNarrowingConstraint::ALWAYS_TRUE
+        };
         self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
     }
 

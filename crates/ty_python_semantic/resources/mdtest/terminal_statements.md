@@ -1104,6 +1104,55 @@ class Example:
     reveal_type(continuing_value)  # revealed: Never
 ```
 
+### Generic calls in module and class scopes
+
+A generic call is terminal when its argument specializes the return type to `Never`.
+
+```py
+from typing import NoReturn, TypeVar, cast
+
+T = TypeVar("T")
+
+def identity(argument: T) -> T:
+    return argument
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+module_value = 1
+
+if bool(input()):
+    module_value = "unreachable"
+    identity(stop())
+
+reveal_type(module_value)  # revealed: Literal[1]
+```
+
+Generic specialization also works when its terminal argument is not a simple call.
+
+```py
+cast_value = 1
+
+if bool(input()):
+    cast_value = "unreachable"
+    identity(cast(NoReturn, None))
+
+reveal_type(cast_value)  # revealed: Literal[1]
+```
+
+The same terminal call also narrows bindings in a class body.
+
+```py
+class Example:
+    value = 1
+
+    if bool(input()):
+        value = "unreachable"
+        identity(stop())
+
+    reveal_type(value)  # revealed: Literal[1]
+```
+
 ### Overloads in module scope
 
 When only one overload returns `Never`, select the matching overload before deciding whether its
@@ -1131,6 +1180,19 @@ if flag:
 reveal_type(value)  # revealed: Literal[1]
 ```
 
+A local argument that requires inference must still select its terminal overload.
+
+```py
+local_argument: int = int(input())
+local_value = 1
+
+if bool(input()):
+    local_value = "unreachable"
+    stop_if_int(local_argument)
+
+reveal_type(local_value)  # revealed: Literal[1]
+```
+
 The overload that returns normally must not remove its branch.
 
 ```py
@@ -1142,6 +1204,33 @@ if other_flag:
     stop_if_int("safe")
 
 reveal_type(continuing_value)  # revealed: Literal[1, "reachable"]
+```
+
+### Calls with no applicable bound overloads
+
+A bound method with no applicable overloads is invalid, but its call can still return at runtime. It
+must not hide bindings from its branch or subsequent diagnostics.
+
+```py
+from __future__ import annotations
+from typing import overload
+
+class Example:
+    @overload
+    def method(self: str) -> None: ...
+    @overload
+    def method(self: bytes) -> None: ...
+    def method(self: Example | str | bytes) -> None:
+        pass
+
+value = 1
+
+if bool(input()):
+    value = "reachable"
+    Example().method()  # error: [no-matching-overload]
+
+reveal_type(value)  # revealed: Literal[1, "reachable"]
+value.bit_count()  # error: [unresolved-attribute]
 ```
 
 ### Possibly unresolved diagnostics

@@ -512,13 +512,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let node_with_kind = node.to_kind(self.module);
 
         let scope = Scope::new(parent, node_with_kind, children_start..children_start);
-        let is_class_scope = scope.kind().is_class();
+        let scope_kind = scope.kind();
         self.exception_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
-            .push(Box::new(UseDefMapBuilder::new(is_class_scope)));
+            .push(Box::new(UseDefMapBuilder::new(scope_kind)));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
