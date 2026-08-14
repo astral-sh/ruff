@@ -29,6 +29,7 @@
 use crate::Db;
 use bitflags::bitflags;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::script::ScriptTag;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
     walk_interpolated_string_element, walk_stmt,
@@ -39,6 +40,8 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
+use toml_parser::parser::{Event, EventKind};
+use ty_project::script_tag;
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_semantic::{
@@ -195,7 +198,80 @@ pub fn semantic_tokens(
     visitor.expecting_docstring = true;
     visitor.visit_body(parsed.suite());
 
+    if let Some(tag) = script_tag(db, file.file(db)) {
+        let insertion = visitor
+            .tokens
+            .partition_point(|token| token.start() < tag.start());
+        visitor
+            .tokens
+            .splice(insertion..insertion, script_metadata_tokens(tag, range));
+    }
+
     SemanticTokens::new(visitor.tokens)
+}
+
+/// Highlights embedded TOML without treating its Python comment prefixes as TOML content.
+fn script_metadata_tokens(tag: &ScriptTag, range: Option<TextRange>) -> Vec<SemanticToken> {
+    let metadata = tag.metadata();
+    let tokens = toml_parser::Source::new(metadata).lex().collect::<Vec<_>>();
+    let mut semantic_tokens = Vec::new();
+
+    toml_parser::parser::parse_document(
+        &tokens,
+        &mut |event: Event| {
+            let span = event.span();
+            let Some(text) = metadata.get(span.start()..span.end()) else {
+                return;
+            };
+
+            let token_type = match event.kind() {
+                EventKind::SimpleKey => SemanticTokenType::Property,
+                EventKind::Scalar if event.encoding().is_some() => SemanticTokenType::String,
+                EventKind::Scalar if matches!(text, "true" | "false") => SemanticTokenType::Keyword,
+                EventKind::Scalar
+                    if text.as_bytes().first().is_some_and(|first| {
+                        first.is_ascii_digit() || matches!(first, b'+' | b'-')
+                    }) || matches!(text, "inf" | "nan") =>
+                {
+                    SemanticTokenType::Number
+                }
+                _ => return,
+            };
+
+            let Ok(mut offset) = TextSize::try_from(span.start()) else {
+                return;
+            };
+
+            // Multiline TOML values are interrupted by Python comment prefixes in the source.
+            // Highlight each metadata line separately so those prefixes remain comments.
+            for line in text.split_inclusive('\n') {
+                let content = line.strip_suffix('\n').unwrap_or(line);
+                let token_range = tag
+                    .source_map()
+                    .map_range(TextRange::at(offset, content.text_len()));
+                offset += line.text_len();
+
+                if token_range.is_empty()
+                    || range.is_some_and(|requested| {
+                        token_range
+                            .intersect(requested)
+                            .is_none_or(TextRange::is_empty)
+                    })
+                {
+                    continue;
+                }
+
+                semantic_tokens.push(SemanticToken {
+                    range: token_range,
+                    token_type,
+                    modifiers: SemanticTokenModifier::empty(),
+                });
+            }
+        },
+        &mut (),
+    );
+
+    semantic_tokens
 }
 
 /// AST visitor that collects semantic tokens.
@@ -1299,6 +1375,119 @@ mod tests {
         let tokens = test.highlight_file();
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#""foo" @ 4..7: Function [definition]"#);
+    }
+
+    #[test]
+    fn script_metadata_highlights_toml_in_source_order() {
+        let source = r#"before = 1
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["httpx"]
+# [tool.uv]
+# enabled = true
+# retries = 2
+# "quoted-key" = { nested = "value" }
+# ///
+after = 2
+"#;
+        let test = SemanticTokenTest::new(source);
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let highlighted: Vec<_> = tokens
+            .iter()
+            .map(|token| (&source[token.range()], token.token_type))
+            .collect();
+
+        assert_eq!(
+            highlighted,
+            vec![
+                ("before", SemanticTokenType::Variable),
+                ("1", SemanticTokenType::Number),
+                ("requires-python", SemanticTokenType::Property),
+                ("\">=3.12\"", SemanticTokenType::String),
+                ("dependencies", SemanticTokenType::Property),
+                ("\"httpx\"", SemanticTokenType::String),
+                ("tool", SemanticTokenType::Property),
+                ("uv", SemanticTokenType::Property),
+                ("enabled", SemanticTokenType::Property),
+                ("true", SemanticTokenType::Keyword),
+                ("retries", SemanticTokenType::Property),
+                ("2", SemanticTokenType::Number),
+                ("\"quoted-key\"", SemanticTokenType::Property),
+                ("nested", SemanticTokenType::Property),
+                ("\"value\"", SemanticTokenType::String),
+                ("after", SemanticTokenType::Variable),
+                ("2", SemanticTokenType::Number),
+            ]
+        );
+    }
+
+    #[test]
+    fn script_metadata_multiline_strings_exclude_comment_prefixes() {
+        let source = "# /// script\n# description = \"\"\"\n# first\n#\n# last\n# \"\"\"\n# ///\n";
+        let test = SemanticTokenTest::new(source);
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let highlighted: Vec<_> = tokens
+            .iter()
+            .map(|token| (&source[token.range()], token.token_type))
+            .collect();
+
+        assert_eq!(
+            highlighted,
+            vec![
+                ("description", SemanticTokenType::Property),
+                ("\"\"\"", SemanticTokenType::String),
+                ("first", SemanticTokenType::String),
+                ("last", SemanticTokenType::String),
+                ("\"\"\"", SemanticTokenType::String),
+            ]
+        );
+    }
+
+    #[test]
+    fn script_metadata_inside_statement_remains_in_source_order() {
+        let source = r#"value = (
+    1
+# /// script
+# dependencies = ["httpx"]
+# ///
+    + 2
+)
+"#;
+        let test = SemanticTokenTest::new(source);
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let highlighted: Vec<_> = tokens
+            .iter()
+            .map(|token| (&source[token.range()], token.token_type))
+            .collect();
+
+        assert_eq!(
+            highlighted,
+            vec![
+                ("value", SemanticTokenType::Variable),
+                ("1", SemanticTokenType::Number),
+                ("dependencies", SemanticTokenType::Property),
+                ("\"httpx\"", SemanticTokenType::String),
+                ("2", SemanticTokenType::Number),
+            ]
+        );
+    }
+
+    #[test]
+    fn script_metadata_respects_requested_token_range() {
+        let source = "# /// script\n# dependencies = [\"httpx\"]\n# ///\nvalue = 1\n";
+        let test = SemanticTokenTest::new(source);
+        let range = TextRange::at(
+            "# /// script\n# dependencies = [".text_len(),
+            "\"httpx\"".text_len(),
+        );
+        let tokens = test.highlight_range(range);
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].range(), range);
+        assert_eq!(tokens[0].token_type, SemanticTokenType::String);
     }
 
     #[test]

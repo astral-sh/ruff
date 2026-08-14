@@ -23,7 +23,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
-pub use script::{ScriptEnvironmentAvailability, ScriptEnvironments};
+pub use script::{ScriptEnvironmentAvailability, ScriptEnvironments, script_tag};
 use std::backtrace::BacktraceStatus;
 use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;

@@ -137,7 +137,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 ///
 /// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
 #[salsa::tracked(returns(as_deref))]
-pub(crate) fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
+pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
     let path = file.path(db);
     if path.is_vendored_path() {
         return None;

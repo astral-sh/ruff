@@ -4,6 +4,52 @@ use ruff_db::system::SystemPath;
 use crate::TestServerBuilder;
 
 #[test]
+fn script_metadata_is_highlighted_as_toml() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let source = "#!/usr/bin/env python3\n# /// script\n# dependencies = [\"httpx\"]\n# requires-python = \">=3.12\"\n# ///\nvalue = 1\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(script, source)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, source, 1);
+
+    let tokens = server
+        .semantic_tokens_full_request(&server.file_uri(script))
+        .ok_or_else(|| anyhow::anyhow!("expected semantic tokens for the script"))?;
+
+    let actual: Vec<_> = tokens
+        .data
+        .into_iter()
+        .map(|token| {
+            (
+                token.delta_line,
+                token.delta_start,
+                token.length,
+                token.token_type,
+            )
+        })
+        .collect();
+
+    assert_eq!(
+        actual,
+        vec![
+            (2, 2, 12, ty_ide::SemanticTokenType::Property as u32),
+            (0, 16, 7, ty_ide::SemanticTokenType::String as u32),
+            (1, 2, 15, ty_ide::SemanticTokenType::Property as u32),
+            (0, 18, 8, ty_ide::SemanticTokenType::String as u32),
+            (2, 0, 5, ty_ide::SemanticTokenType::Variable as u32),
+            (0, 8, 1, ty_ide::SemanticTokenType::Number as u32),
+        ]
+    );
+
+    Ok(())
+}
+
+#[test]
 fn multiline_token_client_not_supporting_multiline_tokens() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
