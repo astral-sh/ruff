@@ -7069,18 +7069,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut item_types = FxHashMap::default();
 
         // Validate `TypedDict` dictionary literal assignments.
-        if let Some(annotation) = tcx
-            .annotation
-            .map(|annotation| annotation.resolve_type_alias(db))
-        {
+        if let Some(annotation) = tcx.annotation.map(|annotation| {
+            annotation
+                .resolve_type_alias(db)
+                .expand_union_aliases(db, env)
+        }) {
             if let Some(typed_dict) = annotation.as_typed_dict() {
-                // If there is a single typed dict annotation, infer against it directly.
+                // If there is a single typed dict annotation, infer against it directly. Expanding
+                // first means a union whose arms all alias the same `TypedDict` arrives here as
+                // that `TypedDict`, rather than falling out of both branches unvalidated.
                 if let Some(ty) =
                     self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
                 {
                     return ty;
                 }
-            } else if let Type::Union(union) = annotation.expand_union_aliases(db, env) {
+            } else if let Type::Union(union) = annotation {
                 let union_elements = union.elements(self.db());
                 let mut typed_dicts = Vec::new();
                 let mut has_dict_compatible_fallback = false;

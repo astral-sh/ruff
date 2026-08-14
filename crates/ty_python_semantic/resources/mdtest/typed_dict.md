@@ -1125,6 +1125,33 @@ Keys are still validated against the aliased `TypedDict`:
 unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
 ```
 
+Expanding can leave a single `TypedDict` rather than a union, when every arm aliases the same one.
+Such an annotation is still validated field by field:
+
+```py
+type FirstPerson = Person
+type SecondPerson = Person
+
+collapsed: FirstPerson | SecondPerson = {"name": "Alice", "age": 30}
+reveal_type(collapsed)  # revealed: Person
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+collapsed_unknown_key: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nickname": "Ali"}
+```
+
+The same holds where the annotation is a parameter default or a nested field:
+
+```py
+class Team(TypedDict):
+    lead: FirstPerson | SecondPerson
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+def hire(person: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nickname": "Ali"}): ...
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+team: Team = {"lead": {"name": "Alice", "age": 30, "nickname": "Ali"}}
+```
+
 ## Type ignore compatibility issues
 
 Users should be able to ignore TypedDict validation errors with `# type: ignore`
