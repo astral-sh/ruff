@@ -1440,7 +1440,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // instead of two. So until we properly support these, specialize all remaining type
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
-        if any_over_type(db, env, value_ty, true, |ty| ty.is_divergent()) {
+        //
+        // A lazily inferred class member can contain its own unrelated recursive type, so only
+        // inspect the alias structure and generic arguments when checking whether it is recursive.
+        if any_over_type(db, env, value_ty, false, |ty| ty.is_divergent()) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(

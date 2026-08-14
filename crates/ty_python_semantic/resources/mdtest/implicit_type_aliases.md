@@ -632,6 +632,73 @@ class Derived2(GenericBaseAlias[int]):
     pass
 ```
 
+### Generic typed dictionaries in aliases
+
+First, define a generic typed dictionary whose field uses a legacy type variable:
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Item(TypedDict, Generic[T]):
+    value: T
+```
+
+An implicit union alias remains generic when its only type variable appears in the typed dictionary,
+and specialization preserves the dictionary's field type:
+
+```py
+OptionalItem = Item[T] | None
+
+def _(item: OptionalItem[int]):
+    reveal_type(item)  # revealed: Item[int] | None
+
+    if item is not None:
+        reveal_type(item["value"])  # revealed: int
+```
+
+Without an explicit type argument, the alias uses the type variable's default specialization:
+
+```py
+def _(item: OptionalItem):
+    reveal_type(item)  # revealed: Item[Unknown] | None
+```
+
+The type variable is also discovered when the typed dictionary is nested inside a container:
+
+```py
+Items = list[Item[T]]
+
+def _(items: Items[str]):
+    reveal_type(items)  # revealed: list[Item[str]]
+    reveal_type(items[0]["value"])  # revealed: str
+```
+
+### Type-variable order in generic typed-dictionary aliases
+
+Type variables that appear inside a typed dictionary are collected in the same order as variables in
+other union members:
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Item(TypedDict, Generic[T]):
+    value: T
+
+TypedDictFirst = Item[T] | list[U]
+TypedDictLast = list[U] | Item[T]
+Repeated = Item[T] | list[T]
+
+def _(first: TypedDictFirst[int, str], last: TypedDictLast[str, int], repeated: Repeated[int]):
+    reveal_type(first)  # revealed: Item[int] | list[str]
+    reveal_type(last)  # revealed: list[str] | Item[int]
+    reveal_type(repeated)  # revealed: Item[int] | list[int]
+```
+
 ### Imported aliases
 
 Generic implicit type aliases can be imported from other modules and specialized:
@@ -662,6 +729,45 @@ def _(
     reveal_type(list_of_ints2)  # revealed: list[int]
     reveal_type(list_of_str)  # revealed: list[str]
     reveal_type(list_of_str_or_none)  # revealed: list[str] | None
+```
+
+### Imported tagged typed-dictionary aliases
+
+A stub can define a generic tagged union containing a typed dictionary and expose a concrete
+specialization through a function signature:
+
+`events.pyi`:
+
+```pyi
+from typing import Generic, Literal, TypeVar, TypedDict, Union
+
+T = TypeVar("T")
+
+class ObjectEvent(TypedDict, Generic[T]):
+    type: Literal["ADDED"]
+    object: T
+
+class BookmarkEvent(TypedDict):
+    type: Literal["BOOKMARK"]
+    object: object
+
+DecodedEvent = Union[ObjectEvent[T], BookmarkEvent, None]
+
+def get_event() -> DecodedEvent[int]: ...
+```
+
+After excluding the other union members, Python code sees the concrete typed-dictionary field type:
+
+`main.py`:
+
+```py
+from events import get_event
+
+event = get_event()
+if event is not None and event["type"] != "BOOKMARK":
+    reveal_type(event)  # revealed: ObjectEvent[int]
+    reveal_type(event["object"])  # revealed: int
+    event["object"].bit_length()
 ```
 
 ### In stringified annotations
@@ -1972,6 +2078,26 @@ def _(
     reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
     reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
     reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
+```
+
+### Recursive typed-dictionary fields in generic aliases
+
+A recursive field on a non-generic typed dictionary does not make an unrelated enclosing generic
+alias recursive:
+
+```py
+from typing import TypeVar, TypedDict
+
+T = TypeVar("T")
+RecursiveList = list["RecursiveList | None"]
+
+class Payload(TypedDict):
+    value: RecursiveList
+
+ListOrPayload = list[T] | Payload
+
+def _(value: ListOrPayload[int]):
+    reveal_type(value)  # revealed: list[int] | Payload
 ```
 
 ### Self-referential generic implicit type aliases
