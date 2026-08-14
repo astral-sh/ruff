@@ -152,6 +152,7 @@ Scalar types follow the Python-input conversions in Pydantic's [conversion table
 import re
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from fractions import Fraction
 from ipaddress import (
     IPv4Address,
     IPv4Interface,
@@ -174,6 +175,7 @@ LaxBool(value=1.0)
 LaxBool(value=1)
 LaxBool(value=Decimal(1))
 LaxBool(value="true")
+LaxBool(value=b"true")
 LaxBool(value=[True])  # error: [invalid-argument-type]
 
 class LaxBytes(BaseModel):
@@ -217,6 +219,7 @@ LaxFloat(value=True)
 LaxFloat(value=b"1.0")
 LaxFloat(value="1.0")
 LaxFloat(value=Decimal("1.0"))
+LaxFloat(value=Fraction(1, 2))
 LaxFloat(value=(1, 0))  # error: [invalid-argument-type]
 
 class LaxInt(BaseModel):
@@ -228,6 +231,7 @@ LaxInt(value=b"1")
 LaxInt(value=1.0)
 LaxInt(value="1")
 LaxInt(value=Decimal(1))
+LaxInt(value=Fraction(2, 1))
 LaxInt(value=(1,))  # error: [invalid-argument-type]
 
 class LaxStr(BaseModel):
