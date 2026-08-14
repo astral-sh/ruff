@@ -45,7 +45,7 @@ use crate::codes::Category;
 /// - [Pandas documentation: `merge`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.merge.html#pandas.DataFrame.merge)
 /// - [Pandas documentation: `pd.merge`](https://pandas.pydata.org/docs/reference/api/pandas.merge.html#pandas.merge)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Style)]
 pub(crate) struct PandasUseOfPdMerge;
 
 impl Violation for PandasUseOfPdMerge {

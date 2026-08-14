@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// my_task = PythonOperator(task_id="my_task")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Style)]
 pub(crate) struct AirflowVariableNameTaskIdMismatch {
     task_id: String,
 }

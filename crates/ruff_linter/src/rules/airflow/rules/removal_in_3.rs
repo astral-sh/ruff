@@ -44,7 +44,7 @@ use ruff_text_size::TextRange;
 /// yesterday = today - timedelta(days=1)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Suspicious)]
 pub(crate) struct Airflow3Removal {
     deprecated: String,
     replacement: Replacement,
