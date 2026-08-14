@@ -1008,6 +1008,7 @@ mod tests {
         	pandas-use-of-dot-not-null (PD004),
         	pandas-use-of-dot-read-table (PD012),
         	pandas-use-of-pd-merge (PD015),
+        	undefined-local-with-nested-import-star-usage (F406),
         	missing-maxsplit-arg (PLC0207),
         	unnecessary-dunder-call (PLC2801),
         	dict-iter-missing-items (PLE1141),
@@ -1058,7 +1059,15 @@ mod tests {
         ]
 
         Removed in preview:
-        []
+        [
+        	call-datetime-without-tzinfo (DTZ001),
+        	call-datetime-now-without-tzinfo (DTZ005),
+        	call-datetime-fromtimestamp (DTZ006),
+        	call-datetime-strptime-without-zone (DTZ007),
+        	call-date-today (DTZ011),
+        	call-date-fromtimestamp (DTZ012),
+        	datetime-min-max (DTZ901),
+        ]
         ");
     }
 }
