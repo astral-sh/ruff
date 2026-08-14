@@ -922,6 +922,153 @@ reveal_type(Example().left)  # revealed: str
 reveal_type(Example().right)  # revealed: list[str] | str
 ```
 
+## Mutually dependent attributes captured by lazy callables, defining class first
+
+A lambda's body is executed lazily, but its return type can still depend on another attribute in the
+same recursive component. Both callable alternatives must remain visible to diagnostics.
+
+`model.py`:
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = lambda: "a"
+        self.right = lambda: 1
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = lambda: self.right
+        else:
+            self.right = lambda: self.left
+
+def accept_string(value: str) -> None: ...
+
+reveal_type(Example().left())  # revealed: str | Divergent | (() -> int)
+accept_string(Example().left())  # error: [invalid-argument-type]
+```
+
+`consumer.py`:
+
+```py
+from model import Example
+
+def accept_int(value: int) -> None: ...
+
+reveal_type(Example().right())  # revealed: int | Divergent | (() -> str)
+accept_int(Example().right())  # error: [invalid-argument-type]
+```
+
+## Mutually dependent attributes captured by lazy callables, consumer first
+
+Checking the other callable first must not hide either callable alternative or suppress its invalid
+argument diagnostic.
+
+`consumer.py`:
+
+```py
+from model import Example
+
+def accept_int(value: int) -> None: ...
+
+reveal_type(Example().right())  # revealed: int | Divergent | (() -> str)
+accept_int(Example().right())  # error: [invalid-argument-type]
+```
+
+`model.py`:
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = lambda: "a"
+        self.right = lambda: 1
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = lambda: self.right
+        else:
+            self.right = lambda: self.left
+
+def accept_string(value: str) -> None: ...
+
+reveal_type(Example().left())  # revealed: str | Divergent | (() -> int)
+accept_string(Example().left())  # error: [invalid-argument-type]
+```
+
+## Mutually dependent lazy callables with finite return types
+
+Calling the other attribute inside each lambda does not repeatedly wrap its return type. This finite
+dependency must converge without introducing a divergent callable.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = lambda: "a"
+        self.right = lambda: 1
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = lambda: self.right()
+        else:
+            self.right = lambda: self.left()
+
+def accept_int(value: int) -> None: ...
+
+reveal_type(Example().left)  # revealed: () -> int | str
+reveal_type(Example().right)  # revealed: () -> str | int
+reveal_type(Example().right())  # revealed: str | int
+accept_int(Example().right())  # error: [invalid-argument-type]
+```
+
+## Lazy callables capturing attributes on another class
+
+A deferred lambda can capture an attribute on an annotated receiver belonging to another class. Its
+type dependency still participates in the shared cross-class component.
+
+```py
+from __future__ import annotations
+
+class Left:
+    def initialize(self) -> None:
+        self.callback = lambda: "a"
+
+    def update(self, other: Right) -> None:
+        self.callback = lambda: other.callback
+
+class Right:
+    def initialize(self) -> None:
+        self.callback = lambda: 1
+
+    def update(self, other: Left) -> None:
+        self.callback = lambda: other.callback
+
+def accept_string(value: str) -> None: ...
+def accept_int(value: int) -> None: ...
+
+accept_string(Left().callback())  # error: [invalid-argument-type]
+accept_int(Right().callback())  # error: [invalid-argument-type]
+```
+
+## Lazy callable parameters that shadow the enclosing receiver
+
+A lambda parameter named `self` shadows the method receiver. Its attribute read must not create a
+false dependency on the enclosing class's attribute.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = lambda: "a"
+        self.right = lambda: 1
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = lambda self: self.right
+        else:
+            self.right = lambda self: self.left
+
+reveal_type(Example().left)  # revealed: (() -> str) | ((self) -> Unknown)
+reveal_type(Example().right)  # revealed: (() -> int) | ((self) -> Unknown)
+```
+
 ## Recursive attributes that repeatedly introduce a callable
 
 A callable that returns the previous attribute value produces an unbounded recursive type without
@@ -2224,6 +2371,146 @@ class Right:
 class RightChild(Right): ...
 
 reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+```
+
+## Cross-class recursive attributes with union-annotated receivers, defining class first
+
+Each class named by a receiver's union annotation can contribute to a recursive attribute. Checking
+the defining classes first must preserve values introduced on either side of that dependency.
+
+`model.py`:
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Foreign:
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Left:
+    def update(self, other: Right | Foreign) -> None:
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`consumer.py`:
+
+```py
+from model import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes with union-annotated receivers, consumer first
+
+Checking the consumer before the classes must not discard the value introduced through the
+union-annotated receiver or suppress either invalid-argument diagnostic.
+
+`consumer.py`:
+
+```py
+from model import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+`model.py`:
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Foreign:
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Left:
+    def update(self, other: Right | Foreign) -> None:
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes with aliased union receivers
+
+A type alias for a union receiver names the same possible attribute owners as the union itself.
+Resolving the alias must retain the shared component and its concrete invalid-argument diagnostic.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Foreign:
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+type Receiver = Right | Foreign
+
+class Left:
+    def update(self, other: Receiver) -> None:
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
 ```
 
 ## Cross-class recursive attributes through conditional receiver aliases

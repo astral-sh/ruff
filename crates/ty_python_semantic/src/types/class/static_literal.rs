@@ -4835,11 +4835,20 @@ fn attribute_receiver_owners<'db>(
         let Some(receiver_type) = parameter_annotation_only(db, declaration) else {
             continue;
         };
-        let Some((class, decorator)) = receiver_type.member_cycle_receiver(db, &env) else {
-            continue;
+        let receiver_type = receiver_type.resolve_type_alias(db);
+        let receivers = match receiver_type {
+            Type::Union(union) => Either::Left(union.elements(db).iter().copied()),
+            receiver => Either::Right(std::iter::once(receiver)),
         };
-        if let Some((owner, _)) = class.static_class_literal(db) {
-            owners.insert((owner, decorator));
+
+        for receiver in receivers {
+            if let Some((class, decorator)) = receiver
+                .resolve_type_alias(db)
+                .member_cycle_receiver(db, &env)
+                && let Some((owner, _)) = class.static_class_literal(db)
+            {
+                owners.insert((owner, decorator));
+            }
         }
     }
 

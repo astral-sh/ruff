@@ -457,10 +457,51 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Checks if a symbol name is bound in any intermediate eager scopes
+    /// Identify a method whose active assignment contains the current attribute read.
+    ///
+    /// Lambda bodies execute lazily, but their return types are inferred when the enclosing
+    /// callable is constructed. Their captured member reads therefore contribute to the
+    /// assignment's type without creating an eager runtime use in the method scope.
+    fn assignment_dependency_method_scope(&self) -> Option<FileScopeId> {
+        if let Some(method_scope) = self.is_method_or_eagerly_executed_in_method() {
+            return Some(method_scope);
+        }
+
+        let frame = self.assignment_member_dependency.as_ref()?;
+        if !frame.collecting || self.scopes[frame.scope].kind() != ScopeKind::Function {
+            return None;
+        }
+
+        let parent = self.scopes[frame.scope].parent()?;
+        let class = if self.scopes[parent].kind() == ScopeKind::TypeParams {
+            self.scopes[parent].parent()?
+        } else {
+            parent
+        };
+        if self.scopes[class].kind() != ScopeKind::Class {
+            return None;
+        }
+
+        let mut contains_lambda = false;
+        for scope in self.scope_stack.iter().rev() {
+            if scope.file_scope_id == frame.scope {
+                return contains_lambda.then_some(frame.scope);
+            }
+
+            match self.scopes[scope.file_scope_id].kind() {
+                ScopeKind::Lambda => contains_lambda = true,
+                kind if kind.is_eager() => {}
+                _ => return None,
+            }
+        }
+
+        None
+    }
+
+    /// Checks if a symbol name is bound in any intermediate scopes
     /// between the current scope and the specified method scope.
     ///
-    fn is_symbol_bound_in_intermediate_eager_scopes(
+    fn is_symbol_bound_in_intermediate_scopes(
         &self,
         symbol_name: &str,
         method_scope_id: FileScopeId,
@@ -1415,7 +1456,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let assignment_scope = frame.scope;
         if assignment_scope != self.current_scope() {
-            if self.is_method_or_eagerly_executed_in_method() != Some(assignment_scope) {
+            if self.assignment_dependency_method_scope() != Some(assignment_scope) {
                 return;
             }
 
@@ -1427,12 +1468,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     };
 
                     if !member.is_instance_attribute()
-                        && (self.is_symbol_bound_in_intermediate_eager_scopes(
-                            receiver,
-                            assignment_scope,
-                        ) || self.place_tables[assignment_scope]
-                            .symbol_id(receiver)
-                            .is_none())
+                        && (self.is_symbol_bound_in_intermediate_scopes(receiver, assignment_scope)
+                            || self.place_tables[assignment_scope]
+                                .symbol_id(receiver)
+                                .is_none())
                     {
                         return;
                     }
@@ -1457,7 +1496,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
                 ScopedPlaceId::Symbol(symbol) => {
                     let name = self.current_place_table().symbol(symbol).name();
-                    if self.is_symbol_bound_in_intermediate_eager_scopes(name, assignment_scope) {
+                    if self.is_symbol_bound_in_intermediate_scopes(name, assignment_scope) {
                         return;
                     }
 
@@ -5112,7 +5151,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // and those bindings need to exist before we register parent/member associations.
                 let mut deferred_effects = None;
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
+                    if let Some(method_scope_id) = self.assignment_dependency_method_scope()
                         && let PlaceExpr::Member(member) = &mut place_expr
                         && member.is_instance_attribute_candidate()
                         && let Some(attribute) = expr.as_attribute_expr()
@@ -5129,7 +5168,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     .value
                                     .as_name_expr()
                                     .is_some_and(|name| name.id == first)
-                                    && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                    && !self.is_symbol_bound_in_intermediate_scopes(
                                         first,
                                         method_scope_id,
                                     )
