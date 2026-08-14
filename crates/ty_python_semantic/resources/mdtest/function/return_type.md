@@ -920,6 +920,43 @@ def returns_nested_gradual_bounded(value: Any) -> Bounded[list[Any]]:
     return value
 ```
 
+## Regression test: `unsound-return-statement` with tuple class objects
+
+A tuple class has only one generic parameter, so its element types are combined into a union. Its
+original element types must still determine whether the tuple class is fully static.
+
+```toml
+[environment]
+python-version = "3.11"
+
+[rules]
+unsound-return-statement = "error"
+```
+
+A tuple class with fully static elements forms a fully static return boundary:
+
+```py
+from typing import Any
+
+def returns_static_tuple_class(value: Any) -> type[tuple[int, object]]:
+    return value  # error: [unsound-return-statement]
+```
+
+A tuple class with an `Any` element remains gradual even though the union `object | Any` simplifies
+to `object`:
+
+```py
+def returns_gradual_tuple_class(value: Any) -> type[tuple[object, Any]]:
+    return value
+```
+
+An unpacked gradual tuple likewise makes the entire tuple class gradual:
+
+```py
+def returns_gradual_variadic_tuple_class(value: Any) -> type[tuple[object, *tuple[Any, ...]]]:
+    return value
+```
+
 ## Regression test: `unsound-return-statement` uses "pure redundancy"
 
 Internally, the rule uses "pure redundancy" rather than "impure redundancy". The following example
