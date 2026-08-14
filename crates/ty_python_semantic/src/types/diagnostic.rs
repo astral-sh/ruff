@@ -94,7 +94,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
-    registry.register_lint(&INVALID_IMPORT);
+    registry.register_lint(&INVALID_MODULE_GETATTR_CALL);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
@@ -566,9 +566,9 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-import.md")]
-    pub(crate) static INVALID_IMPORT = {
-        summary: "detects imports that fail while retrieving a module member",
+    #[doc = include_str!("../../resources/lint_docs/invalid-module-getattr-call.md")]
+    pub(crate) static INVALID_MODULE_GETATTR_CALL = {
+        summary: "detects imports that fail while calling module-level `__getattr__`",
         status: LintStatus::stable("0.0.72"),
         default_level: Level::Error,
     }
@@ -1901,12 +1901,12 @@ pub(super) fn report_bad_import_call<'db>(
         context,
         target.into(),
         &CallDiagnosticOverride {
-            lint: &INVALID_IMPORT,
+            lint: &INVALID_MODULE_GETATTR_CALL,
             message: format!(
                 "Cannot import `{name}` from module `{}`",
                 module.module(db).name(db),
             ),
-            info: "This import implicitly calls `__getattr__`",
+            info: "This import implicitly calls a module-level `__getattr__` function",
             argument_ranges: &[target.range()],
         },
     );

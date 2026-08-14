@@ -1902,44 +1902,6 @@ Use instead:
 a = 20 / 0  # type: ignore
 ```
 
-## `invalid-import`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.72">0.0.72</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-import%22" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L568" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Checks for imports that resolve to a module but fail while retrieving the imported member.
-
-**Why is this bad?**
-
-
-If a module defines `__getattr__`, Python calls it when a `from` import requests a name that is not
-otherwise defined. The import raises an exception if `__getattr__` cannot accept the requested name.
-
-**Examples**
-
-
-`module.py`:
-
-```python
-def __getattr__() -> str:
-    return "fallback"
-```
-
-`main.py`:
-
-```python
-# TypeError: __getattr__() takes 0 positional arguments but 1 was given
-from module import missing  # error
-```
-
 ## `invalid-key`
 
 <small>
@@ -2292,6 +2254,44 @@ Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#in
 
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 [override]: https://docs.python.org/3/library/typing.html#typing.override
+
+## `invalid-module-getattr-call`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.72">0.0.72</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-module-getattr-call%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L568" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Checks for imports that fail when calling a module-level `__getattr__` function.
+
+**Why is this bad?**
+
+
+If a module defines `__getattr__`, Python calls it when a `from` import requests a name that is not
+otherwise defined. The import raises an exception if `__getattr__` cannot accept the requested name.
+
+**Examples**
+
+
+`module.py`:
+
+```python
+def __getattr__() -> str:
+    return "fallback"
+```
+
+`main.py`:
+
+```python
+# TypeError: __getattr__() takes 0 positional arguments but 1 was given
+from module import missing  # error
+```
 
 ## `invalid-named-tuple`
 

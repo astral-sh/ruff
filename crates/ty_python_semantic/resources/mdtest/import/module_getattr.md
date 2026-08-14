@@ -95,21 +95,22 @@ def __getattr__(name: str) -> int:
 
 An invalid module-level `__getattr__` call is reported on `from ... import` statements while
 retaining the function's return type for recovery. Since the failed operation is an import, it
-receives an `invalid-import` diagnostic instead of an `invalid-attribute-access` diagnostic.
+receives an `invalid-module-getattr-call` diagnostic instead of an `invalid-attribute-access`
+diagnostic.
 
 ```py
-from invalid_getattr_module import missing  # snapshot: invalid-import
+from invalid_getattr_module import missing  # snapshot: invalid-module-getattr-call
 
 reveal_type(missing)  # revealed: str
 ```
 
 ```snapshot
-error[invalid-import]: Cannot import `missing` from module `invalid_getattr_module`
+error[invalid-module-getattr-call]: Cannot import `missing` from module `invalid_getattr_module`
  --> src/mdtest_snippet.py:1:36
   |
-1 | from invalid_getattr_module import missing  # snapshot: invalid-import
+1 | from invalid_getattr_module import missing  # snapshot: invalid-module-getattr-call
   |                                    ^^^^^^^ Too many positional arguments to function `__getattr__`: expected 0, got 1
-info: This import implicitly calls `__getattr__`
+info: This import implicitly calls a module-level `__getattr__` function
 info: Function signature here
  --> src/invalid_getattr_module.py:1:5
   |
@@ -232,7 +233,7 @@ return type.
 ```py
 from limited_getattr_module import known_attr
 
-# error: [invalid-import] "Cannot import `unknown_attr` from module `limited_getattr_module`"
+# error: [invalid-module-getattr-call] "Cannot import `unknown_attr` from module `limited_getattr_module`"
 from limited_getattr_module import unknown_attr
 
 reveal_type(known_attr)  # revealed: int

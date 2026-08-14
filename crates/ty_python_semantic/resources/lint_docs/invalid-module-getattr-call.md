@@ -1,6 +1,6 @@
 ## What it does
 
-Checks for imports that resolve to a module but fail while retrieving the imported member.
+Checks for imports that fail when calling a module-level `__getattr__` function.
 
 ## Why is this bad?
 
