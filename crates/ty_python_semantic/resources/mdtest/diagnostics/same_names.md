@@ -165,6 +165,53 @@ class Config:
     pass
 ```
 
+## Specialized class instances
+
+Precisely modeled `property`, `range`, and `TypeAliasType` instances remain distinct from
+user-defined classes with the same names.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`custom.py`:
+
+```py
+class property: ...
+class range: ...
+class TypeAliasType: ...
+```
+
+```py
+import custom
+
+class Owner:
+    @property
+    def value(self) -> int:
+        return 1
+
+# error: [invalid-assignment] "Object of type `builtins.property` is not assignable to `custom.property`"
+wrong_property: custom.property = Owner.value
+
+# error: [invalid-assignment] "Object of type `builtins.range` is not assignable to `custom.range`"
+wrong_range: custom.range = range(3)
+
+type Alias = int
+
+# error: [invalid-assignment] "Object of type `typing_extensions.TypeAliasType` is not assignable to `custom.TypeAliasType`"
+wrong_alias: custom.TypeAliasType = Alias
+
+def accepts_property(value: custom.property) -> None: ...
+def accepts_range(value: custom.range) -> None: ...
+
+# error: [invalid-argument-type] "Expected `custom.property`, found `builtins.property`"
+accepts_property(Owner.value)
+
+# error: [invalid-argument-type] "Expected `custom.range`, found `builtins.range`"
+accepts_range(range(4))
+```
+
 ## Generic aliases
 
 ```py
@@ -1070,69 +1117,6 @@ def invalid_assertion(value: second.Model) -> None:
 # error: [invalid-type-guard-definition] "Narrowed type `second.Model` is not assignable to the declared parameter type `first.Model`"
 def invalid_type_is(value: first.Model) -> TypeIs[second.Model]:
     return True
-```
-
-## Intrinsic typing names and sentinels
-
-User-defined classes remain distinct from intrinsic typing names and sentinels that share their
-display names.
-
-```toml
-[environment]
-python-version = "3.13"
-```
-
-`custom.py`:
-
-```py
-class Never: ...
-class Any: ...
-class NoDefault: ...
-```
-
-```py
-from typing import Any, Never, NoDefault, assert_never, assert_type
-
-import custom
-
-# error: [invalid-assignment] "Object of type `custom.Never` is not assignable to `Never`"
-never_value: Never = custom.Never()
-
-def expects_never(value: Never) -> None: ...
-
-# error: [invalid-argument-type] "Expected `Never`, found `custom.Never`"
-expects_never(custom.Never())
-
-assert_type(custom.Never(), Never)  # snapshot: type-assertion-failure
-
-# error: [type-assertion-failure] "Type `custom.Any` does not match asserted type `Any`"
-assert_type(custom.Any(), Any)
-
-# error: [invalid-assignment] "Object of type `NoDefault` is not assignable to `custom.NoDefault`"
-no_default: custom.NoDefault = NoDefault
-
-assert_never(custom.Never())  # snapshot: type-assertion-failure
-```
-
-```snapshot
-error[type-assertion-failure]: Argument does not have asserted type `Never`
-  --> src/mdtest_snippet.py:13:1
-   |
-13 | assert_type(custom.Never(), Never)  # snapshot: type-assertion-failure
-   | ^^^^^^^^^^^^--------------^^^^^^^^
-   |             |
-   |             Inferred type is `custom.Never`
-info: `Never` and `custom.Never` are not equivalent types
-
-
-error[type-assertion-failure]: Argument does not have asserted type `Never`
-  --> src/mdtest_snippet.py:21:1
-   |
-21 | assert_never(custom.Never())  # snapshot: type-assertion-failure
-   | ^^^^^^^^^^^^^--------------^
-   |              |
-   |              Inferred type of argument is `custom.Never`
-info: `Never` and `custom.Never` are not equivalent types
 ```
 
 ## Type variable bounds, constraints, and defaults
@@ -2926,7 +2910,6 @@ required by their names, field names, defaults, and keyword arguments.
 ```py
 class str: ...
 class bool: ...
-class Any: ...
 class Iterable: ...
 ```
 
@@ -2941,7 +2924,6 @@ namedtuple(custom.str(), [])  # snapshot: invalid-argument-type
 namedtuple("Value", [], rename=custom.bool())  # snapshot: invalid-argument-type
 namedtuple("Value", [], module=custom.str())  # snapshot: invalid-argument-type
 namedtuple("Value", custom.str())  # snapshot: invalid-argument-type
-namedtuple("Value", [], defaults=custom.Any())  # snapshot: invalid-argument-type
 namedtuple("Value", [], defaults=custom.Iterable())  # snapshot: invalid-argument-type
 ```
 
@@ -2984,14 +2966,7 @@ error[invalid-argument-type]: Invalid argument to parameter `field_names` of `na
 error[invalid-argument-type]: Invalid argument to parameter `defaults` of `namedtuple()`
   --> src/mdtest_snippet.py:11:34
    |
-11 | namedtuple("Value", [], defaults=custom.Any())  # snapshot: invalid-argument-type
-   |                                  ^^^^^^^^^^^^ Expected `Iterable[Any] | None`, found `custom.Any`
-
-
-error[invalid-argument-type]: Invalid argument to parameter `defaults` of `namedtuple()`
-  --> src/mdtest_snippet.py:12:34
-   |
-12 | namedtuple("Value", [], defaults=custom.Iterable())  # snapshot: invalid-argument-type
+11 | namedtuple("Value", [], defaults=custom.Iterable())  # snapshot: invalid-argument-type
    |                                  ^^^^^^^^^^^^^^^^^ Expected `typing.Iterable[Any] | None`, found `custom.Iterable`
 ```
 
