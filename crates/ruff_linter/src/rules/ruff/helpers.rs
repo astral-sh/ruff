@@ -227,7 +227,7 @@ pub(super) fn has_default_copy_semantics(
 /// Returns `true` if the given function is an instantiation of a class that implements the
 /// descriptor protocol.
 ///
-/// See: <https://docs.python.org/3.10/reference/datamodel.html#descriptors>
+/// See: <https://docs.python.org/3/reference/datamodel.html#descriptors>
 pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.lookup_attribute(func).is_some_and(|id| {
         let BindingKind::ClassDefinition(scope_id) = semantic.binding(id).kind else {
