@@ -52,7 +52,8 @@ use crate::{
 /// especially on older versions of Python.
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is always marked as unsafe because `pathlib.Path` and `os.stat` differ in their
+/// handling of `bytes` paths and file descriptors.
 ///
 /// ## References
 /// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
