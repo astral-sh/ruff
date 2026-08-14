@@ -1160,6 +1160,31 @@ accepted_by_fallback: PersonOrId | dict[str, str] = dict(other="x")
 reveal_type(accepted_by_fallback)  # revealed: dict[str, str]
 ```
 
+That holds wherever the union supplies the type context, not just in an assignment:
+
+```py
+class Roster(TypedDict):
+    lead: PersonOrId | dict[str, str]
+
+def takes_fallback(value: PersonOrId | dict[str, str]) -> None: ...
+
+takes_fallback(dict(other="x"))
+
+def returns_fallback() -> PersonOrId | dict[str, str]:
+    return dict(other="x")
+
+nested_fallback: Roster = {"lead": dict(other="x")}
+```
+
+A wider arm serves as well as an exact one:
+
+```py
+from typing import Any, Mapping
+
+any_fallback: PersonOrId | Any = dict(other="x")
+mapping_fallback: PersonOrId | Mapping[str, str] = dict(other="x")
+```
+
 With no arm to fall back to, the call is validated against the `TypedDict` as before:
 
 ```py
