@@ -769,3 +769,40 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 # These are fine:
 type Ok1[T, *Ts] = tuple[T, *Ts]
 ```
+
+## Solving a typevar through a generic union alias
+
+Expanding aliases must not disturb the solver. Here the parameter is a generic union alias whose
+first element is itself a generic alias, and both mention the typevar being solved. Expanding such
+an alias where union elements are filtered for disjointness drops the arms carrying the typevar, and
+the call then infers `Unknown` rather than picking the overload the argument matches.
+
+Reduced from `scipy.stats.differential_entropy`, whose parameter is
+`_ToArrayMax1D[InexactT, InexactT]`.
+
+```py
+from typing import assert_type, overload
+
+class Number: ...
+class Bool: ...
+class Integer(Number): ...
+class Inexact(Number): ...
+class Float64(Inexact): ...
+class CanArray1D[ScalarT]: ...
+
+type Strict1D[PyScalarT, ScalarT] = CanArray1D[ScalarT] | list[PyScalarT | ScalarT]
+type ToArrayStrict1D[PyScalarT, ScalarT] = Strict1D[PyScalarT, ScalarT]
+
+type AsFloat64 = Float64 | Integer | Bool
+type ToArrayMax1D[ScalarT: Number | Bool, PyScalarT] = ToArrayStrict1D[PyScalarT, ScalarT] | PyScalarT | ScalarT
+
+@overload
+def entropy[InexactT: Inexact](values: ToArrayMax1D[InexactT, InexactT]) -> InexactT: ...
+@overload
+def entropy(values: ToArrayMax1D[AsFloat64, float]) -> Float64: ...
+def entropy(values: object) -> object:
+    raise NotImplementedError
+
+def probe(scalar: float) -> None:
+    assert_type(entropy(scalar), Float64)
+```
