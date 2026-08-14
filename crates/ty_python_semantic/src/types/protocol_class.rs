@@ -495,7 +495,10 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface.includes_member(db, name)
     }
 
-    /// Includes inherited `object` members except `__hash__`, which subclasses can disable.
+    /// Includes inherited `object` members that are guaranteed for every instance.
+    ///
+    /// Subclasses can disable `__hash__`, and slotted instances can omit the `__dict__` that
+    /// typeshed declares on `object`.
     fn includes_member_or_object_fallback(
         self,
         db: &'db dyn Db,
@@ -503,7 +506,7 @@ impl<'db> ProtocolInterfaceView<'db> {
         name: &str,
     ) -> bool {
         self.includes_member(db, name)
-            || name != "__hash__"
+            || !matches!(name, "__hash__" | "__dict__")
                 && object_member_names(db, self.interface.program(db)).contains(name)
                 && matches!(
                     Type::object().member(db, env, name).place,
@@ -3485,7 +3488,9 @@ fn non_object_protocol_member_count<'db>(
 ) -> usize {
     let inherited_member_count = object_member_names(db, interface.program(db))
         .iter()
-        .filter(|name| name.as_str() != "__hash__" && interface.includes_member(db, name))
+        .filter(|name| {
+            !matches!(name.as_str(), "__hash__" | "__dict__") && interface.includes_member(db, name)
+        })
         .count();
     interface.member_count(db) - inherited_member_count
 }

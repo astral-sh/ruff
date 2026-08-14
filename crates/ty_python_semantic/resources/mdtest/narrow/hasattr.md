@@ -108,6 +108,22 @@ def has_dictionary(value: object) -> None:
         reveal_type(value)  # revealed: <Protocol with members '__dict__'>
 ```
 
+A protocol can be implemented by classes with or without instance dictionaries, so checking for
+`__dict__` preserves both possibilities.
+
+```py
+from typing import Protocol
+
+class HasValue(Protocol):
+    value: int
+
+def protocol_dictionary(value: HasValue) -> None:
+    if hasattr(value, "__dict__"):
+        reveal_type(value)  # revealed: HasValue & <Protocol with members '__dict__'>
+    else:
+        reveal_type(value)  # revealed: HasValue & ~<Protocol with members '__dict__'>
+```
+
 A final slotted class cannot gain an instance dictionary through a subclass, so the positive branch
 is unreachable.
 
