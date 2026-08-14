@@ -15,6 +15,7 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
+use ty_module_resolver::system_module_search_paths;
 use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
@@ -29,6 +30,43 @@ pub trait Db: SemanticDb {
     fn script_environments(&self) -> &ScriptEnvironments;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
+}
+
+/// Returns the program to use for `file`.
+///
+/// Scripts use their own program, and project files use the project program. For third-party files,
+/// this chooses the most likely program.
+fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
+    if let Some(script) = Script::for_file(db, file) {
+        return script.program(db).program_file(db, file);
+    }
+
+    let project = db.project();
+    let project_program = project.program(db);
+    let Some(path) = file.path(db).as_system_path() else {
+        return project_program.program_file(db, file);
+    };
+
+    if project.is_file_included(db, path).is_included()
+        || system_module_search_paths(db, project_program.resolver_environment(db))
+            .any(|search_path| path.starts_with(search_path))
+    {
+        return project_program.program_file(db, file);
+    }
+
+    let program = db
+        .script_environments()
+        .files()
+        .into_iter()
+        .filter_map(|script| Script::for_file(db, script))
+        .map(|script| script.program(db))
+        .find(|program| {
+            system_module_search_paths(db, program.resolver_environment(db))
+                .any(|search_path| path.starts_with(search_path))
+        })
+        .unwrap_or(project_program);
+
+    program.program_file(db, file)
 }
 
 /// Tracked so that a change to the open-file set only invalidates queries
@@ -533,12 +571,7 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
-        let program = match Script::for_file(self, file) {
-            None => self.project().program(self),
-            Some(script) => script.program(self),
-        };
-
-        program.program_file(self, file)
+        program_file(self, file)
     }
 
     fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
@@ -796,12 +829,7 @@ pub(crate) mod testing {
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
         fn program_file(&self, file: File) -> ProgramFile<'_> {
-            let program = match Script::for_file(self, file) {
-                None => self.project().program(self),
-                Some(script) => script.program(self),
-            };
-
-            program.program_file(self, file)
+            super::program_file(self, file)
         }
 
         fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
