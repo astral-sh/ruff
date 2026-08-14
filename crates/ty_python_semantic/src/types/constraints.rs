@@ -3976,7 +3976,7 @@ impl<'db> PathBounds<'db> {
         ))
     }
 
-    /// Selects a preliminary solution for type-context inference.
+    /// Selects a preliminary solution to use as type context during generic call inference.
     ///
     /// Unlike [`Self::default_solve`], the range of a gradual solution is not restricted by inferred
     /// upper bounds, as the inferred types may not have stabilized yet.
