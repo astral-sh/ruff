@@ -613,19 +613,58 @@ struct ConstraintTables<'db> {
 /// Reachability gates can contain predicates that are unrelated to the place being narrowed.
 /// Keeping the conservative targets computed while building the semantic index lets type
 /// inference skip constructing those predicates' full narrowing maps.
+///
+/// Scope-wide control-flow gates apply to every place that existed when they were recorded. At
+/// most two leading entries use the otherwise-reserved `ALWAYS_TRUE` predicate to retain the
+/// highest covered symbol and member IDs without adding fields to every cached constraint table.
 #[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct PredicateNarrowingTargets(Box<[(ScopedPredicateId, ScopedPlaceId)]>);
 
 impl PredicateNarrowingTargets {
-    fn from_entries(mut entries: Vec<(ScopedPredicateId, ScopedPlaceId)>) -> Self {
+    fn from_entries(
+        mut entries: Vec<(ScopedPredicateId, ScopedPlaceId)>,
+        scope_wide_targets: ScopeWideNarrowingTargets,
+    ) -> Self {
         entries.sort_unstable_by_key(|&(predicate, place)| (place, predicate));
         entries.dedup();
+
+        let mut marker_count = 0;
+        if scope_wide_targets.symbols > 0 {
+            entries.push((
+                ScopedPredicateId::ALWAYS_TRUE,
+                ScopedPlaceId::Symbol(ScopedSymbolId::new(scope_wide_targets.symbols - 1)),
+            ));
+            marker_count += 1;
+        }
+        if scope_wide_targets.members > 0 {
+            entries.push((
+                ScopedPredicateId::ALWAYS_TRUE,
+                ScopedPlaceId::Member(ScopedMemberId::new(scope_wide_targets.members - 1)),
+            ));
+            marker_count += 1;
+        }
+        entries.rotate_right(marker_count);
+
         Self(entries.into_boxed_slice())
+    }
+
+    fn place_specific_entries(&self) -> &[(ScopedPredicateId, ScopedPlaceId)] {
+        let marker_count = usize::from(
+            self.0
+                .first()
+                .is_some_and(|&(predicate, _)| predicate == ScopedPredicateId::ALWAYS_TRUE),
+        ) + usize::from(
+            self.0
+                .get(1)
+                .is_some_and(|&(predicate, _)| predicate == ScopedPredicateId::ALWAYS_TRUE),
+        );
+
+        &self.0[marker_count..]
     }
 
     /// Returns whether `predicate` may narrow `place`.
     pub fn contains(&self, predicate: ScopedPredicateId, place: ScopedPlaceId) -> bool {
-        self.0
+        self.place_specific_entries()
             .binary_search_by_key(&(place, predicate), |&(predicate, place)| {
                 (place, predicate)
             })
@@ -634,10 +673,30 @@ impl PredicateNarrowingTargets {
 
     /// Returns whether any predicate may narrow `place`.
     pub fn contains_place(&self, place: ScopedPlaceId) -> bool {
-        self.0
+        self.place_specific_entries()
             .binary_search_by_key(&place, |&(_, target)| target)
             .is_ok()
     }
+
+    /// Returns whether a scope-wide control-flow gate can affect `place`.
+    pub fn contains_scope_wide_control_flow(&self, place: ScopedPlaceId) -> bool {
+        self.0
+            .iter()
+            .take(2)
+            .take_while(|(predicate, _)| *predicate == ScopedPredicateId::ALWAYS_TRUE)
+            .any(|&(_, last_place)| match (place, last_place) {
+                (ScopedPlaceId::Symbol(place), ScopedPlaceId::Symbol(last)) => place <= last,
+                (ScopedPlaceId::Member(place), ScopedPlaceId::Member(last)) => place <= last,
+                _ => false,
+            })
+    }
+}
+
+/// Number of places covered by at least one scope-wide narrowing gate.
+#[derive(Clone, Copy, Debug, Default)]
+struct ScopeWideNarrowingTargets {
+    symbols: usize,
+    members: usize,
 }
 
 /// Fields that are empty in most use-def maps.
@@ -1792,6 +1851,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Predicate-place pairs for which a narrowing constraint was recorded.
     predicate_narrowing_targets: Vec<(ScopedPredicateId, ScopedPlaceId)>,
 
+    /// Places that existed when a control-flow gate was applied to the entire scope.
+    scope_wide_narrowing_targets: ScopeWideNarrowingTargets,
+
     /// Builder of reachability constraints.
     pub(super) reachability_constraints: ReachabilityConstraintsBuilder,
 
@@ -1861,6 +1923,7 @@ impl<'db> UseDefMapBuilder<'db> {
             all_definitions: IndexVec::from_iter([DefinitionEntry::Undefined]),
             predicates: PredicatesBuilder::default(),
             predicate_narrowing_targets: Vec::new(),
+            scope_wide_narrowing_targets: ScopeWideNarrowingTargets::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
@@ -2313,6 +2376,15 @@ impl<'db> UseDefMapBuilder<'db> {
         constraint: ScopedNarrowingConstraint,
     ) {
         self.checkpoint_state.record_call_gate();
+        self.scope_wide_narrowing_targets.symbols = self
+            .scope_wide_narrowing_targets
+            .symbols
+            .max(self.symbol_states.len());
+        self.scope_wide_narrowing_targets.members = self
+            .scope_wide_narrowing_targets
+            .members
+            .max(self.member_states.len());
+
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -2952,8 +3024,10 @@ impl<'db> UseDefMapBuilder<'db> {
             })
         });
         let predicates = self.predicates.build();
-        let predicate_narrowing_targets =
-            PredicateNarrowingTargets::from_entries(self.predicate_narrowing_targets);
+        let predicate_narrowing_targets = PredicateNarrowingTargets::from_entries(
+            self.predicate_narrowing_targets,
+            self.scope_wide_narrowing_targets,
+        );
         let reachability_constraints = self.reachability_constraints.build();
         let narrowing_constraints = self.narrowing_constraints.build();
         let constraint_tables = (!reachability_constraints.used_interiors().is_empty()
