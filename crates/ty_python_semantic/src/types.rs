@@ -8159,6 +8159,14 @@ impl<'db> Type<'db> {
                 instance.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
 
+            Type::TypedDict(TypedDictType::Class(class)) => {
+                class.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+            }
+
+            // Synthesized schemas can contain type variables, but their internal narrowing and
+            // update constraints inherit those variables from an existing generic context.
+            Type::TypedDict(TypedDictType::Synthesized(_)) => {}
+
             Type::NewTypeInstance(_) => {
                 // A newtype can never be constructed from an unspecialized generic class, so it is
                 // impossible that we could ever find any legacy typevars in a newtype instance or
@@ -8307,8 +8315,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::LiteralValue(_)
             | Type::BoundSuper(_)
-            | Type::SpecialForm(_)
-            | Type::TypedDict(_) => {}
+            | Type::SpecialForm(_) => {}
         }
     }
 

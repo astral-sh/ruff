@@ -170,6 +170,27 @@ def pick(x: object) -> str | bool:
 reveal_type(pick([1]))  # revealed: bool
 ```
 
+## Inferring generic typed-dictionary parameters
+
+A type variable that appears only inside a typed dictionary still makes the function generic, so
+specialized typed dictionaries can be passed to it.
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Item(TypedDict, Generic[T]):
+    value: T
+
+def accept(value: Item[T]) -> None: ...
+
+item: Item[int] = {"value": 1}
+
+reveal_type(accept)  # revealed: def accept[T](value: Item[T]) -> None
+accept(item)
+```
+
 ## Inferring a class-object parameter through a generic factory
 
 A factory can infer its type arguments from a specialized subclass of its class-object parameter.
