@@ -22,15 +22,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
+        let annotation = call_expression_tcx
+            .annotation
+            .map(|annotation| annotation.expand_union_aliases(db, self.program_environment()));
+
         // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
         // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
         // is `TypedDict`-shaped.
-        if let Some(tcx) = call_expression_tcx.annotation
-            && let annotation = tcx.expand_union_aliases(db, self.program_environment())
+        if let Some(annotation) = annotation
             && let Some(typed_dict) = annotation
                 .filter_union(db, Type::is_typed_dict)
                 .as_typed_dict()
-            && !self.dict_call_matches_union_fallback(func, arguments, collection_expr, annotation)
+            && !self.has_dict_compatible_fallback(func, arguments, collection_expr, annotation)
         {
             // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
             // are already valid for the target, including gradual and bottom types. The additional
@@ -123,7 +126,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// so committing to the `TypedDict` would report key errors for a call the annotation allows.
     ///
     /// A non-`TypedDict` type context cannot re-enter the fast path, so the recursion terminates.
-    fn dict_call_matches_union_fallback(
+    fn has_dict_compatible_fallback(
         &mut self,
         func: &ast::Expr,
         arguments: &ast::Arguments,
