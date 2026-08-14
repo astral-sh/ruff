@@ -34,7 +34,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     def bar(cls): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.7", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "v0.1.7", category = Category::Style)]
 pub(crate) struct NoClassmethodDecorator;
 
 impl AlwaysFixableViolation for NoClassmethodDecorator {
@@ -71,7 +71,7 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 ///     def bar(arg1, arg2): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.7", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "v0.1.7", category = Category::Style)]
 pub(crate) struct NoStaticmethodDecorator;
 
 impl AlwaysFixableViolation for NoStaticmethodDecorator {

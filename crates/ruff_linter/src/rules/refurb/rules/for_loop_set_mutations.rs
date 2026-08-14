@@ -45,7 +45,7 @@ use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.5", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "v0.3.5", category = Category::Complexity)]
 pub(crate) struct ForLoopSetMutations {
     method_name: &'static str,
     batch_method_name: &'static str,

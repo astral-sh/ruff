@@ -32,7 +32,7 @@ use crate::{Violation, checkers::ast::LintContext};
 ///
 /// [lexical-analysis-indentation]: https://docs.python.org/3/reference/lexical_analysis.html#indentation
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.6", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.9.6", category = Category::Correctness)]
 pub(crate) struct IndentedFormFeed;
 
 impl Violation for IndentedFormFeed {

@@ -28,7 +28,7 @@ use crate::codes::Category;
 /// f"hello {first} {second}"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.8", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.15.8", category = Category::Suspicious)]
 pub(crate) struct FStringPercentFormat;
 
 impl Violation for FStringPercentFormat {

@@ -32,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.3", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.9.3", category = Category::Correctness)]
 pub(crate) struct NeedlessElse;
 
 impl AlwaysFixableViolation for NeedlessElse {

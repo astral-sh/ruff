@@ -69,7 +69,7 @@ use crate::{
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.2", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.8.2", category = Category::Correctness)]
 pub(crate) struct UsedDummyVariable {
     name: String,
     shadowed_kind: Option<ShadowedKind>,
