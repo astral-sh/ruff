@@ -1593,7 +1593,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `String` token.
     ///
-    /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
+    /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
         let range = self.current_token_range();
         let flags = self.tokens.current_flags().as_any_string_flags();
