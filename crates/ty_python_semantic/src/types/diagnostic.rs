@@ -2665,7 +2665,7 @@ pub(crate) fn report_instance_layout_conflict(
 pub(super) fn report_conflicting_metaclass_from_bases<'db>(
     context: &InferContext<'db, '_>,
     node: AnyNodeRef,
-    class_name: &str,
+    class: ClassLiteral<'db>,
     metaclass1: ClassType,
     base1: ClassBase<'db>,
     metaclass2: ClassType,
@@ -2679,6 +2679,7 @@ pub(super) fn report_conflicting_metaclass_from_bases<'db>(
     let env = context.program_environment();
 
     let types = [
+        Type::from(class),
         Type::from(metaclass1),
         Type::from(base1),
         Type::from(metaclass2),
@@ -2693,11 +2694,12 @@ pub(super) fn report_conflicting_metaclass_from_bases<'db>(
     };
 
     builder.into_diagnostic(format_args!(
-        "The metaclass of a derived class (`{class_name}`) \
+        "The metaclass of a derived class (`{class}`) \
             must be a subclass of the metaclasses of all its bases, \
             but `{metaclass1}` (metaclass of base class `{base1}`) \
             and `{metaclass2}` (metaclass of base class `{base2}`) \
             have no subclass relationship",
+        class = class.display_with(db, settings.clone()),
         metaclass1 = metaclass1
             .class_literal(db)
             .display_with(db, settings.clone()),
@@ -3846,6 +3848,7 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     context: &InferContext<'db, '_>,
     key_node: AnyNodeRef,
     typed_dict_ty: TypedDictType<'db>,
+    full_object_ty: Option<Type<'db>>,
     field_name: &str,
     field: Option<&crate::types::typed_dict::TypedDictField<'db>>,
     error_kind: TypedDictDeleteErrorKind,
@@ -3856,7 +3859,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     };
     let env = &context.program_environment();
 
-    let typed_dict_name = Type::TypedDict(typed_dict_ty).display(db, env);
+    let types = std::iter::once(Type::TypedDict(typed_dict_ty)).chain(full_object_ty);
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+    let typed_dict_name = Type::TypedDict(typed_dict_ty).display_with(db, env, settings.clone());
 
     let mut diagnostic = match error_kind {
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
@@ -3896,7 +3901,10 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
                 Annotation::secondary(
                     Span::from(file).with_range(class.class_literal(db).header_range(db)),
                 )
-                .message(format_args!("`{}` defined here", class.name(db))),
+                .message(format_args!(
+                    "`{}` defined here",
+                    class.class_literal(db).display_with(db, settings.clone())
+                )),
             );
         }
 

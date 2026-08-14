@@ -922,6 +922,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     .chain(failure.invalid_argument_types());
                 let settings =
                     DisplaySettings::from_possibly_ambiguous_types(&self.builder.context, types);
+
                 failure.report_diagnostics_with_override(
                     &self.builder.context,
                     self.target.into(),

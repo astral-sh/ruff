@@ -1713,14 +1713,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let db = self.db();
 
-        let attach_original_type_info = |diagnostic: &mut LintDiagnosticGuard| {
-            if let Some(full_object_ty) = full_object_ty {
-                diagnostic.info(format_args!(
-                    "The full type of the subscripted object is `{}`",
-                    full_object_ty.display(db, env)
-                ));
-            }
-        };
+        let attach_original_type_info =
+            |diagnostic: &mut LintDiagnosticGuard, settings: &DisplaySettings<'db>| {
+                if let Some(full_object_ty) = full_object_ty {
+                    diagnostic.info(format_args!(
+                        "The full type of the subscripted object is `{}`",
+                        full_object_ty.display_with(db, env, settings.clone())
+                    ));
+                }
+            };
 
         match object_ty {
             Type::Union(union) => {
@@ -1831,7 +1832,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .context
                                 .report_lint(&INVALID_ASSIGNMENT, rhs_value_node)
                         {
-                            let types = [rhs_value_ty, slice_ty, object_ty, expected_ty];
+                            let types = [rhs_value_ty, slice_ty, object_ty, expected_ty]
+                                .into_iter()
+                                .chain(full_object_ty);
+
                             let settings = DisplaySettings::from_possibly_ambiguous_types(
                                 &self.context,
                                 types,
@@ -1846,9 +1850,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ));
                             diagnostic.set_primary_annotation_message(format_args!(
                                 "Expected value assignable to `{}`",
-                                expected_ty.display_with(db, env, settings)
+                                expected_ty.display_with(db, env, settings.clone())
                             ));
-                            attach_original_type_info(&mut diagnostic);
+                            attach_original_type_info(&mut diagnostic, &settings);
                         }
                         return false;
                     }
@@ -1876,7 +1880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 on TypedDict `{value_d}`",
                                 slice_ty.display_with(db, env, settings.clone())
                             ));
-                            attach_original_type_info(&mut diagnostic);
+                            attach_original_type_info(&mut diagnostic, &settings);
                         }
                     } else {
                         if let Some(builder) = self
@@ -1888,7 +1892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 with a string literal key, got key of type `{}`.",
                                 slice_ty.display_with(db, env, settings.clone())
                             ));
-                            attach_original_type_info(&mut diagnostic);
+                            attach_original_type_info(&mut diagnostic, &settings);
                         }
                     }
 
@@ -1972,11 +1976,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .context
                                 .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
                         {
+                            let types = std::iter::once(object_ty).chain(full_object_ty);
+                            let settings = DisplaySettings::from_possibly_ambiguous_types(
+                                &self.context,
+                                types,
+                            );
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Method `__setitem__` of type `{}` may be missing",
-                                object_ty.display(db, env),
+                                object_ty.display_with(db, env, settings.clone()),
                             ));
-                            attach_original_type_info(&mut diagnostic);
+                            attach_original_type_info(&mut diagnostic, &settings);
                         }
                         false
                     }
@@ -2003,9 +2012,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         "Method `__setitem__` of type `{}` is not callable \
                                              on object of type `{}`",
                                         callable_ty.display_with(db, env, settings.clone()),
-                                        object_ty.display_with(db, env, settings),
+                                        object_ty.display_with(db, env, settings.clone()),
                                     ));
-                                    attach_original_type_info(&mut diagnostic);
+                                    attach_original_type_info(&mut diagnostic, &settings);
                                 }
                             }
                             CallErrorKind::BindingError => {
@@ -2033,7 +2042,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             target.range.cover(rhs_value_node.range()),
                                         )
                                     {
-                                        let types = [rhs_value_ty, object_ty, slice_ty];
+                                        let types = [rhs_value_ty, object_ty, slice_ty]
+                                            .into_iter()
+                                            .chain(full_object_ty)
+                                            .chain(bindings.invalid_argument_types());
+
                                         let settings =
                                             DisplaySettings::from_possibly_ambiguous_types(
                                                 &self.context,
@@ -2092,7 +2105,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             }
                                         }
 
-                                        attach_original_type_info(&mut diagnostic);
+                                        attach_original_type_info(&mut diagnostic, &settings);
                                     }
                                 }
                             }
@@ -2114,9 +2127,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         "Method `__setitem__` of type `{}` may not be callable \
                                         on object of type `{}`",
                                         callable_ty.display_with(db, env, settings.clone()),
-                                        object_ty.display_with(db, env, settings),
+                                        object_ty.display_with(db, env, settings.clone()),
                                     ));
-                                    attach_original_type_info(&mut diagnostic);
+                                    attach_original_type_info(&mut diagnostic, &settings);
                                 }
                             }
                         }
@@ -2136,7 +2149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 "Cannot assign to a subscript on an object of type `{}`",
                                 object_ty.display_with(db, env, settings.clone()),
                             ));
-                            attach_original_type_info(&mut diagnostic);
+                            attach_original_type_info(&mut diagnostic, &settings);
 
                             // If it's a user-defined class, suggest adding a `__setitem__` method.
                             if object_ty
@@ -2189,14 +2202,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let db = self.db();
 
-        let attach_original_type_info = |diagnostic: &mut LintDiagnosticGuard| {
-            if let Some(full_object_ty) = full_object_ty {
-                diagnostic.info(format_args!(
-                    "The full type of the subscripted object is `{}`",
-                    full_object_ty.display(db, env)
-                ));
-            }
-        };
+        let attach_original_type_info =
+            |diagnostic: &mut LintDiagnosticGuard, settings: &DisplaySettings<'db>| {
+                if let Some(full_object_ty) = full_object_ty {
+                    diagnostic.info(format_args!(
+                        "The full type of the subscripted object is `{}`",
+                        full_object_ty.display_with(db, env, settings.clone())
+                    ));
+                }
+            };
 
         match object_ty {
             Type::Union(union) => {
@@ -2275,11 +2289,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .context
                             .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
                         {
+                            let types = std::iter::once(object_ty).chain(full_object_ty);
+                            let settings = DisplaySettings::from_possibly_ambiguous_types(
+                                &self.context,
+                                types,
+                            );
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Method `__delitem__` of type `{}` may be missing",
-                                object_ty.display(db, env),
+                                object_ty.display_with(db, env, settings.clone()),
                             ));
-                            attach_original_type_info(&mut diagnostic);
+                            attach_original_type_info(&mut diagnostic, &settings);
                         }
                     }
                     CallDunderError::CallError(call_error_kind, bindings, _) => {
@@ -2301,9 +2320,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         "Method `__delitem__` of type `{}` \
                                         is not callable on object of type `{}`",
                                         callable_ty.display_with(db, env, settings.clone()),
-                                        object_ty.display_with(db, env, settings),
+                                        object_ty.display_with(db, env, settings.clone()),
                                     ));
-                                    attach_original_type_info(&mut diagnostic);
+                                    attach_original_type_info(&mut diagnostic, &settings);
                                 }
                             }
                             CallErrorKind::BindingError => {
@@ -2320,6 +2339,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 &self.context,
                                                 (&*target.slice).into(),
                                                 typed_dict,
+                                                full_object_ty,
                                                 key,
                                                 Some(field),
                                                 TypedDictDeleteErrorKind::RequiredKey,
@@ -2332,6 +2352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 &self.context,
                                                 (&*target.slice).into(),
                                                 typed_dict,
+                                                full_object_ty,
                                                 key,
                                                 None,
                                                 TypedDictDeleteErrorKind::ReadOnlyExtraItem,
@@ -2342,6 +2363,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 &self.context,
                                                 (&*target.slice).into(),
                                                 typed_dict,
+                                                full_object_ty,
                                                 key,
                                                 None,
                                                 TypedDictDeleteErrorKind::UnknownKey,
@@ -2356,31 +2378,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                                             let types = [callable_ty, slice_ty, object_ty]
                                                 .into_iter()
-                                                .chain(full_object_ty);
+                                                .chain(full_object_ty)
+                                                .chain(bindings.invalid_argument_types());
+
                                             let settings =
                                                 DisplaySettings::from_possibly_ambiguous_types(
                                                     &self.context,
                                                     types,
                                                 );
 
+                                            let display = |ty: Type<'db>| {
+                                                ty.display_with(db, env, settings.clone())
+                                            };
+
                                             let mut diagnostic =
                                                 builder.into_diagnostic(format_args!(
                                                     "Method `__delitem__` of type `{}` \
                                                     cannot be called with key of type \
                                                     `{}` on object of type `{}`",
-                                                    callable_ty.display_with(
-                                                        db,
-                                                        env,
-                                                        settings.clone()
-                                                    ),
-                                                    slice_ty.display_with(
-                                                        db,
-                                                        env,
-                                                        settings.clone()
-                                                    ),
-                                                    object_ty.display_with(db, env, settings),
+                                                    display(callable_ty),
+                                                    display(slice_ty),
+                                                    display(object_ty),
                                                 ));
-                                            attach_original_type_info(&mut diagnostic);
+                                            attach_original_type_info(&mut diagnostic, &settings);
                                         }
                                     }
                                 } else {
@@ -2392,7 +2412,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                                         let types = [callable_ty, slice_ty, object_ty]
                                             .into_iter()
-                                            .chain(full_object_ty);
+                                            .chain(full_object_ty)
+                                            .chain(bindings.invalid_argument_types());
                                         let settings =
                                             DisplaySettings::from_possibly_ambiguous_types(
                                                 &self.context,
@@ -2405,9 +2426,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             object of type `{}`",
                                             callable_ty.display_with(db, env, settings.clone()),
                                             slice_ty.display_with(db, env, settings.clone()),
-                                            object_ty.display_with(db, env, settings),
+                                            object_ty.display_with(db, env, settings.clone()),
                                         ));
-                                        attach_original_type_info(&mut diagnostic);
+                                        attach_original_type_info(&mut diagnostic, &settings);
                                     }
                                 }
                             }
@@ -2428,9 +2449,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         "Method `__delitem__` of type `{}` may not be \
                                         callable on object of type `{}`",
                                         callable_ty.display_with(db, env, settings.clone()),
-                                        object_ty.display_with(db, env, settings),
+                                        object_ty.display_with(db, env, settings.clone()),
                                     ));
-                                    attach_original_type_info(&mut diagnostic);
+                                    attach_original_type_info(&mut diagnostic, &settings);
                                 }
                             }
                         }

@@ -493,12 +493,13 @@ pub(crate) fn check_static_class_definitions<'db>(
                 if let Some(builder) =
                     context.report_lint(&INCONSISTENT_MRO, class.header_range(db))
                 {
-                    let settings =
-                        DisplaySettings::from_possibly_ambiguous_types(context, bases_list);
+                    let types =
+                        std::iter::once(Type::from(class)).chain(bases_list.iter().copied());
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Cannot create a consistent method resolution order (MRO) \
                                     for class `{}` with bases list `[{}]`",
-                        class.name(db),
+                        ClassLiteral::Static(class).display_with(db, settings.clone()),
                         bases_list
                             .iter()
                             .map(|base| base.display_with(db, env, settings.clone()))
@@ -644,7 +645,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     report_conflicting_metaclass_from_bases(
                         context,
                         class_node.into(),
-                        class.name(db),
+                        ClassLiteral::Static(class),
                         *metaclass1,
                         ClassBase::Class(ClassType::NonGeneric(ClassLiteral::from(*class1))),
                         *metaclass2,

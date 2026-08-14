@@ -89,7 +89,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         report_conflicting_metaclass_from_bases(
             context,
             call_expr.into(),
-            dynamic_class.name(db),
+            ClassLiteral::Dynamic(dynamic_class),
             metaclass1,
             base1,
             metaclass2,

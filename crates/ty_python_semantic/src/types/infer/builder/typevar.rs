@@ -367,13 +367,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .any(|o| default_constraint.is_equivalent_to(db, env, *o))
                             {
                                 if let Some(mut diagnostic) = inconsistent_with_constraints() {
+                                    let types = outer
+                                        .iter()
+                                        .copied()
+                                        .chain(std::iter::once(*default_constraint));
+                                    let settings = DisplaySettings::from_possibly_ambiguous_types(
+                                        &self.context,
+                                        types,
+                                    );
+                                    let constraint =
+                                        default_constraint.display_with(db, env, settings);
                                     annotate_default_definition(&mut diagnostic);
                                     if let Some(name) = name {
                                         diagnostic.set_primary_annotation_message(format_args!(
                                             "Constraint `{constraint}` of default \
                                                 `{default_name}` is not one of the constraints \
                                                 of `{name}`",
-                                            constraint = default_constraint.display(db, env),
                                         ));
                                         diagnostic.set_concise_message(format_args!(
                                             "Default `{default_name}` of TypeVar `{name}` \
@@ -381,14 +390,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 `{name}` because constraint `{constraint}` of \
                                                 `{default_name}` is not one of the constraints \
                                                 of `{name}`",
-                                            constraint = default_constraint.display(db, env),
                                         ));
                                     } else {
                                         diagnostic.set_primary_annotation_message(format_args!(
                                             "Constraint `{constraint}` of outer TypeVar default \
                                                 `{default_name}` is not one of the constraints \
                                                 of the outer TypeVar",
-                                            constraint = default_constraint.display(db, env),
                                         ));
                                         diagnostic.set_concise_message(format_args!(
                                             "Default `{default_name}` of outer TypeVar is \
@@ -396,7 +403,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             TypeVar because constraint `{constraint}` of \
                                             default `{default_name}` is not one of the \
                                             constraints of the outer TypeVar",
-                                            constraint = default_constraint.display(db, env),
                                         ));
                                     }
                                 }
@@ -409,13 +415,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(mut diagnostic) = inconsistent_with_constraints() {
                             annotate_default_definition(&mut diagnostic);
                             if let Some(default_bound) = default_typevar.upper_bound(db, env) {
+                                let types =
+                                    outer.iter().copied().chain(std::iter::once(default_bound));
+                                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                                    &self.context,
+                                    types,
+                                );
                                 diagnostic.set_primary_annotation_message(
                                     "Bounded TypeVar cannot be used as the default \
                                     for a constrained TypeVar",
                                 );
                                 diagnostic.info(format_args!(
                                     "`{default_name}` has bound `{default_bound}` but is not constrained",
-                                    default_bound = default_bound.display(db, env),
+                                    default_bound = default_bound.display_with(db, env, settings),
                                 ));
                             } else {
                                 diagnostic.set_primary_annotation_message(
@@ -457,15 +469,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .any(|c| default_ty.is_equivalent_to(db, env, *c))
                 {
                     if let Some(mut diagnostic) = inconsistent_with_constraints() {
+                        let types = constraints
+                            .elements(db)
+                            .iter()
+                            .copied()
+                            .chain(std::iter::once(default_ty));
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
+                            
+                        let default = default_ty.display_with(db, env, settings);
                         if let Some(name) = name {
                             diagnostic.set_primary_annotation_message(format_args!(
                                 "`{default}` is not one of the constraints of `{name}`",
-                                default = default_ty.display(db, env),
                             ));
                         } else {
                             diagnostic.set_primary_annotation_message(format_args!(
                                 "`{default}` is not one of the constraints",
-                                default = default_ty.display(db, env),
                             ));
                         }
                     }

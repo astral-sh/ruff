@@ -917,6 +917,22 @@ impl<'db> Bindings<'db> {
         self.elements.iter().flat_map(BindingsElement::callables)
     }
 
+    /// Returns the provided and expected types from every failed argument match.
+    pub(crate) fn invalid_argument_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.iter_flat()
+            .flatten()
+            .flat_map(Binding::errors)
+            .filter_map(|error| match error {
+                BindingError::InvalidArgumentType {
+                    provided_ty,
+                    expected_ty,
+                    ..
+                } => Some([*provided_ty, *expected_ty]),
+                _ => None,
+            })
+            .flatten()
+    }
+
     /// Returns a mutable iterator over all `CallableBinding`s, flattening the two-level structure.
     ///
     /// Note: This loses the union/intersection distinction. Use only when you need to
@@ -4621,10 +4637,19 @@ impl<'db> CallableBinding<'db> {
                         function.name(context.db())
                     ));
 
+                    let signatures = possible_overloads
+                        .iter()
+                        .take(MAXIMUM_OVERLOADS)
+                        .map(|overload| overload.signature(db));
+                    let display_settings =
+                        DisplaySettings::from_possibly_ambiguous_signatures(context, signatures);
+
                     for overload in possible_overloads.iter().take(MAXIMUM_OVERLOADS) {
                         diag.info(format_args!(
                             "  {}",
-                            overload.signature(db).display(db, env)
+                            overload
+                                .signature(db)
+                                .display_with(db, env, display_settings.clone())
                         ));
                     }
                     if possible_overloads.len() > MAXIMUM_OVERLOADS {
@@ -8892,7 +8917,7 @@ impl<'db> BindingError<'db> {
 
                 let defining_class =
                     CallableDescription::defining_class(db, callable_ty).map(Type::ClassLiteral);
-                let types = [*provided_ty, *expected_ty]
+                let types = [*provided_ty, *expected_ty, callable_ty]
                     .into_iter()
                     .chain(defining_class);
                 let display_settings = context
@@ -9008,7 +9033,11 @@ impl<'db> BindingError<'db> {
                             }
                             diag.info(format_args!(
                                 "  {}",
-                                overload.signature(db).display(db, env)
+                                overload.signature(db).display_with(
+                                    db,
+                                    env,
+                                    display_settings.clone()
+                                )
                             ));
                         }
                         if matching_overload.candidate_count() > MAXIMUM_OVERLOADS {

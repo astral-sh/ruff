@@ -130,12 +130,20 @@ fn validate_typed_dict_field_overrides<'db>(
                 .then(|| child_field.first_declaration())
                 .flatten();
 
+            let types = direct_bases.iter().map(Type::from).chain([
+                Type::from(class),
+                child_field.declared_ty,
+                base_field.declared_ty,
+            ]);
+            let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
             report_typed_dict_field_override(
                 context,
                 class,
                 field_name.as_str(),
                 &reason,
-                base.name(db),
+                *base,
+                &settings,
                 base_field.first_declaration(),
                 own_field_definition,
                 inherited_field_definition,
@@ -400,7 +408,11 @@ enum TypedDictFieldOverrideReason<'db> {
 }
 
 impl<'db> TypedDictFieldOverrideReason<'db> {
-    fn display<'a>(&'a self, context: &'a InferContext<'db, '_>) -> impl std::fmt::Display + 'a {
+    fn display<'a>(
+        &'a self,
+        context: &'a InferContext<'db, '_>,
+        settings: &'a DisplaySettings<'db>,
+    ) -> impl std::fmt::Display + 'a {
         let db = context.db();
         let env = context.program_environment();
 
@@ -424,23 +436,19 @@ impl<'db> TypedDictFieldOverrideReason<'db> {
                 )
             }
             Self::ReadOnlyTypeNotAssignable { child_ty, base_ty } => {
-                let settings =
-                    DisplaySettings::from_possibly_ambiguous_types(context, [base_ty, child_ty]);
                 write!(
                     f,
                     "Inherited read-only field type `{}` is not assignable from `{}`",
                     base_ty.display_with(db, env, settings.clone()),
-                    child_ty.display_with(db, env, settings),
+                    child_ty.display_with(db, env, settings.clone()),
                 )
             }
             Self::MutableTypeIncompatible { child_ty, base_ty } => {
-                let settings =
-                    DisplaySettings::from_possibly_ambiguous_types(context, [base_ty, child_ty]);
                 write!(
                     f,
                     "Inherited mutable field type `{}` is incompatible with `{}`",
                     base_ty.display_with(db, env, settings.clone()),
-                    child_ty.display_with(db, env, settings),
+                    child_ty.display_with(db, env, settings.clone()),
                 )
             }
         })
@@ -505,7 +513,8 @@ fn report_typed_dict_field_override<'db>(
     class: StaticClassLiteral<'db>,
     field_name: &str,
     reason: &TypedDictFieldOverrideReason<'db>,
-    base_name: &str,
+    base: ClassType<'db>,
+    settings: &DisplaySettings<'db>,
     base_definition: Option<Definition<'db>>,
     own_field_definition: Option<Definition<'db>>,
     inherited_field_definition: Option<Definition<'db>>,
@@ -533,7 +542,7 @@ fn report_typed_dict_field_override<'db>(
         ))
     };
 
-    diagnostic.set_primary_annotation_message(reason.display(context));
+    diagnostic.set_primary_annotation_message(reason.display(context, settings));
 
     if own_field_definition.is_none() {
         add_definition_subdiagnostic(
@@ -548,7 +557,10 @@ fn report_typed_dict_field_override<'db>(
         db,
         &mut diagnostic,
         base_definition,
-        format_args!("Inherited field `{field_name}` declared here on base `{base_name}`"),
+        format_args!(
+            "Inherited field `{field_name}` declared here on base `{}`",
+            base.class_literal(db).display_with(db, settings.clone())
+        ),
     );
 }
 

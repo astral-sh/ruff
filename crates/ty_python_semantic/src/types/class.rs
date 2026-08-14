@@ -2522,6 +2522,12 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     }
 }
 
+impl<'db> From<&ClassType<'db>> for Type<'db> {
+    fn from(value: &ClassType<'db>) -> Self {
+        Type::from(*value)
+    }
+}
+
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
     fn variance_of(
         self,

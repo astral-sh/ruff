@@ -300,7 +300,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 report_conflicting_metaclass_from_bases(
                     &self.context,
                     call_expr.into(),
-                    dynamic_class.name(db),
+                    ClassLiteral::Dynamic(dynamic_class),
                     metaclass1,
                     base1,
                     metaclass2,

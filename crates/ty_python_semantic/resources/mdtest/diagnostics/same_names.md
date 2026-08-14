@@ -432,6 +432,60 @@ info: Function defined here
   |         ^^^^^^^       ------------- Parameter declared here
 ```
 
+## Method and constructor descriptions
+
+Call diagnostics distinguish the class that defines a method or constructor from a same-named
+parameter type.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+import first
+
+class Model:
+    def __init__(self, value: first.Model) -> None: ...
+    def method(self, value: first.Model) -> None: ...
+```
+
+```py
+import second
+
+def calls(value: second.Model) -> None:
+    value.method(1)  # snapshot: invalid-argument-type
+    second.Model(1)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `second.Model.method` is incorrect
+ --> src/mdtest_snippet.py:4:18
+  |
+4 |     value.method(1)  # snapshot: invalid-argument-type
+  |                  ^ Expected `first.Model`, found `Literal[1]`
+info: Method defined here
+ --> src/second.py:5:9
+  |
+5 |     def method(self, value: first.Model) -> None: ...
+  |         ^^^^^^       ------------------ Parameter declared here
+
+
+error[invalid-argument-type]: Argument to `second.Model.__init__` is incorrect
+ --> src/mdtest_snippet.py:5:18
+  |
+5 |     second.Model(1)  # snapshot: invalid-argument-type
+  |                  ^ Expected `first.Model`, found `Literal[1]`
+info: Method defined here
+ --> src/second.py:4:9
+  |
+4 |     def __init__(self, value: first.Model) -> None: ...
+  |         ^^^^^^^^       ------------------ Parameter declared here
+```
+
 ## Function defaults, assertions, and narrowing
 
 The expected and actual types remain distinct in parameter defaults, `assert_type`, and `TypeIs`
@@ -525,6 +579,14 @@ requires_constraint(second.Model())
 
 # error: [invalid-type-variable-default] "upper bound `second.Model` is not assignable to `first.Model`"
 def invalid_default[First: second.Model, Second: first.Model = First]() -> None: ...
+def invalid_constrained_default[
+    First: (second.Model, int),
+    # error: [invalid-type-variable-default] "constraint `second.Model` of `First` is not one of the constraints of `Second`"
+    Second: (first.Model, int) = First,
+]() -> None: ...
+
+# error: [invalid-type-variable-default] "`second.Model` is not one of the constraints of `T`"
+def invalid_concrete_default[T: (first.Model, int) = second.Model]() -> None: ...
 ```
 
 ## Inconsistent generic bases
@@ -614,6 +676,69 @@ class ChildExtras(BaseExtras, extra_items=second.Model): ...
 # error: [invalid-typed-dict-header] "Item `item` of type `second.Model` is not assignable to extra items type `first.Model`"
 class ChildField(BaseExtras):
     item: second.Model
+```
+
+## TypedDict inheritance annotations
+
+Field-override annotations distinguish a child from a same-named base and distinguish conflicting
+bases that have the same name.
+
+`first.py`:
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    item: int
+```
+
+`second.py`:
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    item: str
+```
+
+```py
+import first
+import second
+
+class Merged(first.Record, second.Record): ...  # snapshot: invalid-typed-dict-field
+
+class Record(first.Record):
+    item: str  # snapshot: invalid-typed-dict-field
+```
+
+```snapshot
+error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `item` while merging base classes
+ --> src/mdtest_snippet.py:4:7
+  |
+4 | class Merged(first.Record, second.Record): ...  # snapshot: invalid-typed-dict-field
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
+info: Field declaration
+ --> src/first.py:4:5
+  |
+4 |     item: int
+  |     --------- Field `item` already inherited from another base here
+info: Field declaration
+ --> src/second.py:4:5
+  |
+4 |     item: str
+  |     --------- Inherited field `item` declared here on base `second.Record`
+
+
+error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `item`
+ --> src/mdtest_snippet.py:7:5
+  |
+7 |     item: str  # snapshot: invalid-typed-dict-field
+  |     ^^^^^^^^^ Inherited mutable field type `int` is incompatible with `str`
+info: Field declaration
+ --> src/first.py:4:5
+  |
+4 |     item: int
+  |     --------- Inherited field `item` declared here on base `first.Record`
 ```
 
 ## TypedDict inheritance openness
@@ -1197,6 +1322,107 @@ info: parameter `value` has an incompatible type: `first.Model` is not assignabl
 info: Overload returns `first.Model`, which is not assignable to implementation return type `second.Model`
 ```
 
+## Overload call candidates
+
+Diagnostics for calls that do not match any overload distinguish same-named parameter types across
+all candidate signatures.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+from typing import overload
+
+import first
+import second
+
+@overload
+def unmatched(value: first.Model) -> None: ...
+@overload
+def unmatched(value: second.Model) -> None: ...
+def unmatched(value: first.Model | second.Model) -> None: ...
+
+unmatched(1)  # snapshot: no-matching-overload
+```
+
+```snapshot
+error[no-matching-overload]: No overload of function `unmatched` matches arguments
+  --> src/mdtest_snippet.py:12:1
+   |
+12 | unmatched(1)  # snapshot: no-matching-overload
+   | ^^^^^^^^^^^^
+info: First overload defined here
+ --> src/mdtest_snippet.py:6:1
+  |
+6 | / @overload
+7 | | def unmatched(value: first.Model) -> None: ...
+  | |______________________________________________^ First overload defined here
+info: Possible overloads for function `unmatched`:
+info:   (value: first.Model) -> None
+info:   (value: second.Model) -> None
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:10:5
+   |
+10 | def unmatched(value: first.Model | second.Model) -> None: ...
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Non-matching overload candidates
+
+When one overload matches the number of arguments but rejects an argument's type, the remaining
+candidate signatures remain consistent with the expected and actual argument types.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+from typing import overload
+
+import first
+import second
+
+@overload
+def partial(value: first.Model, extra: int) -> None: ...
+@overload
+def partial(value: second.Model) -> None: ...
+def partial(value: first.Model | second.Model, extra: int | None = None) -> None: ...
+
+partial(second.Model(), 1)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `partial` is incorrect
+  --> src/mdtest_snippet.py:12:9
+   |
+12 | partial(second.Model(), 1)  # snapshot: invalid-argument-type
+   |         ^^^^^^^^^^^^^^ Expected `first.Model`, found `second.Model`
+info: Matching overload defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | def partial(value: first.Model, extra: int) -> None: ...
+  |     ^^^^^^^ ------------------ Parameter declared here
+info: Non-matching overloads for function `partial`:
+info:   (value: second.Model) -> None
+```
+
 ## Invalid super arguments
 
 Diagnostics for invalid `super()` arguments distinguish both arguments and same-named types nested
@@ -1301,7 +1527,8 @@ error[invalid-assignment]: Invalid subscript assignment with key of type `second
 
 ## Subscript operations on same-named union members
 
-Subscript assignment and deletion identify the union member that lacks the corresponding method.
+Subscript reads, assignments, and deletions identify the union member that lacks the corresponding
+method.
 
 `first.py`:
 
@@ -1313,6 +1540,8 @@ class Container: ...
 
 ```py
 class Container:
+    def __getitem__(self, key: int) -> int:
+        return 0
     def __setitem__(self, key: int, value: int) -> None: ...
     def __delitem__(self, key: int) -> None: ...
 ```
@@ -1327,6 +1556,10 @@ def assignment(value: first.Container | second.Container) -> None:
 def deletion(value: first.Container | second.Container) -> None:
     # error: [not-subscriptable] "Cannot delete subscript on object of type `first.Container` with no `__delitem__` method"
     del value[0]
+
+def read(value: first.Container | second.Container) -> int:
+    # error: [not-subscriptable] "Cannot subscript object of type `first.Container` with no `__getitem__` method"
+    return value[0]
 ```
 
 ```snapshot
@@ -1337,6 +1570,227 @@ error[invalid-assignment]: Cannot assign to a subscript on an object of type `fi
   |     ^^^^^^^^
 info: The full type of the subscripted object is `first.Container | second.Container`
 help: Consider adding a `__setitem__` method to `first.Container`.
+```
+
+## Subscript assignments with invalid calls on same-named union members
+
+Subscript assignment diagnostics distinguish the union members and the incompatible argument types
+passed to their `__setitem__` methods.
+
+`first.py`:
+
+```py
+class Model: ...
+
+class Container:
+    def __setitem__(self, key: int, value: Model) -> None: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+
+class Container:
+    def __setitem__(self, key: int, value: Model) -> None: ...
+```
+
+```py
+import first
+import second
+
+def assignment(value: first.Container | second.Container, item: second.Model) -> None:
+    value[0] = item  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal[0]` and value of type `second.Model` on object of type `first.Container`
+ --> src/mdtest_snippet.py:5:5
+  |
+5 |     value[0] = item  # snapshot: invalid-assignment
+  |     ^^^^^^^^^^^^^^^
+info: The full type of the subscripted object is `first.Container | second.Container`
+```
+
+## Subscript deletions with invalid calls on same-named union members
+
+Subscript deletion diagnostics distinguish the receiver, expected key type, and provided key type.
+
+`first.py`:
+
+```py
+class Model: ...
+
+class Container:
+    def __delitem__(self, key: Model) -> None: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+
+class Container:
+    def __delitem__(self, key: Model) -> None: ...
+```
+
+```py
+import first
+import second
+
+def delete(value: first.Container | second.Container, key: second.Model) -> None:
+    del value[key]  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Method `__delitem__` of type `bound method first.Container.__delitem__(key: first.Model) -> None` cannot be called with key of type `second.Model` on object of type `first.Container`
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     del value[key]  # snapshot: invalid-argument-type
+  |         ^^^^^^^^^^
+info: The full type of the subscripted object is `first.Container | second.Container`
+```
+
+## Possibly missing subscript methods
+
+Diagnostics identify the union member whose assignment or deletion method is only conditionally
+defined.
+
+`first.py`:
+
+```py
+def condition() -> bool:
+    return False
+
+class Container:
+    if condition():
+        def __setitem__(self, key: int, value: int) -> None: ...
+        def __delitem__(self, key: int) -> None: ...
+```
+
+`second.py`:
+
+```py
+class Container:
+    def __setitem__(self, key: int, value: int) -> None: ...
+    def __delitem__(self, key: int) -> None: ...
+```
+
+```py
+import first
+import second
+
+def assign(value: first.Container | second.Container) -> None:
+    # error: [possibly-missing-implicit-call] "Method `__setitem__` of type `first.Container` may be missing"
+    value[0] = 1
+
+def delete(value: first.Container | second.Container) -> None:
+    # error: [possibly-missing-implicit-call] "Method `__delitem__` of type `first.Container` may be missing"
+    del value[0]
+```
+
+## Full subscripted-object annotations
+
+The full-object note uses the same class names as the primary subscript-assignment or deletion
+diagnostic, even when the union itself contains only one class with that name.
+
+`first.py`:
+
+```py
+from __future__ import annotations
+
+class Container:
+    def __setitem__(self, key: int, value: Container) -> None: ...
+    def __delitem__(self, key: Container) -> None: ...
+```
+
+`second.py`:
+
+```py
+class Container: ...
+```
+
+```py
+import first
+import second
+
+class Other:
+    def __setitem__(self, key: int, value: second.Container) -> None: ...
+    def __delitem__(self, key: second.Container) -> None: ...
+
+def assign(value: first.Container | Other, item: second.Container) -> None:
+    value[0] = item  # snapshot: invalid-assignment
+
+def delete(value: first.Container | Other, key: second.Container) -> None:
+    del value[key]  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal[0]` and value of type `second.Container` on object of type `first.Container`
+ --> src/mdtest_snippet.py:9:5
+  |
+9 |     value[0] = item  # snapshot: invalid-assignment
+  |     ^^^^^^^^^^^^^^^
+info: The full type of the subscripted object is `first.Container | Other`
+
+
+error[invalid-argument-type]: Method `__delitem__` of type `bound method first.Container.__delitem__(key: first.Container) -> None` cannot be called with key of type `second.Container` on object of type `first.Container`
+  --> src/mdtest_snippet.py:12:9
+   |
+12 |     del value[key]  # snapshot: invalid-argument-type
+   |         ^^^^^^^^^^
+info: The full type of the subscripted object is `first.Container | Other`
+```
+
+## TypedDict union key deletions
+
+Deleting a required key from a union identifies each same-named TypedDict in its own diagnostic and
+field annotation.
+
+`first.py`:
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    item: int
+```
+
+`second.py`:
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    item: int
+```
+
+```py
+import first
+import second
+
+def delete(value: first.Record | second.Record) -> None:
+    # error: [invalid-argument-type] "from TypedDict `second.Record`"
+    del value["item"]  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Cannot delete required key "item" from TypedDict `first.Record`
+ --> src/mdtest_snippet.py:6:15
+  |
+6 |     del value["item"]  # snapshot: invalid-argument-type
+  |               ^^^^^^
+info: Field defined here
+ --> src/first.py:3:7
+  |
+3 | class Record(TypedDict):
+  |       ----------------- `first.Record` defined here
+4 |     item: int
+  |     ---------
+  |     |
+  |     `item` declared as required here
+  |     Consider making it `NotRequired`
+info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
 ```
 
 ## Identifying union members
@@ -1395,6 +1849,50 @@ error[invalid-context-manager]: Object of type `first.Context | second.Context` 
 9 |     with value:  # snapshot: invalid-context-manager
   |          ^^^^^
 info: `second.Context` does not implement `__enter__` or `__exit__`
+```
+
+## Invalid boolean conversion return types
+
+Boolean-conversion diagnostics distinguish the object being converted from a same-named class
+returned by its `__bool__` method.
+
+`first.py`:
+
+```py
+import second
+
+class Model:
+    def __bool__(self) -> second.Model:
+        return second.Model()
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+
+def condition(value: first.Model) -> None:
+    if value:  # snapshot: unsupported-bool-conversion
+        pass
+```
+
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `first.Model`
+ --> src/mdtest_snippet.py:4:8
+  |
+4 |     if value:  # snapshot: unsupported-bool-conversion
+  |        ^^^^^
+info: `second.Model` is not assignable to `bool`
+ --> src/first.py:4:27
+  |
+4 |     def __bool__(self) -> second.Model:
+  |         --------          ^^^^^^^^^^^^ Incorrect return type
+  |         |
+  |         Method defined here
 ```
 
 ## Async context managers with same-named return types
@@ -1494,7 +1992,7 @@ info: Its `__aiter__` method returns an object of type `second.AsyncIterable`, w
 ## Class inheritance conflicts
 
 Diagnostics for MRO failures, conflicting metaclasses, and incompatible instance layouts distinguish
-same-named classes across every displayed base.
+same-named derived classes, base classes, and metaclasses.
 
 `first.py`:
 
@@ -1504,6 +2002,7 @@ class Second: ...
 class Conflict(First, Second): ...
 class Meta(type): ...
 class Custom(metaclass=Meta): ...
+class Explicit(metaclass=Meta): ...
 
 class Layout:
     __slots__ = ("first",)
@@ -1529,11 +2028,20 @@ import second
 # error: [inconsistent-mro] "bases list `[<class 'first.Conflict'>, <class 'second.Conflict'>]`"
 class BadMro(first.Conflict, second.Conflict): ...
 
+# error: [inconsistent-mro] "for class `mdtest_snippet.Conflict` with bases list `[<class 'first.Conflict'>, <class 'second.Conflict'>]`"
+class Conflict(first.Conflict, second.Conflict): ...
+
 # error: [inconsistent-mro] "bases `[<class 'first.Conflict'>, <class 'second.Conflict'>]`"
 BadDynamicMro = type("BadDynamicMro", (first.Conflict, second.Conflict), {})
 
 # error: [conflicting-metaclass] "`first.Meta` (metaclass of base class `first.Custom`) and `second.Meta` (metaclass of base class `second.Custom`)"
 class BadMetaclass(first.Custom, second.Custom): ...
+
+# error: [conflicting-metaclass] "derived class (`mdtest_snippet.Custom`)"
+class Custom(first.Custom, second.Custom): ...
+
+# error: [conflicting-metaclass] "`second.Meta` (metaclass of `mdtest_snippet.Explicit`) and `first.Meta` (metaclass of base class `first.Explicit`)"
+class Explicit(first.Explicit, metaclass=second.Meta): ...
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`BadDynamicMetaclass`) must be a subclass of the metaclasses of all its bases, but `first.Meta` (metaclass of base class `first.Custom`) and `second.Meta` (metaclass of base class `second.Custom`) have no subclass relationship"
 BadDynamicMetaclass = type("BadDynamicMetaclass", (first.Custom, second.Custom), {})

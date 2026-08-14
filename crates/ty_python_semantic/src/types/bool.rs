@@ -462,15 +462,17 @@ impl<'db> BoolError<'db> {
                 not_boolable_type,
                 return_type,
             } => {
+                let types = [not_boolable_type, return_type];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{not_boolable}`",
-                    not_boolable = not_boolable_type.display(db, env),
+                    not_boolable = not_boolable_type.display_with(db, env, settings.clone()),
                 ));
                 let mut sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(
                         "`{return_type}` is not assignable to `bool`",
-                        return_type = return_type.display(db, env),
+                        return_type = return_type.display_with(db, env, settings),
                     ),
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type

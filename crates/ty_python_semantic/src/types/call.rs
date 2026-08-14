@@ -317,19 +317,7 @@ impl<'db> CallError<'db> {
 
     /// Returns the provided and expected types from every failed argument match.
     pub(crate) fn invalid_argument_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        self.1
-            .iter_flat()
-            .flatten()
-            .flat_map(bind::Binding::errors)
-            .filter_map(|error| match error {
-                BindingError::InvalidArgumentType {
-                    provided_ty,
-                    expected_ty,
-                    ..
-                } => Some([*provided_ty, *expected_ty]),
-                _ => None,
-            })
-            .flatten()
+        self.1.invalid_argument_types()
     }
 
     /// Returns `Some(property)` if the call error was caused by an attempt to read a property

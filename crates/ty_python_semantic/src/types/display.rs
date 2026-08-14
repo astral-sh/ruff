@@ -1,7 +1,7 @@
 //! Display implementations for types.
 
 use crate::ProgramEnvironment;
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
@@ -287,11 +287,11 @@ impl<'db> DisplaySettings<'db> {
     #[must_use]
     pub(crate) fn from_possibly_ambiguous_signatures(
         context: &InferContext<'db, '_>,
-        signatures: impl IntoIterator<Item = &'db Signature<'db>>,
+        signatures: impl IntoIterator<Item = impl Borrow<Signature<'db>>>,
     ) -> Self {
         let collector = AmbiguousNameCollector::new(context.program_environment());
         for signature in signatures {
-            walk_signature(context.db(), signature, &collector);
+            walk_signature(context.db(), signature.borrow(), &collector);
         }
         collector.into_display_settings()
     }
