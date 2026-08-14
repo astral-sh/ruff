@@ -61,7 +61,21 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// Inspects type-alias arguments without evaluating lazy alias bodies or other metadata.
+    /// Returns whether this type might reference `typevar_id`, including type-alias arguments.
+    ///
+    /// Other non-lazy type-variable visitors stop at type aliases because inspecting an alias's
+    /// value can trigger lazy inference or expand a recursive definition. Receiver specialization
+    /// still needs to notice `T` in `Alias[T]`, so this visitor inspects the already-available
+    /// specialization arguments without evaluating the alias body.
+    ///
+    /// This deliberately over-approximates: `type Alias[T] = int` does not actually depend on
+    /// `T`, and specialization can also erase an argument. That can cause an unnecessary
+    /// receiver-specialization attempt, but actual receiver constraints are still solved before
+    /// changing the signature. Applying the same traversal to visitors that use type-variable
+    /// occurrences to drive inference or diagnostics can instead change behavior.
+    ///
+    /// TODO: Explore whether other type-variable visitors can safely inspect alias arguments,
+    /// accounting for unused parameters and arguments erased by specialization.
     pub(crate) fn references_typevar_through_aliases(
         self,
         db: &'db dyn Db,
