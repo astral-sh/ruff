@@ -315,6 +315,23 @@ impl<'db> CallError<'db> {
         self.1.return_type(db, env)
     }
 
+    /// Returns the provided and expected types from every failed argument match.
+    pub(crate) fn invalid_argument_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.1
+            .iter_flat()
+            .flatten()
+            .flat_map(bind::Binding::errors)
+            .filter_map(|error| match error {
+                BindingError::InvalidArgumentType {
+                    provided_ty,
+                    expected_ty,
+                    ..
+                } => Some([*provided_ty, *expected_ty]),
+                _ => None,
+            })
+            .flatten()
+    }
+
     /// Returns `Some(property)` if the call error was caused by an attempt to read a property
     /// that has no getter, and `None` otherwise.
     pub(crate) fn as_attempt_to_get_property_with_no_getter(
@@ -373,7 +390,7 @@ impl<'db> CallError<'db> {
         &self,
         context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
-        overrides: &CallDiagnosticOverride<'_>,
+        overrides: &CallDiagnosticOverride<'db, '_>,
     ) {
         self.1
             .report_diagnostics_with_override(context, node, overrides);

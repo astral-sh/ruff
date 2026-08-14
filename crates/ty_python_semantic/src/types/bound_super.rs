@@ -108,21 +108,33 @@ impl<'db> BoundSuperError<'db> {
             } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     let env = context.program_environment();
+
+                    let types = [*pivot_class, *owner_type].into_iter().chain(
+                        typevar_context.map(|context| context.bound_or_constraints_type(db, env)),
+                    );
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     if let Some(typevar_context) = typevar_context {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "`{owner}` is a type variable \
                             with an abstract/structural type as its bounds or constraints, \
                             in `super({pivot_class}, {owner})` call",
-                            pivot_class = pivot_class.display(db, env),
-                            owner = owner_type.display(db, env),
+                            pivot_class = pivot_class.display_with(db, env, settings.clone()),
+                            owner = owner_type.display_with(db, env, settings.clone()),
                         ));
-                        Self::describe_typevar(db, env, &mut diagnostic, *typevar_context);
+                        Self::describe_typevar(
+                            db,
+                            env,
+                            &settings,
+                            &mut diagnostic,
+                            *typevar_context,
+                        );
                     } else {
                         builder.into_diagnostic(format_args!(
                             "`{owner}` is an abstract/structural type in \
                             `super({pivot_class}, {owner})` call",
-                            pivot_class = pivot_class.display(db, env),
-                            owner = owner_type.display(db, env),
+                            pivot_class = pivot_class.display_with(db, env, settings.clone()),
+                            owner = owner_type.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -134,7 +146,7 @@ impl<'db> BoundSuperError<'db> {
                         Type::GenericAlias(alias) => {
                             builder.into_diagnostic(format_args!(
                                 "`types.GenericAlias` instance `{}` is not a valid class",
-                                alias.display_with(db, env, DisplaySettings::default(),),
+                                alias.display(db, env),
                             ));
                         }
                         _ => {
@@ -159,21 +171,33 @@ impl<'db> BoundSuperError<'db> {
             } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     let env = context.program_environment();
+
+                    let types = [*pivot_class, *owner].into_iter().chain(
+                        typevar_context.map(|context| context.bound_or_constraints_type(db, env)),
+                    );
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "`{owner}` is not an instance or subclass of \
                         `{pivot_class}` in `super({pivot_class}, {owner})` call",
-                        pivot_class = pivot_class.display(db, env),
-                        owner = owner.display(db, env),
+                        pivot_class = pivot_class.display_with(db, env, settings.clone()),
+                        owner = owner.display_with(db, env, settings.clone()),
                     ));
                     if let Some(typevar_context) = typevar_context {
-                        Self::describe_typevar(db, env, &mut diagnostic, *typevar_context);
+                        Self::describe_typevar(
+                            db,
+                            env,
+                            &settings,
+                            &mut diagnostic,
+                            *typevar_context,
+                        );
                         diagnostic.info(format_args!(
                             "`{bounds_or_constraints}` is not an instance or subclass of \
                              `{pivot_class}`",
                             bounds_or_constraints = typevar_context
                                 .bound_or_constraints_type(db, env)
-                                .display(db, env),
-                            pivot_class = pivot_class.display(db, env),
+                                .display_with(db, env, settings.clone()),
+                            pivot_class = pivot_class.display_with(db, env, settings),
                         ));
                         let typevar = typevar_context.typevar(context.db());
                         if typevar_context.has_implicit_upper_bound(db, env) {
@@ -202,6 +226,7 @@ impl<'db> BoundSuperError<'db> {
     fn describe_typevar(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        settings: &DisplaySettings<'db>,
         diagnostic: &mut Diagnostic,
         type_var_context: TypeVarOwnerContext<'db>,
     ) -> Type<'db> {
@@ -218,7 +243,7 @@ impl<'db> BoundSuperError<'db> {
                 diagnostic.info(format_args!(
                     "Type variable `{}` has upper bound `{}`",
                     type_var.name(db),
-                    bound.display(db, env)
+                    bound.display_with(db, env, settings.clone())
                 ));
                 bound
             }
@@ -229,7 +254,7 @@ impl<'db> BoundSuperError<'db> {
                     constraints
                         .elements(db)
                         .iter()
-                        .map(|c| c.display(db, env))
+                        .map(|constraint| constraint.display_with(db, env, settings.clone()))
                         .join(", ")
                 ));
                 constraints.as_type(db, env)

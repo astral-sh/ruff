@@ -1,4 +1,3 @@
-use crate::ProgramEnvironment;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
@@ -10,7 +9,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     types::{
-        ClassType, StaticClassLiteral, Type, TypedDictType,
+        ClassLiteral, ClassType, DisplaySettings, StaticClassLiteral, Type, TypedDictType,
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
@@ -103,7 +102,6 @@ fn validate_typed_dict_field_overrides<'db>(
     direct_bases: &[ClassType<'db>],
 ) {
     let db = context.db();
-    let env = context.program_environment();
     let child_fields = TypedDictType::new(class.identity_specialization(db)).items(db);
     let own_fields = class.own_fields(db, None, CodeGeneratorKind::TypedDict);
     let mut reported_fields = FxHashSet::default();
@@ -115,7 +113,7 @@ fn validate_typed_dict_field_overrides<'db>(
             };
 
             let Some(reason) =
-                TypedDictFieldOverrideReason::from_fields(db, env, child_field, base_field)
+                TypedDictFieldOverrideReason::from_fields(context, child_field, base_field)
             else {
                 continue;
             };
@@ -178,15 +176,19 @@ fn validate_typed_dict_openness<'db>(
             TypedDictOpenness::ImplicitlyOpen => {}
             TypedDictOpenness::Closed => {
                 if !child_openness.is_closed() {
+                    let types = [Type::from(class), Type::from(*base)];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "TypedDict `{}` must remain closed because base `{}` is closed",
-                            class.name(db),
-                            base.name(db),
+                            ClassLiteral::Static(class).display_with(db, settings.clone()),
+                            base.class_literal(db).display_with(db, settings),
                         ),
                     );
+
                     continue;
                 }
 
@@ -207,15 +209,20 @@ fn validate_typed_dict_openness<'db>(
             TypedDictOpenness::Extra(base_extra_items) if base_extra_items.is_read_only() => {
                 match child_openness {
                     TypedDictOpenness::ImplicitlyOpen => {
+                        let types = [Type::from(class), Type::from(*base)];
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                         report_invalid_typed_dict_openness(
                             context,
                             class,
                             format_args!(
                                 "TypedDict `{}` cannot be open because base `{}` has extra items",
-                                class.name(db),
-                                base.name(db),
+                                ClassLiteral::Static(class).display_with(db, settings.clone()),
+                                base.class_literal(db).display_with(db, settings),
                             ),
                         );
+
                         continue;
                     }
                     TypedDictOpenness::Closed => {}
@@ -225,16 +232,23 @@ fn validate_typed_dict_openness<'db>(
                             env,
                             base_extra_items.declared_ty,
                         ) {
+                            let child_type = child_extra_items.declared_ty;
+                            let base_type = base_extra_items.declared_ty;
+                            let types = [child_type, base_type, Type::from(*base)];
+                            let settings =
+                                DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                             report_invalid_typed_dict_openness(
                                 context,
                                 class,
                                 format_args!(
                                     "Extra items type `{}` is not assignable to `{}` from base `{}`",
-                                    child_extra_items.declared_ty.display(db, env),
-                                    base_extra_items.declared_ty.display(db, env),
-                                    base.name(db),
+                                    child_type.display_with(db, env, settings.clone()),
+                                    base_type.display_with(db, env, settings.clone()),
+                                    base.class_literal(db).display_with(db, settings),
                                 ),
                             );
+
                             continue;
                         }
                     }
@@ -248,29 +262,38 @@ fn validate_typed_dict_openness<'db>(
                             base_extra_items.declared_ty,
                         )
                 }) {
+                    let field_type = field.declared_ty;
+                    let base_type = base_extra_items.declared_ty;
+                    let types = [field_type, base_type, Type::from(*base)];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "Item `{field_name}` of type `{}` is not assignable to extra items type `{}` from base `{}`",
-                            field.declared_ty.display(db, env),
-                            base_extra_items.declared_ty.display(db, env),
-                            base.name(db),
+                            field_type.display_with(db, env, settings.clone()),
+                            base_type.display_with(db, env, settings.clone()),
+                            base.class_literal(db).display_with(db, settings),
                         ),
                     );
                 }
             }
             TypedDictOpenness::Extra(base_extra_items) => {
                 let Some(child_extra_items) = child_openness.explicit_extra_items() else {
+                    let types = [Type::from(class), Type::from(*base)];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "TypedDict `{}` must preserve mutable extra items from base `{}`",
-                            class.name(db),
-                            base.name(db),
+                            ClassLiteral::Static(class).display_with(db, settings.clone()),
+                            base.class_literal(db).display_with(db, settings),
                         ),
                     );
+
                     continue;
                 };
 
@@ -286,16 +309,26 @@ fn validate_typed_dict_openness<'db>(
                         child_extra_items.declared_ty,
                     )
                 {
+                    let types = [
+                        Type::from(class),
+                        Type::from(*base),
+                        base_extra_items.declared_ty,
+                    ];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "TypedDict `{}` must preserve mutable extra items type `{}` from base `{}`",
-                            class.name(db),
-                            base_extra_items.declared_ty.display(db, env),
-                            base.name(db),
+                            ClassLiteral::Static(class).display_with(db, settings.clone()),
+                            base_extra_items
+                                .declared_ty
+                                .display_with(db, env, settings.clone()),
+                            base.class_literal(db).display_with(db, settings),
                         ),
                     );
+
                     continue;
                 }
 
@@ -314,13 +347,18 @@ fn validate_typed_dict_openness<'db>(
                                 field.declared_ty,
                             ))
                 }) {
+                    let types = [base_extra_items.declared_ty, Type::from(*base)];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "Item `{field_name}` must be mutable, not required, and consistent with extra items type `{}` from base `{}`",
-                            base_extra_items.declared_ty.display(db, env),
-                            base.name(db),
+                            base_extra_items
+                                .declared_ty
+                                .display_with(db, env, settings.clone()),
+                            base.class_literal(db).display_with(db, settings),
                         ),
                     );
                 }
@@ -351,23 +389,22 @@ enum TypedDictFieldOverrideReason<'db> {
     MutableNotRequiredFieldMadeRequired,
     /// A read-only inherited field's new type is not assignable to the base type.
     ReadOnlyTypeNotAssignable {
-        db: &'db dyn Db,
-        env: ProgramEnvironment<'db>,
         child_ty: Type<'db>,
         base_ty: Type<'db>,
     },
     /// A mutable inherited field's new type is not mutually assignable with the base type.
     MutableTypeIncompatible {
-        db: &'db dyn Db,
-        env: ProgramEnvironment<'db>,
         child_ty: Type<'db>,
         base_ty: Type<'db>,
     },
 }
 
-impl std::fmt::Display for TypedDictFieldOverrideReason<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
+impl<'db> TypedDictFieldOverrideReason<'db> {
+    fn display<'a>(&'a self, context: &'a InferContext<'db, '_>) -> impl std::fmt::Display + 'a {
+        let db = context.db();
+        let env = context.program_environment();
+
+        std::fmt::from_fn(move |f| match self {
             Self::RequiredFieldMadeNotRequired => {
                 write!(
                     f,
@@ -386,36 +423,31 @@ impl std::fmt::Display for TypedDictFieldOverrideReason<'_> {
                     "Mutable inherited `NotRequired` fields cannot be redeclared as required"
                 )
             }
-            Self::ReadOnlyTypeNotAssignable {
-                db,
-                env,
-                child_ty,
-                base_ty,
-            } => write!(
-                f,
-                "Inherited read-only field type `{}` is not assignable from `{}`",
-                base_ty.display(*db, env),
-                child_ty.display(*db, env),
-            ),
-            Self::MutableTypeIncompatible {
-                db,
-                env,
-                child_ty,
-                base_ty,
-            } => write!(
-                f,
-                "Inherited mutable field type `{}` is incompatible with `{}`",
-                base_ty.display(*db, env),
-                child_ty.display(*db, env),
-            ),
-        }
+            Self::ReadOnlyTypeNotAssignable { child_ty, base_ty } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(context, [base_ty, child_ty]);
+                write!(
+                    f,
+                    "Inherited read-only field type `{}` is not assignable from `{}`",
+                    base_ty.display_with(db, env, settings.clone()),
+                    child_ty.display_with(db, env, settings),
+                )
+            }
+            Self::MutableTypeIncompatible { child_ty, base_ty } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(context, [base_ty, child_ty]);
+                write!(
+                    f,
+                    "Inherited mutable field type `{}` is incompatible with `{}`",
+                    base_ty.display_with(db, env, settings.clone()),
+                    child_ty.display_with(db, env, settings),
+                )
+            }
+        })
     }
-}
 
-impl<'db> TypedDictFieldOverrideReason<'db> {
     fn from_fields(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        context: &InferContext<'db, '_>,
         child_field: &TypedDictField<'db>,
         base_field: &TypedDictField<'db>,
     ) -> Option<Self> {
@@ -432,6 +464,9 @@ impl<'db> TypedDictFieldOverrideReason<'db> {
                 return Some(Self::MutableNotRequiredFieldMadeRequired);
             }
         }
+
+        let db = context.db();
+        let env = context.program_environment();
 
         let types_are_compatible = if base_field.is_read_only() {
             child_field
@@ -452,15 +487,11 @@ impl<'db> TypedDictFieldOverrideReason<'db> {
 
         Some(if base_field.is_read_only() {
             Self::ReadOnlyTypeNotAssignable {
-                db,
-                env: env.clone(),
                 child_ty: child_field.declared_ty,
                 base_ty: base_field.declared_ty,
             }
         } else {
             Self::MutableTypeIncompatible {
-                db,
-                env: env.clone(),
                 child_ty: child_field.declared_ty,
                 base_ty: base_field.declared_ty,
             }
@@ -502,7 +533,7 @@ fn report_typed_dict_field_override<'db>(
         ))
     };
 
-    diagnostic.set_primary_annotation_message(format_args!("{reason}"));
+    diagnostic.set_primary_annotation_message(reason.display(context));
 
     if own_field_definition.is_none() {
         add_definition_subdiagnostic(

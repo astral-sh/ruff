@@ -23,8 +23,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
+    ClassLiteral, DisplaySettings, IntersectionBuilder, IntersectionType, KnownInstanceType, Type,
+    TypeAliasType, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -276,11 +276,16 @@ impl<'db> SubscriptErrorKind<'db> {
             } => match kind {
                 CallErrorKind::NotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                        let callable_ty = bindings.callable_type();
+
+                        let types = [callable_ty, *value_ty];
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` is not callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(db, env),
-                            value_ty.display(db, env),
+                            callable_ty.display_with(db, env, settings.clone()),
+                            value_ty.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -298,22 +303,34 @@ impl<'db> SubscriptErrorKind<'db> {
                     } else if let Some(builder) =
                         context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                     {
+                        let callable_ty = bindings.callable_type();
+
+                        let types = [callable_ty, *slice_ty, *value_ty];
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` cannot be called \
                             with key of type `{}` on object of type `{}`",
-                            bindings.callable_type().display(db, env),
-                            slice_ty.display(db, env),
-                            value_ty.display(db, env),
+                            callable_ty.display_with(db, env, settings.clone()),
+                            slice_ty.display_with(db, env, settings.clone()),
+                            value_ty.display_with(db, env, settings),
                         ));
                     }
                 }
                 CallErrorKind::PossiblyNotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                        let callable_ty = bindings.callable_type();
+
+                        let types = [callable_ty, *value_ty];
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` may not be callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(db, env),
-                            value_ty.display(db, env),
+                            callable_ty.display_with(db, env, settings.clone()),
+                            value_ty.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -335,7 +352,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 );
             }
             Self::NotSubscriptable { value_ty, method } => {
-                report_not_subscriptable(context, subscript, *value_ty, method.as_str());
+                report_not_subscriptable(context, subscript, *value_ty, None, method.as_str());
             }
             Self::InvalidLegacyGenericArgument {
                 origin,

@@ -2,8 +2,8 @@ use crate::{
     Db, ProgramEnvironment,
     reachability::ReachabilityConstraintsExtension,
     types::{
-        KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
-        TypeContext, TypeVarKind, UnionType,
+        DisplaySettings, KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner,
+        SubclassOfType, Type, TypeContext, TypeVarKind, UnionType,
         constraints::ConstraintSetBuilder,
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
@@ -1075,11 +1075,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .context
                         .report_lint(&INVALID_PARAMETER_DEFAULT, parameter_with_default)
                     {
+                        let types = [default_ty, declared_ty];
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
                         builder.into_diagnostic(format_args!(
                             "Default value of type `{}` is not assignable \
                              to annotated parameter type `{}`",
-                            default_ty.display(db, env),
-                            declared_ty.display(db, env)
+                            default_ty.display_with(db, env, settings.clone()),
+                            declared_ty.display_with(db, env, settings)
                         ));
                     }
                 }

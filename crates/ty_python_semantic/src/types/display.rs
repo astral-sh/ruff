@@ -23,6 +23,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::context::InferContext;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
@@ -35,8 +36,8 @@ use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType,
     Protocol, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
-    visitor,
+    TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, TypingModule, UnionType,
+    WrapperDescriptorKind, visitor, walk_signature,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -233,39 +234,66 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub(crate) fn from_possibly_ambiguous_types<I, T>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        types: I,
-    ) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        fn build_display_settings<'db>(
-            collector: &AmbiguousNameCollector<'_, 'db>,
-        ) -> DisplaySettings<'db> {
-            // Both classes and type aliases use the same qualification map since
-            // a class and type alias with the same name need to be disambiguated.
-            let qualification_map = Rc::new(collector.qualification_map());
-            DisplaySettings {
-                qualified: Rc::clone(&qualification_map),
-                qualified_type_aliases: qualification_map,
-                ..DisplaySettings::default()
-            }
+    pub(crate) fn from_possibly_ambiguous_types(
+        context: &InferContext<'db, '_>,
+        types: impl IntoIterator<Item = impl Into<Type<'db>>>,
+    ) -> Self {
+        Self::from_types_in_environment(context.db(), context.program_environment(), types)
+    }
+
+    /// Preserves existing qualification while accounting for additional displayed types.
+    #[must_use]
+    pub(crate) fn with_possibly_ambiguous_types(
+        &self,
+        context: &InferContext<'db, '_>,
+        types: impl IntoIterator<Item = impl Into<Type<'db>>>,
+    ) -> Self {
+        let additional = Self::from_possibly_ambiguous_types(context, types);
+        if additional.qualified.is_empty() {
+            return self.clone();
         }
 
-        let collector = AmbiguousNameCollector {
-            env,
-            visited_types: RefCell::default(),
-            names: RefCell::default(),
-        };
+        let mut qualified = (*self.qualified).clone();
+        qualified.extend(additional.qualified.iter().map(|(&name, &level)| {
+            let level = self
+                .qualified
+                .get(name)
+                .copied()
+                .map(|existing| existing.max(level))
+                .unwrap_or(level);
+            (name, level)
+        }));
 
+        let qualified = Rc::new(qualified);
+        Self {
+            qualified: Rc::clone(&qualified),
+            qualified_type_aliases: qualified,
+            ..self.clone()
+        }
+    }
+
+    fn from_types_in_environment(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        types: impl IntoIterator<Item = impl Into<Type<'db>>>,
+    ) -> Self {
+        let collector = AmbiguousNameCollector::new(env);
         for ty in types {
             collector.visit_type(db, ty.into());
         }
+        collector.into_display_settings()
+    }
 
-        build_display_settings(&collector)
+    #[must_use]
+    pub(crate) fn from_possibly_ambiguous_signatures(
+        context: &InferContext<'db, '_>,
+        signatures: impl IntoIterator<Item = &'db Signature<'db>>,
+    ) -> Self {
+        let collector = AmbiguousNameCollector::new(context.program_environment());
+        for signature in signatures {
+            walk_signature(context.db(), signature, &collector);
+        }
+        collector.into_display_settings()
     }
 }
 
@@ -490,7 +518,7 @@ impl std::ops::DerefMut for TypeDetailGuard<'_, '_, '_, '_> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum QualificationLevel {
     ModuleName,
     FileAndLineNumber,
@@ -512,7 +540,15 @@ struct AmbiguousNameCollector<'a, 'db> {
     names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
 }
 
-impl<'db> AmbiguousNameCollector<'_, 'db> {
+impl<'a, 'db> AmbiguousNameCollector<'a, 'db> {
+    fn new(env: &'a ProgramEnvironment<'db>) -> Self {
+        Self {
+            env,
+            visited_types: RefCell::default(),
+            names: RefCell::default(),
+        }
+    }
+
     /// Records an item for ambiguity tracking.
     ///
     /// This updates the ambiguity state for items with the same name:
@@ -565,18 +601,30 @@ impl<'db> AmbiguousNameCollector<'_, 'db> {
         self.record(db, NamedItem::TypeAlias(type_alias));
     }
 
-    /// Returns the qualification level map for all names.
-    ///
-    /// When there's any ambiguity for a name (including conflicts between a class
-    /// and a type alias), the name is included so that items with that name get qualified.
-    fn qualification_map(&self) -> FxHashMap<&'db str, QualificationLevel> {
-        self.names
+    fn into_display_settings(self) -> DisplaySettings<'db> {
+        // The qualification level map for all names.
+        //
+        // When there's any ambiguity for a name (including conflicts between a class
+        // and a type alias), the name is included so that items with that name get qualified.
+        //
+        // Both classes and type aliases use the same qualification map since
+        // a class and type alias with the same name need to be disambiguated.
+        let qualification_map = self
+            .names
             .borrow()
             .iter()
             .filter_map(|(name, ambiguity)| {
                 Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
             })
-            .collect()
+            .collect();
+
+        let qualification_map = Rc::new(qualification_map);
+
+        DisplaySettings {
+            qualified: Rc::clone(&qualification_map),
+            qualified_type_aliases: qualification_map,
+            ..DisplaySettings::default()
+        }
     }
 }
 
@@ -646,7 +694,7 @@ impl<'db> Type<'db> {
     ) -> DisplayType<'env, 'db> {
         DisplayType {
             ty: self,
-            settings: DisplaySettings::from_possibly_ambiguous_types(db, env, [self]),
+            settings: DisplaySettings::from_types_in_environment(db, env, [self]),
             db,
             env,
         }
@@ -895,7 +943,7 @@ impl<'db> TypeAliasType<'db> {
             env,
             type_alias: self,
             value_ty,
-            settings: DisplaySettings::from_possibly_ambiguous_types(
+            settings: DisplaySettings::from_types_in_environment(
                 db,
                 env,
                 [Type::TypeAlias(self), value_ty],
@@ -1879,7 +1927,9 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
     ) -> DisplayGenericAlias<'env, 'db> {
-        self.display_with(db, env, DisplaySettings::default())
+        let settings =
+            DisplaySettings::from_types_in_environment(db, env, [Type::GenericAlias(self)]);
+        self.display_with(db, env, settings)
     }
 
     pub(crate) fn display_with<'env>(
@@ -2345,7 +2395,7 @@ impl<'db> Signature<'db> {
             self,
             db,
             env,
-            DisplaySettings::from_possibly_ambiguous_types(
+            DisplaySettings::from_types_in_environment(
                 db,
                 env,
                 self.parameters()

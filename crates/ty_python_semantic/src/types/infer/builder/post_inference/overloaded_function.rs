@@ -9,7 +9,7 @@ use crate::{
     Db,
     place::{DefinedPlace, Definedness, Place, place_from_bindings},
     types::{
-        CallableType, KnownClass, Type,
+        CallableType, DisplaySettings, KnownClass, Type,
         context::InferContext,
         diagnostic::INVALID_OVERLOAD,
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
@@ -408,22 +408,28 @@ fn check_non_generic_overload_implementation_consistency<'db>(
         let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) else {
             continue;
         };
+        let signatures = [implementation_signature, &overload_signature];
+        let settings = DisplaySettings::from_possibly_ambiguous_signatures(context, signatures);
         let mut diagnostic = builder.into_diagnostic(format_args!("{message}"));
         if let Some(error_context) = parameter_error_context {
             diagnostic.info(format_args!(
                 "Implementation signature `{}` is not assignable to overload signature `{}`",
-                implementation_signature.display(db, env),
-                overload_signature.display(db, env),
+                implementation_signature.display_with(db, env, settings.clone()),
+                overload_signature.display_with(db, env, settings.clone()),
             ));
-            error_context.attach_to(db, env, &mut diagnostic);
+            error_context.attach_to(context, &settings, &mut diagnostic);
         }
         if let Some(error_context) = return_type_error_context {
             diagnostic.info(format_args!(
                 "Overload returns `{}`, which is not assignable to implementation return type `{}`",
-                overload_signature.return_ty.display(db, env),
-                implementation_signature.return_ty.display(db, env),
+                overload_signature
+                    .return_ty
+                    .display_with(db, env, settings.clone()),
+                implementation_signature
+                    .return_ty
+                    .display_with(db, env, settings.clone()),
             ));
-            error_context.attach_to(db, env, &mut diagnostic);
+            error_context.attach_to(context, &settings, &mut diagnostic);
         }
         diagnostic.annotate(
             context

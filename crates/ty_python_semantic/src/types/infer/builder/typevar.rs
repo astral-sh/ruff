@@ -1,8 +1,8 @@
 use crate::{
     reachability::is_reachable,
     types::{
-        BindingContext, KnownClass, KnownInstanceType, LintDiagnosticGuard, Truthiness, Type,
-        TypeContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+        BindingContext, DisplaySettings, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+        Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
         context::InferContext,
         diagnostic::{
             INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMSPEC, INVALID_TYPE_VARIABLE_BOUND,
@@ -251,6 +251,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             };
 
+            let display_settings =
+                |types| DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
+
             match bound_or_constraints {
                 TypeVarBoundOrConstraints::UpperBound(outer_bound) => {
                     // Default TypeVar's upper bound must be assignable to outer's bound.
@@ -260,13 +263,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         for constraint in default_constraints {
                             if !constraint.is_assignable_to(db, env, outer_bound) {
                                 if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
+                                    let settings = display_settings([*constraint, outer_bound]);
+
                                     annotate_default_definition(&mut diagnostic);
                                     if let Some(name) = name {
                                         diagnostic.set_primary_annotation_message(format_args!(
                                             "Constraint `{constraint}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of `{name}`",
-                                            constraint = constraint.display(db, env),
+                                            constraint =
+                                                constraint.display_with(db, env, settings.clone()),
                                         ));
                                         diagnostic.set_concise_message(format_args!(
                                             "Default `{default_name}` of TypeVar `{name}` \
@@ -274,23 +280,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             of `{name}` because constraint `{constraint}` \
                                             of `{default_name}` is not assignable to \
                                             `{bound}`",
-                                            bound = outer_bound.display(db, env),
-                                            constraint = constraint.display(db, env),
+                                            bound =
+                                                outer_bound.display_with(db, env, settings.clone()),
+                                            constraint = constraint.display_with(db, env, settings),
                                         ));
                                     } else {
                                         diagnostic.set_primary_annotation_message(format_args!(
                                             "Constraint `{constraint}` of `{default_name}` is \
                                             not assignable to upper bound `{bound}` of \
                                             outer TypeVar",
-                                            constraint = constraint.display(db, env),
-                                            bound = outer_bound.display(db, env),
+                                            constraint =
+                                                constraint.display_with(db, env, settings.clone()),
+                                            bound =
+                                                outer_bound.display_with(db, env, settings.clone()),
                                         ));
                                         diagnostic.set_concise_message(format_args!(
                                             "Default of TypeVar is not assignable its upper \
                                             bound `{bound}` because constraint `{constraint}` \
                                             of `{default_name}` is not assignable to `{bound}`",
-                                            bound = outer_bound.display(db, env),
-                                            constraint = constraint.display(db, env),
+                                            bound =
+                                                outer_bound.display_with(db, env, settings.clone()),
+                                            constraint = constraint.display_with(db, env, settings),
                                         ));
                                     }
                                 }
@@ -303,13 +313,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .unwrap_or_else(Type::object);
                         if !default_bound.is_assignable_to(db, env, outer_bound) {
                             if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
+                                let settings = display_settings([default_bound, outer_bound]);
                                 annotate_default_definition(&mut diagnostic);
                                 if let Some(name) = name {
                                     diagnostic.set_primary_annotation_message(format_args!(
                                         "Upper bound `{default_bound}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of `{name}`",
-                                        default_bound = default_bound.display(db, env),
+                                        default_bound =
+                                            default_bound.display_with(db, env, settings.clone()),
                                     ));
                                     diagnostic.set_concise_message(format_args!(
                                         "Default `{default_name}` of TypeVar `{name}` \
@@ -317,15 +329,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             of `{name}` because its upper bound \
                                             `{default_bound}` is not assignable to \
                                             `{bound}`",
-                                        bound = outer_bound.display(db, env),
-                                        default_bound = default_bound.display(db, env),
+                                        bound = outer_bound.display_with(db, env, settings.clone()),
+                                        default_bound =
+                                            default_bound.display_with(db, env, settings),
                                     ));
                                 } else {
                                     diagnostic.set_primary_annotation_message(format_args!(
                                         "Upper bound `{default_bound}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of outer TypeVar",
-                                        default_bound = default_bound.display(db, env),
+                                        default_bound =
+                                            default_bound.display_with(db, env, settings.clone()),
                                     ));
                                     diagnostic.set_concise_message(format_args!(
                                         "TypeVar default `{default_name}` is not \
@@ -333,8 +347,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             because upper bound of `{default_name}`
                                             (`{default_bound}`) is not assignable
                                             to `{bound}`",
-                                        bound = outer_bound.display(db, env),
-                                        default_bound = default_bound.display(db, env),
+                                        bound = outer_bound.display_with(db, env, settings.clone()),
+                                        default_bound =
+                                            default_bound.display_with(db, env, settings),
                                     ));
                                 }
                             }

@@ -190,9 +190,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     call_expr.into(),
                     dynamic_class.name(db),
                     metaclass1,
-                    base1.display(db, env),
+                    base1,
                     metaclass2,
-                    base2.display(db, env),
+                    base2,
                 );
             }
         }

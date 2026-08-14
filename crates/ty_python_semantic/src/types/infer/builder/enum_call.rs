@@ -8,7 +8,7 @@ use ty_python_core::definition::Definition;
 use crate::{
     Db, ProgramEnvironment,
     types::{
-        ClassLiteral, KnownClass, Type, TypeContext, UnionType,
+        ClassLiteral, DisplaySettings, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -912,13 +912,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let names_ty = self.expression_type(names_arg);
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, names_arg) {
             let env = self.program_environment();
+            let expected_ty = enum_names_type(db, env);
+            let settings = DisplaySettings::from_possibly_ambiguous_types(
+                &self.context,
+                [expected_ty, names_ty],
+            );
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `names` of `{base_name}()`"
             ));
             diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `{}`, found `{}`",
-                enum_names_type(db, env).display(db, env),
-                names_ty.display(db, env),
+                expected_ty.display_with(db, env, settings.clone()),
+                names_ty.display_with(db, env, settings),
             ));
         }
     }

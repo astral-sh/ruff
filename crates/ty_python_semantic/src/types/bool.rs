@@ -4,10 +4,10 @@ use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::{
-    CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
-    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    CallArguments, CallDunderError, ClassType, CycleDetector, DisplaySettings, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, SubclassOfInner, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
+    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -510,12 +510,16 @@ impl<'db> BoolError<'db> {
                     .iter()
                     .find_map(|element| element.try_bool(db, env).err())
                     .unwrap();
+                let union_ty = Type::Union(*union);
+                let error_ty = first_error.not_boolable_type();
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(context, [union_ty, error_ty]);
 
                 builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for union `{}` \
                      because `{}` doesn't implement `__bool__` correctly",
-                    Type::Union(*union).display(db, env),
-                    first_error.not_boolable_type().display(db, env),
+                    union_ty.display_with(db, env, settings.clone()),
+                    error_ty.display_with(db, env, settings),
                 ));
             }
 

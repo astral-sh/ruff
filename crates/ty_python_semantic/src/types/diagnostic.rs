@@ -32,7 +32,7 @@ use crate::types::{
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, declare_lint};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::source::source_text;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
@@ -1444,6 +1444,7 @@ pub(super) fn report_not_subscriptable(
     context: &InferContext,
     node: &ast::ExprSubscript,
     not_subscriptable_ty: Type,
+    full_object_ty: Option<Type>,
     method: &str,
 ) {
     let db = context.db();
@@ -1451,15 +1452,17 @@ pub(super) fn report_not_subscriptable(
         return;
     };
     let env = &context.program_environment();
+    let types = [not_subscriptable_ty].into_iter().chain(full_object_ty);
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
     if method == "__delitem__" {
         builder.into_diagnostic(format_args!(
             "Cannot delete subscript on object of type `{}` with no `{method}` method",
-            not_subscriptable_ty.display(db, env)
+            not_subscriptable_ty.display_with(db, env, settings)
         ));
     } else {
         builder.into_diagnostic(format_args!(
             "Cannot subscript object of type `{}` with no `{method}` method",
-            not_subscriptable_ty.display(db, env)
+            not_subscriptable_ty.display_with(db, env, settings)
         ));
     }
 }
@@ -1662,7 +1665,7 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [target_ty, value_ty]);
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, [target_ty, value_ty]);
 
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows
@@ -1686,7 +1689,7 @@ pub(super) fn report_invalid_assignment<'db>(
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
             value_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings)
+            target_ty.display_with(db, env, settings.clone())
         ),
     ) else {
         return;
@@ -1726,18 +1729,18 @@ pub(super) fn report_invalid_assignment<'db>(
                 // Otherwise, annotate the target with its declared type.
                 diag.annotate(context.secondary(target_node).message(format_args!(
                     "Declared type `{}`",
-                    target_ty.display(db, env)
+                    target_ty.display_with(db, env, settings.clone())
                 )));
             }
         }
 
         diag.set_primary_annotation_message(format_args!(
             "Incompatible value of type `{}`",
-            value_ty.display(db, env),
+            value_ty.display_with(db, env, settings.clone()),
         ));
 
         let error_context = value_ty.assignability_error_context(db, env, target_ty);
-        error_context.attach_to(db, env, &mut diag);
+        error_context.attach_to(context, &settings, &mut diag);
 
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.headline_message().to_string();
@@ -1763,21 +1766,21 @@ pub(super) fn report_invalid_attribute_assignment(
     // diagnostic being emitted here.
 
     let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, [source_ty, target_ty]);
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
             source_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings),
+            target_ty.display_with(db, env, settings.clone()),
         ),
     ) else {
         return;
     };
 
     let error_context = source_ty.assignability_error_context(db, env, target_ty);
-    error_context.attach_to(db, env, &mut diag);
+    error_context.attach_to(context, &settings, &mut diag);
 }
 
 /// Reports an invalid implicit call to a descriptor's `__get__` method.
@@ -1819,6 +1822,11 @@ pub(super) fn report_bad_dunder_get_call<'db>(
             ));
         }
     } else {
+        let types = [object_type, descriptor_type]
+            .into_iter()
+            .chain(failure.invalid_argument_types());
+        let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
         failure.report_diagnostics_with_override(
             context,
             target.into(),
@@ -1826,13 +1834,14 @@ pub(super) fn report_bad_dunder_get_call<'db>(
                 lint: &INVALID_ATTRIBUTE_ACCESS,
                 message: format!(
                     "Invalid access to descriptor attribute `{attribute}` on type `{}`",
-                    object_type.display(db, env),
+                    object_type.display_with(db, env, settings.clone()),
                 ),
                 info: &format!(
                     "This access implicitly calls `__get__` on a descriptor of type `{}`",
-                    descriptor_type.display(db, env),
+                    descriptor_type.display_with(db, env, settings.clone()),
                 ),
                 argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+                display_settings: settings,
             },
         );
     }
@@ -1874,6 +1883,8 @@ pub(super) fn report_bad_attribute_access_call<'db>(
     let db = context.db();
     let env = &context.program_environment();
     let attribute = target.attr.as_str();
+    let types = std::iter::once(object_type).chain(failure.invalid_argument_types());
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
 
     failure.report_diagnostics_with_override(
         context,
@@ -1882,10 +1893,11 @@ pub(super) fn report_bad_attribute_access_call<'db>(
             lint: &INVALID_ATTRIBUTE_ACCESS,
             message: format!(
                 "Invalid access to attribute `{attribute}` on type `{}`",
-                object_type.display(db, env),
+                object_type.display_with(db, env, settings.clone()),
             ),
             info: &format!("This access implicitly calls `{}`", method.as_str()),
             argument_ranges: &[target.range()],
+            display_settings: settings,
         },
     );
 }
@@ -1957,6 +1969,11 @@ pub(super) fn report_bad_dunder_set_call<'db>(
         } else {
             &[target.value.range(), value.range()][..]
         };
+        let types = [object_type, descriptor_type]
+            .into_iter()
+            .chain(dunder_set_failure.invalid_argument_types());
+        let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
         dunder_set_failure.report_diagnostics_with_override(
             context,
             target.into(),
@@ -1964,13 +1981,14 @@ pub(super) fn report_bad_dunder_set_call<'db>(
                 lint: &INVALID_ASSIGNMENT,
                 message: format!(
                     "Invalid assignment to data descriptor attribute `{attribute}` on type `{}`",
-                    object_type.display(db, env)
+                    object_type.display_with(db, env, settings.clone())
                 ),
                 info: &format!(
                     "This assignment implicitly calls `__set__` on a descriptor of type `{}`",
-                    descriptor_type.display(db, env)
+                    descriptor_type.display_with(db, env, settings.clone())
                 ),
                 argument_ranges,
+                display_settings: settings,
             },
         );
     }
@@ -2062,7 +2080,7 @@ pub(super) fn report_invalid_return_type(
 
     let env = &context.program_environment();
     let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+        DisplaySettings::from_possibly_ambiguous_types(context, [expected_ty, actual_ty]);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
@@ -2074,12 +2092,12 @@ pub(super) fn report_invalid_return_type(
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display_with(db, env, settings),
+            expected_ty = expected_ty.display_with(db, env, settings.clone()),
         )),
     );
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
-    error_context.attach_to(db, env, &mut diag);
+    error_context.attach_to(context, &settings, &mut diag);
 }
 
 pub(super) fn report_unsound_return_statement(
@@ -2105,11 +2123,11 @@ pub(super) fn report_unsound_return_statement(
     };
 
     let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+        DisplaySettings::from_possibly_ambiguous_types(context, [expected_ty, actual_ty]);
 
     let mut diag = builder.into_diagnostic("Unsound return statement");
     let actual_ty_display = actual_ty.display_with(db, env, settings.clone());
-    let expected_ty_display = expected_ty.display_with(db, env, settings);
+    let expected_ty_display = expected_ty.display_with(db, env, settings.clone());
 
     diag.set_concise_message(format_args!(
         "Unsound return statement: `{actual_ty_display}` is not a subtype \
@@ -2125,7 +2143,7 @@ pub(super) fn report_unsound_return_statement(
         but not a subtype of `{expected_ty_display}`",
     ));
     let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
-    error_context.attach_to(db, env, &mut diag);
+    error_context.attach_to(context, &settings, &mut diag);
     diag.help("Consider using an `assert` to narrow the type prior to the `return` statement");
 }
 
@@ -2187,9 +2205,9 @@ pub(super) fn report_invalid_generator_yield_type(
 
     let env = &context.program_environment();
     let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+        DisplaySettings::from_possibly_ambiguous_types(context, [expected_ty, actual_ty]);
     let expected_display = expected_ty.display_with(db, env, settings.clone());
-    let actual_display = actual_ty.display_with(db, env, settings);
+    let actual_display = actual_ty.display_with(db, env, settings.clone());
 
     let (kind_name, title, concise) = match kind {
         GeneratorMismatchKind::YieldType => (
@@ -2229,7 +2247,7 @@ pub(super) fn report_invalid_generator_yield_type(
     }
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
-    error_context.attach_to(db, env, &mut diag);
+    error_context.attach_to(context, &settings, &mut diag);
 }
 
 pub(super) fn report_unsound_yield(
@@ -2247,9 +2265,9 @@ pub(super) fn report_unsound_yield(
 
     let env = context.program_environment();
     let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+        DisplaySettings::from_possibly_ambiguous_types(context, [expected_ty, actual_ty]);
     let actual_display = actual_ty.display_with(db, env, settings.clone());
-    let expected_display = expected_ty.display_with(db, env, settings);
+    let expected_display = expected_ty.display_with(db, env, settings.clone());
 
     let mut diagnostic = builder.into_diagnostic(format_args!("Unsound `{kind}`"));
     diagnostic.set_concise_message(format_args!(
@@ -2277,7 +2295,7 @@ pub(super) fn report_unsound_yield(
         but not a subtype of `{expected_display}`"
     ));
     let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
-    error_context.attach_to(db, env, &mut diagnostic);
+    error_context.attach_to(context, &settings, &mut diagnostic);
 
     match kind {
         YieldKind::Yield => {
@@ -2441,17 +2459,20 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     };
 
     let env = &context.program_environment();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, [node_type]);
+
     let mut diagnostic = builder.into_diagnostic("Invalid tuple caught in an exception handler");
+
     diagnostic.set_concise_message(format_args!(
         "Cannot catch object of type `{}` in an exception handler",
-        node_type.display(db, env)
+        node_type.display_with(db, env, settings.clone())
     ));
 
     for (sub_node, ty) in invalid_tuple_nodes {
         let span = context.span(sub_node);
         diagnostic.annotate(Annotation::secondary(span.clone()).message(format_args!(
             "Invalid element of type `{}`",
-            ty.display(db, env)
+            ty.display_with(db, env, settings.clone())
         )));
         if ty.is_notimplemented(context.db()) {
             diagnostic.annotate(
@@ -2553,18 +2574,19 @@ pub(crate) fn report_instance_layout_conflict(
 ) {
     debug_assert!(disjoint_bases.len() > 1);
 
-    let db = context.db();
-
     let Some(builder) = context.report_lint(&INSTANCE_LAYOUT_CONFLICT, header_range) else {
         return;
     };
+
+    let db = context.db();
+    let settings = disjoint_bases.display_settings(context);
 
     let mut diagnostic = builder
         .into_diagnostic("Class will raise `TypeError` at runtime due to incompatible bases");
 
     diagnostic.set_primary_annotation_message(format_args!(
         "Bases {} cannot be combined in multiple inheritance",
-        disjoint_bases.describe_problematic_class_bases(db)
+        disjoint_bases.describe_problematic_class_bases(db, &settings)
     ));
 
     let mut subdiagnostic = SubDiagnostic::new(
@@ -2592,14 +2614,14 @@ pub(crate) fn report_instance_layout_conflict(
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout \
                         because `{base}` defines non-empty `__slots__`",
-                        base = originating_base.name(db)
+                        base = originating_base.display_with(db, settings.clone())
                     ));
                 }
                 DisjointBaseKind::DisjointBaseDecorator => {
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout \
                         because of the way `{base}` is implemented in a C extension",
-                        base = originating_base.name(db)
+                        base = originating_base.display_with(db, settings.clone())
                     ));
                 }
             }
@@ -2608,8 +2630,8 @@ pub(crate) fn report_instance_layout_conflict(
             annotation = annotation.message(format_args!(
                 "`{base}` instances have a distinct memory layout \
                 because `{base}` inherits from `{disjoint_base}`",
-                base = originating_base.name(db),
-                disjoint_base = disjoint_base.class.name(db)
+                base = originating_base.display_with(db, settings.clone()),
+                disjoint_base = disjoint_base.class.display_with(db, settings.clone())
             ));
             subdiagnostic.annotate(annotation);
 
@@ -2619,14 +2641,14 @@ pub(crate) fn report_instance_layout_conflict(
                 DisjointBaseKind::DefinesSlots => additional_annotation.message(format_args!(
                     "`{disjoint_base}` instances have a distinct memory layout \
                     because `{disjoint_base}` defines non-empty `__slots__`",
-                    disjoint_base = disjoint_base.class.name(db),
+                    disjoint_base = disjoint_base.class.display_with(db, settings.clone()),
                 )),
 
                 DisjointBaseKind::DisjointBaseDecorator => {
                     additional_annotation.message(format_args!(
                         "`{disjoint_base}` instances have a distinct memory layout \
                         because of the way `{disjoint_base}` is implemented in a C extension",
-                        disjoint_base = disjoint_base.class.name(db),
+                        disjoint_base = disjoint_base.class.display_with(db, settings.clone()),
                     ))
                 }
             };
@@ -2640,27 +2662,50 @@ pub(crate) fn report_instance_layout_conflict(
 
 /// Emit a diagnostic for a metaclass conflict where both conflicting metaclasses
 /// are inherited from base classes.
-pub(super) fn report_conflicting_metaclass_from_bases(
-    context: &InferContext,
+pub(super) fn report_conflicting_metaclass_from_bases<'db>(
+    context: &InferContext<'db, '_>,
     node: AnyNodeRef,
     class_name: &str,
     metaclass1: ClassType,
-    base1: impl std::fmt::Display,
+    base1: ClassBase<'db>,
     metaclass2: ClassType,
-    base2: impl std::fmt::Display,
+    base2: ClassBase<'db>,
 ) {
     let Some(builder) = context.report_lint(&CONFLICTING_METACLASS, node) else {
         return;
     };
+
     let db = context.db();
+    let env = context.program_environment();
+
+    let types = [
+        Type::from(metaclass1),
+        Type::from(base1),
+        Type::from(metaclass2),
+        Type::from(base2),
+    ];
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
+    let display_base = |base: ClassBase<'db>| {
+        base.into_class()
+            .map(|class| Either::Left(class.class_literal(db).display_with(db, settings.clone())))
+            .unwrap_or_else(|| Either::Right(base.display_with(db, env, settings.clone())))
+    };
+
     builder.into_diagnostic(format_args!(
         "The metaclass of a derived class (`{class_name}`) \
             must be a subclass of the metaclasses of all its bases, \
             but `{metaclass1}` (metaclass of base class `{base1}`) \
             and `{metaclass2}` (metaclass of base class `{base2}`) \
             have no subclass relationship",
-        metaclass1 = metaclass1.name(db),
-        metaclass2 = metaclass2.name(db),
+        metaclass1 = metaclass1
+            .class_literal(db)
+            .display_with(db, settings.clone()),
+        base1 = display_base(base1),
+        metaclass2 = metaclass2
+            .class_literal(db)
+            .display_with(db, settings.clone()),
+        base2 = display_base(base2)
     ));
 }
 
@@ -2689,8 +2734,15 @@ impl<'db> IncompatibleBases<'db> {
     }
 
     /// List the problematic class bases in a human-readable format.
-    fn describe_problematic_class_bases(&self, db: &dyn Db) -> String {
-        let bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
+    fn describe_problematic_class_bases(
+        &self,
+        db: &'db dyn Db,
+        settings: &DisplaySettings<'db>,
+    ) -> String {
+        let bad_base_names = self
+            .0
+            .values()
+            .map(|info| info.originating_base.display_with(db, settings.clone()));
 
         format_enumeration(bad_base_names)
     }
@@ -2723,6 +2775,17 @@ impl<'db> IncompatibleBases<'db> {
             .map(|(base, info)| (*base, *info))
             .collect();
     }
+
+    fn iter(&self) -> indexmap::map::Iter<'_, DisjointBase<'db>, IncompatibleBaseInfo<'db>> {
+        self.0.iter()
+    }
+
+    fn display_settings(&self, context: &InferContext<'db, '_>) -> DisplaySettings<'db> {
+        let types = self
+            .iter()
+            .flat_map(|(base, info)| [Type::from(base.class), Type::from(info.originating_base)]);
+        DisplaySettings::from_possibly_ambiguous_types(context, types)
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a IncompatibleBases<'db> {
@@ -2730,7 +2793,7 @@ impl<'a, 'db> IntoIterator for &'a IncompatibleBases<'db> {
     type IntoIter = indexmap::map::Iter<'a, DisjointBase<'db>, IncompatibleBaseInfo<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.iter()
     }
 }
 
@@ -2910,8 +2973,9 @@ pub(crate) fn report_invalid_match_args_type<T: Ranged>(
         return;
     };
     let env = &context.program_environment();
-    let class_display = cls_ty.display(db, env);
-    let match_args_display = match_args_ty.display(db, env);
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, [cls_ty, match_args_ty]);
+    let class_display = cls_ty.display_with(db, env, settings.clone());
+    let match_args_display = match_args_ty.display_with(db, env, settings);
     builder.into_diagnostic(format_args!(
         "`__match_args__` for `{class_display}` must be an exact tuple, not `{match_args_display}`"
     ));
@@ -3537,10 +3601,13 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
         let env = &context.program_environment();
+        let types = [typed_dict_ty, key_ty].into_iter().chain(full_object_ty);
+        let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
         match key_ty.as_string_literal() {
             Some(key) => {
                 let key = key.value(db);
-                let typed_dict_name = typed_dict_ty.display(db, env);
+                let typed_dict_name = typed_dict_ty.display_with(db, env, settings.clone());
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
@@ -3554,7 +3621,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         } else {
                             "intersection"
                         },
-                        full_object_ty = full_object_ty.display(db, env)
+                        full_object_ty = full_object_ty.display_with(db, env, settings.clone())
                     ))
                 } else {
                     context
@@ -3595,7 +3662,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         diagnostic.set_concise_message(format_args!(
                             "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` \
                             (subscripted object has type `{full_ty}`)",
-                            full_ty = full_ty.display(db, env),
+                            full_ty = full_ty.display_with(db, env, settings.clone()),
                         ));
                     } else {
                         diagnostic.set_concise_message(format_args!(
@@ -3608,14 +3675,14 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "TypedDict `{}` can only be subscripted with a string literal key, \
                      got key of type `{}`",
-                    typed_dict_ty.display(db, env),
-                    key_ty.display(db, env),
+                    typed_dict_ty.display_with(db, env, settings.clone()),
+                    key_ty.display_with(db, env, settings.clone()),
                 ));
 
                 if let Some(full_object_ty) = full_object_ty {
                     diagnostic.info(format_args!(
                         "The full type of the subscripted object is `{}`",
-                        full_object_ty.display(db, env)
+                        full_object_ty.display_with(db, env, settings)
                     ));
                 }
             }
@@ -4037,6 +4104,14 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                         "Inconsistent type arguments for `{}` among class bases",
                         origin.name(db)
                     ));
+
+                    let types = [
+                        Type::GenericAlias(earlier_alias),
+                        Type::GenericAlias(supercls_alias),
+                    ];
+
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     let later_is_direct = matches!(
                         base,
                         Type::GenericAlias(alias) if alias.origin(db) == origin
@@ -4048,41 +4123,41 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     ) {
                         diagnostic.annotate(context.secondary(earlier_base).message(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db, env)
+                            earlier_alias.display_with(db, env, settings.clone())
                         )));
                         let later_annotation = context.secondary(later_base);
                         diagnostic.annotate(if later_is_direct {
                             later_annotation.message(format_args!(
                                 "Later class base is `{}`",
-                                supercls_alias.display(db, env)
+                                supercls_alias.display_with(db, env, settings.clone())
                             ))
                         } else {
                             later_annotation.message(format_args!(
                                 "Later class base inherits from `{}`",
-                                supercls_alias.display(db, env)
+                                supercls_alias.display_with(db, env, settings.clone())
                             ))
                         });
                     } else {
                         diagnostic.info(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db, env)
+                            earlier_alias.display_with(db, env, settings.clone())
                         ));
                         if later_is_direct {
                             diagnostic.info(format_args!(
                                 "Later class base is `{}`",
-                                supercls_alias.display(db, env)
+                                supercls_alias.display_with(db, env, settings.clone())
                             ));
                         } else {
                             diagnostic.info(format_args!(
                                 "Later class base inherits from `{}`",
-                                supercls_alias.display(db, env)
+                                supercls_alias.display_with(db, env, settings.clone())
                             ));
                         }
                     }
                     diagnostic.set_concise_message(format_args!(
                         "Inconsistent type arguments: class cannot inherit from both `{}` and `{}`",
-                        supercls_alias.display(db, env),
-                        earlier_alias.display(db, env)
+                        supercls_alias.display_with(db, env, settings.clone()),
+                        earlier_alias.display_with(db, env, settings)
                     ));
                     return true;
                 }
@@ -4156,7 +4231,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
 // but it did not improve readability! -- AW.
 #[expect(clippy::too_many_arguments)]
 pub(super) fn report_invalid_method_override<'db>(
-    context: &InferContext<'db, '_>,
+    context: &'db InferContext<'db, '_>,
     member: &str,
     subclass: ClassType<'db>,
     subclass_definition: Definition<'db>,
@@ -4237,7 +4312,8 @@ pub(super) fn report_invalid_method_override<'db>(
         ));
     }
 
-    error_context().attach_to(db, env, &mut diagnostic);
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, [subclass, superclass]);
+    error_context().attach_to(context, &settings, &mut diagnostic);
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
@@ -4351,7 +4427,7 @@ pub(super) fn report_invalid_method_override<'db>(
 
 /// Reports an incompatible pair of source-defined methods in a resolved MRO.
 pub(super) fn report_incompatible_base_method<'db>(
-    context: &InferContext<'db, '_>,
+    context: &'db InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     member: &str,
     selected: (ClassType<'db>, Definition<'db>, MethodDecorator),
@@ -4391,7 +4467,9 @@ pub(super) fn report_incompatible_base_method<'db>(
             contract_decorator.description(),
         ));
     }
-    error_context().attach_to(db, context.program_environment(), &mut diagnostic);
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(context, [selected_owner, contract_owner]);
+    error_context().attach_to(context, &settings, &mut diagnostic);
     diagnostic.info("This violates the Liskov Substitution Principle");
 
     for (definition, owner_name) in [
@@ -4662,8 +4740,7 @@ pub(super) fn report_unsupported_comparison<'db>(
 
     let env = &context.program_environment();
     let display_settings = DisplaySettings::from_possibly_ambiguous_types(
-        db,
-        env,
+        context,
         [error.left_ty, error.right_ty, left_ty, right_ty],
     );
 
@@ -4829,7 +4906,7 @@ fn report_unsupported_binary_operation_impl<'a>(
     let diagnostic_builder = context.report_lint(&UNSUPPORTED_OPERATOR, range)?;
     let env = &context.program_environment();
     let display_settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [left_ty, right_ty]);
+        DisplaySettings::from_possibly_ambiguous_types(context, [left_ty, right_ty]);
 
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));

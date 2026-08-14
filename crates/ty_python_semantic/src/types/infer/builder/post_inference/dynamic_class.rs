@@ -46,8 +46,6 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    let env = context.program_environment();
-
     // Check for MRO errors.
     if report_dynamic_mro_errors(context, dynamic_class, call_expr, bases) {
         report_inconsistent_dynamic_generic_bases(context, dynamic_class, bases);
@@ -93,9 +91,9 @@ pub(crate) fn check_dynamic_class_definition<'db>(
             call_expr.into(),
             dynamic_class.name(db),
             metaclass1,
-            base1.display(db, env),
+            base1,
             metaclass2,
-            base2.display(db, env),
+            base2,
         );
     }
 }

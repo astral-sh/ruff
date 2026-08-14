@@ -26,7 +26,7 @@ use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, DisplaySettings, ProgramEnvironment};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
@@ -663,6 +663,18 @@ impl<'db> TypedDictType<'db> {
             TypedDictType::Class(defining_class) => defining_class.type_definition(db),
             TypedDictType::Synthesized(_) => None,
         }
+    }
+}
+
+impl<'db> From<TypedDictType<'db>> for Type<'db> {
+    fn from(typeddict: TypedDictType<'db>) -> Self {
+        Type::TypedDict(typeddict)
+    }
+}
+
+impl<'db> From<&TypedDictType<'db>> for Type<'db> {
+    fn from(typeddict: &TypedDictType<'db>) -> Self {
+        Type::TypedDict(*typeddict)
     }
 }
 
@@ -1508,7 +1520,9 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                     .report_lint(self.assignment_kind.diagnostic_type(), self.key_node)
             {
                 let typed_dict_ty = Type::TypedDict(self.typed_dict);
-                let typed_dict_d = typed_dict_ty.display(db, env);
+                let types = [typed_dict_ty].into_iter().chain(self.full_object_ty);
+                let settings = DisplaySettings::from_possibly_ambiguous_types(self.context, types);
+                let typed_dict_d = typed_dict_ty.display_with(db, env, settings.clone());
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Cannot assign to key \"{}\" on TypedDict `{typed_dict_d}`",
@@ -1516,7 +1530,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                 ));
 
                 diagnostic.set_primary_annotation_message(format_args!("key is marked read-only"));
-                self.add_object_type_annotation(db, env, &mut diagnostic);
+                self.add_object_type_annotation(db, env, &settings, &mut diagnostic);
                 Self::add_item_definition_subdiagnostic(
                     db,
                     &item,
@@ -1544,9 +1558,15 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                 .report_lint(self.assignment_kind.diagnostic_type(), self.value_node)
         {
             let typed_dict_ty = Type::TypedDict(self.typed_dict);
-            let typed_dict_d = typed_dict_ty.display(db, env);
-            let value_d = self.value_ty.display(db, env);
-            let item_type_d = item.declared_ty.display(db, env);
+
+            let types = [typed_dict_ty, self.value_ty, item.declared_ty]
+                .into_iter()
+                .chain(self.full_object_ty);
+            let settings = DisplaySettings::from_possibly_ambiguous_types(self.context, types);
+
+            let typed_dict_d = typed_dict_ty.display_with(db, env, settings.clone());
+            let value_d = self.value_ty.display_with(db, env, settings.clone());
+            let item_type_d = item.declared_ty.display_with(db, env, settings.clone());
 
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid {} to key \"{}\" with declared type `{item_type_d}` \
@@ -1569,7 +1589,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                 &mut diagnostic,
                 "Item declared here",
             );
-            self.add_object_type_annotation(db, env, &mut diagnostic);
+            self.add_object_type_annotation(db, env, &settings, &mut diagnostic);
         }
 
         false
@@ -1579,14 +1599,17 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        settings: &DisplaySettings<'db>,
         diagnostic: &mut Diagnostic,
     ) {
         if let Some(full_object_ty) = self.full_object_ty {
+            let typed_dict_ty = Type::TypedDict(self.typed_dict);
+
             diagnostic.annotate(self.context.secondary(self.typed_dict_node).message(
                 format_args!(
                     "TypedDict `{}` in {kind} type `{}`",
-                    Type::TypedDict(self.typed_dict).display(db, env),
-                    full_object_ty.display(db, env),
+                    typed_dict_ty.display_with(db, env, settings.clone()),
+                    full_object_ty.display_with(db, env, settings.clone()),
                     kind = if full_object_ty.is_union() {
                         "union"
                     } else {
@@ -1598,7 +1621,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
             diagnostic.annotate(self.context.secondary(self.typed_dict_node).message(
                 format_args!(
                     "TypedDict `{}`",
-                    Type::TypedDict(self.typed_dict).display(db, env)
+                    Type::TypedDict(self.typed_dict).display_with(db, env, settings.clone())
                 ),
             ));
         }
@@ -2292,15 +2315,20 @@ fn validate_extracted_typed_dict_openness<'db, 'ast>(
             })
         {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
+                let types = [extra_items_ty, target_field.declared_ty, typed_dict_ty];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Unpacked argument has extra items of type `{}` that are not assignable to item `{target_name}` with type `{}` on TypedDict `{}`",
-                    extra_items_ty.display(db, env),
-                    target_field.declared_ty.display(db, env),
-                    typed_dict_ty.display(db, env),
+                    extra_items_ty.display_with(db, env, settings.clone()),
+                    target_field
+                        .declared_ty
+                        .display_with(db, env, settings.clone()),
+                    typed_dict_ty.display_with(db, env, settings.clone()),
                 ));
                 diagnostic.annotate(context.secondary(nodes.typed_dict).message(format_args!(
                     "TypedDict `{}`",
-                    typed_dict_ty.display(db, env)
+                    typed_dict_ty.display_with(db, env, settings)
                 )));
             }
             return false;
@@ -2311,15 +2339,24 @@ fn validate_extracted_typed_dict_openness<'db, 'ast>(
         }
 
         if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
+            let types = [
+                extra_items_ty,
+                target_extra_items.declared_ty,
+                typed_dict_ty,
+            ];
+            let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Unpacked argument has extra items of type `{}` that are not assignable to extra items type `{}` on TypedDict `{}`",
-                extra_items_ty.display(db, env),
-                target_extra_items.declared_ty.display(db, env),
-                typed_dict_ty.display(db, env),
+                extra_items_ty.display_with(db, env, settings.clone()),
+                target_extra_items
+                    .declared_ty
+                    .display_with(db, env, settings.clone()),
+                typed_dict_ty.display_with(db, env, settings.clone()),
             ));
             diagnostic.annotate(context.secondary(nodes.typed_dict).message(format_args!(
                 "TypedDict `{}`",
-                typed_dict_ty.display(db, env)
+                typed_dict_ty.display_with(db, env, settings)
             )));
         }
         return false;
@@ -2527,10 +2564,14 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
                     if !arg_ty.is_assignable_to(db, env, positional_target_ty)
                         && let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg)
                     {
+                        let types = [arg_ty, positional_target_ty];
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                         builder.into_diagnostic(format_args!(
                             "Argument of type `{}` is not assignable to `{}`",
-                            arg_ty.display(db, env),
-                            positional_target_ty.display(db, env),
+                            arg_ty.display_with(db, env, settings.clone()),
+                            positional_target_ty.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -2567,10 +2608,13 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
 
         if !arg_ty.is_assignable_to(db, env, typed_dict_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
+                let types = [arg_ty, typed_dict_ty];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                 builder.into_diagnostic(format_args!(
                     "Argument of type `{}` is not assignable to `{}`",
-                    arg_ty.display(db, env),
-                    typed_dict_ty.display(db, env),
+                    arg_ty.display_with(db, env, settings.clone()),
+                    typed_dict_ty.display_with(db, env, settings),
                 ));
             }
         }
@@ -2745,11 +2789,16 @@ fn validate_merged_dict_literal<'db, 'ast>(
                             if let Some(builder) =
                                 context.report_lint(&INVALID_ARGUMENT_TYPE, &item.value)
                             {
+                                let typed_dict_ty = Type::TypedDict(typed_dict);
+                                let types = [value_ty, expected_ty, typed_dict_ty];
+                                let settings =
+                                    DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                                 builder.into_diagnostic(format_args!(
                                     "Value of type `{}` is not assignable to arbitrary key value type `{}` on TypedDict `{}`",
-                                    value_ty.display(db, env),
-                                    expected_ty.display(db, env),
-                                    Type::TypedDict(typed_dict).display(db, env),
+                                    value_ty.display_with(db, env, settings.clone()),
+                                    expected_ty.display_with(db, env, settings.clone()),
+                                    typed_dict_ty.display_with(db, env, settings),
                                 ));
                             }
                         }
@@ -2765,10 +2814,16 @@ fn validate_merged_dict_literal<'db, 'ast>(
                 } else {
                     valid = false;
                     if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
+                        let typed_dict_ty = Type::TypedDict(typed_dict);
+
+                        let types = [typed_dict_ty, key_ty];
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                         builder.into_diagnostic(format_args!(
                             "TypedDict `{}` requires string keys, got key of type `{}`",
-                            Type::TypedDict(typed_dict).display(db, env),
-                            key_ty.display(db, env),
+                            typed_dict_ty.display_with(db, env, settings.clone()),
+                            key_ty.display_with(db, env, settings),
                         ));
                     }
                 }

@@ -12,7 +12,9 @@ use crate::types::diagnostic::{
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::infer::builder::TypeInferenceBuilder;
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
-use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
+use crate::types::{
+    ClassBase, DisplaySettings, KnownClass, Type, extract_fixed_length_iterable_element_types,
+};
 
 /// Whether a dynamic class is being created via `type()` or `types.new_class()`.
 ///
@@ -60,13 +62,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if !bases_type.is_assignable_to(db, env, formal_parameter_type)
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
         {
+            let types = [formal_parameter_type, bases_type];
+            let settings = DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
             ));
             diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `{}`, found `{}`",
-                formal_parameter_type.display(db, env),
-                bases_type.display(db, env)
+                formal_parameter_type.display_with(db, env, settings.clone()),
+                bases_type.display_with(db, env, settings)
             ));
         }
 
@@ -226,10 +230,12 @@ pub(super) fn report_dynamic_mro_errors<'db>(
     let Err(error) = dynamic_class.try_mro(db) else {
         return true;
     };
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(context, dynamic_class.explicit_bases(db));
     let bases_display = dynamic_class
         .explicit_bases(db)
         .iter()
-        .map(|base| base.display(db, env))
+        .map(|base| base.display_with(db, env, settings.clone()))
         .join(", ");
     report_mro_error_kind(
         context,
@@ -337,12 +343,15 @@ pub(super) fn report_mro_error_kind<'db>(
         DynamicMroErrorKind::DuplicateBases(duplicates) => {
             if let Some(builder) = context.report_lint(&DUPLICATE_BASE, call_expr) {
                 let env = context.program_environment();
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, duplicates);
                 builder.into_diagnostic(format_args!(
                     "Duplicate base class{maybe_s} {dupes} in class `{class_name}`",
                     maybe_s = if duplicates.len() == 1 { "" } else { "es" },
                     dupes = duplicates
                         .iter()
-                        .map(|base: &ClassBase<'_>| base.display(db, env))
+                        .map(|base: &ClassBase<'_>| {
+                            base.display_with(db, env, settings.clone())
+                        })
                         .join(", "),
                 ));
             }

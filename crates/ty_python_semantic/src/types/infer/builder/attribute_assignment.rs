@@ -810,10 +810,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     .context
                     .report_lint(&INVALID_ASSIGNMENT, self.target)
                 {
+                    let types = [value_ty, object_ty];
                     let settings = DisplaySettings::from_possibly_ambiguous_types(
-                        db,
-                        env,
-                        [value_ty, object_ty],
+                        &self.builder.context,
+                        types,
                     );
                     builder.into_diagnostic(format_args!(
                         "Object of type `{}` is not assignable to attribute `{}` on type `{}`",
@@ -917,6 +917,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 );
             }
             AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty, failure } => {
+                let types = [value_ty, self.object_ty]
+                    .into_iter()
+                    .chain(failure.invalid_argument_types());
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(&self.builder.context, types);
                 failure.report_diagnostics_with_override(
                     &self.builder.context,
                     self.target.into(),
@@ -924,12 +929,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         lint: &INVALID_ASSIGNMENT,
                         message: format!(
                             "Cannot assign object of type `{}` to attribute `{}` on type `{}`",
-                            value_ty.display(db, env),
+                            value_ty.display_with(db, env, settings.clone()),
                             self.attribute,
-                            self.object_ty.display(db, env)
+                            self.object_ty.display_with(db, env, settings.clone())
                         ),
                         info: "This assignment implicitly calls a custom `__setattr__` method",
                         argument_ranges: &[self.target.range(), self.value.range()],
+                        display_settings: settings,
                     },
                 );
             }
