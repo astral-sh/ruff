@@ -555,10 +555,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if !mixin_class.could_coexist_in_mro_with(db, env, enum_base, &constraints)
                 && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
             {
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    &self.context,
+                    [mixin_class, enum_base],
+                );
                 builder.into_diagnostic(format_args!(
                     "Class `{}` cannot be used as an enum mixin with `{}`",
-                    mixin_class.name(db),
-                    base_class.name(self.program_environment().python_version(db)),
+                    mixin_class
+                        .class_literal(db)
+                        .display_with(db, settings.clone()),
+                    enum_base.class_literal(db).display_with(db, settings),
                 ));
                 return (None, false);
             }

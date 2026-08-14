@@ -1567,12 +1567,14 @@ fn covariant_supertype_hint<'db>(
 /// Add a diagnostic hint for cases like an invalid `list[bool]` to `list[int]` assignment,
 /// that fails due to invariance.
 pub(super) fn add_invariant_generic_hints<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    context: &InferContext<'db, '_>,
     diag: &mut Diagnostic,
     expected_ty: Type<'db>,
     provided_ty: Type<'db>,
+    settings: &DisplaySettings<'db>,
 ) {
+    let db = context.db();
+    let env = context.program_environment();
     let Some((expected_class, expected_specialization)) = expected_ty.class_specialization(db, env)
     else {
         return;
@@ -1614,7 +1616,7 @@ pub(super) fn add_invariant_generic_hints<'db>(
         return;
     }
 
-    let class_name = expected_class.name(db);
+    let class_name = ClassLiteral::Static(expected_class).display_with(db, settings.clone());
     let message = match (generic_context.len(db), mismatch_indices.as_slice()) {
         (1, _) => {
             format!("`{class_name}` is invariant in its type parameter")
@@ -1749,7 +1751,7 @@ pub(super) fn report_invalid_assignment<'db>(
 
     // special case message
     note_numbers_module_not_supported(db, env, &mut diag, target_ty, value_ty);
-    add_invariant_generic_hints(db, env, &mut diag, target_ty, value_ty);
+    add_invariant_generic_hints(context, &mut diag, target_ty, value_ty, &settings);
 }
 
 pub(super) fn report_invalid_attribute_assignment(

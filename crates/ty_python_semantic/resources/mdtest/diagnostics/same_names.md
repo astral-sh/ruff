@@ -167,8 +167,8 @@ class Config:
 
 ## Specialized class instances
 
-Precisely modeled `property`, `range`, and `TypeAliasType` instances remain distinct from
-user-defined classes with the same names.
+Precisely modeled `property`, `range`, `TypeAliasType`, `TypeVar`, `ParamSpec`, and `TypeVarTuple`
+instances remain distinct from user-defined classes with the same names.
 
 ```toml
 [environment]
@@ -181,9 +181,14 @@ python-version = "3.13"
 class property: ...
 class range: ...
 class TypeAliasType: ...
+class TypeVar: ...
+class ParamSpec: ...
+class TypeVarTuple: ...
 ```
 
 ```py
+from typing import ParamSpec, TypeVar, TypeVarTuple
+
 import custom
 
 class Owner:
@@ -202,14 +207,31 @@ type Alias = int
 # error: [invalid-assignment] "Object of type `typing_extensions.TypeAliasType` is not assignable to `custom.TypeAliasType`"
 wrong_alias: custom.TypeAliasType = Alias
 
+T = TypeVar("T")
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+# error: [invalid-assignment] "Object of type `typing.TypeVar` is not assignable to `custom.TypeVar`"
+wrong_typevar: custom.TypeVar = T
+
+# error: [invalid-assignment] "Object of type `typing.ParamSpec` is not assignable to `custom.ParamSpec`"
+wrong_paramspec: custom.ParamSpec = P
+
+# error: [invalid-assignment] "Object of type `typing.TypeVarTuple` is not assignable to `custom.TypeVarTuple`"
+wrong_typevartuple: custom.TypeVarTuple = Ts
+
 def accepts_property(value: custom.property) -> None: ...
 def accepts_range(value: custom.range) -> None: ...
+def accepts_typevar(value: custom.TypeVar) -> None: ...
 
 # error: [invalid-argument-type] "Expected `custom.property`, found `builtins.property`"
 accepts_property(Owner.value)
 
 # error: [invalid-argument-type] "Expected `custom.range`, found `builtins.range`"
 accepts_range(range(4))
+
+# error: [invalid-argument-type] "Expected `custom.TypeVar`, found `typing.TypeVar`"
+accepts_typevar(T)
 ```
 
 ## Generic aliases
@@ -242,6 +264,42 @@ T = TypeVar("T")
 
 class Container(Generic[T]):
     pass
+```
+
+## Specialized type alias values
+
+Specialized type alias values distinguish both their class arguments and their own alias names from
+unrelated classes with the same names.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`first.py`:
+
+```py
+class Model: ...
+class Alias: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+type Alias[T] = list[T]
+
+# error: [invalid-assignment] "Object of type `<type alias 'Alias[second.Model]'>` is not assignable to `first.Model`"
+wrong_argument: first.Model = Alias[second.Model]
+
+# error: [invalid-assignment] "Object of type `<type alias 'mdtest_snippet.Alias[Model]'>` is not assignable to `first.Alias`"
+wrong_alias: first.Alias = Alias[second.Model]
 ```
 
 ## Protocols
@@ -1555,6 +1613,76 @@ error[invalid-argument-type]: Invalid argument to parameter `typename` of `Typed
    |
 15 | TypedDict(custom.str(), {})  # snapshot: invalid-argument-type
    |           ^^^^^^^^^^^^ Expected `builtins.str`, found `custom.str`
+```
+
+## Invariant generic explanations
+
+Invariance notes distinguish the generic container from same-named classes used as its type
+arguments, both for function calls and assignments.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+import first
+
+class Model(first.Model): ...
+```
+
+`container.py`:
+
+```py
+class Model[T]:
+    value: T
+```
+
+```py
+import container
+import first
+import second
+
+def accepts(value: container.Model[first.Model]) -> None: ...
+def arguments(value: container.Model[second.Model]) -> None:
+    accepts(value)  # snapshot: invalid-argument-type
+
+def assignments(value: container.Model[second.Model]) -> None:
+    wrong: container.Model[first.Model] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `accepts` is incorrect
+ --> src/mdtest_snippet.py:7:13
+  |
+7 |     accepts(value)  # snapshot: invalid-argument-type
+  |             ^^^^^ Expected `container.Model[first.Model]`, found `container.Model[second.Model]`
+info: Function defined here
+ --> src/mdtest_snippet.py:5:5
+  |
+5 | def accepts(value: container.Model[first.Model]) -> None: ...
+  |     ^^^^^^^ ----------------------------------- Parameter declared here
+info: `container.Model` is invariant in its type parameter
+info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
+
+
+error[invalid-assignment]: Object of type `container.Model[second.Model]` is not assignable to `container.Model[first.Model]`
+  --> src/mdtest_snippet.py:10:43
+   |
+10 |     wrong: container.Model[first.Model] = value  # snapshot: invalid-assignment
+   |            ----------------------------   ^^^^^ Incompatible value of type `container.Model[second.Model]`
+   |            |
+   |            Declared type
+info: `container.Model` is invariant in its type parameter
+info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
 ```
 
 ## Assignability explanations
@@ -2898,6 +3026,32 @@ error[invalid-argument-type]: Expected `builtins.int` for `start` argument, got 
   |
 6 | Enum("Model", "ITEM", start=custom.int())  # snapshot: invalid-argument-type
   |                             ^^^^^^^^^^^^
+```
+
+## Enum mixin conflicts
+
+Invalid enum mixins remain distinct from same-named enum base classes.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from enum import IntEnum as BaseIntEnum, IntFlag as BaseIntFlag, StrEnum as BaseStrEnum
+
+class IntEnum(str): ...
+class StrEnum(int): ...
+class IntFlag(str): ...
+
+# error: [invalid-base] "Class `mdtest_snippet.IntEnum` cannot be used as an enum mixin with `enum.IntEnum`"
+BaseIntEnum("Result", "ITEM", type=IntEnum)
+
+# error: [invalid-base] "Class `mdtest_snippet.StrEnum` cannot be used as an enum mixin with `enum.StrEnum`"
+BaseStrEnum("Result", "ITEM", type=StrEnum)
+
+# error: [invalid-base] "Class `mdtest_snippet.IntFlag` cannot be used as an enum mixin with `enum.IntFlag`"
+BaseIntFlag("Result", "ITEM", type=IntFlag)
 ```
 
 ## NamedTuple arguments that shadow built-ins

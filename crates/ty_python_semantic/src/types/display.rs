@@ -682,6 +682,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
     }
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        let mut displayed_specialization = None;
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
             Type::PropertyInstance(property) => {
@@ -690,10 +691,16 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
             Type::KnownInstance(KnownInstanceType::Range { .. }) => {
                 self.record_known_class(db, KnownClass::Range);
             }
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
-                if alias.specialization(db).is_none() =>
-            {
-                self.record_known_class(db, KnownClass::TypeAliasType);
+            Type::KnownInstance(known_instance @ KnownInstanceType::TypeVar(_)) => {
+                self.record_known_class(db, known_instance.class(db));
+            }
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                if let Some(specialization) = alias.specialization(db) {
+                    self.record_type_alias(db, alias);
+                    displayed_specialization = Some(specialization);
+                } else {
+                    self.record_known_class(db, KnownClass::TypeAliasType);
+                }
             }
             Type::LiteralValue(literal) => {
                 if let LiteralValueTypeKind::Enum(literal) = literal.kind() {
@@ -719,6 +726,11 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
             if !self.visited_types.borrow_mut().insert(ty) {
                 // If we have already seen this type, we can skip it.
                 return;
+            }
+            if let Some(specialization) = displayed_specialization {
+                for argument in specialization.types(db) {
+                    self.visit_type(db, *argument);
+                }
             }
             visitor::walk_non_atomic_type(db, t, self);
         }
@@ -3745,14 +3757,13 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 if let Some(specialization) = alias.specialization(db) {
                     f.set_invalid_type_annotation();
                     f.write_str("<type alias '")?;
-                    f.with_type(ty).write_str(alias.name(db))?;
+                    write!(
+                        f.with_type(ty),
+                        "{}",
+                        alias.display_with(db, self.settings.clone())
+                    )?;
                     specialization
-                        .display_short(
-                            db,
-                            self.env,
-                            TupleSpecialization::No,
-                            DisplaySettings::default(),
-                        )
+                        .display_short(db, self.env, TupleSpecialization::No, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_str("'>")
                 } else if let Some(class) =
@@ -3771,7 +3782,17 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
             // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
             KnownInstanceType::TypeVar(typevar_instance) => {
-                if typevar_instance.kind(db).is_paramspec() {
+                if let Some(class) = self
+                    .known_instance
+                    .class(db)
+                    .try_to_class_literal(db, self.env)
+                {
+                    write!(
+                        f.with_type(ty),
+                        "{}",
+                        ClassLiteral::Static(class).display_with(db, self.settings.clone())
+                    )
+                } else if typevar_instance.kind(db).is_paramspec() {
                     f.with_type(ty).write_str("ParamSpec")
                 } else if typevar_instance.kind(db).is_typevartuple() {
                     f.with_type(ty).write_str("TypeVarTuple")

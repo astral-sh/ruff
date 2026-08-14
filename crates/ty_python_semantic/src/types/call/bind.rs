@@ -9157,7 +9157,13 @@ impl<'db> BindingError<'db> {
                     );
                 }
 
-                add_invariant_generic_hints(db, env, &mut diag, *expected_ty, *provided_ty);
+                add_invariant_generic_hints(
+                    context.context,
+                    &mut diag,
+                    *expected_ty,
+                    *provided_ty,
+                    &display_settings,
+                );
             }
 
             Self::InvalidKeyType {
