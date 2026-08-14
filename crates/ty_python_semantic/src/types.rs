@@ -2551,37 +2551,24 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Like [`Type::filter_union`], but also expands elements that are themselves aliases for a
-    /// union.
+    /// If the type is a union (or a type alias that resolves to one) with elements that are
+    /// themselves aliases, expands those elements into the union.
     ///
-    /// Such an element is normally left unexpanded so diagnostics can name it, which hides its
-    /// members from the predicate. Use this when the predicate asks what *shape* an element has —
-    /// whether it is a callable or a `TypedDict` — since an alias standing in for a union of those
-    /// has no shape of its own and would be rejected on its name alone.
+    /// Otherwise, returns the type unchanged.
     ///
-    /// Prefer plain [`Type::filter_union`] when the predicate asks whether an element mentions an
-    /// unsolved typevar. Expanding there exposes typevars that inference is still in the middle of
-    /// binding, and the elements holding them get filtered away before they can be solved.
-    fn filter_union_expanding_aliases(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        mut f: impl FnMut(&Type<'db>) -> bool,
-    ) -> Type<'db> {
-        let Type::Union(union) = self.resolve_type_alias(db) else {
-            return self;
-        };
-        let union = if union.has_aliases(db) {
-            match union.expand_aliases(db, env) {
-                Type::Union(expanded) => expanded,
-                // Expanding collapsed the union to a single type, leaving nothing to filter
-                // between, so apply the predicate to it directly.
-                expanded => return if f(&expanded) { expanded } else { Type::Never },
-            }
-        } else {
-            union
-        };
-        union.filter(db, f)
+    /// An alias element is normally left unexpanded so diagnostics can name it, which hides its
+    /// members from anything inspecting the union. Expand before asking what *shape* the elements
+    /// have — whether one is a callable, a `TypedDict` — since an alias standing in for a union of
+    /// those has no shape of its own and would be judged on its name alone.
+    ///
+    /// Do not expand before asking whether an element mentions an unsolved typevar. That exposes
+    /// typevars inference is still in the middle of binding, and the elements holding them get
+    /// discarded before they can be solved.
+    fn expand_union_aliases(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self.resolve_type_alias(db) {
+            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+            _ => self,
+        }
     }
 
     /// If the type is a union, removes union elements that are disjoint from `target`.

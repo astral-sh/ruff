@@ -7080,13 +7080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     return ty;
                 }
-            } else if let Type::Union(union) = annotation {
-                // An element may itself be an alias for a union, which is left unexpanded so
-                // diagnostics can name it. Expand so the members are visible here.
-                let union = match union.expand_aliases(db, env) {
-                    Type::Union(expanded) => expanded,
-                    _ => union,
-                };
+            } else if let Type::Union(union) = annotation.expand_union_aliases(db, env) {
                 let union_elements = union.elements(self.db());
                 let mut typed_dicts = Vec::new();
                 let mut has_dict_compatible_fallback = false;
@@ -8362,7 +8356,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // in the union/intersection.
         let callable_tcx = if let Some(tcx) = tcx.annotation
             && let Some(callable) = tcx
-                .filter_union_expanding_aliases(db, env, Type::is_callable_type)
+                .expand_union_aliases(db, env)
+                .filter_union(db, Type::is_callable_type)
                 .as_callable()
         {
             match callable.signatures(self.db()).overloads.as_slice() {

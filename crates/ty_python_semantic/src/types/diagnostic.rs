@@ -1470,7 +1470,8 @@ pub(crate) fn is_invalid_typed_dict_literal<'db>(
     source: AnyNodeRef<'_>,
 ) -> bool {
     target_ty
-        .filter_union_expanding_aliases(db, env, Type::is_typed_dict)
+        .expand_union_aliases(db, env)
+        .filter_union(db, Type::is_typed_dict)
         .as_typed_dict()
         .is_some()
         && matches!(source, AnyNodeRef::ExprDict(_))
