@@ -385,27 +385,37 @@ pub(crate) fn check_static_class_definitions<'db>(
                 && !base_class.is_object(db)
                 && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node)
             {
+                let types = [Type::from(class), Type::from(base_class)];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 builder.into_diagnostic(format_args!(
                     "Protocol class `{}` cannot inherit from non-protocol class `{}`",
-                    class.name(db),
-                    base_class.name(db),
+                    ClassLiteral::Static(class).display_with(db, settings.clone()),
+                    base_class.class_literal(db).display_with(db, settings),
                 ));
             }
         } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
             if !base_class.class_literal(db).is_typed_dict(db)
                 && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, source_node)
             {
+                let types = [Type::from(class), Type::from(base_class)];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "TypedDict class `{}` can only inherit from TypedDict classes",
-                    class.name(db),
+                    ClassLiteral::Static(class).display_with(db, settings.clone()),
                 ));
                 diagnostic.set_primary_annotation_message(format_args!(
                     "`{}` is not a `TypedDict` class",
-                    base_class.name(db)
+                    base_class
+                        .class_literal(db)
+                        .display_with(db, settings.clone())
                 ));
                 diagnostic.annotate(
-                    Annotation::secondary(base_class.class_literal(db).header_span(db))
-                        .message(format_args!("`{}` defined here", base_class.name(db))),
+                    Annotation::secondary(base_class.class_literal(db).header_span(db)).message(
+                        format_args!(
+                            "`{}` defined here",
+                            base_class.class_literal(db).display_with(db, settings)
+                        ),
+                    ),
                 );
             }
             if base_class.class_literal(db).is_typed_dict(db) {
@@ -416,10 +426,12 @@ pub(crate) fn check_static_class_definitions<'db>(
         if base_class.is_final(db)
             && let Some(builder) = context.report_lint(&SUBCLASS_OF_FINAL_CLASS, source_node)
         {
+            let types = [Type::from(class), Type::from(base_class)];
+            let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
             builder.into_diagnostic(format_args!(
                 "Class `{}` cannot inherit from final class `{}`",
-                class.name(db),
-                base_class.name(db),
+                ClassLiteral::Static(class).display_with(db, settings.clone()),
+                base_class.class_literal(db).display_with(db, settings),
             ));
         }
 
@@ -447,10 +459,14 @@ pub(crate) fn check_static_class_definitions<'db>(
                 && let Some(builder) =
                     context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, source_node)
             {
+                let types = [Type::from(class), Type::from(ordered_base_class)];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Class `{}` inherits from dataclass `{}` which has `order=True`",
-                    class.name(db),
-                    ordered_base_class.name(db),
+                    ClassLiteral::Static(class).display_with(db, settings.clone()),
+                    ordered_base_class
+                        .class_literal(db)
+                        .display_with(db, settings),
                 ));
                 diagnostic.info(
                     "Comparison of instances of the child class with instances \

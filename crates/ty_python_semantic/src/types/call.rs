@@ -315,9 +315,17 @@ impl<'db> CallError<'db> {
         self.1.return_type(db, env)
     }
 
-    /// Returns the provided and expected types from every failed argument match.
-    pub(crate) fn invalid_argument_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        self.1.invalid_argument_types()
+    /// Returns the signatures that can be included in diagnostics for this call.
+    pub(crate) fn overload_signatures(&self) -> impl Iterator<Item = &Signature<'db>> {
+        self.1.overload_signatures()
+    }
+
+    /// Returns the types displayed by failed argument matches and generic specializations.
+    pub(crate) fn invalid_argument_types<'a>(
+        &'a self,
+        context: &'a InferContext<'db, '_>,
+    ) -> impl Iterator<Item = Type<'db>> + 'a {
+        self.1.invalid_argument_types(context)
     }
 
     /// Returns `Some(property)` if the call error was caused by an attempt to read a property

@@ -458,7 +458,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             report_mro_error_kind(
                 &self.context,
                 error,
-                enum_lit.name(db),
+                ClassLiteral::DynamicEnum(enum_lit),
+                &DisplaySettings::default(),
                 call_expr,
                 None,
                 None,

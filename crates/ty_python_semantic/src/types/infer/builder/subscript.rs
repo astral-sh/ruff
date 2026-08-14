@@ -2045,7 +2045,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         let types = [rhs_value_ty, object_ty, slice_ty]
                                             .into_iter()
                                             .chain(full_object_ty)
-                                            .chain(bindings.invalid_argument_types());
+                                            .chain(bindings.invalid_argument_types(&self.context));
 
                                         let settings =
                                             DisplaySettings::from_possibly_ambiguous_types(
@@ -2379,7 +2379,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             let types = [callable_ty, slice_ty, object_ty]
                                                 .into_iter()
                                                 .chain(full_object_ty)
-                                                .chain(bindings.invalid_argument_types());
+                                                .chain(
+                                                    bindings.invalid_argument_types(&self.context),
+                                                );
 
                                             let settings =
                                                 DisplaySettings::from_possibly_ambiguous_types(
@@ -2413,7 +2415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         let types = [callable_ty, slice_ty, object_ty]
                                             .into_iter()
                                             .chain(full_object_ty)
-                                            .chain(bindings.invalid_argument_types());
+                                            .chain(bindings.invalid_argument_types(&self.context));
                                         let settings =
                                             DisplaySettings::from_possibly_ambiguous_types(
                                                 &self.context,

@@ -1824,8 +1824,12 @@ pub(super) fn report_bad_dunder_get_call<'db>(
     } else {
         let types = [object_type, descriptor_type]
             .into_iter()
-            .chain(failure.invalid_argument_types());
-        let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+            .chain(failure.invalid_argument_types(context));
+        let settings = DisplaySettings::from_possibly_ambiguous_types_and_signatures(
+            context,
+            types,
+            failure.overload_signatures(),
+        );
 
         failure.report_diagnostics_with_override(
             context,
@@ -1883,8 +1887,12 @@ pub(super) fn report_bad_attribute_access_call<'db>(
     let db = context.db();
     let env = &context.program_environment();
     let attribute = target.attr.as_str();
-    let types = std::iter::once(object_type).chain(failure.invalid_argument_types());
-    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+    let types = std::iter::once(object_type).chain(failure.invalid_argument_types(context));
+    let settings = DisplaySettings::from_possibly_ambiguous_types_and_signatures(
+        context,
+        types,
+        failure.overload_signatures(),
+    );
 
     failure.report_diagnostics_with_override(
         context,
@@ -1915,6 +1923,11 @@ pub(super) fn report_bad_import_call<'db>(
     name: &str,
 ) {
     let db = context.db();
+    let settings = DisplaySettings::from_possibly_ambiguous_types_and_signatures(
+        context,
+        failure.invalid_argument_types(context),
+        failure.overload_signatures(),
+    );
 
     failure.report_diagnostics_with_override(
         context,
@@ -1927,6 +1940,7 @@ pub(super) fn report_bad_import_call<'db>(
             ),
             info: "This import implicitly calls a module-level `__getattr__` function",
             argument_ranges: &[target.range()],
+            display_settings: settings,
         },
     );
 }
@@ -1971,8 +1985,12 @@ pub(super) fn report_bad_dunder_set_call<'db>(
         };
         let types = [object_type, descriptor_type]
             .into_iter()
-            .chain(dunder_set_failure.invalid_argument_types());
-        let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+            .chain(dunder_set_failure.invalid_argument_types(context));
+        let settings = DisplaySettings::from_possibly_ambiguous_types_and_signatures(
+            context,
+            types,
+            dunder_set_failure.overload_signatures(),
+        );
 
         dunder_set_failure.report_diagnostics_with_override(
             context,
@@ -3396,14 +3414,21 @@ pub(crate) fn report_duplicate_bases(
         later_indices,
     } = duplicate_base_error;
 
-    let duplicate_name = duplicate_base.name(db);
+    let types = [Type::from(class), Type::from(*duplicate_base)];
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+    let duplicate_name = match duplicate_base {
+        ClassBase::Class(base) => {
+            Either::Left(base.class_literal(db).display_with(db, settings.clone()))
+        }
+        _ => Either::Right(duplicate_base.name(db)),
+    };
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`"));
 
     diagnostic.info(format_args!(
         "Definition of class `{}` will raise `TypeError` at runtime",
-        class.name(db)
+        ClassLiteral::Static(class).display_with(db, settings)
     ));
 
     let first_base = bases_list[*first_index].source_node();
@@ -4108,17 +4133,15 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     else {
                         return true;
                     };
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Inconsistent type arguments for `{}` among class bases",
-                        origin.name(db)
-                    ));
-
                     let types = [
                         Type::GenericAlias(earlier_alias),
                         Type::GenericAlias(supercls_alias),
                     ];
-
                     let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Inconsistent type arguments for `{}` among class bases",
+                        ClassLiteral::Static(origin).display_with(db, settings.clone())
+                    ));
 
                     let later_is_direct = matches!(
                         base,
@@ -4962,32 +4985,29 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         return;
     };
 
+    let types = [Type::from(class), Type::from(base_class)];
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+    let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
+    let base_class_name = ClassLiteral::Static(base_class).display_with(db, settings);
+
     let mut diagnostic = if base_is_frozen {
         let mut diagnostic =
             builder.into_diagnostic("Non-frozen dataclass cannot inherit from frozen dataclass");
         diagnostic.set_concise_message(format_args!(
-            "Non-frozen dataclass `{}` cannot inherit from frozen dataclass `{}`",
-            class.name(db),
-            base_class.name(db)
+            "Non-frozen dataclass `{class_name}` cannot inherit from frozen dataclass `{base_class_name}`"
         ));
         diagnostic.set_primary_annotation_message(format_args!(
-            "Subclass `{}` is not frozen but base class `{}` is",
-            class.name(db),
-            base_class.name(db)
+            "Subclass `{class_name}` is not frozen but base class `{base_class_name}` is"
         ));
         diagnostic
     } else {
         let mut diagnostic =
             builder.into_diagnostic("Frozen dataclass cannot inherit from non-frozen dataclass");
         diagnostic.set_concise_message(format_args!(
-            "Frozen dataclass `{}` cannot inherit from non-frozen dataclass `{}`",
-            class.name(db),
-            base_class.name(db)
+            "Frozen dataclass `{class_name}` cannot inherit from non-frozen dataclass `{base_class_name}`"
         ));
         diagnostic.set_primary_annotation_message(format_args!(
-            "Subclass `{}` is frozen but base class `{}` is not",
-            class.name(db),
-            base_class.name(db)
+            "Subclass `{class_name}` is frozen but base class `{base_class_name}` is not"
         ));
         diagnostic
     };
@@ -4998,7 +5018,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         diagnostic.annotate(
             context
                 .secondary(&class_node.decorator_list[position])
-                .message(format_args!("`{}` dataclass parameters", class.name(db))),
+                .message(format_args!("`{class_name}` dataclass parameters")),
         );
     }
     diagnostic.info("This causes the class creation to fail");
@@ -5010,7 +5030,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         );
         sub.annotate(
             Annotation::primary(base_class.header_span(db))
-                .message(format_args!("`{}` definition", base_class.name(db))),
+                .message(format_args!("`{base_class_name}` definition")),
         );
 
         let base_class_file = base_class.file(db);
@@ -5025,9 +5045,8 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
             .range();
 
         sub.annotate(
-            Annotation::secondary(Span::from(base_class_file).with_range(decorator_range)).message(
-                format_args!("`{}` dataclass parameters", base_class.name(db)),
-            ),
+            Annotation::secondary(Span::from(base_class_file).with_range(decorator_range))
+                .message(format_args!("`{base_class_name}` dataclass parameters")),
         );
 
         diagnostic.sub(sub);

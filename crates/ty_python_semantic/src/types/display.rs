@@ -249,6 +249,12 @@ impl<'db> DisplaySettings<'db> {
         types: impl IntoIterator<Item = impl Into<Type<'db>>>,
     ) -> Self {
         let additional = Self::from_possibly_ambiguous_types(context, types);
+        self.with_qualification_from(&additional)
+    }
+
+    /// Preserves existing qualification while incorporating another display's qualified names.
+    #[must_use]
+    pub(crate) fn with_qualification_from(&self, additional: &Self) -> Self {
         if additional.qualified.is_empty() {
             return self.clone();
         }
@@ -289,7 +295,23 @@ impl<'db> DisplaySettings<'db> {
         context: &InferContext<'db, '_>,
         signatures: impl IntoIterator<Item = impl Borrow<Signature<'db>>>,
     ) -> Self {
+        Self::from_possibly_ambiguous_types_and_signatures(
+            context,
+            std::iter::empty::<Type<'db>>(),
+            signatures,
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn from_possibly_ambiguous_types_and_signatures(
+        context: &InferContext<'db, '_>,
+        types: impl IntoIterator<Item = impl Into<Type<'db>>>,
+        signatures: impl IntoIterator<Item = impl Borrow<Signature<'db>>>,
+    ) -> Self {
         let collector = AmbiguousNameCollector::new(context.program_environment());
+        for ty in types {
+            collector.visit_type(context.db(), ty.into());
+        }
         for signature in signatures {
             walk_signature(context.db(), signature.borrow(), &collector);
         }

@@ -476,7 +476,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .chain(std::iter::once(default_ty));
                         let settings =
                             DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
-                            
+
                         let default = default_ty.display_with(db, env, settings);
                         if let Some(name) = name {
                             diagnostic.set_primary_annotation_message(format_args!(

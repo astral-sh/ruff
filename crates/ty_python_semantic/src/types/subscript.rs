@@ -347,7 +347,7 @@ impl<'db> SubscriptErrorKind<'db> {
                         let types = [callable_ty, *slice_ty, *value_ty]
                             .into_iter()
                             .chain(*full_object_ty)
-                            .chain(bindings.invalid_argument_types());
+                            .chain(bindings.invalid_argument_types(context));
 
                         let settings =
                             DisplaySettings::from_possibly_ambiguous_types(context, types);

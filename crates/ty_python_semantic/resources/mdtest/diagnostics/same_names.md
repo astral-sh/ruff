@@ -432,6 +432,260 @@ info: Function defined here
   |         ^^^^^^^       ------------- Parameter declared here
 ```
 
+## Generic descriptor access and assignments
+
+Descriptor diagnostics distinguish the owner from same-named type-variable bounds and constraints.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`descriptor.py`:
+
+```py
+from typing import TypeVar
+
+import first
+
+Bounded = TypeVar("Bounded", bound=first.Model)
+Constrained = TypeVar("Constrained", first.Model, int)
+
+class BoundedDescriptor:
+    def __get__(self, instance: Bounded, owner: object) -> Bounded:
+        return instance
+
+class ConstrainedDescriptor:
+    def __set__(self, instance: object, value: Constrained) -> None: ...
+```
+
+`owner.py`:
+
+```py
+import descriptor
+
+class Model:
+    bounded: descriptor.BoundedDescriptor = descriptor.BoundedDescriptor()
+    constrained: descriptor.ConstrainedDescriptor = descriptor.ConstrainedDescriptor()
+```
+
+```py
+import owner
+
+instance = owner.Model()
+instance.bounded  # snapshot: invalid-attribute-access
+
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `constrained` on type `owner.Model`: Argument type `owner.Model` does not satisfy constraints (`first.Model`, `int`)"
+instance.constrained = instance
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to descriptor attribute `bounded` on type `owner.Model`
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | instance.bounded  # snapshot: invalid-attribute-access
+  | ^^^^^^^^ Argument type `owner.Model` does not satisfy upper bound `first.Model` of type variable `Bounded`
+info: Argument to function `BoundedDescriptor.__get__` is incorrect
+info: This access implicitly calls `__get__` on a descriptor of type `BoundedDescriptor`
+info: Type variable defined here
+ --> src/descriptor.py:5:1
+  |
+5 | Bounded = TypeVar("Bounded", bound=first.Model)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Generic descriptors with same-named owners
+
+Generic descriptor diagnostics distinguish the owner from a same-named descriptor even when its
+type-variable bound or constraints have a different name.
+
+`bound.py`:
+
+```py
+class Other: ...
+```
+
+`descriptor.py`:
+
+```py
+from typing import TypeVar
+
+import bound
+
+Bounded = TypeVar("Bounded", bound=bound.Other)
+Constrained = TypeVar("Constrained", bound.Other, int)
+
+class Model:
+    def __get__(self, instance: Bounded, owner: object) -> Bounded:
+        return instance
+
+    def __set__(self, instance: object, value: Constrained) -> None: ...
+```
+
+`owner.py`:
+
+```py
+import descriptor
+
+class Model:
+    item: descriptor.Model = descriptor.Model()
+```
+
+```py
+import owner
+
+instance = owner.Model()
+instance.item  # snapshot: invalid-attribute-access
+
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `item` on type `owner.Model`: Argument type `owner.Model` does not satisfy constraints (`Other`, `int`)"
+instance.item = instance
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to descriptor attribute `item` on type `owner.Model`
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | instance.item  # snapshot: invalid-attribute-access
+  | ^^^^^^^^ Argument type `owner.Model` does not satisfy upper bound `Other` of type variable `Bounded`
+info: Argument to function `descriptor.Model.__get__` is incorrect
+info: This access implicitly calls `__get__` on a descriptor of type `descriptor.Model`
+info: Type variable defined here
+ --> src/descriptor.py:5:1
+  |
+5 | Bounded = TypeVar("Bounded", bound=bound.Other)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Overloaded descriptor access
+
+Overload candidates distinguish their parameter types from the same-named descriptor owner.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`descriptor.py`:
+
+```py
+from typing import overload
+
+import first
+
+class Descriptor:
+    @overload
+    def __get__(self, instance: first.Model, owner: object) -> int: ...
+    @overload
+    def __get__(self, instance: int, owner: object) -> str: ...
+    def __get__(self, instance: first.Model | int, owner: object) -> int | str:
+        return 1
+```
+
+`owner.py`:
+
+```py
+import descriptor
+
+class Model:
+    item: descriptor.Descriptor = descriptor.Descriptor()
+```
+
+```py
+import owner
+
+owner.Model().item  # snapshot: invalid-attribute-access
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to descriptor attribute `item` on type `owner.Model`
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | owner.Model().item  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^^^ No overload of function `Descriptor.__get__` matches arguments
+info: This access implicitly calls `__get__` on a descriptor of type `Descriptor`
+info: First overload defined here
+ --> src/descriptor.py:6:5
+  |
+6 | /     @overload
+7 | |     def __get__(self, instance: first.Model, owner: object) -> int: ...
+  | |_______________________________________________________________________^ First overload defined here
+info: Possible overloads for function `__get__`:
+info:   (self, instance: first.Model, owner: object) -> int
+info:   (self, instance: int, owner: object) -> str
+info: Overload implementation defined here
+  --> src/descriptor.py:10:9
+   |
+10 |     def __get__(self, instance: first.Model | int, owner: object) -> int | str:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Overloaded descriptor access with incompatible argument counts
+
+Overload candidates distinguish same-named owners and parameter types even when every candidate has
+the wrong number of parameters.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`descriptor.py`:
+
+```py
+from typing import overload
+
+import first
+
+class Descriptor:
+    @overload
+    def __get__(self, instance: first.Model, owner: object, extra: int) -> int: ...
+    @overload
+    def __get__(self, instance: int, owner: object, extra: int) -> str: ...
+    def __get__(self, instance: first.Model | int, owner: object, extra: int) -> int | str:
+        return 1
+```
+
+`owner.py`:
+
+```py
+import descriptor
+
+class Model:
+    item: descriptor.Descriptor = descriptor.Descriptor()
+```
+
+```py
+import owner
+
+owner.Model().item  # snapshot: invalid-attribute-access
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to descriptor attribute `item` on type `owner.Model`
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | owner.Model().item  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^^^ No overload of function `Descriptor.__get__` matches arguments
+info: This access implicitly calls `__get__` on a descriptor of type `Descriptor`
+info: First overload defined here
+ --> src/descriptor.py:6:5
+  |
+6 | /     @overload
+7 | |     def __get__(self, instance: first.Model, owner: object, extra: int) -> int: ...
+  | |___________________________________________________________________________________^ First overload defined here
+info: Possible overloads for function `__get__`:
+info:   (self, instance: first.Model, owner: object, extra: int) -> int
+info:   (self, instance: int, owner: object, extra: int) -> str
+info: Overload implementation defined here
+  --> src/descriptor.py:10:9
+   |
+10 |     def __get__(self, instance: first.Model | int, owner: object, extra: int) -> int | str:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
 ## Method and constructor descriptions
 
 Call diagnostics distinguish the class that defines a method or constructor from a same-named
@@ -484,6 +738,46 @@ info: Method defined here
   |
 4 |     def __init__(self, value: first.Model) -> None: ...
   |         ^^^^^^^^       ------------------ Parameter declared here
+```
+
+## Generic method specializations
+
+Diagnostics for invalid generic method calls distinguish the method's defining class from same-named
+argument types, bounds, and constraints.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+from typing import TypeVar
+
+import first
+
+Bounded = TypeVar("Bounded", bound=first.Model)
+Constrained = TypeVar("Constrained", first.Model, int)
+
+class Model:
+    def bounded(self, value: Bounded) -> Bounded:
+        return value
+
+    def constrained(self, value: Constrained) -> Constrained:
+        return value
+```
+
+```py
+import second
+
+def calls(value: second.Model) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `second.Model.bounded` is incorrect: Argument type `second.Model` does not satisfy upper bound `first.Model`"
+    value.bounded(value)
+
+    # error: [invalid-argument-type] "Argument to bound method `second.Model.constrained` is incorrect: Argument type `second.Model` does not satisfy constraints (`first.Model`, `int`)"
+    value.constrained(value)
 ```
 
 ## Function defaults, assertions, and narrowing
@@ -622,6 +916,47 @@ class SecondBase(SharedBase[second.Model]): ...
 class InconsistentBases(FirstBase, SecondBase): ...
 ```
 
+## Generic bases with same-named origins and arguments
+
+Diagnostics for inconsistent generic bases distinguish the generic ancestor from a same-named type
+argument in both the headline and the base annotations.
+
+`first.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Model(Generic[T]): ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+class FirstBase(first.Model[int]): ...
+class SecondBase(first.Model[second.Model]): ...
+class Combined(FirstBase, SecondBase): ...  # snapshot: invalid-generic-class
+```
+
+```snapshot
+error[invalid-generic-class]: Inconsistent type arguments for `first.Model` among class bases
+ --> src/mdtest_snippet.py:6:7
+  |
+6 | class Combined(FirstBase, SecondBase): ...  # snapshot: invalid-generic-class
+  |       ^^^^^^^^^---------^^----------^
+  |                |          |
+  |                |          Later class base inherits from `first.Model[second.Model]`
+  |                Earlier class base inherits from `first.Model[int]`
+```
+
 ## TypedDict inheritance and assignments
 
 Inherited field overrides, explicit extra items, and assignments all compare the declared and actual
@@ -756,6 +1091,7 @@ python-version = "3.15"
 from typing import ReadOnly, TypedDict
 
 class Closed(TypedDict, closed=True): ...
+class ClosedWithAdditionalField(TypedDict, closed=True): ...
 class ReadOnlyExtras(TypedDict, extra_items=ReadOnly[int]): ...
 class MutableExtras(TypedDict, extra_items=int): ...
 class MutableExtrasType(TypedDict, extra_items=int): ...
@@ -766,6 +1102,10 @@ import first
 
 # error: [invalid-typed-dict-header] "TypedDict `mdtest_snippet.Closed` must remain closed because base `first.Closed` is closed"
 class Closed(first.Closed, closed=False): ...
+
+# error: [invalid-typed-dict-header] "Cannot add item `additional` to closed TypedDict base `first.ClosedWithAdditionalField`"
+class ClosedWithAdditionalField(first.ClosedWithAdditionalField, closed=True):
+    additional: int
 
 # error: [invalid-typed-dict-header] "TypedDict `mdtest_snippet.ReadOnlyExtras` cannot be open because base `first.ReadOnlyExtras` has extra items"
 class ReadOnlyExtras(first.ReadOnlyExtras, closed=False): ...
@@ -1325,7 +1665,7 @@ info: Overload returns `first.Model`, which is not assignable to implementation 
 ## Overload call candidates
 
 Diagnostics for calls that do not match any overload distinguish same-named parameter types across
-all candidate signatures.
+all candidate signatures and identify same-named classes that define overloaded methods.
 
 `first.py`:
 
@@ -1352,6 +1692,15 @@ def unmatched(value: second.Model) -> None: ...
 def unmatched(value: first.Model | second.Model) -> None: ...
 
 unmatched(1)  # snapshot: no-matching-overload
+
+class Model:
+    @overload
+    def method(self, value: first.Model) -> None: ...
+    @overload
+    def method(self, value: int) -> None: ...
+    def method(self, value: first.Model | int) -> None: ...
+
+Model().method(second.Model())  # snapshot: no-matching-overload
 ```
 
 ```snapshot
@@ -1374,23 +1723,47 @@ info: Overload implementation defined here
    |
 10 | def unmatched(value: first.Model | second.Model) -> None: ...
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+error[no-matching-overload]: No overload of bound method `mdtest_snippet.Model.method` matches arguments
+  --> src/mdtest_snippet.py:21:1
+   |
+21 | Model().method(second.Model())  # snapshot: no-matching-overload
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: First overload defined here
+  --> src/mdtest_snippet.py:15:5
+   |
+15 | /     @overload
+16 | |     def method(self, value: first.Model) -> None: ...
+   | |_____________________________________________________^ First overload defined here
+info: Possible overloads for bound method `method`:
+info:   (self, value: first.Model) -> None
+info:   (self, value: int) -> None
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:19:9
+   |
+19 |     def method(self, value: first.Model | int) -> None: ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ## Non-matching overload candidates
 
 When one overload matches the number of arguments but rejects an argument's type, the remaining
-candidate signatures remain consistent with the expected and actual argument types.
+candidate signatures distinguish same-named types even when those types differ from the expected and
+actual argument types.
 
 `first.py`:
 
 ```py
 class Model: ...
+class Interface: ...
 ```
 
 `second.py`:
 
 ```py
 class Model: ...
+class Interface: ...
 ```
 
 ```py
@@ -1403,16 +1776,24 @@ import second
 def partial(value: first.Model, extra: int) -> None: ...
 @overload
 def partial(value: second.Model) -> None: ...
-def partial(value: first.Model | second.Model, extra: int | None = None) -> None: ...
+@overload
+def partial(value: first.Interface) -> None: ...
+@overload
+def partial(value: second.Interface, extra: int, more: int) -> None: ...
+def partial(
+    value: first.Model | second.Model | first.Interface | second.Interface,
+    extra: int | None = None,
+    more: int | None = None,
+) -> None: ...
 
 partial(second.Model(), 1)  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `partial` is incorrect
-  --> src/mdtest_snippet.py:12:9
+  --> src/mdtest_snippet.py:20:9
    |
-12 | partial(second.Model(), 1)  # snapshot: invalid-argument-type
+20 | partial(second.Model(), 1)  # snapshot: invalid-argument-type
    |         ^^^^^^^^^^^^^^ Expected `first.Model`, found `second.Model`
 info: Matching overload defined here
  --> src/mdtest_snippet.py:7:5
@@ -1421,6 +1802,8 @@ info: Matching overload defined here
   |     ^^^^^^^ ------------------ Parameter declared here
 info: Non-matching overloads for function `partial`:
 info:   (value: second.Model) -> None
+info:   (value: first.Interface) -> None
+info:   (value: second.Interface, extra: int, more: int) -> None
 ```
 
 ## Invalid super arguments
@@ -2000,6 +2383,7 @@ same-named derived classes, base classes, and metaclasses.
 class First: ...
 class Second: ...
 class Conflict(First, Second): ...
+class DynamicConflict(First, Second): ...
 class Meta(type): ...
 class Custom(metaclass=Meta): ...
 class Explicit(metaclass=Meta): ...
@@ -2014,6 +2398,7 @@ class Layout:
 import first
 
 class Conflict(first.Second, first.First): ...
+class DynamicConflict(first.Second, first.First): ...
 class Meta(type): ...
 class Custom(metaclass=Meta): ...
 
@@ -2034,6 +2419,9 @@ class Conflict(first.Conflict, second.Conflict): ...
 # error: [inconsistent-mro] "bases `[<class 'first.Conflict'>, <class 'second.Conflict'>]`"
 BadDynamicMro = type("BadDynamicMro", (first.Conflict, second.Conflict), {})
 
+# error: [inconsistent-mro] "for class `mdtest_snippet.DynamicConflict` with bases `[<class 'first.DynamicConflict'>, <class 'second.DynamicConflict'>]`"
+DynamicConflict = type("DynamicConflict", (first.DynamicConflict, second.DynamicConflict), {})
+
 # error: [conflicting-metaclass] "`first.Meta` (metaclass of base class `first.Custom`) and `second.Meta` (metaclass of base class `second.Custom`)"
 class BadMetaclass(first.Custom, second.Custom): ...
 
@@ -2048,6 +2436,174 @@ BadDynamicMetaclass = type("BadDynamicMetaclass", (first.Custom, second.Custom),
 
 # error: [instance-layout-conflict] "Bases `first.Layout` and `second.Layout` cannot be combined in multiple inheritance"
 class BadLayout(first.Layout, second.Layout): ...
+```
+
+## Unsupported dynamic class bases
+
+Dynamic-class diagnostics distinguish an unsupported base type from a same-named class created by
+`type()`.
+
+```toml
+[rules]
+unsupported-dynamic-base = "error"
+```
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+
+def create(base: type[first.Model]) -> None:
+    Model = type("Model", (base,), {})  # snapshot: unsupported-dynamic-base
+```
+
+```snapshot
+error[unsupported-dynamic-base]: Unsupported class base
+ --> src/mdtest_snippet.py:4:28
+  |
+4 |     Model = type("Model", (base,), {})  # snapshot: unsupported-dynamic-base
+  |                            ^^^^ Has type `type[first.Model]`
+info: ty cannot determine a MRO for class `mdtest_snippet.<locals of function 'create'>.Model` due to this base
+info: Only class objects or `Any` are supported as class bases
+```
+
+## Final-class inheritance
+
+Static classes and classes constructed with `type()` or `types.new_class()` distinguish themselves
+from a same-named final base.
+
+`first.py`:
+
+```py
+from typing import final
+
+@final
+class Model: ...
+
+@final
+class DynamicModel: ...
+
+@final
+class NewModel: ...
+```
+
+```py
+from types import new_class
+
+import first
+
+# error: [subclass-of-final-class] "Class `mdtest_snippet.Model` cannot inherit from final class `first.Model`"
+class Model(first.Model): ...
+
+# error: [subclass-of-final-class] "Class `mdtest_snippet.DynamicModel` cannot inherit from final class `first.DynamicModel`"
+DynamicModel = type("DynamicModel", (first.DynamicModel,), {})
+
+# error: [subclass-of-final-class] "Class `mdtest_snippet.NewModel` cannot inherit from final class `first.NewModel`"
+NewModel = new_class("NewModel", (first.NewModel,))
+```
+
+## Dataclass inheritance
+
+Ordered and frozen dataclass diagnostics distinguish a derived class from a same-named base,
+including the concise messages for incompatible frozen inheritance.
+
+`first.py`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(order=True)
+class Ordered:
+    value: int
+
+@dataclass(frozen=True)
+class Frozen:
+    value: int
+
+@dataclass
+class NonFrozen:
+    value: int
+```
+
+```py
+from dataclasses import dataclass
+
+import first
+
+# error: [subclass-of-dataclass-with-order] "Class `mdtest_snippet.Ordered` inherits from dataclass `first.Ordered` which has `order=True`"
+class Ordered(first.Ordered): ...
+
+@dataclass
+# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `mdtest_snippet.Frozen` cannot inherit from frozen dataclass `first.Frozen`"
+class Frozen(first.Frozen): ...
+
+@dataclass(frozen=True)
+# error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `mdtest_snippet.NonFrozen` cannot inherit from non-frozen dataclass `first.NonFrozen`"
+class NonFrozen(first.NonFrozen): ...
+```
+
+## Protocol and TypedDict inheritance
+
+Invalid protocol and TypedDict bases remain distinct from the same-named classes inheriting them.
+
+`first.py`:
+
+```py
+class Interface: ...
+class Record: ...
+```
+
+```py
+from typing import Protocol, TypedDict
+
+import first
+
+# error: [invalid-protocol] "Protocol class `mdtest_snippet.Interface` cannot inherit from non-protocol class `first.Interface`"
+class Interface(first.Interface, Protocol): ...
+
+# error: [invalid-typed-dict-header] "TypedDict class `mdtest_snippet.Record` can only inherit from TypedDict classes: `first.Record` is not a `TypedDict` class"
+class Record(first.Record, TypedDict): ...
+```
+
+## Duplicate class bases
+
+Duplicate-base diagnostics distinguish static and dynamic derived classes from the repeated base.
+
+`first.py`:
+
+```py
+class Named: ...
+class DynamicNamed: ...
+class NewNamed: ...
+```
+
+```py
+from types import new_class
+
+import first
+
+class Named(first.Named, first.Named): ...  # snapshot: duplicate-base
+
+# error: [duplicate-base] "Duplicate base class <class 'first.DynamicNamed'> in class `mdtest_snippet.DynamicNamed`"
+DynamicNamed = type("DynamicNamed", (first.DynamicNamed, first.DynamicNamed), {})
+
+# error: [duplicate-base] "Duplicate base class <class 'first.NewNamed'> in class `mdtest_snippet.NewNamed`"
+NewNamed = new_class("NewNamed", (first.NewNamed, first.NewNamed))
+```
+
+```snapshot
+error[duplicate-base]: Duplicate base class `first.Named`
+ --> src/mdtest_snippet.py:5:7
+  |
+5 | class Named(first.Named, first.Named): ...  # snapshot: duplicate-base
+  |       ^^^^^ -----------  ^^^^^^^^^^^ Class `first.Named` later repeated here
+  |             |
+  |             Class `first.Named` first included in bases list here
+info: Definition of class `mdtest_snippet.Named` will raise `TypeError` at runtime
 ```
 
 ## Enum member value explanations

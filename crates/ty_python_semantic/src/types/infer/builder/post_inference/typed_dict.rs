@@ -204,12 +204,15 @@ fn validate_typed_dict_openness<'db>(
                     .iter()
                     .find(|(field_name, _)| !base_items.contains_key(*field_name))
                 {
+                    let types = [Type::from(class), Type::from(*base)];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     report_invalid_typed_dict_openness(
                         context,
                         class,
                         format_args!(
                             "Cannot add item `{field_name}` to closed TypedDict base `{}`",
-                            base.name(db),
+                            base.class_literal(db).display_with(db, settings),
                         ),
                     );
                 }

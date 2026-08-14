@@ -919,9 +919,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty, failure } => {
                 let types = [value_ty, self.object_ty]
                     .into_iter()
-                    .chain(failure.invalid_argument_types());
-                let settings =
-                    DisplaySettings::from_possibly_ambiguous_types(&self.builder.context, types);
+                    .chain(failure.invalid_argument_types(&self.builder.context));
+                let settings = DisplaySettings::from_possibly_ambiguous_types_and_signatures(
+                    &self.builder.context,
+                    types,
+                    failure.overload_signatures(),
+                );
 
                 failure.report_diagnostics_with_override(
                     &self.builder.context,
