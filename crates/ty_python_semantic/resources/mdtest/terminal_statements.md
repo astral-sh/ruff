@@ -1022,6 +1022,128 @@ def g(x: int | None):
     reveal_type(x)  # revealed: int
 ```
 
+### Module scope
+
+A terminal call at module scope removes a binding from its branch even when the branch condition
+does not narrow that binding.
+
+```py
+from typing import NoReturn
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def continue_normally() -> None:
+    pass
+
+flag: bool = bool(input())
+value = 1
+
+if flag:
+    value = "unreachable"
+    stop()
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
+A call that returns normally must retain the binding from its branch.
+
+```py
+continuing_value = 1
+other_flag: bool = bool(input())
+
+if other_flag:
+    continuing_value = "reachable"
+    continue_normally()
+
+reveal_type(continuing_value)  # revealed: Literal[1, "reachable"]
+```
+
+An unconditional terminal call eliminates the remaining bindings.
+
+```py
+stop()
+reveal_type(continuing_value)  # revealed: Never
+```
+
+### Class scope
+
+Terminal and non-terminal calls have the same effect on class-body bindings as they do on
+module-level bindings.
+
+```py
+from typing import NoReturn
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def continue_normally() -> None:
+    pass
+
+flag: bool = bool(input())
+other_flag: bool = bool(input())
+
+class Example:
+    value = 1
+
+    if flag:
+        value = "unreachable"
+        stop()
+
+    reveal_type(value)  # revealed: Literal[1]
+
+    continuing_value = 1
+
+    if other_flag:
+        continuing_value = "reachable"
+        continue_normally()
+
+    reveal_type(continuing_value)  # revealed: Literal[1, "reachable"]
+
+    stop()
+    reveal_type(continuing_value)  # revealed: Never
+```
+
+### Overloads in module scope
+
+When only one overload returns `Never`, select the matching overload before deciding whether its
+branch terminates.
+
+```py
+from typing import NoReturn, overload
+
+@overload
+def stop_if_int(argument: int) -> NoReturn: ...
+@overload
+def stop_if_int(argument: str) -> int: ...
+def stop_if_int(argument: int | str) -> int:
+    if isinstance(argument, int):
+        raise RuntimeError
+    return 1
+
+flag: bool = bool(input())
+value = 1
+
+if flag:
+    value = "unreachable"
+    stop_if_int(1)
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
+The overload that returns normally must not remove its branch.
+
+```py
+other_flag: bool = bool(input())
+continuing_value = 1
+
+if other_flag:
+    continuing_value = "reachable"
+    stop_if_int("safe")
+
+reveal_type(continuing_value)  # revealed: Literal[1, "reachable"]
+```
+
 ### Possibly unresolved diagnostics
 
 If the codepath on which a variable is not defined eventually returns `Never`, use of the variable
