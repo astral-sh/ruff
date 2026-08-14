@@ -473,6 +473,23 @@ info: Type variable defined here
    |                                 ^^^^^^
 ```
 
+### Starred variadic arguments without a variadic return
+
+A bounded or constrained element is checked even when the return type does not contain its pack.
+
+```py
+def bounded_prefix[T: str, *Ts](*args: *tuple[T, *Ts]) -> None: ...
+def constrained_suffix[T: (str, bytes), *Ts](*args: *tuple[*Ts, T]) -> None: ...
+def check(values: list[int], valid: list[str]) -> None:
+    bounded_prefix(*valid)
+    constrained_suffix(*valid)
+
+    # error: [invalid-argument-type]
+    bounded_prefix(*values)
+    # error: [invalid-argument-type]
+    constrained_suffix(*values)
+```
+
 ### Argument types override incompatible contextual return types
 
 A contextual return type can guide compatible arguments, but it must not override the argument types
@@ -792,6 +809,30 @@ def forward_mixed[*Ts](
     accept_mixed_forwarded(callback, args)
 ```
 
+### Callable inference through nested callable parameters
+
+Nested callable parameters make the pack covariant, but inference currently loses its fixed length.
+
+```py
+from typing import Callable
+
+def nested[*Ts](
+    callback: Callable[[Callable[[*Ts], None]], None],
+    *args: *Ts,
+) -> tuple[*Ts]:
+    return args
+
+def accepts_int_callback(callback: Callable[[int], None]) -> None: ...
+def check(value: int, other: str) -> None:
+    # TODO: Should reveal `tuple[int]`.
+    reveal_type(nested(accepts_int_callback, value))  # revealed: tuple[int, ...]
+    # TODO: Should reveal `tuple[int | str]`.
+    reveal_type(nested(accepts_int_callback, other))  # revealed: tuple[int, ...]
+
+    # TODO: Should report an error because the callback accepts only one argument.
+    nested(accepts_int_callback, value, other)
+```
+
 ### Starred variadic tuple normalization
 
 A fixed provided tuple containing `Never` keeps its shape during tuple-level constraint inference.
@@ -1025,6 +1066,67 @@ def f(i: int, s: str, b: bool) -> None:
     reveal_type(foo((i, s), (b, i)))  # revealed: tuple[int, str | int]
     # error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `tuple[int]`, found `tuple[str, bool]`"
     reveal_type(foo((i,), (s, b)))  # revealed: tuple[int]
+```
+
+A positional tuple and `*args` using the same type variable tuple must have the same length. When
+their lengths match, their element types are combined.
+
+```py
+def repeat[*Ts](expected: tuple[*Ts], *args: *Ts) -> tuple[*Ts]:
+    return expected
+
+def check_repeated(i: int, s: str) -> None:
+    reveal_type(repeat(()))  # revealed: tuple[()]
+    reveal_type(repeat((i, s), i, s))  # revealed: tuple[int, str]
+    reveal_type(repeat((i, s), i, i))  # revealed: tuple[int, str | int]
+
+    # error: 5 [invalid-argument-type] "Argument to function `repeat` is incorrect: Expected `tuple[int]`, found `tuple[()]`"
+    repeat((i,))
+    # error: 20 [invalid-argument-type] "Argument to function `repeat` is incorrect: Expected `tuple[int, str]`, found `tuple[int]`"
+    repeat((i, s), i)
+    # snapshot: invalid-argument-type
+    repeat((i,), i, s)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `repeat` is incorrect
+  --> src/mdtest_snippet.py:21:18
+   |
+21 |     repeat((i,), i, s)
+   |                  ^^^^ Expected `tuple[int]`, found `tuple[int, str]`
+info: a tuple of length 2 is not assignable to a tuple of length 1
+info: Function defined here
+ --> src/mdtest_snippet.py:8:5
+  |
+8 | def repeat[*Ts](expected: tuple[*Ts], *args: *Ts) -> tuple[*Ts]:
+  |     ^^^^^^                            ---------- Parameter declared here
+```
+
+The same length and element-type rules apply when the tuple is passed as a keyword-only argument.
+
+```py
+def repeat_keyword[*Ts](*args: *Ts, expected: tuple[*Ts]) -> tuple[*Ts]:
+    return expected
+
+def check_repeated_keyword(i: int, s: str) -> None:
+    reveal_type(repeat_keyword(expected=()))  # revealed: tuple[()]
+    reveal_type(repeat_keyword(i, s, expected=(i, s)))  # revealed: tuple[int, str]
+    reveal_type(repeat_keyword(i, i, expected=(i, s)))  # revealed: tuple[int, str | int]
+
+    # error: 20 [invalid-argument-type] "Argument to function `repeat_keyword` is incorrect: Expected `tuple[int, str]`, found `tuple[int]`"
+    repeat_keyword(i, expected=(i, s))
+    # error: 20 [invalid-argument-type] "Argument to function `repeat_keyword` is incorrect: Expected `tuple[int]`, found `tuple[int, str]`"
+    repeat_keyword(i, s, expected=(i,))
+```
+
+Matching lengths are also required when the return type does not contain the type variable tuple.
+
+```py
+def repeat_without_return[*Ts](expected: tuple[*Ts], *args: *Ts) -> None: ...
+
+repeat_without_return((1, "value"), 1, "value")
+# error: [invalid-argument-type]
+repeat_without_return((1, "value"), 1)
 ```
 
 ## Type concatenation

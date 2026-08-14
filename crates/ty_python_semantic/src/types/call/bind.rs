@@ -61,6 +61,7 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
     walk_type_with_recursion_guard,
@@ -6036,6 +6037,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn infer_typevartuple_argument_constraints<'c>(
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
+        specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
         let Some((parameter_index, parameter)) = self.signature.parameters().variadic() else {
@@ -6065,41 +6067,44 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         };
 
-        let contains_typevartuple = |ty| {
-            any_over_type(db, self.env, ty, true, |nested| {
-                matches!(
-                    nested,
-                    Type::TypeVar(typevar)
-                        if typevar.identity(db) == typevartuple.identity(db)
-                )
+        // The old solver stores one specialization per TypeVarTuple, so it can only merge
+        // covariant occurrences as lower bounds. A contravariant occurrence, such as a callable
+        // parameter, instead provides an upper bound that must constrain the variadic arguments.
+        // TODO: Remove this guard when TypeVarTuple uses the new constraint solver, which can
+        // represent and solve lower and upper bounds together.
+        if self
+            .enumerate_argument_types()
+            .any(|(argument_index, _, argument, _)| {
+                !matches!(argument, Argument::Synthetic)
+                    && self.argument_matches[argument_index].iter().any(|matched| {
+                        matched.index != parameter_index
+                            && !self.signature.parameters()[matched.index]
+                                .annotated_type()
+                                .variance_of(db, self.env, typevartuple.identity(db))
+                                .is_covariant()
+                    })
             })
-        };
-
-        // Another parameter using this pack needs joint inference; do not independently widen it.
-        if !contains_typevartuple(self.return_ty)
-            || self
-                .enumerate_argument_types()
-                .any(|(argument_index, _, argument, _)| {
-                    !matches!(argument, Argument::Synthetic)
-                        && self.argument_matches[argument_index].iter().any(|matched| {
-                            matched.index != parameter_index
-                                && contains_typevartuple(
-                                    self.signature.parameters()[matched.index].annotated_type(),
-                                )
-                        })
-                })
         {
             return Ok(());
         }
 
         let mut actual = TupleSpecBuilder::with_capacity(self.arguments.len());
-        for (argument_index, _, argument, argument_types) in self.enumerate_argument_types() {
+        // Source indices of the first and last arguments matched to the variadic parameter.
+        let mut argument_indices: Option<(usize, usize)> = None;
+        for (argument_index, adjusted_argument_index, argument, argument_types) in
+            self.enumerate_argument_types()
+        {
             let matches = &self.argument_matches[argument_index];
             if !matches
                 .iter()
                 .any(|matched| matched.index == parameter_index)
             {
                 continue;
+            }
+
+            if let Some(index) = adjusted_argument_index {
+                argument_indices =
+                    Some((argument_indices.map_or(index, |(first, _)| first), index));
             }
 
             if matches!(argument, Argument::Variadic) {
@@ -6182,7 +6187,33 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
         let actual = Type::tuple(TupleType::new(db, self.env, &actual));
 
-        builder.infer(formal, actual)
+        builder.infer(formal, actual)?;
+
+        if let Some(generic_context) = self.signature.generic_context {
+            let specialization = builder.build_with(generic_context, |_, _| None);
+            let expected_ty = formal.apply_specialization(db, specialization);
+
+            // The legacy solver keeps the first pack when another occurrence has a different length.
+            if let (Some(expected_tuple), Some(actual_tuple)) = (
+                expected_ty.exact_tuple_instance_spec(db),
+                actual.exact_tuple_instance_spec(db),
+            ) && let (TupleLength::Fixed(expected), TupleLength::Fixed(provided)) =
+                (expected_tuple.len(), actual_tuple.len())
+                && expected != provided
+            {
+                specialization_errors.push(BindingError::InvalidArgumentType {
+                    parameter: ParameterContext::new(parameter, parameter_index, false),
+                    argument_index: argument_indices.map(|(first, _)| first),
+                    last_argument_index: argument_indices.map(|(_, last)| last),
+                    expected_ty,
+                    provided_ty: actual,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
+                    parameter_source: None,
+                });
+            }
+        }
+
+        Ok(())
     }
 
     fn infer_argument_constraints<'c>(
@@ -6221,7 +6252,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        if let Err(error) = self.infer_typevartuple_argument_constraints(builder)
+        if let Err(error) =
+            self.infer_typevartuple_argument_constraints(builder, specialization_errors)
             && !specialization_errors.iter().any(|existing| {
                 matches!(
                     existing,
@@ -6370,6 +6402,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.errors.push(BindingError::InvalidArgumentType {
                 parameter: ParameterContext::new(parameter, parameter_index, positional),
                 argument_index: adjusted_argument_index,
+                last_argument_index: None,
                 expected_ty,
                 provided_ty: argument_type,
                 provenance: matched_parameter.provenance,
@@ -8414,6 +8447,8 @@ pub(crate) enum BindingError<'db> {
     InvalidArgumentType {
         parameter: ParameterContext,
         argument_index: Option<usize>,
+        /// Last argument when this error describes all arguments matched to a variadic parameter.
+        last_argument_index: Option<usize>,
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
         provenance: InvalidArgumentTypeProvenance,
@@ -8571,8 +8606,16 @@ impl BindingError<'_> {
             *argument_index = map(*argument_index);
         };
         match self {
-            BindingError::InvalidArgumentType { argument_index, .. }
-            | BindingError::InvalidKeyType { argument_index, .. }
+            BindingError::InvalidArgumentType {
+                argument_index,
+                last_argument_index,
+                ..
+            } => {
+                remap(argument_index);
+                remap(last_argument_index);
+            }
+
+            BindingError::InvalidKeyType { argument_index, .. }
             | BindingError::UnknownArgument { argument_index, .. }
             | BindingError::UnknownKeywordVariadicArgument { argument_index }
             | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
@@ -8701,6 +8744,7 @@ impl<'db> BindingError<'db> {
             Self::InvalidArgumentType {
                 parameter,
                 argument_index,
+                last_argument_index,
                 expected_ty,
                 provided_ty,
                 provenance,
@@ -8711,7 +8755,10 @@ impl<'db> BindingError<'db> {
                 // silenced diagnostics during overload evaluation, and rely on the assignability
                 // diagnostic being emitted here.
 
-                let range = context.get_range(node, *argument_index);
+                let mut range = context.get_range(node, *argument_index);
+                if let Some(last) = last_argument_index {
+                    range = range.cover(context.get_range(node, Some(*last)));
+                }
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
