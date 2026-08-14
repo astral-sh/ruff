@@ -26,7 +26,7 @@ use crate::codes::Category;
 /// print("got it!")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Correctness)]
 pub(crate) struct InEmptyCollection;
 
 impl Violation for InEmptyCollection {
