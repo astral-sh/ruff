@@ -53,7 +53,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     def prop(self): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.21", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.15.21", category = Category::Suspicious)]
 pub(crate) struct DeprecatedAbcDecorator {
     from: &'static str,
     to: &'static str,

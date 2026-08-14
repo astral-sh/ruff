@@ -53,7 +53,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.7", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.9.7", category = Category::Suspicious)]
 pub(crate) struct ImplicitClassVarInDataclass;
 
 impl Violation for ImplicitClassVarInDataclass {

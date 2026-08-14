@@ -50,7 +50,7 @@ use crate::codes::Category;
 /// ## References
 /// - [Python documentation: `contextlib.contextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.14", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.15.14", category = Category::Suspicious)]
 pub(crate) struct FallibleContextManager;
 
 impl Violation for FallibleContextManager {

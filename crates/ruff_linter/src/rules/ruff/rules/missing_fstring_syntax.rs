@@ -67,7 +67,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [gettext]: https://docs.python.org/3/library/gettext.html
 /// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.1", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "v0.2.1", category = Category::Suspicious)]
 pub(crate) struct MissingFStringSyntax;
 
 impl AlwaysFixableViolation for MissingFStringSyntax {
