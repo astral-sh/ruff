@@ -32,6 +32,7 @@ jobs:
     name: "Determine changes"
     runs-on: ubuntu-latest
     outputs:
+      comparison_base: ${{ steps.merge_base.outputs.sha }}
       # Flag that is raised when any code that affects parser is changed
       parser: ${{ steps.check_parser.outputs.changed }}
       # Flag that is raised when any code that affects linter is changed
@@ -67,7 +68,12 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
         run: |
-          sha=$(git merge-base HEAD "origin/${BASE_REF}")
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            # The first parent contains any preceding layers in a stacked pull request.
+            sha="$(git rev-parse "${GITHUB_SHA}^1")"
+          else
+            sha="$(git merge-base HEAD "origin/${BASE_REF}")"
+          fi
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
       - name: Check if release build inputs changed
@@ -659,7 +665,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ needs.determine_changes.outputs.comparison_base }}
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -791,6 +797,7 @@ jobs:
       - name: Fuzz
         env:
           FORCE_COLOR: 1
+          MERGE_BASE: ${{ needs.determine_changes.outputs.comparison_base }}
           # Line-tables-only debug info: faster builds, backtraces still work.
           CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
         run: |
@@ -799,7 +806,6 @@ jobs:
           cargo build --profile=profiling --bin=ty
           mv target/profiling/ty ty-new
 
-          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
           git checkout -b old_commit "$MERGE_BASE"
           echo "old commit (merge base)"
           git rev-list --format=%s --max-count=1 old_commit
