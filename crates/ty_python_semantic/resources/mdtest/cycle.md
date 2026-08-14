@@ -693,6 +693,851 @@ class Example:
 reveal_type(Example().left)  # revealed: list[str]
 ```
 
+## Mutually dependent attributes reached through an annotated local alias
+
+A local alias can read either attribute, so both possible dependencies contribute to the same
+recursive attribute group.
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        previous: list[str] = self.right if flag else self.left
+        if flag:
+            self.left = [*previous]
+        else:
+            self.right = [*previous]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+reveal_type(Example().right)  # revealed: list[str]
+```
+
+## Widening mutually dependent attributes when the left attribute is checked first
+
+A dependent assignment can introduce a type absent from both independently initialized attributes.
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left, 1]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str | int] | list[str]
+```
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[str | int] | list[str]
+```
+
+## Widening mutually dependent attributes when the right attribute is checked first
+
+Checking the opposite attribute first preserves the type introduced by the dependent assignment.
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[str | int] | list[str]
+```
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left, 1]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str | int] | list[str]
+```
+
+## Widening mutually dependent attributes with user-defined types, left first
+
+A recursive assignment must retain a new user-defined type even when neither class is final.
+
+`left.py`:
+
+```py
+class Original: ...
+class Added: ...
+
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left, Added()]
+
+    def initialize(self) -> None:
+        self.left = [Original()]
+        self.right = [Original()]
+
+reveal_type(Example().left)  # revealed: list[Original | Added] | list[Original]
+```
+
+`right.py`:
+
+```py
+from left import Example, Original
+
+def accepts_original(value: Original) -> None: ...
+
+accepts_original(Example().right[0])  # error: [invalid-argument-type]
+reveal_type(Example().right)  # revealed: list[Original | Added] | list[Original]
+```
+
+## Widening mutually dependent attributes with user-defined types, right first
+
+Checking the opposite attribute first must not suppress the incompatible-argument diagnostic.
+
+`right.py`:
+
+```py
+from left import Example, Original
+
+def accepts_original(value: Original) -> None: ...
+
+accepts_original(Example().right[0])  # error: [invalid-argument-type]
+reveal_type(Example().right)  # revealed: list[Original | Added] | list[Original]
+```
+
+`left.py`:
+
+```py
+class Original: ...
+class Added: ...
+
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left, Added()]
+
+    def initialize(self) -> None:
+        self.left = [Original()]
+        self.right = [Original()]
+
+reveal_type(Example().left)  # revealed: list[Original | Added] | list[Original]
+```
+
+## Mutually dependent attributes introducing a collection type, left first
+
+A recursive assignment may introduce a new collection type without creating unbounded nesting.
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = set(self.left)
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+```
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: set[str] | list[str]
+```
+
+## Mutually dependent attributes introducing a collection type, right first
+
+Checking the opposite attribute first must preserve the independently initialized list.
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: set[str] | list[str]
+```
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = set(self.left)
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+```
+
+## Mutually dependent attributes introducing a collection around an atomic value
+
+A collection introduced around another attribute's value can remain finite when the other assignment
+immediately extracts its element.
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = self.right[0]
+        else:
+            self.right = [self.left]
+
+    def initialize(self) -> None:
+        self.left = "a"
+        self.right = "a"
+
+reveal_type(Example().left)  # revealed: str
+reveal_type(Example().right)  # revealed: list[str] | str
+```
+
+## Recursive attributes that repeatedly introduce a callable
+
+A callable that returns the previous attribute value produces an unbounded recursive type without
+preventing inference from terminating.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def wrap(value: T) -> Callable[[], T]:
+    return lambda: value
+
+class Example:
+    def initialize(self) -> None:
+        self.value = 1
+
+    def update(self) -> None:
+        self.value = wrap(self.value)
+
+reveal_type(Example().value)  # revealed: int | (() -> Divergent)
+```
+
+## Recursive attributes in callable parameter types
+
+Recursive growth in a callable's parameter type is normalized just like growth in its return type.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def wrap(value: T) -> Callable[[T], int]:
+    return lambda _: 1
+
+class Example:
+    def initialize(self) -> None:
+        self.value = 1
+
+    def update(self) -> None:
+        self.value = wrap(self.value)
+
+reveal_type(Example().value)  # revealed: int | ((Divergent, /) -> int)
+```
+
+## Recursive attributes nested in a class object
+
+Recursion remains guarded when the attribute value appears beneath both a list and a class object.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def wrap(value: T) -> list[type[T]]:
+    return [type(value)]
+
+class Example:
+    def initialize(self) -> None:
+        self.value = 1
+
+    def update(self) -> None:
+        self.value = wrap(self.value)
+
+reveal_type(Example().value)  # revealed: int | list[Divergent]
+```
+
+## Recursive attributes nested in a structural protocol
+
+Protocol specializations preserve the recursive marker without repeatedly expanding their type
+argument.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Wrapper(Protocol[T]):
+    def wrap(self, value: T) -> T: ...
+
+def wrap(value: T) -> Wrapper[T]:
+    raise NotImplementedError
+
+class Example:
+    def initialize(self) -> None:
+        self.value = 1
+
+    def update(self) -> None:
+        self.value = wrap(self.value)
+
+reveal_type(Example().value)  # revealed: int | Wrapper[Divergent]
+```
+
+## Recursive attributes that repeatedly wrap a projected element
+
+Recursion can expand an extracted element without ever containing the preceding complete attribute
+type as a nested value.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.value = ["a"]
+
+    def update(self) -> None:
+        self.value = [(self.value[0],)]
+
+reveal_type(Example().value)  # revealed: list[str] | list[Divergent]
+```
+
+## Recursive attributes that wrap comprehension elements
+
+An eagerly executed comprehension can introduce the same unbounded element recursion from a nested
+inference scope.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.value = ["a"]
+
+    def update(self) -> None:
+        self.value = [(item,) for item in self.value]
+
+reveal_type(Example().value)  # revealed: list[str] | list[Divergent]
+```
+
+## Mutually recursive attributes with alternating collection types
+
+Different attributes can grow the same recursive type through alternating list and tuple
+constructors.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = 1
+        self.right = "a"
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [self.right]
+        else:
+            self.right = (self.left,)
+
+def accept_string(value: str) -> None: ...
+
+reveal_type(Example().left)  # revealed: int | list[Divergent] | list[str]
+reveal_type(Example().right)  # revealed: str | tuple[Divergent] | tuple[int]
+accept_string(Example().right[0])  # error: [invalid-argument-type]
+```
+
+## Finite mutually dependent attributes that wrap an initially nested value
+
+Wrapping another attribute and then extracting the result reaches a finite fixed point even when the
+independently initialized values already contain the same collection constructor.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [self.right]
+        else:
+            self.right = self.left[0]
+
+reveal_type(Example().left)  # revealed: list[str] | list[list[str] | str]
+reveal_type(Example().right)  # revealed: list[str] | str
+```
+
+## Finite mutually dependent attributes that unwrap several collections
+
+A cycle can introduce several nested collections through different attributes and then remove all of
+them again without constructing an infinitely recursive type.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.middle = ["a"]
+        self.right = ["a"]
+
+    def update(self, mode: int) -> None:
+        if mode == 0:
+            self.left = [self.middle]
+        elif mode == 1:
+            self.middle = [self.right]
+        else:
+            self.right = self.left[0][0]
+
+reveal_type(Example().left)  # revealed: list[str] | list[list[str] | list[list[str] | str]]
+reveal_type(Example().middle)  # revealed: list[str] | list[list[str] | str]
+reveal_type(Example().right)  # revealed: list[str] | str
+```
+
+## Finite mutually dependent attributes that wrap several times per assignment
+
+A finite cycle can add several collection layers in each of two assignments before a third
+assignment removes those layers. Its propagated element type must remain available to diagnostics.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = 1
+        self.middle = "a"
+        self.right = b"a"
+
+    def update(self, mode: int) -> None:
+        if mode == 0:
+            self.left = [[[self.middle]]]
+        elif mode == 1:
+            self.middle = [[[self.right]]]
+        else:
+            self.right = self.left[0][0][0][0][0][0] if isinstance(self.left, list) else False
+
+def accept_initial(value: bytes | bool) -> None: ...
+
+# revealed: int | list[list[list[str | list[list[list[bytes | str | bool]]]]]]
+reveal_type(Example().left)
+accept_initial(Example().right)  # error: [invalid-argument-type]
+reveal_type(Example().right)  # revealed: bytes | str | bool
+```
+
+## Finite mutually dependent attributes that unwrap a collection
+
+Wrapping one attribute and immediately unwrapping it in the other remains finite, even when a new
+element type appears after the first iteration.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = 1
+        self.right = "a"
+
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [self.right]
+        else:
+            self.right = self.left[0] if isinstance(self.left, list) else b"a"
+
+reveal_type(Example().left)  # revealed: int | list[str | bytes]
+reveal_type(Example().right)  # revealed: str | bytes
+```
+
+## Mutually dependent attributes in comprehensions, left first
+
+Eager comprehension scopes retain dependencies on the enclosing method's receiver.
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [item for item in self.right]
+        else:
+            self.right = [item for item in self.left]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+```
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[str]
+```
+
+## Mutually dependent attributes in comprehensions, right first
+
+Checking the opposite attribute first must preserve both comprehension element types.
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[str]
+```
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [item for item in self.right]
+        else:
+            self.right = [item for item in self.left]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+```
+
+## Mutually dependent attributes captured by comprehension bodies
+
+An attribute accessed only inside a comprehension body still belongs to the enclosing method's
+recursive attribute group.
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [self.right[0] for _ in [0]]
+        else:
+            self.right = [self.left[0] for _ in [0]]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+reveal_type(Example().right)  # revealed: list[str]
+```
+
+## Mutually dependent attributes captured through local aliases, left first
+
+A comprehension can capture an enclosing local variable that aliases another attribute in the same
+recursive component.
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            previous = self.right
+            self.left = [previous[0] for _ in [0]]
+        else:
+            previous = self.left
+            self.right = [previous[0] for _ in [0]]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+```
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[str]
+```
+
+## Mutually dependent attributes captured through local aliases, right first
+
+Reading the opposite attribute first must not change dependencies captured through a local alias.
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[str]
+```
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            previous = self.right
+            self.left = [previous[0] for _ in [0]]
+        else:
+            previous = self.left
+            self.right = [previous[0] for _ in [0]]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = ["a"]
+
+reveal_type(Example().left)  # revealed: list[str]
+```
+
+## Differently initialized attributes when the left attribute is checked first
+
+Mutually dependent attributes retain both independently initialized types.
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = [1]
+
+reveal_type(Example().left)  # revealed: list[str | int] | list[str]
+```
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[int | str] | list[int]
+```
+
+## Differently initialized attributes when the right attribute is checked first
+
+Checking the opposite attribute first preserves both independently initialized types.
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example().right)  # revealed: list[int | str] | list[int]
+```
+
+`left.py`:
+
+```py
+class Example:
+    def update(self, flag: bool) -> None:
+        if flag:
+            self.left = [*self.right]
+        else:
+            self.right = [*self.left]
+
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.right = [1]
+
+reveal_type(Example().left)  # revealed: list[str | int] | list[str]
+```
+
+## Three mutually dependent attributes with different initial types
+
+Three differently initialized attributes converge without dropping any of their initial types.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        self.left = ["a"]
+        self.middle = [1]
+        self.right = [b"a"]
+
+    def update(self) -> None:
+        self.left = [*self.middle]
+        self.middle = [*self.right]
+        self.right = [*self.left]
+
+    def get_left(self) -> list[str]:
+        return self.left  # error: [invalid-return-type]
+
+reveal_type(Example().left)  # revealed: list[str] | list[int | bytes | str]
+```
+
+## Mutually dependent class attributes when the left attribute is checked first
+
+Independently initialized class attributes can depend on each other through different branches.
+
+`left.py`:
+
+```py
+class Example:
+    @classmethod
+    def update(cls, flag: bool) -> None:
+        if flag:
+            cls.left = [*cls.right]
+        else:
+            cls.right = [*cls.left]
+
+    @classmethod
+    def initialize(cls) -> None:
+        cls.left = ["a"]
+        cls.right = ["a"]
+
+reveal_type(Example.left)  # revealed: list[str]
+```
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example.right)  # revealed: list[str]
+```
+
+## Mutually dependent class attributes when the right attribute is checked first
+
+Checking the opposite class attribute first preserves both independently initialized types.
+
+`right.py`:
+
+```py
+from left import Example
+
+reveal_type(Example.right)  # revealed: list[str]
+```
+
+`left.py`:
+
+```py
+class Example:
+    @classmethod
+    def update(cls, flag: bool) -> None:
+        if flag:
+            cls.left = [*cls.right]
+        else:
+            cls.right = [*cls.left]
+
+    @classmethod
+    def initialize(cls) -> None:
+        cls.left = ["a"]
+        cls.right = ["a"]
+
+reveal_type(Example.left)  # revealed: list[str]
+```
+
+## Mutually dependent class attributes with different initial types
+
+Class attributes with different initial types converge together across class methods.
+
+```py
+class Example:
+    @classmethod
+    def initialize(cls) -> None:
+        cls.left = ["a"]
+        cls.right = [1]
+
+    @classmethod
+    def update(cls, flag: bool) -> None:
+        if flag:
+            cls.left = [*cls.right]
+        else:
+            cls.right = [*cls.left]
+
+reveal_type(Example.left)  # revealed: list[str] | list[int | str]
+```
+
+## Mutually dependent class attributes with a metaclass data descriptor
+
+A metaclass data descriptor takes precedence over provisional class-attribute values.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> list[int]:
+        return [1]
+
+    def __set__(self, instance: object, value: list[int]) -> None:
+        pass
+
+class Meta(type):
+    right = Descriptor()
+
+class Example(metaclass=Meta):
+    @classmethod
+    def initialize(cls) -> None:
+        cls.left = ["a"]
+        cls.right = ["a"]  # error: [invalid-assignment]
+
+    @classmethod
+    def update(cls, flag: bool) -> None:
+        if flag:
+            cls.left = [*cls.right]
+        else:
+            cls.right = [*cls.left]  # error: [invalid-assignment]
+
+    @classmethod
+    def get_left(cls) -> list[str]:
+        return cls.left  # error: [invalid-return-type]
+
+reveal_type(Example.left)  # revealed: list[str] | list[int]
+reveal_type(Example.right)  # revealed: list[int]
+```
+
+## Mutually dependent class attributes with a metaclass declaration
+
+A metaclass declaration takes precedence over provisional class-attribute values.
+
+```py
+class Meta(type):
+    right: list[int]
+
+class Example(metaclass=Meta):
+    @classmethod
+    def initialize(cls) -> None:
+        cls.left = ["a"]
+        cls.right = ["a"]
+
+    @classmethod
+    def update(cls, flag: bool) -> None:
+        if flag:
+            cls.left = [*cls.right]
+        else:
+            cls.right = [*cls.left]
+
+    @classmethod
+    def get_left(cls) -> list[str]:
+        return cls.left  # error: [invalid-return-type]
+
+reveal_type(Example.left)  # revealed: list[str] | list[int]
+reveal_type(Example.right)  # revealed: list[int]
+```
+
 ## Mutually dependent attributes that widen an initial value
 
 Widening one attribute invalidates provisional values for other attributes that depend on it.

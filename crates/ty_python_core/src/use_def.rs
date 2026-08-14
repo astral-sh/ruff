@@ -606,7 +606,7 @@ struct ConstraintTables<'db> {
 
 /// Fields that are empty in most use-def maps.
 ///
-/// These fields share an allocation to avoid storing six collection headers in every
+/// These fields share an allocation to avoid storing seven collection headers in every
 /// [`UseDefMap`]. They are not otherwise semantically related.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct UseDefMapExtra<'db> {
@@ -630,6 +630,11 @@ struct UseDefMapExtra<'db> {
 
     /// Definitions whose values may depend on an attribute read, including local aliases.
     member_dependent_definitions: ThinVec<Definition<'db>>,
+
+    /// Specific first-parameter attributes that may contribute to each definition's value.
+    ///
+    /// Only nonempty dependency sets are retained, ordered by definition and then member.
+    member_dependencies_by_definition: Box<[(Definition<'db>, ScopedMemberId)]>,
 }
 
 static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
@@ -915,6 +920,25 @@ impl<'db> UseDefMap<'db> {
                 .binary_search(&definition)
                 .is_ok()
         })
+    }
+
+    /// First-parameter attributes that this definition's value might read.
+    ///
+    /// A member is included if any reachable assignment branch or local alias could read it.
+    /// Member identifiers belong to the same scope as `definition`.
+    pub fn definition_member_dependencies(
+        &self,
+        definition: Definition<'db>,
+    ) -> impl Iterator<Item = ScopedMemberId> + '_ {
+        let dependencies = self.extra.as_ref().map_or(&[][..], |extra| {
+            extra.member_dependencies_by_definition.as_ref()
+        });
+        let start = dependencies.partition_point(|(candidate, _)| *candidate < definition);
+
+        dependencies[start..]
+            .iter()
+            .take_while(move |(candidate, _)| *candidate == definition)
+            .map(|(_, member)| *member)
     }
 
     pub fn multi_bindings_at_use(
@@ -1834,6 +1858,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Definitions whose values may depend on an attribute read, including local aliases.
     member_dependent_definitions: FxHashSet<Definition<'db>>,
 
+    /// Specific first-parameter attributes that may contribute to a definition's value.
+    member_dependencies_by_definition: FxHashMap<Definition<'db>, SmallVec<[ScopedMemberId; 2]>>,
+
     /// Currently live bindings and declarations for each place.
     symbol_states: IndexVec<ScopedSymbolId, PendingPlaceState>,
 
@@ -1874,6 +1901,7 @@ impl<'db> UseDefMapBuilder<'db> {
             control_flow_revision: ControlFlowRevision::default(),
             definitions_by_definition: FxHashMap::default(),
             member_dependent_definitions: FxHashSet::default(),
+            member_dependencies_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
             pending_reachability: PendingReachability::default(),
@@ -2012,6 +2040,30 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Record that an assignment value might depend on an attribute read.
     pub(super) fn record_member_dependent_definition(&mut self, definition: Definition<'db>) {
         self.member_dependent_definitions.insert(definition);
+    }
+
+    /// Retain the first-parameter attributes that may contribute to a completed definition.
+    pub(super) fn record_definition_member_dependencies(
+        &mut self,
+        definition: Definition<'db>,
+        mut dependencies: SmallVec<[ScopedMemberId; 2]>,
+    ) {
+        dependencies.sort_unstable();
+        dependencies.dedup();
+        if !dependencies.is_empty() {
+            self.member_dependencies_by_definition
+                .insert(definition, dependencies);
+        }
+    }
+
+    /// First-parameter attributes that may contribute to an earlier local definition.
+    pub(super) fn definition_member_dependencies(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&[ScopedMemberId]> {
+        self.member_dependencies_by_definition
+            .get(&definition)
+            .map(SmallVec::as_slice)
     }
 
     /// Whether any reaching value of this local alias might depend on an attribute read.
@@ -2934,11 +2986,22 @@ impl<'db> UseDefMapBuilder<'db> {
             .collect::<ThinVec<_>>();
         member_dependent_definitions.sort_unstable();
         member_dependent_definitions.shrink_to_fit();
+        let mut member_dependencies_by_definition = self
+            .member_dependencies_by_definition
+            .into_iter()
+            .flat_map(|(definition, members)| {
+                members.into_iter().map(move |member| (definition, member))
+            })
+            .collect::<Vec<_>>();
+        member_dependencies_by_definition.sort_unstable();
+        let member_dependencies_by_definition =
+            member_dependencies_by_definition.into_boxed_slice();
         let extra = (!bindings_by_use.is_empty()
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()
             || !loop_headers.is_empty()
-            || !member_dependent_definitions.is_empty())
+            || !member_dependent_definitions.is_empty()
+            || !member_dependencies_by_definition.is_empty())
         .then(|| {
             Box::new(UseDefMapExtra {
                 bindings_by_use: bindings_by_use.into(),
@@ -2947,6 +3010,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 enclosing_snapshots: enclosing_snapshots.into(),
                 loop_headers: loop_headers.into(),
                 member_dependent_definitions,
+                member_dependencies_by_definition,
             })
         });
         let predicates = self.predicates.build();

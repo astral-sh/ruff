@@ -31,7 +31,7 @@ use super::{
     MemberInferenceContext, OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
     infer_deferred_types, infer_definition_types, infer_expression_types,
     infer_expression_types_with_member_context, infer_same_file_expression_type,
-    infer_unpack_types,
+    infer_scope_types_with_member_context, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -1021,6 +1021,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {
                 infer_complete_scope_types(self.db(), expr_scope).type_expression_flags(expression)
             }
+        }
+    }
+
+    /// Preserve the active attribute component when an expression introduces a nested scope.
+    fn infer_nested_scope_types(
+        &self,
+        scope: ScopeId<'db>,
+        tcx: TypeContext<'db>,
+    ) -> &'db ScopeInference<'db> {
+        if let Some(member_context) = self.member_inference_context {
+            infer_scope_types_with_member_context(self.db(), scope, tcx, member_context)
+        } else {
+            infer_scope_types(self.db(), scope, tcx)
         }
     }
 
@@ -7871,7 +7884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             EvaluationMode::from_is_async(scope_id.is_async_comprehension(self.index));
         let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, yield_tcx);
+        let inference = self.infer_nested_scope_types(scope, yield_tcx);
         self.extend_scope(inference);
         let yield_type = self.comprehension_element_type(elt, inference);
 
@@ -7951,7 +7964,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
+        let inference = self.infer_nested_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -7992,7 +8005,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
+        let inference = self.infer_nested_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -8034,7 +8047,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
+        let inference = self.infer_nested_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -8202,7 +8215,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
             if is_first {
-                infer_same_file_expression_type(builder.db(), builder.index.expression(iter), tcx)
+                if let Some(member_context) = builder.member_inference_context {
+                    infer_expression_types_with_member_context(
+                        builder.db(),
+                        builder.index.expression(iter),
+                        tcx,
+                        member_context,
+                    )
+                    .expression_type(iter)
+                } else {
+                    infer_same_file_expression_type(
+                        builder.db(),
+                        builder.index.expression(iter),
+                        tcx,
+                    )
+                }
             } else {
                 builder.infer_maybe_standalone_expression(iter, tcx)
             }
@@ -8230,7 +8257,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
-            let result = infer_expression_types(self.db(), expression, TypeContext::default());
+            let result = if let Some(member_context) = self.member_inference_context {
+                infer_expression_types_with_member_context(
+                    self.db(),
+                    expression,
+                    TypeContext::default(),
+                    member_context,
+                )
+            } else {
+                infer_expression_types(self.db(), expression, TypeContext::default())
+            };
             let iterable_type = result.expression_type(iterable);
             let element_type = if comprehension.is_async() {
                 None
@@ -8507,7 +8543,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeContext::new(None)
         };
 
-        let inference = infer_scope_types(self.db(), scope, return_tcx);
+        let inference = self.infer_nested_scope_types(scope, return_tcx);
         self.extend_scope(inference);
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
@@ -10193,7 +10229,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(context) = self.member_inference_context
-            && let Some(incoming) = context.incoming(self.db(), attribute.attr.id.as_str())
+            && context.contains(self.db(), attribute.attr.id.as_str())
             && let Some(place_expr) = PlaceExpr::try_from_expr(attribute)
             && let place_table = self
                 .index
@@ -10201,19 +10237,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(ScopedPlaceId::Member(member)) =
                 place_table.place_id(PlaceExprRef::from(&place_expr))
             && place_table.member(member).is_instance_attribute()
-            && context.target_method_decorator(self.db())
-                == if matches!(value_type, Type::ClassLiteral(_) | Type::GenericAlias(_)) {
-                    MethodDecorator::ClassMethod
-                } else {
-                    MethodDecorator::None
-                }
-            && value_type
-                .nominal_class(self.db(), self.program_environment())
-                .or_else(|| value_type.to_class_type(self.db()))
-                .and_then(|class| class.static_class_literal(self.db()))
+            && let Some((class, target_method_decorator)) =
+                value_type.member_cycle_receiver(self.db(), self.program_environment())
+            && context.target_method_decorator(self.db()) == target_method_decorator
+            && class
+                .static_class_literal(self.db())
                 .is_some_and(|(owner, _)| owner == context.owner(self.db()))
+            && let Some(incoming) = context.incoming(self.db(), attribute.attr.id.as_str())
         {
-            return Ok(incoming);
+            let scope = self.scope().file_scope_id(self.db());
+            let use_id = attribute.scoped_use_id(self.db(), self.program_file());
+            return Ok(self.narrow_place_with_applicable_constraints(
+                PlaceExprRef::from(&place_expr),
+                incoming,
+                &[(scope, ConstraintKey::UseId(use_id))],
+            ));
         }
 
         let env = self.program_environment();
@@ -10222,33 +10260,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let mut constraint_keys = vec![];
 
-        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
-            && typevar.is_paramspec(db)
-            && let Some(bound_typevar) = bind_typevar(
-                db,
-                self.index,
-                self.scope().file_scope_id(db),
-                self.typevar_binding_context,
-                typevar,
-            )
-        {
-            value_type = Type::TypeVar(bound_typevar);
-        }
-
-        let mut assigned_type = None;
-        if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
-            let (resolved, keys) =
-                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
-            constraint_keys.extend(keys);
-            if let Place::Defined(DefinedPlace {
-                ty,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) = resolved.place
-            {
-                assigned_type = Some(ty);
-            }
-        }
         let is_member_dependent_assignment = match self.region {
             InferenceRegion::Definition(definition) => {
                 matches!(definition.kind(db), DefinitionKind::Assignment(_))
@@ -10277,18 +10288,60 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | InferenceRegion::Deferred(_)
             | InferenceRegion::Scope(_, _) => false,
         };
-        let fallback_place = if is_member_dependent_assignment {
-            value_type.try_member_lookup_with_cycle_anchor(db, env, &attr.id)
-        } else {
-            value_type.try_member_lookup(db, env, &attr.id)
+
+        if is_member_dependent_assignment
+            && let Some(place_expr) = PlaceExpr::try_from_expr(attribute)
+            && let place_table = self.index.place_table(self.scope().file_scope_id(db))
+            && let Some(ScopedPlaceId::Member(member)) =
+                place_table.place_id(PlaceExprRef::from(&place_expr))
+            && place_table.member(member).is_instance_attribute()
+            && let Some((class, target_method_decorator)) =
+                value_type.member_cycle_receiver(db, env)
+            && let Some((owner, _)) = class.static_class_literal(db)
+            && let Some(component) =
+                owner.attribute_inference_scc(db, attr.id.as_str(), target_method_decorator)
+        {
+            // Select the canonical component before resolving local bindings, which can otherwise
+            // make an individual definition or expression the head of the recursive Salsa cycle.
+            let _ = owner.attribute_scc_member(db, component, attr.id.as_str());
         }
-        .unwrap_or_else(|error| {
-            error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
-            error.fallback_member(db)
-        })
-        .map_type(|ty| {
-            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-        });
+
+        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
+            && typevar.is_paramspec(db)
+            && let Some(bound_typevar) = bind_typevar(
+                db,
+                self.index,
+                self.scope().file_scope_id(db),
+                self.typevar_binding_context,
+                typevar,
+            )
+        {
+            value_type = Type::TypeVar(bound_typevar);
+        }
+
+        let mut assigned_type = None;
+        if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
+            let (resolved, keys) =
+                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
+            constraint_keys.extend(keys);
+            if let Place::Defined(DefinedPlace {
+                ty,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) = resolved.place
+            {
+                assigned_type = Some(ty);
+            }
+        }
+        let fallback_place = value_type
+            .try_member_lookup(db, env, &attr.id)
+            .unwrap_or_else(|error| {
+                error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
+                error.fallback_member(db)
+            })
+            .map_type(|ty| {
+                self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+            });
 
         let attr_name = &attr.id;
         let lookup_result = fallback_place.into_lookup_result(db, env);

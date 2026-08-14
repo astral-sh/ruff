@@ -46,7 +46,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -59,8 +59,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, MethodDecorator, StaticClassLiteral, Type, TypeAndQualifiers,
-    TypeQualifiers,
+    AttributeInferenceScc, ClassLiteral, KnownClass, MethodDecorator, StaticClassLiteral, Type,
+    TypeAndQualifiers, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -235,16 +235,10 @@ pub(crate) fn annotated_assignment_annotation<'db>(
     .infer_annotated_assignment_annotation_only(assignment)
 }
 
-/// Infer an attribute assignment's effect under a shared set of provisional attribute values.
+/// Infer an attribute assignment's effect under its component's current attribute values.
 ///
-/// The assumptions are included in expression and definition query identities, allowing ordinary
-/// inference and name resolution to distinguish this provisional result from uncontextualized
-/// inference while retaining independent roots for mutually dependent attributes.
-#[salsa::tracked(
-    returns(copy),
-    cycle_result=|_, _, _, _| None,
-    heap_size=ruff_memory_usage::heap_size
-)]
+/// The component owns cycle recovery. Keeping this helper untracked allows recursive expression
+/// inference to reenter that component instead of terminating the cycle at an intermediate query.
 pub(crate) fn dependent_assignment_transfer<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -262,7 +256,9 @@ pub(crate) fn dependent_assignment_transfer<'db>(
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let attribute = assignment.target(&module).as_attribute_expr()?;
-    member_context.incoming(db, attribute.attr.id.as_str())?;
+    if !member_context.contains(db, attribute.attr.id.as_str()) {
+        return None;
+    }
 
     let index = semantic_index(db, program_file);
     let owner = nearest_enclosing_class(db, index, definition.scope(db))?;
@@ -475,6 +471,17 @@ pub(crate) fn infer_scope_types<'db>(
     infer_scope_types_impl(db, InferScope::new(db, scope, tcx))
 }
 
+/// Infer a nested scope without losing the component that owns its captured attribute reads.
+pub(super) fn infer_scope_types_with_member_context<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    tcx: TypeContext<'db>,
+    member_context: MemberInferenceContext<'db>,
+) -> &'db ScopeInference<'db> {
+    let input = ScopeWithMemberContext::new(db, scope, tcx, member_context);
+    infer_scope_types_with_member_context_impl(db, input)
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
@@ -488,6 +495,31 @@ pub(crate) fn infer_scope_types<'db>(
 pub(crate) fn infer_scope_types_impl<'db>(
     db: &'db dyn Db,
     input: InferScope<'db>,
+) -> ScopeInference<'db> {
+    infer_scope_types_with_optional_member_context(db, input, None)
+}
+
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: ScopeWithMemberContext<'db>| {
+        let env = ProgramEnvironment::from_scope(input.scope(db));
+        inference.cycle_normalized(db, &env, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn infer_scope_types_with_member_context_impl<'db>(
+    db: &'db dyn Db,
+    input: ScopeWithMemberContext<'db>,
+) -> ScopeInference<'db> {
+    let scope = InferScope::new(db, input.scope(db), input.tcx(db));
+    infer_scope_types_with_optional_member_context(db, scope, Some(input.member_context(db)))
+}
+
+fn infer_scope_types_with_optional_member_context<'db>(
+    db: &'db dyn Db,
+    input: InferScope<'db>,
+    member_context: Option<MemberInferenceContext<'db>>,
 ) -> ScopeInference<'db> {
     let (scope, tcx) = input.into_inner(db);
     let program_file = scope.program_file(db);
@@ -503,7 +535,7 @@ pub(crate) fn infer_scope_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let builder = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Scope(scope, tcx),
@@ -511,7 +543,13 @@ pub(crate) fn infer_scope_types_impl<'db>(
         program_file,
         index,
         &module,
-    )
+    );
+
+    if let Some(member_context) = member_context {
+        builder.with_member_context(member_context)
+    } else {
+        builder
+    }
     .finish_scope()
 }
 
@@ -797,6 +835,17 @@ pub(super) struct ScopeWithContext<'db> {
     tcx: TypeContext<'db>,
 }
 
+/// A nested scope whose captured attribute reads belong to a fixed component.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ScopeWithMemberContext<'db> {
+    #[returns(copy)]
+    scope: ScopeId<'db>,
+    #[returns(copy)]
+    tcx: TypeContext<'db>,
+    #[returns(copy)]
+    member_context: MemberInferenceContext<'db>,
+}
+
 impl<'db> InferScope<'db> {
     fn new(db: &'db dyn Db, scope: ScopeId<'db>, tcx: TypeContext<'db>) -> InferScope<'db> {
         if tcx.annotation.is_some() {
@@ -816,28 +865,43 @@ impl<'db> InferScope<'db> {
     }
 }
 
-/// Provisional values assumed for reads of independently initialized attributes on one class.
+/// The stable component whose current values govern recursive attribute inference.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct MemberInferenceContext<'db> {
     #[returns(copy)]
-    pub(crate) owner: StaticClassLiteral<'db>,
-    #[returns(copy)]
-    pub(crate) target_method_decorator: MethodDecorator,
-    #[returns(deref)]
-    pub(crate) roots: Box<[(Name, Type<'db>)]>,
+    pub(crate) component: AttributeInferenceScc<'db>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for MemberInferenceContext<'_> {}
 
 impl<'db> MemberInferenceContext<'db> {
-    /// Return the independently established type for a provisionally known attribute.
+    pub(crate) fn owner(self, db: &'db dyn Db) -> StaticClassLiteral<'db> {
+        self.component(db).owner(db)
+    }
+
+    pub(crate) fn target_method_decorator(self, db: &'db dyn Db) -> MethodDecorator {
+        self.component(db).target_method_decorator(db)
+    }
+
+    /// Check membership without requesting the component's current approximation.
+    pub(crate) fn contains(self, db: &'db dyn Db, name: &str) -> bool {
+        self.component(db)
+            .members(db)
+            .binary_search_by(|member| member.as_str().cmp(name))
+            .is_ok()
+    }
+
+    /// Read an attribute through the component query that owns its fixed-point iteration.
     pub(crate) fn incoming(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
-        let roots = self.roots(db);
-        let index = roots
-            .binary_search_by(|(candidate, _)| candidate.as_str().cmp(name))
-            .ok()?;
-        Some(roots[index].1)
+        if !self.contains(db, name) {
+            return None;
+        }
+
+        let component = self.component(db);
+        component
+            .owner(db)
+            .attribute_scc_member(db, component, name)
     }
 }
 

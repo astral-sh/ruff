@@ -21,13 +21,13 @@ use crate::{
         DeclarationsIteratorExtension, ReachabilityConstraintsExtension, binding_reachability,
     },
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
-        CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
-        DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
-        MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
-        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypedDictModule, UnionBuilder, UnionType,
+        ApplyTypeMappingVisitor, AttributeInferenceScc, BoundTypeVarIdentity, BoundTypeVarInstance,
+        CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS,
+        DataclassFlags, DataclassParams, GenericAlias, GenericContext, KnownClass,
+        KnownInstanceType, MaterializationKind, MemberLookupPolicy, MetaclassCandidate,
+        MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType, Signature,
+        SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
+        TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
@@ -60,7 +60,7 @@ use crate::{
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
         variance::VarianceInferable,
-        visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard},
     },
 };
 use crate::{attribute_assignments, attribute_declarations};
@@ -2891,7 +2891,13 @@ impl<'db> StaticClassLiteral<'db> {
         );
 
         let (has_declaration, qualifier_bits) = implicit_attribute_declaration(db, attribute);
-        if !has_declaration && let Some(incoming) = self.independent_attribute_value(db, attribute)
+        if !has_declaration
+            && let Some(component) = self.attribute_inference_scc(db, name, target_method_decorator)
+            && let Some(member) = self.attribute_scc_implicit_attribute(db, component, name)
+        {
+            member
+        } else if !has_declaration
+            && let Some(incoming) = self.independent_attribute_value(db, attribute)
         {
             Self::implicit_attribute_anchored(db, attribute, incoming, qualifier_bits)
         } else {
@@ -2959,134 +2965,272 @@ impl<'db> StaticClassLiteral<'db> {
         None
     }
 
-    /// Finds a same-class initializer without evaluating assignments that may read an attribute.
-    pub(crate) fn independent_own_attribute_value(
+    /// Return the structural attribute component containing `name`, before inferring its values.
+    pub(crate) fn attribute_inference_scc(
         self,
         db: &'db dyn Db,
         name: &str,
         target_method_decorator: MethodDecorator,
-    ) -> Option<Type<'db>> {
-        let class_body_scope = self.body_scope(db);
-        let names = implicit_attribute_names(db, class_body_scope);
-        let name_index = names
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .ok()?;
-        let attribute = ImplicitAttributeName::new(
-            db,
-            class_body_scope,
-            &names[name_index],
-            target_method_decorator,
-        );
-        if implicit_attribute_declaration(db, attribute).0 {
+    ) -> Option<AttributeInferenceScc<'db>> {
+        let has_member_dependency =
+            attribute_assignments(db, self.body_scope(db), name).any(|(mut bindings, _)| {
+                bindings.any(|binding| {
+                    let DefinitionState::Defined(definition) = binding.binding else {
+                        return false;
+                    };
+                    use_def_map(db, definition.scope(db))
+                        .definition_member_dependencies(definition)
+                        .next()
+                        .is_some()
+                })
+            });
+        if !has_member_dependency {
             return None;
         }
-
-        self.independent_own_attribute_value_inner(db, attribute)
+        let group = IndependentAttributeGroup::new(db, self, target_method_decorator);
+        Self::attribute_inference_components(db, group)
+            .iter()
+            .copied()
+            .find(|component| {
+                component
+                    .members(db)
+                    .binary_search_by(|candidate| candidate.as_str().cmp(name))
+                    .is_ok()
+            })
     }
 
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, _, _, _| None,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
-    fn independent_own_attribute_value_inner(
+    /// Read one member through its component query, including during fixed-point iteration.
+    pub(crate) fn attribute_scc_member(
         self,
         db: &'db dyn Db,
-        attribute: ImplicitAttributeName<'db>,
+        component: AttributeInferenceScc<'db>,
+        name: &str,
     ) -> Option<Type<'db>> {
-        let class_body_scope = attribute.class_body_scope(db);
-        let has_dependent_assignment =
-            attribute_assignments(db, class_body_scope, attribute.name(db).as_str()).any(
-                |(mut bindings, _)| {
-                    bindings.any(|binding| {
-                        let DefinitionState::Defined(definition) = binding.binding else {
-                            return false;
-                        };
-
-                        matches!(definition.kind(db), DefinitionKind::Assignment(_))
-                            && use_def_map(db, definition.scope(db))
-                                .definition_may_depend_on_instance_member(definition)
-                    })
-                },
-            );
-        if !has_dependent_assignment {
-            return None;
-        }
-
-        let group = IndependentAttributeGroup::new(db, self, attribute.target_method_decorator(db));
-        let candidates = Self::independent_own_attribute_candidates(db, group);
-        let candidate_index = candidates
-            .binary_search_by(|candidate| candidate.name.as_str().cmp(attribute.name(db).as_str()))
-            .ok()?;
-        if candidates[candidate_index].dependent_assignments.is_empty() {
-            return None;
-        }
-
-        let roots = Self::independent_own_attribute_values(db, group);
-        roots
-            .binary_search_by(|(name, _)| name.as_str().cmp(attribute.name(db).as_str()))
-            .ok()
-            .map(|index| roots[index].1)
+        self.attribute_scc_implicit_attribute(db, component, name)?
+            .member
+            .ignore_possibly_undefined()
     }
 
-    /// Collect all provisional class-member roots before evaluating any dependent assignment.
-    ///
-    /// A transfer from `self.left` to `self.right` can participate in the same cycle as a transfer
-    /// in the opposite direction. Discovering one member and validating it before discovering the
-    /// other would re-enter this query without either provisional root being available.
+    fn attribute_scc_implicit_attribute(
+        self,
+        db: &'db dyn Db,
+        component: AttributeInferenceScc<'db>,
+        name: &str,
+    ) -> Option<ImplicitAttribute<'db>> {
+        if component.owner(db) != self {
+            return None;
+        }
+        let index = component
+            .members(db)
+            .binary_search_by(|candidate| candidate.as_str().cmp(name))
+            .ok()?;
+        Self::attribute_scc_values(db, component)
+            .values
+            .get(index)
+            .copied()
+    }
+
+    /// Build component identities from indexed member reads, without evaluating assignment values.
     #[salsa::tracked(
         returns(deref),
         cycle_initial=|_, _, _| Box::default(),
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn independent_own_attribute_candidates(
+    fn attribute_inference_components(
         db: &'db dyn Db,
         group: IndependentAttributeGroup<'db>,
-    ) -> Box<[IndependentAttributeCandidate<'db>]> {
-        let class_body_scope = group.owner(db).body_scope(db);
+    ) -> Box<[AttributeInferenceScc<'db>]> {
+        let owner = group.owner(db);
+        let class_body_scope = owner.body_scope(db);
         let index = semantic_index(db, class_body_scope.program_file(db));
         let module = parsed_module(db, class_body_scope.program_file(db).python_file(db)).load(db);
-        let env = ProgramEnvironment::from_scope(class_body_scope);
-        let mut candidates = Vec::new();
-
-        for name in implicit_attribute_names(db, class_body_scope) {
-            // Class-body declarations and descriptors take precedence over an instance initializer.
-            // Checking indexed namespace symbols preserves that contract without inferring their
-            // values before every provisional root has been collected.
-            if group.owner(db).iter_mro(db, None).any(|superclass| {
-                let ClassBase::Class(superclass) = superclass else {
+        let names: Vec<_> = implicit_attribute_names(db, class_body_scope)
+            .iter()
+            .filter(|name| {
+                if owner.implicit_attribute_has_namespace_definition(
+                    db,
+                    name.as_str(),
+                    group.target_method_decorator(db),
+                ) {
                     return false;
-                };
-                let (class, _) = superclass.class_literal_and_specialization(db);
-                let ClassLiteral::Static(class) = class else {
-                    return false;
-                };
+                }
+                let attribute = ImplicitAttributeName::new(
+                    db,
+                    class_body_scope,
+                    *name,
+                    group.target_method_decorator(db),
+                );
+                !implicit_attribute_declaration(db, attribute).0
+                    && attribute_assignments(db, class_body_scope, name.as_str()).all(
+                        |(mut bindings, method_scope_id)| {
+                            !implicit_attribute_matches_scope(
+                                db,
+                                attribute,
+                                index.scope(method_scope_id),
+                            ) || bindings.all(|binding| {
+                                let DefinitionState::Defined(definition) = binding.binding else {
+                                    return true;
+                                };
+                                match definition.kind(db) {
+                                    DefinitionKind::Assignment(assignment) => {
+                                        assignment.unpack().is_none()
+                                    }
+                                    DefinitionKind::AugmentedAssignment(_) => true,
+                                    _ => false,
+                                }
+                            })
+                        },
+                    )
+            })
+            .cloned()
+            .collect();
+        let mut edges = vec![Vec::new(); names.len()];
 
-                let class_namespace = place_table(db, class.body_scope(db));
-                class_namespace.symbol_id(name.as_str()).is_some_and(|id| {
-                    let symbol = class_namespace.symbol(id);
-                    symbol.is_bound() || symbol.is_declared()
-                })
-            }) {
-                continue;
-            }
-
+        for (target_index, name) in names.iter().enumerate() {
             let attribute = ImplicitAttributeName::new(
                 db,
                 class_body_scope,
                 name,
                 group.target_method_decorator(db),
             );
-            if implicit_attribute_declaration(db, attribute).0 {
-                continue;
+            for (bindings, method_scope_id) in
+                attribute_assignments(db, class_body_scope, name.as_str())
+            {
+                let method_scope = index.scope(method_scope_id);
+                if !implicit_attribute_matches_scope(db, attribute, method_scope)
+                    || implicit_attribute_scope_reachability(
+                        db,
+                        index,
+                        class_body_scope,
+                        method_scope,
+                        &module,
+                    )
+                    .is_always_false()
+                {
+                    continue;
+                }
+                for binding in bindings {
+                    let DefinitionState::Defined(definition) = binding.binding else {
+                        continue;
+                    };
+                    let place_table = index.place_table(definition.file_scope(db));
+                    for member in use_def_map(db, definition.scope(db))
+                        .definition_member_dependencies(definition)
+                    {
+                        let Some(dependency) = place_table.member(member).as_instance_attribute()
+                        else {
+                            continue;
+                        };
+                        if let Ok(dependency_index) =
+                            names.binary_search_by(|candidate| candidate.as_str().cmp(dependency))
+                        {
+                            edges[target_index].push(dependency_index);
+                        }
+                    }
+                }
             }
+            edges[target_index].sort_unstable();
+            edges[target_index].dedup();
+        }
 
+        let mut search = AttributeComponentSearch {
+            next_index: 0,
+            indices: vec![None; names.len()],
+            low_links: vec![0; names.len()],
+            stack: Vec::new(),
+            on_stack: vec![false; names.len()],
+            components: Vec::new(),
+        };
+        for member in 0..names.len() {
+            if search.indices[member].is_none() {
+                search.visit(member, &edges);
+            }
+        }
+
+        let mut components: Vec<_> = search
+            .components
+            .into_iter()
+            .map(|members| {
+                let members = members
+                    .into_iter()
+                    .map(|member| names[member].clone())
+                    .collect::<Box<[_]>>();
+                AttributeInferenceScc::new(db, owner, group.target_method_decorator(db), members)
+            })
+            .collect();
+        components.sort_by(|left, right| left.members(db).cmp(right.members(db)));
+        components.into_boxed_slice()
+    }
+
+    /// Namespace declarations and descriptors take precedence over implicit writes.
+    fn implicit_attribute_has_namespace_definition(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        target_method_decorator: MethodDecorator,
+    ) -> bool {
+        let namespace_defines_name = |class: StaticClassLiteral<'db>| {
+            let namespace = place_table(db, class.body_scope(db));
+            namespace.symbol_id(name).is_some_and(|id| {
+                let symbol = namespace.symbol(id);
+                symbol.is_bound() || symbol.is_declared()
+            })
+        };
+
+        self.iter_mro(db, None).any(|superclass| {
+            let ClassBase::Class(superclass) = superclass else {
+                return false;
+            };
+            superclass
+                .static_class_literal(db)
+                .is_some_and(|(class, _)| namespace_defines_name(class))
+        }) || (target_method_decorator == MethodDecorator::ClassMethod
+            && self
+                .metaclass(db)
+                .to_class_type(db)
+                .is_none_or(|metaclass| {
+                    metaclass.iter_mro(db).any(|base| match base {
+                        ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+                        ClassBase::Class(class) => class
+                            .static_class_literal(db)
+                            .is_none_or(|(class, _)| namespace_defines_name(class)),
+                        ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
+                    })
+                }))
+    }
+
+    /// Infer independent definitions only after the entire component has been identified.
+    #[salsa::tracked(
+        returns(deref),
+        cycle_initial=|_, _, _| Box::default(),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn attribute_scc_candidates(
+        db: &'db dyn Db,
+        component: AttributeInferenceScc<'db>,
+    ) -> Box<[IndependentAttributeCandidate<'db>]> {
+        let class_body_scope = component.owner(db).body_scope(db);
+        let index = semantic_index(db, class_body_scope.program_file(db));
+        let module = parsed_module(db, class_body_scope.program_file(db).python_file(db)).load(db);
+        let env = ProgramEnvironment::from_scope(class_body_scope);
+        let mut candidates = Vec::with_capacity(component.members(db).len());
+
+        for name in component.members(db) {
+            let attribute = ImplicitAttributeName::new(
+                db,
+                class_body_scope,
+                name,
+                component.target_method_decorator(db),
+            );
+            let qualifier_bits = implicit_attribute_declaration(db, attribute).1;
             let mut independent_values = UnionBuilder::new(db, &env);
             let mut has_independent_value = false;
-            let mut dependent_assignments = Vec::new();
+            let mut assignments = Vec::new();
+            let mut augmented_bindings = Vec::new();
+            let mut provenance = Provenance::Unknown;
 
             for (bindings, method_scope_id) in
-                attribute_assignments(db, class_body_scope, attribute.name(db).as_str())
+                attribute_assignments(db, class_body_scope, name.as_str())
             {
                 let method_scope = index.scope(method_scope_id);
                 if !implicit_attribute_matches_scope(db, attribute, method_scope)
@@ -3103,99 +3247,157 @@ impl<'db> StaticClassLiteral<'db> {
                 }
 
                 for binding in bindings {
-                    let DefinitionState::Defined(binding) = binding.binding else {
+                    let DefinitionState::Defined(definition) = binding.binding else {
                         continue;
                     };
-                    let DefinitionKind::Assignment(assignment) = binding.kind(db) else {
-                        continue;
-                    };
-
-                    if use_def_map(db, binding.scope(db))
-                        .definition_may_depend_on_instance_member(binding)
-                    {
-                        dependent_assignments.push(binding);
+                    if matches!(definition.kind(db), DefinitionKind::AugmentedAssignment(_)) {
+                        augmented_bindings.push(definition);
                         continue;
                     }
+                    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+                        continue;
+                    };
+                    provenance = provenance.or(Provenance::SingleDefinition(definition));
 
-                    if assignment.unpack().is_none()
+                    if use_def_map(db, definition.scope(db))
+                        .definition_may_depend_on_instance_member(definition)
+                    {
+                        assignments.push(AttributeAssignment::Dependent(definition));
+                    } else if assignment.unpack().is_none()
                         && let ty = infer_expression_type(
                             db,
                             index.expression(assignment.value(&module)),
                             TypeContext::default(),
                         )
-                        && !ty.is_divergent()
                     {
-                        has_independent_value = true;
-                        independent_values.add_in_place(ty);
+                        assignments.push(AttributeAssignment::Independent(ty));
+                        if !ty.is_divergent() {
+                            has_independent_value = true;
+                            independent_values.add_in_place(ty);
+                        }
                     }
                 }
             }
 
-            if has_independent_value {
-                candidates.push(IndependentAttributeCandidate {
-                    name: name.clone(),
-                    incoming: independent_values
+            candidates.push(IndependentAttributeCandidate {
+                incoming: has_independent_value.then(|| {
+                    independent_values
                         .build()
                         .promote(db, &env)
-                        .promote_singletons(db, &env),
-                    dependent_assignments: dependent_assignments.into_boxed_slice(),
-                });
-            }
+                        .promote_singletons(db, &env)
+                }),
+                assignments: assignments.into_boxed_slice(),
+                augmented_bindings: (!augmented_bindings.is_empty())
+                    .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
+                provenance,
+                qualifier_bits,
+            });
         }
 
         candidates.into_boxed_slice()
     }
 
-    /// Retain only provisional roots preserved by every transfer under the same assumptions.
-    ///
-    /// Every candidate in one round sees the same complete provisional map. A rejected root can
-    /// invalidate transfers for other members, so validation repeats without the rejected roots
-    /// until the remaining map is stable.
+    /// Infer all mutually dependent attributes as one authoritative Salsa fixed-point query.
     #[salsa::tracked(
-        returns(deref),
-        cycle_initial=|_, _, _| Box::default(),
+        returns(ref),
+        cycle_initial=attribute_scc_cycle_initial,
+        cycle_fn=attribute_scc_cycle_recover,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn independent_own_attribute_values(
+    fn attribute_scc_values(
         db: &'db dyn Db,
-        group: IndependentAttributeGroup<'db>,
-    ) -> Box<[(Name, Type<'db>)]> {
-        let owner = group.owner(db);
-        let env = ProgramEnvironment::from_scope(owner.body_scope(db));
-        let candidates = Self::independent_own_attribute_candidates(db, group);
-        let mut roots: Vec<_> = candidates
+        component: AttributeInferenceScc<'db>,
+    ) -> AttributeSccState<'db> {
+        let env = ProgramEnvironment::from_scope(component.owner(db).body_scope(db));
+        let context = MemberInferenceContext::new(db, component);
+        let candidates = Self::attribute_scc_candidates(db, component);
+        let index = semantic_index(db, component.owner(db).body_scope(db).program_file(db));
+        let mut first_transfer_constructor_growth = 0usize;
+        let mut constructor_edges = Vec::new();
+
+        let values = candidates
             .iter()
-            .map(|candidate| (candidate.name.clone(), candidate.incoming))
+            .enumerate()
+            .map(|(target_index, candidate)| {
+                let mut values = UnionBuilder::new(db, &env);
+                for assignment in &candidate.assignments {
+                    let ty = match assignment {
+                        AttributeAssignment::Independent(ty) => *ty,
+                        AttributeAssignment::Dependent(definition) => {
+                            let ty = dependent_assignment_transfer(db, *definition, context)
+                                .unwrap_or_else(Type::unknown);
+                            let effect_constructor_depth =
+                                Type::maximum_attribute_constructor_depth(
+                                    db,
+                                    &env,
+                                    std::slice::from_ref(&ty),
+                                );
+                            for member in use_def_map(db, definition.scope(db))
+                                .definition_member_dependencies(*definition)
+                            {
+                                let Some(name) = index
+                                    .place_table(definition.file_scope(db))
+                                    .member(member)
+                                    .as_instance_attribute()
+                                else {
+                                    continue;
+                                };
+                                let Ok(source_index) = component
+                                    .members(db)
+                                    .binary_search_by(|candidate| candidate.as_str().cmp(name))
+                                else {
+                                    continue;
+                                };
+                                let source_constructor_depth =
+                                    candidates[source_index].incoming.map_or(0, |incoming| {
+                                        Type::maximum_attribute_constructor_depth(
+                                            db,
+                                            &env,
+                                            std::slice::from_ref(&incoming),
+                                        )
+                                    });
+                                first_transfer_constructor_growth =
+                                    first_transfer_constructor_growth.max(
+                                        effect_constructor_depth
+                                            .saturating_sub(source_constructor_depth),
+                                    );
+                                let effect_depth =
+                                    isize::try_from(effect_constructor_depth).unwrap_or(isize::MAX);
+                                let source_depth =
+                                    isize::try_from(source_constructor_depth).unwrap_or(isize::MAX);
+                                constructor_edges.push(AttributeConstructorEdge {
+                                    source: source_index,
+                                    target: target_index,
+                                    weight: effect_depth.saturating_sub(source_depth),
+                                });
+                            }
+                            ty
+                        }
+                    };
+                    values.add_in_place(ty);
+                }
+                candidate.implicit_attribute(
+                    values
+                        .build()
+                        .promote(db, &env)
+                        .promote_singletons(db, &env),
+                )
+            })
             .collect();
-
-        while !roots.is_empty() {
-            let context = MemberInferenceContext::new(
-                db,
-                owner,
-                group.target_method_decorator(db),
-                roots.clone().into_boxed_slice(),
+        let first_transfer_has_positive_constructor_cycle =
+            attribute_component_has_positive_constructor_cycle(
+                candidates.len(),
+                &constructor_edges,
             );
-            let rejected: Vec<_> = candidates
-                .iter()
-                .filter(|candidate| {
-                    context.incoming(db, candidate.name.as_str()).is_some()
-                        && candidate.dependent_assignments.iter().any(|definition| {
-                            dependent_assignment_transfer(db, *definition, context).is_none_or(
-                                |effect| !effect.is_subtype_of(db, &env, candidate.incoming),
-                            )
-                        })
-                })
-                .map(|candidate| &candidate.name)
-                .collect();
 
-            if rejected.is_empty() {
-                break;
-            }
-
-            roots.retain(|(name, _)| rejected.binary_search(&name).is_err());
+        AttributeSccState {
+            values,
+            first_transfer_constructor_growth: Some(first_transfer_constructor_growth.max(1)),
+            first_transfer_has_positive_constructor_cycle: Some(
+                first_transfer_has_positive_constructor_cycle,
+            ),
+            first_generation_values: None,
         }
-
-        roots.into_boxed_slice()
     }
 
     #[salsa::tracked(
@@ -4282,12 +4484,266 @@ struct IndependentAttributeGroup<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IndependentAttributeGroup<'_> {}
 
+/// Find cyclic groups in the stable, indexed attribute-dependency graph.
+struct AttributeComponentSearch {
+    next_index: usize,
+    indices: Vec<Option<usize>>,
+    low_links: Vec<usize>,
+    stack: Vec<usize>,
+    on_stack: Vec<bool>,
+    components: Vec<Vec<usize>>,
+}
+
+impl AttributeComponentSearch {
+    fn visit(&mut self, member: usize, edges: &[Vec<usize>]) {
+        let index = self.next_index;
+        self.next_index += 1;
+        self.indices[member] = Some(index);
+        self.low_links[member] = index;
+        self.stack.push(member);
+        self.on_stack[member] = true;
+
+        for dependency in &edges[member] {
+            if self.indices[*dependency].is_none() {
+                self.visit(*dependency, edges);
+                self.low_links[member] = self.low_links[member].min(self.low_links[*dependency]);
+            } else if self.on_stack[*dependency]
+                && let Some(index) = self.indices[*dependency]
+            {
+                self.low_links[member] = self.low_links[member].min(index);
+            }
+        }
+
+        if self.low_links[member] == index {
+            let mut component = Vec::new();
+            while let Some(dependency) = self.stack.pop() {
+                self.on_stack[dependency] = false;
+                component.push(dependency);
+                if dependency == member {
+                    break;
+                }
+            }
+            if component.len() > 1 || edges[member].contains(&member) {
+                component.sort_unstable();
+                self.components.push(component);
+            }
+        }
+    }
+}
+
+/// The member values and first-round constructor growth of one attribute fixed point.
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct AttributeSccState<'db> {
+    values: Box<[ImplicitAttribute<'db>]>,
+    first_transfer_constructor_growth: Option<usize>,
+    first_transfer_has_positive_constructor_cycle: Option<bool>,
+    first_generation_values: Option<Box<[Type<'db>]>>,
+}
+
+/// The signed constructor-depth effect of one indexed attribute dependency.
+struct AttributeConstructorEdge {
+    source: usize,
+    target: usize,
+    weight: isize,
+}
+
+/// Detect whether following a component cycle can increase constructor depth without bound.
+fn attribute_component_has_positive_constructor_cycle(
+    member_count: usize,
+    edges: &[AttributeConstructorEdge],
+) -> bool {
+    let mut depths = vec![0isize; member_count];
+
+    for iteration in 0..member_count {
+        let mut changed = false;
+        // An initially scalar attribute can hide a later projection: indexing `"a"` still
+        // produces a string, but the same operation can remove a list after another assignment.
+        // Only cycles whose every observed edge adds a constructor therefore justify early
+        // widening; neutral or destructive edges must retain the full finite-path allowance.
+        for edge in edges.iter().filter(|edge| edge.weight > 0) {
+            let depth = depths[edge.source].saturating_add(edge.weight);
+            if depth > depths[edge.target] {
+                depths[edge.target] = depth;
+                changed = true;
+            }
+        }
+
+        if !changed {
+            return false;
+        }
+        if iteration.saturating_add(1) == member_count {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// An independently initialized member and the assignments that could modify its inferred type.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct IndependentAttributeCandidate<'db> {
-    name: Name,
-    incoming: Type<'db>,
-    dependent_assignments: Box<[Definition<'db>]>,
+    incoming: Option<Type<'db>>,
+    assignments: Box<[AttributeAssignment<'db>]>,
+    augmented_bindings: Option<AugmentedBindings<'db>>,
+    provenance: Provenance<'db>,
+    qualifier_bits: u8,
+}
+
+/// An attribute assignment in the same source order used by ordinary implicit-member lookup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+enum AttributeAssignment<'db> {
+    Independent(Type<'db>),
+    Dependent(Definition<'db>),
+}
+
+impl<'db> IndependentAttributeCandidate<'db> {
+    fn implicit_attribute(&self, ty: Type<'db>) -> ImplicitAttribute<'db> {
+        ImplicitAttribute {
+            member: Member {
+                inner: Place::bound(ty)
+                    .with_provenance(self.provenance)
+                    .with_qualifiers(
+                        TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
+                            | TypeQualifiers::from_bits_retain(self.qualifier_bits),
+                    ),
+            },
+            augmented_bindings: self.augmented_bindings,
+        }
+    }
+}
+
+fn attribute_scc_cycle_initial<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    component: AttributeInferenceScc<'db>,
+) -> AttributeSccState<'db> {
+    AttributeSccState {
+        values: StaticClassLiteral::attribute_scc_candidates(db, component)
+            .iter()
+            .map(|candidate| {
+                candidate.implicit_attribute(candidate.incoming.unwrap_or(Type::divergent(id)))
+            })
+            .collect(),
+        first_transfer_constructor_growth: None,
+        first_transfer_has_positive_constructor_cycle: None,
+        first_generation_values: None,
+    }
+}
+
+fn attribute_scc_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &AttributeSccState<'db>,
+    current: AttributeSccState<'db>,
+    component: AttributeInferenceScc<'db>,
+) -> AttributeSccState<'db> {
+    let env = ProgramEnvironment::from_scope(component.owner(db).body_scope(db));
+    let candidates = StaticClassLiteral::attribute_scc_candidates(db, component);
+    let previous_component: Vec<_> = previous
+        .values
+        .iter()
+        .filter_map(|attribute| match attribute.member.inner.place {
+            Place::Defined(place) => Some(place.ty),
+            Place::Undefined => None,
+        })
+        .collect();
+    let independent_component: Vec<_> = candidates
+        .iter()
+        .filter_map(|candidate| candidate.incoming)
+        .collect();
+    let first_transfer_constructor_growth = previous
+        .first_transfer_constructor_growth
+        .or(current.first_transfer_constructor_growth)
+        .unwrap_or(1);
+    let first_transfer_has_positive_constructor_cycle = previous
+        .first_transfer_has_positive_constructor_cycle
+        .or(current.first_transfer_has_positive_constructor_cycle)
+        .unwrap_or(false);
+    let first_generation_values = previous.first_generation_values.clone().unwrap_or_else(|| {
+        current
+            .values
+            .iter()
+            .map(|attribute| match attribute.member.inner.place {
+                Place::Defined(place) => place.ty,
+                Place::Undefined => Type::Never,
+            })
+            .collect()
+    });
+    let previous_constructor_depth =
+        Type::maximum_attribute_constructor_depth(db, &env, &previous_component);
+    let independent_constructor_depth =
+        Type::maximum_attribute_constructor_depth(db, &env, &independent_component);
+    let path_length = if first_transfer_has_positive_constructor_cycle {
+        1
+    } else {
+        component.members(db).len()
+    };
+    let finite_constructor_depth = independent_constructor_depth
+        .saturating_add(path_length.saturating_mul(first_transfer_constructor_growth));
+
+    let values = current
+        .values
+        .into_vec()
+        .into_iter()
+        .zip(previous.values.iter())
+        .zip(candidates.iter())
+        .zip(first_generation_values.iter())
+        .map(|(((current, previous), candidate), first_generation)| {
+            let inner = match (current.member.inner.place, previous.member.inner.place) {
+                (Place::Defined(current_place), Place::Defined(previous_place)) => {
+                    let ty = if candidate.incoming == Some(previous_place.ty)
+                        || current_place.ty == previous_place.ty
+                    {
+                        current_place
+                            .ty
+                            .cycle_normalized(db, &env, previous_place.ty, cycle)
+                    } else {
+                        current_place.ty.attribute_cycle_normalized(
+                            db,
+                            &env,
+                            previous_place.ty,
+                            previous_constructor_depth,
+                            finite_constructor_depth,
+                            cycle,
+                        )
+                    };
+                    let ty = if component.members(db).len() > 1
+                        && any_over_type(db, &env, ty, false, |nested| {
+                            nested.same_divergent_marker(Type::divergent(cycle.id()))
+                        }) {
+                        UnionType::from_elements_cycle_recovery(db, &env, [ty, *first_generation])
+                    } else {
+                        ty
+                    };
+                    Place::Defined(DefinedPlace {
+                        ty,
+                        provenance: previous_place.provenance.or(current_place.provenance),
+                        ..current_place
+                    })
+                    .with_qualifiers(
+                        current.member.inner.qualifiers | previous.member.inner.qualifiers,
+                    )
+                }
+                _ => current
+                    .member
+                    .inner
+                    .cycle_normalized(db, &env, previous.member.inner, cycle),
+            };
+            ImplicitAttribute {
+                member: Member { inner },
+                ..current
+            }
+        })
+        .collect();
+
+    AttributeSccState {
+        values,
+        first_transfer_constructor_growth: Some(first_transfer_constructor_growth),
+        first_transfer_has_positive_constructor_cycle: Some(
+            first_transfer_has_positive_constructor_cycle,
+        ),
+        first_generation_values: Some(first_generation_values),
+    }
 }
 
 fn implicit_attribute_matches_scope<'db>(
