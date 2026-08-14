@@ -2365,10 +2365,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .generic_context
                 .map_or(TypeVarSet::None, |context| context.inferable_typevars(db))
         };
-        let signature_typevars = signature_typevars(source).merge(db, signature_typevars(target));
+        let source_inferable = signature_typevars(source);
+        let target_inferable = signature_typevars(target);
+        let signature_inferable = source_inferable.merge(db, target_inferable);
 
-        let relation_typevars = signature_typevars;
-        let inferable = self.inferable.merge(db, relation_typevars);
+        let inferable = self.inferable.merge(db, signature_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
@@ -2394,7 +2395,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(db, env, self.constraints, relation_typevars)
+        when.reduce_inferable(db, env, self.constraints, signature_inferable)
     }
 
     fn with_signature_recursion_guard(
