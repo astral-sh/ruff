@@ -2556,14 +2556,8 @@ impl<'db> Type<'db> {
     ///
     /// Otherwise, returns the type unchanged.
     ///
-    /// An alias element is normally left unexpanded so diagnostics can name it, which hides its
-    /// members from anything inspecting the union. Expand before asking what *shape* the elements
-    /// have — whether one is a callable, a `TypedDict` — since an alias standing in for a union of
-    /// those has no shape of its own and would be judged on its name alone.
-    ///
-    /// Do not expand before asking whether an element mentions an unsolved typevar. That exposes
-    /// typevars inference is still in the middle of binding, and the elements holding them get
-    /// discarded before they can be solved.
+    /// Alias elements are otherwise left unexpanded so diagnostics can name them, which hides
+    /// their members from anything inspecting the union.
     fn expand_union_aliases(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self.resolve_type_alias(db) {
             Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),

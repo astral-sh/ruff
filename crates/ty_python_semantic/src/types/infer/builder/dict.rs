@@ -119,13 +119,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Whether some non-`TypedDict` arm of `annotation` already accepts this `dict(...)` call.
     ///
-    /// Finding a `TypedDict` among the arms is not on its own a reason to validate the call as
-    /// one. `Config | int | dict[str, int]` accepts `dict(other=1)` through its `dict[str, int]`
-    /// arm, and committing to `Config` would report key errors for a call the annotation allows.
+    /// `Config | int | dict[str, int]` accepts `dict(other=1)` through its `dict[str, int]` arm,
+    /// so committing to `Config` would report key errors for a call the annotation allows.
     ///
-    /// Inferring against the arm rather than testing the arm's shape mirrors what dictionary
-    /// literals do, and reuses whatever `dict(...)` would ordinarily infer: passing a
-    /// non-`TypedDict` type context here cannot re-enter the fast path.
+    /// A non-`TypedDict` type context cannot re-enter the fast path, so the recursion terminates.
     fn dict_call_matches_union_fallback(
         &mut self,
         func: &ast::Expr,

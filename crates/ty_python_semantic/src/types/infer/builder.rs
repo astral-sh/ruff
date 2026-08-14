@@ -7076,8 +7076,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }) {
             if let Some(typed_dict) = annotation.as_typed_dict() {
                 // If there is a single typed dict annotation, infer against it directly. Expanding
-                // first means a union whose arms all alias the same `TypedDict` arrives here as
-                // that `TypedDict`, rather than falling out of both branches unvalidated.
+                // first means a union whose arms all alias the same `TypedDict` reaches this
+                // branch rather than neither.
                 if let Some(ty) =
                     self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
                 {
