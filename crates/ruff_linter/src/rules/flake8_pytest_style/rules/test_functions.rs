@@ -32,7 +32,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Original Pytest issue](https://github.com/pytest-dev/pytest/issues/12693)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Suspicious)]
 pub(crate) struct PytestParameterWithDefaultArgument {
     parameter_name: String,
 }

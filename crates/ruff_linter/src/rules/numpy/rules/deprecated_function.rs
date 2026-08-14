@@ -32,7 +32,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// np.all([True, False])
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Suspicious)]
 pub(crate) struct NumpyDeprecatedFunction {
     existing: String,
     replacement: String,

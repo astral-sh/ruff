@@ -43,7 +43,7 @@ use crate::codes::Category;
 /// - [Python documentation: `unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
 /// - [PyPI: `pytest-mock`](https://pypi.org/project/pytest-mock/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Complexity)]
 pub(crate) struct PytestPatchWithLambda;
 
 impl Violation for PytestPatchWithLambda {
