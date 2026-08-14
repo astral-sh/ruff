@@ -1227,12 +1227,22 @@ pub struct Specialization<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Specialization<'_> {}
 
+/// Visit specialization arguments and the generic declaration.
 pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
     visitor: &V,
 ) {
     walk_generic_context(db, specialization.generic_context(db), visitor);
+    walk_specialization_types(db, specialization, visitor);
+}
+
+/// Visit specialization arguments without walking the generic declaration.
+pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    specialization: Specialization<'db>,
+    visitor: &V,
+) {
     for ty in specialization.types(db) {
         visitor.visit_type(db, *ty);
     }
