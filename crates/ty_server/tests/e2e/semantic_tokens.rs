@@ -37,10 +37,14 @@ fn script_metadata_is_highlighted_as_toml() -> Result<()> {
     assert_eq!(
         actual,
         vec![
-            (2, 2, 12, ty_ide::SemanticTokenType::Property as u32),
-            (0, 16, 7, ty_ide::SemanticTokenType::String as u32),
-            (1, 2, 15, ty_ide::SemanticTokenType::Property as u32),
-            (0, 18, 8, ty_ide::SemanticTokenType::String as u32),
+            (2, 2, 12, ty_ide::SemanticTokenType::Variable as u32),
+            (0, 13, 1, ty_ide::SemanticTokenType::Operator as u32),
+            (0, 2, 1, ty_ide::SemanticTokenType::Operator as u32),
+            (0, 1, 7, ty_ide::SemanticTokenType::String as u32),
+            (0, 7, 1, ty_ide::SemanticTokenType::Operator as u32),
+            (1, 2, 15, ty_ide::SemanticTokenType::Variable as u32),
+            (0, 16, 1, ty_ide::SemanticTokenType::Operator as u32),
+            (0, 2, 8, ty_ide::SemanticTokenType::String as u32),
             (2, 0, 5, ty_ide::SemanticTokenType::Variable as u32),
             (0, 8, 1, ty_ide::SemanticTokenType::Number as u32),
         ]

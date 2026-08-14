@@ -40,6 +40,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
+use toml_parser::decoder::ScalarKind;
 use toml_parser::parser::{Event, EventKind};
 use ty_project::script_tag;
 use ty_python_core::ProgramFile;
@@ -73,11 +74,13 @@ pub enum SemanticTokenType {
     Decorator,
     BuiltinConstant,
     TypeParameter,
+    Operator,
+    Regexp,
 }
 
 impl SemanticTokenType {
     /// Returns all supported semantic token types as enum variants.
-    pub const fn all() -> [SemanticTokenType; 15] {
+    pub const fn all() -> [SemanticTokenType; 17] {
         [
             SemanticTokenType::Namespace,
             SemanticTokenType::Class,
@@ -94,6 +97,8 @@ impl SemanticTokenType {
             SemanticTokenType::Decorator,
             SemanticTokenType::BuiltinConstant,
             SemanticTokenType::TypeParameter,
+            SemanticTokenType::Operator,
+            SemanticTokenType::Regexp,
         ]
     }
 
@@ -121,6 +126,8 @@ impl SemanticTokenType {
             SemanticTokenType::Decorator => "decorator",
             SemanticTokenType::BuiltinConstant => "builtinConstant",
             SemanticTokenType::TypeParameter => "typeParameter",
+            SemanticTokenType::Operator => "operator",
+            SemanticTokenType::Regexp => "regexp",
         }
     }
 }
@@ -215,6 +222,7 @@ fn script_metadata_tokens(tag: &ScriptTag, range: Option<TextRange>) -> Vec<Sema
     let metadata = tag.metadata();
     let tokens = toml_parser::Source::new(metadata).lex().collect::<Vec<_>>();
     let mut semantic_tokens = Vec::new();
+    let mut in_table_header = false;
 
     toml_parser::parser::parse_document(
         &tokens,
@@ -225,15 +233,36 @@ fn script_metadata_tokens(tag: &ScriptTag, range: Option<TextRange>) -> Vec<Sema
             };
 
             let token_type = match event.kind() {
-                EventKind::SimpleKey => SemanticTokenType::Property,
-                EventKind::Scalar if event.encoding().is_some() => SemanticTokenType::String,
-                EventKind::Scalar if matches!(text, "true" | "false") => SemanticTokenType::Keyword,
-                EventKind::Scalar
-                    if text.as_bytes().first().is_some_and(|first| {
-                        first.is_ascii_digit() || matches!(first, b'+' | b'-')
-                    }) || matches!(text, "inf" | "nan") =>
-                {
-                    SemanticTokenType::Number
+                EventKind::StdTableOpen | EventKind::ArrayTableOpen => {
+                    in_table_header = true;
+                    SemanticTokenType::Operator
+                }
+                EventKind::StdTableClose | EventKind::ArrayTableClose => {
+                    in_table_header = false;
+                    SemanticTokenType::Operator
+                }
+                EventKind::InlineTableOpen
+                | EventKind::InlineTableClose
+                | EventKind::ArrayOpen
+                | EventKind::ArrayClose
+                | EventKind::KeySep
+                | EventKind::KeyValSep
+                | EventKind::ValueSep => SemanticTokenType::Operator,
+                EventKind::SimpleKey if in_table_header => SemanticTokenType::Namespace,
+                EventKind::SimpleKey => SemanticTokenType::Variable,
+                EventKind::Scalar => {
+                    let scalar = toml_parser::Raw::new_unchecked(text, event.encoding(), span);
+
+                    match scalar.decode_scalar(&mut (), &mut ()) {
+                        ScalarKind::String => SemanticTokenType::String,
+                        ScalarKind::Boolean(_) => SemanticTokenType::BuiltinConstant,
+                        ScalarKind::DateTime => SemanticTokenType::Regexp,
+                        ScalarKind::Float | ScalarKind::Integer(_) => SemanticTokenType::Number,
+                    }
+                }
+                EventKind::Newline => {
+                    in_table_header = false;
+                    return;
                 }
                 _ => return,
             };
@@ -1382,11 +1411,14 @@ mod tests {
         let source = r#"before = 1
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["httpx"]
+# dependencies = ["httpx", "attrs"]
 # [tool.uv]
 # enabled = true
+# disabled = false
 # retries = 2
 # "quoted-key" = { nested = "value" }
+# [[tool.packages]]
+# name = "example"
 # ///
 after = 2
 "#;
@@ -1403,21 +1435,91 @@ after = 2
             vec![
                 ("before", SemanticTokenType::Variable),
                 ("1", SemanticTokenType::Number),
-                ("requires-python", SemanticTokenType::Property),
+                ("requires-python", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
                 ("\">=3.12\"", SemanticTokenType::String),
-                ("dependencies", SemanticTokenType::Property),
+                ("dependencies", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("[", SemanticTokenType::Operator),
                 ("\"httpx\"", SemanticTokenType::String),
-                ("tool", SemanticTokenType::Property),
-                ("uv", SemanticTokenType::Property),
-                ("enabled", SemanticTokenType::Property),
-                ("true", SemanticTokenType::Keyword),
-                ("retries", SemanticTokenType::Property),
+                (",", SemanticTokenType::Operator),
+                ("\"attrs\"", SemanticTokenType::String),
+                ("]", SemanticTokenType::Operator),
+                ("[", SemanticTokenType::Operator),
+                ("tool", SemanticTokenType::Namespace),
+                (".", SemanticTokenType::Operator),
+                ("uv", SemanticTokenType::Namespace),
+                ("]", SemanticTokenType::Operator),
+                ("enabled", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("true", SemanticTokenType::BuiltinConstant),
+                ("disabled", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("false", SemanticTokenType::BuiltinConstant),
+                ("retries", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
                 ("2", SemanticTokenType::Number),
-                ("\"quoted-key\"", SemanticTokenType::Property),
-                ("nested", SemanticTokenType::Property),
+                ("\"quoted-key\"", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("{", SemanticTokenType::Operator),
+                ("nested", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
                 ("\"value\"", SemanticTokenType::String),
+                ("}", SemanticTokenType::Operator),
+                ("[[", SemanticTokenType::Operator),
+                ("tool", SemanticTokenType::Namespace),
+                (".", SemanticTokenType::Operator),
+                ("packages", SemanticTokenType::Namespace),
+                ("]]", SemanticTokenType::Operator),
+                ("name", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("\"example\"", SemanticTokenType::String),
                 ("after", SemanticTokenType::Variable),
                 ("2", SemanticTokenType::Number),
+            ]
+        );
+    }
+
+    #[test]
+    fn script_metadata_distinguishes_numeric_and_datetime_values() {
+        let source = r#"# /// script
+# integer = 42
+# hexadecimal = 0xff
+# float = 1.5
+# infinity = +inf
+# not-a-number = nan
+# date = 2026-08-14
+# time = 08:15:30
+# datetime = 2026-08-14T08:15:30
+# offset-datetime = 2026-08-14T08:15:30Z
+# ///
+"#;
+        let test = SemanticTokenTest::new(source);
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let values: Vec<_> = tokens
+            .iter()
+            .filter(|token| {
+                matches!(
+                    token.token_type,
+                    SemanticTokenType::Number | SemanticTokenType::Regexp
+                )
+            })
+            .map(|token| (&source[token.range()], token.token_type))
+            .collect();
+
+        assert_eq!(
+            values,
+            vec![
+                ("42", SemanticTokenType::Number),
+                ("0xff", SemanticTokenType::Number),
+                ("1.5", SemanticTokenType::Number),
+                ("+inf", SemanticTokenType::Number),
+                ("nan", SemanticTokenType::Number),
+                ("2026-08-14", SemanticTokenType::Regexp),
+                ("08:15:30", SemanticTokenType::Regexp),
+                ("2026-08-14T08:15:30", SemanticTokenType::Regexp),
+                ("2026-08-14T08:15:30Z", SemanticTokenType::Regexp),
             ]
         );
     }
@@ -1436,7 +1538,8 @@ after = 2
         assert_eq!(
             highlighted,
             vec![
-                ("description", SemanticTokenType::Property),
+                ("description", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
                 ("\"\"\"", SemanticTokenType::String),
                 ("first", SemanticTokenType::String),
                 ("last", SemanticTokenType::String),
@@ -1468,8 +1571,11 @@ after = 2
             vec![
                 ("value", SemanticTokenType::Variable),
                 ("1", SemanticTokenType::Number),
-                ("dependencies", SemanticTokenType::Property),
+                ("dependencies", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("[", SemanticTokenType::Operator),
                 ("\"httpx\"", SemanticTokenType::String),
+                ("]", SemanticTokenType::Operator),
                 ("2", SemanticTokenType::Number),
             ]
         );
