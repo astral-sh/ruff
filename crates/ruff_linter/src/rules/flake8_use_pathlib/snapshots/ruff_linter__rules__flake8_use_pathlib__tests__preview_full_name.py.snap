@@ -336,6 +336,7 @@ help: Replace with `Path(...).stat()`
 24 + pathlib.Path(p).stat()
 25 | os.path.isabs(p)
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PTH117 [*] `os.path.isabs()` should be replaced by `Path.is_absolute()`
   --> full_name.py:24:1

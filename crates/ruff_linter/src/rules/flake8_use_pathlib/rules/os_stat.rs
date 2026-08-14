@@ -181,11 +181,7 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
             format!("{binding}({path_code}).{method}({stat_args})")
         };
 
-        let applicability = if checker.comment_ranges().intersects(range) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
+        let applicability = Applicability::Unsafe;
 
         Ok(Fix::applicable_edits(
             Edit::range_replacement(replacement, range),
@@ -199,7 +195,7 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
 ///
 /// If the keyword is omitted, returns `Some(true)` (its default value).
 /// Returns `None` if the keyword argument is present but not a boolean literal.
-pub(crate) fn is_boolean_literal_or_default(argument: &Arguments, name: &str) -> Option<bool> {
+fn is_boolean_literal_or_default(argument: &Arguments, name: &str) -> Option<bool> {
     let Some(kw) = argument.find_keyword(name) else {
         return Some(true);
     };
