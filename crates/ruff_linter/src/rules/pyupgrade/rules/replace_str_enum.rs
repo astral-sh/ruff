@@ -82,7 +82,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [breaking change]: https://blog.pecar.me/python-enum
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct ReplaceStrEnum {
     name: String,
 }

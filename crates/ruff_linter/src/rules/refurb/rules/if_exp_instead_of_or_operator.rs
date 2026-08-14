@@ -43,7 +43,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// (assuming `foo()` returns a truthy value), but only once in
 /// `foo() or bar()`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Complexity)]
 pub(crate) struct IfExpInsteadOfOrOperator;
 
 impl Violation for IfExpInsteadOfOrOperator {
