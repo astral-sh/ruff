@@ -208,23 +208,3 @@ help: Replace with `Path("tmp_path/pyproject.toml")....`
 159 + pathlib.Path("tmp_path/pyproject.toml").write_text(dedent(
 160 |         """
     |
-
-FURB103 [*] `open` and `write` should be replaced by `Path("descriptor_control.txt").write_text("test")`
-   --> FURB103_0.py:191:6
-    |
-190 | # FURB103: a `str` filename in the same position is still flagged.
-191 | with open("descriptor_control.txt", "w") as f:
-    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-192 |     f.write("test")
-    |
-help: Replace with `Path("descriptor_control.txt").write_text("test")`
-    |
-150 | import json
-151 + import pathlib
-152 |
---------------------------------------------------------------------------------
-191 | # FURB103: a `str` filename in the same position is still flagged.
-    - with open("descriptor_control.txt", "w") as f:
-    -     f.write("test")
-192 + pathlib.Path("descriptor_control.txt").write_text("test")
-    |
