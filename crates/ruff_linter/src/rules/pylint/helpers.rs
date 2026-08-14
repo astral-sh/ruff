@@ -11,7 +11,7 @@ use crate::settings::LinterSettings;
 
 /// Returns `true` if a module member is public despite having an
 /// underscore-prefixed name.
-pub(crate) fn is_exceptionally_public_module_member(qualified_name: &QualifiedName) -> bool {
+pub(crate) fn is_underscore_prefixed_public_member(qualified_name: &QualifiedName) -> bool {
     matches!(qualified_name.segments(), ["os", "_exit"])
 }
 
