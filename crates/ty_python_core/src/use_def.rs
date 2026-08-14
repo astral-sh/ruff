@@ -649,15 +649,12 @@ impl PredicateNarrowingTargets {
     }
 
     fn place_specific_entries(&self) -> &[(ScopedPredicateId, ScopedPlaceId)] {
-        let marker_count = usize::from(
-            self.0
-                .first()
-                .is_some_and(|&(predicate, _)| predicate == ScopedPredicateId::ALWAYS_TRUE),
-        ) + usize::from(
-            self.0
-                .get(1)
-                .is_some_and(|&(predicate, _)| predicate == ScopedPredicateId::ALWAYS_TRUE),
-        );
+        let marker_count = self
+            .0
+            .iter()
+            .take(2)
+            .take_while(|(predicate, _)| *predicate == ScopedPredicateId::ALWAYS_TRUE)
+            .count();
 
         &self.0[marker_count..]
     }
@@ -2183,7 +2180,9 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Records a negated narrowing constraint for only the specified places.
     ///
     /// The positive and negative constraints use the same predicate ID. This lets `P or not P`
-    /// simplify to `ALWAYS_TRUE`, so narrowing cancels out after a complete `if`/`else`.
+    /// simplify to `ALWAYS_TRUE`, so narrowing cancels out after a complete `if`/`else`. The
+    /// predicate's possible targets are independent of its polarity and were already recorded
+    /// with the positive constraint.
     pub(super) fn record_negated_narrowing_constraint_for_places(
         &mut self,
         predicate: ScopedPredicateId,
@@ -2194,9 +2193,6 @@ impl<'db> UseDefMapBuilder<'db> {
         {
             return;
         }
-
-        self.predicate_narrowing_targets
-            .extend(places.iter().map(|place| (predicate, *place)));
 
         let negated = self.narrowing_constraints.add_negated_atom(predicate);
         self.record_narrowing_constraint_node_for_places(negated, places);
