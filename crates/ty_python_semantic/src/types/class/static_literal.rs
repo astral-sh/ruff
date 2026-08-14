@@ -2629,9 +2629,26 @@ impl<'db> StaticClassLiteral<'db> {
                     None
                 } else {
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    place_from_bindings(db, &env, bindings)
-                        .place
-                        .ignore_possibly_undefined()
+                    let has_default = !self.file(db).is_stub(db) || {
+                        let module = parsed_module(db, self.python_file(db)).load(db);
+                        bindings.clone().any(|binding| {
+                            binding.binding.is_defined_and(|definition| {
+                                // Annotation-only declarations in stubs also act as bindings for
+                                // attribute lookup, but they do not supply field defaults.
+                                definition.kind(db).category(false, &module).is_binding()
+                                    && !binding_reachability(db, &use_def, &binding)
+                                        .is_always_false()
+                            })
+                        })
+                    };
+
+                    if has_default {
+                        place_from_bindings(db, &env, bindings)
+                            .place
+                            .ignore_possibly_undefined()
+                    } else {
+                        None
+                    }
                 };
 
                 default_ty =
