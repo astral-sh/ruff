@@ -709,7 +709,7 @@ def check_structural(
 ```
 
 Unions of structurally compatible protocols retain the same tuple. Incompatible alternatives are
-rejected without widening their inferred tuple to an unknown-length tuple.
+rejected, but their overlapping tuple constraints are preserved in the fallback result.
 
 ```py
 class Other[*Ts](Protocol):
@@ -724,9 +724,9 @@ def check_unions(
     reveal_type(invariant_structural(invariant_match))  # revealed: tuple[str]
     reveal_type(contravariant_structural(contravariant_match))  # revealed: tuple[str]
     # error: [invalid-argument-type]
-    reveal_type(invariant_structural(invariant_mismatch))  # revealed: tuple[()]
+    reveal_type(invariant_structural(invariant_mismatch))  # revealed: tuple[tuple[str] & tuple[bytes], ...]
     # error: [invalid-argument-type]
-    reveal_type(contravariant_structural(contravariant_mismatch))  # revealed: tuple[()]
+    reveal_type(contravariant_structural(contravariant_mismatch))  # revealed: tuple[tuple[str] & tuple[bytes], ...]
 ```
 
 A nominal class implementing the same variadic protocol retains its precise method parameter.

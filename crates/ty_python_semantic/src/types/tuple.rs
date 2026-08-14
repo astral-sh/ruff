@@ -696,7 +696,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
     pub(super) fn check_tuple_spec_pair(
         &self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         left: &TupleSpec<'db>,
         right: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -710,46 +710,11 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             return self.always();
         }
 
-        // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
-        let any_disjoint = |a: &[Type<'db>], b: &[Type<'db>], rev: bool| {
-            if rev {
-                std::iter::zip(a.iter().rev(), b.iter().rev()).when_any(
-                    db,
-                    self.constraints,
-                    |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
-                )
-            } else {
-                std::iter::zip(a, b).when_any(db, self.constraints, |(&left_elem, &right_elem)| {
-                    self.check_type_pair(db, left_elem, right_elem)
-                })
-            }
-        };
-
-        match (left, right) {
-            (Tuple::Fixed(left), Tuple::Fixed(right)) => {
-                any_disjoint(left.all_elements(), right.all_elements(), false)
-            }
-
-            // Note that we don't compare the variable-length portions; two pure homogeneous tuples
-            // `tuple[A, ...]` and `tuple[B, ...]` can never be disjoint even if A and B are
-            // disjoint, because `tuple[()]` would be assignable to both.
-            (Tuple::Variable(left), Tuple::Variable(right)) => {
-                any_disjoint(left.prefix_elements(), right.prefix_elements(), false).or(
-                    db,
-                    self.constraints,
-                    || any_disjoint(left.suffix_elements(), right.suffix_elements(), true),
-                )
-            }
-
-            (Tuple::Fixed(fixed), Tuple::Variable(variable))
-            | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                any_disjoint(fixed.all_elements(), variable.prefix_elements(), false).or(
-                    db,
-                    self.constraints,
-                    || any_disjoint(fixed.all_elements(), variable.suffix_elements(), true),
-                )
-            }
-        }
+        // Tuple elements are covariant, so `tuple[Never]` is a common subtype of `tuple[int]` and
+        // `tuple[str]`. Unlike `Never` itself, `tuple[Never]` can be inhabited by a user-defined
+        // tuple subclass. Therefore, incompatible element types do not make tuple specializations
+        // with compatible lengths disjoint.
+        self.never()
     }
 }
 

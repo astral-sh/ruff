@@ -425,10 +425,19 @@ c = (1, 2, 3)
 
 reveal_type(a is (1, 2))  # revealed: bool
 reveal_type(a is not (1, 2))  # revealed: bool
+```
 
-reveal_type(a is b)  # revealed: Literal[False]
-reveal_type(a is not b)  # revealed: Literal[True]
+Tuples with incompatible element types can still share a subclass, so equal lengths do not rule out
+identity.
 
+```py
+reveal_type(a is b)  # revealed: bool
+reveal_type(a is not b)  # revealed: bool
+```
+
+Tuples with incompatible lengths cannot be the same object.
+
+```py
 reveal_type(a is c)  # revealed: Literal[False]
 reveal_type(a is not c)  # revealed: Literal[True]
 ```

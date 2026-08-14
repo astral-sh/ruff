@@ -230,12 +230,13 @@ static_assert(is_disjoint_from(I, J))
 
 ## Tuple types
 
-Tuple types are disjoint when their lengths or corresponding element types cannot overlap.
+Tuple types are disjoint from incompatible runtime types and from other tuples whose possible
+lengths do not overlap.
 
 ```py
-from typing_extensions import Literal, Never
+from typing_extensions import Literal, Never, NoReturn, Unpack
 from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from, is_subtype_of
 
 static_assert(is_disjoint_from(tuple[()], TypeOf[object]))
 static_assert(is_disjoint_from(tuple[()], TypeOf[Literal]))
@@ -246,15 +247,61 @@ static_assert(is_disjoint_from(tuple[None], Literal["a"]))
 static_assert(is_disjoint_from(tuple[None], Literal[1]))
 static_assert(is_disjoint_from(tuple[None], Literal[True]))
 
-static_assert(is_disjoint_from(tuple[Literal[1]], tuple[Literal[2]]))
 static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1]]))
-static_assert(is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], Literal[3]]))
+static_assert(is_disjoint_from(tuple[Never], tuple[()]))
+static_assert(is_disjoint_from(tuple[Never, Never], tuple[int]))
+```
+
+Tuple elements are covariant. Consequently, a potentially inhabited `tuple[Never]` is a common
+subtype of tuple types whose element types would otherwise be disjoint.
+
+```py
+static_assert(is_subtype_of(tuple[Never], tuple[int]))
+static_assert(is_subtype_of(tuple[Never], tuple[str]))
+
+static_assert(not is_disjoint_from(tuple[Never], tuple[Never]))
+static_assert(not is_disjoint_from(tuple[Never], tuple[int]))
+static_assert(not is_disjoint_from(tuple[NoReturn], tuple[str]))
+static_assert(not is_disjoint_from(tuple[int], tuple[str]))
+static_assert(not is_disjoint_from(tuple[Literal[1]], tuple[Literal[2]]))
+static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], Literal[3]]))
 
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[1], int]))
 static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[int, ...]))
+static_assert(not is_disjoint_from(tuple[int, int], tuple[None, ...]))
+```
 
-# TODO: should pass
-static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [static-assert-error]
+The same overlap exists for nested tuples and for required prefixes or suffixes of variable-length
+tuples.
+
+```py
+static_assert(not is_disjoint_from(tuple[tuple[Never]], tuple[tuple[int]]))
+static_assert(not is_disjoint_from(tuple[tuple[int]], tuple[tuple[str]]))
+
+static_assert(not is_disjoint_from(tuple[Never, Unpack[tuple[int, ...]]], tuple[str, Unpack[tuple[str, ...]]]))
+static_assert(not is_disjoint_from(tuple[Unpack[tuple[int, ...]], Never], tuple[Unpack[tuple[str, ...]], bytes]))
+static_assert(not is_disjoint_from(tuple[int, Never, Unpack[tuple[str, ...]]], tuple[str, bytes, Unpack[tuple[int, ...]]]))
+```
+
+A tuple subclass with a `Never` element must overlap itself and every compatible tuple supertype. It
+remains disjoint from tuples whose lengths cannot match.
+
+```py
+class BottomTuple(tuple[Never]): ...
+
+static_assert(not is_disjoint_from(BottomTuple, BottomTuple))
+static_assert(not is_disjoint_from(BottomTuple, tuple[Never]))
+static_assert(not is_disjoint_from(BottomTuple, tuple[int]))
+static_assert(not is_disjoint_from(BottomTuple, tuple[str]))
+static_assert(is_disjoint_from(BottomTuple, tuple[()]))
+```
+
+A homogeneous `tuple[Never, ...]` has no required elements and therefore simplifies to the empty
+tuple type rather than overlapping tuples with required elements.
+
+```py
+static_assert(not is_disjoint_from(tuple[Never, ...], tuple[()]))
+static_assert(is_disjoint_from(tuple[Never, ...], tuple[int]))
 ```
 
 ## Unions
