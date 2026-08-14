@@ -322,7 +322,9 @@ pub(super) fn attribute_write_requirement<'db>(
             {
                 builtins_symbol(db, env, attribute)
             } else {
-                module.static_member(db, env, attribute)
+                module
+                    .static_member(db, env, attribute)
+                    .unwrap_or_else(|_| Place::Undefined.into())
             };
             AttributeWriteRequirement::Module(match symbol.place {
                 Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
