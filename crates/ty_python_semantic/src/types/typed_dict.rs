@@ -1533,7 +1533,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
             return true;
         }
 
-        if diagnostic::is_invalid_typed_dict_literal(db, item.declared_ty, self.value_node) {
+        if diagnostic::is_invalid_typed_dict_literal(db, env, item.declared_ty, self.value_node) {
             return false;
         }
 

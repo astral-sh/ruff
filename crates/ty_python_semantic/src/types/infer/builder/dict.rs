@@ -26,7 +26,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
         // is `TypedDict`-shaped.
         if let Some(tcx) = call_expression_tcx.annotation
-            && let Some(typed_dict) = tcx.filter_union(db, Type::is_typed_dict).as_typed_dict()
+            && let Some(typed_dict) = tcx
+                .filter_union(db, self.program_environment(), Type::is_typed_dict)
+                .as_typed_dict()
         {
             // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
             // are already valid for the target, including gradual and bottom types. The additional

@@ -6412,7 +6412,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(tcx) = tcx.annotation
             && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
                 .resolve_type_alias(db)
-                .filter_union(db, |ty| ty.as_literal_value().is_some())
+                .filter_union(db, env, |ty| ty.as_literal_value().is_some())
             && ty.is_assignable_to(db, env, literal_tcx)
         {
             ty = Type::LiteralValue(literal.to_unpromotable());
@@ -6541,7 +6541,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for binding in solution {
                 let inferred_ty = binding
                     .solution
-                    .filter_union(db, |ty| !ty.has_unspecialized_type_var(db, env));
+                    .filter_union(db, env, |ty| !ty.has_unspecialized_type_var(db, env));
                 if inferred_ty.has_unspecialized_type_var(db, env) {
                     continue;
                 }
@@ -7081,6 +7081,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return ty;
                 }
             } else if let Type::Union(union) = annotation {
+                // An element may itself be an alias for a union, which is left unexpanded so
+                // diagnostics can name it. Expand so the members are visible here.
+                let union = match union.expand_aliases(db, env) {
+                    Type::Union(expanded) => expanded,
+                    _ => union,
+                };
                 let union_elements = union.elements(self.db());
                 let mut typed_dicts = Vec::new();
                 let mut has_dict_compatible_fallback = false;
@@ -7321,11 +7327,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .zip(specialization.types(self.db()))
                 {
                     let inferred_ty = inferred_ty
-                        .filter_union(db, |ty| {
+                        .filter_union(db, env, |ty| {
                             !ty.as_typevar()
                                 .is_some_and(|tv| tv.is_inferable(self.db(), inferable))
                         })
-                        .filter_union(db, |ty| !ty.has_unspecialized_type_var(db, env));
+                        .filter_union(db, env, |ty| !ty.has_unspecialized_type_var(db, env));
                     if inferred_ty.has_unspecialized_type_var(db, env) {
                         continue;
                     }
@@ -7375,8 +7381,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // Avoid inferring a preferred type based on partially specialized
                                 // type context from an outer generic call. If the type context is
                                 // a union, we try to keep any concrete elements.
-                                let inferred_ty = inferred_ty
-                                    .filter_union(db, |ty| !ty.has_unspecialized_type_var(db, env));
+                                let inferred_ty = inferred_ty.filter_union(db, env, |ty| {
+                                    !ty.has_unspecialized_type_var(db, env)
+                                });
                                 if inferred_ty.has_unspecialized_type_var(db, env) {
                                     continue;
                                 }
@@ -8355,7 +8362,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
         // in the union/intersection.
         let callable_tcx = if let Some(tcx) = tcx.annotation
-            && let Some(callable) = tcx.filter_union(db, Type::is_callable_type).as_callable()
+            && let Some(callable) = tcx
+                .filter_union(db, env, Type::is_callable_type)
+                .as_callable()
         {
             match callable.signatures(self.db()).overloads.as_slice() {
                 [signature] => Some(signature),

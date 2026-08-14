@@ -1080,6 +1080,51 @@ def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
 takes_td_or_iterable({42: 42})
 ```
 
+## Union of `TypedDict` behind a type alias
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A `TypedDict` is still found when the annotation reaches it through a type alias, including when the
+alias resolves to a union and is itself one element of a larger union:
+
+```py
+from typing import TypedDict
+from typing_extensions import TypeAliasType
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+type PersonAlias = Person
+type PersonOrId = Person | int
+PersonOrIdAliasType = TypeAliasType("PersonOrIdAliasType", Person | int)
+
+aliased: PersonAlias = {"name": "Alice", "age": 30}
+reveal_type(aliased)  # revealed: Person
+
+aliased_in_union: PersonAlias | str = {"name": "Alice", "age": 30}
+reveal_type(aliased_in_union)  # revealed: Person
+
+union_alias: PersonOrId = {"name": "Alice", "age": 30}
+reveal_type(union_alias)  # revealed: Person
+
+union_alias_in_union: PersonOrId | str = {"name": "Alice", "age": 30}
+reveal_type(union_alias_in_union)  # revealed: Person
+
+alias_type_in_union: PersonOrIdAliasType | str = {"name": "Alice", "age": 30}
+reveal_type(alias_type_in_union)  # revealed: Person
+```
+
+Keys are still validated against the aliased `TypedDict`:
+
+```py
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
+```
+
 ## Type ignore compatibility issues
 
 Users should be able to ignore TypedDict validation errors with `# type: ignore`

@@ -746,6 +746,31 @@ x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 ```
 
+## Type context behind a type alias
+
+A type alias is expanded when looking for the callable in the type context, including when the alias
+resolves to a union and is itself one element of a larger union:
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType
+
+type IntCallback = Callable[[int], None]
+type IntCallbackOrInt = Callable[[int], None] | int
+IntCallbackOrIntAliasType = TypeAliasType("IntCallbackOrIntAliasType", Callable[[int], None] | int)
+
+def consume(value: int) -> None:
+    pass
+
+x1: Callable[[int], None] | str = lambda value: consume(reveal_type(value))  # revealed: int
+x2: IntCallbackOrInt | str = lambda value: consume(reveal_type(value))  # revealed: int
+x3: IntCallbackOrIntAliasType | str = lambda value: consume(reveal_type(value))  # revealed: int
+
+# TODO: An alias that does not resolve to a union is not expanded here, so the parameter is not
+# inferred from the type context.
+x4: IntCallback = lambda value: consume(reveal_type(value))  # revealed: Unknown
+```
+
 ## Generic call argument inference
 
 A function's arguments are also inferred using the type context:
