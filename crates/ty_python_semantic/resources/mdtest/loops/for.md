@@ -1940,7 +1940,7 @@ for _ in range(1_000_000):
         break
     node = node.next
 reveal_type(node)  # revealed: Node
-reveal_type(node.next)  # revealed: None | Node
+reveal_type(node.next)  # revealed: Node | None
 ```
 
 ### Nested collection cycles do not panic

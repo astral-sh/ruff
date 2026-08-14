@@ -157,6 +157,33 @@ class Record(TypedDict):
     value: int
 ```
 
+### Deferred forward references in overloaded calls
+
+Selecting an overload must not recursively infer a loop-carried forward reference before its
+declared `TypedDict` is available.
+
+```py
+from __future__ import annotations
+from typing import Never, TypedDict, overload
+
+@overload
+def inspect(value: str) -> Never: ...
+@overload
+def inspect(value: object) -> int: ...
+def inspect(value: object) -> int:
+    return 1
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    inspect(record)
+    reveal_type(record)  # revealed: Record
+    record["missing"]  # error: [invalid-key]
+
+class Record(TypedDict):
+    value: int
+```
+
 ### Deferred forward references on Python 3.14
 
 Annotations are deferred by default in Python 3.14 and later.
