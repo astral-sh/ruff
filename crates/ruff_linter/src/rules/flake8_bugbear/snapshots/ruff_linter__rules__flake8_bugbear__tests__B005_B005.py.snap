@@ -23,7 +23,7 @@ B005 Using `.strip()` with multi-character strings is misleading
 9 | s.lstrip("we")  # no warning
   |
 
-B005 Using `.strip()` with multi-character strings is misleading
+B005 Using `.lstrip()` with multi-character strings is misleading
   --> B005.py:10:1
    |
  8 | s.lstrip(s)  # no warning
@@ -34,7 +34,7 @@ B005 Using `.strip()` with multi-character strings is misleading
 12 | s.lstrip("\n\t ")  # no warning
    |
 
-B005 Using `.strip()` with multi-character strings is misleading
+B005 Using `.lstrip()` with multi-character strings is misleading
   --> B005.py:13:1
    |
 11 | s.lstrip("e")  # no warning
@@ -45,7 +45,7 @@ B005 Using `.strip()` with multi-character strings is misleading
 15 | s.rstrip("we")  # warning
    |
 
-B005 Using `.strip()` with multi-character strings is misleading
+B005 Using `.rstrip()` with multi-character strings is misleading
   --> B005.py:16:1
    |
 14 | s.rstrip(s)  # no warning
@@ -56,7 +56,7 @@ B005 Using `.strip()` with multi-character strings is misleading
 18 | s.rstrip("\n\t ")  # no warning
    |
 
-B005 Using `.strip()` with multi-character strings is misleading
+B005 Using `.rstrip()` with multi-character strings is misleading
   --> B005.py:19:1
    |
 17 | s.rstrip("e")  # no warning

@@ -46,12 +46,15 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.106")]
-pub(crate) struct StripWithMultiCharacters;
+pub(crate) struct StripWithMultiCharacters {
+    method: String,
+}
 
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `.strip()` with multi-character strings is misleading".to_string()
+        let StripWithMultiCharacters { method } = self;
+        format!("Using `.{method}()` with multi-character strings is misleading")
     }
 }
 
@@ -74,6 +77,11 @@ pub(crate) fn strip_with_multi_characters(
     };
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
-        checker.report_diagnostic(StripWithMultiCharacters, expr.range());
+        checker.report_diagnostic(
+            StripWithMultiCharacters {
+                method: attr.to_string(),
+            },
+            expr.range(),
+        );
     }
 }
