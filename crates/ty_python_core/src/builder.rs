@@ -5191,6 +5191,19 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
                     deferred_effects = Some((place_expr, is_use, is_definition));
+                } else if matches!(expr, ast::Expr::Attribute(_))
+                    && matches!(ctx, ast::ExprContext::Load)
+                    && let Some(frame_scope) = self
+                        .assignment_member_dependency
+                        .as_ref()
+                        .filter(|frame| frame.collecting)
+                        .map(|frame| frame.scope)
+                    && self.assignment_dependency_method_scope() == Some(frame_scope)
+                    && let Some(frame) = self.assignment_member_dependency.as_mut()
+                {
+                    // Computed receivers such as `factory().value` cannot be represented as
+                    // places, but their attribute reads still make the assignment dependent.
+                    frame.has_dependency = true;
                 }
 
                 walk_expr(self, expr);

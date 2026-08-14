@@ -2258,6 +2258,1361 @@ reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
 accept_original(Right().values[0])  # error: [invalid-argument-type]
 ```
 
+## Cross-class recursive attributes on annotated local receivers, defining class first
+
+A receiver's class can be established by a local annotation instead of a parameter annotation.
+Checking the defining module first must retain concrete values introduced by either class.
+
+`model.py`:
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self) -> None:
+        other: Right = Right()
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`consumer.py`:
+
+```py
+from model import Right, accept_original
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on annotated local receivers, consumer first
+
+Checking the other class first must not discard the owner established by the local annotation or
+hide either invalid argument.
+
+`consumer.py`:
+
+```py
+from model import Right, accept_original
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+`model.py`:
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self) -> None:
+        other: Right = Right()
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on narrowed receivers
+
+An `isinstance` check can establish the owner of an attribute even when its receiver's declared type
+is only `object`.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, other: object) -> None:
+        if isinstance(other, Right):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers narrowed by qualified builtins
+
+Referring to `isinstance` through its defining module still establishes the receiver's class.
+
+```py
+from __future__ import annotations
+import builtins
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, other: object) -> None:
+        if builtins.isinstance(other, Right):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers narrowed to multiple classes
+
+Every class in an `isinstance` class-information tuple can own the accessed attribute.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Foreign:
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Left:
+    def update(self, other: object) -> None:
+        if isinstance(other, (Right, Foreign)):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers narrowed by computed class information
+
+A class supplied by a typed helper can establish the receiver's owner even when computing the class
+also accesses the recursive attribute.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+def choose_class(value: object) -> type[Right]:
+    return Right
+
+class Left:
+    def update(self, other: object) -> None:
+        klass = choose_class(self.values)
+        if isinstance(other, klass):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers narrowed by chained class aliases
+
+A class supplied to `isinstance` can be reached through multiple unannotated local aliases.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, other: object) -> None:
+        first = Right
+        klass = first
+        if isinstance(other, klass):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers narrowed by conditional class aliases
+
+Every class that can reach a conditional `isinstance` argument is a possible attribute owner.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Foreign:
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Left:
+    def update(self, other: object, flag: bool) -> None:
+        klass = Right if flag else Foreign
+        if isinstance(other, klass):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers returned by typed factories
+
+A factory's return annotation identifies the receiver's owner without evaluating an argument that
+accesses the recursive attribute.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+def make_right(value: object) -> Right:
+    return Right()
+
+class Left:
+    def update(self) -> None:
+        other = make_right(self.values)
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on annotated module-global receivers
+
+A module-level annotation can identify an attribute receiver used inside a method.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+module_receiver: Right = Right()
+
+class Left:
+    def update(self) -> None:
+        self.values = [*module_receiver.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-module recursive attributes through qualified annotated globals
+
+A module-qualified global preserves the owner established by its annotation.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from __future__ import annotations
+import right as module
+from right import Original
+
+class Left:
+    def update(self) -> None:
+        self.values = [*module.module_receiver.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+```
+
+`right.py`:
+
+```py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+module_receiver: Right = Right()
+```
+
+## Cross-module recursive attributes through qualified typed factories
+
+A factory accessed through its module still establishes its receiver through its return annotation.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from __future__ import annotations
+import right as module
+from right import Original
+
+class Left:
+    def update(self) -> None:
+        self.values = [*module.make_right().values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+```
+
+`right.py`:
+
+```py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def make_right() -> Right:
+    return Right()
+```
+
+## Cross-module recursive attributes through qualified TypeIs guards
+
+A module-qualified `TypeIs` guard identifies the receiver without evaluating its function body.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from __future__ import annotations
+import right as module
+from right import Original
+
+class Left:
+    def update(self, other: object) -> None:
+        if module.is_right(other):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+```
+
+`right.py`:
+
+```py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+from typing_extensions import TypeIs
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def is_right(value: object) -> TypeIs[Right]:
+    return isinstance(value, Right)
+```
+
+## Cross-module recursive attributes through qualified TypeGuard guards
+
+A module-qualified `TypeGuard` provides the same receiver information as a direct import.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from __future__ import annotations
+import right as module
+from right import Original
+
+class Left:
+    def update(self, other: object) -> None:
+        if module.is_right(other):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+```
+
+`right.py`:
+
+```py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+from typing import TypeGuard
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def is_right(value: object) -> TypeGuard[Right]:
+    return isinstance(value, Right)
+```
+
+## Cross-module recursive attributes through imported annotated globals
+
+An imported module-global annotation identifies the receiver before evaluating its initializer.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from __future__ import annotations
+from right import Original, module_receiver
+
+class Left:
+    def update(self) -> None:
+        self.values = [*module_receiver.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+```
+
+`right.py`:
+
+```py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+module_receiver: Right = Right()
+```
+
+## Cross-module recursive attributes through imported typed factories
+
+An imported factory's return annotation establishes the owner of its result.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from __future__ import annotations
+from right import Original, make_right
+
+class Left:
+    def update(self) -> None:
+        self.values = [*make_right().values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+```
+
+`right.py`:
+
+```py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def make_right() -> Right:
+    return Right()
+```
+
+## Cross-module recursive attributes through imported TypeIs guards
+
+An imported `TypeIs` annotation identifies the class established by a custom guard.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from __future__ import annotations
+from right import Original, is_right
+
+class Left:
+    def update(self, other: object) -> None:
+        if is_right(other):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+```
+
+`right.py`:
+
+```py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+from typing_extensions import TypeIs
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def is_right(value: object) -> TypeIs[Right]:
+    return isinstance(value, Right)
+```
+
+## Cross-module recursive attributes through imported TypeGuard guards
+
+An imported `TypeGuard` annotation identifies the class established by a custom guard.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Original, Right
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from __future__ import annotations
+from right import Original, is_right
+
+class Left:
+    def update(self, other: object) -> None:
+        if is_right(other):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+```
+
+`right.py`:
+
+```py
+from __future__ import annotations
+from typing import TYPE_CHECKING
+from typing import TypeGuard
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def is_right(value: object) -> TypeGuard[Right]:
+    return isinstance(value, Right)
+```
+
+## Cross-class recursive attributes on receivers narrowed by TypeIs
+
+A `TypeIs` return annotation can identify a receiver without evaluating the guard.
+
+```py
+from __future__ import annotations
+from typing_extensions import TypeIs
+
+class Original: ...
+class Added: ...
+
+def is_right(value: object) -> TypeIs[Right]:
+    return isinstance(value, Right)
+
+class Left:
+    def update(self, other: object) -> None:
+        if is_right(other):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers narrowed by TypeGuard
+
+A `TypeGuard` return annotation can identify the class established by a custom guard.
+
+```py
+from __future__ import annotations
+from typing import TypeGuard
+
+class Original: ...
+class Added: ...
+
+def is_right(value: object) -> TypeGuard[Right]:
+    return isinstance(value, Right)
+
+class Left:
+    def update(self, other: object) -> None:
+        if is_right(other):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on tuple-element receivers
+
+The class of a tuple element determines the owner of its accessed attribute.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, others: tuple[Right]) -> None:
+        self.values = [*others[0].values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on list-element receivers
+
+The class of a list element determines the owner of its accessed attribute.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, others: list[Right]) -> None:
+        self.values = [*others[0].values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on elements of union-typed containers
+
+Each possible container contributes its element type when determining the receiver's owner.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+class ForeignValue: ...
+
+class Foreign:
+    def initialize(self) -> None:
+        self.values = [ForeignValue()]
+
+class Left:
+    def update(self, others: list[Right] | list[Foreign]) -> None:
+        self.values = [*others[0].values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added | ForeignValue] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | ForeignValue | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on dictionary-value receivers
+
+The value type of a dictionary determines the owner of an accessed element attribute.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, others: dict[str, Right]) -> None:
+        self.values = [*others["right"].values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on direct factory-call receivers
+
+A factory call can be the attribute receiver without first binding its result to a local name.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+def make_right() -> Right:
+    return Right()
+
+class Left:
+    def update(self) -> None:
+        self.values = [*make_right().values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on property-result receiver aliases
+
+A property's return annotation establishes the owner of an attribute accessed through its result.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Holder:
+    @property
+    def current(self) -> Right:
+        return Right()
+
+class Left:
+    def update(self, holder: Holder) -> None:
+        other = holder.current
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on chained property receivers
+
+An attribute can be read directly from a property without first binding the property's result.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Holder:
+    @property
+    def current(self) -> Right:
+        return Right()
+
+class Left:
+    def update(self, holder: Holder) -> None:
+        self.values = [*holder.current.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers narrowed by compound conditions
+
+A receiver can be narrowed by `isinstance` within a condition that also contains an unrelated
+boolean expression.
+
+```py
+from __future__ import annotations
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, other: object, flag: bool) -> None:
+        if flag and isinstance(other, Right):
+            self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on constrained type variables
+
+Every class allowed by a constrained type variable is a possible owner of the receiver's attribute.
+
+```py
+from __future__ import annotations
+from typing import TypeVar
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Foreign:
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+T = TypeVar("T", Right, Foreign)
+
+class Left:
+    def update(self, other: T) -> None:
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on union-bounded type variables
+
+A type variable bounded by a union can access an attribute on any of the classes in that bound.
+
+```py
+from __future__ import annotations
+from typing import TypeVar
+
+class Original: ...
+class Added: ...
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Foreign:
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+T = TypeVar("T", bound=Right | Foreign)
+
+class Left:
+    def update(self, other: T) -> None:
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on cast receivers
+
+A typed cast can establish the receiver's owner without requiring a parameter or local annotation.
+
+```py
+from __future__ import annotations
+from typing import cast
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, value: object) -> None:
+        other = cast(Right, value)
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on casts with dependent annotation metadata
+
+An `Annotated` cast can include metadata that accesses the recursive attribute without changing the
+class established by the annotation itself.
+
+```py
+from __future__ import annotations
+from typing import Annotated, cast
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, value: object) -> None:
+        other = cast(Annotated[Right, self.values], value)
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
+## Cross-class recursive attributes on receivers established by renamed casts
+
+Renaming `typing.cast` does not change the class established by its target type.
+
+```py
+from __future__ import annotations
+from typing import cast as coerce
+
+class Original: ...
+class Added: ...
+
+class Left:
+    def update(self, value: object) -> None:
+        other = coerce(Right, value)
+        self.values = [*other.values]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+class Right:
+    def update(self, other: Left) -> None:
+        self.values = [*other.values, Added()]
+
+    def initialize(self) -> None:
+        self.values = [Original()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
+reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
+accept_original(Left().values[0])  # error: [invalid-argument-type]
+accept_original(Right().values[0])  # error: [invalid-argument-type]
+```
+
 ## Cross-class recursive attributes with specialized generic receivers
 
 The shared component is independent of receiver specialization, but every attribute read must apply

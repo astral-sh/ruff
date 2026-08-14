@@ -45,8 +45,9 @@
 
 use crate::ProgramEnvironment;
 use itertools::Either;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -60,18 +61,24 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     AttributeInferenceScc, ClassBase, ClassLiteral, ClassType, KnownClass, MethodDecorator,
-    StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
 };
 use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::expression::Expression;
+use ty_python_core::predicate::{PredicateNode, ScopedPredicateId};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
+use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, semantic_index};
+use ty_python_core::{
+    ExpressionNodeKey, FileScopeId, ProgramFile, SemanticIndex, Statement, global_scope,
+    place_table, semantic_index, use_def_map,
+};
 
 mod builder;
 mod comparisons;
@@ -235,6 +242,136 @@ pub(crate) fn annotated_assignment_annotation<'db>(
     .infer_annotated_assignment_annotation_only(assignment)
 }
 
+/// Resolve an imported symbol to its declared definitions without evaluating its public value.
+///
+/// Recursive attributes can depend on annotations imported from another module. Loading the
+/// ordinary imported value could evaluate its initializer, a factory body, or an attribute in the
+/// component before that component has been selected. This query only resolves module names and
+/// structurally indexed global definitions; imported re-exports are followed through their own
+/// tracked, file-local queries.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(crate) fn imported_declaration_definitions<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Box<[Definition<'db>]> {
+    let DefinitionKind::ImportFrom(import) = definition.kind(db) else {
+        return Box::default();
+    };
+
+    let importing_program_file = definition.program_file(db);
+    let parsed = parsed_module(db, importing_program_file.python_file(db)).load(db);
+    let statement = import.import(&parsed);
+    let env = ProgramEnvironment::from_file(importing_program_file);
+    let importing_file = ImportingFile::File(
+        importing_program_file.file(db),
+        env.resolver_environment(db),
+    );
+    let Ok(module_name) = ModuleName::from_import_statement(db, importing_file, statement) else {
+        return Box::default();
+    };
+    let Some(module) = resolve_module(db, importing_file, &module_name) else {
+        return Box::default();
+    };
+    let Some(file) = module.file(db) else {
+        return Box::default();
+    };
+    let program_file = ProgramFile::new(db, file, importing_program_file.program(db));
+    let name = import.alias(&parsed).name.id.clone();
+
+    imported_module_declaration_definitions(db, program_file, name)
+        .iter()
+        .copied()
+        .collect()
+}
+
+/// Resolve a member of an imported module without loading the member's public value.
+///
+/// For `import helpers as h`, this resolves the indexed declarations behind `h.receiver`,
+/// `h.make_receiver`, and `h.is_receiver` without evaluating their initializers or bodies.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(crate) fn imported_module_symbol_definitions<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    name: Name,
+) -> Box<[Definition<'db>]> {
+    let DefinitionKind::Import(import) = definition.kind(db) else {
+        return Box::default();
+    };
+
+    let importing_program_file = definition.program_file(db);
+    let parsed = parsed_module(db, importing_program_file.python_file(db)).load(db);
+    let Some(module_name) = ModuleName::new(import.alias(&parsed).name.as_str()) else {
+        return Box::default();
+    };
+    let env = ProgramEnvironment::from_file(importing_program_file);
+    let importing_file = ImportingFile::File(
+        importing_program_file.file(db),
+        env.resolver_environment(db),
+    );
+    let Some(module) = resolve_module(db, importing_file, &module_name) else {
+        return Box::default();
+    };
+    let Some(file) = module.file(db) else {
+        return Box::default();
+    };
+    let program_file = ProgramFile::new(db, file, importing_program_file.program(db));
+
+    imported_module_declaration_definitions(db, program_file, name)
+        .iter()
+        .copied()
+        .collect()
+}
+
+/// Read one module's indexed declarations without exposing its syntax to another module.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn imported_module_declaration_definitions<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    name: Name,
+) -> Box<[Definition<'db>]> {
+    let scope = global_scope(db, file);
+    let table = place_table(db, scope);
+    let Some(symbol) = table.symbol_id(name.as_str()) else {
+        return Box::default();
+    };
+    let use_def = use_def_map(db, scope);
+    let mut definitions = FxIndexSet::default();
+
+    for definition in use_def
+        .reachable_symbol_declarations(symbol)
+        .filter_map(|declaration| declaration.declaration.definition())
+        .chain(
+            use_def
+                .reachable_symbol_bindings(symbol)
+                .filter_map(|binding| binding.binding.definition()),
+        )
+    {
+        if matches!(definition.kind(db), DefinitionKind::ImportFrom(_)) {
+            definitions.extend(
+                imported_declaration_definitions(db, definition)
+                    .iter()
+                    .copied(),
+            );
+        } else {
+            definitions.insert(definition);
+        }
+    }
+
+    definitions.into_iter().collect()
+}
+
 /// Infer a parameter's annotation without evaluating its function's defaults or decorators.
 ///
 /// Recursive attribute components must identify another receiver's class before selecting their
@@ -283,6 +420,466 @@ pub(crate) fn parameter_annotation_only<'db>(
         )
         .infer_parameter_annotation_only(annotation, function_definition),
     )
+}
+
+/// Infer a function's return annotation without evaluating its signature or body.
+///
+/// A typed factory can identify an attribute receiver even when its arguments read recursive
+/// attributes. Dependency discovery must inspect its return annotation without evaluating those
+/// arguments, the function's defaults, decorators, or any other signature expressions.
+#[salsa::tracked(returns(copy), heap_size = ruff_memory_usage::heap_size)]
+pub(crate) fn function_return_annotation_only<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return None;
+    };
+
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let annotation = function.node(&module).returns.as_deref()?;
+    let index = semantic_index(db, program_file);
+    let annotation_scope = index
+        .expression_scope_id(annotation)
+        .to_scope_id(db, program_file);
+    let region = if annotation_scope == definition.scope(db) {
+        InferenceRegion::Deferred(definition)
+    } else {
+        InferenceRegion::Scope(annotation_scope, TypeContext::default())
+    };
+    let env = ProgramEnvironment::from_file(program_file);
+
+    Some(
+        TypeInferenceBuilder::new(
+            db,
+            &env,
+            region,
+            python_file.file(db),
+            program_file,
+            index,
+            &module,
+        )
+        .infer_function_return_annotation_only(annotation, definition),
+    )
+}
+
+/// Recognize an imported dependency without inferring its value or evaluating its module.
+///
+/// Every reaching binding must have the requested import provenance: a reassigned import can no
+/// longer safely identify `typing.cast`, `typing.Annotated`, or `builtins.isinstance`.
+fn dependency_imported_from<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    module: &ParsedModuleRef,
+    scope: FileScopeId,
+    symbol_name: &str,
+    modules: &[&str],
+    member: Option<&str>,
+) -> bool {
+    index
+        .visible_ancestor_scopes(scope)
+        .find_map(|(scope, _)| {
+            let table = index.place_table(scope);
+            let symbol = table.symbol_id(symbol_name)?;
+            if !table.symbol(symbol).is_local() {
+                return None;
+            }
+
+            let mut found = false;
+            for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+                let Some(binding) = binding.binding.definition() else {
+                    continue;
+                };
+                let matching = match (binding.kind(db), member) {
+                    (DefinitionKind::ImportFrom(import), Some(expected)) => {
+                        let statement = import.import(module);
+                        statement.level == 0
+                            && statement
+                                .module
+                                .as_ref()
+                                .is_some_and(|module| modules.contains(&module.as_str()))
+                            && import.alias(module).name.as_str() == expected
+                    }
+                    (DefinitionKind::Import(import), None) => {
+                        modules.contains(&import.alias(module).name.as_str())
+                    }
+                    _ => false,
+                };
+                if !matching {
+                    return Some(false);
+                }
+                found = true;
+            }
+
+            Some(found)
+        })
+        .unwrap_or(false)
+}
+
+/// Resolve a local or module-qualified callable using declarations alone.
+fn dependency_callable_definitions<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    scope: FileScopeId,
+    callable: &ast::Expr,
+) -> FxIndexSet<Definition<'db>> {
+    let (name, member) = match callable {
+        ast::Expr::Name(name) => (name.id.as_str(), None),
+        ast::Expr::Attribute(attribute) => {
+            let Some(name) = attribute.value.as_name_expr() else {
+                return FxIndexSet::default();
+            };
+            (name.id.as_str(), Some(attribute.attr.id.clone()))
+        }
+        _ => return FxIndexSet::default(),
+    };
+    let Some((scope, symbol)) = index.visible_ancestor_scopes(scope).find_map(|(scope, _)| {
+        let table = index.place_table(scope);
+        let symbol = table.symbol_id(name)?;
+        table.symbol(symbol).is_local().then_some((scope, symbol))
+    }) else {
+        return FxIndexSet::default();
+    };
+
+    let mut definitions = FxIndexSet::default();
+    for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+        let Some(definition) = binding.binding.definition() else {
+            continue;
+        };
+        match (definition.kind(db), member.as_ref()) {
+            (DefinitionKind::Import(_), Some(member)) => {
+                definitions.extend(
+                    imported_module_symbol_definitions(db, definition, member.clone())
+                        .iter()
+                        .copied(),
+                );
+            }
+            (DefinitionKind::ImportFrom(_), None) => {
+                definitions.extend(
+                    imported_declaration_definitions(db, definition)
+                        .iter()
+                        .copied(),
+                );
+            }
+            (_, None) => {
+                definitions.insert(definition);
+            }
+            (_, Some(_)) => {}
+        }
+    }
+
+    definitions
+}
+
+/// Resolve a runtime class name without evaluating a factory's argument expressions.
+fn dependency_guard_class_type<'db, 'ast>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    module: &'ast ParsedModuleRef,
+    definition: Definition<'db>,
+    class: &'ast ast::Expr,
+    env: &ProgramEnvironment<'db>,
+) -> Option<Type<'db>> {
+    let program_file = definition.program_file(db);
+    let mut pending = vec![class];
+    let mut visited = FxIndexSet::default();
+    let mut values = UnionBuilder::new(db, env);
+    let mut found = false;
+
+    while let Some(class) = pending.pop() {
+        match class {
+            ast::Expr::If(conditional) => {
+                pending.push(conditional.orelse.as_ref());
+                pending.push(conditional.body.as_ref());
+            }
+            ast::Expr::BoolOp(boolean) => pending.extend(boolean.values.iter().rev()),
+            ast::Expr::Tuple(tuple) => pending.extend(tuple.elts.iter().rev()),
+            ast::Expr::Name(class_name) => {
+                let resolved = index
+                    .visible_ancestor_scopes(definition.file_scope(db))
+                    .find_map(|(scope, _)| {
+                        let table = index.place_table(scope);
+                        let symbol = table.symbol_id(class_name.id.as_str())?;
+                        table.symbol(symbol).is_local().then_some((scope, symbol))
+                    });
+
+                let Some((scope, symbol)) = resolved else {
+                    values.add_in_place(
+                        TypeInferenceBuilder::new(
+                            db,
+                            env,
+                            InferenceRegion::Definition(definition),
+                            program_file.python_file(db).file(db),
+                            program_file,
+                            index,
+                            module,
+                        )
+                        .infer_dependency_type_expression_only(class),
+                    );
+                    found = true;
+                    continue;
+                };
+                if !visited.insert((scope, symbol)) {
+                    continue;
+                }
+
+                let mut has_assignment = false;
+                for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+                    let Some(binding) = binding.binding.definition() else {
+                        continue;
+                    };
+                    match binding.kind(db) {
+                        DefinitionKind::Assignment(assignment) => {
+                            has_assignment = true;
+                            let value = assignment.value(module);
+                            if let ast::Expr::Call(call) = value {
+                                for function in dependency_callable_definitions(
+                                    db,
+                                    index,
+                                    binding.file_scope(db),
+                                    call.func.as_ref(),
+                                ) {
+                                    if let Some(return_type) =
+                                        function_return_annotation_only(db, function)
+                                        && let Some(class_type) =
+                                            return_type.to_instance_approximation(db, env)
+                                    {
+                                        values.add_in_place(class_type);
+                                        found = true;
+                                    }
+                                }
+                            } else if matches!(
+                                value,
+                                ast::Expr::Name(_)
+                                    | ast::Expr::If(_)
+                                    | ast::Expr::BoolOp(_)
+                                    | ast::Expr::Tuple(_)
+                            ) {
+                                pending.push(value);
+                            }
+                        }
+                        DefinitionKind::AnnotatedAssignment(_) => {
+                            has_assignment = true;
+                            if let Some(annotation) = annotated_assignment_annotation(db, binding)
+                                && let Some(class_type) =
+                                    annotation.inner_type().to_instance_approximation(db, env)
+                            {
+                                values.add_in_place(class_type);
+                                found = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                if !has_assignment {
+                    values.add_in_place(
+                        TypeInferenceBuilder::new(
+                            db,
+                            env,
+                            InferenceRegion::Definition(definition),
+                            program_file.python_file(db).file(db),
+                            program_file,
+                            index,
+                            module,
+                        )
+                        .infer_dependency_type_expression_only(class),
+                    );
+                    found = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    found.then(|| values.build())
+}
+
+/// Infer a cast's target type without evaluating its callable or its argument value.
+///
+/// Attribute dependency discovery needs the owner introduced by `cast(Right, value)` before
+/// selecting its canonical component. Inferring the assignment or call would also evaluate
+/// `value`, which could enter that component before the selection has completed.
+#[salsa::tracked(returns(copy), heap_size = ruff_memory_usage::heap_size)]
+pub(crate) fn cast_target_annotation_only<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let call = assignment.value(&module).as_call_expr()?;
+    let (callee, qualified) = match call.func.as_ref() {
+        ast::Expr::Name(name) => (name.id.as_str(), false),
+        ast::Expr::Attribute(attribute) if attribute.attr.as_str() == "cast" => {
+            (attribute.value.as_name_expr()?.id.as_str(), true)
+        }
+        _ => return None,
+    };
+    let index = semantic_index(db, program_file);
+    let is_cast = dependency_imported_from(
+        db,
+        index,
+        &module,
+        definition.file_scope(db),
+        callee,
+        &["typing", "typing_extensions"],
+        (!qualified).then_some("cast"),
+    );
+    if !is_cast {
+        return None;
+    }
+
+    let target = call.arguments.args.first()?;
+    let env = ProgramEnvironment::from_file(program_file);
+
+    Some(
+        TypeInferenceBuilder::new(
+            db,
+            &env,
+            InferenceRegion::Definition(definition),
+            python_file.file(db),
+            program_file,
+            index,
+            &module,
+        )
+        .infer_dependency_type_expression_only(target),
+    )
+}
+
+/// Infer safe class checks from a predicate without evaluating the predicate itself.
+///
+/// The semantic index records `flag and isinstance(value, Right)` as one predicate. Inferring
+/// that complete condition during dependency discovery could evaluate `flag` before selecting
+/// the recursive component. Instead, inspect its syntax and infer only the class type expressions
+/// of unshadowed `isinstance` calls. Both scoped identifiers belong to `definition`'s file scope,
+/// so no expression or AST reference crosses this tracked query's module boundary.
+#[salsa::tracked(returns(copy), heap_size = ruff_memory_usage::heap_size)]
+pub(crate) fn narrowing_predicate_type_only<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    predicate_id: ScopedPredicateId,
+    receiver: ScopedSymbolId,
+) -> Option<Type<'db>> {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let scope = definition.file_scope(db);
+    let receiver_name = index.place_table(scope).symbol(receiver).name();
+
+    let bare_isinstance_unshadowed = !index.visible_ancestor_scopes(scope).any(|(scope, _)| {
+        let table = index.place_table(scope);
+        table
+            .symbol_id("isinstance")
+            .is_some_and(|symbol| table.symbol(symbol).is_local())
+    });
+
+    let predicate = index.use_def_map(scope).predicates()[predicate_id];
+    let PredicateNode::Expression(expression) = predicate.node else {
+        return None;
+    };
+    if expression.program_file(db) != program_file {
+        return None;
+    }
+
+    let env = ProgramEnvironment::from_file(program_file);
+    let mut values = UnionBuilder::new(db, &env);
+    let mut found = false;
+    let mut pending = vec![expression.node_ref(db).node(&module)];
+
+    while let Some(expression) = pending.pop() {
+        match expression {
+            ast::Expr::BoolOp(boolean) => pending.extend(boolean.values.iter().rev()),
+            ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
+                pending.push(unary.operand.as_ref());
+            }
+            ast::Expr::If(conditional) => {
+                pending.push(conditional.orelse.as_ref());
+                pending.push(conditional.body.as_ref());
+                pending.push(conditional.test.as_ref());
+            }
+            ast::Expr::Call(call)
+                if call.arguments.keywords.is_empty()
+                    && let [value, class] = call.arguments.args.as_ref()
+                    && value
+                        .as_name_expr()
+                        .is_some_and(|name| name.id.as_str() == receiver_name.as_str())
+                    && match call.func.as_ref() {
+                        ast::Expr::Name(name) => {
+                            bare_isinstance_unshadowed && name.id.as_str() == "isinstance"
+                        }
+                        ast::Expr::Attribute(attribute)
+                            if attribute.attr.as_str() == "isinstance" =>
+                        {
+                            attribute.value.as_name_expr().is_some_and(|name| {
+                                dependency_imported_from(
+                                    db,
+                                    index,
+                                    &module,
+                                    scope,
+                                    name.id.as_str(),
+                                    &["builtins"],
+                                    None,
+                                )
+                            })
+                        }
+                        _ => false,
+                    } =>
+            {
+                let mut classes = vec![class];
+                while let Some(class) = classes.pop() {
+                    match class {
+                        ast::Expr::Tuple(tuple) => classes.extend(tuple.elts.iter().rev()),
+                        ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                            classes.push(binary.right.as_ref());
+                            classes.push(binary.left.as_ref());
+                        }
+                        ast::Expr::Name(_) => {
+                            if let Some(ty) = dependency_guard_class_type(
+                                db, index, &module, definition, class, &env,
+                            ) {
+                                values.add_in_place(ty);
+                                found = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            ast::Expr::Call(call)
+                if call.arguments.keywords.is_empty()
+                    && let Some(value) = call.arguments.args.first()
+                    && value
+                        .as_name_expr()
+                        .is_some_and(|name| name.id.as_str() == receiver_name.as_str()) =>
+            {
+                for function in
+                    dependency_callable_definitions(db, index, scope, call.func.as_ref())
+                {
+                    let Some(annotation) = function_return_annotation_only(db, function) else {
+                        continue;
+                    };
+                    let narrowed = match annotation {
+                        Type::TypeIs(type_is) => type_is.type_argument(db),
+                        Type::TypeGuard(type_guard) => type_guard.return_type(db),
+                        _ => continue,
+                    };
+                    values.add_in_place(narrowed);
+                    found = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    found.then(|| values.build())
 }
 
 /// Infer an attribute assignment's effect under its component's current attribute values.

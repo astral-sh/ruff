@@ -27,7 +27,8 @@ use crate::{
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
         MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
         Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
+        TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, TypedDictModule, UnionBuilder,
+        UnionType,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
@@ -49,8 +50,11 @@ use crate::{
         },
         generics::Specialization,
         infer::{
-            MemberInferenceContext, annotated_assignment_annotation, dependent_assignment_transfer,
-            function_known_decorator_flags, infer_unpack_types, parameter_annotation_only,
+            MemberInferenceContext, annotated_assignment_annotation, cast_target_annotation_only,
+            dependent_assignment_transfer, function_known_decorator_flags,
+            function_return_annotation_only, imported_declaration_definitions,
+            imported_module_symbol_definitions, infer_unpack_types, narrowing_predicate_type_only,
+            parameter_annotation_only,
         },
         infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
@@ -65,7 +69,9 @@ use crate::{
 };
 use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    ProgramFile, SemanticIndex, attribute_scopes,
+    ProgramFile, SemanticIndex,
+    ast_ids::HasScopedUseId,
+    attribute_scopes,
     definition::{
         Definition, DefinitionKind, DefinitionState, ParameterDefinitionNodeKind, TargetKind,
     },
@@ -3035,7 +3041,7 @@ impl<'db> StaticClassLiteral<'db> {
             Name::new(name),
             target_method_decorator,
         );
-        if !Self::attribute_has_dependencies(db, attribute) {
+        if !Self::attribute_has_dependencies(db, self, attribute) {
             return None;
         }
         let group = IndependentAttributeGroup::new(db, self, target_method_decorator);
@@ -3060,10 +3066,14 @@ impl<'db> StaticClassLiteral<'db> {
     /// Avoid building a class-wide graph for the common case of an independent attribute.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| false,
+        cycle_initial=|_, _, _, _| false,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn attribute_has_dependencies(db: &'db dyn Db, attribute: ImplicitAttributeName<'db>) -> bool {
+    fn attribute_has_dependencies(
+        db: &'db dyn Db,
+        owner: StaticClassLiteral<'db>,
+        attribute: ImplicitAttributeName<'db>,
+    ) -> bool {
         attribute_assignments(
             db,
             attribute.class_body_scope(db),
@@ -3074,10 +3084,13 @@ impl<'db> StaticClassLiteral<'db> {
                 let DefinitionState::Defined(definition) = binding.binding else {
                     return false;
                 };
-                use_def_map(db, definition.scope(db))
+                let use_def = use_def_map(db, definition.scope(db));
+                use_def
                     .definition_member_dependencies(definition)
                     .next()
                     .is_some()
+                    || (use_def.definition_may_depend_on_instance_member(definition)
+                        && !attribute_definition_dependencies(db, owner, definition).is_empty())
             })
         })
     }
@@ -3231,7 +3244,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 db,
                                 index,
                                 &module,
-                                definition,
+                                AttributeReceiverContext { owner, definition },
                                 receiver,
                                 &mut FxIndexSet::default(),
                                 &mut receiver_owners,
@@ -3267,6 +3280,16 @@ impl<'db> StaticClassLiteral<'db> {
                                 }
                             }
                         }
+                    }
+
+                    if use_def_map(db, definition.scope(db))
+                        .definition_may_depend_on_instance_member(definition)
+                    {
+                        dependencies.extend(
+                            attribute_definition_dependencies(db, owner, definition)
+                                .iter()
+                                .cloned(),
+                        );
                     }
                 }
             }
@@ -3645,6 +3668,42 @@ impl<'db> StaticClassLiteral<'db> {
                                         source: source_index,
                                         target: target_index,
                                         weight,
+                                    });
+                                }
+                            }
+
+                            if let Some(target_dependencies) = target_dependencies {
+                                for dependency in
+                                    attribute_definition_dependencies(db, target.owner, *definition)
+                                        .iter()
+                                        .filter(|dependency| {
+                                            target_dependencies.dependencies.contains(dependency)
+                                        })
+                                {
+                                    let Some(source_index) = component
+                                        .members(db)
+                                        .iter()
+                                        .position(|candidate| candidate == dependency)
+                                    else {
+                                        continue;
+                                    };
+                                    let source_constructor_depth =
+                                        candidates[source_index].incoming.map_or(0, |incoming| {
+                                            Type::maximum_attribute_constructor_depth(
+                                                db,
+                                                &target_env,
+                                                std::slice::from_ref(&incoming),
+                                            )
+                                        });
+                                    first_transfer_constructor_growth =
+                                        first_transfer_constructor_growth.max(
+                                            effect_constructor_depth
+                                                .saturating_sub(source_constructor_depth),
+                                        );
+                                    constructor_edges.push(AttributeConstructorEdge {
+                                        source: source_index,
+                                        target: target_index,
+                                        weight: 0,
                                     });
                                 }
                             }
@@ -4799,14 +4858,480 @@ fn compare_attribute_members<'db>(
         .then_with(|| left.name.cmp(&right.name))
 }
 
-/// Follow every reachable parameter annotation, including conditionally assigned aliases.
+/// The class and assignment whose receiver expressions are being inspected.
+#[derive(Clone, Copy)]
+struct AttributeReceiverContext<'db> {
+    owner: StaticClassLiteral<'db>,
+    definition: Definition<'db>,
+}
+
+/// Follow import declarations without reading their target module's syntax in this query.
+fn for_each_attribute_dependency_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    mut visit: impl FnMut(Definition<'db>),
+) {
+    if matches!(definition.kind(db), DefinitionKind::ImportFrom(_)) {
+        for imported in imported_declaration_definitions(db, definition) {
+            visit(*imported);
+        }
+    } else {
+        visit(definition);
+    }
+}
+
+/// Resolve `module.member` through its import without inferring the imported module.
+fn for_each_imported_module_dependency_definition<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    definition: Definition<'db>,
+    attribute: &ast::ExprAttribute,
+    mut visit: impl FnMut(Definition<'db>),
+) {
+    let Some(module) = attribute.value.as_name_expr() else {
+        return;
+    };
+    let Some((scope, symbol)) = index
+        .visible_ancestor_scopes(definition.file_scope(db))
+        .find_map(|(scope, _)| {
+            let table = index.place_table(scope);
+            let symbol = table.symbol_id(module.id.as_str())?;
+            table.symbol(symbol).is_local().then_some((scope, symbol))
+        })
+    else {
+        return;
+    };
+
+    for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+        let Some(import) = binding.binding.definition() else {
+            continue;
+        };
+        if !matches!(import.kind(db), DefinitionKind::Import(_)) {
+            continue;
+        }
+        for imported in imported_module_symbol_definitions(db, import, attribute.attr.id.clone()) {
+            visit(*imported);
+        }
+    }
+}
+
+/// Resolve compound attribute receivers without retaining syntax from their defining module.
+///
+/// The core index records direct `other.value` reads compactly, but expressions such as
+/// `items[0].value`, `self.peer.value`, and `make_peer().value` do not have a direct receiver
+/// place. Their owner can still be recovered from annotations without evaluating the receiver.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn attribute_definition_dependencies<'db>(
+    db: &'db dyn Db,
+    owner: StaticClassLiteral<'db>,
+    definition: Definition<'db>,
+) -> Box<[AttributeInferenceMember<'db>]> {
+    if !use_def_map(db, definition.scope(db)).definition_may_depend_on_instance_member(definition) {
+        return Box::default();
+    }
+
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return Box::default();
+    };
+    let file = definition.program_file(db);
+    let index = semantic_index(db, file);
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let env = ProgramEnvironment::from_file(file);
+    let context = AttributeReceiverContext { owner, definition };
+    let mut dependencies = Vec::new();
+
+    ast::helpers::any_over_expr(assignment.value(&module), |expression| {
+        let ast::Expr::Attribute(attribute) = expression else {
+            return false;
+        };
+        if attribute.value.is_name_expr()
+            || index.expression_scope_id(expression) != definition.file_scope(db)
+        {
+            return false;
+        }
+
+        let mut receiver_types = FxIndexSet::default();
+        attribute_expression_receiver_types(
+            db,
+            index,
+            &module,
+            context,
+            attribute.value.as_ref(),
+            &mut FxIndexSet::default(),
+            &mut receiver_types,
+        );
+        let mut receiver_owners = FxIndexSet::default();
+        for receiver_type in receiver_types {
+            collect_attribute_receiver_type_owners(db, &env, receiver_type, &mut receiver_owners);
+        }
+
+        for (receiver_owner, target_method_decorator) in receiver_owners {
+            if let Some(dependency_owner) = receiver_owner.attribute_inference_defining_owner(
+                db,
+                attribute.attr.id.as_str(),
+                target_method_decorator,
+            ) {
+                dependencies.push(AttributeInferenceMember {
+                    owner: dependency_owner,
+                    target_method_decorator,
+                    name: attribute.attr.id.clone(),
+                });
+            }
+        }
+
+        false
+    });
+
+    dependencies.sort_by(|left, right| compare_attribute_members(db, left, right));
+    dependencies.dedup();
+    dependencies.into_boxed_slice()
+}
+
+/// Read a property's return annotation without inferring its descriptor or getter body.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn property_return_annotation_only<'db>(
+    db: &'db dyn Db,
+    owner: StaticClassLiteral<'db>,
+    attribute: ImplicitAttributeName<'db>,
+) -> Option<Type<'db>> {
+    let scope = owner.body_scope(db);
+    let index = semantic_index(db, scope.program_file(db));
+    let table = index.place_table(scope.file_scope_id(db));
+    let symbol = table.symbol_id(attribute.name(db).as_str())?;
+    let module = parsed_module(db, scope.program_file(db).python_file(db)).load(db);
+
+    for binding in index
+        .use_def_map(scope.file_scope_id(db))
+        .reachable_symbol_bindings(symbol)
+    {
+        let Some(definition) = binding.binding.definition() else {
+            continue;
+        };
+        let DefinitionKind::Function(function) = definition.kind(db) else {
+            continue;
+        };
+        if function
+            .node(&module)
+            .decorator_list
+            .iter()
+            .any(|decorator| {
+                decorator
+                    .expression
+                    .as_name_expr()
+                    .is_some_and(|name| name.id == "property")
+            })
+            && let Some(return_type) = function_return_annotation_only(db, definition)
+        {
+            return Some(return_type);
+        }
+    }
+
+    None
+}
+
+/// Collect receiver types using declarations and pure return annotations only.
+fn attribute_expression_receiver_types<'db, 'ast>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    module: &'ast ParsedModuleRef,
+    context: AttributeReceiverContext<'db>,
+    expression: &'ast ast::Expr,
+    visited: &mut FxIndexSet<Name>,
+    types: &mut FxIndexSet<Type<'db>>,
+) {
+    let definition = context.definition;
+    let env = ProgramEnvironment::from_file(definition.program_file(db));
+
+    match expression {
+        ast::Expr::Name(name) => {
+            if !visited.insert(name.id.clone()) {
+                return;
+            }
+
+            if index
+                .scope(definition.file_scope(db))
+                .node()
+                .as_function()
+                .and_then(|function| {
+                    function
+                        .node(module)
+                        .parameters
+                        .iter_non_variadic_params()
+                        .next()
+                })
+                .is_some_and(|parameter| parameter.name().as_str() == name.id.as_str())
+            {
+                types.insert(Type::instance(
+                    db,
+                    &env,
+                    context.owner.identity_specialization(db),
+                ));
+            }
+
+            let Some((scope, symbol)) = index
+                .visible_ancestor_scopes(definition.file_scope(db))
+                .find_map(|(scope, _)| {
+                    let table = index.place_table(scope);
+                    let symbol = table.symbol_id(name.id.as_str())?;
+                    table.symbol(symbol).is_local().then_some((scope, symbol))
+                })
+            else {
+                return;
+            };
+            let use_def = index.use_def_map(scope);
+            for declaration in use_def.reachable_symbol_declarations(symbol) {
+                let DefinitionState::Defined(declaration) = declaration.declaration else {
+                    continue;
+                };
+                for_each_attribute_dependency_definition(db, declaration, |declaration| {
+                    let ty = match declaration.kind(db) {
+                        DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(_)) => {
+                            parameter_annotation_only(db, declaration)
+                        }
+                        DefinitionKind::AnnotatedAssignment(_) => {
+                            annotated_assignment_annotation(db, declaration)
+                                .map(|annotation| annotation.inner_type())
+                        }
+                        _ => None,
+                    };
+                    if let Some(ty) = ty {
+                        types.insert(ty);
+                    }
+                });
+            }
+
+            for binding in use_def.reachable_symbol_bindings(symbol) {
+                let Some(binding) = binding.binding.definition() else {
+                    continue;
+                };
+                if matches!(binding.kind(db), DefinitionKind::ImportFrom(_)) {
+                    for_each_attribute_dependency_definition(db, binding, |imported| {
+                        if matches!(imported.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                            && let Some(annotation) = annotated_assignment_annotation(db, imported)
+                        {
+                            types.insert(annotation.inner_type());
+                        }
+                    });
+                    continue;
+                }
+                if let Some(ty) = cast_target_annotation_only(db, binding) {
+                    types.insert(ty);
+                }
+                let value = match binding.kind(db) {
+                    DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
+                    DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+                    DefinitionKind::NamedExpression(named) => {
+                        Some(named.node(module).value.as_ref())
+                    }
+                    _ => None,
+                };
+                if let Some(value) = value {
+                    attribute_expression_receiver_types(
+                        db, index, module, context, value, visited, types,
+                    );
+                }
+            }
+        }
+        ast::Expr::Call(call) => match call.func.as_ref() {
+            ast::Expr::Name(function) => {
+                let Some((scope, symbol)) = index
+                    .visible_ancestor_scopes(definition.file_scope(db))
+                    .find_map(|(scope, _)| {
+                        let table = index.place_table(scope);
+                        let symbol = table.symbol_id(function.id.as_str())?;
+                        table.symbol(symbol).is_local().then_some((scope, symbol))
+                    })
+                else {
+                    return;
+                };
+                for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+                    let Some(function) = binding.binding.definition() else {
+                        continue;
+                    };
+                    for_each_attribute_dependency_definition(db, function, |function| {
+                        if matches!(function.kind(db), DefinitionKind::Function(_))
+                            && let Some(return_type) = function_return_annotation_only(db, function)
+                        {
+                            types.insert(return_type);
+                        }
+                    });
+                }
+            }
+            ast::Expr::Attribute(function) => {
+                for_each_imported_module_dependency_definition(
+                    db,
+                    index,
+                    definition,
+                    function,
+                    |function| {
+                        if matches!(function.kind(db), DefinitionKind::Function(_))
+                            && let Some(return_type) = function_return_annotation_only(db, function)
+                        {
+                            types.insert(return_type);
+                        }
+                    },
+                );
+            }
+            _ => {}
+        },
+        ast::Expr::Subscript(subscript) => {
+            let mut containers = FxIndexSet::default();
+            attribute_expression_receiver_types(
+                db,
+                index,
+                module,
+                context,
+                subscript.value.as_ref(),
+                visited,
+                &mut containers,
+            );
+            let mut pending: Vec<_> = containers.into_iter().collect();
+            let mut seen = FxIndexSet::default();
+            while let Some(container) = pending.pop() {
+                let container = container.resolve_type_alias(db);
+                if !seen.insert(container) {
+                    continue;
+                }
+
+                match container {
+                    Type::Union(union) => pending.extend(union.elements(db).iter().copied()),
+                    Type::Intersection(intersection) => {
+                        pending.extend(intersection.iter_positive(db));
+                    }
+                    Type::TypeVar(typevar) => {
+                        if let Some(bounds) = typevar.typevar(db).bound_or_constraints(db, &env) {
+                            let bound = match bounds {
+                                TypeVarBoundOrConstraints::UpperBound(bound) => bound,
+                                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                                    constraints.as_type(db, &env)
+                                }
+                            };
+                            pending.push(bound);
+                        }
+                    }
+                    container => {
+                        if let Some(tuple) = container.tuple_instance_spec(db, &env) {
+                            types.extend(tuple.iter_element_types(db));
+                        } else if let Some((_, specialization)) =
+                            container.class_specialization(db, &env)
+                        {
+                            types.extend(specialization.types(db).iter().copied());
+                        }
+                    }
+                }
+            }
+        }
+        ast::Expr::Attribute(attribute) => {
+            for_each_imported_module_dependency_definition(
+                db,
+                index,
+                definition,
+                attribute,
+                |imported| {
+                    if matches!(imported.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                        && let Some(annotation) = annotated_assignment_annotation(db, imported)
+                    {
+                        types.insert(annotation.inner_type());
+                    }
+                },
+            );
+
+            let mut receivers = FxIndexSet::default();
+            attribute_expression_receiver_types(
+                db,
+                index,
+                module,
+                context,
+                attribute.value.as_ref(),
+                visited,
+                &mut receivers,
+            );
+            for receiver in receivers {
+                let Some((class, _)) = receiver.member_cycle_receiver(db, &env) else {
+                    continue;
+                };
+                let Some((owner, specialization)) = class.static_class_literal(db) else {
+                    continue;
+                };
+                for superclass in owner.iter_mro(db, specialization) {
+                    let ClassBase::Class(superclass) = superclass else {
+                        continue;
+                    };
+                    let Some((superclass, specialization)) = superclass.static_class_literal(db)
+                    else {
+                        continue;
+                    };
+                    let property = ImplicitAttributeName::new(
+                        db,
+                        superclass.body_scope(db),
+                        &attribute.attr.id,
+                        MethodDecorator::None,
+                    );
+                    if let Some(return_type) =
+                        property_return_annotation_only(db, superclass, property)
+                    {
+                        types.insert(return_type.apply_optional_specialization(db, specialization));
+                        break;
+                    }
+                }
+            }
+        }
+        ast::Expr::If(conditional) => {
+            attribute_expression_receiver_types(
+                db,
+                index,
+                module,
+                context,
+                conditional.body.as_ref(),
+                visited,
+                types,
+            );
+            attribute_expression_receiver_types(
+                db,
+                index,
+                module,
+                context,
+                conditional.orelse.as_ref(),
+                visited,
+                types,
+            );
+        }
+        ast::Expr::BoolOp(boolean) => {
+            for value in &boolean.values {
+                attribute_expression_receiver_types(
+                    db, index, module, context, value, visited, types,
+                );
+            }
+        }
+        ast::Expr::Named(named) => attribute_expression_receiver_types(
+            db,
+            index,
+            module,
+            context,
+            named.value.as_ref(),
+            visited,
+            types,
+        ),
+        _ => {}
+    }
+}
+
+/// Follow every reachable receiver declaration, including conditionally assigned aliases.
 ///
 /// Called only while constructing the tracked summary for `definition`'s own file.
 fn attribute_receiver_owners<'db>(
     db: &'db dyn Db,
-    index: &SemanticIndex<'db>,
+    index: &'db SemanticIndex<'db>,
     module: &ParsedModuleRef,
-    definition: Definition<'db>,
+    context: AttributeReceiverContext<'db>,
     receiver: &str,
     visited: &mut FxIndexSet<Name>,
     owners: &mut FxIndexSet<(StaticClassLiteral<'db>, MethodDecorator)>,
@@ -4815,58 +5340,88 @@ fn attribute_receiver_owners<'db>(
         return;
     }
 
+    let definition = context.definition;
     let file_scope = definition.file_scope(db);
-    let place_table = index.place_table(file_scope);
-    let Some(receiver_symbol) = place_table.symbol_id(receiver) else {
+    let Some((receiver_scope, receiver_symbol)) = index
+        .visible_ancestor_scopes(file_scope)
+        .find_map(|(scope, _)| {
+            let place_table = index.place_table(scope);
+            let symbol = place_table.symbol_id(receiver)?;
+            place_table
+                .symbol(symbol)
+                .is_local()
+                .then_some((scope, symbol))
+        })
+    else {
         return;
     };
-    let use_def = use_def_map(db, definition.scope(db));
+    let use_def = index.use_def_map(receiver_scope);
     let env = ProgramEnvironment::from_file(definition.program_file(db));
 
     for declaration in use_def.reachable_symbol_declarations(receiver_symbol) {
         let DefinitionState::Defined(declaration) = declaration.declaration else {
             continue;
         };
-        let DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(_)) =
-            declaration.kind(db)
-        else {
-            continue;
-        };
-        let Some(receiver_type) = parameter_annotation_only(db, declaration) else {
-            continue;
-        };
-        let receiver_type = receiver_type.resolve_type_alias(db);
-        let receivers = match receiver_type {
-            Type::Union(union) => Either::Left(union.elements(db).iter().copied()),
-            receiver => Either::Right(std::iter::once(receiver)),
-        };
-
-        for receiver in receivers {
-            if let Some((class, decorator)) = receiver
-                .resolve_type_alias(db)
-                .member_cycle_receiver(db, &env)
-                && let Some((owner, _)) = class.static_class_literal(db)
-            {
-                owners.insert((owner, decorator));
+        for_each_attribute_dependency_definition(db, declaration, |declaration| {
+            let receiver_type = match declaration.kind(db) {
+                DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(_)) => {
+                    parameter_annotation_only(db, declaration)
+                }
+                DefinitionKind::AnnotatedAssignment(_) => {
+                    annotated_assignment_annotation(db, declaration)
+                        .map(|annotation| annotation.inner_type())
+                }
+                _ => None,
+            };
+            if let Some(receiver_type) = receiver_type {
+                collect_attribute_receiver_type_owners(db, &env, receiver_type, owners);
             }
-        }
+        });
     }
+
+    collect_narrowed_attribute_receiver_owners(db, index, module, definition, receiver, owners);
 
     for binding in use_def.reachable_symbol_bindings(receiver_symbol) {
         let DefinitionState::Defined(binding) = binding.binding else {
             continue;
         };
-        let DefinitionKind::Assignment(assignment) = binding.kind(db) else {
+        if matches!(binding.kind(db), DefinitionKind::ImportFrom(_)) {
+            for_each_attribute_dependency_definition(db, binding, |imported| {
+                if matches!(imported.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                    && let Some(annotation) = annotated_assignment_annotation(db, imported)
+                {
+                    collect_attribute_receiver_type_owners(
+                        db,
+                        &env,
+                        annotation.inner_type(),
+                        owners,
+                    );
+                }
+            });
+            continue;
+        }
+        let value = match binding.kind(db) {
+            DefinitionKind::Assignment(assignment) => {
+                if let Some(receiver_type) = cast_target_annotation_only(db, binding) {
+                    collect_attribute_receiver_type_owners(db, &env, receiver_type, owners);
+                }
+                Some(assignment.value(module))
+            }
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+            DefinitionKind::NamedExpression(named) => Some(named.node(module).value.as_ref()),
+            _ => None,
+        };
+        let Some(value) = value else {
             continue;
         };
-        let mut aliases = vec![assignment.value(module)];
+        let mut aliases = vec![value];
         while let Some(alias) = aliases.pop() {
             match alias {
                 ast::Expr::Name(source) => attribute_receiver_owners(
                     db,
                     index,
                     module,
-                    definition,
+                    context,
                     source.id.as_str(),
                     visited,
                     owners,
@@ -4875,10 +5430,219 @@ fn attribute_receiver_owners<'db>(
                     aliases.push(conditional.body.as_ref());
                     aliases.push(conditional.orelse.as_ref());
                 }
+                ast::Expr::BoolOp(boolean) => {
+                    aliases.extend(boolean.values.iter());
+                }
+                ast::Expr::Named(named) => aliases.push(named.value.as_ref()),
+                ast::Expr::Tuple(tuple) => aliases.extend(tuple.elts.iter()),
+                ast::Expr::List(list) => aliases.extend(list.elts.iter()),
+                ast::Expr::Starred(starred) => aliases.push(starred.value.as_ref()),
+                ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                    let mut receiver_types = FxIndexSet::default();
+                    attribute_expression_receiver_types(
+                        db,
+                        index,
+                        module,
+                        context,
+                        alias,
+                        &mut FxIndexSet::default(),
+                        &mut receiver_types,
+                    );
+                    for receiver_type in receiver_types {
+                        collect_attribute_receiver_type_owners(db, &env, receiver_type, owners);
+                    }
+                }
+                ast::Expr::Call(call) => {
+                    if let ast::Expr::Attribute(function) = call.func.as_ref() {
+                        for_each_imported_module_dependency_definition(
+                            db,
+                            index,
+                            definition,
+                            function,
+                            |function| {
+                                if matches!(function.kind(db), DefinitionKind::Function(_))
+                                    && let Some(receiver_type) =
+                                        function_return_annotation_only(db, function)
+                                {
+                                    collect_attribute_receiver_type_owners(
+                                        db,
+                                        &env,
+                                        receiver_type,
+                                        owners,
+                                    );
+                                }
+                            },
+                        );
+                    }
+                    if let Some(function) = call.func.as_name_expr()
+                        && let Some((scope, symbol)) = index
+                            .visible_ancestor_scopes(file_scope)
+                            .find_map(|(scope, _)| {
+                                let place_table = index.place_table(scope);
+                                let symbol = place_table.symbol_id(function.id.as_str())?;
+                                place_table
+                                    .symbol(symbol)
+                                    .is_local()
+                                    .then_some((scope, symbol))
+                            })
+                    {
+                        for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+                            let Some(function) = binding.binding.definition() else {
+                                continue;
+                            };
+                            for_each_attribute_dependency_definition(db, function, |function| {
+                                if matches!(function.kind(db), DefinitionKind::Function(_))
+                                    && let Some(receiver_type) =
+                                        function_return_annotation_only(db, function)
+                                {
+                                    collect_attribute_receiver_type_owners(
+                                        db,
+                                        &env,
+                                        receiver_type,
+                                        owners,
+                                    );
+                                }
+                            });
+                        }
+                    }
+                    aliases.extend(call.arguments.args.iter());
+                }
                 _ => {}
             }
         }
     }
+}
+
+/// Collect every concrete owner permitted by a receiver's declared or narrowed type.
+///
+/// Type variables and intersections can hide several possible classes, just as unions can. Their
+/// negative constraints never exclude an owner from this conservative dependency graph.
+fn collect_attribute_receiver_type_owners<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    receiver: Type<'db>,
+    owners: &mut FxIndexSet<(StaticClassLiteral<'db>, MethodDecorator)>,
+) {
+    let mut pending = vec![(receiver, None)];
+    let mut seen = FxIndexSet::default();
+
+    while let Some((receiver, decorator)) = pending.pop() {
+        let receiver = receiver.resolve_type_alias(db);
+        if !seen.insert((receiver, decorator)) {
+            continue;
+        }
+
+        match receiver {
+            Type::Union(union) => {
+                pending.extend(
+                    union
+                        .elements(db)
+                        .iter()
+                        .map(|element| (*element, decorator)),
+                );
+            }
+            Type::Intersection(intersection) => {
+                pending.extend(
+                    intersection
+                        .iter_positive(db)
+                        .map(|element| (element, decorator)),
+                );
+            }
+            Type::TypeVar(typevar) => {
+                if let Some(bounds) = typevar.typevar(db).bound_or_constraints(db, env) {
+                    let bound = match bounds {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => bound,
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            constraints.as_type(db, env)
+                        }
+                    };
+                    pending.push((bound, decorator));
+                }
+            }
+            Type::SubclassOf(subclass) if subclass.is_type_var() => {
+                pending.push((
+                    subclass.to_instance(db, env),
+                    Some(MethodDecorator::ClassMethod),
+                ));
+            }
+            receiver => {
+                if let Some((class, inferred_decorator)) = receiver.member_cycle_receiver(db, env)
+                    && let Some((owner, _)) = class.static_class_literal(db)
+                {
+                    owners.insert((owner, decorator.unwrap_or(inferred_decorator)));
+                }
+            }
+        }
+    }
+}
+
+/// Collect a receiver's use-site owners without evaluating arbitrary predicate expressions.
+///
+/// The component has not been selected yet, so inferring a general condition could recursively
+/// request one of its attributes. Walk the narrowing formula without evaluating it, and infer only
+/// unshadowed `isinstance(name, Class)` predicates. This also handles conditions such as
+/// `flag and isinstance(name, Class)` without touching the unrelated `flag` expression.
+fn collect_narrowed_attribute_receiver_owners<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    module: &ParsedModuleRef,
+    definition: Definition<'db>,
+    receiver: &str,
+    owners: &mut FxIndexSet<(StaticClassLiteral<'db>, MethodDecorator)>,
+) {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return;
+    };
+
+    let file = definition.program_file(db);
+    let scope = definition.file_scope(db);
+    let use_def = use_def_map(db, definition.scope(db));
+    let place_table = index.place_table(scope);
+    let Some(receiver_symbol) = place_table.symbol_id(receiver) else {
+        return;
+    };
+    let env = ProgramEnvironment::from_file(file);
+
+    ast::helpers::any_over_expr(assignment.value(module), |expression| {
+        let ast::Expr::Attribute(attribute) = expression else {
+            return false;
+        };
+        let Some(name) = attribute.value.as_name_expr() else {
+            return false;
+        };
+        if name.id != receiver || index.expression_scope_id(attribute.value.as_ref()) != scope {
+            return false;
+        }
+
+        for binding in use_def.bindings_at_use(name.scoped_use_id(db, file)) {
+            let evaluator = &binding.narrowing_constraint;
+            let mut pending = vec![evaluator.constraint()];
+            let mut visited = FxIndexSet::default();
+            let mut visited_predicates = FxIndexSet::default();
+
+            while let Some(constraint) = pending.pop() {
+                if constraint.is_terminal() || !visited.insert(constraint) {
+                    continue;
+                }
+
+                let node = evaluator
+                    .narrowing_constraints()
+                    .get_interior_node(constraint);
+                pending.extend([node.if_true, node.if_uncertain, node.if_false]);
+
+                if !visited_predicates.insert(node.atom) {
+                    continue;
+                }
+                if let Some(receiver_type) =
+                    narrowing_predicate_type_only(db, definition, node.atom, receiver_symbol)
+                {
+                    collect_attribute_receiver_type_owners(db, &env, receiver_type, owners);
+                }
+            }
+        }
+
+        false
+    });
 }
 
 /// Find cyclic groups in the stable, indexed attribute-dependency graph.

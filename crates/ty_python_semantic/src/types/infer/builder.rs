@@ -4367,6 +4367,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
+    /// Infer a function's return annotation without evaluating any other signature expression.
+    pub(super) fn infer_function_return_annotation_only(
+        mut self,
+        annotation: &ast::Expr,
+        function_definition: Definition<'db>,
+    ) -> Type<'db> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+        self.typevar_binding_context = Some(function_definition);
+        self.context
+            .inference_flags
+            .insert(InferenceFlags::IN_RETURN_TYPE);
+
+        let annotation = self.dependency_type_expression_without_metadata(annotation);
+        self.infer_type_expression_with_state(
+            annotation,
+            DeferredExpressionState::from(self.defer_annotations()),
+        )
+    }
+
+    /// Ignore verified `Annotated` metadata while discovering recursive dependencies.
+    ///
+    /// Metadata can itself read an attribute in the component being discovered. Normal type
+    /// inference still evaluates and diagnoses it later; only this structural discovery skips it.
+    fn dependency_type_expression_without_metadata<'a>(
+        &self,
+        mut expression: &'a ast::Expr,
+    ) -> &'a ast::Expr {
+        while let ast::Expr::Subscript(subscript) = expression {
+            let (name, member) = match subscript.value.as_ref() {
+                ast::Expr::Name(name) => (name.id.as_str(), Some("Annotated")),
+                ast::Expr::Attribute(attribute) if attribute.attr.as_str() == "Annotated" => {
+                    let Some(name) = attribute.value.as_name_expr() else {
+                        break;
+                    };
+                    (name.id.as_str(), None)
+                }
+                _ => break,
+            };
+
+            if !super::dependency_imported_from(
+                self.db(),
+                self.index,
+                self.module(),
+                self.scope().file_scope_id(self.db()),
+                name,
+                &["typing", "typing_extensions"],
+                member,
+            ) {
+                break;
+            }
+
+            let ast::Expr::Tuple(arguments) = subscript.slice.as_ref() else {
+                break;
+            };
+            let Some(first) = arguments.elts.first() else {
+                break;
+            };
+            expression = first;
+        }
+
+        expression
+    }
+
+    /// Infer a dependency's type expression without evaluating its surrounding expression.
+    pub(super) fn infer_dependency_type_expression_only(mut self, target: &ast::Expr) -> Type<'db> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+
+        let target = self.dependency_type_expression_without_metadata(target);
+        self.infer_type_expression_with_state(
+            target,
+            DeferredExpressionState::from(self.defer_annotations()),
+        )
+    }
+
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
     pub(super) fn infer_annotated_assignment_cycle_initial(
         mut self,
@@ -10391,47 +10467,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(context) = self.member_inference_context
             && context.contains_name(self.db(), attribute.attr.id.as_str())
-            && let Some(place_expr) = PlaceExpr::try_from_expr(attribute)
-            && let place_table = self
-                .index
-                .place_table(self.scope().file_scope_id(self.db()))
-            && let Some(ScopedPlaceId::Member(member)) =
-                place_table.place_id(PlaceExprRef::from(&place_expr))
-            && place_table.member(member).as_direct_attribute().is_some()
             && let Some(incoming) =
                 self.contextual_attribute_incoming(context, value_type, attribute.attr.id.as_str())
         {
-            let scope = self.scope().file_scope_id(self.db());
-            let use_id = attribute.scoped_use_id(self.db(), self.program_file());
-            let mut constraint_keys = SmallVec::<[(FileScopeId, ConstraintKey); 2]>::new();
-            constraint_keys.push((scope, ConstraintKey::UseId(use_id)));
-
-            for (enclosing_scope, _) in self.index.ancestor_scopes(scope).skip(1) {
-                match self.index.enclosing_snapshot(
-                    enclosing_scope,
-                    PlaceExprRef::from(&place_expr),
-                    scope,
+            if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
+                let scope = self.scope().file_scope_id(self.db());
+                let place_table = self.index.place_table(scope);
+                if matches!(
+                    place_table.place_id(PlaceExprRef::from(&place_expr)),
+                    Some(ScopedPlaceId::Member(_))
                 ) {
-                    EnclosingSnapshotResult::FoundBindings(_) => {
-                        constraint_keys.push((enclosing_scope, ConstraintKey::NestedScope(scope)));
-                        break;
-                    }
-                    EnclosingSnapshotResult::FoundConstraint(constraint) => {
-                        constraint_keys.push((
-                            enclosing_scope,
-                            ConstraintKey::NarrowingConstraint(constraint),
-                        ));
-                    }
-                    EnclosingSnapshotResult::NoLongerInEagerContext => break,
-                    EnclosingSnapshotResult::NotFound => {}
-                }
-            }
+                    let use_id = attribute.scoped_use_id(self.db(), self.program_file());
+                    let mut constraint_keys = SmallVec::<[(FileScopeId, ConstraintKey); 2]>::new();
+                    constraint_keys.push((scope, ConstraintKey::UseId(use_id)));
 
-            return Ok(self.narrow_place_with_applicable_constraints(
-                PlaceExprRef::from(&place_expr),
-                incoming,
-                &constraint_keys,
-            ));
+                    for (enclosing_scope, _) in self.index.ancestor_scopes(scope).skip(1) {
+                        match self.index.enclosing_snapshot(
+                            enclosing_scope,
+                            PlaceExprRef::from(&place_expr),
+                            scope,
+                        ) {
+                            EnclosingSnapshotResult::FoundBindings(_) => {
+                                constraint_keys
+                                    .push((enclosing_scope, ConstraintKey::NestedScope(scope)));
+                                break;
+                            }
+                            EnclosingSnapshotResult::FoundConstraint(constraint) => {
+                                constraint_keys.push((
+                                    enclosing_scope,
+                                    ConstraintKey::NarrowingConstraint(constraint),
+                                ));
+                            }
+                            EnclosingSnapshotResult::NoLongerInEagerContext => break,
+                            EnclosingSnapshotResult::NotFound => {}
+                        }
+                    }
+
+                    return Ok(self.narrow_place_with_applicable_constraints(
+                        PlaceExprRef::from(&place_expr),
+                        incoming,
+                        &constraint_keys,
+                    ));
+                }
+            } else {
+                // A call result has no persistent place whose local bindings could narrow it.
+                // Its receiver still identifies the component's provisional attribute value.
+                return Ok(incoming);
+            }
         }
 
         let env = self.program_environment();
@@ -10469,13 +10551,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | InferenceRegion::Scope(_, _) => false,
         };
 
-        if is_member_dependent_assignment
-            && let Some(place_expr) = PlaceExpr::try_from_expr(attribute)
-            && let place_table = self.index.place_table(self.scope().file_scope_id(db))
-            && let Some(ScopedPlaceId::Member(member)) =
-                place_table.place_id(PlaceExprRef::from(&place_expr))
-            && place_table.member(member).as_direct_attribute().is_some()
-        {
+        if is_member_dependent_assignment {
             // Select the canonical component before resolving local bindings, which can otherwise
             // make an individual definition or expression the head of the recursive Salsa cycle.
             self.preflight_attribute_component(value_type, attr.id.as_str());
