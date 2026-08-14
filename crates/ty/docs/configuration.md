@@ -494,7 +494,7 @@ if they exist and are not packages (i.e. they do not contain `__init__.py` or `_
 * `./python`
 
 Scripts with inline metadata have no first-party roots by default because they are
-single-file programs. Set `root` to allow importing local modules.
+single-file programs. Set `root = ["."]` to allow importing local modules.
 
 **Default value**: `null`
 
