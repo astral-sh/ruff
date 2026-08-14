@@ -686,6 +686,92 @@ info: Overload implementation defined here
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
+## Module attribute access and imports
+
+Module-level `__getattr__` diagnostics distinguish same-named overload parameters for both direct
+attribute access and `from ... import` statements.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+`fallback.py`:
+
+```py
+from typing import overload
+
+import first
+import second
+
+@overload
+def __getattr__(name: first.Model) -> first.Model: ...
+@overload
+def __getattr__(name: second.Model) -> second.Model: ...
+def __getattr__(name: first.Model | second.Model) -> first.Model | second.Model:
+    return name
+```
+
+```py
+import fallback
+
+fallback.missing  # snapshot: invalid-attribute-access
+
+from fallback import missing  # snapshot: invalid-module-getattr-call
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to attribute `missing` on type `<module 'fallback'>`
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | fallback.missing  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^ No overload of function `__getattr__` matches arguments
+info: This access implicitly calls `__getattr__`
+info: First overload defined here
+ --> src/fallback.py:6:1
+  |
+6 | / @overload
+7 | | def __getattr__(name: first.Model) -> first.Model: ...
+  | |______________________________________________________^ First overload defined here
+info: Possible overloads for function `__getattr__`:
+info:   (name: first.Model) -> first.Model
+info:   (name: second.Model) -> second.Model
+info: Overload implementation defined here
+  --> src/fallback.py:10:5
+   |
+10 | def __getattr__(name: first.Model | second.Model) -> first.Model | second.Model:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+error[invalid-module-getattr-call]: Cannot import `missing` from module `fallback`
+ --> src/mdtest_snippet.py:5:22
+  |
+5 | from fallback import missing  # snapshot: invalid-module-getattr-call
+  |                      ^^^^^^^ No overload of function `__getattr__` matches arguments
+info: This import implicitly calls a module-level `__getattr__` function
+info: First overload defined here
+ --> src/fallback.py:6:1
+  |
+6 | / @overload
+7 | | def __getattr__(name: first.Model) -> first.Model: ...
+  | |______________________________________________________^ First overload defined here
+info: Possible overloads for function `__getattr__`:
+info:   (name: first.Model) -> first.Model
+info:   (name: second.Model) -> second.Model
+info: Overload implementation defined here
+  --> src/fallback.py:10:5
+   |
+10 | def __getattr__(name: first.Model | second.Model) -> first.Model | second.Model:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
 ## Method and constructor descriptions
 
 Call diagnostics distinguish the class that defines a method or constructor from a same-named
@@ -740,6 +826,131 @@ info: Method defined here
   |         ^^^^^^^^       ------------------ Parameter declared here
 ```
 
+## Static and unbound method descriptions
+
+Static and unbound method diagnostics distinguish the class that defines the method from a
+same-named parameter type.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`owner.py`:
+
+```py
+import first
+
+class Model:
+    @staticmethod
+    def static(value: first.Model) -> None: ...
+    def instance(self, value: first.Model) -> None: ...
+```
+
+```py
+import owner
+
+# error: [invalid-argument-type] "Argument to function `owner.Model.static` is incorrect: Expected `first.Model`, found `Literal[1]`"
+owner.Model.static(1)
+
+def unbound(value: owner.Model) -> None:
+    # error: [invalid-argument-type] "Argument to function `owner.Model.instance` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    owner.Model.instance(value, 1)
+```
+
+## Inherited method and constructor descriptions
+
+Inherited method and constructor diagnostics identify the defining superclass rather than relying on
+the receiver subclass to disambiguate a same-named parameter type.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`owner.py`:
+
+```py
+import first
+
+class Model:
+    def __init__(self, value: first.Model) -> None: ...
+    def method(self, value: first.Model) -> None: ...
+```
+
+```py
+import owner
+
+class Child(owner.Model): ...
+
+# error: [invalid-argument-type] "Argument to `owner.Model.__init__` is incorrect: Expected `first.Model`, found `Literal[1]`"
+Child(1)
+
+def inherited(value: Child) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `owner.Model.method` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    value.method(1)
+```
+
+## Overloaded static method descriptions
+
+When no static-method overload matches, the defining class and same-named overload parameter remain
+distinct throughout the diagnostic.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`owner.py`:
+
+```py
+from typing import overload
+
+import first
+
+class Model:
+    @overload
+    @staticmethod
+    def method(value: first.Model) -> None: ...
+    @overload
+    @staticmethod
+    def method(value: str) -> None: ...
+    @staticmethod
+    def method(value: first.Model | str) -> None: ...
+```
+
+```py
+import owner
+
+owner.Model.method(1)  # snapshot: no-matching-overload
+```
+
+```snapshot
+error[no-matching-overload]: No overload of function `owner.Model.method` matches arguments
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | owner.Model.method(1)  # snapshot: no-matching-overload
+  | ^^^^^^^^^^^^^^^^^^^^^
+info: First overload defined here
+ --> src/owner.py:6:5
+  |
+6 | /     @overload
+7 | |     @staticmethod
+8 | |     def method(value: first.Model) -> None: ...
+  | |_______________________________________________^ First overload defined here
+info: Possible overloads for function `method`:
+info:   (value: first.Model) -> None
+info:   (value: str) -> None
+info: Overload implementation defined here
+  --> src/owner.py:13:9
+   |
+13 |     def method(value: first.Model | str) -> None: ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
 ## Generic method specializations
 
 Diagnostics for invalid generic method calls distinguish the method's defining class from same-named
@@ -778,6 +989,48 @@ def calls(value: second.Model) -> None:
 
     # error: [invalid-argument-type] "Argument to bound method `second.Model.constrained` is incorrect: Argument type `second.Model` does not satisfy constraints (`first.Model`, `int`)"
     value.constrained(value)
+```
+
+## Inherited generic method specializations
+
+Generic inherited method diagnostics distinguish the defining superclass from same-named bounds and
+constraints.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`owner.py`:
+
+```py
+from typing import TypeVar
+
+import first
+
+Bounded = TypeVar("Bounded", bound=first.Model)
+Constrained = TypeVar("Constrained", first.Model, str)
+
+class Model:
+    def bounded(self, value: Bounded) -> Bounded:
+        return value
+
+    def constrained(self, value: Constrained) -> Constrained:
+        return value
+```
+
+```py
+import owner
+
+class Child(owner.Model): ...
+
+def inherited(value: Child) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `owner.Model.bounded` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `first.Model`"
+    value.bounded(1)
+
+    # error: [invalid-argument-type] "Argument to bound method `owner.Model.constrained` is incorrect: Argument type `Literal[1]` does not satisfy constraints (`first.Model`, `str`)"
+    value.constrained(1)
 ```
 
 ## Function defaults, assertions, and narrowing

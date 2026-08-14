@@ -4621,10 +4621,12 @@ impl<'db> CallableBinding<'db> {
                         .iter()
                         .take(MAXIMUM_OVERLOADS)
                         .map(|overload| overload.signature(db));
+                    let defining_class =
+                        CallableDescription::defining_class(db, self.callable_type)
+                            .map(Type::ClassLiteral);
+                    let types = std::iter::once(self.callable_type).chain(defining_class);
                     let settings = DisplaySettings::from_possibly_ambiguous_types_and_signatures(
-                        context,
-                        [self.callable_type],
-                        signatures,
+                        context, types, signatures,
                     );
                     let settings = match context.overrides {
                         Some(overrides) => overrides
@@ -8389,6 +8391,7 @@ pub(crate) struct CallableDescription<'a> {
 }
 
 impl<'db> CallableDescription<'db> {
+    /// Returns the class whose name appears in a method or constructor description.
     fn defining_class(db: &'db dyn Db, callable_type: Type<'db>) -> Option<ClassLiteral<'db>> {
         let function = match callable_type {
             Type::FunctionLiteral(function) => function,
@@ -8977,11 +8980,6 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let defining_class =
-                    CallableDescription::defining_class(db, callable_ty).map(Type::ClassLiteral);
-                let types = [*provided_ty, *expected_ty, callable_ty]
-                    .into_iter()
-                    .chain(defining_class);
                 let display_settings = context
                     .overrides
                     .map(|overrides| overrides.display_settings.clone())
@@ -8992,10 +8990,13 @@ impl<'db> BindingError<'db> {
                                 .take(MAXIMUM_OVERLOADS)
                                 .map(|(_, overload)| overload.signature(db))
                         });
+                        let defining_class = CallableDescription::defining_class(db, callable_ty)
+                            .map(Type::ClassLiteral);
+                        let types = [*provided_ty, *expected_ty, callable_ty]
+                            .into_iter()
+                            .chain(defining_class);
                         DisplaySettings::from_possibly_ambiguous_types_and_signatures(
-                            context,
-                            types,
-                            signatures,
+                            context, types, signatures,
                         )
                     });
                 let qualified_callable_description = CallableDescription::new_with_settings(
@@ -9363,7 +9364,11 @@ impl<'db> BindingError<'db> {
                         Either::Right(constraints.elements(db).iter().copied())
                     }
                 };
-                let types = expected_types.chain([argument_type, callable_ty]);
+                let defining_class =
+                    CallableDescription::defining_class(db, callable_ty).map(Type::ClassLiteral);
+                let types = expected_types
+                    .chain([argument_type, callable_ty])
+                    .chain(defining_class);
                 let display_settings =
                     DisplaySettings::from_possibly_ambiguous_types(context, types);
                 let display_settings = match context.overrides {
