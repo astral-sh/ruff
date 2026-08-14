@@ -385,7 +385,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // First try loading the requested attribute from the module.
         if !skip_self_referential_member_lookup {
-            let result = module_literal.try_static_member(db, self.program_environment(), name);
+            let result = module_literal.static_member(db, self.program_environment(), name);
             let error = result.err();
             if let PlaceAndQualifiers {
                 place:

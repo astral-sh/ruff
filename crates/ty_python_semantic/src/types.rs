@@ -3768,7 +3768,9 @@ impl<'db> Type<'db> {
         name: &str,
     ) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
-            module.static_member(db, env, name).place
+            module
+                .static_member(db, env, name)
+                .map_or(Place::Undefined, |member| member.place)
         } else if let place @ Place::Defined(_) = self.class_member(db, env, name).place {
             place
         } else if let Some(place @ Place::Defined(_)) = self
@@ -4977,7 +4979,7 @@ impl<'db> Type<'db> {
                     Place::bound(Type::int_literal(i64::from(bool_value))).into()
                 }
 
-                Type::ModuleLiteral(module) => module.try_static_member(db, env, name_str),
+                Type::ModuleLiteral(module) => module.static_member(db, env, name_str),
 
                 // If a protocol does not include a member and the policy disables falling back to
                 // `object`, we return `Place::Undefined` here. This short-circuits attribute lookup
@@ -10073,22 +10075,11 @@ impl<'db> ModuleLiteralType<'db> {
         Place::Undefined.into()
     }
 
-    /// Looks up a module member, treating failed `__getattr__` calls as missing members.
-    fn static_member(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        name: &str,
-    ) -> PlaceAndQualifiers<'db> {
-        self.try_static_member(db, env, name)
-            .unwrap_or_else(|_| Place::Undefined.into())
-    }
-
     /// Looks up a module member while preserving failed module-level `__getattr__` calls.
     ///
-    /// Unlike [`Self::static_member`], this retains the failed call and its recovery type so direct
-    /// attribute access and `from` imports can report the error after resolving lookup precedence.
-    fn try_static_member(
+    /// The failed call and its recovery type are retained so direct attribute access and `from`
+    /// imports can report the error after resolving lookup precedence.
+    fn static_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
