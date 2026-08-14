@@ -271,15 +271,18 @@ fn check_positional_args_for_non_overloaded_method(
             continue;
         };
 
-        if is_object_or_unused(annotation, checker.semantic()) {
+        if checker.match_maybe_stringized_annotation(annotation, |expr| {
+            is_object_or_unused(expr, checker.semantic())
+        }) {
             continue;
         }
 
         // If there's an annotation that's not `object` or `Unused`, check that the annotated type
         // matches the predicate.
-        if non_none_annotation_element(annotation, checker.semantic())
-            .is_some_and(|elem| predicate(elem, checker.semantic()))
-        {
+        if checker.match_maybe_stringized_annotation(annotation, |expr| {
+            non_none_annotation_element(expr, checker.semantic())
+                .is_some_and(|elem| predicate(elem, checker.semantic()))
+        }) {
             continue;
         }
 

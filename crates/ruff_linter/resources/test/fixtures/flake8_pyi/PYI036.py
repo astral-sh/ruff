@@ -167,3 +167,34 @@ class UnacceptableOverload2:
     @overload
     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
+
+
+# Stringized (quoted) annotations are semantically equivalent to direct annotations.
+class GoodStringized:
+    def __exit__(
+        self,
+        typ: "type[BaseException] | None",
+        exc: "BaseException | None",
+        tb: "TracebackType | None",
+    ) -> None: ...
+    async def __aexit__(
+        self,
+        typ: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: "types.TracebackType | None",
+    ) -> None: ...
+
+
+class BadStringized:
+    def __exit__(
+        self,
+        typ: "type[BaseException]",
+        exc: "BaseException | None",
+        tb: "Exception | None",
+    ) -> None: ...  # PYI036: First arg has bad annotation
+    async def __aexit__(
+        self,
+        typ: type[BaseException] | None,
+        exc: "BaseException",
+        tb: "TracebackType",
+    ) -> None: ...  # PYI036: Second arg has bad annotation
