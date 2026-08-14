@@ -1341,7 +1341,7 @@ impl<'db> Specialization<'db> {
         let new_specialization = self.apply_type_mapping(
             db,
             env,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(other)),
+            &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(other)),
         );
         match other.materialization_kind(db) {
             None => new_specialization,
@@ -2181,10 +2181,15 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
-    Specialization(Specialization<'db>),
-    /// Assignments from a specialization that also apply to the declared domains of retained
-    /// synthetic `Self` variables.
-    SpecializationWithSelfDomain(Specialization<'db>),
+    Specialization {
+        specialization: Specialization<'db>,
+        /// Whether to substitute free owner variables in the declared domain of a retained
+        /// synthetic `Self`.
+        ///
+        /// This is only set when projecting a member from its enclosing generic owner. Ordinary
+        /// specialization preserves that domain as fixed evidence.
+        specialize_self_domain: bool,
+    },
     TypeAlias(Specialization<'db>),
     Partial {
         generic_context: GenericContext<'db>,
@@ -2200,6 +2205,13 @@ pub enum ApplySpecialization<'a, 'db> {
 }
 
 impl<'db> ApplySpecialization<'_, 'db> {
+    pub(crate) fn specialization(specialization: Specialization<'db>) -> Self {
+        Self::Specialization {
+            specialization,
+            specialize_self_domain: false,
+        }
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(
@@ -2208,8 +2220,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            ApplySpecialization::Specialization(specialization)
-            | ApplySpecialization::SpecializationWithSelfDomain(specialization)
+            ApplySpecialization::Specialization { specialization, .. }
             | ApplySpecialization::TypeAlias(specialization) => {
                 specialization.get(db, bound_typevar)
             }
@@ -2243,8 +2254,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
     /// context, preserving skipped type variables in partial specializations as identity mappings.
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
-            ApplySpecialization::Specialization(specialization)
-            | ApplySpecialization::SpecializationWithSelfDomain(specialization)
+            ApplySpecialization::Specialization { specialization, .. }
             | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
             ApplySpecialization::Partial {
                 generic_context,

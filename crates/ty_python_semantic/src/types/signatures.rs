@@ -1624,9 +1624,8 @@ impl<'db> Signature<'db> {
     /// Returns this signature with the given specialization applied to parameters and return type.
     fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let type_mapping = TypeMapping::ApplySpecialization(
-            ApplySpecialization::SpecializationWithSelfDomain(specialization),
-        );
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
         self.apply_type_mapping_impl(
             db,
             &type_mapping,
