@@ -19,9 +19,7 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
-};
+use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor};
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
@@ -1496,7 +1494,7 @@ impl<'db> Specialization<'db> {
         });
 
         let original_tuple_inner = self.tuple_inner(db);
-        let tuple_inner = original_tuple_inner.and_then(|tuple| {
+        let tuple_inner = original_tuple_inner.map(|tuple| {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
 
@@ -1653,7 +1651,7 @@ impl<'db> Specialization<'db> {
             }
         });
         let original_tuple_inner = self.tuple_inner(db);
-        let tuple_inner = original_tuple_inner.and_then(|tuple| {
+        let tuple_inner = original_tuple_inner.map(|tuple| {
             // Tuples are immutable, so tuple element types are always in covariant position.
             tuple.apply_type_mapping_impl(
                 db,
@@ -1780,11 +1778,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Materializing the source otherwise loses the bottom needed to
             // simplify `Covariant[Any] | Covariant[Any | str]`. Comparing both
             // top and bottom is a possible alternative, but it gets more complex
-            // due to the need to preserve Divergent markers. Also the fact that we currently
-            // simplify tuples containing `Never` to `Never` means that for
-            // `class C[T: tuple[int, int]]`, `C[tuple[Any, int]]` and `C[tuple[int, Any]]`
-            // have the same top and bottom but expose `Any` in different tuple positions.
-            // TODO: Try resolving the above issues so we can compare top/bottom subtyping here.
+            // due to the need to preserve Divergent markers.
+            // TODO: Resolve that issue so we can compare top/bottom subtyping here.
             !matches!(self.relation, TypeRelation::Redundancy { pure: false })
                 || target
                     == target.materialize_impl(
@@ -2441,6 +2436,24 @@ enum ConstraintSetInferenceError<'db> {
     Unsatisfiable,
 }
 
+/// Returns the directional comparisons required by this comparison's polarity.
+///
+/// A covariant comparison requires `actual <= formal`, a contravariant comparison requires
+/// `formal <= actual`, and an invariant comparison requires both. Bivariant comparisons add
+/// no constraints.
+fn relation_directions<T: Copy>(
+    formal: T,
+    actual: T,
+    polarity: TypeVarVariance,
+) -> impl Iterator<Item = (T, T)> {
+    [
+        (!polarity.is_contravariant()).then_some((actual, formal)),
+        (!polarity.is_covariant()).then_some((formal, actual)),
+    ]
+    .into_iter()
+    .flatten()
+}
+
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
@@ -3019,6 +3032,24 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
+    /// Returns the assignability constraints required by this comparison's polarity.
+    fn constraint_for_relation(
+        &self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+        polarity: TypeVarVariance,
+    ) -> ConstraintSet<'db, 'c> {
+        let db = self.db;
+        relation_directions(formal, actual, polarity).when_all(
+            db,
+            self.constraints,
+            |(source, target)| {
+                let when = source.when_constraint_set_assignable_to_owned(db, self.env, target);
+                self.constraints.load(db, self.env, &when)
+            },
+        )
+    }
+
     /// Returns common protocol constraints for the `TypedDict` members of a union when every such
     /// member has the same constraints as their shared `Mapping[str, object]` fallback.
     fn common_typed_dict_protocol_constraints(
@@ -3223,12 +3254,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// are returned for immediate diagnosis.
     fn infer_from_callable_signature(
         &mut self,
-        formal_signature: &CallableSignature<'db>,
-        actual_callables: &CallableTypes<'db>,
+        formal: CallableType<'db>,
+        actual_callables: CallableTypes<'db>,
+        polarity: TypeVarVariance,
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
-        let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
+        if !matches!(polarity, TypeVarVariance::Covariant) {
+            let actual = actual_callables
+                .map(|callable| callable.into_regular(db))
+                .into_type(db, self.env);
+            let formal = Type::Callable(formal.into_regular(db));
+            let when = self.constraint_for_relation(formal, actual, polarity);
+            return self.infer_from_constraint_set(when);
+        }
 
+        let formal_signature = formal.signatures(db);
+        let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
         for actual_callable in actual_callables.as_slice() {
             if formal_is_single_paramspec {
                 let when = actual_callable
@@ -3300,7 +3341,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
         polarity: TypeVarVariance,
-        seen: &mut FxHashSet<(Type<'db>, Type<'db>)>,
+        seen: &mut FxHashSet<(Type<'db>, Type<'db>, TypeVarVariance)>,
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
         // TODO: Eventually, the builder will maintain a constraint set, instead of a hash-map of
@@ -3316,8 +3357,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
-        // Avoid infinite recursion
-        if !seen.insert((formal, actual)) {
+        // Avoid infinite recursion while retaining comparisons under different polarities.
+        if !seen.insert((formal, actual, polarity)) {
             return Ok(());
         }
 
@@ -3328,6 +3369,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // specialize `T` to `int`, and so ignore the `None`.
         let actual = actual.filter_disjoint_elements(db, self.env, formal, self.inferable);
         let formal = formal.filter_disjoint_elements(db, self.env, actual, self.inferable);
+
+        // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
+        // their entire inference context on the existing signature path, and use forward
+        // structural relations so nested variadics and ordinary type variables retain their
+        // mappings. Preserve the original polarity for recursive and ordinary inference.
+        // TODO: Apply full polarity once variadics are supported by the new constraint solver.
+        let relation_polarity = if !polarity.is_covariant()
+            && self
+                .inferable
+                .iter(db)
+                .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db))
+        {
+            TypeVarVariance::Covariant
+        } else {
+            polarity
+        };
 
         match (formal, actual) {
             // Expand PEP 695 type aliases in the formal type.
@@ -3737,24 +3794,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 || matches!(formal, Type::SubclassOf(subclass)
                     if matches!(subclass.subclass_of(), SubclassOfInner::Class(_))) =>
             {
-                let when = match polarity {
-                    TypeVarVariance::Covariant | TypeVarVariance::Invariant => {
-                        actual.when_constraint_set_assignable_to_owned(db, self.env, formal)
-                    }
-                    TypeVarVariance::Contravariant => {
-                        formal.when_constraint_set_assignable_to_owned(db, self.env, actual)
-                    }
-                    TypeVarVariance::Bivariant => return Ok(()),
-                };
-                let mut when = self.constraints.load(db, self.env, &when);
-                if matches!(polarity, TypeVarVariance::Invariant) {
-                    let reverse =
-                        formal.when_constraint_set_assignable_to_owned(db, self.env, actual);
-                    let reverse = self.constraints.load(db, self.env, &reverse);
-                    when.intersect(db, self.constraints, reverse);
-                }
-                self.infer_from_constraint_set(when)?;
-                return Ok(());
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                return self.infer_from_constraint_set(when);
             }
 
             (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
@@ -3798,29 +3839,55 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     && let Some(actual_origin) = actual_protocol.materialized_origin(db)
                     && let Some(formal_origin) = formal_protocol.class_origin(db)
                 {
-                    let nominally_inherited = actual_origin
-                        .iter_mro(db)
-                        .filter_map(ClassBase::into_class)
-                        .any(|base| base.class_literal(db) == formal_origin.class_literal(db));
-                    let when = if nominally_inherited
-                        || formal_protocol.interface(db).has_only_finite_members(db)
-                    {
-                        Some(actual.when_constraint_set_assignable_to_owned(db, self.env, formal))
-                    } else {
-                        actual_protocol
-                            .when_non_recursive_members_assignable_to_owned(db, formal_protocol)
-                            .map(Cow::Borrowed)
-                    };
-
                     // Materialized protocols cannot be replaced by their nominal origin: doing
                     // so would recover the original `Any` requirements. Infer from the complete
                     // interface when doing so is cycle-safe; otherwise use its nonrecursive
                     // requirements and leave full recursive compatibility to argument checking.
+                    let when = relation_directions(
+                        (formal_protocol, formal_origin),
+                        (actual_protocol, actual_origin),
+                        relation_polarity,
+                    )
+                    .try_fold(
+                        ConstraintSet::from_bool(self.constraints, true),
+                        |mut combined, ((source, source_origin), (target, target_origin))| {
+                            if combined.is_trivially_never_satisfied() {
+                                return Some(combined);
+                            }
+
+                            let when = if source_origin
+                                .is_subtype_of_class_literal(db, target_origin.class_literal(db))
+                                || target.interface(db).has_only_finite_members(db)
+                            {
+                                Type::ProtocolInstance(source)
+                                    .when_constraint_set_assignable_to_owned(
+                                        db,
+                                        self.env,
+                                        Type::ProtocolInstance(target),
+                                    )
+                            } else {
+                                Cow::Borrowed(
+                                    source.when_non_recursive_members_assignable_to_owned(
+                                        db, target,
+                                    )?,
+                                )
+                            };
+                            let next = self.constraints.load(db, self.env, &when);
+                            Some(combined.intersect(db, self.constraints, next))
+                        },
+                    );
+
                     if let Some(when) = when {
-                        let when = self.constraints.load(db, self.env, &when);
-                        self.infer_from_constraint_set(when)?;
-                        return Ok(());
+                        return self.infer_from_constraint_set(when);
                     }
+                }
+
+                // Converting the actual protocol to its nominal origin makes the reversed
+                // comparison impossible: a protocol cannot be assignable to a nominal class.
+                if matches!(formal, Type::ProtocolInstance(_)) && !relation_polarity.is_covariant()
+                {
+                    let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                    return self.infer_from_constraint_set(when);
                 }
 
                 // TODO: This will only handle protocol classes that explicit inherit
@@ -3944,11 +4011,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
                         // (replacing the logic below).
-                        let when =
-                            actual.when_constraint_set_assignable_to_owned(db, self.env, formal);
-                        let when = self.constraints.load(db, self.env, &when);
-                        self.infer_from_constraint_set(when)?;
-                        return Ok(());
+                        let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                        return self.infer_from_constraint_set(when);
                     }
 
                     _ => None,
@@ -3986,25 +4050,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
             (formal @ Type::ProtocolInstance(_), actual @ Type::Union(actual_union)) => {
-                let when = self
-                    .common_typed_dict_protocol_constraints(formal, actual_union)
-                    .unwrap_or_else(|| {
-                        actual.when_constraint_set_assignable_to(
-                            db,
-                            self.env,
-                            formal,
-                            self.constraints,
-                        )
-                    });
-                self.infer_from_constraint_set(when)?;
-                return Ok(());
+                // Common TypedDict constraints prove only `actual <= formal`. Contravariance
+                // reverses that relation, while invariance additionally requires the reverse.
+                let when = if matches!(relation_polarity, TypeVarVariance::Covariant)
+                    && let Some(common) =
+                        self.common_typed_dict_protocol_constraints(formal, actual_union)
+                {
+                    common
+                } else {
+                    self.constraint_for_relation(formal, actual, relation_polarity)
+                };
+                return self.infer_from_constraint_set(when);
             }
 
             (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
-                let when = actual.when_constraint_set_assignable_to_owned(db, self.env, formal);
-                let when = self.constraints.load(db, self.env, &when);
-                self.infer_from_constraint_set(when)?;
-                return Ok(());
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                return self.infer_from_constraint_set(when);
             }
 
             // When the formal type is a protocol with a `__call__` method, infer the specialization
@@ -4021,18 +4082,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
                 // The protocol interface exposes the callable signature already bound for
                 // instance access.
-                let formal_signature = call_method.signatures(db);
-
-                self.infer_from_callable_signature(formal_signature, &actual_callables)?;
+                self.infer_from_callable_signature(
+                    call_method,
+                    actual_callables,
+                    relation_polarity,
+                )?;
             }
 
             (Type::Callable(formal_callable), _) => {
                 let Some(actual_callables) = actual.try_upcast_to_callable(db, self.env) else {
                     return Ok(());
                 };
-                let formal_signature = formal_callable.signatures(db);
-
-                self.infer_from_callable_signature(formal_signature, &actual_callables)?;
+                self.infer_from_callable_signature(
+                    formal_callable,
+                    actual_callables,
+                    relation_polarity,
+                )?;
             }
 
             // Expand type aliases in the actual type.

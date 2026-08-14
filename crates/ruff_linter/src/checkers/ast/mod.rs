@@ -810,6 +810,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::DifferentMatchPatternBindings
             | SemanticSyntaxErrorKind::InvalidExpression(..)
             | SemanticSyntaxErrorKind::GlobalParameter(_)
+            | SemanticSyntaxErrorKind::NonlocalParameter(_)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression

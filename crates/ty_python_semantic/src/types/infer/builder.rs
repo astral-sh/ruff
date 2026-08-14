@@ -9747,6 +9747,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
+    /// Report a deprecated callable only when its union alternative has no non-deprecated
+    /// intersection member that could provide the implementation instead.
+    fn check_deprecated_bindings<T: Ranged>(&self, ranged: &T, bindings: &Bindings<'db>) {
+        let db = self.db();
+
+        for callables in bindings.iter_union_elements() {
+            if callables.clone().all(|callable| {
+                let ty = match callable.callable_type {
+                    Type::BoundMethod(bound) => Type::FunctionLiteral(bound.function(db)),
+                    ty => ty,
+                };
+                ty.is_deprecated(db)
+            }) {
+                for callable in callables {
+                    self.check_deprecated(ranged, callable.callable_type);
+                }
+            }
+        }
+    }
+
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         let db = self.db();
         let expr = PlaceExpr::from_expr_name(name_node);
@@ -10548,8 +10568,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 CallArguments::none(),
                 TypeContext::default(),
             ) {
-                Ok(outcome) => outcome.return_type(db, env),
+                Ok(outcome) => {
+                    self.check_deprecated_bindings(unary, &outcome);
+                    outcome.return_type(db, env)
+                }
                 Err(e) => {
+                    let bindings = match &e {
+                        CallDunderError::PossiblyUnbound { bindings, .. } => Some(bindings),
+                        CallDunderError::CallError(_, bindings, _) => Some(bindings),
+                        CallDunderError::MethodNotAvailable => None,
+                    };
+                    if let Some(bindings) = bindings {
+                        self.check_deprecated_bindings(unary, bindings);
+                    }
                     self.report_unsupported_unary_operator(
                         unary,
                         op,
@@ -10589,7 +10620,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (ast::UnaryOp::Invert, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(!value.as_i64()),
-                LiteralValueTypeKind::Bool(value) => Type::int_literal(!i64::from(value)),
+                LiteralValueTypeKind::Bool(value) => {
+                    // `~bool` is currently deprecated in typeshed. Technically we should
+                    // similarly check for deprecation of dunder methods on all our literal
+                    // type fast paths, but we choose not to pay that extra cost, since it is
+                    // implausible that e.g. `int.__neg__` would ever be deprecated.
+                    if let Some(dunder) = literal
+                        .fallback_instance(db, env)
+                        .member_lookup_with_policy(
+                            db,
+                            env,
+                            "__invert__",
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        )
+                        .place
+                        .ignore_possibly_undefined()
+                    {
+                        self.check_deprecated(unary, dunder);
+                    }
+                    Type::int_literal(!i64::from(value))
+                }
                 _ => fallback_unary_expression_type(),
             },
 
@@ -10631,24 +10681,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 match tvar.typevar(self.db()).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        match Self::map_constrained_typevar_constraints(
+                        // Call the dunder method for every constraint up front so deprecation
+                        // reporting doesn't depend on whether any constraint fails.
+                        let outcomes: Vec<_> = constraints
+                            .elements(db)
+                            .iter()
+                            .map(|constraint| {
+                                constraint.try_call_dunder(
+                                    db,
+                                    env,
+                                    unary_dunder_method,
+                                    CallArguments::none(),
+                                    TypeContext::default(),
+                                )
+                            })
+                            .collect();
+                        for outcome in &outcomes {
+                            let bindings = match outcome {
+                                Ok(bindings) => Some(bindings),
+                                // A method can be deprecated even if it is missing from some
+                                // union members or its signature rejects the implicit call.
+                                // Preserve those bindings so the deprecation is reported
+                                // alongside the unsupported-operator diagnostic.
+                                Err(
+                                    CallDunderError::PossiblyUnbound { bindings, .. }
+                                    | CallDunderError::CallError(_, bindings, _),
+                                ) => Some(bindings.as_ref()),
+                                // A completely missing method has no bindings to inspect.
+                                Err(CallDunderError::MethodNotAvailable) => None,
+                            };
+                            if let Some(bindings) = bindings {
+                                self.check_deprecated_bindings(unary, bindings);
+                            }
+                        }
+
+                        let mut outcomes = outcomes.into_iter();
+                        let result = Self::map_constrained_typevar_constraints(
                             db,
                             env,
                             operand_type,
                             constraints,
-                            |constraint| {
-                                constraint
-                                    .try_call_dunder(
-                                        db,
-                                        env,
-                                        unary_dunder_method,
-                                        CallArguments::none(),
-                                        TypeContext::default(),
-                                    )
-                                    .map(|outcome| outcome.return_type(db, env))
-                                    .ok()
+                            |_constraint| {
+                                let outcome = outcomes.next()?.ok()?;
+                                Some(outcome.return_type(db, env))
                             },
-                        ) {
+                        );
+                        match result {
                             Some(ty) => ty,
                             None => {
                                 // At least one constraint failed; report error.

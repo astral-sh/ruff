@@ -30,7 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `while`](https://docs.python.org/3/reference/compound_stmts.html#the-while-statement)
 /// - [PEP 285 – Adding a bool type](https://peps.python.org/pep-0285/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.16.3")]
 pub(crate) struct WhileOne;
 
 impl AlwaysFixableViolation for WhileOne {
