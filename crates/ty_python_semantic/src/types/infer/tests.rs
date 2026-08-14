@@ -122,7 +122,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
         file,
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 python_version: PythonVersionWithSource {
                     version: PythonVersion::PY311,
                     source: PythonVersionSource::Default,
@@ -137,7 +137,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
         file,
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 python_version: PythonVersionWithSource {
                     version: PythonVersion::PY312,
                     source: PythonVersionSource::Default,
@@ -201,7 +201,7 @@ fn program_file_changes_with_python_version() -> anyhow::Result<()> {
 
     let equivalent_program = Program::from_settings(
         &db,
-        ProgramSettings {
+        &ProgramSettings {
             python_version: db.program_settings().python_version.clone(),
             python_platform: program.python_platform(&db).clone(),
             search_paths: program.search_paths(&db).clone(),
@@ -215,7 +215,7 @@ fn program_file_changes_with_python_version() -> anyhow::Result<()> {
 
     let py312_program = Program::from_settings(
         &db,
-        ProgramSettings {
+        &ProgramSettings {
             python_version: PythonVersionWithSource {
                 version: PythonVersion::PY312,
                 source: PythonVersionSource::Default,

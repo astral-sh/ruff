@@ -5,6 +5,7 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::OptionDiagnostic;
 use crate::parallel::ParallelIteratorExt;
+use crate::script::Script;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
 pub use db::testing::TestDb;
@@ -243,7 +244,7 @@ impl Project {
 
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub fn program(self, db: &dyn Db) -> Program<'_> {
-        Program::from_settings(db, self.program_settings(db).clone())
+        Program::from_settings(db, self.program_settings(db))
     }
 
     pub fn update_program(self, db: &mut dyn Db, settings: ProgramSettings) {
@@ -742,7 +743,19 @@ pub(crate) fn check_file_impl(
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, source_file, || {
-            ty_python_semantic::check_file(*db, file)
+            let diagnostics = ty_python_semantic::check_file(*db, file)?;
+            let Some(script) = Script::for_file(*db, source_file) else {
+                return Ok(diagnostics);
+            };
+
+            let script_diagnostics = script.diagnostics(*db);
+            if script_diagnostics.is_empty() {
+                return Ok(diagnostics);
+            }
+
+            let mut diagnostics = diagnostics.into_vec();
+            diagnostics.extend(script_diagnostics.iter().cloned());
+            Ok(diagnostics.into_boxed_slice())
         }) {
             Ok(result) => result,
             Err(diagnostic) => Ok(Box::new([diagnostic])),

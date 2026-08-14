@@ -5,8 +5,8 @@ use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
 
-use crate::metadata::options::{InnerOverrideOptions, Options, OutputFormat};
-use crate::script::script_metadata;
+use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
+use crate::script::Script;
 use crate::{Db, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
@@ -125,37 +125,15 @@ impl Override {
 /// Resolves the settings for a given file.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
-    let project = db.project();
-
-    // Ignore script settings for files that aren't checked as part of the project. Check for
-    // metadata first so files without metadata don't depend on the low-durability open-file set.
-    if let Some(script) = script_metadata(db, file)
-        && crate::should_check_file(db, file)
-    {
-        let inline = script.ty().cloned().unwrap_or_default();
-        let metadata = project.metadata(db);
-        let primary = if metadata.config_file_override().is_some() {
-            metadata.options()
-        } else {
-            &inline
-        };
-        let mut options = metadata
-            .options_in_precedence_order(primary)
-            .map(Options::file_options);
-        let mut merged = options.next().unwrap_or_default();
-
-        for option in options {
-            merged.combine_with(option);
-        }
-
-        let rules = merged.rules.unwrap_or_default();
-        let analysis = merged.analysis.unwrap_or_default();
-
-        let rules = rules.to_rule_selection(db, &mut Vec::new());
-        let analysis = analysis.to_settings(db, &mut Vec::new());
-
-        return FileSettings::File(Arc::new(OverrideSettings { rules, analysis }));
+    if let Some(script) = Script::for_file(db, file) {
+        let settings = script.settings(db);
+        return FileSettings::File(Arc::new(OverrideSettings {
+            rules: settings.rules().clone(),
+            analysis: settings.analysis().clone(),
+        }));
     }
+
+    let project = db.project();
 
     let settings = project.settings(db);
 
@@ -249,7 +227,7 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
 
 /// The resolved settings for a file.
 #[derive(Debug, Eq, PartialEq, Clone, get_size2::GetSize)]
-pub enum FileSettings {
+pub(crate) enum FileSettings {
     /// The file uses the global settings.
     Global,
 

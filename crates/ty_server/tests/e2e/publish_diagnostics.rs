@@ -8,7 +8,7 @@ use lsp_types::{
     TextDocumentContentChangePartial, TextDocumentContentChangeWholeDocument, TextDocumentItem,
     Uri,
 };
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemVirtualPath};
 use ty_server::ClientOptions;
 
 use crate::notebook::NotebookBuilder;
@@ -142,7 +142,7 @@ def foo() -> str:
 #[test]
 fn on_did_open_non_existing_file_workspace_with_untitled_uri() -> Result<()> {
     let workspace_root = SystemPath::new("src");
-    let foo = SystemPath::new("src/foo.py");
+    let foo = SystemVirtualPath::new("untitled:foo.py");
     let foo_content = "\
 def foo() -> str:
     return 42
@@ -159,17 +159,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.send_notification::<DidOpenTextDocumentNotification>(DidOpenTextDocumentParams {
-        text_document: TextDocumentItem {
-            uri: {
-                let uri = server.file_uri(foo);
-                Uri::parse(&format!("untitled://{}", uri.path())).unwrap()
-            },
-            language_id: LanguageKind::Python,
-            version: 1,
-            text: foo_content.to_string(),
-        },
-    });
+    server.open_virtual_text_document(foo, foo_content, 1)?;
     let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
     insta::assert_debug_snapshot!(diagnostics);
 
@@ -240,6 +230,137 @@ def foo() -> str:
 
     assert_eq!(diagnostics.version, Some(2));
 
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change_script_python_requirement() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let initial = r#"# /// script
+# requires-python = ">=3.12"
+# ///
+
+PythonFinalizationError
+"#;
+    let updated = r#"# /// script
+# requires-python = ">=3.13"
+# ///
+
+PythonFinalizationError
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(script, initial)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, initial, 1);
+    let initial_diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(initial_diagnostics);
+
+    server.change_text_document(
+        script,
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: updated.to_string(),
+                },
+            ),
+        ],
+        2,
+    );
+
+    let updated_diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(updated_diagnostics, @r#"
+    PublishDiagnosticsParams {
+        uri: Url {
+            scheme: "file",
+            cannot_be_a_base: false,
+            username: "",
+            password: None,
+            host: None,
+            port: None,
+            path: "<temp_dir>/src/script.py",
+            query: None,
+            fragment: None,
+        },
+        version: Some(
+            2,
+        ),
+        diagnostics: [],
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_open_virtual_script_uses_its_python_requirement() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemVirtualPath::new("untitled:script.py");
+    let content = r#"# /// script
+# requires-python = ">=3.13"
+# ///
+
+PythonFinalizationError
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_virtual_text_document(script, content, 1)?;
+
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(diagnostics, @r#"
+    PublishDiagnosticsParams {
+        uri: Url {
+            scheme: "untitled",
+            cannot_be_a_base: true,
+            username: "",
+            password: None,
+            host: None,
+            port: None,
+            path: "script.py",
+            query: None,
+            fragment: None,
+        },
+        version: Some(
+            1,
+        ),
+        diagnostics: [],
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_open_virtual_script_reports_inline_configuration_diagnostics() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemVirtualPath::new("untitled:script.py");
+    let content = r#"# /// script
+# [tool.ty.rules]
+# unknown-rule = "warn"
+# ///
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_virtual_text_document(script, content, 1)?;
+
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
     insta::assert_debug_snapshot!(diagnostics);
 
     Ok(())
