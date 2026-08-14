@@ -40,9 +40,20 @@ def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(collect())  # revealed: tuple[Unknown, ...]
-reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
+reveal_type(collect())  # revealed: tuple[()]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
+```
+
+The legacy spelling must also preserve argument-derived types when a surrounding assignment expects
+an incompatible return type.
+
+```py
+inferred = collect(1)
+reveal_type(inferred)  # revealed: tuple[Literal[1]]
+# error: [invalid-assignment]
+indirect: tuple[str] = inferred
+# error: [invalid-assignment]
+direct: tuple[str] = collect(1)
 ```
 
 ## Callable parameters
