@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pathlib;
+use crate::rules::flake8_use_pathlib::helpers::is_file_descriptor;
 use crate::{Applicability, Edit, Fix};
 
 /// Format a code snippet to call `name.method()`.
@@ -280,6 +281,12 @@ fn find_file_open<'a>(
 
     // Match positional arguments, get filename and mode.
     let (filename, pos_mode) = match_open_args(args)?;
+
+    // `open` accepts a file descriptor, but `Path` does not, so a `pathlib` replacement
+    // would fail at runtime. `PTH123` skips these for the same reason.
+    if is_file_descriptor(filename, semantic) {
+        return None;
+    }
 
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
