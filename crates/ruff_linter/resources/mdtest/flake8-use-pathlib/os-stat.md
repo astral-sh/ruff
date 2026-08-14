@@ -88,14 +88,25 @@ help: Replace with `Path(...).lstat()`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-### Uncertain `follow_symlinks` suppresses the diagnostic
+### Dynamic `follow_symlinks` suppresses the fix
+
+If we can't resolve the value of `follow_symlinks`, we still emit a diagnostic but can't reliably
+suggest one of the `stat` methods in a fix.
 
 ```py
 import os
 
 follow = True
 
-os.stat("foo", follow_symlinks=follow)
+os.stat("foo", follow_symlinks=follow)  # snapshot: os-stat
+```
+
+```snapshot
+error[PTH116]: `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | os.stat("foo", follow_symlinks=follow)  # snapshot: os-stat
+  | ^^^^^^^
 ```
 
 ## Python 3.10+

@@ -66,7 +66,7 @@ use crate::{
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct OsStat {
-    method: StatMethod,
+    method: Option<StatMethod>,
 }
 
 impl Violation for OsStat {
@@ -79,7 +79,8 @@ impl Violation for OsStat {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with `Path(...).{}()`", self.method))
+        self.method
+            .map(|method| format!("Replace with `Path(...).{method}()`"))
     }
 }
 
@@ -129,12 +130,12 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
     }
 
     let method = if checker.target_version() >= PythonVersion::PY310 {
-        StatMethod::Stat
+        Some(StatMethod::Stat)
     } else {
         match is_boolean_literal_or_default(&call.arguments, "follow_symlinks") {
-            Some(true) => StatMethod::Stat,
-            Some(false) => StatMethod::LStat,
-            None => return,
+            Some(true) => Some(StatMethod::Stat),
+            Some(false) => Some(StatMethod::LStat),
+            None => None,
         }
     };
 
@@ -149,6 +150,10 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
     {
         return;
     }
+
+    let Some(method) = method else {
+        return;
+    };
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
