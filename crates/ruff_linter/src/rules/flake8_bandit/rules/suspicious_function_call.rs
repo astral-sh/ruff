@@ -336,7 +336,7 @@ impl Violation for SuspiciousMktempUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Suspicious)]
 pub(crate) struct SuspiciousEvalUsage;
 
 impl Violation for SuspiciousEvalUsage {
