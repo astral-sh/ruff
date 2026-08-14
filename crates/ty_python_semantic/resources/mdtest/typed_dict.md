@@ -1152,6 +1152,23 @@ def hire(person: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nick
 team: Team = {"lead": {"name": "Alice", "age": 30, "nickname": "Ali"}}
 ```
 
+Finding a `TypedDict` behind an alias is not on its own a reason to validate a `dict(...)` call as
+one, when another arm of the union already accepts it:
+
+```py
+accepted_by_fallback: PersonOrId | dict[str, str] = dict(other="x")
+reveal_type(accepted_by_fallback)  # revealed: dict[str, str]
+```
+
+With no arm to fall back to, the call is validated against the `TypedDict` as before:
+
+```py
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+no_fallback: PersonOrId = dict(other="x")
+```
+
 ## Type ignore compatibility issues
 
 Users should be able to ignore TypedDict validation errors with `# type: ignore`
