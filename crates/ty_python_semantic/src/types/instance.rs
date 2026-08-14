@@ -1401,10 +1401,12 @@ impl<'db> ProtocolInstanceType<'db> {
         ) -> bool {
             let interface = protocol.interface(db);
 
-            // Hashability is not preserved by inheritance: subclasses can replace
-            // `object.__hash__` with `None`. A protocol that explicitly requires `__hash__`
-            // therefore does not describe every object, despite `object` defining that method.
-            if interface.includes_member(db, "__hash__") {
+            // Neither hashability nor instance-dictionary storage is guaranteed for every object.
+            // Subclasses can replace `object.__hash__` with `None`, while slotted instances can
+            // omit the `__dict__` that typeshed broadly declares on `object`.
+            if interface.includes_member(db, "__hash__")
+                || interface.includes_member(db, "__dict__")
+            {
                 return false;
             }
 
