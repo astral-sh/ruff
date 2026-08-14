@@ -9168,10 +9168,22 @@ impl<'db> BindingError<'db> {
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let provided_ty_display = provided_ty.display(db, env);
-                let mut diag = builder.into_diagnostic(
-                    "Argument expression after ** must be a mapping with `str` key type",
+                let expected_ty = KnownClass::Str.to_instance(db, env);
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    context,
+                    [*provided_ty, expected_ty],
                 );
+                let settings = match context.overrides {
+                    Some(overrides) => overrides
+                        .display_settings
+                        .with_qualification_from(&settings),
+                    None => settings,
+                };
+                let provided_ty_display = provided_ty.display_with(db, env, settings.clone());
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Argument expression after ** must be a mapping with `{}` key type",
+                    expected_ty.display_with(db, env, settings),
+                ));
                 diag.set_primary_annotation_message(format_args!("Found `{provided_ty_display}`"));
 
                 if let Some(compound_diag) = compound_diag {

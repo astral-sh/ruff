@@ -1466,6 +1466,50 @@ def constructors(source: Source, key: str, value: second.Model) -> None:
     first.Record({second.Record(): value})
 ```
 
+## TypedDict names and keys that shadow `str`
+
+Functional TypedDict names and unpacked keyword keys distinguish a user-defined `str` from the
+built-in `str` they require.
+
+`custom.py`:
+
+```py
+class str: ...
+```
+
+```py
+from typing import TypedDict
+
+import custom
+
+class Record(TypedDict): ...
+
+def accepts(**values: int) -> None: ...
+def unpack(values: dict[custom.str, int]) -> None:
+    accepts(**values)  # snapshot: invalid-argument-type
+
+    # error: [invalid-argument-type] "mapping with `builtins.str` key type"
+    # error: [invalid-argument-type] "key type `custom.str` that is not assignable to `builtins.str`"
+    Record(**values)
+
+TypedDict(custom.str(), {})  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument expression after ** must be a mapping with `builtins.str` key type
+ --> src/mdtest_snippet.py:9:13
+  |
+9 |     accepts(**values)  # snapshot: invalid-argument-type
+  |             ^^^^^^^^ Found `custom.str`
+
+
+error[invalid-argument-type]: Invalid argument to parameter `typename` of `TypedDict()`
+  --> src/mdtest_snippet.py:15:11
+   |
+15 | TypedDict(custom.str(), {})  # snapshot: invalid-argument-type
+   |           ^^^^^^^^^^^^ Expected `builtins.str`, found `custom.str`
+```
+
 ## Assignability explanations
 
 Explanatory notes distinguish both same-named containers and the types nested inside them.
@@ -2727,6 +2771,157 @@ BadDynamicMetaclass = type("BadDynamicMetaclass", (first.Custom, second.Custom),
 
 # error: [instance-layout-conflict] "Bases `first.Layout` and `second.Layout` cannot be combined in multiple inheritance"
 class BadLayout(first.Layout, second.Layout): ...
+```
+
+## Dynamic class arguments that shadow built-ins
+
+Dynamic class names and namespaces distinguish user-defined `str` and `dict` classes from the
+corresponding built-in types.
+
+`custom.py`:
+
+```py
+class str: ...
+class dict: ...
+```
+
+```py
+from types import new_class
+
+import custom
+
+type(custom.str(), (), {})  # snapshot: invalid-argument-type
+type("Model", (), custom.dict())  # snapshot: invalid-argument-type
+new_class(custom.str(), ())  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid argument to parameter 1 (`name`) of `type()`
+ --> src/mdtest_snippet.py:5:6
+  |
+5 | type(custom.str(), (), {})  # snapshot: invalid-argument-type
+  |      ^^^^^^^^^^^^ Expected `builtins.str`, found `custom.str`
+
+
+error[invalid-argument-type]: Invalid argument to parameter 3 (`namespace`) of `type()`
+ --> src/mdtest_snippet.py:6:19
+  |
+6 | type("Model", (), custom.dict())  # snapshot: invalid-argument-type
+  |                   ^^^^^^^^^^^^^ Expected `builtins.dict[str, Any]`, found `custom.dict`
+
+
+error[invalid-argument-type]: Invalid argument to parameter 1 (`name`) of `types.new_class()`
+ --> src/mdtest_snippet.py:7:11
+  |
+7 | new_class(custom.str(), ())  # snapshot: invalid-argument-type
+  |           ^^^^^^^^^^^^ Expected `builtins.str`, found `custom.str`
+```
+
+## Enum arguments that shadow built-ins
+
+Enum names and starting values distinguish user-defined `str` and `int` classes from the built-in
+types required by the enum constructor.
+
+`custom.py`:
+
+```py
+class str: ...
+class int: ...
+```
+
+```py
+from enum import Enum
+
+import custom
+
+Enum(custom.str(), "ITEM")  # snapshot: invalid-argument-type
+Enum("Model", "ITEM", start=custom.int())  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid argument to parameter `value` of `Enum()`
+ --> src/mdtest_snippet.py:5:6
+  |
+5 | Enum(custom.str(), "ITEM")  # snapshot: invalid-argument-type
+  |      ^^^^^^^^^^^^ Expected `builtins.str`, found `custom.str`
+
+
+error[invalid-argument-type]: Expected `builtins.int` for `start` argument, got `custom.int`
+ --> src/mdtest_snippet.py:6:29
+  |
+6 | Enum("Model", "ITEM", start=custom.int())  # snapshot: invalid-argument-type
+  |                             ^^^^^^^^^^^^
+```
+
+## Method override owners
+
+Method conflicts distinguish a derived class from same-named method owners, both across inherited
+bases and in explicit overrides with incompatible decorators.
+
+`first.py`:
+
+```py
+class Model:
+    def method(self, value: int) -> int:
+        return value
+
+class Owner:
+    def method(self, value: int) -> int:
+        return value
+```
+
+`second.py`:
+
+```py
+class Different:
+    def method(self, value: str) -> str:
+        return value
+```
+
+```py
+import first
+import second
+
+class Model(first.Model, second.Different): ...  # snapshot: invalid-method-override
+
+class Owner(first.Owner):
+    @staticmethod
+    def method(value: str) -> str:  # snapshot: invalid-method-override
+        return value
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `mdtest_snippet.Model` define method `method` incompatibly
+ --> src/mdtest_snippet.py:4:7
+  |
+4 | class Model(first.Model, second.Different): ...  # snapshot: invalid-method-override
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `first.Model.method` is incompatible with `Different.method`
+  |
+ ::: src/first.py:2:9
+  |
+2 |     def method(self, value: int) -> int:
+  |         ------ `first.Model.method` defined here
+  |
+ ::: src/second.py:2:9
+  |
+2 |     def method(self, value: str) -> str:
+  |         ------ `Different.method` defined here
+info: incompatible return types: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Invalid override of method `method`
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |     def method(value: str) -> str:  # snapshot: invalid-method-override
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `first.Owner.method`
+  |
+ ::: src/first.py:6:9
+  |
+6 |     def method(self, value: int) -> int:
+  |         ------------------------------- `first.Owner.method` defined here
+info: `mdtest_snippet.Owner.method` is a staticmethod but `first.Owner.method` is an instance method
+info: This violates the Liskov Substitution Principle
 ```
 
 ## Unsupported dynamic class bases

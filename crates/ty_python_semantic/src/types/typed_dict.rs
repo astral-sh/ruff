@@ -2955,11 +2955,17 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
     }
 
     if let Some((key_ty, value_ty)) = unpacked_type.unpack_keys_and_items(db, env) {
-        if !key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env)) {
+        let expected_key_ty = KnownClass::Str.to_instance(db, env);
+        if !key_ty.is_assignable_to(db, env, expected_key_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    context,
+                    [key_ty, expected_key_ty],
+                );
                 builder.into_diagnostic(format_args!(
-                    "Unpacked argument has key type `{}` that is not assignable to `str`",
-                    key_ty.display(db, env),
+                    "Unpacked argument has key type `{}` that is not assignable to `{}`",
+                    key_ty.display_with(db, env, settings.clone()),
+                    expected_key_ty.display_with(db, env, settings),
                 ));
             }
             return false;

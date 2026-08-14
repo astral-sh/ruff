@@ -478,16 +478,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let Some(name_literal) = name_type.as_string_literal() else {
             let env = self.program_environment();
-            if !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+            let expected_name_type = KnownClass::Str.to_instance(db, env);
+            if !name_type.is_assignable_to(db, env, expected_name_type)
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
             {
+                let types = [expected_name_type, name_type];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid argument to parameter `value` of `{base_name}()`",
                     base_name = base_class.name(env.python_version(db))
                 ));
                 diagnostic.set_primary_annotation_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db, env)
+                    "Expected `{}`, found `{}`",
+                    expected_name_type.display_with(db, env, settings.clone()),
+                    name_type.display_with(db, env, settings)
                 ));
             }
             return None;
@@ -504,14 +508,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let env = self.program_environment();
-        if ty.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
+        let expected_type = KnownClass::Int.to_instance(db, env);
+        if ty.is_assignable_to(db, env, expected_type) {
             return EnumStart::DynamicInt;
         }
 
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value) {
+            let settings =
+                DisplaySettings::from_possibly_ambiguous_types(&self.context, [expected_type, ty]);
             builder.into_diagnostic(format_args!(
-                "Expected `int` for `start` argument, got `{}`",
-                ty.display(db, env),
+                "Expected `{}` for `start` argument, got `{}`",
+                expected_type.display_with(db, env, settings.clone()),
+                ty.display_with(db, env, settings),
             ));
         }
 

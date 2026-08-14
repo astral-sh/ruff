@@ -4298,15 +4298,14 @@ pub(super) fn report_invalid_method_override<'db>(
         return;
     };
 
-    let class_name = subclass.name(db);
-    let superclass_name = superclass.name(db);
-
-    let overridden_method = if class_name == superclass_name {
-        let qualified_name = superclass.qualified_name(db);
-        format!("{qualified_name}.{member}")
-    } else {
-        format!("{superclass_name}.{member}")
-    };
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, [subclass, superclass]);
+    let class_name = subclass
+        .class_literal(db)
+        .display_with(db, settings.clone());
+    let superclass_name = superclass
+        .class_literal(db)
+        .display_with(db, settings.clone());
+    let overridden_method = format!("{superclass_name}.{member}");
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
@@ -4343,7 +4342,6 @@ pub(super) fn report_invalid_method_override<'db>(
         ));
     }
 
-    let settings = DisplaySettings::from_possibly_ambiguous_types(context, [subclass, superclass]);
     error_context().attach_to(context, &settings, &mut diagnostic);
 
     diagnostic.info("This violates the Liskov Substitution Principle");
@@ -4478,13 +4476,14 @@ pub(super) fn report_incompatible_base_method<'db>(
         Type::from(selected_owner),
         Type::from(contract_owner),
     ];
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, context.program_environment(), types);
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
     let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
     let selected_name = selected_owner
         .class_literal(db)
         .display_with(db, settings.clone());
-    let contract_name = contract_owner.class_literal(db).display_with(db, settings);
+    let contract_name = contract_owner
+        .class_literal(db)
+        .display_with(db, settings.clone());
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Base classes for class `{class_name}` define method `{member}` incompatibly",
     ));
@@ -4498,8 +4497,6 @@ pub(super) fn report_incompatible_base_method<'db>(
             contract_decorator.description(),
         ));
     }
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(context, [selected_owner, contract_owner]);
     error_context().attach_to(context, &settings, &mut diagnostic);
     diagnostic.info("This violates the Liskov Substitution Principle");
 

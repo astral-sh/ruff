@@ -11,7 +11,9 @@ use crate::types::infer::builder::{
         DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
     },
 };
-use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
+use crate::types::{
+    DisplaySettings, KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type,
+};
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 use ty_python_core::definition::Definition;
 
@@ -173,27 +175,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 (Box::new([]), true)
             };
 
+        let expected_namespace_type = KnownClass::Dict.to_specialized_instance(
+            db,
+            env,
+            &[KnownClass::Str.to_instance(db, env), Type::any()],
+        );
         if !matches!(namespace_type, Type::TypedDict(_))
-            && {
-                !namespace_type.is_assignable_to(
-                    db,
-                    env,
-                    KnownClass::Dict.to_specialized_instance(
-                        db,
-                        env,
-                        &[KnownClass::Str.to_instance(db, env), Type::any()],
-                    ),
-                )
-            }
+            && !namespace_type.is_assignable_to(db, env, expected_namespace_type)
             && let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
         {
+            let types = [expected_namespace_type, namespace_type];
+            let settings = DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
             let mut diagnostic = builder
                 .into_diagnostic("Invalid argument to parameter 3 (`namespace`) of `type()`");
             diagnostic.set_primary_annotation_message(format_args!(
-                "Expected `dict[str, Any]`, found `{}`",
-                namespace_type.display(db, env)
+                "Expected `{}`, found `{}`",
+                expected_namespace_type.display_with(db, env, settings.clone()),
+                namespace_type.display_with(db, env, settings)
             ));
         }
 
@@ -201,14 +201,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name = if let Some(literal) = name_type.as_string_literal() {
             literal.value(db)
         } else {
-            if !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+            let expected_name_type = KnownClass::Str.to_instance(db, env);
+            if !name_type.is_assignable_to(db, env, expected_name_type)
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
             {
+                let types = [expected_name_type, name_type];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
                 let mut diagnostic =
                     builder.into_diagnostic("Invalid argument to parameter 1 (`name`) of `type()`");
                 diagnostic.set_primary_annotation_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db, env)
+                    "Expected `{}`, found `{}`",
+                    expected_name_type.display_with(db, env, settings.clone()),
+                    name_type.display_with(db, env, settings)
                 ));
             }
             "<unknown>"

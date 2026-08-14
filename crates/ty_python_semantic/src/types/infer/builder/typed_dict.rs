@@ -19,8 +19,8 @@ use crate::types::typed_dict::{
     validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
-    TypingModule, any_over_type,
+    ClassType, DisplaySettings, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext,
+    TypedDictModule, TypedDictType, TypingModule, any_over_type,
 };
 use crate::{Db, ProgramEnvironment, TypeQualifiers};
 use ty_python_core::definition::Definition;
@@ -293,17 +293,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name = name_type
             .as_string_literal()
             .map(|literal| literal.value(db));
+        let expected_name_type = KnownClass::Str.to_instance(db, env);
 
         if name.is_none()
-            && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+            && !name_type.is_assignable_to(db, env, expected_name_type)
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
+            let types = [expected_name_type, name_type];
+            let settings = DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `typename` of `TypedDict()`"
             ));
             diagnostic.set_primary_annotation_message(format_args!(
-                "Expected `str`, found `{}`",
-                name_type.display(db, env)
+                "Expected `{}`, found `{}`",
+                expected_name_type.display_with(db, env, settings.clone()),
+                name_type.display_with(db, env, settings)
             ));
         } else if let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
