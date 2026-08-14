@@ -1166,7 +1166,13 @@ fn evaluate_target_union<'db>(
         let Some(mut narrowed) = narrowed else {
             continue;
         };
-        if let Some(removed) = removed {
+        // A surviving alternative that is disjoint from every rejected alternative already
+        // satisfies their exclusions. Constructing those redundant exclusions can exponentially
+        // expand intersections such as `Any & Literal["a"]` when the rejected alternatives are
+        // similarly shaped intersections with other string literals.
+        if let Some(removed) = removed
+            && !narrowed.is_disjoint_from(db, env, removed)
+        {
             narrowed = IntersectionBuilder::new(db, env)
                 .add_positive(narrowed)
                 .add_negative(removed)
@@ -1522,17 +1528,16 @@ fn compare_literal_to_other<'db>(
     };
     let condition_expects_equality = operator.condition_expects_equality(branch);
 
-    // Treat broad builtin types as if they exclude subclasses with custom equality. This is
-    // intentionally unsafe: an instance of such a subclass can compare equal to the literal
-    // without inhabiting its literal type. Explicitly typed subclasses do not take this path.
+    // Treat broad builtin types as if only the literal itself can compare equal. This is
+    // intentionally unsafe: subclasses, including `bool` for `int`, can compare equal without
+    // inhabiting the literal type. Explicitly typed subclasses do not take this path.
     if evaluator.soundness_policy.allow_unsafe_equality
         && condition_expects_equality
         && literal_operand == LiteralOperand::Other
-        && let Some(equal_to_literal) = builtin_literals_equal_to(db, env, literal_type, literal)
         && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, other)
     {
         return if literal_semantics == other_semantics {
-            ComparisonResult::CanNarrow(equal_to_literal)
+            ComparisonResult::CanNarrow(literal_type)
         } else {
             operator.result_from_equality(false)
         };

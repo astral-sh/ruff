@@ -145,15 +145,15 @@ def negated_alternative[T, U]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[T, U]))
 ```
 
-## Derived solution element order
+## Independent concrete solutions are stable
 
-Constructing the constraints in the opposite source order makes the derived union observable. Its
-elements should not be reordered merely because the TDD-variable order changes.
+Independent type variables with concrete bounds should not acquire relationships merely because
+their bounds contain the same concrete type.
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
-def derived_solution[U, T]() -> None:
+def independent_solution[U, T]() -> None:
     # (U ≤ int) ∧ (int ≤ T) ∧ ((T ≤ int) | (T ≤ str))
     constraints = (
         ConstraintSet.upper_bound(U, int)
@@ -161,15 +161,10 @@ def derived_solution[U, T]() -> None:
         & (ConstraintSet.upper_bound(T, int) | ConstraintSet.upper_bound(T, str))
     )
 
-    # TODO: The derived relationship should not leave an inferable `U` in the solution for `T`.
-    # TODO: revealed: tuple[Solution[T=int]]
-    # TODO: sometimes: revealed tuple[Solution[T=int | U@derived_solution]]
-    # revealed: tuple[Solution[T=U@derived_solution | int]]
+    # revealed: tuple[Solution[T=int]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
 
-    # TODO: The derived relationship should not leave an inferable `T` in the solution for `U`.
-    # TODO: revealed: tuple[Solution[U=int]]
-    # revealed: tuple[Solution[U=int & T@derived_solution]]
+    # revealed: tuple[Solution[U=int]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
 ```
 
@@ -389,7 +384,6 @@ truncated diagnostic display must not depend on which implications were encounte
 
 ```py
 from typing import Literal
-from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def high_fanout[
@@ -499,6 +493,7 @@ def high_fanout[
     reveal_type(result)
 
     impossible = constraints & ConstraintSet.upper_bound(R11, Literal[0])
-    # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
-    static_assert(not impossible.satisfied_by_all_typevars(inferable=inferable))
+    # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]
+    # revealed: None
+    reveal_type(impossible.solutions_for(R11, inferable=inferable))
 ```

@@ -1046,7 +1046,8 @@ class AnySelf(Protocol):
 ```
 
 Assignments in a comprehension and augmented assignments are also writes to the instance.
-`__getattr__` provides the read side of `+=` below, so that case tests only the write:
+`__getattr__` provides the read side of `+=` below, although the write is not yet recognized as
+establishing an instance attribute:
 
 ```py
 class AssignmentForms(Protocol):
@@ -1057,14 +1058,15 @@ class AssignmentForms(Protocol):
         [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
 
     def augmented_assignment(self) -> None:
+        # error: [unresolved-attribute]
         self.augmented += 1  # snapshot: ambiguous-protocol-member
 ```
 
 ```snapshot
 warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
-   --> src/mdtest_snippet.py:326:9
+   --> src/mdtest_snippet.py:327:9
     |
-326 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+327 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
    --> src/mdtest_snippet.py:318:7
@@ -6179,6 +6181,15 @@ def check(value: Left[int]) -> None:
     expect_right1(value)  # error: [invalid-argument-type]
     # This should be an error
     expect_right2(value)  # error: [invalid-argument-type]
+```
+
+Generic-call inference must also avoid expanding recursive protocol members when checking whether
+its argument constraints are independent:
+
+```py
+def accept[U, V](outer: U, recursive: V) -> None: ...
+def infer[T](outer: T, recursive: C[int]) -> None:
+    accept(outer, recursive)
 ```
 
 ### Recursive legacy generic protocol

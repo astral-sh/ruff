@@ -24,6 +24,8 @@ Run all tests (using `nextest` for faster execution and setting `INSTA_FORCE_PAS
 CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_LTO=off INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run
 ```
 
+File-watcher tests do not work inside the sandbox. It is usually unnecessary to run them locally before filing a change unless you are certain that the change affects file-watching behavior.
+
 Run tests for a specific crate:
 
 ```sh

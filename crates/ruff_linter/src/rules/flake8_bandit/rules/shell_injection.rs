@@ -334,9 +334,14 @@ fn is_trusted_input(arg: &Expr, semantic: &SemanticModel) -> bool {
 pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let call_kind = get_call_kind(&call.func, checker.semantic());
     let shell_keyword = find_shell_keyword(&call.arguments, checker.semantic());
+    let command_argument = match call_kind {
+        Some(CallKind::Subprocess) => find_subprocess_argument(&call.arguments),
+        Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args.first(),
+        None => None,
+    };
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
-        if let Some(arg) = call.arguments.args.first() {
+        if let Some(arg) = command_argument {
             match shell_keyword {
                 // S602
                 Some(ShellKeyword {
@@ -397,11 +402,9 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
 
     // S607
     if checker.is_rule_enabled(Rule::StartProcessWithPartialPath) {
-        if call_kind.is_some() {
-            if let Some(arg) = call.arguments.args.first() {
-                if is_partial_path(arg) {
-                    checker.report_diagnostic(StartProcessWithPartialPath, arg.range());
-                }
+        if let Some(arg) = command_argument {
+            if is_partial_path(arg) {
+                checker.report_diagnostic(StartProcessWithPartialPath, arg.range());
             }
         }
     }
@@ -419,13 +422,25 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 )
             )
         {
-            if let Some(arg) = call.arguments.args.first() {
+            if let Some(arg) = command_argument {
                 if is_wildcard_command(arg) {
                     checker.report_diagnostic(UnixCommandWildcardInjection, arg.range());
                 }
             }
         }
     }
+}
+
+/// Return the command argument to a `subprocess` call.
+fn find_subprocess_argument(arguments: &Arguments) -> Option<&Expr> {
+    arguments.find_argument_value("args", 0).or_else(|| {
+        // A starred first argument (`subprocess.run(*cmd)`) prevents us from locating the
+        // command with `find_argument_value`; treat it as untrusted input.
+        arguments
+            .args
+            .first()
+            .filter(|argument| argument.is_starred_expr())
+    })
 }
 
 #[derive(Copy, Clone, Debug)]

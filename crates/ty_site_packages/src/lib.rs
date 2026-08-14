@@ -279,10 +279,10 @@ impl PythonEnvironment {
     ///
     /// 1. activated virtual environment
     /// 2. conda (child)
-    /// 3. working dir virtual environment
+    /// 3. project virtual environment, when a project root is provided
     /// 4. conda (base)
     pub fn discover(
-        project_root: &SystemPath,
+        project_root: Option<&SystemPath>,
         system: &dyn System,
     ) -> Result<Option<Self>, SitePackagesDiscoveryError> {
         fn resolve_environment(
@@ -308,22 +308,24 @@ impl PythonEnvironment {
                 .map(Some);
         }
 
-        tracing::debug!("Discovering virtual environment in `{project_root}`");
-        let virtual_env_directory = project_root.join(".venv");
+        if let Some(project_root) = project_root {
+            tracing::debug!("Discovering virtual environment in `{project_root}`");
+            let virtual_env_directory = project_root.join(".venv");
 
-        match PythonEnvironment::new(
-            &virtual_env_directory,
-            SysPrefixPathOrigin::LocalVenv,
-            system,
-        ) {
-            Ok(environment) => return Ok(Some(environment)),
-            Err(err) => {
-                if system.is_directory(&virtual_env_directory) {
-                    tracing::debug!(
-                        "Ignoring automatically detected virtual environment at `{}`: {}",
-                        &virtual_env_directory,
-                        err
-                    );
+            match PythonEnvironment::new(
+                &virtual_env_directory,
+                SysPrefixPathOrigin::LocalVenv,
+                system,
+            ) {
+                Ok(environment) => return Ok(Some(environment)),
+                Err(err) => {
+                    if system.is_directory(&virtual_env_directory) {
+                        tracing::debug!(
+                            "Ignoring automatically detected virtual environment at `{}`: {}",
+                            &virtual_env_directory,
+                            err
+                        );
+                    }
                 }
             }
         }
@@ -2119,6 +2121,8 @@ impl Deref for SysPrefixPath {
 pub enum SysPrefixPathOrigin {
     /// The `sys.prefix` path came from a configuration file setting: `pyproject.toml` or `ty.toml`
     ConfigFileSetting(Arc<SystemPathBuf>, Option<TextRange>),
+    /// The `sys.prefix` path came from a standalone script's inline metadata.
+    ScriptMetadataSetting,
     /// The `sys.prefix` path came from a `--python` CLI flag
     PythonCliFlag,
     /// The selected interpreter in the user's editor.
@@ -2149,6 +2153,7 @@ impl SysPrefixPathOrigin {
         match self {
             Self::LocalVenv | Self::VirtualEnvVar => true,
             Self::ConfigFileSetting(..)
+            | Self::ScriptMetadataSetting
             | Self::PythonCliFlag
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
@@ -2167,6 +2172,7 @@ impl SysPrefixPathOrigin {
         match self {
             Self::PythonCliFlag
             | Self::ConfigFileSetting(..)
+            | Self::ScriptMetadataSetting
             | Self::Editor
             | Self::SelfEnvironment
             | Self::PythonBinary => false,
@@ -2188,6 +2194,7 @@ impl SysPrefixPathOrigin {
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
             | Self::ConfigFileSetting(..)
+            | Self::ScriptMetadataSetting
             | Self::PythonCliFlag
             | Self::PythonBinary
             | Self::UvWorkspace => false,
@@ -2201,6 +2208,9 @@ impl std::fmt::Display for SysPrefixPathOrigin {
         match self {
             Self::PythonCliFlag => f.write_str("`--python` argument"),
             Self::ConfigFileSetting(_, _) => f.write_str("`environment.python` setting"),
+            Self::ScriptMetadataSetting => {
+                f.write_str("`environment.python` setting in script metadata")
+            }
             Self::VirtualEnvVar => f.write_str("`VIRTUAL_ENV` environment variable"),
             Self::CondaPrefixVar => f.write_str("`CONDA_PREFIX` environment variable"),
             Self::DerivedFromPyvenvCfg => f.write_str("derived `sys.prefix` path"),

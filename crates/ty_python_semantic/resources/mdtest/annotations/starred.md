@@ -31,4 +31,6 @@ first_arg_int(42, "42", "42")  # fine
 first_arg_int("not an int", "42", "42")
 # error: [invalid-argument-type] "Argument to function `first_arg_int` is incorrect: Expected `str`, found `Literal[56]`"
 first_arg_int(56, "42", 56)
+# error: [missing-argument] "No argument provided for required parameter `*args` of function `first_arg_int`"
+first_arg_int()
 ```

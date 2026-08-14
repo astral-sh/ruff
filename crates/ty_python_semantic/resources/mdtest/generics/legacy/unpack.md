@@ -44,6 +44,18 @@ reveal_type(collect())  # revealed: tuple[()]
 reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 ```
 
+The legacy spelling must also preserve argument-derived types when a surrounding assignment expects
+an incompatible return type.
+
+```py
+inferred = collect(1)
+reveal_type(inferred)  # revealed: tuple[Literal[1]]
+# error: [invalid-assignment]
+indirect: tuple[str] = inferred
+# error: [invalid-assignment]
+direct: tuple[str] = collect(1)
+```
+
 ## Callable parameters
 
 `Unpack` expands a type variable tuple into a callable's positional parameter list. The same tuple

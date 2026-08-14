@@ -186,6 +186,439 @@ def _(a: A, b: B, x: A | B):
     reveal_type(takes_in_supports_foo(x))  # revealed: A | B
 ```
 
+## Inferring through nested nominal generic classes
+
+When a nominal generic class is nested inside another, the outer class determines whether the inner
+specialization contributes a lower bound, an upper bound, or both.
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+class Invariant[T]:
+    value: T
+
+class Producer[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def covariant[T](container: Covariant[Producer[T]], value: T) -> T:
+    return value
+
+def contravariant[T](container: Contravariant[Producer[T]], value: T) -> T:
+    return value
+
+def invariant[T](container: Invariant[Producer[T]], value: T) -> T:
+    return value
+```
+
+Covariance permits the broader `Base`, contravariance accepts the narrower `Derived`, and invariance
+preserves `Middle`.
+
+```py
+class Base: ...
+class Middle(Base): ...
+class Derived(Middle): ...
+
+reveal_type(covariant(Covariant[Producer[Middle]](), Base()))  # revealed: Base
+reveal_type(contravariant(Contravariant[Producer[Middle]](), Derived()))  # revealed: Derived
+reveal_type(invariant(Invariant[Producer[Middle]](), Middle()))  # revealed: Middle
+```
+
+## Inferring through nested generic protocols
+
+Generic protocols must preserve the variance of the outer class when constructing their structural
+constraints, just as nominal generic classes do.
+
+```py
+from typing import Protocol
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+class Invariant[T]:
+    value: T
+
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+def covariant[T](container: Covariant[Producer[T]], value: T) -> T:
+    return value
+
+def contravariant[T](container: Contravariant[Producer[T]], value: T) -> T:
+    return value
+
+def invariant[T](container: Invariant[Producer[T]], value: T) -> T:
+    return value
+```
+
+A covariant outer class permits the broader `Base`, a contravariant class accepts the narrower
+`Derived`, and an invariant class requires exactly `Middle`.
+
+```py
+class Base: ...
+class Middle(Base): ...
+class Derived(Middle): ...
+
+reveal_type(covariant(Covariant[Producer[Middle]](), Base()))  # revealed: Base
+reveal_type(contravariant(Contravariant[Producer[Middle]](), Derived()))  # revealed: Derived
+reveal_type(invariant(Invariant[Producer[Middle]](), Middle()))  # revealed: Middle
+invariant(Invariant[Producer[Middle]](), Base())  # error: [invalid-argument-type]
+```
+
+When the same protocol specialization appears first contravariantly and then covariantly, both
+relationships contribute their constraints even though the formal and actual types are identical.
+
+```py
+class MixedVariance[First, Second]:
+    def put(self, value: First) -> None: ...
+    def get(self) -> Second:
+        raise NotImplementedError
+
+def repeated_polarity[T](container: MixedVariance[Producer[T], Producer[T]], witness: T) -> T:
+    return witness
+
+reveal_type(repeated_polarity(MixedVariance[Producer[Middle], Producer[Middle]](), Derived()))  # revealed: Middle
+```
+
+A consuming protocol reverses the relationship once more. Nesting that protocol inside a
+contravariant class therefore turns its upper bound back into a lower bound.
+
+```py
+class Consumer[T](Protocol):
+    def put(self, value: T) -> None: ...
+
+def consumer[T](container: Covariant[Consumer[T]], value: T) -> T:
+    return value
+
+def double_contravariant[T](container: Contravariant[Consumer[T]], value: T) -> T:
+    return value
+
+reveal_type(consumer(Covariant[Consumer[Middle]](), Derived()))  # revealed: Derived
+reveal_type(double_contravariant(Contravariant[Consumer[Middle]](), Derived()))  # revealed: Middle
+```
+
+A structural protocol method must also preserve its inferred parameters under either outer variance,
+even when its nominal implementation is rejected by the wrapper.
+
+```py
+from typing import Callable
+
+class Runner[**P](Protocol):
+    def run(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class StringRunner:
+    def run(self, value: str) -> None: ...
+
+def invariant_runner[**P](container: Invariant[Runner[P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def contravariant_runner[**P](container: Contravariant[Runner[P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+invariant_run = invariant_runner(Invariant[StringRunner]())  # error: [invalid-argument-type]
+reveal_type(invariant_run)  # revealed: (value: str) -> None
+invariant_run(1)  # error: [invalid-argument-type]
+
+contravariant_run = contravariant_runner(Contravariant[StringRunner]())  # error: [invalid-argument-type]
+reveal_type(contravariant_run)  # revealed: (value: str) -> None
+contravariant_run(1)  # error: [invalid-argument-type]
+```
+
+## Inferring through nested generic callables
+
+Callable return types are covariant, but nesting a callable inside a contravariant or invariant
+generic class changes which constraints its return type supplies.
+
+```py
+from typing import Callable, overload
+
+class Covariant[T]:
+    def __init__(self, *values: T) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def __init__(self, *values: T) -> None: ...
+    def put(self, value: T) -> None: ...
+
+class Invariant[T]:
+    def __init__(self, *values: T) -> None: ...
+    value: T
+
+def covariant[T](container: Covariant[Callable[[], T]], value: T) -> T:
+    return value
+
+def contravariant[T](container: Contravariant[Callable[[], T]], value: T) -> T:
+    return value
+
+def invariant[T](container: Invariant[Callable[[], T]], value: T) -> T:
+    return value
+
+class Base: ...
+class Middle(Base): ...
+class Derived(Middle): ...
+
+reveal_type(covariant(Covariant[Callable[[], Middle]](), Base()))  # revealed: Base
+reveal_type(contravariant(Contravariant[Callable[[], Middle]](), Derived()))  # revealed: Derived
+reveal_type(invariant(Invariant[Callable[[], Middle]](), Middle()))  # revealed: Middle
+invariant(Invariant[Callable[[], Middle]](), Base())  # error: [invalid-argument-type]
+```
+
+The same callable specialization can contribute both an upper and a lower bound when it appears
+first in a contravariant position and then in a covariant position.
+
+```py
+class MixedVariance[First, Second]:
+    def put(self, value: First) -> None: ...
+    def get(self) -> Second:
+        raise NotImplementedError
+
+def repeated_polarity[T](container: MixedVariance[Callable[[], T], Callable[[], T]], witness: T) -> T:
+    return witness
+
+reveal_type(repeated_polarity(MixedVariance[Callable[[], Middle], Callable[[], Middle]](), Derived()))  # revealed: Middle
+```
+
+An unrelated variadic type parameter currently sends the entire inference context through the legacy
+solver, so the ordinary callable loses the contravariant bound shown above.
+
+```py
+def with_paramspec[T, **P](container: Contravariant[Callable[[], T]], value: T, unrelated: Callable[P, None]) -> T:
+    return value
+
+def with_typevartuple[T, *Ts](container: Contravariant[Callable[[], T]], value: T, unrelated: tuple[*Ts]) -> T:
+    return value
+
+def unrelated(value: str) -> None: ...
+
+# TODO: Should reveal `Derived` when an unrelated ParamSpec no longer disables contravariance.
+reveal_type(with_paramspec(Contravariant[Callable[[], Middle]](), Derived(), unrelated))  # revealed: Middle
+# TODO: Should reveal `Derived` when an unrelated TypeVarTuple no longer disables contravariance.
+reveal_type(with_typevartuple(Contravariant[Callable[[], Middle]](), Derived(), ("value",)))  # revealed: Middle
+```
+
+A union of callable return types offers alternative upper bounds; a compatible arm must not be
+rejected just because another arm is incompatible.
+
+```py
+reveal_type(contravariant(Contravariant[Callable[[], Middle] | Callable[[], str]](), Derived()))  # revealed: Derived
+```
+
+Covariance accepts an overloaded callable when one overload matches. Contravariance and invariance
+additionally require the formal callable to cover every overload, so an extra `str` overload is
+incompatible with a callable accepting only `int`.
+
+```py
+@overload
+def overloaded(value: int, /) -> Middle: ...
+@overload
+def overloaded(value: str, /) -> Middle: ...
+def overloaded(value: int | str, /) -> Middle:
+    raise NotImplementedError
+
+def covariant_overload[T](container: Covariant[Callable[[int], T]]) -> T:
+    raise NotImplementedError
+
+def contravariant_overload[T](container: Contravariant[Callable[[int], T]]) -> T:
+    raise NotImplementedError
+
+def invariant_overload[T](container: Invariant[Callable[[int], T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(covariant_overload(Covariant(overloaded)))  # revealed: Middle
+contravariant_overload(Contravariant(overloaded))  # error: [invalid-argument-type]
+invariant_overload(Invariant(overloaded))  # error: [invalid-argument-type]
+```
+
+When every overload is covered by the formal `int` parameter, all three wrapper variances accept it.
+
+```py
+@overload
+def covered(value: bool, /) -> Middle: ...
+@overload
+def covered(value: int, /) -> Middle: ...
+def covered(value: int, /) -> Middle:
+    raise NotImplementedError
+
+reveal_type(covariant_overload(Covariant(covered)))  # revealed: Middle
+reveal_type(contravariant_overload(Contravariant(covered)))  # revealed: Middle
+reveal_type(invariant_overload(Invariant(covered)))  # revealed: Middle
+```
+
+Callable parameter types are already contravariant. An outer contravariant class reverses their
+relationship a second time, producing the same lower bound as a covariant callable return type.
+
+```py
+def consumer[T](container: Covariant[Callable[[T], None]], value: T) -> T:
+    return value
+
+def double_contravariant[T](container: Contravariant[Callable[[T], None]], value: T) -> T:
+    return value
+
+reveal_type(consumer(Covariant[Callable[[Middle], None]](), Derived()))  # revealed: Derived
+reveal_type(double_contravariant(Contravariant[Callable[[Middle], None]](), Derived()))  # revealed: Middle
+```
+
+A `Concatenate` prefix is positional-only, so these wrapped callbacks do not match the formal
+parameter exactly. Their remaining parameters and ordinary return type variable must still be
+inferred precisely under either outer polarity.
+
+```py
+from typing import Concatenate
+
+class InvariantCallback[T]:
+    def __init__(self, callback: T) -> None: ...
+    callback: T
+
+class ContravariantCallback[T]:
+    def __init__(self, callback: T) -> None: ...
+    def put(self, callback: T) -> None: ...
+
+def invariant_tail[**P, R](
+    container: InvariantCallback[Callable[Concatenate[object, P], R]],
+) -> Callable[P, R]:
+    raise NotImplementedError
+
+def contravariant_tail[**P, R](
+    container: ContravariantCallback[Callable[Concatenate[object, P], R]],
+) -> Callable[P, R]:
+    raise NotImplementedError
+
+def original(first: object, value: str) -> int:
+    return len(value)
+
+invariant_remaining = invariant_tail(InvariantCallback(original))  # error: [invalid-argument-type]
+reveal_type(invariant_remaining)  # revealed: (value: str) -> int
+invariant_remaining(1)  # error: [invalid-argument-type]
+invariant_remaining("valid").missing_attribute  # error: [unresolved-attribute]
+
+contravariant_remaining = contravariant_tail(ContravariantCallback(original))  # error: [invalid-argument-type]
+reveal_type(contravariant_remaining)  # revealed: (value: str) -> int
+contravariant_remaining(1)  # error: [invalid-argument-type]
+contravariant_remaining("valid").missing_attribute  # error: [unresolved-attribute]
+```
+
+A higher-order callback must retain its inferred parameter list under both outer variances, even
+when assigning the result causes the outer argument to be rejected. Its callback parameter can
+accept either the declared prefix or a narrower derived prefix.
+
+```py
+def accepts_exact(callback: Callable[[Base, str], None]) -> None: ...
+def accepts_narrower(callback: Callable[[Derived, str], None]) -> None: ...
+def invariant_higher_order[**P](
+    container: InvariantCallback[Callable[[Callable[Concatenate[Base, P], None]], None]],
+) -> Callable[P, None]:
+    raise NotImplementedError
+
+def contravariant_higher_order[**P](
+    container: ContravariantCallback[Callable[[Callable[Concatenate[Base, P], None]], None]],
+) -> Callable[P, None]:
+    raise NotImplementedError
+
+invariant_exact = invariant_higher_order(InvariantCallback(accepts_exact))  # error: [invalid-argument-type]
+reveal_type(invariant_exact)  # revealed: (str, /) -> None
+invariant_exact(1)  # error: [invalid-argument-type]
+
+invariant_narrower = invariant_higher_order(InvariantCallback(accepts_narrower))  # error: [invalid-argument-type]
+reveal_type(invariant_narrower)  # revealed: (str, /) -> None
+
+contravariant_exact = contravariant_higher_order(ContravariantCallback(accepts_exact))  # error: [invalid-argument-type]
+reveal_type(contravariant_exact)  # revealed: (str, /) -> None
+contravariant_exact(1)  # error: [invalid-argument-type]
+
+contravariant_narrower = contravariant_higher_order(ContravariantCallback(accepts_narrower))  # error: [invalid-argument-type]
+reveal_type(contravariant_narrower)  # revealed: (str, /) -> None
+```
+
+## Inferring through nested callable protocols
+
+A callable assigned to a callback protocol contributes the same return-type constraints through its
+signature, including when an outer generic class reverses their direction.
+
+```py
+from typing import Callable, Protocol
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+class Callback[T](Protocol):
+    def __call__(self) -> T: ...
+
+def covariant[T](container: Covariant[Callback[T]], value: T) -> T:
+    return value
+
+def contravariant[T](container: Contravariant[Callback[T]], value: T) -> T:
+    return value
+
+class Base: ...
+class Middle(Base): ...
+class Derived(Middle): ...
+
+reveal_type(covariant(Covariant[Callable[[], Middle]](), Base()))  # revealed: Base
+reveal_type(contravariant(Contravariant[Callable[[], Middle]](), Derived()))  # revealed: Derived
+```
+
+A callback protocol with a positional-only prefix must likewise preserve its inferred parameter
+tail, even when the wrapped callable is rejected.
+
+```py
+class InvariantCallback[T]:
+    def __init__(self, callback: T) -> None: ...
+    callback: T
+
+class ContravariantCallback[T]:
+    def __init__(self, callback: T) -> None: ...
+    def put(self, callback: T) -> None: ...
+
+class VariadicCallback[**P](Protocol):
+    def __call__(self, first: object, /, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def invariant_tail[**P](container: InvariantCallback[VariadicCallback[P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def contravariant_tail[**P](container: ContravariantCallback[VariadicCallback[P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def original(first: object, value: str) -> None: ...
+
+invariant_remaining = invariant_tail(InvariantCallback(original))  # error: [invalid-argument-type]
+reveal_type(invariant_remaining)  # revealed: (value: str) -> None
+invariant_remaining(1)  # error: [invalid-argument-type]
+
+contravariant_remaining = contravariant_tail(ContravariantCallback(original))  # error: [invalid-argument-type]
+reveal_type(contravariant_remaining)  # revealed: (value: str) -> None
+contravariant_remaining(1)  # error: [invalid-argument-type]
+```
+
+A nominal callable object's `__call__` method must likewise preserve the callback protocol's
+inferred parameters under both wrapper variances.
+
+```py
+class CallableObject:
+    def __call__(self, first: object, value: str) -> None: ...
+
+invariant_object = invariant_tail(InvariantCallback(CallableObject()))  # error: [invalid-argument-type]
+reveal_type(invariant_object)  # revealed: (value: str) -> None
+invariant_object(1)  # error: [invalid-argument-type]
+
+contravariant_object = contravariant_tail(ContravariantCallback(CallableObject()))  # error: [invalid-argument-type]
+reveal_type(contravariant_object)  # revealed: (value: str) -> None
+contravariant_object(1)  # error: [invalid-argument-type]
+```
+
 ## Bound violations inferred through protocols
 
 If matching a protocol argument infers a type that violates a type variable's bound, the call should
@@ -1054,6 +1487,27 @@ def _(x: int):
     reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
 
     reveal_type(C().implicit_self(x))  # revealed: tuple[C, int]
+```
+
+## Generic method errors account for the implicit receiver
+
+An implicit `self` participates in generic inference but is absent from the call-site argument list.
+Bound violations must still identify the correct positional or keyword argument.
+
+```py
+class Box:
+    def accept[T: int](self, value: T, *, other: T) -> T:
+        return value
+
+box = Box()
+
+reveal_type(box.accept(1, other=2))  # revealed: Literal[1, 2]
+
+# error: 12 [invalid-argument-type] "does not satisfy upper bound `int`"
+box.accept("invalid", other=1)
+
+# error: 15 [invalid-argument-type] "does not satisfy upper bound `int`"
+box.accept(1, other="invalid")
 ```
 
 ## `~T` is never assignable to `T`

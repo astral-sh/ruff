@@ -23,6 +23,7 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{ImportingFile, KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
+use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
@@ -67,7 +68,8 @@ pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{
-    INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_dunder_get_call, report_bad_dunder_getattr_call,
+    AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
+    report_bad_dunder_get_call,
 };
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
@@ -622,6 +624,12 @@ enum MemberLookupErrorKind<'db> {
         receiver: Type<'db>,
         name: Type<'db>,
     },
+
+    /// An invalid attribute-interception call, represented by its receiver and attribute name.
+    GetAttribute {
+        receiver: Type<'db>,
+        name: Type<'db>,
+    },
 }
 
 /// A failed member lookup together with the member used to recover from the error.
@@ -665,21 +673,38 @@ impl<'db> MemberLookupError<'db> {
                     target,
                 );
             }
-            MemberLookupErrorKind::GetAttr { receiver, name }
-                if assigned_type.is_none()
-                    && let Err(CallDunderError::CallError(kind, bindings, _)) = receiver
-                        .try_call_dunder(
-                            db,
-                            env,
-                            "__getattr__",
-                            CallArguments::positional([name]),
-                            TypeContext::default(),
-                        ) =>
-            {
-                let failure = CallError(kind, bindings);
-                report_bad_dunder_getattr_call(context, &failure, object_type, target);
+            kind @ (MemberLookupErrorKind::GetAttr { receiver, name }
+            | MemberLookupErrorKind::GetAttribute { receiver, name }) => {
+                let method = if matches!(kind, MemberLookupErrorKind::GetAttr { .. }) {
+                    AttributeAccessMethod::GetAttr
+                } else {
+                    AttributeAccessMethod::GetAttribute
+                };
+
+                if method == AttributeAccessMethod::GetAttr && assigned_type.is_some() {
+                    return;
+                }
+
+                if let Err(CallDunderError::CallError(kind, bindings, _)) = receiver
+                    .try_call_dunder(
+                        db,
+                        env,
+                        method.as_str(),
+                        CallArguments::positional([name]),
+                        TypeContext::default(),
+                    )
+                {
+                    let failure = CallError(kind, bindings);
+                    report_bad_attribute_access_call(
+                        context,
+                        &failure,
+                        object_type,
+                        target,
+                        method,
+                    );
+                }
             }
-            MemberLookupErrorKind::DescriptorGet(_) | MemberLookupErrorKind::GetAttr { .. } => {}
+            MemberLookupErrorKind::DescriptorGet(_) => {}
         }
     }
 }
@@ -4146,8 +4171,10 @@ impl<'db> Type<'db> {
 
     /// Returns whether this type is known not to be a data descriptor.
     ///
-    /// Descriptor uncertainty only propagates through outer unions, intersections, and aliases;
-    /// type arguments do not affect the runtime descriptor class.
+    /// Descriptor uncertainty propagates through outer unions, intersections, and aliases.
+    /// `TypeForm` values and inexact `type[...]` values are also uncertain because their bounds
+    /// describe the represented instance types, not the runtime values whose metaclasses determine
+    /// descriptor behavior.
     fn is_definitely_non_data_descriptor(
         self,
         db: &'db dyn Db,
@@ -4180,6 +4207,10 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .is_definitely_non_data_descriptor_impl(db, program),
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                false
+            }
+            Type::TypeForm(_) | Type::SubclassOf(_) => false,
             _ => !self.may_be_data_descriptor(db, env),
         }
     }
@@ -4753,14 +4784,6 @@ impl<'db> Type<'db> {
                 {
                     Place::bound(Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetForAll(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "satisfied_by_all_typevars" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
                     ))
                     .into()
                 }
@@ -6575,6 +6598,49 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return whether a custom `__getattribute__` could affect this lookup.
+    ///
+    /// Reusing the receiver class's existing MRO classification avoids interning a member-lookup
+    /// key just to determine whether an override exists. Class objects use their metaclass instead.
+    /// An unknown base can intercept a missing attribute or bypass a failing descriptor, but cannot
+    /// invalidate a definitely defined member.
+    fn custom_getattribute_may_affect_lookup(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        result: MemberLookupResult<'db>,
+    ) -> bool {
+        let Some(class) = self.nominal_class(db, env).or_else(|| {
+            self.to_meta_type(db, env)
+                .to_instance_approximation(db, env)
+                .and_then(|instance| instance.nominal_class(db, env))
+        }) else {
+            return true;
+        };
+
+        let class = class.class_literal(db);
+        if class.as_static().is_none() {
+            return true;
+        }
+
+        let flags = class.instance_flags(db);
+        if flags.contains(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE) {
+            return true;
+        }
+
+        if !flags.contains(ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE) {
+            return false;
+        }
+
+        !matches!(
+            result,
+            Ok(PlaceAndQualifiers {
+                place: Place::Defined(place),
+                ..
+            }) if place.is_definitely_defined()
+        )
+    }
+
     /// Apply `__getattr__` / `__getattribute__` fallback to an attribute-lookup result.
     ///
     /// A custom `__getattribute__` can intercept even an always-defined normal lookup result.
@@ -6616,46 +6682,61 @@ impl<'db> Type<'db> {
             }
         };
 
-        let custom_getattribute = OnceCell::new();
-        let custom_getattribute = || {
-            *custom_getattribute.get_or_init(|| {
-                if "__getattribute__" == name.as_str() {
-                    return (MemberLookupResult::from(Place::Undefined), false);
-                }
+        let getattribute_policy = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK;
+        if !self.custom_getattribute_may_affect_lookup(db, env, result)
+            || self
+                .class_member_with_policy(db, env, "__getattribute__", getattribute_policy)
+                .place
+                .is_undefined()
+        {
+            return member_lookup_or_fall_back_to(db, env, result, custom_getattr_result);
+        }
 
-                // Skip `object.__getattribute__`, which is the default mechanism we
-                // already model via the normal attribute-lookup path.
-                match self.try_call_dunder_with_policy(
-                    db,
-                    env,
-                    "__getattribute__",
-                    &mut CallArguments::positional([Type::string_literal(db, name)]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                ) {
-                    Ok(bindings) => (Place::bound(bindings.return_type(db, env)).into(), true),
-                    Err(
-                        CallDunderError::PossiblyUnbound { .. } | CallDunderError::CallError(..),
-                    ) => (MemberLookupResult::from(Place::Undefined), true),
-                    Err(CallDunderError::MethodNotAvailable) => {
-                        (MemberLookupResult::from(Place::Undefined), false)
-                    }
-                }
-            })
+        let name_type = Type::string_literal(db, name);
+        let custom_getattribute = match self.try_call_dunder_with_policy(
+            db,
+            env,
+            "__getattribute__",
+            &mut CallArguments::positional([name_type]),
+            TypeContext::default(),
+            getattribute_policy,
+        ) {
+            Ok(bindings) => Place::bound(bindings.return_type(db, env)).into(),
+            Err(CallDunderError::CallError(_, bindings, _)) => member_lookup_result(
+                db,
+                Place::bound(bindings.return_type(db, env)).into(),
+                Some(MemberLookupErrorKind::GetAttribute {
+                    receiver: self,
+                    name: name_type,
+                }),
+            ),
+            Err(CallDunderError::PossiblyUnbound { .. }) => Place::Undefined.into(),
+            Err(CallDunderError::MethodNotAvailable) => {
+                return member_lookup_or_fall_back_to(db, env, result, custom_getattr_result);
+            }
         };
+
+        if let Err(error) = custom_getattribute {
+            let member = result.unwrap_or_else(|error| error.fallback_member(db));
+            return Err(MemberLookupError::new(
+                db,
+                member.or_fall_back_to(db, env, || error.fallback_member(db)),
+                error.kind(db),
+            ));
+        }
 
         // A custom override runs before the descriptor and might return without invoking it.
         let result = if matches!(
             result.err().map(|error| error.kind(db)),
             Some(MemberLookupErrorKind::DescriptorGet(_))
-        ) && custom_getattribute().1
-        {
+        ) {
             Ok(result.unwrap_or_else(|error| error.fallback_member(db)))
         } else {
             result
         };
 
-        let result = member_lookup_or_fall_back_to(db, env, result, || custom_getattribute().0);
+        let result = member_lookup_or_fall_back_to(db, env, result, || custom_getattribute);
         member_lookup_or_fall_back_to(db, env, result, custom_getattr_result)
     }
 
@@ -7437,7 +7518,6 @@ impl<'db> Type<'db> {
                         | KnownBoundMethodType::ConstraintSetSatisfies(_)
                         | KnownBoundMethodType::ConstraintSetExists(_)
                         | KnownBoundMethodType::ConstraintSetForAll(_)
-                        | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                         | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
                         | KnownBoundMethodType::ConstraintSetSolutions(_)
                         | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
@@ -7862,7 +7942,6 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetExists(_)
                 | KnownBoundMethodType::ConstraintSetForAll(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
@@ -8161,7 +8240,6 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetExists(_)
                 | KnownBoundMethodType::ConstraintSetForAll(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),

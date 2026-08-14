@@ -99,6 +99,22 @@ reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Un
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### Inherited specializations containing `Never`
+
+A `Never` argument in a variadic generic must retain its position when a subclass forwards its type
+arguments to a generic base.
+
+```py
+from typing import Any, Never
+
+class Kind[*Ts]: ...
+class SupportsKind[*Ts](Kind[*Ts]): ...
+class Container(SupportsKind[int, Never]): ...
+
+def _(value: Container) -> None:
+    expected: Kind[int, Any] = value
+```
+
 ### `TypeVarTuple` with `ParamSpec`
 
 ```py
@@ -141,6 +157,20 @@ reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
     reveal_type(Variadic(i, s))  # revealed: Variadic[int, str]
+```
+
+Constructor arguments determine the class specialization even when the assignment expects a
+different specialization.
+
+```py
+valid: Variadic[int] = Variadic(1)
+
+inferred = Variadic(1)
+reveal_type(inferred)  # revealed: Variadic[int]
+# error: [invalid-assignment]
+indirect: Variadic[str] = inferred
+# error: [invalid-assignment]
+direct: Variadic[str] = Variadic(1)
 ```
 
 ### Unspecified type arguments
@@ -401,6 +431,9 @@ class Payload(TypedDict):
 def contextual[T](value: T) -> None:
     concrete: tuple[Payload, list[int]] = simple({"value": 1}, [])
     generic: tuple[Payload, T] = simple({"value": 1}, value)
+    # error: [invalid-assignment]
+    # error: [invalid-argument-type]
+    invalid: tuple[Payload] = simple({"value": "wrong"})
 ```
 
 Fixed values next to a type variable tuple keep their normal bound diagnostics.
@@ -416,28 +449,102 @@ bounded_arguments(
 )
 
 def check_splat_error(values: list[int]) -> None:
-    # TODO: Highlight the splatted argument instead of the whole call.
-    # snapshot: invalid-argument-type
     bounded_arguments(
         b"valid",
-        *values,
+        *values,  # snapshot: invalid-argument-type
     )
 ```
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `bounded_arguments` is incorrect
-  --> src/mdtest_snippet.py:83:5
+  --> src/mdtest_snippet.py:86:9
    |
-83 | /     bounded_arguments(
-84 | |         b"valid",
-85 | |         *values,
-86 | |     )
-   | |_____^ Argument type `int` does not satisfy upper bound `str` of type variable `T`
+86 |         *values,  # snapshot: invalid-argument-type
+   |         ^^^^^^^ Argument type `int` does not satisfy upper bound `str` of type variable `T`
 info: Type variable defined here
-  --> src/mdtest_snippet.py:71:33
+  --> src/mdtest_snippet.py:74:33
    |
-71 | def bounded_arguments[U: bytes, T: str, *Ts](first: U, *args: *tuple[*Ts, T]) -> tuple[*Ts, T]:
+74 | def bounded_arguments[U: bytes, T: str, *Ts](first: U, *args: *tuple[*Ts, T]) -> tuple[*Ts, T]:
    |                                 ^^^^^^
+```
+
+### Union splatted arguments
+
+Equal-length tuple unions preserve their length and combine the types at each position. Different
+lengths produce an open tuple, while direct arguments around the splat keep their known positions.
+
+```py
+def collect[*Ts](*args: *Ts) -> tuple[*Ts]:
+    return args
+
+def check(
+    same_length: tuple[int] | tuple[str],
+    paired: tuple[int, str] | tuple[bytes, bool],
+    different_lengths: tuple[int] | tuple[str, bytes],
+    prefix: bool,
+    suffix: bytes,
+) -> None:
+    reveal_type(collect(*same_length))  # revealed: tuple[int | str]
+    reveal_type(collect(*paired))  # revealed: tuple[int | bytes, str | bool]
+    reveal_type(collect(*different_lengths))  # revealed: tuple[int | str | bytes, ...]
+    reveal_type(collect(prefix, *same_length, suffix))  # revealed: tuple[bool, int | str, bytes]
+
+    # error: [invalid-assignment]
+    wrong: tuple[bytes] = collect(*same_length)
+```
+
+### Starred variadic arguments without a variadic return
+
+A bounded or constrained element is checked even when the return type does not contain its pack.
+
+```py
+def bounded_prefix[T: str, *Ts](*args: *tuple[T, *Ts]) -> None: ...
+def constrained_suffix[T: (str, bytes), *Ts](*args: *tuple[*Ts, T]) -> None: ...
+def check(values: list[int], valid: list[str]) -> None:
+    bounded_prefix(*valid)
+    constrained_suffix(*valid)
+
+    # error: [invalid-argument-type]
+    bounded_prefix(*values)
+    # error: [invalid-argument-type]
+    constrained_suffix(*values)
+```
+
+### Argument types override incompatible contextual return types
+
+A contextual return type can guide compatible arguments, but it must not override the argument types
+or the number of arguments in a call.
+
+```py
+def collect[*Ts](*args: *Ts) -> tuple[*Ts]:
+    return args
+
+valid: tuple[int] = collect(1)
+
+inferred = collect(1)
+reveal_type(inferred)  # revealed: tuple[Literal[1]]
+# error: [invalid-assignment]
+indirect: tuple[str] = inferred
+# error: [invalid-assignment]
+direct: tuple[str] = collect(1)
+
+valid_empty: tuple[()] = collect()
+# error: [invalid-assignment]
+invalid_empty: tuple[str] = collect()
+```
+
+Return statements and arguments to other functions also provide contextual return types.
+
+```py
+def invalid_return() -> tuple[str]:
+    # error: [invalid-return-type]
+    return collect(1)
+
+def accept_strings(values: tuple[str]) -> None: ...
+
+accept_strings(collect("valid"))
+# error: [invalid-argument-type]
+accept_strings(collect(1))
 ```
 
 ### Fixed boundaries around variadic type variable tuples
@@ -531,6 +638,105 @@ reveal_type(simple(accepts_object))  # revealed: tuple[int]
 reveal_type(simple(variadic2))  # revealed: tuple[Unknown, ...]
 # error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `(*args: Unknown) -> tuple[Unknown, ...]`, found `def keyword_only(*, x: int) -> tuple[int]`"
 reveal_type(simple(keyword_only))  # revealed: tuple[Unknown, ...]
+```
+
+### Callable inference through invariant and contravariant wrappers
+
+An unpacked `TypeVarTuple` keeps its precise inferred parameter types when a callable or callable
+protocol is nested inside an invariant or contravariant wrapper.
+
+```py
+from typing import Callable, Protocol
+
+class Invariant[T]:
+    def __init__(self, callback: T) -> None: ...
+    callback: T
+
+class Contravariant[T]:
+    def __init__(self, callback: T) -> None: ...
+    def put(self, callback: T) -> None: ...
+
+def invariant[*Ts](wrapper: Invariant[Callable[[*Ts], None]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def contravariant[*Ts](wrapper: Contravariant[Callable[[*Ts], None]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def callback(first: object, value: str) -> None: ...
+
+reveal_type(invariant(Invariant(callback)))  # revealed: tuple[object, str]
+reveal_type(contravariant(Contravariant(callback)))  # revealed: tuple[object, str]
+```
+
+A callable protocol preserves the same inferred parameters through both wrapper variances.
+
+```py
+class Callback[*Ts](Protocol):
+    def __call__(self, *args: *Ts) -> None: ...
+
+def invariant_protocol[*Ts](wrapper: Invariant[Callback[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def contravariant_protocol[*Ts](wrapper: Contravariant[Callback[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+reveal_type(invariant_protocol(Invariant(callback)))  # revealed: tuple[object, str]
+reveal_type(contravariant_protocol(Contravariant(callback)))  # revealed: tuple[object, str]
+```
+
+Separately declared protocols with equivalent variadic methods also preserve the exact inferred
+tuple under both wrapper variances.
+
+```py
+class Target[*Ts](Protocol):
+    def call(self, *args: *Ts) -> None: ...
+
+class Actual[*Ts](Protocol):
+    def call(self, *args: *Ts) -> None: ...
+
+def invariant_structural[*Ts](wrapper: Invariant[Target[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def contravariant_structural[*Ts](wrapper: Contravariant[Target[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def check_structural(
+    invariant_wrapper: Invariant[Actual[str]],
+    contravariant_wrapper: Contravariant[Actual[str]],
+) -> None:
+    reveal_type(invariant_structural(invariant_wrapper))  # revealed: tuple[str]
+    reveal_type(contravariant_structural(contravariant_wrapper))  # revealed: tuple[str]
+```
+
+Unions of structurally compatible protocols retain the same tuple. Incompatible alternatives are
+rejected without widening their inferred tuple to an unknown-length tuple.
+
+```py
+class Other[*Ts](Protocol):
+    def call(self, *args: *Ts) -> None: ...
+
+def check_unions(
+    invariant_match: Invariant[Actual[str] | Other[str]],
+    contravariant_match: Contravariant[Actual[str] | Other[str]],
+    invariant_mismatch: Invariant[Actual[str] | Other[bytes]],
+    contravariant_mismatch: Contravariant[Actual[str] | Other[bytes]],
+) -> None:
+    reveal_type(invariant_structural(invariant_match))  # revealed: tuple[str]
+    reveal_type(contravariant_structural(contravariant_match))  # revealed: tuple[str]
+    # error: [invalid-argument-type]
+    reveal_type(invariant_structural(invariant_mismatch))  # revealed: tuple[()]
+    # error: [invalid-argument-type]
+    reveal_type(contravariant_structural(contravariant_mismatch))  # revealed: tuple[()]
+```
+
+A nominal class implementing the same variadic protocol retains its precise method parameter.
+
+```py
+class StringRunner:
+    def call(self, value: str) -> None: ...
+
+reveal_type(invariant_structural(Invariant(StringRunner())))  # revealed: tuple[str]
+reveal_type(contravariant_structural(Contravariant(StringRunner())))  # revealed: tuple[str]
 ```
 
 ### Callable return inference
@@ -706,11 +912,34 @@ def check_empty_splats(empty: tuple[()]) -> None:
     invoke(accepts_string_or_bytes, *empty)
 ```
 
+### Callable inference through nested callable parameters
+
+Nested callable parameters make the pack covariant, but inference currently loses its fixed length.
+
+```py
+from typing import Callable
+
+def nested[*Ts](
+    callback: Callable[[Callable[[*Ts], None]], None],
+    *args: *Ts,
+) -> tuple[*Ts]:
+    return args
+
+def accepts_int_callback(callback: Callable[[int], None]) -> None: ...
+def check(value: int, other: str) -> None:
+    # TODO: Should reveal `tuple[int]`.
+    reveal_type(nested(accepts_int_callback, value))  # revealed: tuple[int, ...]
+    # TODO: Should reveal `tuple[int | str]`.
+    reveal_type(nested(accepts_int_callback, other))  # revealed: tuple[int, ...]
+
+    # TODO: Should report an error because the callback accepts only one argument.
+    nested(accepts_int_callback, value, other)
+```
+
 ### Starred variadic tuple normalization
 
-A fixed provided tuple containing `Never` normalizes to `Never` before tuple-level constraint
-inference. The impossible argument must not become an empty tuple or remain a constructible tuple
-containing `Never`.
+A fixed provided tuple containing `Never` keeps its shape during tuple-level constraint inference.
+Its `Never` element must not be discarded or replaced by an unknown-length tuple.
 
 ```py
 from typing import Never
@@ -722,8 +951,8 @@ def collect_prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
     raise NotImplementedError
 
 def check_never(value: Never) -> None:
-    reveal_type(collect(value))  # revealed: tuple[Unknown, ...]
-    reveal_type(collect_prefixed(1, value))  # revealed: tuple[Unknown, ...]
+    reveal_type(collect(value))  # revealed: tuple[Never]
+    reveal_type(collect_prefixed(1, value))  # revealed: tuple[Never]
 ```
 
 ### Unsupported callable checks are deferred
@@ -942,6 +1171,67 @@ def f(i: int, s: str, b: bool) -> None:
     reveal_type(foo((i,), (s, b)))  # revealed: tuple[int]
 ```
 
+A positional tuple and `*args` using the same type variable tuple must have the same length. When
+their lengths match, their element types are combined.
+
+```py
+def repeat[*Ts](expected: tuple[*Ts], *args: *Ts) -> tuple[*Ts]:
+    return expected
+
+def check_repeated(i: int, s: str) -> None:
+    reveal_type(repeat(()))  # revealed: tuple[()]
+    reveal_type(repeat((i, s), i, s))  # revealed: tuple[int, str]
+    reveal_type(repeat((i, s), i, i))  # revealed: tuple[int, str | int]
+
+    # error: 5 [invalid-argument-type] "Argument to function `repeat` is incorrect: Expected `tuple[int]`, found `tuple[()]`"
+    repeat((i,))
+    # error: 20 [invalid-argument-type] "Argument to function `repeat` is incorrect: Expected `tuple[int, str]`, found `tuple[int]`"
+    repeat((i, s), i)
+    # snapshot: invalid-argument-type
+    repeat((i,), i, s)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `repeat` is incorrect
+  --> src/mdtest_snippet.py:21:18
+   |
+21 |     repeat((i,), i, s)
+   |                  ^^^^ Expected `tuple[int]`, found `tuple[int, str]`
+info: a tuple of length 2 is not assignable to a tuple of length 1
+info: Function defined here
+ --> src/mdtest_snippet.py:8:5
+  |
+8 | def repeat[*Ts](expected: tuple[*Ts], *args: *Ts) -> tuple[*Ts]:
+  |     ^^^^^^                            ---------- Parameter declared here
+```
+
+The same length and element-type rules apply when the tuple is passed as a keyword-only argument.
+
+```py
+def repeat_keyword[*Ts](*args: *Ts, expected: tuple[*Ts]) -> tuple[*Ts]:
+    return expected
+
+def check_repeated_keyword(i: int, s: str) -> None:
+    reveal_type(repeat_keyword(expected=()))  # revealed: tuple[()]
+    reveal_type(repeat_keyword(i, s, expected=(i, s)))  # revealed: tuple[int, str]
+    reveal_type(repeat_keyword(i, i, expected=(i, s)))  # revealed: tuple[int, str | int]
+
+    # error: 20 [invalid-argument-type] "Argument to function `repeat_keyword` is incorrect: Expected `tuple[int, str]`, found `tuple[int]`"
+    repeat_keyword(i, expected=(i, s))
+    # error: 20 [invalid-argument-type] "Argument to function `repeat_keyword` is incorrect: Expected `tuple[int]`, found `tuple[int, str]`"
+    repeat_keyword(i, s, expected=(i,))
+```
+
+Matching lengths are also required when the return type does not contain the type variable tuple.
+
+```py
+def repeat_without_return[*Ts](expected: tuple[*Ts], *args: *Ts) -> None: ...
+
+repeat_without_return((1, "value"), 1, "value")
+# error: [invalid-argument-type]
+repeat_without_return((1, "value"), 1)
+```
+
 ## Type concatenation
 
 A type variable tuple can be combined with fixed leading or trailing types.
@@ -1097,6 +1387,21 @@ def _(
     reveal_type(a8)  # revealed: tuple[bool]
     reveal_type(a9)  # revealed: tuple[int, str, bool]
     reveal_type(a10)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
+```
+
+### Aliases containing `Never`
+
+A variadic alias retains each specialized argument even when a later argument is `Never`.
+
+```py
+from typing import Never
+
+class Container[*Ts]: ...
+
+type Padded[T] = Container[T, Never]
+
+def _(value: Padded[int]) -> None:
+    reveal_type(value)  # revealed: Container[int, Never]
 ```
 
 ### Unpacked tuple type arguments

@@ -1254,6 +1254,39 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
     );
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4256>.
+///
+/// Excluding rejected gradual string literals must not expand the complement of each intersection
+/// into exponentially many equivalent alternatives.
+fn benchmark_gradual_literal_union_equality(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from typing import Any, Literal\nfrom ty_extensions import Intersection\n\ndef check(value: (\n",
+    );
+    for index in 0..20 {
+        writeln!(
+            &mut code,
+            "    {}Intersection[Any, Literal[\"{index}\"]]",
+            if index == 0 { "" } else { "| " },
+        )
+        .ok();
+    }
+    code.push_str(")) -> None:\n    assert value == \"0\"\n    repr(value)\n");
+
+    criterion.bench_function("ty_micro[gradual_literal_union_equality]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3880>.
 ///
 /// Reachability analysis for a large literal OR pattern on `Any` used to rebuild the remaining
@@ -1358,6 +1391,26 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
             );
         });
     }
+
+    let mut code = String::from("def f(value: str) -> None:\n");
+    for index in 0..800 {
+        writeln!(&mut code, "    local_{index} = {index}").ok();
+    }
+    code.push_str("    try:\n");
+    code.push_str(&"        value.upper()\n".repeat(800));
+    code.push_str("    except Exception:\n        pass\n");
+
+    criterion.bench_function("ty_micro[repeated_statement_calls_in_try]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 struct ProjectBenchmark<'a> {
@@ -1562,6 +1615,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_gradual_literal_union_equality,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,

@@ -40,14 +40,6 @@ impl PyProject {
         Self::deserialize_toml(content)
     }
 
-    pub(crate) fn from_toml_str_without_spans(
-        content: &str,
-        source: ValueSource,
-    ) -> Result<Self, PyProjectError> {
-        let _guard = ValueSourceGuard::new(source, false);
-        Self::deserialize_toml(content)
-    }
-
     fn deserialize_toml(content: &str) -> Result<Self, PyProjectError> {
         let mut pyproject: Self = toml::from_str(content).map_err(PyProjectError::TomlSyntax)?;
         // TOML tables are unordered and the `toml` crate sorts keys
@@ -79,69 +71,63 @@ pub struct Project {
     pub(crate) requires_python: Option<RangedValue<VersionSpecifiers>>,
 }
 
-impl Project {
-    pub(super) fn resolve_requires_python_lower_bound(
-        &self,
-    ) -> Result<Option<RangedValue<SupportedPythonVersion>>, ResolveRequiresPythonError> {
-        let Some(requires_python) = self.requires_python.as_ref() else {
-            return Ok(None);
-        };
+pub(super) fn resolve_requires_python_lower_bound(
+    requires_python: &RangedValue<VersionSpecifiers>,
+) -> Result<Option<RangedValue<SupportedPythonVersion>>, ResolveRequiresPythonError> {
+    tracing::debug!("Resolving requires-python constraint: `{requires_python}`");
 
-        tracing::debug!("Resolving requires-python constraint: `{requires_python}`");
+    let ranges = release_specifiers_to_ranges((**requires_python).clone());
+    let Some((lower, _)) = ranges.bounding_range() else {
+        return Ok(None);
+    };
 
-        let ranges = release_specifiers_to_ranges((**requires_python).clone());
-        let Some((lower, _)) = ranges.bounding_range() else {
-            return Ok(None);
-        };
+    let version = match lower {
+        // Ex) `>=3.10.1` -> `>=3.10`
+        Bound::Included(version) => version,
 
-        let version = match lower {
-            // Ex) `>=3.10.1` -> `>=3.10`
-            Bound::Included(version) => version,
+        // Ex) `>3.10.1` -> `>=3.10` or `>3.10` -> `>=3.10`
+        // The second example looks obscure at first but it is required because
+        // `3.10.1 > 3.10` is true but we only have two digits here. So including 3.10 is the
+        // right move. Overall, using `>` without a patch release is most likely bogus.
+        Bound::Excluded(version) => version,
 
-            // Ex) `>3.10.1` -> `>=3.10` or `>3.10` -> `>=3.10`
-            // The second example looks obscure at first but it is required because
-            // `3.10.1 > 3.10` is true but we only have two digits here. So including 3.10 is the
-            // right move. Overall, using `>` without a patch release is most likely bogus.
-            Bound::Excluded(version) => version,
-
-            // Ex) `<3.10` or ``
-            Bound::Unbounded => {
-                return Err(ResolveRequiresPythonError::NoLowerBound(
-                    requires_python.to_string(),
-                ));
-            }
-        };
-
-        // Take the major and minor version
-        let mut versions = version.release().iter().take(2);
-
-        let Some(major) = versions.next().copied() else {
-            return Ok(None);
-        };
-
-        let minor = versions.next().copied().unwrap_or_default();
-
-        tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
-
-        let major =
-            u8::try_from(major).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(major))?;
-        let minor =
-            u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMinor(minor))?;
-
-        let lower_bound = PythonVersion::from((major, minor));
-        let supported_version = SupportedPythonVersion::iter()
-            .find(|supported_version| supported_version.to_python_version() >= lower_bound);
-
-        let Some(supported_version) = supported_version else {
-            return Err(ResolveRequiresPythonError::NoSupportedVersion(
+        // Ex) `<3.10` or ``
+        Bound::Unbounded => {
+            return Err(ResolveRequiresPythonError::NoLowerBound(
                 requires_python.to_string(),
             ));
-        };
+        }
+    };
 
-        Ok(Some(
-            requires_python.clone().map_value(|_| supported_version),
-        ))
-    }
+    // Take the major and minor version
+    let mut versions = version.release().iter().take(2);
+
+    let Some(major) = versions.next().copied() else {
+        return Ok(None);
+    };
+
+    let minor = versions.next().copied().unwrap_or_default();
+
+    tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
+
+    let major =
+        u8::try_from(major).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(major))?;
+    let minor =
+        u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMinor(minor))?;
+
+    let lower_bound = PythonVersion::from((major, minor));
+    let supported_version = SupportedPythonVersion::iter()
+        .find(|supported_version| supported_version.to_python_version() >= lower_bound);
+
+    let Some(supported_version) = supported_version else {
+        return Err(ResolveRequiresPythonError::NoSupportedVersion(
+            requires_python.to_string(),
+        ));
+    };
+
+    Ok(Some(
+        requires_python.clone().map_value(|_| supported_version),
+    ))
 }
 
 #[derive(Debug, Error)]
