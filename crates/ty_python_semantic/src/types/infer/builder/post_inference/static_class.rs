@@ -1380,7 +1380,12 @@ fn check_final_class_abstract_methods<'db>(
         return;
     };
 
-    let class_name = class.name(db);
+    let types = [
+        Type::from(class),
+        Type::from(abstract_method.defining_class),
+    ];
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+    let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
 
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Final class `{class_name}` has unimplemented abstract methods",
@@ -1448,7 +1453,7 @@ fn check_final_class_abstract_methods<'db>(
         kind,
     } = abstract_method;
 
-    let defining_class_name = defining_class.name(db);
+    let defining_class_name = defining_class.class_literal(db).display_with(db, settings);
 
     if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
         let policy = if kind.is_explicit() {

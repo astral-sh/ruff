@@ -2531,6 +2531,44 @@ info: `second.Model` is not assignable to `bool`
   |         Method defined here
 ```
 
+## Boolean conversion return types that shadow `bool`
+
+A `__bool__` method returning a user-defined class named `bool` distinguishes that class from the
+built-in `bool` required by the method.
+
+`custom.py`:
+
+```py
+class bool: ...
+```
+
+```py
+import custom
+
+class Model:
+    def __bool__(self) -> custom.bool:
+        return custom.bool()
+
+def condition(value: Model) -> None:
+    if value:  # snapshot: unsupported-bool-conversion
+        pass
+```
+
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `Model`
+ --> src/mdtest_snippet.py:8:8
+  |
+8 |     if value:  # snapshot: unsupported-bool-conversion
+  |        ^^^^^
+info: `custom.bool` is not assignable to `builtins.bool`
+ --> src/mdtest_snippet.py:4:27
+  |
+4 |     def __bool__(self) -> custom.bool:
+  |         --------          ^^^^^^^^^^^ Incorrect return type
+  |         |
+  |         Method defined here
+```
+
 ## Async context managers with same-named return types
 
 Async context-manager diagnostics distinguish the manager from a non-awaitable return type.
@@ -2757,6 +2795,72 @@ DynamicModel = type("DynamicModel", (first.DynamicModel,), {})
 
 # error: [subclass-of-final-class] "Class `mdtest_snippet.NewModel` cannot inherit from final class `first.NewModel`"
 NewModel = new_class("NewModel", (first.NewModel,))
+```
+
+## Abstract methods on final classes
+
+Final classes remain distinct from the same-named superclasses defining their abstract methods,
+including implicitly abstract protocol members.
+
+`first.py`:
+
+```py
+from abc import ABC, abstractmethod
+from typing import Protocol
+
+class Model(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+class Interface(Protocol):
+    def method(self) -> int: ...
+```
+
+```py
+from typing import final
+
+import first
+
+@final
+class Model(first.Model): ...  # snapshot: abstract-method-in-final-class
+
+@final
+class Interface(first.Interface): ...  # snapshot: abstract-method-in-final-class
+```
+
+```snapshot
+error[abstract-method-in-final-class]: Final class `mdtest_snippet.Model` has unimplemented abstract methods
+ --> src/mdtest_snippet.py:6:7
+  |
+5 |   @final
+  |   ------
+6 |   class Model(first.Model): ...  # snapshot: abstract-method-in-final-class
+  |         ^^^^^ `method` is unimplemented
+  |
+ ::: src/first.py:5:5
+  |
+5 | /     @abstractmethod
+6 | |     def method(self) -> int: ...
+  | |________________________________- `method` declared as abstract on superclass `first.Model`
+
+
+error[abstract-method-in-final-class]: Final class `mdtest_snippet.Interface` has unimplemented abstract methods
+ --> src/mdtest_snippet.py:9:7
+  |
+8 | @final
+  | ------
+9 | class Interface(first.Interface): ...  # snapshot: abstract-method-in-final-class
+  |       ^^^^^^^^^ `method` is unimplemented
+  |
+ ::: src/first.py:9:5
+  |
+9 |     def method(self) -> int: ...
+  |     ---------------------------- `method` declared as abstract on superclass `first.Interface`
+info: `first.Interface.method` is implicitly abstract because `first.Interface` is a `Protocol` class and `method` lacks an implementation
+ --> src/first.py:8:7
+  |
+8 | class Interface(Protocol):
+  |       ------------------- `first.Interface` declared here
 ```
 
 ## Dataclass inheritance

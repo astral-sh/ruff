@@ -462,7 +462,8 @@ impl<'db> BoolError<'db> {
                 not_boolable_type,
                 return_type,
             } => {
-                let types = [not_boolable_type, return_type];
+                let expected_type = KnownClass::Bool.to_instance(db, env);
+                let types = [not_boolable_type, return_type, &expected_type];
                 let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{not_boolable}`",
@@ -471,8 +472,9 @@ impl<'db> BoolError<'db> {
                 let mut sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(
-                        "`{return_type}` is not assignable to `bool`",
-                        return_type = return_type.display_with(db, env, settings),
+                        "`{return_type}` is not assignable to `{expected_type}`",
+                        return_type = return_type.display_with(db, env, settings.clone()),
+                        expected_type = expected_type.display_with(db, env, settings),
                     ),
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
