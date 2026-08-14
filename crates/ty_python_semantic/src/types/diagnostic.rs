@@ -3,7 +3,7 @@ use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
-    StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
+    ModuleLiteralType, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -94,6 +94,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
+    registry.register_lint(&INVALID_IMPORT);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
@@ -560,6 +561,15 @@ declare_lint! {
     pub(crate) static INVALID_GENERIC_CLASS = {
         summary: "detects invalid generic classes",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-import.md")]
+    pub(crate) static INVALID_IMPORT = {
+        summary: "detects imports that fail while retrieving a module member",
+        status: LintStatus::stable("0.0.72"),
         default_level: Level::Error,
     }
 }
@@ -1851,16 +1861,16 @@ pub(super) fn report_bad_attribute_access_call<'db>(
     context: &InferContext<'db, '_>,
     failure: &CallError<'db>,
     object_type: Type<'db>,
-    target: ast::AnyNodeRef<'_>,
-    attribute: &str,
+    target: &ast::ExprAttribute,
     method: AttributeAccessMethod,
 ) {
     let db = context.db();
     let env = &context.program_environment();
+    let attribute = target.attr.as_str();
 
     failure.report_diagnostics_with_override(
         context,
-        target,
+        target.into(),
         &CallDiagnosticOverride {
             lint: &INVALID_ATTRIBUTE_ACCESS,
             message: format!(
@@ -1868,6 +1878,35 @@ pub(super) fn report_bad_attribute_access_call<'db>(
                 object_type.display(db, env),
             ),
             info: &format!("This access implicitly calls `{}`", method.as_str()),
+            argument_ranges: &[target.range()],
+        },
+    );
+}
+
+/// Reports an import that fails while implicitly calling module-level `__getattr__`.
+///
+/// ```python
+/// from package import missing  # Calls package.__getattr__("missing").
+/// ```
+pub(super) fn report_bad_import_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    module: ModuleLiteralType<'db>,
+    target: &ast::Alias,
+    name: &str,
+) {
+    let db = context.db();
+
+    failure.report_diagnostics_with_override(
+        context,
+        target.into(),
+        &CallDiagnosticOverride {
+            lint: &INVALID_IMPORT,
+            message: format!(
+                "Cannot import `{name}` from module `{}`",
+                module.module(db).name(db),
+            ),
+            info: "This import implicitly calls `__getattr__`",
             argument_ranges: &[target.range()],
         },
     );

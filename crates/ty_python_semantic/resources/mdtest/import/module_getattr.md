@@ -94,13 +94,27 @@ def __getattr__(name: str) -> int:
 ## Invalid `__getattr__` calls in `from` imports
 
 An invalid module-level `__getattr__` call is reported on `from ... import` statements while
-retaining the function's return type for recovery.
+retaining the function's return type for recovery. Since the failed operation is an import, it
+receives an `invalid-import` diagnostic instead of an `invalid-attribute-access` diagnostic.
 
 ```py
-# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<module 'invalid_getattr_module'>`"
-from invalid_getattr_module import missing
+from invalid_getattr_module import missing  # snapshot: invalid-import
 
 reveal_type(missing)  # revealed: str
+```
+
+```snapshot
+error[invalid-import]: Cannot import `missing` from module `invalid_getattr_module`
+ --> src/mdtest_snippet.py:1:36
+  |
+1 | from invalid_getattr_module import missing  # snapshot: invalid-import
+  |                                    ^^^^^^^ Too many positional arguments to function `__getattr__`: expected 0, got 1
+info: This import implicitly calls `__getattr__`
+info: Function signature here
+ --> src/invalid_getattr_module.py:1:5
+  |
+1 | def __getattr__() -> str:
+  |     ^^^^^^^^^^^^^^^^^^^^
 ```
 
 `invalid_getattr_module.py`:
@@ -212,12 +226,13 @@ reveal_type(sub)  # revealed: <module 'invalid_mod.sub'>
 ## Limiting names handled by `__getattr__`
 
 If a module `__getattr__` is annotated to accept only certain string literals, unsupported names
-produce the same invalid-access diagnostic and recovered return type for imports and direct access.
+produce an import or attribute-access diagnostic, respectively, while preserving the recovered
+return type.
 
 ```py
 from limited_getattr_module import known_attr
 
-# error: [invalid-attribute-access] "Invalid access to attribute `unknown_attr` on type `<module 'limited_getattr_module'>`"
+# error: [invalid-import] "Cannot import `unknown_attr` from module `limited_getattr_module`"
 from limited_getattr_module import unknown_attr
 
 reveal_type(known_attr)  # revealed: int

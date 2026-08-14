@@ -69,7 +69,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{
     AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
-    report_bad_dunder_get_call,
+    report_bad_dunder_get_call, report_bad_import_call,
 };
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
@@ -705,18 +705,21 @@ impl<'db> MemberLookupError<'db> {
                         context,
                         &failure,
                         object_type,
-                        target.into(),
-                        target.attr.as_str(),
+                        target,
                         method,
                     );
                 }
             }
-            MemberLookupErrorKind::ModuleGetAttr { .. } if assigned_type.is_none() => {
-                self.report_module_getattr_diagnostic(
+            MemberLookupErrorKind::ModuleGetAttr { .. }
+                if assigned_type.is_none()
+                    && let Some(failure) = self.module_getattr_call_failure(db, env) =>
+            {
+                report_bad_attribute_access_call(
                     context,
+                    &failure,
                     object_type,
-                    target.into(),
-                    target.attr.as_str(),
+                    target,
+                    AttributeAccessMethod::GetAttr,
                 );
             }
             MemberLookupErrorKind::DescriptorGet(_)
@@ -724,39 +727,40 @@ impl<'db> MemberLookupError<'db> {
         }
     }
 
-    /// Reports a failed module `__getattr__` call on an attribute access or import.
+    /// Reports a failed module `__getattr__` call on a `from` import.
     ///
     /// Imports defer this diagnostic until they have ruled out a real submodule:
     ///
     /// ```python
     /// from package import missing  # Calls package.__getattr__("missing").
     /// ```
-    fn report_module_getattr_diagnostic(
+    fn report_module_getattr_import_diagnostic(
         self,
         context: &InferContext<'db, '_>,
-        module_type: Type<'db>,
-        target: ast::AnyNodeRef<'_>,
+        module: ModuleLiteralType<'db>,
+        target: &ast::Alias,
         name: &str,
     ) {
-        let db = context.db();
-        let env = context.program_environment();
-
-        if let MemberLookupErrorKind::ModuleGetAttr {
-            callable,
-            name: name_type,
-        } = self.kind(db)
-            && let Err(failure) =
-                callable.try_call(db, env, &CallArguments::positional([name_type]))
+        if let Some(failure) =
+            self.module_getattr_call_failure(context.db(), context.program_environment())
         {
-            report_bad_attribute_access_call(
-                context,
-                &failure,
-                module_type,
-                target,
-                name,
-                AttributeAccessMethod::GetAttr,
-            );
+            report_bad_import_call(context, &failure, module, target, name);
         }
+    }
+
+    /// Recreates a failed module `__getattr__` call without caching its call bindings.
+    fn module_getattr_call_failure(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<CallError<'db>> {
+        let MemberLookupErrorKind::ModuleGetAttr { callable, name } = self.kind(db) else {
+            return None;
+        };
+
+        callable
+            .try_call(db, env, &CallArguments::positional([name]))
+            .err()
     }
 }
 

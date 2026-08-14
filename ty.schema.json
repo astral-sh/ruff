@@ -794,6 +794,16 @@
             }
           ]
         },
+        "invalid-import": {
+          "title": "detects imports that fail while retrieving a module member",
+          "description": "## What it does\n\nChecks for imports that resolve to a module but fail while retrieving the imported member.\n\n## Why is this bad?\n\nIf a module defines `__getattr__`, Python calls it when a `from` import requests a name that is not\notherwise defined. The import raises an exception if `__getattr__` cannot accept the requested name.\n\n## Examples\n\n`module.py`:\n\n```python\ndef __getattr__() -> str:\n    return \"fallback\"\n```\n\n`main.py`:\n\n```python\n# TypeError: __getattr__() takes 0 positional arguments but 1 was given\nfrom module import missing  # error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-key": {
           "title": "detects invalid subscript accesses or TypedDict literal keys",
           "description": "## What it does\n\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\n\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n\n# error\nbob: Person = {\"nickname\": \"Bob\", \"age\": 30}  # typo!\n\n# error\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",

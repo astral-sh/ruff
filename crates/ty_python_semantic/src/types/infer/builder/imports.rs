@@ -471,10 +471,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `__getattr__`.
         if let Some((ty, qualifiers, source_provenance, error)) = from_module_getattr {
             if let Some(error) = error {
-                error.report_module_getattr_diagnostic(
+                error.report_module_getattr_import_diagnostic(
                     &self.context,
-                    module_ty,
-                    alias.into(),
+                    module_literal,
+                    alias,
                     name,
                 );
             }
