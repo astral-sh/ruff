@@ -4150,6 +4150,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     node_index: _,
                 },
             ) => {
+                let preserve_loop_narrowing = self.in_function_scope();
+                let enclosing_reachability_narrowing = self
+                    .current_use_def_map_mut()
+                    .replace_reachability_narrowing(preserve_loop_narrowing);
+
                 // Pre-walk the loop to collect all the bound places, then create a loop header
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
                 // header definitions store the ID of a reserved `LoopHeader` that we populate
@@ -4227,6 +4232,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for break_state in this_loop.break_states {
                     self.flow_merge(break_state);
                 }
+
+                self.current_use_def_map_mut()
+                    .replace_reachability_narrowing(enclosing_reachability_narrowing);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -4330,6 +4338,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
+                let preserve_loop_narrowing = self.in_function_scope();
+                let enclosing_reachability_narrowing = self
+                    .current_use_def_map_mut()
+                    .replace_reachability_narrowing(preserve_loop_narrowing);
+
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
                 let iteration_can_raise = *is_async || !Self::iteration_is_known_safe(iter);
@@ -4428,6 +4441,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for break_state in this_loop.break_states {
                     self.flow_merge(break_state);
                 }
+
+                self.current_use_def_map_mut()
+                    .replace_reachability_narrowing(enclosing_reachability_narrowing);
             }
             ast::Stmt::Match(ast::StmtMatch {
                 subject,

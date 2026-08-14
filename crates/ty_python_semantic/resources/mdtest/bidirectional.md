@@ -184,6 +184,61 @@ class Record(TypedDict):
     value: int
 ```
 
+### Deferred forward references in nested non-function loops
+
+A loop-carried forward reference keeps its declared type when the module-level loop is nested inside
+a conditional.
+
+```py
+from __future__ import annotations
+from typing import Never, TypedDict, overload
+
+@overload
+def inspect(value: str) -> Never: ...
+@overload
+def inspect(value: object) -> int: ...
+def inspect(value: object) -> int:
+    return 1
+
+if bool(input()) and bool(input()):
+    for _ in range(2):
+        record: ModuleRecord
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: ModuleRecord
+
+class ModuleRecord(TypedDict):
+    value: int
+```
+
+A statically known outer branch also preserves the loop-carried declaration.
+
+```py
+if 1 + 1 == 2:
+    for _ in range(2):
+        record: StaticModuleRecord
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: StaticModuleRecord
+
+class StaticModuleRecord(TypedDict):
+    value: int
+```
+
+The same holds for a forward reference carried by a class-body `while` loop.
+
+```py
+class Container:
+    while bool(input()):
+        record: ClassRecord
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: ClassRecord
+
+class ClassRecord(TypedDict):
+    value: int
+```
+
 ### Deferred forward references on Python 3.14
 
 Annotations are deferred by default in Python 3.14 and later.

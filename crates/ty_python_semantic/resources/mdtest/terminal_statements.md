@@ -1104,6 +1104,50 @@ class Example:
     reveal_type(continuing_value)  # revealed: Never
 ```
 
+### Statically known branches in module and class scopes
+
+A terminal call in the reachable branch of a statically known condition removes its module-level
+binding, even though the condition does not directly narrow that binding.
+
+```py
+from typing import NoReturn
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+flag: bool = bool(input())
+module_value = 1
+
+if flag:
+    module_value = "unreachable"
+
+    if 1 + 1 == 2:
+        stop()
+    else:
+        pass
+
+reveal_type(module_value)  # revealed: Literal[1]
+module_value.bit_count()
+```
+
+The same statically known condition also removes the unreachable binding from a class body.
+
+```py
+class Example:
+    value = 1
+
+    if flag:
+        value = "unreachable"
+
+        if 1 + 1 == 2:
+            stop()
+        else:
+            pass
+
+    reveal_type(value)  # revealed: Literal[1]
+    value.bit_count()
+```
+
 ### Generic calls in module and class scopes
 
 A generic call is terminal when its argument specializes the return type to `Never`.
