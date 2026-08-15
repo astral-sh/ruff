@@ -1524,6 +1524,46 @@ fn benchmark_repeated_suppressing_context_managers(criterion: &mut Criterion) {
     }
 }
 
+/// Exercises overlapping narrowing histories for repeated conditional assignments.
+///
+/// Every `isinstance` check narrows the same place, while each conditional assignment preserves
+/// the earlier binding on another path. Suppressing context managers add additional path gates to
+/// the same narrowing histories.
+fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let cases = [
+        (
+            "ty_micro[repeated_narrowed_assignments]",
+            "    if isinstance(value, int):\n        value = may_raise(value)\n",
+        ),
+        (
+            "ty_micro[repeated_narrowed_assignments_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        if isinstance(value, int):\n            value = may_raise(value)\n",
+        ),
+    ];
+
+    for (name, statement) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f(value: int | str) -> int | str:\n",
+        );
+        code.push_str(&statement.repeat(320));
+        code.push_str("    return value\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -1747,6 +1787,7 @@ criterion_group!(
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
     benchmark_repeated_suppressing_context_managers,
+    benchmark_repeated_narrowed_assignments,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

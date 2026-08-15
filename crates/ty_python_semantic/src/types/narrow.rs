@@ -1092,6 +1092,13 @@ pub(crate) struct NarrowingConstraint<'db> {
 }
 
 impl<'db> NarrowingConstraint<'db> {
+    /// Returns whether this constraint can introduce a type outside the original subject.
+    ///
+    /// Unlike ordinary intersection narrowing, `TypeGuard` replaces the previous type wholesale.
+    pub(crate) fn can_replace_subject_type(&self) -> bool {
+        !self.replacement_disjuncts.is_empty()
+    }
+
     /// Create an "intersection" constraint: the previous type will be
     /// intersected with this constraint
     pub(crate) fn intersection(constraint: Type<'db>) -> Self {
