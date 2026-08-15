@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::helpers::{any_over_expr, is_docstring_stmt};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
@@ -178,10 +178,31 @@ fn move_initialization(
         return Some(Fix::unsafe_edit(default_edit));
     }
 
-    // Add an `if`, to set the argument to its original value if still `None`. Build only the
-    // structural part (the guard and the start of the assignment) here; the default value is
-    // appended *after* indentation below, because it may span multiple lines (e.g. a multiline
-    // string literal) whose interior lines must not be re-indented.
+    // Render the default value. In the preview path we keep the original source
+    // (to preserve, e.g., a walrus assignment); otherwise it is regenerated.
+    let default_value = if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
+        locator
+            .slice(
+                parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                    .unwrap_or(default.range()),
+            )
+            .to_string()
+    } else {
+        checker.generator().expr(default)
+    };
+
+    // Re-indenting the moved default keeps a multi-line expression (e.g. a list
+    // literal) aligned with the new function body. A multi-line *string* literal,
+    // however, must not be re-indented: its interior newlines are part of its
+    // value, so adding indentation would silently change the string (see #27022).
+    let contains_multiline_string = any_over_expr(default, |expr| {
+        matches!(
+            expr,
+            Expr::StringLiteral(_) | Expr::BytesLiteral(_) | Expr::FString(_) | Expr::TString(_)
+        ) && locator.contains_line_break(expr.range())
+    });
+
+    // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
     let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
     content.push_str(stylist.line_ending().as_str());
@@ -191,20 +212,20 @@ fn move_initialization(
     // Determine the indentation depth of the function body.
     let indentation = indentation_at_offset(statement.start(), locator.contents())?;
 
-    // Indent the structural part to match the body indentation, then append the default value
-    // verbatim so that re-indentation does not alter multiline literals.
-    let mut content = textwrap::indent(&content, indentation).to_string();
-    if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
-        content.push_str(
-            locator.slice(
-                parenthesized_range(default.into(), parameter.into(), checker.tokens())
-                    .unwrap_or(default.range()),
-            ),
-        );
+    let mut content = if contains_multiline_string {
+        // Indent only the structural part, then append the default verbatim so the
+        // multi-line string keeps its exact contents.
+        let mut content = textwrap::indent(&content, indentation).to_string();
+        content.push_str(&default_value);
+        content.push_str(stylist.line_ending().as_str());
+        content
     } else {
-        content.push_str(&checker.generator().expr(default));
-    }
-    content.push_str(stylist.line_ending().as_str());
+        // Build the whole block and indent it as a unit, re-aligning any multi-line
+        // expression with the function body.
+        content.push_str(&default_value);
+        content.push_str(stylist.line_ending().as_str());
+        textwrap::indent(&content, indentation).to_string()
+    };
 
     // Find the position to insert the initialization after docstring and imports
     let mut pos = locator.line_start(statement.start());

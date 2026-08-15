@@ -43,3 +43,32 @@ help: Replace with `None`; initialize within function
 15 |         return value
    |
 note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_10.py:20:11
+   |
+18 |   # be aligned with the function body rather than left at its original indentation.
+19 |   def g(
+20 |       value=[
+   |  ___________^
+21 | |         "first",
+22 | |         "second",
+23 | |     ],
+   | |_____^
+24 |   ):
+25 |       return value
+   |
+help: Replace with `None`; initialize within function
+   |
+19 | def g(
+   -     value=[
+   -         "first",
+   -         "second",
+   -     ],
+20 +     value=None,
+21 | ):
+22 +     if value is None:
+23 +         value = ["first", "second"]
+24 |     return value
+   |
+note: This is an unsafe fix and may change runtime behavior

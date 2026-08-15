@@ -12,3 +12,14 @@ class C:
     def m(self, value=["""first
 second"""]):
         return value
+
+
+# A multi-line default with no multi-line string is safe to re-indent, and should
+# be aligned with the function body rather than left at its original indentation.
+def g(
+    value=[
+        "first",
+        "second",
+    ],
+):
+    return value
