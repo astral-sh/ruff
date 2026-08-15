@@ -325,7 +325,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         assignable
     }
 
-    /// Distinguish incompatible generic arguments from valid contextual widening of invariants.
+    /// Returns whether contextual inference hides an incompatible generic component.
+    ///
+    /// A rejected invariant container is not necessarily an invalid assignment: a `list[int]`
+    /// expression can contextually widen to `list[object]`. However, a `list[int | str]` cannot
+    /// safely become `list[int]`, even when contextual lambda inference obscures the `str`.
+    /// Recursing through matching specializations and union alternatives distinguishes these
+    /// cases without reporting valid widening.
     fn contains_incompatible_assignment_component(
         &self,
         value_ty: Type<'db>,
@@ -795,11 +801,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 let mut value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
                 if qualifiers.contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
                     && value_ty.is_assignable_to(
-                        self.builder.db(),
-                        self.builder.program_environment(),
-                        *ty,
-                    )
-                    && !uncontextualized_value_ty.is_assignable_to(
                         self.builder.db(),
                         self.builder.program_environment(),
                         *ty,

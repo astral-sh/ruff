@@ -2903,11 +2903,16 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Collect assignments that establish this attribute without reading another attribute.
+    /// Finds an independently established fallback for mutually recursive attributes.
     ///
-    /// If inference later encounters a cycle, Salsa applies this established value to every
-    /// participating attribute query. Assignments outside that value remain subject to the
-    /// ordinary attribute-assignment checks.
+    /// ```python
+    /// self.left = [1]
+    /// self.right = self.left
+    /// self.left = self.right
+    /// ```
+    ///
+    /// A complete root or independent constructor fragment gives each participant its own stable
+    /// immediate cycle result without suppressing ordinary assignment checks.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _, _| None,
@@ -2925,6 +2930,34 @@ impl<'db> StaticClassLiteral<'db> {
         let env = ProgramEnvironment::from_scope(class_body_scope);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
+        let contains_attribute = |value: &ast::Expr| {
+            ast::helpers::any_over_expr(value, |expression| {
+                matches!(expression, ast::Expr::Attribute(_))
+            })
+        };
+        let matching_method = |method_scope_id: FileScopeId, final_binding: bool| {
+            let method_def = index.scope(method_scope_id).node().as_function()?;
+            let method = index.expect_single_definition(method_def);
+            if !implicit_attribute_matches_method(db, attribute, method) {
+                return None;
+            }
+
+            let symbol = class_table.symbol_id(&method_def.node(&module).name)?;
+            let mut bindings = if final_binding {
+                class_map.end_of_scope_symbol_bindings(symbol)
+            } else {
+                class_map.reachable_symbol_bindings(symbol)
+            };
+
+            bindings
+                .any(|binding| {
+                    binding
+                        .binding
+                        .is_defined_and(|definition| definition == method)
+                        && !binding_reachability(db, class_map, &binding).is_always_false()
+                })
+                .then_some(method_def)
+        };
         let mut values = UnionBuilder::new(db, &env);
         let mut constructor_candidates = Vec::new();
         let mut has_independent_value = false;
@@ -2934,47 +2967,15 @@ impl<'db> StaticClassLiteral<'db> {
         for (bindings, method_scope_id) in
             attribute_assignments(db, class_body_scope, attribute.name(db).as_str())
         {
-            let method_scope = index.scope(method_scope_id);
-            let Some(method_def) = method_scope.node().as_function() else {
+            let Some(method_def) = matching_method(method_scope_id, false) else {
                 continue;
             };
-            let method = index.expect_single_definition(method_def);
-            let first_parameter = method_def
-                .node(&module)
+            let method_node = method_def.node(&module);
+            let first_parameter = method_node
                 .parameters
                 .iter_non_variadic_params()
                 .next()
                 .map(|parameter| parameter.name().as_str());
-            let decorators = function_known_decorator_flags(db, method);
-            let method_name = method.name(db);
-            let is_classmethod = decorators.contains(FunctionDecorators::CLASSMETHOD)
-                || method_name.as_deref().is_some_and(is_implicit_classmethod);
-            let is_staticmethod = decorators.contains(FunctionDecorators::STATICMETHOD)
-                || method_name.as_deref().is_some_and(is_implicit_staticmethod);
-
-            let matches_decorator = match attribute.target_method_decorator(db) {
-                MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                MethodDecorator::ClassMethod => is_classmethod,
-                MethodDecorator::StaticMethod => is_staticmethod,
-            };
-            if !matches_decorator {
-                continue;
-            }
-
-            let Some(method_place) = class_table.symbol_id(&method_def.node(&module).name) else {
-                continue;
-            };
-            if !class_map
-                .reachable_symbol_bindings(method_place)
-                .any(|binding| {
-                    binding
-                        .binding
-                        .is_defined_and(|definition| definition == method)
-                        && !binding_reachability(db, class_map, &binding).is_always_false()
-                })
-            {
-                continue;
-            }
 
             for binding in bindings {
                 let DefinitionState::Defined(definition) = binding.binding else {
@@ -3015,28 +3016,12 @@ impl<'db> StaticClassLiteral<'db> {
                                         };
                                         match definition.kind(db) {
                                             DefinitionKind::Assignment(assignment) => {
-                                                !ast::helpers::any_over_expr(
-                                                    assignment.value(&module),
-                                                    |expression| {
-                                                        matches!(
-                                                            expression,
-                                                            ast::Expr::Attribute(_)
-                                                        )
-                                                    },
-                                                )
+                                                !contains_attribute(assignment.value(&module))
                                             }
                                             DefinitionKind::Function(function) => {
                                                 let function = function.node(&module);
                                                 function.returns.as_ref().is_some_and(|returns| {
-                                                    !ast::helpers::any_over_expr(
-                                                        returns,
-                                                        |expression| {
-                                                            matches!(
-                                                                expression,
-                                                                ast::Expr::Attribute(_)
-                                                            )
-                                                        },
-                                                    )
+                                                    !contains_attribute(returns)
                                                 }) && function.decorator_list.iter().any(
                                                     |decorator| {
                                                         decorator
@@ -3087,18 +3072,16 @@ impl<'db> StaticClassLiteral<'db> {
                     });
                 let mut active_aliases = FxIndexSet::default();
                 let reads_local_alias = ast::helpers::any_over_expr(value, |expression| {
-                    if !matches!(expression, ast::Expr::Name(_)) {
-                        return false;
-                    }
-                    implicit_attribute_expression_reads_member(
-                        db,
-                        index,
-                        (program_file, method_scope_id),
-                        &module,
-                        expression,
-                        &mut active_aliases,
-                        &is_independent_attribute,
-                    )
+                    matches!(expression, ast::Expr::Name(_))
+                        && implicit_attribute_expression_reads_member(
+                            db,
+                            index,
+                            (program_file, method_scope_id),
+                            &module,
+                            expression,
+                            &mut active_aliases,
+                            &is_independent_attribute,
+                        )
                 });
                 if reads_attribute || reads_local_alias {
                     has_self_reference |= first_parameter.is_some_and(|receiver| {
@@ -3126,8 +3109,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 return false;
                             };
                             let is_same_owner_parameter = |receiver_name: &str| {
-                                method_def
-                                    .node(&module)
+                                method_node
                                     .parameters
                                     .find(receiver_name)
                                     .and_then(ast::ParameterWithDefault::annotation)
@@ -3151,8 +3133,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         }
                                         ast::Expr::Name(name) => {
                                             Some(name.id.as_str()) != first_parameter
-                                                && method_def
-                                                    .node(&module)
+                                                && method_node
                                                     .parameters
                                                     .find(name.id.as_str())
                                                     .is_some()
@@ -3215,44 +3196,10 @@ impl<'db> StaticClassLiteral<'db> {
                 .any(|name| {
                     attribute_assignments(db, class_body_scope, name.as_str()).any(
                         |(mut bindings, method_scope_id)| {
-                            let Some(method_def) =
-                                index.scope(method_scope_id).node().as_function()
-                            else {
+                            let Some(method_def) = matching_method(method_scope_id, true) else {
                                 return false;
                             };
-                            let method = index.expect_single_definition(method_def);
-                            let decorators = function_known_decorator_flags(db, method);
-                            let method_name = method.name(db);
-                            let is_classmethod = decorators
-                                .contains(FunctionDecorators::CLASSMETHOD)
-                                || method_name.as_deref().is_some_and(is_implicit_classmethod);
-                            let is_staticmethod = decorators
-                                .contains(FunctionDecorators::STATICMETHOD)
-                                || method_name.as_deref().is_some_and(is_implicit_staticmethod);
-                            if !match attribute.target_method_decorator(db) {
-                                MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                                MethodDecorator::ClassMethod => is_classmethod,
-                                MethodDecorator::StaticMethod => is_staticmethod,
-                            } {
-                                return false;
-                            }
-
                             let method_node = method_def.node(&module);
-                            let Some(method_place) = class_table.symbol_id(&method_node.name)
-                            else {
-                                return false;
-                            };
-                            if !class_map.end_of_scope_symbol_bindings(method_place).any(
-                                |binding| {
-                                    binding
-                                        .binding
-                                        .is_defined_and(|definition| definition == method)
-                                        && !binding_reachability(db, class_map, &binding)
-                                            .is_always_false()
-                                },
-                            ) {
-                                return false;
-                            }
                             let Some(receiver) = method_node
                                 .parameters
                                 .iter_non_variadic_params()
@@ -3309,36 +3256,34 @@ impl<'db> StaticClassLiteral<'db> {
             return None;
         }
 
-        if has_independent_value {
-            Some(
-                values
-                    .build()
-                    .promote(db, &env)
-                    .promote_singletons(db, &env),
-            )
-        } else {
-            let mut constructor_seeds = UnionBuilder::new(db, &env);
-            let mut has_constructor_seed = false;
+        if !has_independent_value {
             for definition in constructor_candidates {
                 if let Some(seed) = independent_assignment_constructor_seed(db, definition)
                     && !seed.is_unknown()
                     && !seed.is_divergent()
                     && !seed.is_never()
                 {
-                    has_constructor_seed = true;
-                    constructor_seeds.add_in_place(seed);
+                    has_independent_value = true;
+                    values.add_in_place(seed);
                 }
             }
-            has_constructor_seed.then(|| {
-                constructor_seeds
-                    .build()
-                    .promote(db, &env)
-                    .promote_singletons(db, &env)
-            })
         }
+
+        has_independent_value.then(|| {
+            values
+                .build()
+                .promote(db, &env)
+                .promote_singletons(db, &env)
+        })
     }
 
-    /// Find an attribute value established before methods on this class run.
+    /// Finds an inherited or class-body value established before this class's methods run.
+    ///
+    /// ```python
+    /// class Child(Parent):
+    ///     def update(self):
+    ///         self.value = self.value
+    /// ```
     ///
     /// Inspecting class namespaces never invokes their implicit classmethod lookup. Instance
     /// attributes from proper superclasses are resolved recursively, always moving toward a
@@ -3398,6 +3343,7 @@ impl<'db> StaticClassLiteral<'db> {
         None
     }
 
+    /// Recovers every participant in a recursive attribute query using its independent value.
     #[salsa::tracked(
         returns(copy),
         cycle_result=|_, _, _, incoming| ImplicitAttribute {
@@ -4494,7 +4440,12 @@ struct ImplicitAttributeName<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
-/// Follow local receiver aliases without inferring the expressions that establish them.
+/// Follows reachable local receiver aliases without inferring their assignments.
+///
+/// ```python
+/// source = self
+/// source.value
+/// ```
 fn implicit_attribute_receiver_is_alias<'db>(
     db: &'db dyn Db,
     index: &'db SemanticIndex<'db>,
@@ -4537,46 +4488,33 @@ fn implicit_attribute_receiver_is_alias<'db>(
                 return false;
             }
 
-            let is_alias = match definition.kind(db) {
-                DefinitionKind::Assignment(assignment) => implicit_attribute_receiver_is_alias(
-                    db,
-                    index,
-                    scope,
-                    module,
-                    assignment.value(module),
-                    receiver,
-                    active_aliases,
-                ),
-                DefinitionKind::AnnotatedAssignment(assignment) => {
-                    assignment.value(module).is_some_and(|value| {
-                        implicit_attribute_receiver_is_alias(
-                            db,
-                            index,
-                            scope,
-                            module,
-                            value,
-                            receiver,
-                            active_aliases,
-                        )
-                    })
-                }
-                DefinitionKind::NamedExpression(named) => implicit_attribute_receiver_is_alias(
-                    db,
-                    index,
-                    scope,
-                    module,
-                    &named.node(module).value,
-                    receiver,
-                    active_aliases,
-                ),
-                _ => false,
+            let value = match definition.kind(db) {
+                DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
+                DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+                DefinitionKind::NamedExpression(named) => Some(named.node(module).value.as_ref()),
+                _ => None,
             };
+            let is_alias = value.is_some_and(|value| {
+                implicit_attribute_receiver_is_alias(
+                    db,
+                    index,
+                    scope,
+                    module,
+                    value,
+                    receiver,
+                    active_aliases,
+                )
+            });
             active_aliases.shift_remove(&definition);
             is_alias
         })
 }
 
-/// Detect a different member even inside a wrapper or a lambda's parameter defaults.
+/// Detects another attribute through arbitrary wrappers and lambda parameter defaults.
+///
+/// ```python
+/// self.left = lambda value=self.right: value
+/// ```
 fn implicit_attribute_cross_member_transfer(
     value: &ast::Expr,
     receiver: &str,
@@ -4617,7 +4555,31 @@ fn implicit_attribute_cross_member_transfer(
     })
 }
 
+/// Matches explicit and implicit method decorators to the attribute's receiver kind.
+fn implicit_attribute_matches_method<'db>(
+    db: &'db dyn Db,
+    attribute: ImplicitAttributeName<'db>,
+    definition: Definition<'db>,
+) -> bool {
+    let decorators = function_known_decorator_flags(db, definition);
+    let method_name = definition.name(db);
+    let is_classmethod = decorators.contains(FunctionDecorators::CLASSMETHOD)
+        || method_name.as_deref().is_some_and(is_implicit_classmethod);
+    let is_staticmethod = decorators.contains(FunctionDecorators::STATICMETHOD)
+        || method_name.as_deref().is_some_and(is_implicit_staticmethod);
+
+    match attribute.target_method_decorator(db) {
+        MethodDecorator::None => !is_classmethod && !is_staticmethod,
+        MethodDecorator::ClassMethod => is_classmethod,
+        MethodDecorator::StaticMethod => is_staticmethod,
+    }
+}
+
 /// Returns whether a matching method explicitly declares this attribute.
+///
+/// ```python
+/// self.value: int = initial
+/// ```
 ///
 /// Local declarations take precedence over inherited values used for cycle recovery.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
@@ -4631,23 +4593,14 @@ fn implicit_attribute_has_declaration<'db>(
     attribute_declarations(db, class_body_scope, attribute.name(db).as_str()).any(
         |(mut declarations, method_scope_id)| {
             let method_scope = index.scope(method_scope_id);
-            if let Some(method_def) = method_scope.node().as_function() {
-                let definition = index.expect_single_definition(method_def);
-                let decorators = function_known_decorator_flags(db, definition);
-                let method_name = definition.name(db);
-                let is_classmethod = decorators.contains(FunctionDecorators::CLASSMETHOD)
-                    || method_name.as_deref().is_some_and(is_implicit_classmethod);
-                let is_staticmethod = decorators.contains(FunctionDecorators::STATICMETHOD)
-                    || method_name.as_deref().is_some_and(is_implicit_staticmethod);
-
-                let is_valid_scope = match attribute.target_method_decorator(db) {
-                    MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                    MethodDecorator::ClassMethod => is_classmethod,
-                    MethodDecorator::StaticMethod => is_staticmethod,
-                };
-                if !is_valid_scope {
-                    return false;
-                }
+            if let Some(method_def) = method_scope.node().as_function()
+                && !implicit_attribute_matches_method(
+                    db,
+                    attribute,
+                    index.expect_single_definition(method_def),
+                )
+            {
+                return false;
             }
 
             declarations.any(|declaration| {

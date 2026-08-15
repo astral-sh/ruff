@@ -162,11 +162,15 @@ pub(crate) fn infer_definition_types<'db>(
     .finish_definition(definition)
 }
 
-/// Retain independently established collection elements when a recursive assignment has no root.
+/// Retain independently established elements when a recursive collection has no initial value.
 ///
-/// Only the collection elements that can be inferred without reading an attribute participate in
-/// this query. Keeping the owning definition as the query key prevents a dependency on its AST
-/// from escaping into a query for a different module.
+/// ```python
+/// self.left = [*self.right]
+/// self.right = [*self.left, Added()]  # Seed: list[Unknown | Added]
+/// ```
+///
+/// Returns `None` when no independent element exists. The definition-owned query keeps its AST
+/// dependency within the assignment's module and recovers conservatively from nested cycles.
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, _, _| None,
@@ -200,7 +204,15 @@ pub(crate) fn independent_assignment_constructor_seed<'db>(
     .infer_independent_assignment_constructor_seed(value)
 }
 
-/// Follow local assignment aliases without evaluating expressions that might read an attribute.
+/// Detect member dependencies through flow-sensitive local aliases and eager lambda defaults.
+///
+/// ```python
+/// source = self.other
+/// self.values = [*source, Added()]
+/// ```
+///
+/// Inspect aliases structurally instead of inferring their values, which could enter the very
+/// attribute cycle that callers are trying to classify.
 pub(crate) fn implicit_attribute_expression_reads_member<'db>(
     db: &'db dyn Db,
     index: &'db SemanticIndex<'db>,
@@ -262,44 +274,25 @@ pub(crate) fn implicit_attribute_expression_reads_member<'db>(
                     return true;
                 }
 
-                let depends = match definition.kind(db) {
-                    DefinitionKind::Assignment(assignment) => {
-                        implicit_attribute_expression_reads_member(
-                            db,
-                            index,
-                            scope,
-                            module,
-                            assignment.value(module),
-                            active_aliases,
-                            is_independent_attribute,
-                        )
-                    }
-                    DefinitionKind::AnnotatedAssignment(assignment) => {
-                        assignment.value(module).is_none_or(|value| {
-                            implicit_attribute_expression_reads_member(
-                                db,
-                                index,
-                                scope,
-                                module,
-                                value,
-                                active_aliases,
-                                is_independent_attribute,
-                            )
-                        })
-                    }
+                let value = match definition.kind(db) {
+                    DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
+                    DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
                     DefinitionKind::NamedExpression(named) => {
-                        implicit_attribute_expression_reads_member(
-                            db,
-                            index,
-                            scope,
-                            module,
-                            &named.node(module).value,
-                            active_aliases,
-                            is_independent_attribute,
-                        )
+                        Some(named.node(module).value.as_ref())
                     }
-                    _ => true,
+                    _ => None,
                 };
+                let depends = value.is_none_or(|value| {
+                    implicit_attribute_expression_reads_member(
+                        db,
+                        index,
+                        scope,
+                        module,
+                        value,
+                        active_aliases,
+                        is_independent_attribute,
+                    )
+                });
                 active_aliases.shift_remove(&definition);
                 depends
             })

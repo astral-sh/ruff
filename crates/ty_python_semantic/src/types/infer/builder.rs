@@ -499,7 +499,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer only the independent elements of an otherwise recursive collection assignment.
+    /// Preserve concrete collection elements without resolving their recursive counterparts.
     pub(super) fn infer_independent_assignment_constructor_seed(
         mut self,
         expression: &ast::Expr,
@@ -509,23 +509,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
         ) -> Option<Type<'db>> {
-            let mut evidence = UnionBuilder::new(db, env);
-            evidence.add_in_place(Type::unknown());
-            let mut has_evidence = false;
-
-            if let Some(union) = ty.as_union_like(db) {
-                for element in union.elements(db) {
-                    if !matches!(element, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
-                        evidence.add_in_place(*element);
-                        has_evidence = true;
-                    }
-                }
-            } else if !matches!(ty, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
-                evidence.add_in_place(ty);
-                has_evidence = true;
-            }
-
-            has_evidence.then(|| evidence.build())
+            let evidence = ty.as_union_like(db).map_or(ty, |union| {
+                union.filter(db, |element| {
+                    !matches!(element, Type::Dynamic(_) | Type::Divergent(_) | Type::Never)
+                })
+            });
+            (!matches!(
+                evidence,
+                Type::Dynamic(_) | Type::Divergent(_) | Type::Never
+            ))
+            .then(|| UnionType::from_two_elements(db, env, Type::unknown(), evidence))
         }
 
         self.context.suppress_diagnostics();
@@ -561,6 +554,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(seed.promote(db, &env).promote_singletons(db, &env))
     }
 
+    /// Provisionally replace recursive member reads with `Unknown`, preserving lexical bindings.
     fn infer_independent_constructor_value(
         &mut self,
         expression: &ast::Expr,
@@ -602,9 +596,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Set(ast::ExprSet { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let mut elements = UnionBuilder::new(db, &env);
-
-                for element in elts {
+                let elements = elts.iter().map(|element| {
                     let (fragment, starred) = match element {
                         ast::Expr::Starred(starred) => (starred.value.as_ref(), true),
                         _ => (element, false),
@@ -618,10 +610,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .map(|iterable| iterable.homogeneous_element_type(db, &env))
                             .unwrap_or_else(|_| Type::unknown());
                     }
-                    elements.add_in_place(element_ty);
-                }
+                    element_ty
+                });
 
-                let element_ty = elements.build();
+                let element_ty = UnionType::from_elements(db, &env, elements);
                 Some(match expression {
                     ast::Expr::List(_) => {
                         KnownClass::List.to_specialized_instance(db, &env, &[element_ty])
@@ -638,30 +630,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut values = UnionBuilder::new(db, &env);
 
                 for item in items {
-                    let Some(key) = item.key.as_ref() else {
+                    let (key_ty, value_ty) = if let Some(key) = item.key.as_ref() {
+                        (
+                            self.infer_independent_constructor_value(key, bindings)
+                                .unwrap_or_else(Type::unknown),
+                            self.infer_independent_constructor_value(&item.value, bindings)
+                                .unwrap_or_else(Type::unknown),
+                        )
+                    } else {
                         let mapping = self
                             .infer_independent_constructor_value(&item.value, bindings)
                             .unwrap_or_else(Type::unknown);
-                        let Some(specialization) =
-                            mapping.known_specialization(db, &env, KnownClass::Dict)
-                        else {
-                            keys.add_in_place(Type::unknown());
-                            values.add_in_place(Type::unknown());
-                            continue;
-                        };
-                        let [key_ty, value_ty] = specialization.types(db) else {
-                            continue;
-                        };
-                        keys.add_in_place(*key_ty);
-                        values.add_in_place(*value_ty);
-                        continue;
+                        mapping
+                            .known_specialization(db, &env, KnownClass::Dict)
+                            .and_then(|specialization| {
+                                let [key, value] = specialization.types(db) else {
+                                    return None;
+                                };
+                                Some((*key, *value))
+                            })
+                            .unwrap_or((Type::unknown(), Type::unknown()))
                     };
-                    let key_ty = self
-                        .infer_independent_constructor_value(key, bindings)
-                        .unwrap_or_else(Type::unknown);
-                    let value_ty = self
-                        .infer_independent_constructor_value(&item.value, bindings)
-                        .unwrap_or_else(Type::unknown);
                     keys.add_in_place(key_ty);
                     values.add_in_place(value_ty);
                 }
@@ -679,20 +668,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 });
                 let mut callable =
                     self.infer_independent_constructor_value(&call.func, bindings)?;
+                let argument_type = |position| {
+                    let argument = arguments.argument_types(position)?;
+                    argument.get_default()
+                };
+                let union_argument = call
+                    .func
+                    .as_attribute_expr()
+                    .filter(|method| method.attr.as_str() == "union")
+                    .and_then(|_| argument_type(0))
+                    .and_then(|argument| argument.known_specialization(db, &env, KnownClass::Set));
 
-                if callable.is_unknown()
-                    && let Some(method) = call.func.as_attribute_expr()
-                    && method.attr.as_str() == "union"
-                    && let Some(argument) = arguments.argument_types(0)
-                    && let Some(argument) = argument.get_default()
-                    && argument
-                        .known_specialization(db, &env, KnownClass::Set)
-                        .is_some()
-                {
+                if callable.is_unknown() && union_argument.is_some() {
                     let receiver =
                         KnownClass::Set.to_specialized_instance(db, &env, &[Type::unknown()]);
                     callable = receiver
-                        .try_member_lookup(db, &env, method.attr.as_str())
+                        .try_member_lookup(db, &env, "union")
                         .ok()?
                         .place
                         .ignore_possibly_undefined()?;
@@ -708,10 +699,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && matches!(function.name(db).as_str(), "add" | "or_")
                     && file_to_module(db, function.program_file(db).resolver_file(db))
                         .is_some_and(|module| module.name(db) == "_operator")
-                    && let Some(left) = arguments.argument_types(0)
-                    && let Some(left) = left.get_default()
-                    && let Some(right) = arguments.argument_types(1)
-                    && let Some(right) = right.get_default()
+                    && let Some(left) = argument_type(0)
+                    && let Some(right) = argument_type(1)
                 {
                     let operator = if function.name(db).as_str() == "add" {
                         ast::Operator::Add
@@ -726,12 +715,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .ok()?
                     .return_type(db, &env);
 
-                if let Some(method) = call.func.as_attribute_expr()
-                    && method.attr.as_str() == "union"
+                if let Some(argument) = union_argument
                     && let Some(result) = inferred.known_specialization(db, &env, KnownClass::Set)
-                    && let Some(argument) = arguments.argument_types(0)
-                    && let Some(argument) = argument.get_default()
-                    && let Some(argument) = argument.known_specialization(db, &env, KnownClass::Set)
                     && let ([result], [argument]) = (result.types(db), argument.types(db))
                 {
                     let elements = UnionType::from_two_elements(db, &env, *result, *argument);
@@ -776,17 +761,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::If(ast::ExprIf {
                 test, body, orelse, ..
             }) => {
-                let truthiness = if let ast::Expr::BooleanLiteral(literal) = test.as_ref() {
-                    Some(if literal.value {
-                        Truthiness::AlwaysTrue
-                    } else {
-                        Truthiness::AlwaysFalse
-                    })
-                } else {
-                    self.infer_independent_constructor_value(test, bindings)
-                        .and_then(|ty| ty.try_bool(db, &env).ok())
-                };
-                if let Some(truthiness) = truthiness {
+                if let Some(truthiness) = self
+                    .infer_independent_constructor_value(test, bindings)
+                    .and_then(|ty| self.independent_constructor_truthiness(test, ty))
+                {
                     match truthiness {
                         Truthiness::AlwaysTrue => {
                             return self.infer_independent_constructor_value(body, bindings);
@@ -813,26 +791,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut has_seed = false;
                 for (index, branch) in values.iter().enumerate() {
                     if let Some(seed) = self.infer_independent_constructor_value(branch, bindings) {
-                        let truthiness = match branch {
-                            ast::Expr::BooleanLiteral(literal) => Some(if literal.value {
-                                Truthiness::AlwaysTrue
-                            } else {
-                                Truthiness::AlwaysFalse
-                            }),
-                            ast::Expr::List(list) if list.elts.is_empty() => {
-                                Some(Truthiness::AlwaysFalse)
-                            }
-                            ast::Expr::Set(set) if set.elts.is_empty() => {
-                                Some(Truthiness::AlwaysFalse)
-                            }
-                            ast::Expr::Tuple(tuple) if tuple.elts.is_empty() => {
-                                Some(Truthiness::AlwaysFalse)
-                            }
-                            ast::Expr::Dict(mapping) if mapping.items.is_empty() => {
-                                Some(Truthiness::AlwaysFalse)
-                            }
-                            _ => seed.try_bool(db, &env).ok(),
-                        };
+                        let truthiness = self.independent_constructor_truthiness(branch, seed);
 
                         if index + 1 == values.len()
                             || !matches!(
@@ -871,15 +830,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) => {
                 let element_ty =
                     self.infer_independent_comprehension_element(generators, elt, bindings)?;
-                Some(match expression {
-                    ast::Expr::ListComp(_) => {
-                        KnownClass::List.to_specialized_instance(db, &env, &[element_ty])
-                    }
-                    ast::Expr::SetComp(_) => {
-                        KnownClass::Set.to_specialized_instance(db, &env, &[element_ty])
-                    }
-                    _ => return None,
-                })
+                let class = if matches!(expression, ast::Expr::ListComp(_)) {
+                    KnownClass::List
+                } else {
+                    KnownClass::Set
+                };
+                Some(class.to_specialized_instance(db, &env, &[element_ty]))
             }
             ast::Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
@@ -910,6 +866,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Preserve known branch outcomes before singleton promotion obscures them.
+    fn independent_constructor_truthiness(
+        &self,
+        expression: &ast::Expr,
+        inferred: Type<'db>,
+    ) -> Option<Truthiness> {
+        let known = match expression {
+            ast::Expr::BooleanLiteral(literal) => Some(literal.value),
+            ast::Expr::List(list) => list.elts.is_empty().then_some(false),
+            ast::Expr::Set(set) => set.elts.is_empty().then_some(false),
+            ast::Expr::Tuple(tuple) => tuple.elts.is_empty().then_some(false),
+            ast::Expr::Dict(mapping) => mapping.items.is_empty().then_some(false),
+            _ => None,
+        };
+        known.map(Truthiness::from).or_else(|| {
+            inferred
+                .try_bool(self.db(), self.program_environment())
+                .ok()
+        })
+    }
+
+    /// Apply collection operators after approximating an unknown recursive operand.
     fn infer_independent_binary_value(
         &self,
         mut left: Type<'db>,
@@ -920,24 +898,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
 
         let unknown_collection_like = |ty: Type<'db>| {
-            if ty.known_specialization(db, env, KnownClass::Dict).is_some() {
-                return Some(KnownClass::Dict.to_specialized_instance(
-                    db,
-                    env,
-                    &[Type::unknown(), Type::unknown()],
-                ));
-            }
-
-            [KnownClass::List, KnownClass::Set, KnownClass::Tuple]
-                .into_iter()
-                .find(|class| ty.known_specialization(db, env, *class).is_some())
-                .map(|class| {
-                    if class == KnownClass::Tuple {
-                        Type::homogeneous_tuple(db, env, Type::unknown())
-                    } else {
-                        class.to_specialized_instance(db, env, &[Type::unknown()])
-                    }
-                })
+            [
+                KnownClass::Dict,
+                KnownClass::List,
+                KnownClass::Set,
+                KnownClass::Tuple,
+            ]
+            .into_iter()
+            .find(|class| ty.known_specialization(db, env, *class).is_some())
+            .map(|class| match class {
+                KnownClass::Dict => {
+                    class.to_specialized_instance(db, env, &[Type::unknown(), Type::unknown()])
+                }
+                KnownClass::Tuple => Type::homogeneous_tuple(db, env, Type::unknown()),
+                _ => class.to_specialized_instance(db, env, &[Type::unknown()]),
+            })
         };
 
         if left.is_unknown()
@@ -965,6 +940,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(inferred)
     }
 
+    /// Evaluate a projected element without leaking comprehension bindings into sibling nodes.
     fn infer_independent_comprehension_element(
         &mut self,
         generators: &[ast::Comprehension],
@@ -984,31 +960,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .ok()?
                     .homogeneous_element_type(db, &env);
 
-                match &generator.target {
-                    ast::Expr::Name(name) => bindings.push((name.id.clone(), element_ty)),
-                    ast::Expr::Tuple(tuple) => {
-                        let elements = element_ty.try_iterate(db, &env).ok()?;
-                        let elements = elements.as_fixed_length()?.all_elements();
-                        if elements.len() != tuple.elts.len() {
-                            return None;
-                        }
-                        for (target, ty) in tuple.elts.iter().zip(elements) {
-                            let name = target.as_name_expr()?;
-                            bindings.push((name.id.clone(), *ty));
-                        }
+                let targets = match &generator.target {
+                    ast::Expr::Name(name) => {
+                        bindings.push((name.id.clone(), element_ty));
+                        continue;
                     }
-                    ast::Expr::List(list) => {
-                        let elements = element_ty.try_iterate(db, &env).ok()?;
-                        let elements = elements.as_fixed_length()?.all_elements();
-                        if elements.len() != list.elts.len() {
-                            return None;
-                        }
-                        for (target, ty) in list.elts.iter().zip(elements) {
-                            let name = target.as_name_expr()?;
-                            bindings.push((name.id.clone(), *ty));
-                        }
-                    }
+                    ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
+                    ast::Expr::List(list) => list.elts.as_slice(),
                     _ => return None,
+                };
+                let elements = element_ty.try_iterate(db, &env).ok()?;
+                let elements = elements.as_fixed_length()?.all_elements();
+                if elements.len() != targets.len() {
+                    return None;
+                }
+                for (target, ty) in targets.iter().zip(elements) {
+                    let name = target.as_name_expr()?;
+                    bindings.push((name.id.clone(), *ty));
                 }
             }
 
@@ -1019,6 +987,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         inferred
     }
 
+    /// Infer a member-free fragment in its actual lexical scope without reporting diagnostics.
+    ///
+    /// Comprehension bodies need a scope-local builder; reusing the method's builder would apply
+    /// narrowing constraints to places that do not exist in its symbol table.
     fn infer_independent_constructor_fragment(
         &mut self,
         expression: &ast::Expr,
@@ -1067,6 +1039,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(inferred.promote(db, &env).promote_singletons(db, &env))
     }
 
+    /// Distinguish external values from receivers that can re-enter the current attribute cycle.
     fn constructor_attribute_is_independent(&self, attribute: &ast::ExprAttribute) -> bool {
         let db = self.db();
         let method_scope = self.scope().file_scope_id(db);

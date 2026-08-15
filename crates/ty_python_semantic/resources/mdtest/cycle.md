@@ -285,42 +285,29 @@ reveal_type(Cyclic().left)  # revealed: list[int]
 reveal_type(Cyclic().right)  # revealed: list[int]
 ```
 
-## Recursive instance attributes reject nested list growth
+## Recursive instance attributes reject nested collection growth
 
-Wrapping another independently initialized attribute creates an incompatible extra nesting level,
-even when both attributes begin with the same element type.
-
-```py
-class Cyclic:
-    def reset(self):
-        self.left = [1]
-        self.right = [1]
-
-    def update(self):
-        self.left = [self.right]  # error: [invalid-assignment]
-        self.right = [self.left]  # error: [invalid-assignment]
-
-reveal_type(Cyclic().left)  # revealed: list[int]
-reveal_type(Cyclic().right)  # revealed: list[int]
-```
-
-## Recursive instance attributes reject nested tuple growth
-
-Independently established tuple types remain distinct when mutually dependent assignments add an
-incompatible tuple layer.
+Wrapping another independently initialized list or tuple creates an incompatible extra nesting
+level, even when both lists begin with the same element type.
 
 ```py
 class Cyclic:
     def reset(self):
-        self.left = ("initial",)
-        self.right = (1,)
+        self.list_left = [1]
+        self.list_right = [1]
+        self.tuple_left = ("initial",)
+        self.tuple_right = (1,)
 
     def update(self):
-        self.left = (self.right,)  # error: [invalid-assignment]
-        self.right = (self.left,)  # error: [invalid-assignment]
+        self.list_left = [self.list_right]  # error: [invalid-assignment]
+        self.list_right = [self.list_left]  # error: [invalid-assignment]
+        self.tuple_left = (self.tuple_right,)  # error: [invalid-assignment]
+        self.tuple_right = (self.tuple_left,)  # error: [invalid-assignment]
 
-reveal_type(Cyclic().left)  # revealed: tuple[str]
-reveal_type(Cyclic().right)  # revealed: tuple[int]
+reveal_type(Cyclic().list_left)  # revealed: list[int]
+reveal_type(Cyclic().list_right)  # revealed: list[int]
+reveal_type(Cyclic().tuple_left)  # revealed: tuple[str]
+reveal_type(Cyclic().tuple_right)  # revealed: tuple[int]
 ```
 
 ## Recursive instance attributes propagate self-growing dependencies
@@ -411,180 +398,103 @@ class Cyclic:
 reveal_type(Cyclic().values)  # revealed: list[int] | list[Divergent]
 ```
 
-## Recursive instance attributes copied through dictionary unpacking
+## Recursive instance attributes copied through collection expressions
 
-Unpacking another attribute preserves its independently established dictionary type. Introducing an
-incompatible value requires an explicit annotation.
-
-```py
-class Cyclic:
-    def reset(self):
-        self.left = {"left": "initial"}
-        self.right = {"right": "initial"}
-
-    def update(self):
-        self.left = {**self.right}
-        self.right = {**self.left, "added": 1}  # error: [invalid-assignment]
-
-reveal_type(Cyclic().left)  # revealed: dict[str, str]
-reveal_type(Cyclic().right)  # revealed: dict[str, str]
-```
-
-## Recursive instance attributes copied through comprehensions
-
-A comprehension can copy another attribute without changing its established element type. Adding an
-incompatible element still requires an explicit annotation.
+Dictionary unpacking, comprehensions, conditional expressions, nested calls, and mapped lambdas can
+each transfer another attribute's independently established type. Separate attribute pairs ensure
+that recognizing one expression does not hide a failure to recognize another.
 
 ```py
 class Cyclic:
     def reset(self):
-        self.left = [1]
-        self.right = [1]
-
-    def update(self):
-        self.left = [value for value in self.right]
-        self.right = [value for value in self.left] + ["added"]  # error: [invalid-assignment]
-
-reveal_type(Cyclic().left)  # revealed: list[int]
-reveal_type(Cyclic().right)  # revealed: list[int]
-```
-
-## Recursive instance attributes selected by conditional expressions
-
-Conditional and Boolean expressions can both transfer another independently initialized attribute.
-
-```py
-class Cyclic:
-    def reset(self):
-        self.left = [1]
-        self.right = [1]
+        self.mapping_left = {"left": "initial"}
+        self.mapping_right = {"right": "initial"}
+        self.comprehension_left = [1]
+        self.comprehension_right = [1]
+        self.conditional_left = [1]
+        self.conditional_right = [1]
+        self.nested_left = [1]
+        self.nested_right = [1]
+        self.mapped_left = [1]
+        self.mapped_right = [1]
 
     def update(self, flag: bool):
-        self.left = self.right if flag else self.right
-        self.right = self.left or ["added"]  # error: [invalid-assignment]
+        self.mapping_left = {**self.mapping_right}
+        self.mapping_right = {**self.mapping_left, "added": 1}  # error: [invalid-assignment]
+        self.comprehension_left = [value for value in self.comprehension_right]
+        self.comprehension_right = [value for value in self.comprehension_left] + ["added"]  # error: [invalid-assignment]
+        self.conditional_left = self.conditional_right if flag else self.conditional_right
+        self.conditional_right = self.conditional_left or ["added"]  # error: [invalid-assignment]
+        self.nested_left = list(tuple(self.nested_right))
+        self.nested_right = list(tuple(self.nested_left)) + ["added"]  # error: [invalid-assignment]
+        self.mapped_left = list(map(lambda value: value, self.mapped_right))
+        self.mapped_right = list(map(lambda value: value, self.mapped_left)) + ["added"]  # error: [invalid-assignment]
 
-reveal_type(Cyclic().left)  # revealed: list[int]
-reveal_type(Cyclic().right)  # revealed: list[int]
-```
-
-## Recursive instance attributes copied by nested calls
-
-Nested collection constructors can copy another attribute without otherwise changing its element
-type.
-
-```py
-class Cyclic:
-    def reset(self):
-        self.left = [1]
-        self.right = [1]
-
-    def update(self):
-        self.left = list(tuple(self.right))
-        self.right = list(tuple(self.left)) + ["added"]  # error: [invalid-assignment]
-
-reveal_type(Cyclic().left)  # revealed: list[int]
-reveal_type(Cyclic().right)  # revealed: list[int]
-```
-
-## Recursive instance attributes copied through mapped lambdas
-
-Contextual inference of an identity lambda must not hide an incompatible assignment introduced by
-the surrounding recursive collection.
-
-```py
-class Cyclic:
-    def reset(self):
-        self.left = [1]
-        self.right = [1]
-
-    def update(self):
-        self.left = list(map(lambda value: value, self.right))
-        self.right = list(map(lambda value: value, self.left)) + ["added"]  # error: [invalid-assignment]
-
-reveal_type(Cyclic().left)  # revealed: list[int]
-reveal_type(Cyclic().right)  # revealed: list[int]
+reveal_type(Cyclic().mapping_left)  # revealed: dict[str, str]
+reveal_type(Cyclic().mapping_right)  # revealed: dict[str, str]
+reveal_type(Cyclic().comprehension_left)  # revealed: list[int]
+reveal_type(Cyclic().comprehension_right)  # revealed: list[int]
+reveal_type(Cyclic().conditional_left)  # revealed: list[int]
+reveal_type(Cyclic().conditional_right)  # revealed: list[int]
+reveal_type(Cyclic().nested_left)  # revealed: list[int]
+reveal_type(Cyclic().nested_right)  # revealed: list[int]
+reveal_type(Cyclic().mapped_left)  # revealed: list[int]
+reveal_type(Cyclic().mapped_right)  # revealed: list[int]
 ```
 
 ## Recursive attributes preserve valid contextual collection widening
 
-A copied `list[int]` can be contextually widened for an inferred `list[object]` attribute. The
-opposite assignment remains invalid.
-
-```py
-class Cyclic:
-    def reset(self):
-        self.left = [object()]
-        self.right = [1]
-
-    def update(self):
-        self.left = [*self.right]
-        self.right = [*self.left]  # error: [invalid-assignment]
-
-reveal_type(Cyclic().left)  # revealed: list[object]
-reveal_type(Cyclic().right)  # revealed: list[int]
-```
-
-## Recursive attributes preserve widening into a union alternative
-
-A copied `list[int]` can be widened to the compatible `list[object]` alternative of an inferred
-union.
+A copied `list[int]` can widen to an inferred `list[object]` attribute or to a compatible union
+alternative. The opposite assignments remain invalid.
 
 ```py
 class Cyclic:
     def reset(self, flag: bool):
-        if flag:
-            self.left = [object()]
-        else:
-            self.left = ["initial"]
+        self.left = [object()]
         self.right = [1]
+        if flag:
+            self.union_left = [object()]
+        else:
+            self.union_left = ["initial"]
+        self.union_right = [1]
 
     def update(self):
         self.left = [*self.right]
         self.right = [*self.left]  # error: [invalid-assignment]
+        self.union_left = [*self.union_right]
+        self.union_right = [*self.union_left]  # error: [invalid-assignment]
 
-reveal_type(Cyclic().left)  # revealed: list[object] | list[str]
+reveal_type(Cyclic().left)  # revealed: list[object]
 reveal_type(Cyclic().right)  # revealed: list[int]
+reveal_type(Cyclic().union_left)  # revealed: list[object] | list[str]
+reveal_type(Cyclic().union_right)  # revealed: list[int]
 ```
 
-## Recursive attribute dependencies inside lambdas
+## Recursive attribute dependencies inside lambda scopes
 
 Inferring a lambda's return type can read another attribute even though calling the lambda is
-deferred.
+deferred. Nested lambdas and comprehensions can also capture the enclosing method's receiver.
 
 ```py
 class Cyclic:
     def reset(self):
         self.left = lambda: "initial"
         self.right = lambda: 1
+        self.nested_left = lambda: "initial"
+        self.nested_right = lambda: 1
 
     def update(self, flag: bool):
         if flag:
             self.left = lambda: self.right  # error: [invalid-assignment]
+            self.nested_left = lambda: lambda: self.nested_right  # error: [invalid-assignment]
         else:
             self.right = lambda: self.left  # error: [invalid-assignment]
+            self.nested_right = lambda: [self.nested_left for _ in [0]][0]  # error: [invalid-assignment]
 
 reveal_type(Cyclic().left)  # revealed: () -> str
 reveal_type(Cyclic().right)  # revealed: () -> int
-```
-
-## Recursive attribute dependencies inside nested lambda scopes
-
-Nested lambdas and comprehensions can both capture the enclosing method's receiver.
-
-```py
-class Cyclic:
-    def reset(self):
-        self.left = lambda: "initial"
-        self.right = lambda: 1
-
-    def update(self, flag: bool):
-        if flag:
-            self.left = lambda: lambda: self.right  # error: [invalid-assignment]
-        else:
-            self.right = lambda: [self.left for _ in [0]][0]  # error: [invalid-assignment]
-
-reveal_type(Cyclic().left)  # revealed: () -> str
-reveal_type(Cyclic().right)  # revealed: () -> int
+reveal_type(Cyclic().nested_left)  # revealed: () -> str
+reveal_type(Cyclic().nested_right)  # revealed: () -> int
 ```
 
 ## Recursive attributes across classes when definitions are checked first
@@ -747,144 +657,72 @@ reveal_type(Left().values)  # revealed: list[int]
 reveal_type(Right().values)  # revealed: list[int]
 ```
 
-## Recursive attributes initialized through local aliases
+## Recursive attributes initialized from independently typed values
 
-Local aliases of independent values remain valid initial attribute types, even when the alias chain
-contains more than one assignment.
-
-```py
-class Left:
-    def reset(self):
-        first = 1
-        initial = first
-        self.values = [initial]
-
-    def update(self, other: "Right"):
-        self.values = [*other.values]
-
-class Right:
-    def reset(self):
-        first = 1
-        initial = first
-        self.values = [initial]
-
-    def update(self, other: Left):
-        self.values = [*other.values, "added"]  # error: [invalid-assignment]
-
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
-```
-
-## Recursive attributes initialized from declared attributes
-
-A declared attribute supplies an independent initial value without relying on recursive attribute
-inference.
+Local aliases, class and method annotations, inferred class attributes, and typed properties can all
+establish independent initial values. Each attribute pair remains a separate recursive dependency.
 
 ```py
 class Left:
-    default: int = 1
+    declared: int = 1
+    inferred = 1
 
-    def reset(self):
-        self.values = [self.default]
-
-    def update(self, other: "Right"):
-        self.values = [*other.values]
-
-class Right:
-    default: int = 1
-
-    def reset(self):
-        self.values = [self.default]
-
-    def update(self, other: Left):
-        self.values = [*other.values, "added"]  # error: [invalid-assignment]
-
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
-```
-
-## Recursive attributes initialized from method-level declarations
-
-An instance attribute explicitly annotated inside a method supplies a concrete initial value.
-
-```py
-class Left:
-    def reset(self):
-        self.default: int = 1
-        self.values = [self.default]
-
-    def update(self, other: "Right"):
-        self.values = [*other.values]
-
-class Right:
-    def reset(self):
-        self.default: int = 1
-        self.values = [self.default]
-
-    def update(self, other: Left):
-        self.values = [*other.values, "added"]  # error: [invalid-assignment]
-
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
-```
-
-## Recursive attributes initialized from inferred class attributes
-
-An unannotated class attribute can also establish an independent initial value.
-
-```py
-class Left:
-    default = 1
-
-    def reset(self):
-        self.values = [self.default]
-
-    def update(self, other: "Right"):
-        self.values = [*other.values]
-
-class Right:
-    default = 1
-
-    def reset(self):
-        self.values = [self.default]
-
-    def update(self, other: Left):
-        self.values = [*other.values, "added"]  # error: [invalid-assignment]
-
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
-```
-
-## Recursive attributes initialized from typed properties
-
-A property's declared return type establishes an independent initial value without evaluating its
-getter.
-
-```py
-class Left:
     @property
-    def default(self) -> int:
+    def typed(self) -> int:
         return 1
 
     def reset(self):
-        self.values = [self.default]
+        first = 1
+        initial = first
+        self.alias = [initial]
+        self.annotated = [self.declared]
+        self.default: int = 1
+        self.method = [self.default]
+        self.class_value = [self.inferred]
+        self.property_value = [self.typed]
 
     def update(self, other: "Right"):
-        self.values = [*other.values]
+        self.alias = [*other.alias]
+        self.annotated = [*other.annotated]
+        self.method = [*other.method]
+        self.class_value = [*other.class_value]
+        self.property_value = [*other.property_value]
 
 class Right:
+    declared: int = 1
+    inferred = 1
+
     @property
-    def default(self) -> int:
+    def typed(self) -> int:
         return 1
 
     def reset(self):
-        self.values = [self.default]
+        first = 1
+        initial = first
+        self.alias = [initial]
+        self.annotated = [self.declared]
+        self.default: int = 1
+        self.method = [self.default]
+        self.class_value = [self.inferred]
+        self.property_value = [self.typed]
 
     def update(self, other: Left):
-        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+        self.alias = [*other.alias, "added"]  # error: [invalid-assignment]
+        self.annotated = [*other.annotated, "added"]  # error: [invalid-assignment]
+        self.method = [*other.method, "added"]  # error: [invalid-assignment]
+        self.class_value = [*other.class_value, "added"]  # error: [invalid-assignment]
+        self.property_value = [*other.property_value, "added"]  # error: [invalid-assignment]
 
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
+reveal_type(Left().alias)  # revealed: list[int]
+reveal_type(Right().alias)  # revealed: list[int]
+reveal_type(Left().annotated)  # revealed: list[int]
+reveal_type(Right().annotated)  # revealed: list[int]
+reveal_type(Left().method)  # revealed: list[int]
+reveal_type(Right().method)  # revealed: list[int]
+reveal_type(Left().class_value)  # revealed: list[int]
+reveal_type(Right().class_value)  # revealed: list[int]
+reveal_type(Left().property_value)  # revealed: list[int]
+reveal_type(Right().property_value)  # revealed: list[int]
 ```
 
 ## Acyclic instance attributes on another receiver
@@ -918,230 +756,69 @@ class Rootless:
 reveal_type(Rootless().values)  # revealed: list[Divergent]
 ```
 
-## Recursive attributes retain elements introduced without an initializer
+## Recursive attributes retain independently introduced elements
 
-When recursive assignments have no independent initial value, an explicitly inserted element remains
-known even though the other elements are unknown.
+Without an independent initial collection, direct construction, local aliases, constructor
+arguments, unary literals, and class methods can still establish an individual element's type.
 
 ```py
 class Original: ...
-class Added: ...
 
-class Rootless:
+class Added:
+    def __init__(self, value: int = 0): ...
+    @classmethod
+    def create(cls) -> "Added":
+        return cls()
+
+class Direct:
     def update(self):
         self.left = [*self.right]
         self.right = [*self.left, Added()]
 
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
-reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain locally aliased elements without an initializer
-
-An independent element does not become recursive when it is first assigned to a local variable.
-
-```py
-class Original: ...
-class Added: ...
-
-class Rootless:
+class Aliased:
     def update(self):
         candidate = Added()
         self.left = [*self.right]
         self.right = [*self.left, candidate]
 
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
-reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain constructed elements without an initializer
-
-A constructor remains independent when its arguments do not refer to recursive attributes.
-
-```py
-class Original: ...
-
-class Added:
-    def __init__(self, value: int): ...
-
-class Rootless:
+class Constructed:
     def update(self):
         self.left = [*self.right]
         self.right = [*self.left, Added(1)]
 
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
-reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain unary literals without an initializer
-
-Applying a unary operator to a literal does not hide its independent element type.
-
-```py
-class Original: ...
-
-class Rootless:
+class Unary:
     def update(self):
         self.left = [*self.right]
         self.right = [*self.left, -1]
 
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: list[Unknown | int]
-reveal_type(Rootless().right)  # revealed: list[Unknown | int]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain elements returned by class methods
-
-A class method can provide independent evidence without accessing either recursive attribute.
-
-```py
-class Original: ...
-
-class Added:
-    @classmethod
-    def create(cls) -> "Added":
-        return cls()
-
-class Rootless:
+class ClassMethod:
     def update(self):
         self.left = [*self.right]
         self.right = [*self.left, Added.create()]
 
 def accept_original(value: Original) -> None: ...
 
-reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
-reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+reveal_type(Direct().right)  # revealed: list[Unknown | Added]
+reveal_type(Aliased().right)  # revealed: list[Unknown | Added]
+reveal_type(Constructed().right)  # revealed: list[Unknown | Added]
+reveal_type(Unary().right)  # revealed: list[Unknown | int]
+reveal_type(ClassMethod().right)  # revealed: list[Unknown | Added]
+accept_original(Direct().left[0])  # error: [invalid-argument-type]
+accept_original(Direct().right[0])  # error: [invalid-argument-type]
+accept_original(Aliased().left[0])  # error: [invalid-argument-type]
+accept_original(Aliased().right[0])  # error: [invalid-argument-type]
+accept_original(Constructed().left[0])  # error: [invalid-argument-type]
+accept_original(Constructed().right[0])  # error: [invalid-argument-type]
+accept_original(Unary().left[0])  # error: [invalid-argument-type]
+accept_original(Unary().right[0])  # error: [invalid-argument-type]
+accept_original(ClassMethod().left[0])  # error: [invalid-argument-type]
+accept_original(ClassMethod().right[0])  # error: [invalid-argument-type]
 ```
 
-## Recursive attributes retain evidence inside conditional comprehensions
+## Recursive attributes retain elements through comprehensions and iterators
 
-An independent element remains visible when its collection is copied inside a comprehension and
-selected by a conditional expression.
-
-```py
-class Original: ...
-class Added: ...
-
-class Rootless:
-    def update(self, flag: bool):
-        self.left = [*self.right]
-        self.right = [value for value in [*self.left, Added()]] if flag else [value for value in [*self.left, Added()]]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
-reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain elements inside generator expressions
-
-Copying a collection through a generator does not erase an independently inserted element.
-
-```py
-class Original: ...
-class Added: ...
-
-class Rootless:
-    def update(self):
-        self.left = [*self.right]
-        self.right = list(value for value in [*self.left, Added()])
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
-reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain independently unpacked mapping entries
-
-Unpacking an independent mapping preserves its key and value evidence, including through a local
-alias.
-
-```py
-class Original: ...
-class Added: ...
-
-class Rootless:
-    def update(self):
-        additional = {"added": Added()}
-        self.left = {**self.right, **{"other": Added()}}
-        self.right = {**self.left, **additional}
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Rootless().right)  # revealed: dict[Unknown | str, Unknown | Added]
-accept_original(next(iter(Rootless().left.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Rootless().right.values())))  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain entries copied through mapping comprehensions
-
-A mapping comprehension preserves independently inserted keys and values.
-
-```py
-class Original: ...
-class Added: ...
-
-class Rootless:
-    def update(self):
-        self.left = {**self.right}
-        self.right = {key: value for key, value in {**self.left, "added": Added()}.items()}
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Rootless().right)  # revealed: dict[Unknown | str, Unknown | Added]
-accept_original(next(iter(Rootless().left.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Rootless().right.values())))  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain evidence across nested comprehension generators
-
-Independent elements remain visible when multiple comprehension generators flatten nested
-collections.
-
-```py
-class Original: ...
-class Added: ...
-
-class Rootless:
-    def update(self):
-        self.left = [*self.right]
-        self.right = [value for group in [[*self.left, Added()]] for value in group]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
-reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain evidence through composed iterator operations
-
-Iterator chaining, reversal, and slicing do not erase an independently inserted element.
+Conditional and nested comprehensions, generator expressions, composed iterator operations, and
+constant-condition branches all preserve independently introduced elements.
 
 ```py
 from itertools import chain
@@ -1149,27 +826,77 @@ from itertools import chain
 class Original: ...
 class Added: ...
 
-class Rootless:
+class Conditional:
+    def update(self, flag: bool):
+        self.left = [*self.right]
+        self.right = [value for value in [*self.left, Added()]] if flag else [value for value in [*self.left, Added()]]
+
+class Generator:
+    def update(self):
+        self.left = [*self.right]
+        self.right = list(value for value in [*self.left, Added()])
+
+class Nested:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [value for group in [[*self.left, Added()]] for value in group]
+
+class Composed:
     def update(self):
         self.left = [*self.right]
         self.right = list(reversed(list(chain(self.left, [Added()]))))[:]
 
+class SelectedTrue:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left, Added()] if True else [*self.left]
+
+class SelectedFalse:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left] if False else [*self.left, Added()]
+
 def accept_original(value: Original) -> None: ...
 
-reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
-reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
-accept_original(Rootless().left[0])  # error: [invalid-argument-type]
-accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+reveal_type(Conditional().right)  # revealed: list[Unknown | Added]
+reveal_type(Generator().right)  # revealed: list[Unknown | Added]
+reveal_type(Nested().right)  # revealed: list[Unknown | Added]
+reveal_type(Composed().right)  # revealed: list[Unknown | Added]
+reveal_type(SelectedTrue().right)  # revealed: list[Unknown | Added]
+reveal_type(SelectedFalse().right)  # revealed: list[Unknown | Added]
+accept_original(Conditional().left[0])  # error: [invalid-argument-type]
+accept_original(Conditional().right[0])  # error: [invalid-argument-type]
+accept_original(Generator().left[0])  # error: [invalid-argument-type]
+accept_original(Generator().right[0])  # error: [invalid-argument-type]
+accept_original(Nested().left[0])  # error: [invalid-argument-type]
+accept_original(Nested().right[0])  # error: [invalid-argument-type]
+accept_original(Composed().left[0])  # error: [invalid-argument-type]
+accept_original(Composed().right[0])  # error: [invalid-argument-type]
+accept_original(SelectedTrue().left[0])  # error: [invalid-argument-type]
+accept_original(SelectedTrue().right[0])  # error: [invalid-argument-type]
+accept_original(SelectedFalse().left[0])  # error: [invalid-argument-type]
+accept_original(SelectedFalse().right[0])  # error: [invalid-argument-type]
 ```
 
-## Recursive attributes retain transformed mapping entries
+## Recursive mappings retain independently introduced entries
 
-Transforming comprehension keys or supplying independent keyword entries preserves their value
-evidence.
+Unpacking, identity and transformed comprehensions, keyword constructors, generated entries, and
+independent values paired with recursive keys all preserve their known mapping components.
 
 ```py
 class Original: ...
 class Added: ...
+
+class Unpacked:
+    def update(self):
+        additional = {"added": Added()}
+        self.left = {**self.right, **{"other": Added()}}
+        self.right = {**self.left, **additional}
+
+class Copied:
+    def update(self):
+        self.left = {**self.right}
+        self.right = {key: value for key, value in {**self.left, "added": Added()}.items()}
 
 class Transformed:
     def update(self):
@@ -1181,42 +908,46 @@ class Constructed:
         self.left = {**self.right}
         self.right = dict(self.left, added=Added())
 
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Transformed().right)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Constructed().right)  # revealed: dict[Unknown | str, Unknown | Added]
-accept_original(next(iter(Transformed().left.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Transformed().right.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Constructed().left.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Constructed().right.values())))  # error: [invalid-argument-type]
-```
-
-## Recursive mapping comprehensions preserve independently constructed values
-
-An independent value remains visible when the comprehension keys come from a recursive mapping.
-
-```py
-class Original: ...
-class Added: ...
-
-class Rootless:
+class IndependentValue:
     def update(self):
         self.left = {**self.right}
         self.right = {key: Added() for key in self.left}
 
+class Generator:
+    def update(self):
+        self.left = {**self.right}
+        self.right = dict((key, value) for key, value in {**self.left, "added": Added()}.items())
+
 def accept_original(value: Original) -> None: ...
 
-reveal_type(Rootless().left)  # revealed: dict[Unknown, Unknown | Added]
-reveal_type(Rootless().right)  # revealed: dict[Unknown, Unknown | Added]
-accept_original(next(iter(Rootless().left.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Rootless().right.values())))  # error: [invalid-argument-type]
+reveal_type(Unpacked().right)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Copied().right)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Transformed().right)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Constructed().right)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(IndependentValue().right)  # revealed: dict[Unknown, Unknown | Added]
+reveal_type(Generator().right)  # revealed: dict[Unknown | str, Unknown | Added]
+accept_original(next(iter(Unpacked().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Unpacked().right.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Copied().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Copied().right.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Transformed().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Transformed().right.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Constructed().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Constructed().right.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(IndependentValue().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(IndependentValue().right.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Generator().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Generator().right.values())))  # error: [invalid-argument-type]
 ```
 
 ## Recursive collections preserve independently added operands
 
-Concatenation and collection unions retain elements introduced by independent operands.
+Collection concatenation, mapping and set unions, operator helpers, and bound collection methods
+retain independently supplied elements.
 
 ```py
+from operator import add
+
 class Original: ...
 class Added: ...
 
@@ -1235,83 +966,12 @@ class Sets:
         self.left = {*self.right}
         self.right = self.left | {Added()}
 
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Lists().right)  # revealed: list[Unknown | Added]
-reveal_type(Mappings().right)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Sets().right)  # revealed: set[Unknown | Added]
-accept_original(Lists().left[0])  # error: [invalid-argument-type]
-accept_original(Lists().right[0])  # error: [invalid-argument-type]
-accept_original(next(iter(Mappings().left.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Mappings().right.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Sets().left)))  # error: [invalid-argument-type]
-accept_original(next(iter(Sets().right)))  # error: [invalid-argument-type]
-```
-
-## Recursive attributes retain evidence selected by constant conditions
-
-Both true and false conditions preserve independent elements from their selected branches.
-
-```py
-class Original: ...
-class Added: ...
-
-class SelectedTrue:
-    def update(self):
-        self.left = [*self.right]
-        self.right = [*self.left, Added()] if True else [*self.left]
-
-class SelectedFalse:
-    def update(self):
-        self.left = [*self.right]
-        self.right = [*self.left] if False else [*self.left, Added()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(SelectedTrue().right)  # revealed: list[Unknown | Added]
-reveal_type(SelectedFalse().right)  # revealed: list[Unknown | Added]
-accept_original(SelectedTrue().left[0])  # error: [invalid-argument-type]
-accept_original(SelectedTrue().right[0])  # error: [invalid-argument-type]
-accept_original(SelectedFalse().left[0])  # error: [invalid-argument-type]
-accept_original(SelectedFalse().right[0])  # error: [invalid-argument-type]
-```
-
-## Recursive mappings retain entries copied by generator expressions
-
-Constructing a mapping from generated key-value pairs preserves its independent entries.
-
-```py
-class Original: ...
-class Added: ...
-
-class Rootless:
-    def update(self):
-        self.left = {**self.right}
-        self.right = dict((key, value) for key, value in {**self.left, "added": Added()}.items())
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Rootless().right)  # revealed: dict[Unknown | str, Unknown | Added]
-accept_original(next(iter(Rootless().left.values())))  # error: [invalid-argument-type]
-accept_original(next(iter(Rootless().right.values())))  # error: [invalid-argument-type]
-```
-
-## Recursive collections preserve semantic method and operator results
-
-Bound collection methods and operator helpers retain independently supplied elements.
-
-```py
-from operator import add
-
-class Original: ...
-class Added: ...
-
-class Lists:
+class Operator:
     def update(self):
         self.left = [*self.right]
         self.right = add([*self.left], [Added()])
 
-class Sets:
+class Method:
     def update(self):
         self.left = {*self.right}
         self.right = self.left.union({Added()})
@@ -1319,11 +979,20 @@ class Sets:
 def accept_original(value: Original) -> None: ...
 
 reveal_type(Lists().right)  # revealed: list[Unknown | Added]
+reveal_type(Mappings().right)  # revealed: dict[Unknown | str, Unknown | Added]
 reveal_type(Sets().right)  # revealed: set[Unknown | Added]
+reveal_type(Operator().right)  # revealed: list[Unknown | Added]
+reveal_type(Method().right)  # revealed: set[Unknown | Added]
 accept_original(Lists().left[0])  # error: [invalid-argument-type]
 accept_original(Lists().right[0])  # error: [invalid-argument-type]
+accept_original(next(iter(Mappings().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Mappings().right.values())))  # error: [invalid-argument-type]
 accept_original(next(iter(Sets().left)))  # error: [invalid-argument-type]
 accept_original(next(iter(Sets().right)))  # error: [invalid-argument-type]
+accept_original(Operator().left[0])  # error: [invalid-argument-type]
+accept_original(Operator().right[0])  # error: [invalid-argument-type]
+accept_original(next(iter(Method().left)))  # error: [invalid-argument-type]
+accept_original(next(iter(Method().right)))  # error: [invalid-argument-type]
 ```
 
 ## Cycle normalization preserves non-gradual variadic parameters
