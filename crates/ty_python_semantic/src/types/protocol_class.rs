@@ -15,7 +15,7 @@ use crate::types::attribute_write::{
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
@@ -1803,7 +1803,7 @@ enum StructuralMemberPriority {
     Simple,
     /// A non-recursive callable member with multiple overloads.
     FiniteOverload,
-    /// A member that may recurse through a protocol or type alias, or whose finiteness is unknown.
+    /// A member that contains a protocol or recursive alias, or whose finiteness is unknown.
     Recursive,
 }
 
@@ -1908,16 +1908,16 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     /// Returns the priority for structurally comparing this member.
     ///
-    /// Simple finite members are cheapest, followed by finite overloads. Recursive and
-    /// alias-containing members are compared last because they can expand the same interface again.
+    /// Simple finite members are cheapest, followed by finite overloads. Recursive members and
+    /// aliases that contain a protocol or are themselves recursive are compared last.
     fn structural_member_priority(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> StructuralMemberPriority {
         let is_recursive_type = |ty| {
-            any_over_type(db, env, ty, false, |nested| {
-                matches!(nested, Type::ProtocolInstance(_) | Type::TypeAlias(_))
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                matches!(nested, Type::ProtocolInstance(_))
             })
         };
 

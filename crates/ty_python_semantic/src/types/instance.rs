@@ -17,6 +17,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
 };
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::walk_specialization;
 use crate::types::protocol_class::{
@@ -703,8 +704,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_interface = source_protocol.interface(db);
         let target_interface = protocol.interface(db);
-        let source_non_recursive =
-            non_recursive_protocol_interface(db, source_interface.base(), identity_protocol, ty);
         let target_non_recursive = non_recursive_protocol_interface(
             db,
             target_interface.base(),
@@ -712,19 +711,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             Type::ProtocolInstance(protocol),
         );
 
-        if source_non_recursive == source_interface.base()
-            && target_non_recursive == target_interface.base()
-        {
+        if target_non_recursive == target_interface.base() {
             return None;
         }
 
+        // Filter requirements, not evidence: a target-finite member can contain the same protocol
+        // in the source specialization and must remain available for comparison.
         Some(self.check_protocol_interface_pair(
             db,
             ty,
-            ProtocolInterfaceView::new(
-                source_non_recursive,
-                source_interface.materialization_kind(),
-            ),
+            source_interface,
             ProtocolInterfaceView::new(
                 target_non_recursive,
                 target_interface.materialization_kind(),
@@ -802,6 +798,7 @@ fn non_recursive_protocol_interface<'db>(
         origin: ClassLiteral<'db>,
         found: Cell<bool>,
         recursion_guard: TypeCollector<'db>,
+        active_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
     }
 
     impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'_, 'db> {
@@ -814,7 +811,11 @@ fn non_recursive_protocol_interface<'db>(
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-            self.visit_type(db, type_alias.value_type(db));
+            self.active_aliases.visit(
+                &Type::TypeAlias(type_alias).to_type_identity(db),
+                || self.found.set(true),
+                || self.visit_type(db, type_alias.value_type(db)),
+            );
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -844,6 +845,7 @@ fn non_recursive_protocol_interface<'db>(
             origin: protocol.class_literal(db),
             found: Cell::new(false),
             recursion_guard: TypeCollector::default(),
+            active_aliases: ActiveRecursionDetector::default(),
         };
         walk_protocol_instance_member(db, member, receiver_ty, &visitor);
         !visitor.found.get()
