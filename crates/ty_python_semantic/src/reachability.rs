@@ -542,6 +542,7 @@ fn accumulate_constraint<'db>(
 
 const NON_TERMINAL_CALL_CHUNK_SIZE: usize = 16;
 const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
+const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
@@ -743,19 +744,36 @@ fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthines
     }
 }
 
+/// Selects sparse, stable checkpoints without adding a second scope-wide predicate index.
+///
+/// Statement calls retain their existing checkpoint spacing. Other control-flow predicates become
+/// checkpoints only after a sufficiently long path has demonstrated that reuse is worthwhile.
 fn is_reachability_checkpoint(
-    call_predicates: &[ScopedPredicateId],
+    call_predicates: Option<&[ScopedPredicateId]>,
     predicate: ScopedPredicateId,
+    visited: usize,
 ) -> bool {
-    call_predicates
-        .binary_search(&predicate)
-        .is_ok_and(|index| (index + 1) % REACHABILITY_EVALUATION_CHUNK_SIZE == 0)
+    if let Some(call_index) = call_predicates.and_then(|calls| calls.binary_search(&predicate).ok())
+    {
+        return (call_index + 1).is_multiple_of(REACHABILITY_EVALUATION_CHUNK_SIZE);
+    }
+
+    // Folding the adjacent bucket prevents regularly interleaved predicate kinds from always
+    // missing the same checkpoint positions.
+    let index = predicate.index();
+    let checkpoint_position = index ^ (index / CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL);
+    visited >= CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL
+        && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
 /// Walks a reachability decision diagram until it reaches a terminal or reusable checkpoint.
 ///
 /// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
 /// node is evaluated directly to prevent the query from immediately calling itself again.
+///
+/// General checkpoints are created only after traversing a genuinely long path. Their positions
+/// depend on stable predicate IDs, so adjacent roots reuse the same suffix without requiring an
+/// additional retained scope-wide index or allocating tracked queries for short, ordinary paths.
 fn evaluate_reachability_path<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -766,6 +784,7 @@ fn evaluate_reachability_path<'db>(
     mut use_checkpoint: bool,
 ) -> Truthiness {
     let env = ProgramEnvironment::from_scope(scope);
+    let mut visited = 0;
 
     loop {
         if let Some(reachability) = terminal_reachability(id) {
@@ -773,11 +792,7 @@ fn evaluate_reachability_path<'db>(
         }
 
         let node = constraints.get_interior_node(id);
-        if use_checkpoint
-            && call_predicates.is_some_and(|call_predicates| {
-                is_reachability_checkpoint(call_predicates, node.atom())
-            })
-        {
+        if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
             return evaluate_reachability_checkpoint(db, scope, id);
         }
 
@@ -787,14 +802,16 @@ fn evaluate_reachability_path<'db>(
             Truthiness::AlwaysFalse => node.if_false(),
         };
         use_checkpoint = true;
+        visited += 1;
     }
 }
 
 /// Evaluates a canonical suffix of a reachability decision diagram.
 ///
-/// Only every [`REACHABILITY_EVALUATION_CHUNK_SIZE`]th non-terminal-call predicate is a checkpoint.
-/// This lets later statements reuse the constraints accumulated by earlier statements without
-/// retaining a Salsa query key and memo for every reachability constraint in the scope.
+/// Statement calls retain their existing sparse checkpoints; other predicates become checkpoints
+/// only after a long path demonstrates that reuse is worthwhile. This lets later statements reuse
+/// constraints accumulated by earlier statements without retaining an additional scope-wide index
+/// or a Salsa query key and memo for every constraint.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
@@ -806,12 +823,19 @@ fn evaluate_reachability_checkpoint<'db>(
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     let use_def = use_def_map(db, scope);
+    let predicates = use_def.predicates();
+    let has_many_calls = predicates
+        .iter()
+        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
+        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
+        .is_some();
+    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
     evaluate_reachability_path(
         db,
         scope,
         use_def.reachability_constraints(),
-        use_def.predicates(),
-        Some(non_terminal_call_predicates(db, scope)),
+        predicates,
+        call_predicates,
         id,
         false,
     )
@@ -1975,6 +1999,120 @@ mod tests {
     use ty_python_core::narrowing_constraints::InteriorNode;
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
+
+    #[test]
+    fn control_flow_checkpoints_handle_interleaved_predicates() {
+        for offset in 0..CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL {
+            let checkpoints = (0..CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
+                .map(|index| {
+                    ScopedPredicateId::new(
+                        index * CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL + offset,
+                    )
+                })
+                .filter(|predicate| {
+                    is_reachability_checkpoint(
+                        None,
+                        *predicate,
+                        CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL,
+                    )
+                })
+                .count();
+            assert_eq!(checkpoints, 1);
+        }
+    }
+
+    #[test]
+    fn statement_call_checkpoints_keep_sparse_spacing() {
+        let calls = (0..REACHABILITY_EVALUATION_CHUNK_SIZE)
+            .map(ScopedPredicateId::new)
+            .collect::<Vec<_>>();
+
+        assert!(!is_reachability_checkpoint(
+            Some(&calls),
+            calls[CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL - 1],
+            CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL,
+        ));
+        assert!(is_reachability_checkpoint(
+            Some(&calls),
+            calls[REACHABILITY_EVALUATION_CHUNK_SIZE - 1],
+            0,
+        ));
+    }
+
+    #[test]
+    fn repeated_control_flow_uses_sparse_reachability_checkpoints() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let repetitions = CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL * 3 + 1;
+        let body = "    with suppress(ValueError):\n        value = may_raise(value)\n"
+            .repeat(repetitions);
+        let source = format!(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef function() -> int:\n    value: int | str = 0\n    if isinstance(value, str):\n        value = 0\n{body}    return value\n"
+        );
+        db.write_file("/src/test.py", &source)?;
+
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let index = semantic_index(&db, program_file);
+        let function_scope = index
+            .child_scopes(FileScopeId::global())
+            .nth(1)
+            .unwrap()
+            .0
+            .to_scope_id(&db, program_file);
+        let suppression_predicates = use_def_map(&db, function_scope)
+            .predicates()
+            .iter_enumerated()
+            .filter_map(|(id, predicate)| {
+                matches!(
+                    predicate.node,
+                    PredicateNode::ContextManagerSuppresses { .. }
+                )
+                .then_some(id)
+            })
+            .collect::<Vec<_>>();
+        let checkpoints = suppression_predicates
+            .into_iter()
+            .filter(|predicate| {
+                is_reachability_checkpoint(
+                    None,
+                    *predicate,
+                    CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(checkpoints.len(), 3);
+        assert!(checkpoints.iter().all(|predicate| {
+            !is_reachability_checkpoint(
+                None,
+                *predicate,
+                CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL - 1,
+            )
+        }));
+
+        let value = index
+            .place_table(function_scope.file_scope_id(&db))
+            .symbol_id("value")
+            .unwrap();
+        let narrowed_bindings = use_def_map(&db, function_scope)
+            .end_of_scope_symbol_bindings(value)
+            .filter(|binding| !binding.narrowing_constraint.constraint().is_terminal())
+            .count();
+        assert_eq!(narrowed_bindings, 1);
+
+        crate::types::infer_complete_scope_types(&db, function_scope);
+        let events = db.take_salsa_events();
+        assert!(
+            ruff_db::testing::find_will_execute_event_by_name(
+                &db,
+                "evaluate_reachability_checkpoint",
+                None,
+                &events,
+            )
+            .is_some()
+        );
+        Ok(())
+    }
 
     #[test]
     fn non_terminal_call_range_recovers_cross_file_cycle() -> anyhow::Result<()> {

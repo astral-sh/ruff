@@ -464,6 +464,17 @@ def propagating_exception(value: int | str) -> None:
     reveal_type(value)  # revealed: str
 ```
 
+Narrowing established after an earlier operation that may raise is preserved too:
+
+```py
+def narrowing_after_possible_exception(value: int | str) -> None:
+    with Manager():
+        int("invalid")
+        if isinstance(value, int):
+            raise ValueError
+    reveal_type(value)  # revealed: str
+```
+
 ## Overloaded context manager exit methods
 
 Whether an overloaded exit method can suppress an exception depends on the overload used when an
