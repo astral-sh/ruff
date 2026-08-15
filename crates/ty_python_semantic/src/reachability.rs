@@ -705,6 +705,30 @@ fn evaluate_reachability_constraint<'db>(
     )
 }
 
+/// Evaluates the normal continuation captured by a deferred `finally` predicate.
+///
+/// Unlike other reachability predicates, a deferred `finally` predicate recursively evaluates
+/// another reachability constraint, which may contain earlier deferred `finally` predicates.
+/// Caching these continuations prevents a sequence of `finally` suites from repeatedly evaluating
+/// all preceding continuations, which would otherwise take exponential time.
+///
+/// Other expensive predicates already use tracked queries, while ordinary reachability
+/// constraints are cached within each inference region and at sparse checkpoints. Tracking
+/// [`evaluate_reachability_constraint`] itself would instead retain a Salsa query key and memo for
+/// every constraint.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn evaluate_finally_continuation<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    continuation: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    evaluate_reachability_constraint(db, scope, continuation)
+}
+
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
     match id {
         ScopedReachabilityConstraintId::ALWAYS_TRUE => Some(Truthiness::AlwaysTrue),
@@ -1544,7 +1568,7 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             scope,
             continuation,
         } => Truthiness::from(
-            evaluate_reachability_constraint(db, scope, continuation).is_always_false(),
+            evaluate_finally_continuation(db, scope, continuation).is_always_false(),
         )
         .negate_if(!predicate.is_positive),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
