@@ -301,6 +301,12 @@ inherits = "release"
 opt-level = "z"
 codegen-units = 1
 
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+# Avoid the local ThinLTO that Cargo enables at nonzero optimization levels.
+lto = "off"
+
 [profile.dev.package.insta]
 opt-level = 3
 

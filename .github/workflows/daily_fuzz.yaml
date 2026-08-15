@@ -22,6 +22,8 @@ env:
   RUSTUP_MAX_RETRIES: 10
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
   PACKAGE_NAME: ruff
   FORCE_COLOR: 1
 
