@@ -1928,8 +1928,7 @@ Child(1)
 
 ### Defaulted fields inherited from stub dataclasses
 
-An ellipsis assigned to a stub field indicates an actual default, as does an assignment separated
-from the field's annotation.
+An ellipsis assigned to a stub field indicates an actual default.
 
 `base.pyi`:
 
@@ -1940,32 +1939,21 @@ from dataclasses import dataclass
 class EllipsisDefault:
     required: int
     optional: int = ...
-
-@dataclass
-class SplitDefault:
-    optional: int
-    optional = 1
 ```
 
-Both forms produce optional constructor parameters, so adding a required field in a subclass is
+The field produces an optional constructor parameter, so adding a required field in a subclass is
 invalid.
 
 ```py
 from dataclasses import dataclass
-from base import EllipsisDefault, SplitDefault
+from base import EllipsisDefault
 
 reveal_type(EllipsisDefault.__init__)  # revealed: (self: EllipsisDefault, required: int, optional: int = ...) -> None
-reveal_type(SplitDefault.__init__)  # revealed: (self: SplitDefault, optional: int = 1) -> None
 
 EllipsisDefault(1)
-SplitDefault()
 
 @dataclass
 class InvalidEllipsisChild(EllipsisDefault):
-    added: str  # error: [dataclass-field-order]
-
-@dataclass
-class InvalidSplitChild(SplitDefault):
     added: str  # error: [dataclass-field-order]
 ```
 

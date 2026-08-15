@@ -2625,31 +2625,22 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
-                let mut default_ty = if field_policy == CodeGeneratorKind::TypedDict {
+                // Annotation-only declarations in stubs also act as bindings for attribute
+                // lookup, but they do not supply field defaults.
+                let mut default_ty = if field_policy == CodeGeneratorKind::TypedDict
+                    || (self.file(db).is_stub(db)
+                        && !first_declaration.is_some_and(|definition| {
+                            matches!(
+                                definition.kind(db),
+                                DefinitionKind::AnnotatedAssignment(annotation)
+                                    if annotation.has_value()
+                            )
+                        })) {
                     None
                 } else {
-                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let has_default = !self.file(db).is_stub(db) || {
-                        bindings.clone().any(|binding| {
-                            binding.binding.is_defined_and(|definition| {
-                                // Annotation-only declarations in stubs also act as bindings for
-                                // attribute lookup, but they do not supply field defaults.
-                                !matches!(
-                                    definition.kind(db),
-                                    DefinitionKind::AnnotatedAssignment(annotation)
-                                        if !annotation.has_value()
-                                ) && !binding_reachability(db, use_def, &binding).is_always_false()
-                            })
-                        })
-                    };
-
-                    if has_default {
-                        place_from_bindings(db, &env, bindings)
-                            .place
-                            .ignore_possibly_undefined()
-                    } else {
-                        None
-                    }
+                    place_from_bindings(db, &env, use_def.end_of_scope_symbol_bindings(symbol_id))
+                        .place
+                        .ignore_possibly_undefined()
                 };
 
                 default_ty =
