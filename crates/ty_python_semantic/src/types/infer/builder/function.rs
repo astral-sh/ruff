@@ -25,8 +25,8 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorator_flags, function_known_decorators, infer_statement_types,
-            nearest_enclosing_function, original_class_type,
+            function_known_decorator_flags, function_known_decorators, nearest_enclosing_function,
+            original_class_type,
         },
         infer_scope_types,
         relation::TypeRelation,
@@ -1410,10 +1410,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let enclosing_stmt = infer_statement_types(
-            self.db(),
-            self.index.enclosing_lambda_statement(lambda.into())?,
-        );
+        let enclosing_stmt = self
+            .infer_member_statement_types(self.index.enclosing_lambda_statement(lambda.into())?);
         let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
         let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
             // TODO: If there are multiple applicable overloads, we could attempt multi-inference.

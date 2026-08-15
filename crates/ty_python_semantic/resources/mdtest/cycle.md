@@ -266,10 +266,28 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
-## Recursive instance attributes retain independently established types
+## Recursive instance attributes widen independently established types
 
-Mutually dependent attributes fall back to their independent values. An assignment that widens
-either value requires an explicit annotation.
+An inferred attribute is not a declaration: every assignment contributes to its type, even when two
+attributes depend on one another.
+
+```py
+class Scalars:
+    def reset(self):
+        self.left = 1
+        self.right = "initial"
+
+    def update(self, flag: bool):
+        if flag:
+            self.left = self.right
+        else:
+            self.right = self.left
+
+reveal_type(Scalars().left)  # revealed: int | str
+reveal_type(Scalars().right)  # revealed: str | int
+```
+
+Collection elements introduced through either attribute remain visible to typed consumers.
 
 ```py
 class Cyclic:
@@ -279,16 +297,129 @@ class Cyclic:
 
     def update(self):
         self.left = [*self.right]
-        self.right = [*self.left, "added"]  # error: [invalid-assignment]
+        self.right = [*self.left, "added"]
 
-reveal_type(Cyclic().left)  # revealed: list[int]
-reveal_type(Cyclic().right)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+
+reveal_type(Cyclic().left)  # revealed: list[int] | list[int | str]
+reveal_type(Cyclic().right)  # revealed: list[int] | list[int | str]
+accept_int(Cyclic().left[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().right[0])  # error: [invalid-argument-type]
 ```
 
-## Recursive instance attributes reject nested collection growth
+## Explicitly declared recursive attributes retain their upper bounds
 
-Wrapping another independently initialized list or tuple creates an incompatible extra nesting
-level, even when both lists begin with the same element type.
+Unlike independently inferred values, class-body annotations are actual assignment contracts.
+
+```py
+class Declared:
+    left: int
+    right: str
+
+    def reset(self):
+        self.left = 1
+        self.right = "initial"
+
+    def update(self):
+        self.left = self.right  # error: [invalid-assignment]
+        self.right = self.left  # error: [invalid-assignment]
+
+reveal_type(Declared().left)  # revealed: int
+reveal_type(Declared().right)  # revealed: str
+```
+
+## Recursive attributes written through assignment targets
+
+Unpacking, loop targets, context managers, and comprehensions all write instance attributes without
+using an ordinary attribute assignment.
+
+```py
+from contextlib import nullcontext
+
+class Cyclic:
+    def reset(self):
+        self.unpacked_left = 1
+        self.unpacked_right = "initial"
+        self.loop_left = 1
+        self.loop_right = "initial"
+        self.context_left = 1
+        self.context_right = "initial"
+        self.comprehension_left = 1
+        self.comprehension_right = "initial"
+
+    def update(self):
+        (self.unpacked_left,) = (self.unpacked_right,)
+        (self.unpacked_right,) = (self.unpacked_left,)
+
+        for self.loop_left in [self.loop_right]:
+            pass
+        for self.loop_right in [self.loop_left]:
+            pass
+
+        with nullcontext(self.context_right) as self.context_left:
+            pass
+        with nullcontext(self.context_left) as self.context_right:
+            pass
+
+        [self.comprehension_left for self.comprehension_left in [self.comprehension_right]]
+        [self.comprehension_right for self.comprehension_right in [self.comprehension_left]]
+
+reveal_type(Cyclic().unpacked_left)  # revealed: int | str
+reveal_type(Cyclic().loop_left)  # revealed: int | str
+reveal_type(Cyclic().context_left)  # revealed: int | str
+reveal_type(Cyclic().comprehension_left)  # revealed: int | str
+```
+
+## Recursive assignments respect narrowing and unreachable branches
+
+Filtering another attribute with `isinstance` must preserve its narrowed type. A constant-false
+branch contributes no assignment.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = 1
+        self.right = "initial"
+
+    def update(self):
+        if isinstance(self.right, int):
+            self.left = self.right
+        if isinstance(self.left, str):
+            self.right = self.left
+        if False:
+            self.left = object()
+
+reveal_type(Cyclic().left)  # revealed: int
+reveal_type(Cyclic().right)  # revealed: str
+```
+
+## Recursive assignments preserve contextual `TypedDict` inference
+
+An explicit `TypedDict` declaration provides the expected type for a dictionary literal while its
+value reads another declared attribute.
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class Cyclic:
+    left: Payload
+    right: Payload
+
+    def update(self):
+        self.left = {"value": self.right["value"]}
+        self.right = {"value": self.left["value"]}
+
+reveal_type(Cyclic().left)  # revealed: Payload
+reveal_type(Cyclic().right)  # revealed: Payload
+```
+
+## Recursive instance attributes normalize nested collection growth
+
+Wrapping another independently initialized list or tuple is a valid assignment. Recursive growth
+must terminate without manufacturing an assignment error.
 
 ```py
 class Cyclic:
@@ -299,15 +430,16 @@ class Cyclic:
         self.tuple_right = (1,)
 
     def update(self):
-        self.list_left = [self.list_right]  # error: [invalid-assignment]
-        self.list_right = [self.list_left]  # error: [invalid-assignment]
-        self.tuple_left = (self.tuple_right,)  # error: [invalid-assignment]
-        self.tuple_right = (self.tuple_left,)  # error: [invalid-assignment]
+        self.list_left = [self.list_right]
+        self.list_right = [self.list_left]
+        self.tuple_left = (self.tuple_right,)
+        self.tuple_right = (self.tuple_left,)
 
-reveal_type(Cyclic().list_left)  # revealed: list[int]
-reveal_type(Cyclic().list_right)  # revealed: list[int]
-reveal_type(Cyclic().tuple_left)  # revealed: tuple[str]
-reveal_type(Cyclic().tuple_right)  # revealed: tuple[int]
+def accept_int(value: int) -> None: ...
+def accept_string(value: str) -> None: ...
+
+accept_int(Cyclic().list_left[0])  # error: [invalid-argument-type]
+accept_string(Cyclic().tuple_left[0])  # error: [invalid-argument-type]
 ```
 
 ## Recursive instance attributes propagate self-growing dependencies
@@ -325,11 +457,11 @@ class Cyclic:
     def update(self):
         self.left = [*self.middle]
         self.middle = [*self.right]
-        self.right = [self.right]  # error: [invalid-assignment]
+        self.right = [self.right]
 
-reveal_type(Cyclic().left)  # revealed: list[str] | list[int | bytes]
-reveal_type(Cyclic().middle)  # revealed: list[int] | list[bytes]
-reveal_type(Cyclic().right)  # revealed: list[bytes]
+def accept_string(value: str) -> None: ...
+
+accept_string(Cyclic().left[0])  # error: [invalid-argument-type]
 ```
 
 ## Recursive attributes propagate dependencies through local aliases
@@ -352,7 +484,7 @@ class Cyclic:
         self.middle = [*receiver.right]
 
     def update(self):
-        self.right = [self.right]  # error: [invalid-assignment]
+        self.right = [self.right]
 
 class ClassCyclic:
     @classmethod
@@ -364,12 +496,12 @@ class ClassCyclic:
     def update(cls):
         value = cls.right
         cls.middle = [*value]
-        cls.right = [cls.right]  # error: [invalid-assignment]
+        cls.right = [cls.right]
 
-reveal_type(Cyclic().middle)  # revealed: list[int] | list[bytes]
-reveal_type(Cyclic().right)  # revealed: list[bytes]
-reveal_type(ClassCyclic.middle)  # revealed: list[int] | list[bytes]
-reveal_type(ClassCyclic.right)  # revealed: list[bytes]
+def accept_int(value: int) -> None: ...
+
+accept_int(Cyclic().middle[0])  # error: [invalid-argument-type]
+accept_int(ClassCyclic.middle[0])  # error: [invalid-argument-type]
 ```
 
 ## Recursive attributes ignore unreachable dependent assignments
@@ -420,32 +552,35 @@ class Cyclic:
 
     def update(self, flag: bool):
         self.mapping_left = {**self.mapping_right}
-        self.mapping_right = {**self.mapping_left, "added": 1}  # error: [invalid-assignment]
+        self.mapping_right = {**self.mapping_left, "added": 1}
         self.comprehension_left = [value for value in self.comprehension_right]
-        self.comprehension_right = [value for value in self.comprehension_left] + ["added"]  # error: [invalid-assignment]
+        self.comprehension_right = [value for value in self.comprehension_left] + ["added"]
         self.conditional_left = self.conditional_right if flag else self.conditional_right
-        self.conditional_right = self.conditional_left or ["added"]  # error: [invalid-assignment]
+        self.conditional_right = self.conditional_left or ["added"]
         self.nested_left = list(tuple(self.nested_right))
-        self.nested_right = list(tuple(self.nested_left)) + ["added"]  # error: [invalid-assignment]
+        self.nested_right = list(tuple(self.nested_left)) + ["added"]
         self.mapped_left = list(map(lambda value: value, self.mapped_right))
-        self.mapped_right = list(map(lambda value: value, self.mapped_left)) + ["added"]  # error: [invalid-assignment]
+        self.mapped_right = list(map(lambda value: value, self.mapped_left)) + ["added"]
 
-reveal_type(Cyclic().mapping_left)  # revealed: dict[str, str]
-reveal_type(Cyclic().mapping_right)  # revealed: dict[str, str]
-reveal_type(Cyclic().comprehension_left)  # revealed: list[int]
-reveal_type(Cyclic().comprehension_right)  # revealed: list[int]
-reveal_type(Cyclic().conditional_left)  # revealed: list[int]
-reveal_type(Cyclic().conditional_right)  # revealed: list[int]
-reveal_type(Cyclic().nested_left)  # revealed: list[int]
-reveal_type(Cyclic().nested_right)  # revealed: list[int]
-reveal_type(Cyclic().mapped_left)  # revealed: list[int]
-reveal_type(Cyclic().mapped_right)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+def accept_string(value: str) -> None: ...
+
+accept_string(Cyclic().mapping_left["added"])  # error: [invalid-argument-type]
+accept_string(Cyclic().mapping_right["added"])  # error: [invalid-argument-type]
+accept_int(Cyclic().comprehension_left[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().comprehension_right[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().conditional_left[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().conditional_right[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().nested_left[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().nested_right[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().mapped_left[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().mapped_right[0])  # error: [invalid-argument-type]
 ```
 
 ## Recursive attributes preserve valid contextual collection widening
 
-A copied `list[int]` can widen to an inferred `list[object]` attribute or to a compatible union
-alternative. The opposite assignments remain invalid.
+A copied `list[int]` can coexist with an inferred `list[object]` or a compatible union alternative.
+Assignments in either direction widen the inferred attribute; neither becomes an upper bound.
 
 ```py
 class Cyclic:
@@ -458,16 +593,18 @@ class Cyclic:
             self.union_left = ["initial"]
         self.union_right = [1]
 
-    def update(self):
-        self.left = [*self.right]
-        self.right = [*self.left]  # error: [invalid-assignment]
-        self.union_left = [*self.union_right]
-        self.union_right = [*self.union_left]  # error: [invalid-assignment]
+    def update(self, flag: bool):
+        if flag:
+            self.left = [*self.right]
+            self.union_left = [*self.union_right]
+        else:
+            self.right = [*self.left]
+            self.union_right = [*self.union_left]
 
-reveal_type(Cyclic().left)  # revealed: list[object]
-reveal_type(Cyclic().right)  # revealed: list[int]
-reveal_type(Cyclic().union_left)  # revealed: list[object] | list[str]
-reveal_type(Cyclic().union_right)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+
+accept_int(Cyclic().right[0])  # error: [invalid-argument-type]
+accept_int(Cyclic().union_right[0])  # error: [invalid-argument-type]
 ```
 
 ## Recursive attribute dependencies inside lambda scopes
@@ -485,22 +622,22 @@ class Cyclic:
 
     def update(self, flag: bool):
         if flag:
-            self.left = lambda: self.right  # error: [invalid-assignment]
-            self.nested_left = lambda: lambda: self.nested_right  # error: [invalid-assignment]
+            self.left = lambda: self.right
+            self.nested_left = lambda: lambda: self.nested_right
         else:
-            self.right = lambda: self.left  # error: [invalid-assignment]
-            self.nested_right = lambda: [self.nested_left for _ in [0]][0]  # error: [invalid-assignment]
+            self.right = lambda: self.left
+            self.nested_right = lambda: [self.nested_left for _ in [0]][0]
 
-reveal_type(Cyclic().left)  # revealed: () -> str
-reveal_type(Cyclic().right)  # revealed: () -> int
-reveal_type(Cyclic().nested_left)  # revealed: () -> str
-reveal_type(Cyclic().nested_right)  # revealed: () -> int
+def accept_string(value: str) -> None: ...
+
+accept_string(Cyclic().left())  # error: [invalid-argument-type]
+accept_string(Cyclic().nested_left())  # error: [invalid-argument-type]
 ```
 
 ## Recursive attributes across classes when definitions are checked first
 
-The same conservative recovery applies across classes without needing to resolve receiver ownership
-before entering the attribute queries.
+Assignments across two classes contribute to a shared fixed point rather than treating either
+independent initializer as a declaration.
 
 `model.py`:
 
@@ -517,7 +654,7 @@ class Right:
         self.values = [1]
 
     def update(self, other: Left):
-        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+        self.values = [*other.values, "added"]
 ```
 
 `consumer.py`:
@@ -525,21 +662,30 @@ class Right:
 ```py
 from model import Left, Right
 
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[int] | list[int | str]
+reveal_type(Right().values)  # revealed: list[int] | list[int | str]
+accept_int(Left().values[0])  # error: [invalid-argument-type]
+accept_int(Right().values[0])  # error: [invalid-argument-type]
 ```
 
 ## Recursive attributes across classes when uses are checked first
 
-Checking the consumer before the class definitions produces the same types and assignment error.
+Checking the consumer before the class definitions preserves both widened types and real downstream
+diagnostics.
 
 `consumer.py`:
 
 ```py
 from model import Left, Right
 
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+
+reveal_type(Left().values)  # revealed: list[int] | list[int | str]
+reveal_type(Right().values)  # revealed: list[int] | list[int | str]
+accept_int(Left().values[0])  # error: [invalid-argument-type]
+accept_int(Right().values[0])  # error: [invalid-argument-type]
 ```
 
 `model.py`:
@@ -557,21 +703,23 @@ class Right:
         self.values = [1]
 
     def update(self, other: Left):
-        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+        self.values = [*other.values, "added"]
 ```
 
 ## Recursive attributes across classes through an intermediate field
 
 An attribute chain beginning with `self` can still read a different instance. Checking the consumer
-first must not hide an incompatible assignment through that intermediate field.
+first must retain the element introduced through that intermediate field.
 
 `consumer.py`:
 
 ```py
 from model import Left, Right
 
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+
+accept_int(Left().values[0])  # error: [invalid-argument-type]
+accept_int(Right().values[0])  # error: [invalid-argument-type]
 ```
 
 `model.py`:
@@ -593,21 +741,23 @@ class Right:
         self.values = [1]
 
     def update(self):
-        self.values = [*self.holder.values, "added"]  # error: [invalid-assignment]
+        self.values = [*self.holder.values, "added"]
 ```
 
 ## Recursive attributes across classes through conditional intermediate fields
 
 Both branches of a conditional receiver can point to another class. Checking the consumer first must
-retain the same independent roots and report an incompatible assignment.
+retain both initializer types and the additional assigned element.
 
 `consumer.py`:
 
 ```py
 from model import Left, Right
 
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+
+accept_int(Left().values[0])  # error: [invalid-argument-type]
+accept_int(Right().values[0])  # error: [invalid-argument-type]
 ```
 
 `model.py`:
@@ -631,7 +781,7 @@ class Right:
         self.values = [1]
 
     def update(self, flag: bool):
-        self.values = [*(self.holder if flag else self.alternate).values, "added"]  # error: [invalid-assignment]
+        self.values = [*(self.holder if flag else self.alternate).values, "added"]
 ```
 
 ## Recursive attributes across conditionally selected receivers
@@ -655,13 +805,300 @@ class Right:
         self.right = [1]
 
     def update(self, other: Left, alternate: Left, flag: bool):
-        self.values = [*(other if flag else alternate).values, "added"]  # error: [invalid-assignment]
-        self.right = [*(other if flag else alternate).left, "added"]  # error: [invalid-assignment]
+        self.values = [*(other if flag else alternate).values, "added"]
+        self.right = [*(other if flag else alternate).left, "added"]
 
-reveal_type(Left().values)  # revealed: list[int]
-reveal_type(Right().values)  # revealed: list[int]
-reveal_type(Left().left)  # revealed: list[int]
-reveal_type(Right().right)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+
+accept_int(Left().values[0])  # error: [invalid-argument-type]
+accept_int(Right().values[0])  # error: [invalid-argument-type]
+accept_int(Left().left[0])  # error: [invalid-argument-type]
+accept_int(Right().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes across flow-narrowed receivers
+
+Built-in narrowing and imported `TypeIs` and `TypeGuard` predicates identify the other participant
+in a recursive dependency, even when its declared parameter type is `object`.
+
+`consumer.py`:
+
+```py
+from model import Left, Right
+
+def accept_int(value: int) -> None: ...
+
+accept_int(Left().builtin[0])  # error: [invalid-argument-type]
+accept_int(Right().builtin[0])  # error: [invalid-argument-type]
+accept_int(Left().type_is[0])  # error: [invalid-argument-type]
+accept_int(Right().type_is[0])  # error: [invalid-argument-type]
+accept_int(Left().type_guard[0])  # error: [invalid-argument-type]
+accept_int(Right().type_guard[0])  # error: [invalid-argument-type]
+```
+
+`guards.py`:
+
+```py
+from typing import TYPE_CHECKING, TypeGuard
+from typing_extensions import TypeIs
+
+if TYPE_CHECKING:
+    from model import Right
+
+def is_right(value: object) -> TypeIs["Right"]:
+    return hasattr(value, "sentinel")
+
+def is_right_guard(value: object) -> TypeGuard["Right"]:
+    return hasattr(value, "sentinel")
+```
+
+`model.py`:
+
+```py
+from guards import is_right, is_right_guard
+
+class Left:
+    def reset(self):
+        self.builtin = [1]
+        self.type_is = [1]
+        self.type_guard = [1]
+
+    def update(self, other: object):
+        if isinstance(other, Right):
+            self.builtin = [*other.builtin]
+        if is_right(other):
+            self.type_is = [*other.type_is]
+        if is_right_guard(other):
+            self.type_guard = [*other.type_guard]
+
+class Right:
+    sentinel = True
+
+    def reset(self):
+        self.builtin = [1]
+        self.type_is = [1]
+        self.type_guard = [1]
+
+    def update(self, other: Left):
+        self.builtin = [*other.builtin, "added"]
+        self.type_is = [*other.type_is, "added"]
+        self.type_guard = [*other.type_guard, "added"]
+```
+
+## Recursive attributes across specialized generic receivers
+
+Specializing a generic field, property, method, or inherited property identifies the concrete
+receiver whose attributes participate in a cycle.
+
+`model.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Holder(Generic[T]):
+    item: T
+
+    @property
+    def current(self) -> T:
+        return self.item
+
+    def get(self) -> T:
+        return self.item
+
+class ConcreteHolder(Holder["Right"]): ...
+
+class Left:
+    def reset(self):
+        self.field = [1]
+        self.property = [1]
+        self.method = [1]
+        self.inherited = [1]
+
+    def update(self, holder: Holder["Right"], inherited: ConcreteHolder):
+        self.field = [*holder.item.field]
+        self.property = [*holder.current.property]
+        self.method = [*holder.get().method]
+        self.inherited = [*inherited.current.inherited]
+
+class Right:
+    def reset(self):
+        self.field = [1]
+        self.property = [1]
+        self.method = [1]
+        self.inherited = [1]
+
+    def update(self, other: Left):
+        self.field = [*other.field, "added"]
+        self.property = [*other.property, "added"]
+        self.method = [*other.method, "added"]
+        self.inherited = [*other.inherited, "added"]
+```
+
+`consumer.py`:
+
+```py
+from model import Left, Right
+
+def accept_int(value: int) -> None: ...
+
+accept_int(Left().field[0])  # error: [invalid-argument-type]
+accept_int(Right().field[0])  # error: [invalid-argument-type]
+accept_int(Left().property[0])  # error: [invalid-argument-type]
+accept_int(Right().property[0])  # error: [invalid-argument-type]
+accept_int(Left().method[0])  # error: [invalid-argument-type]
+accept_int(Right().method[0])  # error: [invalid-argument-type]
+accept_int(Left().inherited[0])  # error: [invalid-argument-type]
+accept_int(Right().inherited[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes across imported factory receivers
+
+An imported classmethod can return a concrete receiver, while an imported generic factory derives
+that receiver from its argument. Local callable aliases, unpacked arguments, and generic callable
+instances preserve the same dependencies between attributes in separate files.
+
+`consumer.py`:
+
+```py
+from left import Left
+from right import Right
+
+def accept_int(value: int) -> None: ...
+
+accept_int(Left().classmethod[0])  # error: [invalid-argument-type]
+accept_int(Right().classmethod[0])  # error: [invalid-argument-type]
+accept_int(Left().generic[0])  # error: [invalid-argument-type]
+accept_int(Right().generic[0])  # error: [invalid-argument-type]
+accept_int(Left().alias[0])  # error: [invalid-argument-type]
+accept_int(Right().alias[0])  # error: [invalid-argument-type]
+accept_int(Left().starred[0])  # error: [invalid-argument-type]
+accept_int(Right().starred[0])  # error: [invalid-argument-type]
+accept_int(Left().keywords[0])  # error: [invalid-argument-type]
+accept_int(Right().keywords[0])  # error: [invalid-argument-type]
+accept_int(Left().callable[0])  # error: [invalid-argument-type]
+accept_int(Right().callable[0])  # error: [invalid-argument-type]
+```
+
+`left.py`:
+
+```py
+from right import CallableFactory, Factory, Right, identity
+
+class Left:
+    def reset(self):
+        self.classmethod = [1]
+        self.generic = [1]
+        self.alias = [1]
+        self.starred = [1]
+        self.keywords = [1]
+        self.callable = [1]
+
+    def update(self):
+        self.classmethod = [*Factory.make().classmethod]
+        self.generic = [*identity(Right()).generic]
+        local_identity = identity
+        self.alias = [*local_identity(Right()).alias]
+        self.starred = [*identity(*(Right(),)).starred]
+        self.keywords = [*identity(**{"value": Right()}).keywords]
+        self.callable = [*CallableFactory(Right())().callable]
+```
+
+`right.py`:
+
+```py
+from typing import TYPE_CHECKING, Generic, TypeVar
+
+if TYPE_CHECKING:
+    from left import Left
+
+class Right:
+    def reset(self):
+        self.classmethod = [1]
+        self.generic = [1]
+        self.alias = [1]
+        self.starred = [1]
+        self.keywords = [1]
+        self.callable = [1]
+
+    def update(self, other: "Left"):
+        self.classmethod = [*other.classmethod, "added"]
+        self.generic = [*other.generic, "added"]
+        self.alias = [*other.alias, "added"]
+        self.starred = [*other.starred, "added"]
+        self.keywords = [*other.keywords, "added"]
+        self.callable = [*other.callable, "added"]
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class Factory:
+    @classmethod
+    def make(cls) -> Right:
+        return Right()
+
+class CallableFactory(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+    def __call__(self) -> T:
+        return self.value
+```
+
+## Recursive attributes across explicitly cast receivers
+
+Direct, renamed, and module-qualified `typing.cast` calls identify a recursive receiver without
+treating the independently inferred attribute as an annotated declaration.
+
+`consumer.py`:
+
+```py
+from model import Left, Right
+
+def accept_int(value: int) -> None: ...
+
+accept_int(Left().direct[0])  # error: [invalid-argument-type]
+accept_int(Right().direct[0])  # error: [invalid-argument-type]
+accept_int(Left().renamed[0])  # error: [invalid-argument-type]
+accept_int(Right().renamed[0])  # error: [invalid-argument-type]
+accept_int(Left().qualified[0])  # error: [invalid-argument-type]
+accept_int(Right().qualified[0])  # error: [invalid-argument-type]
+```
+
+`model.py`:
+
+```py
+import typing
+from typing import cast
+from typing import cast as coerce
+
+class Left:
+    def reset(self):
+        self.direct = [1]
+        self.renamed = [1]
+        self.qualified = [1]
+
+    def update(self, other: object):
+        direct = cast(Right, other)
+        renamed = coerce(Right, other)
+        qualified = typing.cast(Right, other)
+        self.direct = [*direct.direct]
+        self.renamed = [*renamed.renamed]
+        self.qualified = [*qualified.qualified]
+
+class Right:
+    def reset(self):
+        self.direct = [1]
+        self.renamed = [1]
+        self.qualified = [1]
+
+    def update(self, other: Left):
+        self.direct = [*other.direct, "added"]
+        self.renamed = [*other.renamed, "added"]
+        self.qualified = [*other.qualified, "added"]
 ```
 
 ## Recursive attributes initialized from independently typed values
@@ -714,22 +1151,24 @@ class Right:
         self.property_value = [self.typed]
 
     def update(self, other: Left):
-        self.alias = [*other.alias, "added"]  # error: [invalid-assignment]
-        self.annotated = [*other.annotated, "added"]  # error: [invalid-assignment]
-        self.method = [*other.method, "added"]  # error: [invalid-assignment]
-        self.class_value = [*other.class_value, "added"]  # error: [invalid-assignment]
-        self.property_value = [*other.property_value, "added"]  # error: [invalid-assignment]
+        self.alias = [*other.alias, "added"]
+        self.annotated = [*other.annotated, "added"]
+        self.method = [*other.method, "added"]
+        self.class_value = [*other.class_value, "added"]
+        self.property_value = [*other.property_value, "added"]
 
-reveal_type(Left().alias)  # revealed: list[int]
-reveal_type(Right().alias)  # revealed: list[int]
-reveal_type(Left().annotated)  # revealed: list[int]
-reveal_type(Right().annotated)  # revealed: list[int]
-reveal_type(Left().method)  # revealed: list[int]
-reveal_type(Right().method)  # revealed: list[int]
-reveal_type(Left().class_value)  # revealed: list[int]
-reveal_type(Right().class_value)  # revealed: list[int]
-reveal_type(Left().property_value)  # revealed: list[int]
-reveal_type(Right().property_value)  # revealed: list[int]
+def accept_int(value: int) -> None: ...
+
+accept_int(Left().alias[0])  # error: [invalid-argument-type]
+accept_int(Right().alias[0])  # error: [invalid-argument-type]
+accept_int(Left().annotated[0])  # error: [invalid-argument-type]
+accept_int(Right().annotated[0])  # error: [invalid-argument-type]
+accept_int(Left().method[0])  # error: [invalid-argument-type]
+accept_int(Right().method[0])  # error: [invalid-argument-type]
+accept_int(Left().class_value[0])  # error: [invalid-argument-type]
+accept_int(Right().class_value[0])  # error: [invalid-argument-type]
+accept_int(Left().property_value[0])  # error: [invalid-argument-type]
+accept_int(Right().property_value[0])  # error: [invalid-argument-type]
 ```
 
 ## Acyclic instance attributes on another receiver
@@ -761,6 +1200,53 @@ class Rootless:
         self.values = [*self.values]
 
 reveal_type(Rootless().values)  # revealed: list[Divergent]
+```
+
+## Recursive singleton attributes preserve independently introduced elements
+
+An attribute can contribute a concrete element to its own recursive assignment, with or without a
+separate initializer. Other classes must also see that independently introduced element.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rooted:
+    def reset(self):
+        self.values = [Original()]
+
+    def update(self):
+        self.values = [*self.values, Added()]
+
+class Rootless:
+    def update(self):
+        self.values = [*self.values, Added()]
+
+class Concatenated:
+    def update(self):
+        self.values = self.values + [Added()]
+
+class United:
+    def update(self):
+        self.values = self.values | {Added()}
+
+class Consumer:
+    def reset(self):
+        self.values = [Original()]
+
+    def update(self, other: Rootless):
+        self.values = [*other.values]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rooted().values)  # revealed: list[Original] | list[Original | Added]
+reveal_type(Rootless().values)  # revealed: list[Added]
+reveal_type(Consumer().values)  # revealed: list[Original] | list[Added]
+accept_original(Rooted().values[0])  # error: [invalid-argument-type]
+accept_original(Rootless().values[0])  # error: [invalid-argument-type]
+accept_original(Concatenated().values[0])  # error: [invalid-argument-type]
+accept_original(next(iter(United().values)))  # error: [invalid-argument-type]
+accept_original(Consumer().values[0])  # error: [invalid-argument-type]
 ```
 
 ## Recursive attributes retain independently introduced elements
@@ -805,11 +1291,11 @@ class ClassMethod:
 
 def accept_original(value: Original) -> None: ...
 
-reveal_type(Direct().right)  # revealed: list[Unknown | Added]
-reveal_type(Aliased().right)  # revealed: list[Unknown | Added]
-reveal_type(Constructed().right)  # revealed: list[Unknown | Added]
-reveal_type(Unary().right)  # revealed: list[Unknown | int]
-reveal_type(ClassMethod().right)  # revealed: list[Unknown | Added]
+reveal_type(Direct().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(Aliased().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(Constructed().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(Unary().right)  # revealed: list[int] | list[Unknown | int]
+reveal_type(ClassMethod().right)  # revealed: list[Added] | list[Unknown | Added]
 accept_original(Direct().left[0])  # error: [invalid-argument-type]
 accept_original(Direct().right[0])  # error: [invalid-argument-type]
 accept_original(Aliased().left[0])  # error: [invalid-argument-type]
@@ -911,19 +1397,19 @@ class SelectedFalse:
 
 def accept_original(value: Original) -> None: ...
 
-reveal_type(Conditional().right)  # revealed: list[Unknown | Added]
-reveal_type(Generator().right)  # revealed: list[Unknown | Added]
-reveal_type(Captured().right)  # revealed: list[Unknown | Added]
-reveal_type(CapturedGenerator().right)  # revealed: list[Unknown | Added]
-reveal_type(CapturedUnpacked().right)  # revealed: list[Unknown | Added]
-reveal_type(CapturedLoop().right)  # revealed: list[Unknown | Added]
-reveal_type(CapturedContext().right)  # revealed: list[Unknown | Added]
-reveal_type(LocallyImportedContext().right)  # revealed: list[Unknown | Added]
+reveal_type(Conditional().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(Generator().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(Captured().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(CapturedGenerator().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(CapturedUnpacked().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(CapturedLoop().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(CapturedContext().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(LocallyImportedContext().right)  # revealed: list[Added] | list[Unknown | Added]
 reveal_type(CapturedDefault().right)  # revealed: list[Unknown | Added]
-reveal_type(Nested().right)  # revealed: list[Unknown | Added]
-reveal_type(Composed().right)  # revealed: list[Unknown | Added]
-reveal_type(SelectedTrue().right)  # revealed: list[Unknown | Added]
-reveal_type(SelectedFalse().right)  # revealed: list[Unknown | Added]
+reveal_type(Nested().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(Composed().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(SelectedTrue().right)  # revealed: list[Added] | list[Unknown | Added]
+reveal_type(SelectedFalse().right)  # revealed: list[Added] | list[Unknown | Added]
 accept_original(Conditional().left[0])  # error: [invalid-argument-type]
 accept_original(Conditional().right[0])  # error: [invalid-argument-type]
 accept_original(Generator().left[0])  # error: [invalid-argument-type]
@@ -1001,13 +1487,13 @@ class Generator:
 
 def accept_original(value: Original) -> None: ...
 
-reveal_type(Unpacked().right)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Copied().right)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Captured().right)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Transformed().right)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Constructed().right)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(IndependentValue().right)  # revealed: dict[Unknown, Unknown | Added]
-reveal_type(Generator().right)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Unpacked().right)  # revealed: dict[Unknown | str, Added]
+reveal_type(Copied().right)  # revealed: dict[Unknown | str, Added]
+reveal_type(Captured().right)  # revealed: dict[Unknown | str, Added]
+reveal_type(Transformed().right)  # revealed: dict[Unknown | str, Added]
+reveal_type(Constructed().right)  # revealed: dict[str, Added]
+reveal_type(IndependentValue().right)  # revealed: dict[Unknown, Added]
+reveal_type(Generator().right)  # revealed: dict[Unknown | str, Added]
 accept_original(next(iter(Unpacked().left.values())))  # error: [invalid-argument-type]
 accept_original(next(iter(Unpacked().right.values())))  # error: [invalid-argument-type]
 accept_original(next(iter(Copied().left.values())))  # error: [invalid-argument-type]
@@ -1062,10 +1548,10 @@ class Method:
 
 def accept_original(value: Original) -> None: ...
 
-reveal_type(Lists().right)  # revealed: list[Unknown | Added]
-reveal_type(Mappings().right)  # revealed: dict[Unknown | str, Unknown | Added]
-reveal_type(Sets().right)  # revealed: set[Unknown | Added]
-reveal_type(Operator().right)  # revealed: list[Unknown | Added]
+reveal_type(Lists().right)  # revealed: list[Added] | list[Unknown | Added] | list[Unknown]
+reveal_type(Mappings().right)  # revealed: dict[str, Added] | dict[Unknown | str, Added]
+reveal_type(Sets().right)  # revealed: set[Added] | set[Unknown | Added]
+reveal_type(Operator().right)  # revealed: list[Added] | list[Unknown | Added] | list[Unknown]
 reveal_type(Method().right)  # revealed: set[Unknown | Added]
 accept_original(Lists().left[0])  # error: [invalid-argument-type]
 accept_original(Lists().right[0])  # error: [invalid-argument-type]
@@ -1196,6 +1682,71 @@ class Cached:
         return self._metadata
 
 reveal_type(Cached().metadata)  # revealed: int
+```
+
+## Guarded implicit attributes when the base is checked first
+
+An attribute initialized behind a negative `hasattr` check cannot establish its own absence while
+the initializer is being inferred. This is a regression test for
+<https://github.com/astral-sh/ty/issues/4076>.
+
+`base.py`:
+
+```py
+class Base:
+    existing = 1
+
+    def __init__(self) -> None:
+        if not hasattr(self, "value"):
+            self.value = self.__str__
+        if not hasattr(self, "existing"):
+            self.missing
+        if not hasattr(self, "other"):
+            self.other = self.missing  # error: [unresolved-attribute]
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    value = Base.__str__
+
+    def other(self): ...
+    def missing(self): ...
+```
+
+## Guarded implicit attributes when the subclass is checked first
+
+Checking the subclass before its guarded base initializer must not change whether the assignment is
+valid.
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    value = Base.__str__
+
+    def other(self): ...
+    def missing(self): ...
+```
+
+`base.py`:
+
+```py
+class Base:
+    existing = 1
+
+    def __init__(self) -> None:
+        if not hasattr(self, "value"):
+            self.value = self.__str__
+        if not hasattr(self, "existing"):
+            self.missing
+        if not hasattr(self, "other"):
+            self.other = self.missing  # error: [unresolved-attribute]
 ```
 
 ## Inherited instance attributes when the base is checked first

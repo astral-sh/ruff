@@ -11,12 +11,12 @@ use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDict
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
-    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    Parameter, Parameters, Signature, SpecialFormType, StringLiteralType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    callable_pattern_type, class_pattern_positional_sources,
+    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::expression::Expression;
@@ -27,6 +27,7 @@ use ty_python_core::predicate::{
     PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
     SubjectElementPatternPredicate,
 };
+use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
 
@@ -144,6 +145,46 @@ fn all_narrowing_constraints_for_expression<'db>(
     ExpressionNarrowingConstraints {
         positive: NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true).finish(),
         negative: NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false).finish(),
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum AttributePresence {
+    Present,
+    Absent,
+    Indeterminate,
+}
+
+/// Check presence without allowing a guarded initializer to prove its own absence.
+///
+/// ```python
+/// if not hasattr(self, "value"):
+///     self.value = self.__str__
+/// ```
+///
+/// Inferring `value` can reenter this predicate through the narrowed receiver. Keeping the
+/// predicate in the query identity and recovering with `Indeterminate` prevents file order from
+/// deciding whether the initializer is valid, while preserving unrelated `hasattr` narrowing.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _, _| AttributePresence::Indeterminate,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn negative_hasattr_presence_proof<'db>(
+    db: &'db dyn Db,
+    predicate: Expression<'db>,
+    receiver: Type<'db>,
+    attribute: StringLiteralType<'db>,
+) -> AttributePresence {
+    let env = ProgramEnvironment::from_file(predicate.program_file(db));
+    if receiver
+        .member(db, &env, attribute.value(db))
+        .place
+        .is_definitely_bound()
+    {
+        AttributePresence::Present
+    } else {
+        AttributePresence::Absent
     }
 }
 
@@ -3191,6 +3232,71 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         place_table(db, self.scope())
     }
 
+    /// Return whether every reachable assignment to this member depends on this guard.
+    fn predicate_initializes_member(&self, member: ScopedPlaceId) -> bool {
+        let db = self.db;
+        let scope = self.scope();
+        let index = semantic_index(db, scope.program_file(db));
+        let use_def = index.use_def_map(scope.file_scope_id(db));
+        let constraints = use_def.reachability_constraints();
+        let predicates = use_def.predicates();
+        let is_terminal = |constraint| {
+            matches!(
+                constraint,
+                ScopedReachabilityConstraintId::ALWAYS_TRUE
+                    | ScopedReachabilityConstraintId::AMBIGUOUS
+                    | ScopedReachabilityConstraintId::ALWAYS_FALSE
+            )
+        };
+
+        let mut initialized_by_predicate = false;
+        for binding in use_def.reachable_bindings(member) {
+            if binding.binding.definition().is_none() {
+                continue;
+            }
+
+            let mut constraint = binding.reachability_constraint;
+            while !is_terminal(constraint) {
+                let node = constraints.get_interior_node(constraint);
+                let predicate = predicates[node.atom()];
+
+                if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    if !predicate.is_positive
+                        || node.if_false() != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                    {
+                        return false;
+                    }
+                    constraint = node.if_true();
+                    continue;
+                }
+
+                let opposing_branch = if self.is_positive == predicate.is_positive {
+                    node.if_false()
+                } else {
+                    node.if_true()
+                };
+
+                if predicate.node != self.predicate
+                    || opposing_branch != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                    || ![node.if_true(), node.if_ambiguous(), node.if_false()]
+                        .into_iter()
+                        .all(is_terminal)
+                {
+                    return false;
+                }
+
+                initialized_by_predicate = true;
+                break;
+            }
+
+            if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                return false;
+            }
+        }
+
+        initialized_by_predicate
+    }
+
     fn scope(&self) -> ScopeId<'db> {
         let db = self.db;
         match self.predicate {
@@ -4268,17 +4374,48 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg_place = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(db)?;
-                let place = self.expect_place(&first_arg);
+                let place = self.expect_place(&first_arg_place);
 
                 if function == KnownFunction::HasAttr {
-                    let attr = inference
-                        .expression_type(second_arg)
-                        .as_string_literal()?
-                        .value(db);
+                    let attribute = inference.expression_type(second_arg).as_string_literal()?;
+                    let attr = attribute.value(db);
 
                     if !is_identifier(attr) {
+                        return None;
+                    }
+
+                    let places = self.places();
+                    let receiver = inference.expression_type(first_arg);
+                    if !is_positive
+                        && let Some(member) = places.member_id_by_instance_attribute_name(attr)
+                        && places.place(member).is_bound()
+                        && places
+                            .parents(places.place(member))
+                            .any(|parent| parent == place)
+                        && matches!(receiver, Type::TypeVar(typevar) if typevar.typevar(db).is_self(db))
+                        && let PredicateNode::Expression(predicate) = self.predicate
+                        && !matches!(
+                            predicate.node_ref(db).node(self.module),
+                            ast::Expr::BoolOp(_)
+                        )
+                        && self.predicate_initializes_member(member.into())
+                        && !receiver.nominal_class(db, &self.env).is_some_and(|class| {
+                            class
+                                .iter_mro(db)
+                                .filter_map(ClassBase::into_class)
+                                .filter_map(|base| base.static_class_literal(db))
+                                .any(|(base, _)| {
+                                    let places = place_table(db, base.body_scope(db));
+                                    places
+                                        .symbol_id(attr)
+                                        .is_some_and(|symbol| places.symbol(symbol).is_bound())
+                                })
+                        })
+                        && negative_hasattr_presence_proof(db, predicate, receiver, attribute)
+                            == AttributePresence::Indeterminate
+                    {
                         return None;
                     }
 

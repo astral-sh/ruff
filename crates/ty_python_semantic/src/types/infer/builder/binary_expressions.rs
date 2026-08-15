@@ -384,6 +384,52 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(Type::TypedDict(right_typed_dict))
             }
 
+            // A rootless attribute starts as a bottom-materialized cycle marker. Preserve an
+            // independently known operand's generic shape long enough for normal operator
+            // inference to discover its concrete elements, such as `self.x + [Added()]`.
+            (divergent @ Type::Divergent(_), other, _)
+            | (other, divergent @ Type::Divergent(_), _)
+                if let Some(context) = self.member_inference_context
+                    && divergent.materialized_divergent_fallback() == Some(Type::Never)
+                    && matches!(other, Type::NominalInstance(_))
+                    && let Some((origin, specialization)) = other.class_specialization(db, env)
+                    && specialization.materialization_kind(db).is_none()
+                    && specialization.tuple(db).is_none()
+                    && context.component(db).members(db).iter().any(|member| {
+                        context
+                            .incoming(
+                                db,
+                                member.owner,
+                                member.target_method_decorator,
+                                member.name.as_str(),
+                            )
+                            .is_some_and(|incoming| incoming.same_divergent_marker(divergent))
+                    }) =>
+            {
+                let placeholder = Type::instance(
+                    db,
+                    env,
+                    origin.apply_specialization(db, |generic| {
+                        generic.repeat_specialization(db, divergent)
+                    }),
+                );
+                let (left, right) = if left_ty.same_divergent_marker(divergent) {
+                    (placeholder, right_ty)
+                } else {
+                    (left_ty, placeholder)
+                };
+                visitor.visit(db, (left_ty, op, right_ty), || {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        left,
+                        right,
+                        op,
+                        visitor,
+                    )
+                })
+            }
+
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),

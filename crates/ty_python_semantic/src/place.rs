@@ -12,8 +12,9 @@ use crate::reachability::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
+    DynamicType, KnownClass, MemberInferenceContext, MemberLookupPolicy, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type, exists_at_runtime,
+    infer_definition_types_with_member_context, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
@@ -810,6 +811,24 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         Some(reachability_cache),
+    )
+}
+
+/// Resolve local aliases without dropping the recursive component that owns their definitions.
+pub(super) fn place_from_bindings_with_reachability_cache_and_member_context<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    reachability_cache: &ReachabilityEvaluationCache<'db>,
+    member_context: Option<MemberInferenceContext<'db>>,
+) -> PlaceWithDefinition<'db> {
+    place_from_bindings_impl_with_member_context(
+        db,
+        env,
+        bindings_with_constraints,
+        RequiresExplicitReExport::No,
+        Some(reachability_cache),
+        member_context,
     )
 }
 
@@ -1617,6 +1636,24 @@ fn place_from_bindings_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> PlaceWithDefinition<'db> {
+    place_from_bindings_impl_with_member_context(
+        db,
+        env,
+        bindings_with_constraints,
+        requires_explicit_reexport,
+        reachability_cache,
+        None,
+    )
+}
+
+fn place_from_bindings_impl_with_member_context<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    requires_explicit_reexport: RequiresExplicitReExport,
+    reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+    member_context: Option<MemberInferenceContext<'db>>,
+) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
@@ -1779,7 +1816,14 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
-            let binding_ty = binding_type(db, binding);
+            let binding_ty = if let Some(member_context) = member_context
+                && member_context.applies_to_definition(db, binding)
+            {
+                infer_definition_types_with_member_context(db, binding, member_context)
+                    .binding_type(binding)
+            } else {
+                binding_type(db, binding)
+            };
             Some((
                 narrowing_constraint.narrow(db, env, binding_ty, binding.place(db)),
                 static_reachability,

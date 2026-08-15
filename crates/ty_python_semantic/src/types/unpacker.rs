@@ -9,7 +9,10 @@ use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
-use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::infer::{
+    ExpressionInference, FrozenMap, MemberInferenceContext,
+    infer_expression_types_with_member_context,
+};
 use crate::types::tuple::{ResizeTupleError, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use ty_python_core::ExpressionNodeKey;
@@ -24,6 +27,7 @@ use super::diagnostic::INVALID_ASSIGNMENT;
 pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
     targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    member_inference_context: Option<MemberInferenceContext<'db>>,
 }
 
 /// Records an `Unknown` type for every expression in a malformed unpack target subtree.
@@ -56,7 +60,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 module,
             ),
             targets: FxHashMap::default(),
+            member_inference_context: None,
         }
+    }
+
+    /// Preserve the component that owns recursive reads in the unpacked expression.
+    pub(crate) fn with_member_context(mut self, context: MemberInferenceContext<'db>) -> Self {
+        self.member_inference_context = Some(context);
+        self.context.suppress_diagnostics();
+        self
     }
 
     fn db(&self) -> &'db dyn Db {
@@ -75,11 +87,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference = infer_expression_types(
-            self.context.db(),
-            value.expression(),
-            TypeContext::default(),
-        );
+        let value_inference = if let Some(member_context) = self.member_inference_context {
+            infer_expression_types_with_member_context(
+                db,
+                value.expression(),
+                TypeContext::default(),
+                member_context,
+            )
+        } else {
+            infer_expression_types(db, value.expression(), TypeContext::default())
+        };
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         if matches!(value.kind(), UnpackKind::Assign)

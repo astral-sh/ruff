@@ -1,6 +1,5 @@
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashSet;
 
 use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
 use crate::place::{DefinedPlace, Place, PlaceAndQualifiers};
@@ -325,50 +324,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         assignable
     }
 
-    /// Returns whether contextual inference hides an incompatible generic component.
-    ///
-    /// A rejected invariant container is not necessarily an invalid assignment: a `list[int]`
-    /// expression can contextually widen to `list[object]`. However, a `list[int | str]` cannot
-    /// safely become `list[int]`, even when contextual lambda inference obscures the `str`.
-    /// Recursing through matching specializations and union alternatives distinguishes these
-    /// cases without reporting valid widening.
-    fn contains_incompatible_assignment_component(
-        &self,
-        value_ty: Type<'db>,
-        target_ty: Type<'db>,
-        visited: &mut FxHashSet<(Type<'db>, Type<'db>)>,
-    ) -> bool {
-        let db = self.builder.db();
-        let env = self.builder.program_environment();
-
-        if value_ty.is_assignable_to(db, env, target_ty) || !visited.insert((value_ty, target_ty)) {
-            return false;
-        }
-
-        if let Type::Union(union) = target_ty.resolve_type_alias(db) {
-            return union.elements(db).iter().all(|&target| {
-                self.contains_incompatible_assignment_component(value_ty, target, visited)
-            });
-        }
-
-        if let Some((value_class, value_specialization)) = value_ty.class_specialization(db, env)
-            && let Some((target_class, target_specialization)) =
-                target_ty.class_specialization(db, env)
-            && value_class == target_class
-            && value_specialization.types(db).len() == target_specialization.types(db).len()
-        {
-            return value_specialization
-                .types(db)
-                .iter()
-                .zip(target_specialization.types(db))
-                .any(|(&value, &target)| {
-                    self.contains_incompatible_assignment_component(value, target, visited)
-                });
-        }
-
-        true
-    }
-
     fn final_assignment_is_valid(
         &mut self,
         object_ty: Type<'db>,
@@ -517,19 +472,15 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 let member_valid =
                     self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
                 if let Some(fallback) = fallback {
-                    let fallback_valid = self.evaluate_instance_fallback(
-                        object_ty,
-                        fallback,
-                        value_ty,
-                        emit_diagnostics,
-                    );
+                    let fallback_valid =
+                        self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics);
                     member_valid && fallback_valid
                 } else {
                     member_valid
                 }
             }
             InstanceAttributeWriteMember::Instance(fallback) => {
-                self.evaluate_instance_fallback(object_ty, fallback, value_ty, emit_diagnostics)
+                self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics)
             }
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
                 Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
@@ -786,7 +737,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         &mut self,
         object_ty: Type<'db>,
         requirement: &FallbackAttributeWriteRequirement<'db>,
-        uncontextualized_value_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
         match requirement {
@@ -798,21 +748,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }
-                let mut value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
-                if qualifiers.contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-                    && value_ty.is_assignable_to(
-                        self.builder.db(),
-                        self.builder.program_environment(),
-                        *ty,
-                    )
-                    && self.contains_incompatible_assignment_component(
-                        uncontextualized_value_ty,
-                        *ty,
-                        &mut FxHashSet::default(),
-                    )
-                {
-                    value_ty = uncontextualized_value_ty;
-                }
+                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
                 let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
                 if *possibly_missing {
                     self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);

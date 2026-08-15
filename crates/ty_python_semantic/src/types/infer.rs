@@ -43,10 +43,13 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
+use std::cell::RefCell;
+
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -59,21 +62,25 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    AttributeInferenceScc, ClassBase, ClassLiteral, ClassType, KnownClass, MethodDecorator,
+    StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, any_over_type,
 };
 use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::ast_ids::HasScopedUseId;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::expression::Expression;
+use ty_python_core::predicate::{PredicateNode, ScopedPredicateId};
 use ty_python_core::scope::{FileScopeId, ScopeId};
 use ty_python_core::statement::StatementInner;
+use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::unpack::Unpack;
 use ty_python_core::{
     EnclosingSnapshotResult, ExpressionNodeKey, ProgramFile, SemanticIndex, Statement,
-    semantic_index,
+    global_scope, place_table, semantic_index, use_def_map,
 };
 
 mod builder;
@@ -139,6 +146,33 @@ pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
+    infer_definition_types_with_optional_member_context(db, definition, None)
+}
+
+/// Infer a definition under the component whose provisional attributes it may read.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, definition: Definition<'db>, _: MemberInferenceContext<'db>| {
+        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+    },
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>, _: MemberInferenceContext<'db>| {
+        inference.cycle_normalized(db, previous, cycle, definition)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn infer_definition_types_with_member_context<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    member_context: MemberInferenceContext<'db>,
+) -> DefinitionInference<'db> {
+    infer_definition_types_with_optional_member_context(db, definition, Some(member_context))
+}
+
+fn infer_definition_types_with_optional_member_context<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    member_context: Option<MemberInferenceContext<'db>>,
+) -> DefinitionInference<'db> {
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
@@ -153,7 +187,7 @@ pub(crate) fn infer_definition_types<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let builder = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Definition(definition),
@@ -161,37 +195,68 @@ pub(crate) fn infer_definition_types<'db>(
         program_file,
         index,
         &module,
-    )
+    );
+
+    if let Some(member_context) = member_context {
+        builder.with_member_context(member_context)
+    } else {
+        builder
+    }
     .finish_definition(definition)
 }
 
-/// Retain independently established elements when a recursive collection has no initial value.
+/// Infer an ordinary attribute assignment's value within its recursive component.
 ///
-/// ```python
-/// self.left = [*self.right]
-/// self.right = [*self.left, Added()]  # Seed: list[Unknown | Added]
-/// ```
-///
-/// Returns `None` when no independent element exists. The definition-owned query keeps its AST
-/// dependency within the assignment's module and recovers conservatively from nested cycles.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial=|_, _, _| None,
-    heap_size=ruff_memory_usage::heap_size
-)]
-pub(crate) fn independent_assignment_constructor_seed<'db>(
+/// Keeping this query file-local allows components spanning several modules to reuse ordinary
+/// expression inference without taking direct dependencies on another module's syntax tree.
+#[salsa::tracked(returns(copy), heap_size = ruff_memory_usage::heap_size)]
+pub(crate) fn dependent_assignment_transfer<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
+    member_context: MemberInferenceContext<'db>,
 ) -> Option<Type<'db>> {
     let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+    if assignment.unpack().is_some() || !member_context.applies_to_definition(db, definition) {
+        return None;
+    }
+
+    let program_file = definition.program_file(db);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
+    let attribute = assignment.target(&module).as_attribute_expr()?;
+    if !member_context.contains_name(db, attribute.attr.id.as_str()) {
+        return None;
+    }
+
+    let index = semantic_index(db, program_file);
+    let expression = index.try_expression(assignment.value(&module))?;
+    let inference = infer_expression_types_with_member_context(
+        db,
+        expression,
+        TypeContext::default(),
+        member_context,
+    );
+    Some(inference.expression_type(expression.node_ref(db)))
+}
+
+/// Infer an annotated assignment's declaration without evaluating its initializer.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn annotated_assignment_annotation<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<TypeAndQualifiers<'db>> {
+    let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
         return None;
     };
 
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
-    let value = assignment.value(&module);
-
     let index = semantic_index(db, program_file);
     let env = ProgramEnvironment::from_file(program_file);
 
@@ -204,7 +269,681 @@ pub(crate) fn independent_assignment_constructor_seed<'db>(
         index,
         &module,
     )
-    .infer_independent_assignment_constructor_seed(value)
+    .infer_annotated_assignment_annotation_only(assignment)
+}
+
+/// Resolve an imported declaration without evaluating its module's public value.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(crate) fn imported_declaration_definitions<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Box<[Definition<'db>]> {
+    let DefinitionKind::ImportFrom(import) = definition.kind(db) else {
+        return Box::default();
+    };
+
+    let importing_program_file = definition.program_file(db);
+    let module = parsed_module(db, importing_program_file.python_file(db)).load(db);
+    let statement = import.import(&module);
+    let env = ProgramEnvironment::from_file(importing_program_file);
+    let importing_file = ImportingFile::File(
+        importing_program_file.file(db),
+        env.resolver_environment(db),
+    );
+    let Ok(module_name) = ModuleName::from_import_statement(db, importing_file, statement) else {
+        return Box::default();
+    };
+    let Some(file) =
+        resolve_module(db, importing_file, &module_name).and_then(|module| module.file(db))
+    else {
+        return Box::default();
+    };
+    let program_file = ProgramFile::new(db, file, importing_program_file.program(db));
+    let name = import.alias(&module).name.id.clone();
+
+    imported_module_declaration_definitions(db, program_file, name)
+        .iter()
+        .copied()
+        .collect()
+}
+
+/// Resolve an imported module's member using only its indexed declarations.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(crate) fn imported_module_symbol_definitions<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    name: Name,
+) -> Box<[Definition<'db>]> {
+    let DefinitionKind::Import(import) = definition.kind(db) else {
+        return Box::default();
+    };
+
+    let importing_program_file = definition.program_file(db);
+    let module = parsed_module(db, importing_program_file.python_file(db)).load(db);
+    let Some(module_name) = ModuleName::new(import.alias(&module).name.as_str()) else {
+        return Box::default();
+    };
+    let env = ProgramEnvironment::from_file(importing_program_file);
+    let importing_file = ImportingFile::File(
+        importing_program_file.file(db),
+        env.resolver_environment(db),
+    );
+    let Some(file) =
+        resolve_module(db, importing_file, &module_name).and_then(|module| module.file(db))
+    else {
+        return Box::default();
+    };
+    let program_file = ProgramFile::new(db, file, importing_program_file.program(db));
+
+    imported_module_declaration_definitions(db, program_file, name)
+        .iter()
+        .copied()
+        .collect()
+}
+
+/// Keep indexed declarations and imported reexports within their owning module's query.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Salsa tracked query keys must own their inputs"
+)]
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn imported_module_declaration_definitions<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    name: Name,
+) -> Box<[Definition<'db>]> {
+    let scope = global_scope(db, file);
+    let Some(symbol) = place_table(db, scope).symbol_id(name.as_str()) else {
+        return Box::default();
+    };
+    let use_def = use_def_map(db, scope);
+    let mut definitions = FxIndexSet::default();
+
+    for definition in use_def
+        .reachable_symbol_declarations(symbol)
+        .filter_map(|declaration| declaration.declaration.definition())
+        .chain(
+            use_def
+                .reachable_symbol_bindings(symbol)
+                .filter_map(|binding| binding.binding.definition()),
+        )
+    {
+        if matches!(definition.kind(db), DefinitionKind::ImportFrom(_)) {
+            definitions.extend(
+                imported_declaration_definitions(db, definition)
+                    .iter()
+                    .copied(),
+            );
+        } else {
+            definitions.insert(definition);
+        }
+    }
+
+    definitions.into_iter().collect()
+}
+
+/// Infer a receiver annotation without evaluating function defaults or decorators.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn parameter_annotation_only<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) =
+        definition.kind(db)
+    else {
+        return None;
+    };
+
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let annotation = parameter.node(&module).parameter.annotation.as_deref()?;
+    let index = semantic_index(db, program_file);
+    let function = index
+        .scope(definition.file_scope(db))
+        .node()
+        .as_function()?;
+    let function_definition = index.expect_single_definition(function);
+    let annotation_scope = index
+        .expression_scope_id(annotation)
+        .to_scope_id(db, program_file);
+    let region = if annotation_scope == function_definition.scope(db) {
+        InferenceRegion::Deferred(function_definition)
+    } else {
+        InferenceRegion::Scope(annotation_scope, TypeContext::default())
+    };
+    let env = ProgramEnvironment::from_file(program_file);
+
+    Some(
+        TypeInferenceBuilder::new(
+            db,
+            &env,
+            region,
+            python_file.file(db),
+            program_file,
+            index,
+            &module,
+        )
+        .infer_parameter_annotation_only(annotation, function_definition),
+    )
+}
+
+/// Resolve a factory's return annotation without evaluating its body, decorators, or defaults.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn function_return_annotation_only<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return None;
+    };
+
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let annotation = function.node(&module).returns.as_deref()?;
+    let index = semantic_index(db, program_file);
+    let annotation_scope = index
+        .expression_scope_id(annotation)
+        .to_scope_id(db, program_file);
+    let region = if annotation_scope == definition.scope(db) {
+        InferenceRegion::Deferred(definition)
+    } else {
+        InferenceRegion::Scope(annotation_scope, TypeContext::default())
+    };
+    let env = ProgramEnvironment::from_file(program_file);
+
+    Some(
+        TypeInferenceBuilder::new(
+            db,
+            &env,
+            region,
+            python_file.file(db),
+            program_file,
+            index,
+            &module,
+        )
+        .infer_function_return_annotation_only(annotation, definition),
+    )
+}
+
+/// Identify parameters whose generic arguments can determine a factory's return type.
+///
+/// For `def head[T](values: list[T]) -> T`, the returned entry identifies both `values` and its
+/// exact `T` and `list[T]` without inspecting the function body or unrelated call arguments.
+pub(crate) fn generic_return_parameter_positions<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> &'db [(usize, Name, Type<'db>, Type<'db>)] {
+    function_return_annotation_only(db, definition)
+        .map(|return_type| generic_parameter_positions_for_type(db, definition, return_type))
+        .unwrap_or_default()
+}
+
+/// Match a requested generic result against the annotated parameters that determine it.
+///
+/// Passing a callable instance's `__call__` result allows its `__init__` parameters to supply
+/// the same class type variable without inspecting either method's body.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(crate) fn generic_parameter_positions_for_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    requested_type: Type<'db>,
+) -> Box<[(usize, Name, Type<'db>, Type<'db>)]> {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return Box::default();
+    };
+
+    let program_file = definition.program_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
+    let returned_typevars = RefCell::new(FxIndexSet::default());
+    any_over_type(db, &env, requested_type, false, |ty| {
+        if let Type::TypeVar(_) = ty {
+            returned_typevars.borrow_mut().insert(ty);
+        }
+        false
+    });
+    let returned_typevars = returned_typevars.into_inner();
+    if returned_typevars.is_empty() {
+        return Box::default();
+    }
+
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
+    let index = semantic_index(db, program_file);
+    let mut positions = Vec::new();
+    for (position, parameter) in function
+        .node(&module)
+        .parameters
+        .iter_non_variadic_params()
+        .enumerate()
+    {
+        let Some(definition) = index.try_definition(parameter) else {
+            continue;
+        };
+        let Some(annotation) = parameter_annotation_only(db, definition) else {
+            continue;
+        };
+        for returned_typevar in &returned_typevars {
+            if any_over_type(db, &env, annotation, false, |ty| ty == *returned_typevar) {
+                positions.push((
+                    position,
+                    parameter.name().id.clone(),
+                    *returned_typevar,
+                    annotation,
+                ));
+            }
+        }
+    }
+
+    positions.into_boxed_slice()
+}
+
+/// Confirm import provenance without evaluating a binding or accepting a reassigned import.
+fn dependency_imported_from<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    module: &ParsedModuleRef,
+    scope: FileScopeId,
+    symbol_name: &str,
+    modules: &[&str],
+    member: Option<&str>,
+) -> bool {
+    index
+        .visible_ancestor_scopes(scope)
+        .find_map(|(scope, _)| {
+            let table = index.place_table(scope);
+            let symbol = table.symbol_id(symbol_name)?;
+            if !table.symbol(symbol).is_local() {
+                return None;
+            }
+
+            let mut found = false;
+            for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+                let Some(definition) = binding.binding.definition() else {
+                    continue;
+                };
+                let matches = match (definition.kind(db), member) {
+                    (DefinitionKind::ImportFrom(import), Some(expected)) => {
+                        let statement = import.import(module);
+                        statement.level == 0
+                            && statement
+                                .module
+                                .as_ref()
+                                .is_some_and(|module| modules.contains(&module.as_str()))
+                            && import.alias(module).name.as_str() == expected
+                    }
+                    (DefinitionKind::Import(import), None) => {
+                        modules.contains(&import.alias(module).name.as_str())
+                    }
+                    _ => false,
+                };
+                if !matches {
+                    return Some(false);
+                }
+                found = true;
+            }
+            Some(found)
+        })
+        .unwrap_or(false)
+}
+
+/// Resolve a guard or factory from declarations without evaluating its call.
+fn dependency_callable_definitions<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    scope: FileScopeId,
+    callable: &ast::Expr,
+) -> FxIndexSet<Definition<'db>> {
+    let (name, member) = match callable {
+        ast::Expr::Name(name) => (name.id.as_str(), None),
+        ast::Expr::Attribute(attribute) => {
+            let Some(name) = attribute.value.as_name_expr() else {
+                return FxIndexSet::default();
+            };
+            (name.id.as_str(), Some(attribute.attr.id.clone()))
+        }
+        _ => return FxIndexSet::default(),
+    };
+    let Some((scope, symbol)) = index.visible_ancestor_scopes(scope).find_map(|(scope, _)| {
+        let table = index.place_table(scope);
+        let symbol = table.symbol_id(name)?;
+        table.symbol(symbol).is_local().then_some((scope, symbol))
+    }) else {
+        return FxIndexSet::default();
+    };
+
+    let mut definitions = FxIndexSet::default();
+    for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+        let Some(definition) = binding.binding.definition() else {
+            continue;
+        };
+        match (definition.kind(db), member.as_ref()) {
+            (DefinitionKind::Import(_), Some(member)) => definitions.extend(
+                imported_module_symbol_definitions(db, definition, member.clone())
+                    .iter()
+                    .copied(),
+            ),
+            (DefinitionKind::ImportFrom(_), None) => definitions.extend(
+                imported_declaration_definitions(db, definition)
+                    .iter()
+                    .copied(),
+            ),
+            (_, None) => {
+                definitions.insert(definition);
+            }
+            (_, Some(_)) => {}
+        }
+    }
+    definitions
+}
+
+/// Resolve `isinstance` class names and aliases without evaluating factory arguments.
+fn dependency_guard_class_type<'db, 'ast>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    module: &'ast ParsedModuleRef,
+    definition: Definition<'db>,
+    class: &'ast ast::Expr,
+    env: &ProgramEnvironment<'db>,
+) -> Option<Type<'db>> {
+    let program_file = definition.program_file(db);
+    let mut pending = vec![class];
+    let mut visited = FxIndexSet::default();
+    let mut values = UnionBuilder::new(db, env);
+    let mut found = false;
+
+    while let Some(class) = pending.pop() {
+        match class {
+            ast::Expr::If(conditional) => {
+                pending.push(conditional.orelse.as_ref());
+                pending.push(conditional.body.as_ref());
+            }
+            ast::Expr::BoolOp(boolean) => pending.extend(boolean.values.iter().rev()),
+            ast::Expr::Tuple(tuple) => pending.extend(tuple.elts.iter().rev()),
+            ast::Expr::Name(name) => {
+                let resolved = index
+                    .visible_ancestor_scopes(definition.file_scope(db))
+                    .find_map(|(scope, _)| {
+                        let table = index.place_table(scope);
+                        let symbol = table.symbol_id(name.id.as_str())?;
+                        table.symbol(symbol).is_local().then_some((scope, symbol))
+                    });
+                let Some((scope, symbol)) = resolved else {
+                    values.add_in_place(
+                        TypeInferenceBuilder::new(
+                            db,
+                            env,
+                            InferenceRegion::Definition(definition),
+                            program_file.python_file(db).file(db),
+                            program_file,
+                            index,
+                            module,
+                        )
+                        .infer_dependency_type_expression_only(class),
+                    );
+                    found = true;
+                    continue;
+                };
+                if !visited.insert((scope, symbol)) {
+                    continue;
+                }
+
+                let mut has_assignment = false;
+                for binding in index.use_def_map(scope).reachable_symbol_bindings(symbol) {
+                    let Some(binding) = binding.binding.definition() else {
+                        continue;
+                    };
+                    match binding.kind(db) {
+                        DefinitionKind::Assignment(assignment) => {
+                            has_assignment = true;
+                            let value = assignment.value(module);
+                            if let ast::Expr::Call(call) = value {
+                                for function in dependency_callable_definitions(
+                                    db,
+                                    index,
+                                    binding.file_scope(db),
+                                    call.func.as_ref(),
+                                ) {
+                                    if let Some(return_type) =
+                                        function_return_annotation_only(db, function)
+                                        && let Some(class_type) =
+                                            return_type.to_instance_approximation(db, env)
+                                    {
+                                        values.add_in_place(class_type);
+                                        found = true;
+                                    }
+                                }
+                            } else if matches!(
+                                value,
+                                ast::Expr::Name(_)
+                                    | ast::Expr::If(_)
+                                    | ast::Expr::BoolOp(_)
+                                    | ast::Expr::Tuple(_)
+                            ) {
+                                pending.push(value);
+                            }
+                        }
+                        DefinitionKind::AnnotatedAssignment(_) => {
+                            has_assignment = true;
+                            if let Some(annotation) = annotated_assignment_annotation(db, binding)
+                                && let Some(class_type) =
+                                    annotation.inner_type().to_instance_approximation(db, env)
+                            {
+                                values.add_in_place(class_type);
+                                found = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                if !has_assignment {
+                    values.add_in_place(
+                        TypeInferenceBuilder::new(
+                            db,
+                            env,
+                            InferenceRegion::Definition(definition),
+                            program_file.python_file(db).file(db),
+                            program_file,
+                            index,
+                            module,
+                        )
+                        .infer_dependency_type_expression_only(class),
+                    );
+                    found = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    found.then(|| values.build())
+}
+
+/// Resolve a verified cast's target without evaluating its recursive value argument.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn cast_target_annotation_only<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let call = assignment.value(&module).as_call_expr()?;
+    let (callee, qualified) = match call.func.as_ref() {
+        ast::Expr::Name(name) => (name.id.as_str(), false),
+        ast::Expr::Attribute(attribute) if attribute.attr.as_str() == "cast" => {
+            (attribute.value.as_name_expr()?.id.as_str(), true)
+        }
+        _ => return None,
+    };
+    let index = semantic_index(db, program_file);
+    if !dependency_imported_from(
+        db,
+        index,
+        &module,
+        definition.file_scope(db),
+        callee,
+        &["typing", "typing_extensions"],
+        (!qualified).then_some("cast"),
+    ) {
+        return None;
+    }
+
+    let target = call.arguments.args.first()?;
+    let env = ProgramEnvironment::from_file(program_file);
+    Some(
+        TypeInferenceBuilder::new(
+            db,
+            &env,
+            InferenceRegion::Definition(definition),
+            python_file.file(db),
+            program_file,
+            index,
+            &module,
+        )
+        .infer_dependency_type_expression_only(target),
+    )
+}
+
+/// Infer narrowing targets without evaluating a predicate, guard call, or unrelated arguments.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn narrowing_predicate_type_only<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    predicate_id: ScopedPredicateId,
+    receiver: ScopedSymbolId,
+) -> Option<Type<'db>> {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let scope = definition.file_scope(db);
+    let receiver_name = index.place_table(scope).symbol(receiver).name();
+    let bare_isinstance_unshadowed = !index.visible_ancestor_scopes(scope).any(|(scope, _)| {
+        let table = index.place_table(scope);
+        table
+            .symbol_id("isinstance")
+            .is_some_and(|symbol| table.symbol(symbol).is_local())
+    });
+    let predicate = index.use_def_map(scope).predicates()[predicate_id];
+    let PredicateNode::Expression(expression) = predicate.node else {
+        return None;
+    };
+    if expression.program_file(db) != program_file {
+        return None;
+    }
+
+    let env = ProgramEnvironment::from_file(program_file);
+    let mut values = UnionBuilder::new(db, &env);
+    let mut found = false;
+    let mut pending = vec![expression.node_ref(db).node(&module)];
+
+    while let Some(expression) = pending.pop() {
+        match expression {
+            ast::Expr::BoolOp(boolean) => pending.extend(boolean.values.iter().rev()),
+            ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
+                pending.push(unary.operand.as_ref());
+            }
+            ast::Expr::If(conditional) => {
+                pending.push(conditional.orelse.as_ref());
+                pending.push(conditional.body.as_ref());
+                pending.push(conditional.test.as_ref());
+            }
+            ast::Expr::Call(call)
+                if call.arguments.keywords.is_empty()
+                    && let [value, class] = call.arguments.args.as_ref()
+                    && value
+                        .as_name_expr()
+                        .is_some_and(|name| name.id.as_str() == receiver_name.as_str())
+                    && match call.func.as_ref() {
+                        ast::Expr::Name(name) => {
+                            bare_isinstance_unshadowed && name.id.as_str() == "isinstance"
+                        }
+                        ast::Expr::Attribute(attribute)
+                            if attribute.attr.as_str() == "isinstance" =>
+                        {
+                            attribute.value.as_name_expr().is_some_and(|name| {
+                                dependency_imported_from(
+                                    db,
+                                    index,
+                                    &module,
+                                    scope,
+                                    name.id.as_str(),
+                                    &["builtins"],
+                                    None,
+                                )
+                            })
+                        }
+                        _ => false,
+                    } =>
+            {
+                let mut classes = vec![class];
+                while let Some(class) = classes.pop() {
+                    match class {
+                        ast::Expr::Tuple(tuple) => classes.extend(tuple.elts.iter().rev()),
+                        ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                            classes.push(binary.right.as_ref());
+                            classes.push(binary.left.as_ref());
+                        }
+                        ast::Expr::Name(_) => {
+                            if let Some(ty) = dependency_guard_class_type(
+                                db, index, &module, definition, class, &env,
+                            ) {
+                                values.add_in_place(ty);
+                                found = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            ast::Expr::Call(call)
+                if call.arguments.keywords.is_empty()
+                    && let Some(value) = call.arguments.args.first()
+                    && value
+                        .as_name_expr()
+                        .is_some_and(|name| name.id.as_str() == receiver_name.as_str()) =>
+            {
+                for function in
+                    dependency_callable_definitions(db, index, scope, call.func.as_ref())
+                {
+                    let Some(annotation) = function_return_annotation_only(db, function) else {
+                        continue;
+                    };
+                    let narrowed = match annotation {
+                        Type::TypeIs(type_is) => type_is.type_argument(db),
+                        Type::TypeGuard(type_guard) => type_guard.return_type(db),
+                        _ => continue,
+                    };
+                    values.add_in_place(narrowed);
+                    found = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    found.then(|| values.build())
 }
 
 /// An attribute access discovered while structurally inspecting an expression.
@@ -226,6 +965,9 @@ pub(super) fn implicit_attribute_binding_source<'ast>(
     match definition {
         DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
         DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+        DefinitionKind::AugmentedAssignment(assignment) => {
+            Some(assignment.node(module).value.as_ref())
+        }
         DefinitionKind::NamedExpression(named) => Some(named.node(module).value.as_ref()),
         DefinitionKind::For(statement) => Some(statement.iterable(module)),
         DefinitionKind::Comprehension(comprehension) => Some(comprehension.iterable(module)),
@@ -264,38 +1006,6 @@ pub(crate) fn implicit_attribute_member_dependencies<'db>(
             false
         },
     );
-}
-
-/// Detect member dependencies through flow-sensitive local aliases and eager lambda defaults.
-///
-/// ```python
-/// source = self.other
-/// self.values = [*source, Added()]
-/// ```
-///
-/// Inspect aliases structurally instead of inferring their values, which could enter the very
-/// attribute cycle that callers are trying to classify.
-pub(crate) fn implicit_attribute_expression_reads_member<'db>(
-    db: &'db dyn Db,
-    index: &'db SemanticIndex<'db>,
-    scope: (ProgramFile<'db>, FileScopeId),
-    module: &ParsedModuleRef,
-    value: &ast::Expr,
-    active_aliases: &mut FxIndexSet<Definition<'db>>,
-    is_independent_attribute: &impl Fn(&ast::ExprAttribute) -> bool,
-) -> bool {
-    visit_implicit_attribute_member_dependencies(
-        db,
-        index,
-        scope,
-        module,
-        value,
-        (active_aliases, false),
-        &mut |dependency| match dependency {
-            MemberDependency::Attribute { attribute, .. } => !is_independent_attribute(attribute),
-            MemberDependency::UnknownAlias => true,
-        },
-    )
 }
 
 /// Walk structural dependencies until the callback requests early termination.
@@ -599,6 +1309,19 @@ pub(crate) fn infer_scope_types<'db>(
     infer_scope_types_impl(db, InferScope::new(db, scope, tcx))
 }
 
+/// Preserve a recursive component while inferring a captured lambda or comprehension scope.
+pub(super) fn infer_scope_types_with_member_context<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    tcx: TypeContext<'db>,
+    member_context: MemberInferenceContext<'db>,
+) -> &'db ScopeInference<'db> {
+    infer_scope_types_with_member_context_impl(
+        db,
+        ScopeWithMemberContext::new(db, scope, tcx, member_context),
+    )
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
@@ -612,6 +1335,31 @@ pub(crate) fn infer_scope_types<'db>(
 pub(crate) fn infer_scope_types_impl<'db>(
     db: &'db dyn Db,
     input: InferScope<'db>,
+) -> ScopeInference<'db> {
+    infer_scope_types_with_optional_member_context(db, input, None)
+}
+
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: ScopeWithMemberContext<'db>| {
+        let env = ProgramEnvironment::from_scope(input.scope(db));
+        inference.cycle_normalized(db, &env, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn infer_scope_types_with_member_context_impl<'db>(
+    db: &'db dyn Db,
+    input: ScopeWithMemberContext<'db>,
+) -> ScopeInference<'db> {
+    let scope = InferScope::new(db, input.scope(db), input.tcx(db));
+    infer_scope_types_with_optional_member_context(db, scope, Some(input.member_context(db)))
+}
+
+fn infer_scope_types_with_optional_member_context<'db>(
+    db: &'db dyn Db,
+    input: InferScope<'db>,
+    member_context: Option<MemberInferenceContext<'db>>,
 ) -> ScopeInference<'db> {
     let (scope, tcx) = input.into_inner(db);
     let program_file = scope.program_file(db);
@@ -627,7 +1375,7 @@ pub(crate) fn infer_scope_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let builder = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Scope(scope, tcx),
@@ -635,7 +1383,13 @@ pub(crate) fn infer_scope_types_impl<'db>(
         program_file,
         index,
         &module,
-    )
+    );
+
+    if let Some(member_context) = member_context {
+        builder.with_member_context(member_context)
+    } else {
+        builder
+    }
     .finish_scope()
 }
 
@@ -651,6 +1405,19 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
+/// Infer an expression without dropping its recursive component at a tracked query boundary.
+pub(crate) fn infer_expression_types_with_member_context<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    tcx: TypeContext<'db>,
+    member_context: MemberInferenceContext<'db>,
+) -> &'db ExpressionInference<'db> {
+    infer_expression_types_with_member_context_impl(
+        db,
+        ExpressionWithMemberContext::new(db, expression, tcx, member_context),
+    )
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=expression_cycle_initial,
@@ -664,6 +1431,37 @@ pub(crate) fn infer_expression_types<'db>(
 pub(super) fn infer_expression_types_impl<'db>(
     db: &'db dyn Db,
     input: InferExpression<'db>,
+) -> ExpressionInference<'db> {
+    infer_expression_types_with_optional_member_context(db, input, None)
+}
+
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, input: ExpressionWithMemberContext<'db>| {
+        ExpressionInference::cycle_initial(input.expression(db).scope(db), Type::divergent(id))
+    },
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: ExpressionWithMemberContext<'db>| {
+        let env = ProgramEnvironment::from_scope(input.expression(db).scope(db));
+        inference.cycle_normalized(db, &env, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn infer_expression_types_with_member_context_impl<'db>(
+    db: &'db dyn Db,
+    input: ExpressionWithMemberContext<'db>,
+) -> ExpressionInference<'db> {
+    let expression = InferExpression::new(db, input.expression(db), input.tcx(db));
+    infer_expression_types_with_optional_member_context(
+        db,
+        expression,
+        Some(input.member_context(db)),
+    )
+}
+
+fn infer_expression_types_with_optional_member_context<'db>(
+    db: &'db dyn Db,
+    input: InferExpression<'db>,
+    member_context: Option<MemberInferenceContext<'db>>,
 ) -> ExpressionInference<'db> {
     let (expression, tcx) = input.into_inner(db);
 
@@ -682,7 +1480,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let builder = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -690,7 +1488,13 @@ pub(super) fn infer_expression_types_impl<'db>(
         program_file,
         index,
         &module,
-    )
+    );
+
+    if let Some(member_context) = member_context {
+        builder.with_member_context(member_context)
+    } else {
+        builder
+    }
     .finish_expression()
 }
 
@@ -872,6 +1676,17 @@ pub(super) struct ScopeWithContext<'db> {
     tcx: TypeContext<'db>,
 }
 
+/// A nested scope inferred under its owning recursive-attribute component.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ScopeWithMemberContext<'db> {
+    #[returns(copy)]
+    scope: ScopeId<'db>,
+    #[returns(copy)]
+    tcx: TypeContext<'db>,
+    #[returns(copy)]
+    member_context: MemberInferenceContext<'db>,
+}
+
 impl<'db> InferScope<'db> {
     fn new(db: &'db dyn Db, scope: ScopeId<'db>, tcx: TypeContext<'db>) -> InferScope<'db> {
         if tcx.annotation.is_some() {
@@ -890,6 +1705,124 @@ impl<'db> InferScope<'db> {
         }
     }
 }
+
+/// The stable component whose provisional values govern recursive attribute reads.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct MemberInferenceContext<'db> {
+    #[returns(copy)]
+    pub(crate) component: AttributeInferenceScc<'db>,
+}
+
+impl get_size2::GetSize for MemberInferenceContext<'_> {}
+
+impl<'db> MemberInferenceContext<'db> {
+    /// Whether a definition can depend on a participating component's provisional values.
+    pub(crate) fn applies_to_definition(
+        self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> bool {
+        let kind = definition.kind(db);
+        if kind.is_import()
+            || matches!(
+                kind,
+                DefinitionKind::Parameter(_) | DefinitionKind::Class(_)
+            )
+        {
+            return false;
+        }
+
+        let program_file = definition.program_file(db);
+        self.component(db)
+            .members(db)
+            .iter()
+            .any(|member| member.owner.body_scope(db).program_file(db) == program_file)
+    }
+
+    /// Whether any component member has this attribute name.
+    pub(crate) fn contains_name(self, db: &'db dyn Db, name: &str) -> bool {
+        self.component(db)
+            .members(db)
+            .iter()
+            .any(|member| member.name.as_str() == name)
+    }
+
+    /// Test membership without entering the component's fixed-point query.
+    pub(crate) fn contains(
+        self,
+        db: &'db dyn Db,
+        owner: StaticClassLiteral<'db>,
+        target_method_decorator: MethodDecorator,
+        name: &str,
+    ) -> bool {
+        self.component(db).members(db).iter().any(|member| {
+            member.owner == owner
+                && member.target_method_decorator == target_method_decorator
+                && member.name.as_str() == name
+        })
+    }
+
+    /// Read the current value from the component that owns fixed-point recovery.
+    pub(crate) fn incoming(
+        self,
+        db: &'db dyn Db,
+        owner: StaticClassLiteral<'db>,
+        target_method_decorator: MethodDecorator,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        self.contains(db, owner, target_method_decorator, name)
+            .then(|| {
+                owner.attribute_scc_member(db, self.component(db), target_method_decorator, name)
+            })?
+    }
+
+    /// Resolve inherited component members using the actual receiver's specialization.
+    pub(crate) fn incoming_for_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver: ClassType<'db>,
+        target_method_decorator: MethodDecorator,
+        name: &str,
+    ) -> Option<(Type<'db>, Option<Specialization<'db>>)> {
+        let (receiver_owner, receiver_specialization) = receiver.static_class_literal(db)?;
+        let (defining_owner, component) = receiver_owner.attribute_inference_scc_for_receiver(
+            db,
+            name,
+            target_method_decorator,
+        )?;
+        if component != self.component(db) {
+            return None;
+        }
+
+        let specialization = receiver_owner
+            .iter_mro(db, receiver_specialization)
+            .find_map(|base| {
+                let ClassBase::Class(base) = base else {
+                    return None;
+                };
+                let (owner, specialization) = base.static_class_literal(db)?;
+                (owner == defining_owner).then_some(specialization)
+            })?;
+
+        Some((
+            self.incoming(db, defining_owner, target_method_decorator, name)?,
+            specialization,
+        ))
+    }
+}
+
+/// An expression inferred under a query-keyed recursive-attribute component.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ExpressionWithMemberContext<'db> {
+    #[returns(copy)]
+    expression: Expression<'db>,
+    #[returns(copy)]
+    tcx: TypeContext<'db>,
+    #[returns(copy)]
+    member_context: MemberInferenceContext<'db>,
+}
+
+impl get_size2::GetSize for ExpressionWithMemberContext<'_> {}
 
 /// The type context for a given expression, namely the type annotation
 /// in an annotated assignment.
@@ -979,6 +1912,32 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
+    infer_unpack_types_with_optional_member_context(db, unpack, None)
+}
+
+/// Preserve a recursive component while unpacking assignments, iterables, or context managers.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, id, _, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>, _: MemberInferenceContext<'db>| {
+        let env = ProgramEnvironment::from_file(unpack.program_file(db));
+        result.cycle_normalized(db, &env, previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_unpack_types_with_member_context<'db>(
+    db: &'db dyn Db,
+    unpack: Unpack<'db>,
+    member_context: MemberInferenceContext<'db>,
+) -> UnpackResult<'db> {
+    infer_unpack_types_with_optional_member_context(db, unpack, Some(member_context))
+}
+
+fn infer_unpack_types_with_optional_member_context<'db>(
+    db: &'db dyn Db,
+    unpack: Unpack<'db>,
+    member_context: Option<MemberInferenceContext<'db>>,
+) -> UnpackResult<'db> {
     let program_file = unpack.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
@@ -990,7 +1949,12 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     .entered();
 
     let env = ProgramEnvironment::from_file(program_file);
-    let mut unpacker = Unpacker::new(db, &env, unpack.target_scope(db), program_file, &module);
+    let unpacker = Unpacker::new(db, &env, unpack.target_scope(db), program_file, &module);
+    let mut unpacker = if let Some(member_context) = member_context {
+        unpacker.with_member_context(member_context)
+    } else {
+        unpacker
+    };
     unpacker.unpack(unpack.target(db, &module), unpack.value(db));
     unpacker.finish()
 }

@@ -20,7 +20,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
-use ty_module_resolver::{ImportingFile, ModuleName, file_to_module, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
@@ -28,9 +28,11 @@ use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_unpack_types,
+    MemberInferenceContext, OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
+    infer_deferred_types, infer_definition_types, infer_definition_types_with_member_context,
+    infer_expression_types, infer_expression_types_with_member_context,
+    infer_same_file_expression_type, infer_scope_types_with_member_context, infer_unpack_types,
+    infer_unpack_types_with_member_context,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -38,8 +40,9 @@ use crate::place::{
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
     explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    place_from_bindings_with_reachability_cache,
+    place_from_bindings_with_reachability_cache_and_member_context,
+    place_from_declarations_with_reachability_cache, typing_extensions_symbol,
 };
 use crate::place_load::{
     ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
@@ -135,13 +138,14 @@ use ty_python_core::definition::{
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
-use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
     ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, ProgramFile, SemanticIndex,
-    Truthiness, unpack::UnpackPosition,
+    Truthiness,
+    unpack::{Unpack, UnpackPosition},
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -362,6 +366,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
+    /// The recursive attribute component represented in this builder's tracked query key.
+    member_inference_context: Option<MemberInferenceContext<'db>>,
+
     /// If the inference region refers to a definition, whether synthesized dictionary-key
     /// assignments derived from its right-hand side should be discarded.
     discards_dict_key_assignments: bool,
@@ -494,794 +501,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
+            member_inference_context: None,
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
         }
     }
 
-    /// Preserve concrete collection elements without resolving their recursive counterparts.
-    pub(super) fn infer_independent_assignment_constructor_seed(
-        mut self,
-        expression: &ast::Expr,
-    ) -> Option<Type<'db>> {
-        fn concrete_evidence<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-        ) -> Option<Type<'db>> {
-            let evidence = ty.as_union_like(db).map_or(ty, |union| {
-                union.filter(db, |element| {
-                    !matches!(element, Type::Dynamic(_) | Type::Divergent(_) | Type::Never)
-                })
-            });
-            (!matches!(
-                evidence,
-                Type::Dynamic(_) | Type::Divergent(_) | Type::Never
-            ))
-            .then(|| UnionType::from_two_elements(db, env, Type::unknown(), evidence))
-        }
-
+    /// Carry the component identity through ordinary inference and its tracked child queries.
+    pub(super) fn with_member_context(mut self, context: MemberInferenceContext<'db>) -> Self {
+        self.member_inference_context = Some(context);
         self.context.suppress_diagnostics();
-        self.context.defuse();
-
-        let db = self.db();
-        let env = self.program_environment().clone();
-        let mut bindings = Vec::new();
-        let inferred = self.infer_independent_constructor_value(expression, &mut bindings)?;
-
-        let seed = if let Some(specialization) =
-            inferred.known_specialization(db, &env, KnownClass::Dict)
-        {
-            let [key, value] = specialization.types(db) else {
-                return None;
-            };
-            let value = concrete_evidence(db, &env, *value)?;
-            let key = concrete_evidence(db, &env, *key).unwrap_or_else(Type::unknown);
-            KnownClass::Dict.to_specialized_instance(db, &env, &[key, value])
-        } else {
-            let class = [KnownClass::List, KnownClass::Set, KnownClass::Tuple]
-                .into_iter()
-                .find(|class| inferred.known_specialization(db, &env, *class).is_some())?;
-            let iterable = inferred.try_iterate(db, &env).ok()?;
-            let element = concrete_evidence(db, &env, iterable.homogeneous_element_type(db, &env))?;
-            if class == KnownClass::Tuple {
-                Type::homogeneous_tuple(db, &env, element)
-            } else {
-                class.to_specialized_instance(db, &env, &[element])
-            }
-        };
-
-        Some(seed.promote(db, &env).promote_singletons(db, &env))
-    }
-
-    /// Provisionally replace recursive member reads with `Unknown`, preserving lexical bindings.
-    fn infer_independent_constructor_value(
-        &mut self,
-        expression: &ast::Expr,
-        bindings: &mut Vec<(Name, Type<'db>)>,
-    ) -> Option<Type<'db>> {
-        let db = self.db();
-        let env = self.program_environment().clone();
-
-        if let ast::Expr::Name(name) = expression
-            && let Some((_, ty)) = bindings
-                .iter()
-                .rev()
-                .find(|(bound_name, _)| *bound_name == name.id)
-        {
-            return Some(*ty);
-        }
-
-        let references_bound_name = !bindings.is_empty()
-            && ast::helpers::any_over_expr(expression, |expression| {
-                matches!(expression, ast::Expr::Name(name)
-                    if bindings.iter().any(|(bound_name, _)| *bound_name == name.id))
-            });
-        if !references_bound_name
-            && let Some(ty) = self.infer_independent_constructor_fragment(expression)
-        {
-            return Some(ty);
-        }
-
-        match expression {
-            ast::Expr::Name(name) => {
-                let method_scope = self.scope().file_scope_id(db);
-                let table = self.index.place_table(method_scope);
-                let symbol = table.symbol_id(name.id.as_str())?;
-                if !table.symbol(symbol).is_local() {
-                    return Some(Type::unknown());
-                }
-
-                let expression_scope = self.index.expression_scope_id(expression);
-                let use_def = self.index.use_def_map(method_scope);
-                let definitions = if expression_scope == method_scope {
-                    use_def.bindings_at_use(name.scoped_use_id(db, self.program_file()))
-                } else {
-                    let EnclosingSnapshotResult::FoundBindings(definitions) = self
-                        .index
-                        .enclosing_snapshot(method_scope, table.place(symbol), expression_scope)
-                    else {
-                        return Some(Type::unknown());
-                    };
-                    definitions
-                };
-
-                let initial_bindings = bindings.len();
-                bindings.push((name.id.clone(), Type::unknown()));
-                let mut values = UnionBuilder::new(db, &env);
-                let mut has_value = false;
-                for binding in definitions {
-                    let Some(definition) = binding.binding.definition() else {
-                        continue;
-                    };
-                    if let Some(inferred) =
-                        self.infer_independent_binding_value(definition, bindings)
-                    {
-                        values.add_in_place(inferred);
-                        has_value = true;
-                    }
-                }
-                bindings.truncate(initial_bindings);
-                Some(if has_value {
-                    values.build()
-                } else {
-                    Type::unknown()
-                })
-            }
-            ast::Expr::Tuple(tuple)
-                if tuple.elts.iter().all(|element| !element.is_starred_expr()) =>
-            {
-                let elements = tuple.elts.iter().map(|element| {
-                    self.infer_independent_constructor_value(element, bindings)
-                        .unwrap_or_else(Type::unknown)
-                });
-                Some(Type::heterogeneous_tuple(db, &env, elements))
-            }
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Set(ast::ExprSet { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let elements = elts.iter().map(|element| {
-                    let (fragment, starred) = match element {
-                        ast::Expr::Starred(starred) => (starred.value.as_ref(), true),
-                        _ => (element, false),
-                    };
-                    let mut element_ty = self
-                        .infer_independent_constructor_value(fragment, bindings)
-                        .unwrap_or_else(Type::unknown);
-                    if starred {
-                        element_ty = element_ty
-                            .try_iterate(db, &env)
-                            .map(|iterable| iterable.homogeneous_element_type(db, &env))
-                            .unwrap_or_else(|_| Type::unknown());
-                    }
-                    element_ty
-                });
-
-                let element_ty = UnionType::from_elements(db, &env, elements);
-                Some(match expression {
-                    ast::Expr::List(_) => {
-                        KnownClass::List.to_specialized_instance(db, &env, &[element_ty])
-                    }
-                    ast::Expr::Set(_) => {
-                        KnownClass::Set.to_specialized_instance(db, &env, &[element_ty])
-                    }
-                    ast::Expr::Tuple(_) => Type::homogeneous_tuple(db, &env, element_ty),
-                    _ => return None,
-                })
-            }
-            ast::Expr::Dict(ast::ExprDict { items, .. }) => {
-                let mut keys = UnionBuilder::new(db, &env);
-                let mut values = UnionBuilder::new(db, &env);
-
-                for item in items {
-                    let (key_ty, value_ty) = if let Some(key) = item.key.as_ref() {
-                        (
-                            self.infer_independent_constructor_value(key, bindings)
-                                .unwrap_or_else(Type::unknown),
-                            self.infer_independent_constructor_value(&item.value, bindings)
-                                .unwrap_or_else(Type::unknown),
-                        )
-                    } else {
-                        let mapping = self
-                            .infer_independent_constructor_value(&item.value, bindings)
-                            .unwrap_or_else(Type::unknown);
-                        mapping
-                            .known_specialization(db, &env, KnownClass::Dict)
-                            .and_then(|specialization| {
-                                let [key, value] = specialization.types(db) else {
-                                    return None;
-                                };
-                                Some((*key, *value))
-                            })
-                            .unwrap_or((Type::unknown(), Type::unknown()))
-                    };
-                    keys.add_in_place(key_ty);
-                    values.add_in_place(value_ty);
-                }
-
-                Some(KnownClass::Dict.to_specialized_instance(
-                    db,
-                    &env,
-                    &[keys.build(), values.build()],
-                ))
-            }
-            ast::Expr::Call(call) => {
-                if let ast::Expr::Lambda(lambda) = call.func.as_ref() {
-                    let initial_bindings = bindings.len();
-                    let inferred = (|| {
-                        if let Some(parameters) = lambda.parameters.as_ref() {
-                            for (index, parameter) in
-                                parameters.iter_non_variadic_params().enumerate()
-                            {
-                                let argument = call.arguments.args.get(index).or_else(|| {
-                                    call.arguments
-                                        .keywords
-                                        .iter()
-                                        .find(|keyword| {
-                                            keyword.arg.as_deref()
-                                                == Some(parameter.name().as_str())
-                                        })
-                                        .map(|keyword| &keyword.value)
-                                });
-                                let value = argument.or_else(|| parameter.default())?;
-                                let inferred =
-                                    self.infer_independent_constructor_value(value, bindings)?;
-                                bindings.push((Name::new(parameter.name().as_str()), inferred));
-                            }
-                        }
-
-                        self.infer_independent_constructor_value(&lambda.body, bindings)
-                    })();
-                    bindings.truncate(initial_bindings);
-                    if let Some(inferred) = inferred {
-                        return Some(inferred);
-                    }
-                }
-
-                let arguments = CallArguments::from_arguments_typed(&call.arguments, |argument| {
-                    self.infer_independent_constructor_value(argument, bindings)
-                        .unwrap_or_else(Type::unknown)
-                });
-                let mut callable =
-                    self.infer_independent_constructor_value(&call.func, bindings)?;
-                let argument_type = |position| {
-                    let argument = arguments.argument_types(position)?;
-                    argument.get_default()
-                };
-                let union_argument = call
-                    .func
-                    .as_attribute_expr()
-                    .filter(|method| method.attr.as_str() == "union")
-                    .and_then(|_| argument_type(0))
-                    .and_then(|argument| argument.known_specialization(db, &env, KnownClass::Set));
-
-                if callable.is_unknown() && union_argument.is_some() {
-                    let receiver =
-                        KnownClass::Set.to_specialized_instance(db, &env, &[Type::unknown()]);
-                    callable = receiver
-                        .try_member_lookup(db, &env, "union")
-                        .ok()?
-                        .place
-                        .ignore_possibly_undefined()?;
-                }
-
-                let original_callable = self
-                    .expressions
-                    .get(&call.func.as_ref().into())
-                    .copied()
-                    .unwrap_or(callable);
-                if let Type::FunctionLiteral(function) = original_callable
-                    && arguments.len() == 2
-                    && matches!(function.name(db).as_str(), "add" | "or_")
-                    && file_to_module(db, function.program_file(db).resolver_file(db))
-                        .is_some_and(|module| module.name(db) == "_operator")
-                    && let Some(left) = argument_type(0)
-                    && let Some(right) = argument_type(1)
-                {
-                    let operator = if function.name(db).as_str() == "add" {
-                        ast::Operator::Add
-                    } else {
-                        ast::Operator::BitOr
-                    };
-                    return self.infer_independent_binary_value(left, operator, right);
-                }
-
-                let inferred = callable
-                    .try_call(db, &env, &arguments)
-                    .ok()?
-                    .return_type(db, &env);
-
-                if let Some(argument) = union_argument
-                    && let Some(result) = inferred.known_specialization(db, &env, KnownClass::Set)
-                    && let ([result], [argument]) = (result.types(db), argument.types(db))
-                {
-                    let elements = UnionType::from_two_elements(db, &env, *result, *argument);
-                    return Some(KnownClass::Set.to_specialized_instance(db, &env, &[elements]));
-                }
-
-                Some(inferred)
-            }
-            ast::Expr::Attribute(attribute) => {
-                if !self.constructor_attribute_is_independent(attribute)
-                    && !references_bound_name
-                    && attribute.value.as_name_expr().is_some_and(|receiver| {
-                        self.index
-                            .scope(self.scope().file_scope_id(db))
-                            .node()
-                            .as_function()
-                            .is_some_and(|function| {
-                                function
-                                    .node(self.module())
-                                    .parameters
-                                    .find(receiver.id.as_str())
-                                    .is_some()
-                            })
-                    })
-                {
-                    return Some(Type::unknown());
-                }
-
-                let receiver =
-                    self.infer_independent_constructor_value(&attribute.value, bindings)?;
-                receiver
-                    .try_member_lookup(db, &env, attribute.attr.as_str())
-                    .ok()?
-                    .place
-                    .ignore_possibly_undefined()
-            }
-            ast::Expr::Subscript(subscript) => {
-                let receiver =
-                    self.infer_independent_constructor_value(&subscript.value, bindings)?;
-                let index = self
-                    .infer_independent_constructor_value(&subscript.slice, bindings)
-                    .unwrap_or_else(Type::unknown);
-                receiver
-                    .try_call_dunder(
-                        db,
-                        &env,
-                        "__getitem__",
-                        CallArguments::positional([index]),
-                        TypeContext::default(),
-                    )
-                    .ok()
-                    .map(|binding| binding.return_type(db, &env))
-            }
-            ast::Expr::If(ast::ExprIf {
-                test, body, orelse, ..
-            }) => {
-                if let Some(truthiness) = self
-                    .infer_independent_constructor_value(test, bindings)
-                    .and_then(|ty| self.independent_constructor_truthiness(test, ty))
-                {
-                    match truthiness {
-                        Truthiness::AlwaysTrue => {
-                            return self.infer_independent_constructor_value(body, bindings);
-                        }
-                        Truthiness::AlwaysFalse => {
-                            return self.infer_independent_constructor_value(orelse, bindings);
-                        }
-                        Truthiness::Ambiguous => {}
-                    }
-                }
-
-                let mut seeds = UnionBuilder::new(db, &env);
-                let mut has_seed = false;
-                for branch in [body.as_ref(), orelse.as_ref()] {
-                    if let Some(seed) = self.infer_independent_constructor_value(branch, bindings) {
-                        seeds.add_in_place(seed);
-                        has_seed = true;
-                    }
-                }
-                has_seed.then(|| seeds.build())
-            }
-            ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-                let mut seeds = UnionBuilder::new(db, &env);
-                let mut has_seed = false;
-                for (index, branch) in values.iter().enumerate() {
-                    if let Some(seed) = self.infer_independent_constructor_value(branch, bindings) {
-                        let truthiness = self.independent_constructor_truthiness(branch, seed);
-
-                        if index + 1 == values.len()
-                            || !matches!(
-                                (op, truthiness),
-                                (ast::BoolOp::Or, Some(Truthiness::AlwaysFalse))
-                                    | (ast::BoolOp::And, Some(Truthiness::AlwaysTrue))
-                            )
-                        {
-                            seeds.add_in_place(seed);
-                            has_seed = true;
-                        }
-
-                        if matches!(
-                            (op, truthiness),
-                            (ast::BoolOp::Or, Some(Truthiness::AlwaysTrue))
-                                | (ast::BoolOp::And, Some(Truthiness::AlwaysFalse))
-                        ) {
-                            break;
-                        }
-                    }
-                }
-                has_seed.then(|| seeds.build())
-            }
-            ast::Expr::BinOp(ast::ExprBinOp {
-                left, op, right, ..
-            }) => {
-                let left = self.infer_independent_constructor_value(left, bindings)?;
-                let right = self.infer_independent_constructor_value(right, bindings)?;
-                self.infer_independent_binary_value(left, *op, right)
-            }
-            ast::Expr::ListComp(ast::ExprListComp {
-                elt, generators, ..
-            })
-            | ast::Expr::SetComp(ast::ExprSetComp {
-                elt, generators, ..
-            }) => {
-                let element_ty =
-                    self.infer_independent_comprehension_element(generators, elt, bindings)?;
-                let class = if matches!(expression, ast::Expr::ListComp(_)) {
-                    KnownClass::List
-                } else {
-                    KnownClass::Set
-                };
-                Some(class.to_specialized_instance(db, &env, &[element_ty]))
-            }
-            ast::Expr::Generator(ast::ExprGenerator {
-                elt, generators, ..
-            }) => {
-                let element =
-                    self.infer_independent_comprehension_element(generators, elt, bindings)?;
-                let none = Type::none(db, &env);
-                Some(KnownClass::GeneratorType.to_specialized_instance(
-                    db,
-                    &env,
-                    &[element, none, none],
-                ))
-            }
-            ast::Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                ..
-            }) => {
-                let key = key.as_deref()?;
-                let key_ty =
-                    self.infer_independent_comprehension_element(generators, key, bindings)?;
-                let value_ty =
-                    self.infer_independent_comprehension_element(generators, value, bindings)?;
-                Some(KnownClass::Dict.to_specialized_instance(db, &env, &[key_ty, value_ty]))
-            }
-            _ => Some(Type::unknown()),
-        }
-    }
-
-    /// Resolve a local binding provisionally, retaining iteration and context-manager semantics.
-    fn infer_independent_binding_value(
-        &mut self,
-        definition: Definition<'db>,
-        bindings: &mut Vec<(Name, Type<'db>)>,
-    ) -> Option<Type<'db>> {
-        let db = self.db();
-        let env = self.program_environment().clone();
-        let kind = definition.kind(db);
-        let source = super::implicit_attribute_binding_source(kind, self.module())?;
-        let value = self.infer_independent_constructor_value(source, bindings)?;
-
-        match kind {
-            DefinitionKind::Assignment(assignment) => {
-                if let Some(unpack) = assignment.unpack() {
-                    self.infer_independent_unpacked_target(
-                        value,
-                        unpack.target(db, self.module()),
-                        assignment.target(self.module()),
-                    )
-                } else {
-                    Some(value)
-                }
-            }
-            DefinitionKind::For(statement) => {
-                let element = value
-                    .try_iterate_with_mode(
-                        db,
-                        &env,
-                        EvaluationMode::from_is_async(statement.is_async()),
-                    )
-                    .ok()?
-                    .homogeneous_element_type(db, &env);
-                match statement.target_kind() {
-                    TargetKind::Single => Some(element),
-                    TargetKind::Sequence(_, unpack) => self.infer_independent_unpacked_target(
-                        element,
-                        unpack.target(db, self.module()),
-                        statement.target(self.module()),
-                    ),
-                }
-            }
-            DefinitionKind::Comprehension(comprehension) => {
-                let element = value
-                    .try_iterate_with_mode(
-                        db,
-                        &env,
-                        EvaluationMode::from_is_async(comprehension.is_async()),
-                    )
-                    .ok()?
-                    .homogeneous_element_type(db, &env);
-                match comprehension.target_kind() {
-                    TargetKind::Single => Some(element),
-                    TargetKind::Sequence(_, unpack) => self.infer_independent_unpacked_target(
-                        element,
-                        unpack.target(db, self.module()),
-                        comprehension.target(self.module()),
-                    ),
-                }
-            }
-            DefinitionKind::WithItem(item) => {
-                let entered = value
-                    .try_enter_with_mode(db, &env, EvaluationMode::from_is_async(item.is_async()))
-                    .ok()?;
-                match item.target_kind() {
-                    TargetKind::Single => Some(entered),
-                    TargetKind::Sequence(_, unpack) => self.infer_independent_unpacked_target(
-                        entered,
-                        unpack.target(db, self.module()),
-                        item.target(self.module()),
-                    ),
-                }
-            }
-            _ => Some(value),
-        }
-    }
-
-    /// Project the actual unpack target instead of merging unrelated tuple elements.
-    fn infer_independent_unpacked_target(
-        &self,
-        value: Type<'db>,
-        pattern: &ast::Expr,
-        target: &ast::Expr,
-    ) -> Option<Type<'db>> {
-        if pattern.range() == target.range() {
-            return Some(value);
-        }
-
-        let elements = match pattern {
-            ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
-            ast::Expr::List(list) => list.elts.as_slice(),
-            ast::Expr::Starred(starred) => {
-                return self.infer_independent_unpacked_target(value, &starred.value, target);
-            }
-            _ => return None,
-        };
-
-        let db = self.db();
-        let env = self.program_environment();
-        let iterable = value.try_iterate(db, env).ok()?;
-        for (index, element) in elements.iter().enumerate() {
-            if element.range().contains_range(target.range()) {
-                let element_type = iterable
-                    .as_fixed_length()
-                    .and_then(|fixed| fixed.all_elements().get(index).copied())
-                    .unwrap_or_else(|| iterable.homogeneous_element_type(db, env));
-                return self.infer_independent_unpacked_target(element_type, element, target);
-            }
-        }
-
-        None
-    }
-
-    /// Preserve known branch outcomes before singleton promotion obscures them.
-    fn independent_constructor_truthiness(
-        &self,
-        expression: &ast::Expr,
-        inferred: Type<'db>,
-    ) -> Option<Truthiness> {
-        let known = match expression {
-            ast::Expr::BooleanLiteral(literal) => Some(literal.value),
-            ast::Expr::List(list) => list.elts.is_empty().then_some(false),
-            ast::Expr::Set(set) => set.elts.is_empty().then_some(false),
-            ast::Expr::Tuple(tuple) => tuple.elts.is_empty().then_some(false),
-            ast::Expr::Dict(mapping) => mapping.items.is_empty().then_some(false),
-            _ => None,
-        };
-        known.map(Truthiness::from).or_else(|| {
-            inferred
-                .try_bool(self.db(), self.program_environment())
-                .ok()
-        })
-    }
-
-    /// Apply collection operators after approximating an unknown recursive operand.
-    fn infer_independent_binary_value(
-        &self,
-        mut left: Type<'db>,
-        operator: ast::Operator,
-        mut right: Type<'db>,
-    ) -> Option<Type<'db>> {
-        let db = self.db();
-        let env = self.program_environment();
-
-        let unknown_collection_like = |ty: Type<'db>| {
-            [
-                KnownClass::Dict,
-                KnownClass::List,
-                KnownClass::Set,
-                KnownClass::Tuple,
-            ]
-            .into_iter()
-            .find(|class| ty.known_specialization(db, env, *class).is_some())
-            .map(|class| match class {
-                KnownClass::Dict => {
-                    class.to_specialized_instance(db, env, &[Type::unknown(), Type::unknown()])
-                }
-                KnownClass::Tuple => Type::homogeneous_tuple(db, env, Type::unknown()),
-                _ => class.to_specialized_instance(db, env, &[Type::unknown()]),
-            })
-        };
-
-        if left.is_unknown()
-            && let Some(approximation) = unknown_collection_like(right)
-        {
-            left = approximation;
-        }
-        if right.is_unknown()
-            && let Some(approximation) = unknown_collection_like(left)
-        {
-            right = approximation;
-        }
-
-        let inferred = Type::try_call_bin_op_return_type(db, env, left, operator, right)?;
-
-        if operator == ast::Operator::Add
-            && let Some(left) = left.known_specialization(db, env, KnownClass::List)
-            && let Some(right) = right.known_specialization(db, env, KnownClass::List)
-            && let ([left], [right]) = (left.types(db), right.types(db))
-        {
-            let elements = UnionType::from_two_elements(db, env, *left, *right);
-            return Some(KnownClass::List.to_specialized_instance(db, env, &[elements]));
-        }
-
-        Some(inferred)
-    }
-
-    /// Evaluate a projected element without leaking comprehension bindings into sibling nodes.
-    fn infer_independent_comprehension_element(
-        &mut self,
-        generators: &[ast::Comprehension],
-        element: &ast::Expr,
-        bindings: &mut Vec<(Name, Type<'db>)>,
-    ) -> Option<Type<'db>> {
-        let db = self.db();
-        let env = self.program_environment().clone();
-        let initial_bindings = bindings.len();
-
-        let inferred = (|| {
-            for generator in generators {
-                let iterable =
-                    self.infer_independent_constructor_value(&generator.iter, bindings)?;
-                let element_ty = iterable
-                    .try_iterate(db, &env)
-                    .ok()?
-                    .homogeneous_element_type(db, &env);
-
-                let targets = match &generator.target {
-                    ast::Expr::Name(name) => {
-                        bindings.push((name.id.clone(), element_ty));
-                        continue;
-                    }
-                    ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
-                    ast::Expr::List(list) => list.elts.as_slice(),
-                    _ => return None,
-                };
-                let elements = element_ty.try_iterate(db, &env).ok()?;
-                let elements = elements.as_fixed_length()?.all_elements();
-                if elements.len() != targets.len() {
-                    return None;
-                }
-                for (target, ty) in targets.iter().zip(elements) {
-                    let name = target.as_name_expr()?;
-                    bindings.push((name.id.clone(), *ty));
-                }
-            }
-
-            self.infer_independent_constructor_value(element, bindings)
-        })();
-
-        bindings.truncate(initial_bindings);
-        inferred
-    }
-
-    /// Infer a member-free fragment in its actual lexical scope without reporting diagnostics.
-    ///
-    /// Comprehension bodies need a scope-local builder; reusing the method's builder would apply
-    /// narrowing constraints to places that do not exist in its symbol table.
-    fn infer_independent_constructor_fragment(
-        &mut self,
-        expression: &ast::Expr,
-    ) -> Option<Type<'db>> {
-        let db = self.db();
-        let mut active_aliases = FxIndexSet::default();
-        if super::implicit_attribute_expression_reads_member(
-            db,
-            self.index,
-            (self.program_file(), self.scope().file_scope_id(db)),
-            self.module(),
-            expression,
-            &mut active_aliases,
-            &|attribute| self.constructor_attribute_is_independent(attribute),
-        ) {
-            return None;
-        }
-
-        let env = self.program_environment().clone();
-        let inferred =
-            if self.index.expression_scope_id(expression) == self.scope().file_scope_id(db) {
-                self.expressions
-                    .get(&expression.into())
-                    .copied()
-                    .unwrap_or_else(|| {
-                        self.infer_maybe_standalone_expression(expression, TypeContext::default())
-                    })
-            } else {
-                let scope = self
-                    .index
-                    .expression_scope_id(expression)
-                    .to_scope_id(db, self.program_file());
-                let mut builder = TypeInferenceBuilder::new(
-                    db,
-                    &env,
-                    InferenceRegion::Scope(scope, TypeContext::default()),
-                    self.file(),
-                    self.program_file(),
-                    self.index,
-                    self.module(),
-                );
-                builder.context.suppress_diagnostics();
-                builder.context.defuse();
-                builder.infer_expression_impl(expression, TypeContext::default())
-            };
-        Some(inferred.promote(db, &env).promote_singletons(db, &env))
-    }
-
-    /// Distinguish external values from receivers that can re-enter the current attribute cycle.
-    fn constructor_attribute_is_independent(&self, attribute: &ast::ExprAttribute) -> bool {
-        let db = self.db();
-        let method_scope = self.scope().file_scope_id(db);
-        let Some(function) = self.index.scope(method_scope).node().as_function() else {
-            return false;
-        };
-        let function = function.node(self.module());
-
-        !ast::helpers::any_over_expr(&attribute.value, |expression| {
-            let ast::Expr::Name(name) = expression else {
-                return false;
-            };
-            if name.ctx != ast::ExprContext::Load {
-                return false;
-            }
-            if function.parameters.find(name.id.as_str()).is_some() {
-                return true;
-            }
-
-            if self.index.expression_scope_id(expression) != method_scope {
-                return false;
-            }
-            let table = self.index.place_table(method_scope);
-            let Some(symbol) = table.symbol_id(name.id.as_str()) else {
-                return false;
-            };
-            if !table.symbol(symbol).is_local() {
-                return false;
-            }
-
-            let mut aliases = FxIndexSet::default();
-            super::implicit_attribute_expression_reads_member(
-                db,
-                self.index,
-                (self.program_file(), method_scope),
-                self.module(),
-                expression,
-                &mut aliases,
-                &|_| false,
-            )
-        })
+        self
     }
 
     fn reachability_cache(&self) -> &ReachabilityEvaluationCache<'db> {
@@ -1778,6 +1008,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.expression_type(expression)
             }
+            _ if let Some(member_context) = self.member_inference_context => {
+                infer_scope_types_with_member_context(
+                    self.db(),
+                    expr_scope,
+                    TypeContext::default(),
+                    member_context,
+                )
+                .expression_type(expression)
+            }
             _ => infer_complete_scope_types(self.db(), expr_scope).expression_type(expression),
         }
     }
@@ -1794,6 +1033,77 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 infer_complete_scope_types(self.db(), expr_scope).type_expression_flags(expression)
             }
         }
+    }
+
+    /// Preserve recursive attribute assumptions when entering lambdas and comprehensions.
+    fn infer_nested_scope_types(
+        &self,
+        scope: ScopeId<'db>,
+        tcx: TypeContext<'db>,
+    ) -> &'db ScopeInference<'db> {
+        if let Some(member_context) = self.member_inference_context {
+            infer_scope_types_with_member_context(self.db(), scope, tcx, member_context)
+        } else {
+            infer_scope_types(self.db(), scope, tcx)
+        }
+    }
+
+    /// Keep recursive assumptions when unpacking definitions in nested inference regions.
+    fn infer_unpack_types(&self, unpack: Unpack<'db>) -> &'db UnpackResult<'db> {
+        if let Some(member_context) = self.member_inference_context {
+            infer_unpack_types_with_member_context(self.db(), unpack, member_context)
+        } else {
+            infer_unpack_types(self.db(), unpack)
+        }
+    }
+
+    /// Resolve loop and captured aliases under the same component as their surrounding region.
+    fn infer_member_binding_type(&self, definition: Definition<'db>) -> Type<'db> {
+        self.infer_member_definition(definition)
+            .binding_type(definition)
+    }
+
+    /// Keep local definition queries attached to their current recursive component.
+    fn infer_member_definition(
+        &self,
+        definition: Definition<'db>,
+    ) -> &'db DefinitionInference<'db> {
+        if let Some(context) = self.member_inference_context
+            && context.applies_to_definition(self.db(), definition)
+        {
+            infer_definition_types_with_member_context(self.db(), definition, context)
+        } else {
+            infer_definition_types(self.db(), definition)
+        }
+    }
+
+    /// Preserve the current component when a nested lambda requests its enclosing statement.
+    fn infer_member_statement_types(&self, statement: Statement<'db>) -> StatementInference<'db> {
+        if let Some(context) = self.member_inference_context {
+            match statement {
+                Statement::Expression(expression) => {
+                    return StatementInference::Expression(
+                        infer_expression_types_with_member_context(
+                            self.db(),
+                            expression,
+                            TypeContext::default(),
+                            context,
+                        ),
+                    );
+                }
+                Statement::Definition(definition)
+                    if context.applies_to_definition(self.db(), definition) =>
+                {
+                    return StatementInference::Definition(
+                        definition,
+                        infer_definition_types_with_member_context(self.db(), definition, context),
+                    );
+                }
+                Statement::Definition(_) | Statement::Other(_) => {}
+            }
+        }
+
+        infer_statement_types(self.db(), statement)
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -2278,13 +1588,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
                 self.infer_maybe_standalone_expression(value, TypeContext::default())
             });
+            let member = value_type.member(db, self.program_environment(), attr);
+            if member
+                .qualifiers
+                .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                && let Some(context) = self.member_inference_context
+                && self
+                    .contextual_attribute_incoming(context, value_type, attr)
+                    .is_some()
+            {
+                return None;
+            }
             if let Place::Defined(DefinedPlace {
                 ty,
                 definedness: Definedness::AlwaysDefined,
                 ..
-            }) = value_type
-                .member(db, self.program_environment(), attr)
-                .place
+            }) = member.place
             {
                 // TODO: also consider qualifiers on the attribute
                 Some(ty)
@@ -2822,7 +2141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
-        let result = infer_definition_types(self.db(), definition);
+        let result = self.infer_member_definition(definition);
         self.extend_definition(definition, result);
     }
 
@@ -2988,7 +2307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let target_ty = match with_item.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
-                let unpacked = infer_unpack_types(self.db(), unpack);
+                let unpacked = self.infer_unpack_types(unpack);
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -3245,7 +2564,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut union = UnionBuilder::new(db, env).recursively_defined(RecursivelyDefined::Yes);
 
         for reachable_binding in &loop_header.reachable_bindings {
-            let binding_ty = binding_type(db, reachable_binding.definition);
+            let binding_ty = self.infer_member_binding_type(reachable_binding.definition);
             let narrowed_ty = use_def
                 .narrowing_evaluator(reachable_binding.narrowing_constraint)
                 .narrow(db, env, binding_ty, place);
@@ -3298,7 +2617,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let DefinitionState::Defined(source) = binding.binding else {
                         continue;
                     };
-                    let ty = binding_type(db, source);
+                    let ty = self.infer_member_binding_type(source);
                     union.add_in_place(binding.narrowing_constraint.narrow(
                         db,
                         env,
@@ -3309,11 +2628,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            let Some(ty) = place_from_bindings_with_reachability_cache(
+            let Some(ty) = place_from_bindings_with_reachability_cache_and_member_context(
                 db,
                 env,
                 bindings,
                 self.reachability_cache(),
+                self.member_inference_context,
             )
             .place
             .raw_type() else {
@@ -3565,7 +2885,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Infer the standalone expression here to include its diagnostics in this region.
                 self.infer_standalone_expression(value, TypeContext::default());
 
-                let unpacked = infer_unpack_types(self.db(), unpack);
+                let unpacked = self.infer_unpack_types(unpack);
                 self.context.extend(unpacked.diagnostics());
                 self.infer_unpacked_assignment_target(target, value, unpacked);
             } else {
@@ -4053,7 +3373,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(unpack) => {
                 // The assignment statement owns unpacking diagnostics so that targets without a
                 // name definition are still checked, and each diagnostic is reported only once.
-                let unpacked = infer_unpack_types(self.db(), unpack);
+                let unpacked = self.infer_unpack_types(unpack);
                 unpacked.expression_type(target)
             }
             None => {
@@ -5025,6 +4345,111 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         declared
     }
 
+    /// Resolve an assignment annotation without touching its potentially recursive initializer.
+    pub(super) fn infer_annotated_assignment_annotation_only(
+        mut self,
+        assignment: &AnnotatedAssignmentDefinitionKind,
+    ) -> Option<TypeAndQualifiers<'db>> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+
+        let target = assignment.target(self.module());
+        (target.is_name_expr() || self.is_valid_receiver_annotation_target(target))
+            .then(|| self.infer_annotated_assignment_annotation(assignment))
+    }
+
+    /// Resolve one parameter annotation without evaluating other signature expressions.
+    pub(super) fn infer_parameter_annotation_only(
+        mut self,
+        annotation: &ast::Expr,
+        function_definition: Definition<'db>,
+    ) -> Type<'db> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+        self.typevar_binding_context = Some(function_definition);
+        self.context
+            .inference_flags
+            .insert(InferenceFlags::IN_PARAMETER_ANNOTATION);
+
+        self.infer_type_expression_with_state(
+            annotation,
+            DeferredExpressionState::from(self.defer_annotations()),
+        )
+    }
+
+    /// Resolve a return annotation without inferring the rest of its function signature.
+    pub(super) fn infer_function_return_annotation_only(
+        mut self,
+        annotation: &ast::Expr,
+        function_definition: Definition<'db>,
+    ) -> Type<'db> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+        self.typevar_binding_context = Some(function_definition);
+        self.context
+            .inference_flags
+            .insert(InferenceFlags::IN_RETURN_TYPE);
+
+        let annotation = self.dependency_type_expression_without_metadata(annotation);
+        self.infer_type_expression_with_state(
+            annotation,
+            DeferredExpressionState::from(self.defer_annotations()),
+        )
+    }
+
+    /// Skip verified `Annotated` metadata only during structural component discovery.
+    fn dependency_type_expression_without_metadata<'a>(
+        &self,
+        mut expression: &'a ast::Expr,
+    ) -> &'a ast::Expr {
+        while let ast::Expr::Subscript(subscript) = expression {
+            let (name, member) = match subscript.value.as_ref() {
+                ast::Expr::Name(name) => (name.id.as_str(), Some("Annotated")),
+                ast::Expr::Attribute(attribute) if attribute.attr.as_str() == "Annotated" => {
+                    let Some(name) = attribute.value.as_name_expr() else {
+                        break;
+                    };
+                    (name.id.as_str(), None)
+                }
+                _ => break,
+            };
+
+            if !super::dependency_imported_from(
+                self.db(),
+                self.index,
+                self.module(),
+                self.scope().file_scope_id(self.db()),
+                name,
+                &["typing", "typing_extensions"],
+                member,
+            ) {
+                break;
+            }
+
+            let ast::Expr::Tuple(arguments) = subscript.slice.as_ref() else {
+                break;
+            };
+            let Some(first) = arguments.elts.first() else {
+                break;
+            };
+            expression = first;
+        }
+
+        expression
+    }
+
+    /// Infer a dependency's annotation without evaluating its surrounding runtime expression.
+    pub(super) fn infer_dependency_type_expression_only(mut self, target: &ast::Expr) -> Type<'db> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+
+        let target = self.dependency_type_expression_without_metadata(target);
+        self.infer_type_expression_with_state(
+            target,
+            DeferredExpressionState::from(self.defer_annotations()),
+        )
+    }
+
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
     pub(super) fn infer_annotated_assignment_cycle_initial(
         mut self,
@@ -5679,7 +5104,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
+        let value_ty = self
+            .infer_member_definition(assignment)
+            .expression_type(value);
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }
@@ -5754,7 +5181,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let loop_var_value_type = match for_stmt.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
-                let unpacked = infer_unpack_types(self.db(), unpack);
+                let unpacked = self.infer_unpack_types(unpack);
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -7031,7 +6458,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let types = infer_expression_types(self.db(), standalone_expression, tcx);
+        let types = if let Some(member_context) = self.member_inference_context {
+            infer_expression_types_with_member_context(
+                self.db(),
+                standalone_expression,
+                tcx,
+                member_context,
+            )
+        } else {
+            infer_expression_types(self.db(), standalone_expression, tcx)
+        };
         self.extend_expression(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
@@ -8617,7 +8053,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             EvaluationMode::from_is_async(scope_id.is_async_comprehension(self.index));
         let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, yield_tcx);
+        let inference = self.infer_nested_scope_types(scope, yield_tcx);
         self.extend_scope(inference);
         let yield_type = self.comprehension_element_type(elt, inference);
 
@@ -8697,7 +8133,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
+        let inference = self.infer_nested_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -8738,7 +8174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
+        let inference = self.infer_nested_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -8780,7 +8216,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
+        let inference = self.infer_nested_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -8948,7 +8384,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
             if is_first {
-                infer_same_file_expression_type(builder.db(), builder.index.expression(iter), tcx)
+                if let Some(member_context) = builder.member_inference_context {
+                    let expression = builder.index.expression(iter);
+                    infer_expression_types_with_member_context(
+                        builder.db(),
+                        expression,
+                        tcx,
+                        member_context,
+                    )
+                    .expression_type(expression.node_ref(builder.db()))
+                } else {
+                    infer_same_file_expression_type(
+                        builder.db(),
+                        builder.index.expression(iter),
+                        tcx,
+                    )
+                }
             } else {
                 builder.infer_maybe_standalone_expression(iter, tcx)
             }
@@ -8976,7 +8427,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
-            let result = infer_expression_types(self.db(), expression, TypeContext::default());
+            let result = if let Some(member_context) = self.member_inference_context {
+                infer_expression_types_with_member_context(
+                    self.db(),
+                    expression,
+                    TypeContext::default(),
+                    member_context,
+                )
+            } else {
+                infer_expression_types(self.db(), expression, TypeContext::default())
+            };
             let iterable_type = result.expression_type(iterable);
             let element_type = if comprehension.is_async() {
                 None
@@ -9001,7 +8461,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let target_type = match comprehension.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
-                let unpacked = infer_unpack_types(self.db(), unpack);
+                let unpacked = self.infer_unpack_types(unpack);
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -9039,7 +8499,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
-            let result = infer_definition_types(self.db(), definition);
+            let result = self.infer_member_definition(definition);
             self.extend_definition(definition, result);
             result.binding_type(definition)
         } else {
@@ -9085,30 +8545,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
-        let (body_ty, orelse_ty) =
-            if is_empty_collection_type_context(tcx) && is_collection_literal(body) {
-                // Infer the peer branch first so the body can use its type as context.
-                let orelse_ty = self.infer_expression(orelse, tcx);
-                let body_ty = self.infer_expression_with_collection_literal_peer_context(
-                    body,
-                    tcx,
-                    Some(orelse_ty),
-                );
-                (body_ty, orelse_ty)
-            } else {
-                let body_ty = self.infer_expression(body, tcx);
-                let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
-                    orelse,
-                    tcx,
-                    Some(body_ty),
-                );
-                (body_ty, orelse_ty)
-            };
-
-        match test_ty.try_bool(db, env).unwrap_or_else(|err| {
+        let truthiness = test_ty.try_bool(db, env).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, &**test);
             err.fallback_truthiness()
-        }) {
+        });
+        let (body_ty, orelse_ty) = if truthiness != Truthiness::Ambiguous {
+            // An unreachable branch cannot supply useful context to the branch that executes.
+            (
+                self.infer_expression(body, tcx),
+                self.infer_expression(orelse, tcx),
+            )
+        } else if is_empty_collection_type_context(tcx) && is_collection_literal(body) {
+            // Infer the peer branch first so the body can use its type as context.
+            let orelse_ty = self.infer_expression(orelse, tcx);
+            let body_ty = self.infer_expression_with_collection_literal_peer_context(
+                body,
+                tcx,
+                Some(orelse_ty),
+            );
+            (body_ty, orelse_ty)
+        } else {
+            let body_ty = self.infer_expression(body, tcx);
+            let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
+                orelse,
+                tcx,
+                Some(body_ty),
+            );
+            (body_ty, orelse_ty)
+        };
+
+        match truthiness {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
             Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
@@ -9253,7 +8719,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeContext::new(None)
         };
 
-        let inference = infer_scope_types(self.db(), scope, return_tcx);
+        let inference = self.infer_nested_scope_types(scope, return_tcx);
         self.extend_scope(inference);
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
@@ -9309,11 +8775,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for bindings in
             use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.program_file()))
         {
-            let place = place_from_bindings_with_reachability_cache(
+            let place = place_from_bindings_with_reachability_cache_and_member_context(
                 db,
                 env,
                 bindings.clone(),
                 self.reachability_cache(),
+                self.member_inference_context,
             );
             let Some(key) = place.first_definition.and_then(definition_key) else {
                 continue;
@@ -10663,11 +10130,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let place = match source.kind {
             PlaceLoadSourceKind::Bindings(bindings) => {
-                let mut place = place_from_bindings_with_reachability_cache(
+                let mut place = place_from_bindings_with_reachability_cache_and_member_context(
                     db,
                     env,
                     bindings,
                     self.reachability_cache(),
+                    self.member_inference_context,
                 )
                 .place;
 
@@ -10685,7 +10153,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 scope,
                 id,
                 RequiresExplicitReExport::No,
-                ConsideredDefinitions::AllReachable,
+                self.deferred_self_class_definitions(scope, id),
             ),
             PlaceLoadSourceKind::Implicit(implicit) => match implicit {
                 ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
@@ -10702,7 +10170,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 ImplicitPlaceLoad::ExplicitGlobalSymbol { file, name } => {
-                    explicit_global_symbol(db, file, &name)
+                    let scope = FileScopeId::global().to_scope_id(db, file);
+                    if let Some(symbol) = self
+                        .index
+                        .place_table(FileScopeId::global())
+                        .symbol_id(name.as_str())
+                        && self.deferred_self_class_definitions(scope, symbol.into())
+                            == ConsideredDefinitions::EndOfScope
+                    {
+                        place_by_id(
+                            db,
+                            scope,
+                            symbol.into(),
+                            RequiresExplicitReExport::No,
+                            ConsideredDefinitions::EndOfScope,
+                        )
+                    } else {
+                        explicit_global_symbol(db, file, &name)
+                    }
                 }
                 ImplicitPlaceLoad::ModuleImplicitGlobal { file, name } => {
                     module_type_implicit_global_symbol(db, file, &name)
@@ -10723,6 +10208,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place.map_type(|ty| {
                 self.narrow_place_with_applicable_constraints(place_expr, ty, narrowing_constraints)
             })
+        }
+    }
+
+    /// Excludes a shadowed class from its own methods and forward return annotations.
+    ///
+    /// A method cannot refer to a previous class of the same name before its enclosing class
+    /// exists. Fall back to all reachable definitions when that class is rebound later.
+    fn deferred_self_class_definitions(
+        &self,
+        scope: ScopeId<'db>,
+        place: ScopedPlaceId,
+    ) -> ConsideredDefinitions {
+        let db = self.db();
+        let in_return_annotation = self.in_string_annotation()
+            && self
+                .context
+                .inference_flags
+                .contains(InferenceFlags::IN_RETURN_TYPE);
+        if !(in_return_annotation || self.scope().is_method_scope(db))
+            || !scope.file_scope_id(db).is_global()
+        {
+            return ConsideredDefinitions::AllReachable;
+        }
+
+        let Some(symbol) = place.as_symbol() else {
+            return ConsideredDefinitions::AllReachable;
+        };
+        let Some(class) = self
+            .index
+            .ancestor_scopes(self.scope().file_scope_id(db))
+            .find_map(|(_, ancestor)| ancestor.node().as_class())
+            .map(|class| self.index.expect_single_definition(class))
+        else {
+            return ConsideredDefinitions::AllReachable;
+        };
+
+        if class.scope(db) != scope || class.place(db) != place {
+            return ConsideredDefinitions::AllReachable;
+        }
+
+        let mut bindings = self
+            .index
+            .use_def_map(FileScopeId::global())
+            .end_of_scope_symbol_bindings(symbol);
+        if matches!(
+            (bindings.next(), bindings.next()),
+            (Some(binding), None) if binding.binding.is_defined_and(|definition| definition == class)
+        ) {
+            ConsideredDefinitions::EndOfScope
+        } else {
+            ConsideredDefinitions::AllReachable
         }
     }
 
@@ -10760,20 +10296,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         prefix_loads.iter().any(|prefix| {
             let place = match prefix {
                 PlaceExprPrefixLoad::AtUse(use_id) => {
-                    place_from_bindings_with_reachability_cache(
+                    place_from_bindings_with_reachability_cache_and_member_context(
                         db,
                         env,
                         use_def.bindings_at_use(use_id),
                         self.reachability_cache(),
+                        self.member_inference_context,
                     )
                     .place
                 }
                 PlaceExprPrefixLoad::AllReachable(place_id) => {
-                    place_from_bindings_with_reachability_cache(
+                    place_from_bindings_with_reachability_cache_and_member_context(
                         db,
                         env,
                         use_def.reachable_bindings(place_id),
                         self.reachability_cache(),
+                        self.member_inference_context,
                     )
                     .place
                 }
@@ -10915,6 +10453,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
+    /// Preserve unrelated union arms while reading a provisional component member.
+    fn contextual_attribute_incoming(
+        &self,
+        context: MemberInferenceContext<'db>,
+        receiver: Type<'db>,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let incoming_for_receiver = |receiver: Type<'db>| {
+            let (class, decorator) = receiver.member_cycle_receiver(db, env)?;
+            let (incoming, specialization) =
+                context.incoming_for_receiver(db, class, decorator, name)?;
+            Some(incoming.apply_optional_specialization(db, specialization))
+        };
+
+        let Some(union) = receiver.as_union() else {
+            return incoming_for_receiver(receiver);
+        };
+
+        let mut values = UnionBuilder::new(db, env);
+        let mut has_component_member = false;
+        for element in union.elements(db) {
+            if let Some(incoming) = incoming_for_receiver(*element) {
+                has_component_member = true;
+                values.add_in_place(incoming);
+            } else {
+                let member = element.try_member_lookup(db, env, name).ok()?;
+                if !member.place.is_definitely_bound() {
+                    return None;
+                }
+                values.add_in_place(member.ignore_possibly_undefined()?);
+            }
+        }
+
+        has_component_member.then(|| values.build())
+    }
+
+    /// Enter the canonical component before a local definition can become the Salsa cycle head.
+    fn preflight_attribute_component(&self, receiver: Type<'db>, name: &str) {
+        let db = self.db();
+        if let Some(union) = receiver.as_union() {
+            for element in union.elements(db) {
+                self.preflight_attribute_component(*element, name);
+            }
+            return;
+        }
+
+        if let Some((class, decorator)) =
+            receiver.member_cycle_receiver(db, self.program_environment())
+            && let Some((receiver_owner, _)) = class.static_class_literal(db)
+            && let Some((owner, component)) =
+                receiver_owner.attribute_inference_scc_for_receiver(db, name, decorator)
+        {
+            let _ = owner.attribute_scc_member(db, component, decorator, name);
+        }
+    }
+
     /// Infer an attribute load on a known receiver, returning its recovery type if lookup fails.
     fn infer_attribute_load_impl(
         &mut self,
@@ -10937,11 +10533,79 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        if let Some(context) = self.member_inference_context
+            && context.contains_name(self.db(), attribute.attr.id.as_str())
+            && let Some(incoming) =
+                self.contextual_attribute_incoming(context, value_type, attribute.attr.id.as_str())
+        {
+            let Some(place_expr) = PlaceExpr::try_from_expr(attribute) else {
+                return Ok(incoming);
+            };
+            let place_table = self
+                .index
+                .place_table(self.scope().file_scope_id(self.db()));
+            if let Some(ScopedPlaceId::Member(_)) =
+                place_table.place_id(PlaceExprRef::from(&place_expr))
+            {
+                let scope = self.scope().file_scope_id(self.db());
+                let use_id = attribute.scoped_use_id(self.db(), self.program_file());
+                let mut keys = SmallVec::<[(FileScopeId, ConstraintKey); 2]>::new();
+                keys.push((scope, ConstraintKey::UseId(use_id)));
+
+                for (enclosing_scope, _) in self.index.ancestor_scopes(scope).skip(1) {
+                    match self.index.enclosing_snapshot(
+                        enclosing_scope,
+                        PlaceExprRef::from(&place_expr),
+                        scope,
+                    ) {
+                        EnclosingSnapshotResult::FoundBindings(_) => {
+                            keys.push((enclosing_scope, ConstraintKey::NestedScope(scope)));
+                            break;
+                        }
+                        EnclosingSnapshotResult::FoundConstraint(constraint) => {
+                            keys.push((
+                                enclosing_scope,
+                                ConstraintKey::NarrowingConstraint(constraint),
+                            ));
+                        }
+                        EnclosingSnapshotResult::NoLongerInEagerContext => break,
+                        EnclosingSnapshotResult::NotFound => {}
+                    }
+                }
+
+                return Ok(self.narrow_place_with_applicable_constraints(
+                    PlaceExprRef::from(&place_expr),
+                    incoming,
+                    &keys,
+                ));
+            }
+            return Ok(incoming);
+        }
+
         let env = self.program_environment();
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let db = self.db();
         let mut constraint_keys = vec![];
+
+        let is_member_dependent = match self.region {
+            InferenceRegion::Definition(definition) => matches!(
+                definition.kind(db),
+                DefinitionKind::Assignment(_)
+                    | DefinitionKind::AugmentedAssignment(_)
+                    | DefinitionKind::For(_)
+                    | DefinitionKind::WithItem(_)
+                    | DefinitionKind::Comprehension(_)
+            ),
+            InferenceRegion::Expression(expression, _) => expression.assigned_to(db).is_some(),
+            InferenceRegion::Statement(_)
+            | InferenceRegion::FunctionDecorators(_)
+            | InferenceRegion::Deferred(_)
+            | InferenceRegion::Scope(_, _) => false,
+        };
+        if is_member_dependent {
+            self.preflight_attribute_component(value_type, attr.id.as_str());
+        }
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)
@@ -11837,6 +11501,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            member_inference_context: _,
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -11898,6 +11563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            member_inference_context: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -11995,6 +11661,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             called_functions,
             expression_cache: _,
+            member_inference_context: _,
             reachability_cache: _,
             declarations: _,
             deferred: _,
@@ -12056,6 +11723,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            member_inference_context: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -12196,6 +11864,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Builder only state
             expression_cache: _,
+            member_inference_context: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -12253,6 +11922,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state,
             typevar_binding_context,
             ref expression_cache,
+            member_inference_context,
             ref reachability_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
@@ -12290,6 +11960,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Ensure the speculative builder has the same inference context as the current one.
         builder.cycle_recovery = cycle_recovery;
+        builder.member_inference_context = member_inference_context;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
@@ -12338,6 +12009,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            member_inference_context: _,
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
