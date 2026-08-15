@@ -1558,10 +1558,27 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                 .report_lint(self.assignment_kind.diagnostic_type(), self.value_node)
         {
             let typed_dict_ty = Type::TypedDict(self.typed_dict);
+            let related_item_types = self
+                .full_object_ty
+                .into_iter()
+                .flat_map(|ty| {
+                    ty.as_union()
+                        .into_iter()
+                        .flat_map(|union| union.elements(db).iter())
+                        .chain(
+                            ty.as_intersection()
+                                .into_iter()
+                                .flat_map(|intersection| intersection.positive(db).iter()),
+                        )
+                })
+                .filter_map(|ty| ty.as_typed_dict())
+                .filter_map(|typed_dict| typed_dict.item(db, self.key))
+                .map(|item| item.declared_ty);
 
             let types = [typed_dict_ty, self.value_ty, item.declared_ty]
                 .into_iter()
-                .chain(self.full_object_ty);
+                .chain(self.full_object_ty)
+                .chain(related_item_types);
             let settings = DisplaySettings::from_possibly_ambiguous_types(self.context, types);
 
             let typed_dict_d = typed_dict_ty.display_with(db, env, settings.clone());

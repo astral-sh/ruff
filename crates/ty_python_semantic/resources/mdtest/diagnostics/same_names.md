@@ -1763,6 +1763,58 @@ info: Item declaration
   |     ---------- Item declared here
 ```
 
+## TypedDict union assignment annotations
+
+Assignments to a union distinguish same-named TypedDict classes and the same-named types declared
+for their matching fields.
+
+`first.py`:
+
+```py
+from typing import TypedDict
+
+class Model: ...
+
+class Record(TypedDict):
+    value: Model
+```
+
+`second.py`:
+
+```py
+from typing import TypedDict
+
+class Model: ...
+
+class Record(TypedDict):
+    value: Model
+```
+
+```py
+import first
+import second
+
+def assign(mapping: first.Record | second.Record) -> None:
+    # error: [invalid-assignment] "declared type `second.Model` on TypedDict `second.Record`: value of type `None`"
+    mapping["value"] = None  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to key "value" with declared type `first.Model` on TypedDict `first.Record`
+ --> src/mdtest_snippet.py:6:24
+  |
+6 |     mapping["value"] = None  # snapshot: invalid-assignment
+  |     ------- -------    ^^^^ value of type `None`
+  |     |       |
+  |     |       key has declared type `first.Model`
+  |     TypedDict `first.Record` in union type `first.Record | second.Record`
+info: Item declaration
+ --> src/first.py:6:5
+  |
+6 |     value: Model
+  |     ------------ Item declared here
+```
+
 ## TypedDict constructor item types
 
 Constructor validation distinguishes extra-item types, values supplied through non-literal keys, and
