@@ -367,6 +367,181 @@ min(Y)  # error: [invalid-argument-type]
 T = f()
 ```
 
+## Guarded instance attributes when the base is checked first
+
+A guarded bound-method initializer remains valid, while another initializer still reports an
+attribute that is missing from the base class. This reproduces
+<https://github.com/astral-sh/ty/issues/4076>.
+
+`base.py`:
+
+```py
+class Base:
+    existing = 1
+
+    def __init__(self):
+        if not hasattr(self, "x"):
+            self.x = self.__str__
+        if not hasattr(self, "existing"):
+            self.missing
+        if not hasattr(self, "z"):
+            self.z = self.y  # error: [unresolved-attribute]
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    x = Base.__str__
+
+    def z(self): ...
+    def y(self): ...
+```
+
+## Guarded instance attributes when the subclass is checked first
+
+Checking the subclass first preserves the valid initializer and the missing-attribute diagnostic.
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    x = Base.__str__
+
+    def z(self): ...
+    def y(self): ...
+```
+
+`base.py`:
+
+```py
+class Base:
+    existing = 1
+
+    def __init__(self):
+        if not hasattr(self, "x"):
+            self.x = self.__str__
+        if not hasattr(self, "existing"):
+            self.missing
+        if not hasattr(self, "z"):
+            self.z = self.y  # error: [unresolved-attribute]
+```
+
+## Guarded instance attributes after a call when the base is checked first
+
+A call before a guarded initializer must not make its validity or later diagnostics depend on file
+order.
+
+`base.py`:
+
+```py
+def prepare() -> None: ...
+
+class Base:
+    def __init__(self):
+        if not hasattr(self, "x"):
+            prepare()
+            self.x = self.__str__
+            self.missing  # error: [unresolved-attribute]
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    x = Base.__str__
+```
+
+## Guarded instance attributes after a call when the subclass is checked first
+
+Checking the subclass first must preserve the same guarded assignment and genuine missing-attribute
+diagnostic after the intervening call.
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    x = Base.__str__
+```
+
+`base.py`:
+
+```py
+def prepare() -> None: ...
+
+class Base:
+    def __init__(self):
+        if not hasattr(self, "x"):
+            prepare()
+            self.x = self.__str__
+            self.missing  # error: [unresolved-attribute]
+```
+
+## Non-returning initializers do not define instance attributes
+
+An assignment whose initializer never returns cannot make its target attribute present.
+
+```py
+from typing import NoReturn
+
+def fail() -> NoReturn:
+    raise RuntimeError
+
+class C:
+    def initialize(self):
+        if not hasattr(self, "x"):
+            self.x = fail()  # error: [invalid-assignment]
+
+C().x  # error: [unresolved-attribute]
+```
+
+## Assignments in the opposite guard branch do not initialize an attribute
+
+Assigning an existing attribute when `hasattr` succeeds does not initialize it in the opposite
+branch. That branch remains unreachable and cannot create another instance attribute. Existing
+inherited class attributes also retain their usual narrowing.
+
+```py
+class Base:
+    inherited = 1
+
+class C(Base):
+    def __init__(self):
+        self.x = 1
+
+    def update(self):
+        if not hasattr(self, "inherited"):
+            self.missing
+        if hasattr(self, "x"):
+            self.x = 2
+        else:
+            self.y = self.missing
+
+C().y  # error: [unresolved-attribute]
+```
+
+## Contradictory attribute guards do not initialize an attribute
+
+An impossible inner `hasattr` branch cannot create an instance attribute.
+
+```py
+class C:
+    def initialize(self):
+        if hasattr(self, "x"):
+            if not hasattr(self, "x"):
+                self.x = self.missing
+
+C().x  # error: [unresolved-attribute]
+```
+
 ## Lazy cached property behind `hasattr`
 
 This pattern used to panic with "too many cycle iterations".
