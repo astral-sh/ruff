@@ -1676,8 +1676,9 @@ impl PendingReachability {
     ///
     /// States shared by both branches only need their path constraints merged. For states that
     /// differ, reachability is materialized while narrowing gates stay separate until individual
-    /// bindings are merged. This prevents path gates from accumulating on bindings whose types are
-    /// not narrowed. Places absent from the alternative branch are undefined on that path.
+    /// bindings are merged. These gates must be preserved even on initially unnarrowed bindings,
+    /// since they may later join a path where the same binding is narrowed. Places absent from the
+    /// alternative branch are undefined on that path.
     fn merge_place_states<I: Idx>(
         &self,
         current_states: &mut IndexVec<I, PendingPlaceState>,

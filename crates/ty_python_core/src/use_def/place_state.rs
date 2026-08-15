@@ -434,12 +434,12 @@ impl Bindings {
         );
     }
 
-    /// Merges two paths without applying their gates to bindings that do not need them.
+    /// Merges two paths while preserving each binding's applicable path constraints.
     ///
-    /// Reachability already determines whether a binding from only one path is visible. Its path
-    /// gate matters to narrowing only when that binding already has place-specific narrowing. For a
-    /// binding present on both paths, gates matter when the paths narrow it differently or when
-    /// neither path is unconditional.
+    /// A binding from only one path needs its gate even when it is not yet narrowed: a later merge
+    /// can combine that binding with another path that does narrow it. For a binding present on both
+    /// paths, gates matter when the paths narrow it differently or when neither path is
+    /// unconditional.
     fn merge_with_path_constraints(
         &mut self,
         b: Self,
@@ -468,8 +468,8 @@ impl Bindings {
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
         // the merged `live_bindings` vec remains sorted. If a definition is found in both `a` and
         // `b`, we combine its boolean narrowing constraints and its ternary reachability
-        // constraints. If a definition is found in only one path, its gate matters only when it
-        // already has place-specific narrowing.
+        // constraints. If a definition is found in only one path, its path constraint is retained
+        // in case it later joins a differently narrowed path.
         let a = a.live_bindings.into_iter();
         let b = b.live_bindings.into_iter();
         for zipped in a.merge_join_by(b, |a, b| a.binding().cmp(&b.binding())) {
@@ -504,18 +504,14 @@ impl Bindings {
                 }
 
                 EitherOrBoth::Left(mut binding) => {
-                    if binding.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
-                        binding.narrowing_constraint = narrowing_constraints
-                            .add_and_constraint(binding.narrowing_constraint, a_path_constraint);
-                    }
+                    binding.narrowing_constraint = narrowing_constraints
+                        .add_and_constraint(binding.narrowing_constraint, a_path_constraint);
                     self.live_bindings.push(binding);
                 }
 
                 EitherOrBoth::Right(mut binding) => {
-                    if binding.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
-                        binding.narrowing_constraint = narrowing_constraints
-                            .add_and_constraint(binding.narrowing_constraint, b_path_constraint);
-                    }
+                    binding.narrowing_constraint = narrowing_constraints
+                        .add_and_constraint(binding.narrowing_constraint, b_path_constraint);
                     self.live_bindings.push(binding);
                 }
             }
@@ -640,7 +636,7 @@ impl PlaceState {
             .merge(b.declarations, reachability_constraints);
     }
 
-    /// Merges paths while applying deferred control-flow gates only where narrowing requires them.
+    /// Merges paths while preserving deferred control-flow gates on live bindings.
     pub(super) fn merge_with_path_constraints(
         &mut self,
         b: PlaceState,
@@ -803,7 +799,7 @@ mod tests {
     }
 
     #[test]
-    fn merge_applies_path_constraints_only_to_narrowed_bindings() {
+    fn merge_preserves_path_constraints_for_single_sided_bindings() {
         let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
         let mut current = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
@@ -824,13 +820,25 @@ mod tests {
             narrowing,
             &[ScopedDefinitionId::from_u32(1)],
         );
-        let gate = narrowing_constraints.add_atom(ScopedPredicateId::new(1));
-        let expected = narrowing_constraints.add_and_constraint(narrowing, gate);
+        let current_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(1));
+        let branch_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(2));
+        let shared_gate = narrowing_constraints.add_or_constraint(current_gate, branch_gate);
+        let expected_narrowing = narrowing_constraints.add_and_constraint(narrowing, current_gate);
+
+        let mut branch = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        branch.record_binding(
+            ScopedDefinitionId::from_u32(3),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            false,
+            true,
+            PreviousDefinitions::AreKept,
+            FutureDefinitions::ShadowThisOne,
+        );
 
         current.merge_with_path_constraints(
-            PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE),
-            gate,
-            ScopedNarrowingConstraint::ALWAYS_TRUE,
+            branch,
+            current_gate,
+            branch_gate,
             &mut narrowing_constraints,
             &mut reachability_constraints,
         );
@@ -838,9 +846,10 @@ mod tests {
         assert_bindings(
             &current,
             &[
-                (0, ScopedNarrowingConstraint::ALWAYS_TRUE),
-                (1, expected),
-                (2, ScopedNarrowingConstraint::ALWAYS_TRUE),
+                (0, shared_gate),
+                (1, expected_narrowing),
+                (2, current_gate),
+                (3, branch_gate),
             ],
         );
     }
