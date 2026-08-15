@@ -5,12 +5,12 @@ pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
+use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
-use self::static_literal::{AugmentedBindings, ImplicitAttribute};
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
@@ -68,6 +68,7 @@ use ty_python_core::{ProgramFile, place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
+mod implicit_attributes;
 mod known;
 mod named_tuple;
 mod static_literal;
@@ -2227,14 +2228,7 @@ impl<'db> ClassType<'db> {
     ) -> ImplicitAttribute<'db> {
         let augmented_bindings = self
             .static_class_literal(db)
-            .map(|(class, _)| {
-                StaticClassLiteral::implicit_attribute_bindings(
-                    db,
-                    class.body_scope(db),
-                    name,
-                    target_method_decorator,
-                )
-            })
+            .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator))
             .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
             .and_then(|implicit| implicit.augmented_bindings);
 
