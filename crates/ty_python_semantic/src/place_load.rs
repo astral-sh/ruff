@@ -248,7 +248,23 @@ impl<'db> Iterator for PlaceLoadResolution<'db, '_> {
                         bindings,
                         enclosing_scope,
                     } = snapshot;
-                    self.next_node = Some(PlaceLoadResolutionNode::ImplicitGlobalSource);
+                    let global_place_table = self.context.index.place_table(FileScopeId::global());
+                    let has_explicit_global = self
+                        .loaded_symbol_name()
+                        .and_then(|name| global_place_table.symbol_id(name))
+                        .is_some_and(|symbol_id| {
+                            let symbol = global_place_table.symbol(symbol_id);
+                            symbol.is_bound() || symbol.is_declared()
+                        });
+
+                    // Nested global assignments create synthetic module bindings even when the
+                    // module never defines the name itself. Do not let those bindings hide an
+                    // implicit global or builtin when the forwarded assignment did not run.
+                    self.next_node = Some(if has_explicit_global {
+                        PlaceLoadResolutionNode::ExplicitGlobalSource(PlaceLoadSourceRole::Ordinary)
+                    } else {
+                        PlaceLoadResolutionNode::ImplicitGlobalSource
+                    });
 
                     let source = self.constraints.source(
                         PlaceLoadSourceKind::Bindings(bindings),
