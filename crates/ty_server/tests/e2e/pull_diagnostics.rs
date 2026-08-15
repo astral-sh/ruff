@@ -48,12 +48,12 @@ fn baselined_diagnostic_is_a_hint_and_refreshes() -> Result<()> {
     let baseline_path = SystemPath::new("src/baseline.json");
     let foo_content = "def foo() -> str:\n    return 42\n";
     let baseline = r#"{
-        "version": 1,
+        "version": 0,
         "files": {
             "foo.py": [{
                 "rule": "invalid-return-type",
-                "precedingHash": "e99fde1986a53fd7",
-                "followingHash": "7b33129b3c4424a"
+                "precedingHash": "41b4ab2dc0fd3c0697a4f3c3c8e4a048",
+                "followingHash": "7d090b0c134202a4dc847ca723b9a012"
             }]
         }
     }"#;
@@ -70,7 +70,7 @@ fn baselined_diagnostic_is_a_hint_and_refreshes() -> Result<()> {
     let diagnostics = server.document_diagnostic_request(foo, None);
     insta::assert_debug_snapshot!(condensed_document_diagnostic_snapshot(diagnostics), @r#""1:11..1:13[HINT]: Return type does not match returned value: expected `str`, found `Literal[42]`""#);
 
-    server.write_file(baseline_path, "{\"version\": 1, \"files\": {}}")?;
+    server.write_file(baseline_path, "{\"version\": 0, \"files\": {}}")?;
     server.did_change_watched_files(vec![FileEvent {
         uri: server.file_uri(baseline_path),
         kind: FileChangeType::Changed,

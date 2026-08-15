@@ -452,8 +452,7 @@ impl MainLoop {
                                 ),
                             };
 
-                            if let Ok(result) = result {
-                                let mut result = result;
+                            if let Ok(mut result) = result {
                                 retain_visible_diagnostics(&mut result.diagnostics);
                                 let fixed_diagnostics = match mode {
                                     FixMode::AddIgnore => None,

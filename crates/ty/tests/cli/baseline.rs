@@ -39,7 +39,7 @@ fn update_and_use_configured_baseline() -> anyhow::Result<()> {
     let serialized = fs::read_to_string(case.root().join("baseline.json"))?;
     assert!(serialized.ends_with('\n'));
     let value: serde_json::Value = serde_json::from_str(&serialized)?;
-    assert_eq!(value["version"], 1);
+    assert_eq!(value["version"], 0);
     assert_eq!(value["files"]["test.py"].as_array().unwrap().len(), 1);
     assert_eq!(value["files"]["test.py"][0]["rule"], "invalid-assignment");
     assert!(value["files"]["test.py"][0].get("message").is_none());
@@ -248,7 +248,7 @@ fn baseline_json_is_path_keyed() -> anyhow::Result<()> {
     let baseline = fs::read_to_string(case.root().join("baseline.json"))?;
     assert_snapshot!(baseline.lines().take(6).collect::<Vec<_>>().join("\n"), @r#"
     {
-      "version": 1,
+      "version": 0,
       "files": {
         "a.py": [
           {
