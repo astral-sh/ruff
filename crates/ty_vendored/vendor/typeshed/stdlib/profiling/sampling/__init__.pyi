@@ -3,6 +3,7 @@
 This module provides low-overhead profiling by periodically sampling the
 call stack rather than tracing every function call.
 """
+
 from .collector import Collector as Collector
 from .gecko_collector import GeckoCollector as GeckoCollector
 from .heatmap_collector import HeatmapCollector as HeatmapCollector

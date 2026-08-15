@@ -32,6 +32,7 @@ You can also use the ElementTree class to wrap an element structure
 and convert it to and from XML.
 
 """
+
 import sys
 from _collections_abc import dict_keys
 from _typeshed import FileDescriptorOrPath, ReadableBuffer, SupportsRead, SupportsWrite
@@ -101,17 +102,17 @@ def canonicalize(
 ) -> str:
     """Convert XML to its C14N 2.0 serialised form.
 
-If *out* is provided, it must be a file or file-like object that
-receives the serialised canonical XML output (text, not bytes) through
-its ``.write()`` method.  To write to a file, open it in text mode with
-encoding "utf-8".  If *out* is not provided, this function returns the
-output as text string.
+    If *out* is provided, it must be a file or file-like object that
+    receives the serialised canonical XML output (text, not bytes) through
+    its ``.write()`` method.  To write to a file, open it in text mode with
+    encoding "utf-8".  If *out* is not provided, this function returns the
+    output as text string.
 
-Either *xml_data* (an XML string) or *from_file* (a file path or
-file-like object) must be provided as input.
+    Either *xml_data* (an XML string) or *from_file* (a file path or
+    file-like object) must be provided as input.
 
-The configuration options are the same as for the ``C14NWriterTarget``.
-"""
+    The configuration options are the same as for the ``C14NWriterTarget``.
+    """
 @overload
 def canonicalize(
     xml_data: str | ReadableBuffer | None = None,
@@ -138,16 +139,16 @@ _OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
 class Element(Generic[_Tag]):
     tag: _Tag
     """A string identifying what kind of data this element represents"""
-    
+
     attrib: dict[str, str]
     """A dictionary containing the element's attributes"""
-    
+
     text: str | None
     """A string of text directly after the start tag, or None"""
-    
+
     tail: str | None
     """A string of text directly after the end tag, or None"""
-    
+
     def __init__(self, tag: _Tag, attrib: dict[str, str] = {}, **extra: str) -> None: ...
     def append(self, subelement: Element[Any], /) -> None: ...
     def clear(self) -> None: ...
@@ -193,6 +194,7 @@ class Element(Generic[_Tag]):
 
     def __len__(self) -> int:
         """Return len(self)."""
+
     # Doesn't actually exist at runtime, but instance of the class are indeed iterable due to __getitem__.
     def __iter__(self) -> Iterator[Element]: ...
 
@@ -211,39 +213,41 @@ def SubElement(parent: Element[Any], tag: str, attrib: dict[str, str] = ..., **e
 def Comment(text: str | None = None) -> Element[_ElementCallable]:
     """Comment element factory.
 
-This function creates a special element which the standard serializer
-serializes as an XML comment.
+    This function creates a special element which the standard serializer
+    serializes as an XML comment.
 
-*text* is a string containing the comment string.
+    *text* is a string containing the comment string.
 
-"""
+    """
+
 def ProcessingInstruction(target: str, text: str | None = None) -> Element[_ElementCallable]:
     """Processing Instruction element factory.
 
-This function creates a special element which the standard serializer
-serializes as an XML comment.
+    This function creates a special element which the standard serializer
+    serializes as an XML comment.
 
-*target* is a string containing the processing instruction, *text* is a
-string containing the processing instruction contents, if any.
+    *target* is a string containing the processing instruction, *text* is a
+    string containing the processing instruction contents, if any.
 
-"""
+    """
 
 PI = ProcessingInstruction
 
 class QName:
     """Qualified name wrapper.
 
-This class can be used to wrap a QName attribute value in order to get
-proper namespace handing on output.
+    This class can be used to wrap a QName attribute value in order to get
+    proper namespace handing on output.
 
-*text_or_uri* is a string containing the QName value either in the form
-{uri}local, or if the tag argument is given, the URI part of a QName.
+    *text_or_uri* is a string containing the QName value either in the form
+    {uri}local, or if the tag argument is given, the URI part of a QName.
 
-*tag* is an optional argument which if given, will make the first
-argument (text_or_uri) be interpreted as a URI, and this argument (tag)
-be interpreted as a local name.
+    *tag* is an optional argument which if given, will make the first
+    argument (text_or_uri) be interpreted as a URI, and this argument (tag)
+    be interpreted as a local name.
 
-"""
+    """
+
     text: str
     def __init__(self, text_or_uri: str, tag: str | None = None) -> None: ...
     def __lt__(self, other: QName | str) -> bool: ...
@@ -258,99 +262,104 @@ _Root = TypeVar("_Root", Element, Element | None, default=Element | None)
 class ElementTree(Generic[_Root]):
     """An XML element hierarchy.
 
-This class also provides support for serialization to and from
-standard XML.
+    This class also provides support for serialization to and from
+    standard XML.
 
-*element* is an optional root element node,
-*file* is an optional file handle or file name of an XML file whose
-contents will be used to initialize the tree with.
+    *element* is an optional root element node,
+    *file* is an optional file handle or file name of an XML file whose
+    contents will be used to initialize the tree with.
 
-"""
+    """
+
     def __init__(self, element: Element[Any] | None = None, file: _FileRead | None = None) -> None: ...
     def getroot(self) -> _Root:
         """Return root element of this tree."""
+
     def _setroot(self, element: Element[Any]) -> None:
         """Replace root element of this tree.
 
-This will discard the current contents of the tree and replace it
-with the given element.  Use with care!
+        This will discard the current contents of the tree and replace it
+        with the given element.  Use with care!
 
-"""
+        """
+
     def parse(self, source: _FileRead, parser: XMLParser | None = None) -> Element:
         """Load external XML document into element tree.
 
-*source* is a file name or file object, *parser* is an optional
-parser instance that defaults to XMLParser.
+        *source* is a file name or file object, *parser* is an optional
+        parser instance that defaults to XMLParser.
 
-ParseError is raised if the parser fails to parse the document.
+        ParseError is raised if the parser fails to parse the document.
 
-Returns the root element of the given source document.
+        Returns the root element of the given source document.
 
-"""
+        """
+
     def iter(self, tag: str | None = None) -> Generator[Element]:
         """Create and return tree iterator for the root element.
 
-The iterator loops over all elements in this tree, in document
-order.
+        The iterator loops over all elements in this tree, in document
+        order.
 
-*tag* is a string with the tag name to iterate over
-(default is to return all elements).
+        *tag* is a string with the tag name to iterate over
+        (default is to return all elements).
 
-"""
+        """
+
     def find(self, path: str, namespaces: dict[str, str] | None = None) -> Element | None:
         """Find first matching element by tag name or path.
 
-Same as getroot().find(path), which is Element.find()
+        Same as getroot().find(path), which is Element.find()
 
-*path* is a string having either an element tag or an XPath,
-*namespaces* is an optional mapping from namespace prefix to full
-name.
+        *path* is a string having either an element tag or an XPath,
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
-Return the first matching element, or None if no element was found.
+        Return the first matching element, or None if no element was found.
 
-"""
+        """
 
     @overload
     def findtext(self, path: str, default: None = None, namespaces: dict[str, str] | None = None) -> str | None:
         """Find first matching element by tag name or path.
 
-Same as getroot().findtext(path),  which is Element.findtext()
+        Same as getroot().findtext(path),  which is Element.findtext()
 
-*path* is a string having either an element tag or an XPath,
-*namespaces* is an optional mapping from namespace prefix to full
-name.
+        *path* is a string having either an element tag or an XPath,
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
-Return the first matching element, or None if no element was found.
+        Return the first matching element, or None if no element was found.
 
-"""
+        """
     @overload
     def findtext(self, path: str, default: _T, namespaces: dict[str, str] | None = None) -> _T | str: ...
 
     def findall(self, path: str, namespaces: dict[str, str] | None = None) -> list[Element]:
         """Find all matching subelements by tag name or path.
 
-Same as getroot().findall(path), which is Element.findall().
+        Same as getroot().findall(path), which is Element.findall().
 
-*path* is a string having either an element tag or an XPath,
-*namespaces* is an optional mapping from namespace prefix to full
-name.
+        *path* is a string having either an element tag or an XPath,
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
-Return list containing all matching elements in document order.
+        Return list containing all matching elements in document order.
 
-"""
+        """
 
     @overload
     def iterfind(self, path: Literal[""], namespaces: dict[str, str] | None = None) -> None:  # type: ignore[overload-overlap]
         """Find all matching subelements by tag name or path.
 
-Same as getroot().iterfind(path), which is element.iterfind()
+        Same as getroot().iterfind(path), which is element.iterfind()
 
-*path* is a string having either an element tag or an XPath,
-*namespaces* is an optional mapping from namespace prefix to full name.
+        *path* is a string having either an element tag or an XPath,
+        *namespaces* is an optional mapping from namespace prefix to full name.
 
-Return an iterable yielding all matching elements in document order.
+        Return an iterable yielding all matching elements in document order.
 
-"""
+        """
     @overload
     def iterfind(self, path: str, namespaces: dict[str, str] | None = None) -> Generator[Element]: ...
 
@@ -366,29 +375,30 @@ Return an iterable yielding all matching elements in document order.
     ) -> None:
         """Write element tree to a file as XML.
 
-Arguments:
-  *file_or_filename* -- file name or a file object opened for
-                        writing
+        Arguments:
+          *file_or_filename* -- file name or a file object opened for
+                                writing
 
-  *encoding* -- the output encoding (default: US-ASCII)
+          *encoding* -- the output encoding (default: US-ASCII)
 
-  *xml_declaration* -- bool indicating if an XML declaration should
-                       be added to the output. If None, an XML
-                       declaration is added if encoding IS NOT
-                       either of: US-ASCII, UTF-8, or Unicode
+          *xml_declaration* -- bool indicating if an XML declaration should
+                               be added to the output. If None, an XML
+                               declaration is added if encoding IS NOT
+                               either of: US-ASCII, UTF-8, or Unicode
 
-  *default_namespace* -- sets the default XML namespace (for
-                         "xmlns")
+          *default_namespace* -- sets the default XML namespace (for
+                                 "xmlns")
 
-  *method* -- either "xml" (default), "html, "text", or "c14n"
+          *method* -- either "xml" (default), "html, "text", or "c14n"
 
-  *short_empty_elements* -- controls the formatting of elements
-                            that contain no content.  If True
-                            (default) they are emitted as a single
-                            self-closed tag, otherwise they are
-                            emitted as a pair of start/end tags
+          *short_empty_elements* -- controls the formatting of elements
+                                    that contain no content.  If True
+                                    (default) they are emitted as a single
+                                    self-closed tag, otherwise they are
+                                    emitted as a pair of start/end tags
 
-"""
+        """
+
     def write_c14n(self, file: _FileWriteC14N) -> None: ...
 
 HTML_EMPTY: Final[set[str]]
@@ -396,15 +406,15 @@ HTML_EMPTY: Final[set[str]]
 def register_namespace(prefix: str, uri: str) -> None:
     """Register a namespace prefix.
 
-The registry is global, and any existing mapping for either the
-given prefix or the namespace URI will be removed.
+    The registry is global, and any existing mapping for either the
+    given prefix or the namespace URI will be removed.
 
-*prefix* is the namespace prefix, *uri* is a namespace uri. Tags and
-attributes in this namespace will be serialized with prefix if possible.
+    *prefix* is the namespace prefix, *uri* is a namespace uri. Tags and
+    attributes in this namespace will be serialized with prefix if possible.
 
-ValueError is raised if prefix is reserved or is invalid.
+    ValueError is raised if prefix is reserved or is invalid.
 
-"""
+    """
 
 @overload
 def tostring(
@@ -418,17 +428,17 @@ def tostring(
 ) -> bytes:
     """Generate string representation of XML element.
 
-All subelements are included.  If encoding is "unicode", a string
-is returned. Otherwise a bytestring is returned.
+    All subelements are included.  If encoding is "unicode", a string
+    is returned. Otherwise a bytestring is returned.
 
-*element* is an Element instance, *encoding* is an optional output
-encoding defaulting to US-ASCII, *method* is an optional output which
-can be one of "xml" (default), "html", "text" or "c14n",
-*default_namespace* sets the default XML namespace (for "xmlns").
+    *element* is an Element instance, *encoding* is an optional output
+    encoding defaulting to US-ASCII, *method* is an optional output which
+    can be one of "xml" (default), "html", "text" or "c14n",
+    *default_namespace* sets the default XML namespace (for "xmlns").
 
-Returns an (optionally) encoded string containing the XML data.
+    Returns an (optionally) encoded string containing the XML data.
 
-"""
+    """
 @overload
 def tostring(
     element: Element[Any],
@@ -484,37 +494,39 @@ def tostringlist(
 def dump(elem: Element[Any] | ElementTree[Any]) -> None:
     """Write element tree or element structure to sys.stdout.
 
-This function should be used for debugging only.
+    This function should be used for debugging only.
 
-*elem* is either an ElementTree, or a single Element.  The exact output
-format is implementation dependent.  In this version, it's written as an
-ordinary XML file.
+    *elem* is either an ElementTree, or a single Element.  The exact output
+    format is implementation dependent.  In this version, it's written as an
+    ordinary XML file.
 
-"""
+    """
+
 def indent(tree: Element[Any] | ElementTree[Any], space: str = "  ", level: int = 0) -> None:
     """Indent an XML document by inserting newlines and indentation space
-after elements.
+    after elements.
 
-*tree* is the ElementTree or Element to modify.  The (root) element
-itself will not be changed, but the tail text of all elements in its
-subtree will be adapted.
+    *tree* is the ElementTree or Element to modify.  The (root) element
+    itself will not be changed, but the tail text of all elements in its
+    subtree will be adapted.
 
-*space* is the whitespace to insert for each indentation level, two
-space characters by default.
+    *space* is the whitespace to insert for each indentation level, two
+    space characters by default.
 
-*level* is the initial indentation level. Setting this to a higher
-value than 0 can be used for indenting subtrees that are more deeply
-nested inside of a document.
-"""
+    *level* is the initial indentation level. Setting this to a higher
+    value than 0 can be used for indenting subtrees that are more deeply
+    nested inside of a document.
+    """
+
 def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTree[Element]:
     """Parse XML document into element tree.
 
-*source* is a filename or file object containing XML data,
-*parser* is an optional parser instance defaulting to XMLParser.
+    *source* is a filename or file object containing XML data,
+    *parser* is an optional parser instance defaulting to XMLParser.
 
-Return an ElementTree instance.
+    Return an ElementTree instance.
 
-"""
+    """
 
 # The type of the second element of the tuple yielded by iterparse depends
 # on the event type in the first element of the tuple:
@@ -538,19 +550,19 @@ class _IterParseIterator(Iterator[tuple[_EventType, _EventT_co]], Protocol[_Even
 def iterparse(source: _FileRead, events: Iterable[_EventType]) -> _IterParseIterator[Any]:
     """Incrementally parse XML document into ElementTree.
 
-This class also reports what's going on to the user based on the
-*events* it is initialized with.  The supported events are the strings
-"start", "end", "start-ns" and "end-ns" (the "ns" events are used to get
-detailed namespace information).  If *events* is omitted, only
-"end" events are reported.
+    This class also reports what's going on to the user based on the
+    *events* it is initialized with.  The supported events are the strings
+    "start", "end", "start-ns" and "end-ns" (the "ns" events are used to get
+    detailed namespace information).  If *events* is omitted, only
+    "end" events are reported.
 
-*source* is a filename or file object containing XML data, *events* is
-a list of events to report back, *parser* is an optional parser
-instance.
+    *source* is a filename or file object containing XML data, *events* is
+    a list of events to report back, *parser* is an optional parser
+    instance.
 
-Returns an iterator providing (event, elem) pairs.
+    Returns an iterator providing (event, elem) pairs.
 
-"""
+    """
 @overload
 def iterparse(source: _FileRead, events: None = None) -> _IterParseIterator[Element[str]]: ...
 
@@ -566,41 +578,45 @@ class XMLPullParser(Generic[_EventT_co]):
     def __init__(self, events: Iterable[_EventType] | None = None, *, _parser: XMLParser[_EventT_co] | None = None) -> None: ...
     def feed(self, data: str | ReadableBuffer) -> None:
         """Feed encoded data to parser."""
+
     def close(self) -> None:
         """Finish feeding data to parser.
 
-Unlike XMLParser, does not return the root element. Use
-read_events() to consume elements from XMLPullParser.
-"""
+        Unlike XMLParser, does not return the root element. Use
+        read_events() to consume elements from XMLPullParser.
+        """
+
     def read_events(self) -> Iterator[_EventQueue | tuple[_EventType, _EventT_co]]:
         """Return an iterator over currently available (event, elem) pairs.
 
-Events are consumed from the internal event queue as they are
-retrieved from the iterator.
-"""
+        Events are consumed from the internal event queue as they are
+        retrieved from the iterator.
+        """
+
     def flush(self) -> None: ...
 
 def XML(text: str | ReadableBuffer, parser: XMLParser | None = None) -> Element:
     """Parse XML document from string constant.
 
-This function can be used to embed "XML Literals" in Python code.
+    This function can be used to embed "XML Literals" in Python code.
 
-*text* is a string containing XML data, *parser* is an
-optional parser instance, defaulting to the standard XMLParser.
+    *text* is a string containing XML data, *parser* is an
+    optional parser instance, defaulting to the standard XMLParser.
 
-Returns an Element instance.
+    Returns an Element instance.
 
-"""
+    """
+
 def XMLID(text: str | ReadableBuffer, parser: XMLParser | None = None) -> tuple[Element, dict[str, Element]]:
     """Parse XML document from string constant for its IDs.
 
-*text* is a string containing XML data, *parser* is an
-optional parser instance, defaulting to the standard XMLParser.
+    *text* is a string containing XML data, *parser* is an
+    optional parser instance, defaulting to the standard XMLParser.
 
-Returns an (Element, dict) tuple, in which the
-dict maps element id:s to elements.
+    Returns an (Element, dict) tuple, in which the
+    dict maps element id:s to elements.
 
-"""
+    """
 
 # This is aliased to XML in the source.
 fromstring = XML
@@ -608,12 +624,12 @@ fromstring = XML
 def fromstringlist(sequence: Sequence[str | ReadableBuffer], parser: XMLParser | None = None) -> Element:
     """Parse XML document from sequence of string fragments.
 
-*sequence* is a list of other sequence, *parser* is an optional parser
-instance, defaulting to the standard XMLParser.
+    *sequence* is a list of other sequence, *parser* is an optional parser
+    instance, defaulting to the standard XMLParser.
 
-Returns an Element instance.
+    Returns an Element instance.
 
-"""
+    """
 
 # This type is both not precise enough and too precise. The TreeBuilder
 # requires the elementfactory to accept tag and attrs in its args and produce
@@ -653,29 +669,30 @@ class TreeBuilder:
 
 class C14NWriterTarget:
     """
-Canonicalization writer target for the XMLParser.
+    Canonicalization writer target for the XMLParser.
 
-Serialises parse events to XML C14N 2.0.
+    Serialises parse events to XML C14N 2.0.
 
-The *write* function is used for writing out the resulting data stream
-as text (not bytes).  To write to a file, open it in text mode with
-encoding "utf-8" and pass its ``.write`` method.
+    The *write* function is used for writing out the resulting data stream
+    as text (not bytes).  To write to a file, open it in text mode with
+    encoding "utf-8" and pass its ``.write`` method.
 
-Configuration options:
+    Configuration options:
 
-- *with_comments*: set to true to include comments
-- *strip_text*: set to true to strip whitespace before and after text
-                content
-- *rewrite_prefixes*: set to true to replace namespace prefixes by
-                      "n{number}"
-- *qname_aware_tags*: a set of qname aware tag names in which prefixes
-                      should be replaced in text content
-- *qname_aware_attrs*: a set of qname aware attribute names in which
-                       prefixes should be replaced in text content
-- *exclude_attrs*: a set of attribute names that should not be
-                   serialised
-- *exclude_tags*: a set of tag names that should not be serialised
-"""
+    - *with_comments*: set to true to include comments
+    - *strip_text*: set to true to strip whitespace before and after text
+                    content
+    - *rewrite_prefixes*: set to true to replace namespace prefixes by
+                          "n{number}"
+    - *qname_aware_tags*: a set of qname aware tag names in which prefixes
+                          should be replaced in text content
+    - *qname_aware_attrs*: a set of qname aware attribute names in which
+                           prefixes should be replaced in text content
+    - *exclude_attrs*: a set of attribute names that should not be
+                       serialised
+    - *exclude_tags*: a set of tag names that should not be serialised
+    """
+
     def __init__(
         self,
         write: Callable[[str], object],
