@@ -12,6 +12,23 @@ def _(x: int | None):
     reveal_type(x)  # revealed: int | None
 ```
 
+Calls in both branches must not prevent complementary narrowing paths from recombining into the
+original type.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def consume(value: object) -> None: ...
+def _(value: Base):
+    if isinstance(value, Child):
+        consume(value)
+    else:
+        consume(value)
+
+    reveal_type(value)  # revealed: Base
+```
+
 ## Narrowing can have a persistent effect if the variable is mutated in one branch
 
 ```py
