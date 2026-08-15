@@ -385,6 +385,193 @@ class Cached:
 reveal_type(Cached().metadata)  # revealed: int
 ```
 
+## Inherited instance attributes when the base is checked first
+
+A self-referential instance assignment preserves the inherited attribute type when the base file is
+checked first.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+## Inherited instance attributes when the subclass is checked first
+
+Reversing the file order must preserve the same inherited attribute type.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Inherited instance initializers when the base is checked first
+
+An independently initialized superclass instance attribute remains available to receiver aliases.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`base.py`:
+
+```py
+class Base:
+    def __init__(self):
+        self.values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        super().__init__()
+        if self.values:
+            receiver = self
+            self.values = [*receiver.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        super().__init__()
+        receiver = self
+        self.values = receiver.values + ["b"]
+```
+
+## Inherited instance initializers when the subclass is checked first
+
+Reversing file order preserves an independently initialized superclass instance attribute.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        super().__init__()
+        receiver = self
+        self.values = receiver.values + ["b"]
+```
+
+`base.py`:
+
+```py
+class Base:
+    def __init__(self):
+        self.values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        super().__init__()
+        if self.values:
+            receiver = self
+            self.values = [*receiver.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Inherited attributes remain stable across assignment forms
+
+Inherited attribute inference does not depend on how an assignment accesses or binds the previous
+value.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def aliased(self) -> None:
+        first = self.values
+        second = first
+        self.values = second + ["b"]
+
+    def augmented_alias(self) -> None:
+        previous = self.values
+        previous += ["b"]
+        self.values = previous
+
+    def named_alias(self) -> None:
+        (previous := self.values)
+        self.values = previous + ["b"]
+
+    def unpacked(self) -> None:
+        (self.values,) = (self.values + ["b"],)
+
+    def loop_target(self) -> None:
+        for self.values in [self.values + ["b"]]:
+            pass
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
 ## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
 
 This example was minimized from

@@ -229,6 +229,10 @@ c_instance = C()
 reveal_type(c_instance.x)  # revealed: int | str
 reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
+
+def accepts_int(value: int) -> None: ...
+
+accepts_int(c_instance.x)  # error: [invalid-argument-type]
 ```
 
 #### Singleton promotion happens after unioning implicit assignments
@@ -1250,6 +1254,36 @@ class Child(Parent):
 reveal_type(Child.value)  # revealed: Before | After
 ```
 
+#### Inherited class variables preserve their public type
+
+An inferred superclass default constrains classmethod assignments without exposing its literal type.
+
+```py
+class Parent:
+    value = 1
+
+class Child(Parent):
+    @classmethod
+    def update(cls) -> None:
+        cls.value = str(cls.value)  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+```
+
+#### Self-referential class variables without an independent value
+
+An ordinary self-referential classmethod assignment retains its recursive type when no independent
+class attribute exists.
+
+```py
+class Example:
+    @classmethod
+    def update(cls) -> None:
+        cls.value = cls.value
+
+reveal_type(Example.value)  # revealed: Divergent
+```
+
 ### Instance variables with class-level default values
 
 These are instance attributes, but the fact that we can see that they have a binding (not a
@@ -1285,6 +1319,71 @@ C.variable_with_class_default1 = "overwritten on class"
 
 reveal_type(C.variable_with_class_default1)  # revealed: Literal["overwritten on class"]
 reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
+```
+
+#### Class-level defaults do not hide invalid instance values
+
+An unannotated default on the same class must not hide a later incompatible instance assignment or
+suppress diagnostics for operations that can receive the assigned value.
+
+```py
+class Parser:
+    token = ""
+
+    def reset(self) -> None:
+        self.token = None  # error: [invalid-assignment]
+
+    def parse(self) -> None:
+        self.token = self.token[1:-1]  # error: [not-subscriptable]
+
+reveal_type(Parser().token)  # revealed: str | None | Unknown
+```
+
+#### Inherited class-level defaults do not hide invalid instance values
+
+An inherited default also cannot erase an incompatible instance value from later recursive reads.
+
+```py
+class Base:
+    token = ""
+
+class Parser(Base):
+    def reset(self) -> None:
+        self.token = None  # error: [invalid-assignment]
+
+    def parse(self) -> None:
+        self.token = self.token[1:-1]  # error: [not-subscriptable]
+
+reveal_type(Parser().token)  # revealed: str | None
+```
+
+Values introduced by destructuring, loop targets, and context managers must remain visible too.
+
+```py
+from contextlib import nullcontext
+
+class UnpackedParser(Base):
+    def reset(self) -> None:
+        (self.token,) = (None,)  # error: [invalid-assignment]
+
+    def parse(self) -> None:
+        self.token = self.token[1:-1]  # error: [not-subscriptable]
+
+class LoopParser(Base):
+    def reset(self) -> None:
+        for self.token in [None]:  # error: [invalid-assignment]
+            pass
+
+    def parse(self) -> None:
+        self.token = self.token[1:-1]  # error: [not-subscriptable]
+
+class ContextParser(Base):
+    def reset(self) -> None:
+        with nullcontext(None) as self.token:  # error: [invalid-assignment]
+            pass
+
+    def parse(self) -> None:
+        self.token = self.token[1:-1]  # error: [not-subscriptable]
 ```
 
 #### Augmented assignments to overriding class-level defaults
@@ -1332,6 +1431,50 @@ class C:
 reveal_type(C().a)  # revealed: int
 reveal_type(C().b)  # revealed: int
 reveal_type(C().c)  # revealed: int
+```
+
+#### Inherited annotated descriptors are bound before self-referential assignments
+
+An inherited descriptor's annotation constrains assignments without changing the bound value read
+before an assignment.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "value"
+
+class Base:
+    value: Descriptor = Descriptor()
+
+class Child(Base):
+    def update(self) -> None:
+        self.value = self.value + "b"  # error: [invalid-assignment]
+
+    def get_value(self) -> str:
+        return self.value
+
+reveal_type(Child().value)  # revealed: str
+```
+
+#### Inherited descriptors are bound before self-referential class assignments
+
+Reading an inherited descriptor through a class invokes `__get__` with `None` before a classmethod
+stores its updated value.
+
+```py
+class Descriptor:
+    def __get__(self, instance: None, owner: type) -> str:
+        return "value"
+
+class Base:
+    value = Descriptor()
+
+class Child(Base):
+    @classmethod
+    def update(cls) -> None:
+        cls.value = cls.value + "b"
+
+reveal_type(Child.value)  # revealed: str
 ```
 
 ### Inheritance of class/instance attributes
@@ -1455,6 +1598,26 @@ reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
 reveal_type(Derived.undeclared)  # revealed: str
 reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
+```
+
+### Explicit subclass annotations override inferred inherited attributes
+
+A subclass's explicit instance-attribute annotation takes precedence over an inferred superclass
+attribute, even when its initializer reads the inherited value.
+
+```py
+class Parent:
+    def __init__(self, value: str) -> None:
+        self.extras = {value}
+
+class Child(Parent):
+    def __init__(self, value: str) -> None:
+        super().__init__(value)
+        self.extras: tuple[str, ...] = tuple(self.extras)
+
+def record(child: Child, values: dict[Child, tuple[str, ...]]) -> None:
+    reveal_type(child.extras)  # revealed: tuple[str, ...]
+    values[child] = child.extras
 ```
 
 ## Allow replacing ordinary methods with compatible functions
@@ -4762,6 +4925,31 @@ class C:
         return t
 
 reveal_type(C().x)  # revealed: int
+```
+
+### Decorated methods on generic classes preserve instance binding
+
+An identity-decorated method on a generic class must see other instance methods as bound, and
+subclasses must be able to override those methods normally.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def callback[F](function: F) -> F:
+    return function
+
+class Base[T]:
+    def update(self) -> None: ...
+    @callback
+    def run(self) -> None:
+        reveal_type(self.update)  # revealed: bound method Self@run.update() -> None
+        self.update()
+
+class Child(Base[int]):
+    def update(self) -> None: ...
 ```
 
 ### Attributes defined in methods with unknown decorators

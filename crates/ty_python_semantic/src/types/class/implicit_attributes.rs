@@ -6,11 +6,12 @@ use crate::{
     place::{Place, Provenance},
     reachability::binding_reachability,
     types::{
-        KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
-        function::{is_implicit_classmethod, is_implicit_staticmethod},
-        infer::infer_unpack_types,
+        ClassBase, ClassLiteral, KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
+        definition_expression_type,
+        function::{FunctionDecorators, is_implicit_classmethod, is_implicit_staticmethod},
+        infer::{function_known_decorator_flags, infer_unpack_types},
         infer_expression_type, inferred_declaration,
-        member::Member,
+        member::{Member, class_member},
     },
 };
 use ruff_db::parsed::parsed_module;
@@ -67,15 +68,108 @@ impl<'db> StaticClassLiteral<'db> {
             };
         };
 
-        Self::implicit_attribute_inner(
+        let attribute = ImplicitAttributeName::new(
             db,
-            ImplicitAttributeName::new(
-                db,
-                class_body_scope,
-                &names[name_index],
-                target_method_decorator,
-            ),
-        )
+            class_body_scope,
+            &names[name_index],
+            target_method_decorator,
+        );
+
+        if !implicit_attribute_has_declaration(db, attribute)
+            && let Some(incoming) = self.independent_attribute_value(db, attribute)
+        {
+            let env = ProgramEnvironment::from_scope(class_body_scope);
+            let mut incoming_values = UnionBuilder::new(db, &env).add(incoming);
+            for &definition in implicit_attribute_assignment_definitions(db, attribute) {
+                if let Some(ty) = independent_attribute_assignment_type(db, attribute, definition) {
+                    incoming_values.add_in_place(ty);
+                }
+            }
+
+            Self::implicit_attribute_anchored(db, attribute, incoming_values.build())
+        } else {
+            Self::implicit_attribute_inner(db, attribute)
+        }
+    }
+
+    /// Find an attribute value independently established by a proper superclass.
+    ///
+    /// Inspecting class namespaces never invokes their implicit classmethod lookup. Instance
+    /// attributes from superclasses are resolved recursively, always moving toward a strictly
+    /// earlier class in the inheritance hierarchy. A default defined by the current class is not
+    /// an independent root: using it for cycle recovery could hide other assignments in that class.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| None,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn independent_attribute_value(
+        self,
+        db: &'db dyn Db,
+        attribute: ImplicitAttributeName<'db>,
+    ) -> Option<Type<'db>> {
+        let name = attribute.name(db).as_str();
+        let target_method_decorator = attribute.target_method_decorator(db);
+        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+
+        for superclass in self.iter_mro(db, None).skip(1) {
+            let ClassBase::Class(superclass) = superclass else {
+                continue;
+            };
+            let (literal, specialization) = superclass.class_literal_and_specialization(db);
+            let ClassLiteral::Static(literal) = literal else {
+                continue;
+            };
+
+            let member = class_member(db, literal.body_scope(db), name)
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization));
+            if member.inner.place.is_definitely_bound()
+                && let Ok(ty) = member.inner.into_lookup_result(db, &env)
+                && let ty = ty.inner_type()
+                && ty.is_definitely_non_data_descriptor(db, &env)
+            {
+                let receiver_class = self.identity_specialization(db);
+                let instance = (target_method_decorator == MethodDecorator::None)
+                    .then(|| Type::instance(db, &env, receiver_class));
+                return Some(
+                    ty.try_call_dunder_get(db, &env, instance, Type::from(receiver_class))
+                        .unwrap_or_else(|error| Some(error.fallback()))
+                        .map_or(ty, |result| result.return_type),
+                );
+            }
+
+            let implicit = literal.implicit_attribute_bindings(db, name, target_method_decorator);
+            if implicit.member.inner.place.is_definitely_bound()
+                && let Some(ty) = implicit.member.ignore_possibly_undefined()
+                && !ty.is_divergent()
+            {
+                return Some(ty.apply_optional_specialization(db, specialization));
+            }
+        }
+
+        None
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _, incoming| ImplicitAttribute {
+            member: Member {
+                inner: Place::bound(incoming)
+                    .with_qualifiers(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE),
+            },
+            augmented_bindings: None,
+        },
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn implicit_attribute_anchored(
+        db: &'db dyn Db,
+        attribute: ImplicitAttributeName<'db>,
+        incoming: Type<'db>,
+    ) -> ImplicitAttribute<'db> {
+        // Independent inherited and local values identify this query and provide an immediate
+        // cycle result without discarding assignments that widen the attribute's inferred type.
+        let _ = incoming;
+        Self::implicit_attribute_impl(db, attribute)
     }
 
     #[salsa::tracked(
@@ -361,7 +455,150 @@ struct ImplicitAttributeName<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
+/// Returns whether a matching method explicitly declares this attribute.
+///
+/// Local declarations take precedence over inherited values used for cycle recovery.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn implicit_attribute_has_declaration<'db>(
+    db: &'db dyn Db,
+    attribute: ImplicitAttributeName<'db>,
+) -> bool {
+    let class_body_scope = attribute.class_body_scope(db);
+    let index = semantic_index(db, class_body_scope.program_file(db));
+
+    attribute_declarations(db, class_body_scope, attribute.name(db).as_str()).any(
+        |(mut declarations, method_scope_id)| {
+            let method_scope = index.scope(method_scope_id);
+            if let Some(method_def) = method_scope.node().as_function() {
+                let definition = index.expect_single_definition(method_def);
+                let decorators = function_known_decorator_flags(db, definition);
+                let method_name = definition.name(db);
+                let is_classmethod = decorators.contains(FunctionDecorators::CLASSMETHOD)
+                    || method_name.as_deref().is_some_and(is_implicit_classmethod);
+                let is_staticmethod = decorators.contains(FunctionDecorators::STATICMETHOD)
+                    || method_name.as_deref().is_some_and(is_implicit_staticmethod);
+
+                let is_valid_scope = match attribute.target_method_decorator(db) {
+                    MethodDecorator::None => !is_classmethod && !is_staticmethod,
+                    MethodDecorator::ClassMethod => is_classmethod,
+                    MethodDecorator::StaticMethod => is_staticmethod,
+                };
+                if !is_valid_scope {
+                    return false;
+                }
+            }
+
+            declarations.any(|declaration| {
+                matches!(
+                    declaration.declaration,
+                    DefinitionState::Defined(definition)
+                        if matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                )
+            })
+        },
+    )
+}
+
+/// Return independently inferrable assignments in matching, reachable methods.
+///
+/// Keeping the definitions in an owner-local query prevents lookups from depending directly on
+/// another file's syntax tree.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn implicit_attribute_assignment_definitions<'db>(
+    db: &'db dyn Db,
+    attribute: ImplicitAttributeName<'db>,
+) -> Box<[Definition<'db>]> {
+    let class_body_scope = attribute.class_body_scope(db);
+    let program_file = class_body_scope.program_file(db);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
+    let index = semantic_index(db, program_file);
+    let class_map = use_def_map(db, class_body_scope);
+    let class_table = place_table(db, class_body_scope);
+    let mut definitions = Vec::new();
+
+    for (assignments, method_scope_id) in
+        attribute_assignments(db, class_body_scope, attribute.name(db).as_str())
+    {
+        let mut method_scope = index.scope(method_scope_id);
+        while method_scope.is_eager()
+            && let Some(parent) = method_scope.parent()
+        {
+            method_scope = index.scope(parent);
+        }
+        let Some(method_def) = method_scope.node().as_function() else {
+            continue;
+        };
+        let method = index.expect_single_definition(method_def);
+        let decorators = function_known_decorator_flags(db, method);
+        let method_name = method.name(db);
+        let is_classmethod = decorators.contains(FunctionDecorators::CLASSMETHOD)
+            || method_name.as_deref().is_some_and(is_implicit_classmethod);
+        let is_staticmethod = decorators.contains(FunctionDecorators::STATICMETHOD)
+            || method_name.as_deref().is_some_and(is_implicit_staticmethod);
+        let is_valid_scope = match attribute.target_method_decorator(db) {
+            MethodDecorator::None => !is_classmethod && !is_staticmethod,
+            MethodDecorator::ClassMethod => is_classmethod,
+            MethodDecorator::StaticMethod => is_staticmethod,
+        };
+        if !is_valid_scope {
+            continue;
+        }
+
+        let Some(method_place) = class_table.symbol_id(&method_def.node(&module).name) else {
+            continue;
+        };
+        if !class_map
+            .reachable_symbol_bindings(method_place)
+            .any(|binding| {
+                binding
+                    .binding
+                    .is_defined_and(|definition| definition == method)
+                    && !binding_reachability(db, class_map, &binding).is_always_false()
+            })
+        {
+            continue;
+        }
+
+        for assignment in assignments {
+            if let DefinitionState::Defined(definition) = assignment.binding
+                && matches!(
+                    definition.kind(db),
+                    DefinitionKind::Assignment(_)
+                        | DefinitionKind::For(_)
+                        | DefinitionKind::WithItem(_)
+                        | DefinitionKind::Comprehension(_)
+                )
+            {
+                definitions.push(definition);
+            }
+        }
+    }
+
+    definitions.into_boxed_slice()
+}
+
+/// Infer one assignment without allowing a recursive read to establish its own value.
+///
+/// A cycle involving this exact definition contributes no independent value. Other assignments
+/// remain available, so an inherited default cannot hide a local assignment such as `None`.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn independent_attribute_assignment_type<'db>(
+    db: &'db dyn Db,
+    attribute: ImplicitAttributeName<'db>,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let _ = attribute;
+    implicit_attribute_binding_type(db, definition)
+}
+
 /// Infer the value written by an attribute definition, including unpacked and iteration targets.
+///
+/// Ordinary inference and inherited cycle recovery share these projections so that independently
+/// written values cannot disappear merely because they were introduced by a `for` or `with`.
 fn implicit_attribute_binding_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -467,12 +704,22 @@ pub(super) fn implicit_attribute_names<'db>(
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
-        names.extend(
-            index
-                .place_table(function_scope_id)
-                .members()
-                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-        );
+        let place_table = index.place_table(function_scope_id);
+        let use_def = index.use_def_map(function_scope_id);
+        names.extend(place_table.members().filter_map(|member| {
+            let name = member.as_instance_attribute()?;
+            let member_id = place_table.member_id_by_instance_attribute_name(name)?;
+            let has_binding = use_def
+                .reachable_member_bindings(member_id)
+                .any(|binding| matches!(binding.binding, DefinitionState::Defined(_)));
+            (has_binding
+                || use_def
+                    .reachable_member_declarations(member_id)
+                    .any(|declaration| {
+                        matches!(declaration.declaration, DefinitionState::Defined(_))
+                    }))
+            .then(|| Name::new(name))
+        }));
     }
 
     names.sort_unstable();
