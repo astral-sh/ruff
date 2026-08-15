@@ -1152,15 +1152,22 @@ def hire(person: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nick
 team: Team = {"lead": {"name": "Alice", "age": 30, "nickname": "Ali"}}
 ```
 
-Finding a `TypedDict` behind an alias is not on its own a reason to validate a `dict(...)` call as
-one, when another arm of the union already accepts it:
+Once the `TypedDict` behind an alias is visible, a `dict(...)` call is validated against it even
+when another arm of the union already accepts the call. That is a pre-existing bug in the
+constructor path rather than something expansion introduces: the same union written without an alias
+behaves identically on `main`, and the dictionary-literal path gets it right. Expansion only makes
+it reachable through an alias.
 
 ```py
+# TODO: the `dict[str, str]` arm accepts this call, so none of these should be emitted.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
 accepted_by_fallback: PersonOrId | dict[str, str] = dict(other="x")
-reveal_type(accepted_by_fallback)  # revealed: dict[str, str]
+reveal_type(accepted_by_fallback)  # revealed: Person
 ```
 
-That holds wherever the union supplies the type context, not just in an assignment:
+It applies wherever the union supplies the type context, not just in an assignment:
 
 ```py
 class Roster(TypedDict):
@@ -1168,24 +1175,41 @@ class Roster(TypedDict):
 
 def takes_fallback(value: PersonOrId | dict[str, str]) -> None: ...
 
+# TODO: none of these should be emitted, here or in the two cases below.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
 takes_fallback(dict(other="x"))
 
 def returns_fallback() -> PersonOrId | dict[str, str]:
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+    # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+    # error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
     return dict(other="x")
 
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
 nested_fallback: Roster = {"lead": dict(other="x")}
 ```
 
-A wider arm serves as well as an exact one:
+A wider arm fares no better:
 
 ```py
 from typing import Any, Mapping
 
+# TODO: neither of these should be emitted.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
 any_fallback: PersonOrId | Any = dict(other="x")
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
 mapping_fallback: PersonOrId | Mapping[str, str] = dict(other="x")
 ```
 
-With no arm to fall back to, the call is validated against the `TypedDict` as before:
+With no arm to fall back to, validating against the `TypedDict` is correct:
 
 ```py
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"

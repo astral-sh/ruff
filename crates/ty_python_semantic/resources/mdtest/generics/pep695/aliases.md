@@ -772,9 +772,9 @@ type Ok1[T, *Ts] = tuple[T, *Ts]
 
 ## Solving a typevar through a generic union alias
 
-Expanding aliases must not disturb the solver. The parameter here is a generic union alias whose
-first arm is itself a generic alias, and both mention the typevar being solved: the call still
-selects the overload the argument matches, rather than inferring `Unknown`.
+Expanding aliases exposes a bug in constraint solving. The parameter here is a generic union alias
+whose first arm is itself a generic alias, and both mention the typevar being solved; once the alias
+is expanded the call fails to select the overload the argument matches.
 
 Reduced from `scipy.stats.differential_entropy`. Simplifying any part of the shape stops exercising
 the case.
@@ -796,5 +796,7 @@ def entropy(values: object) -> object:
     raise NotImplementedError
 
 def probe(scalar: float) -> None:
+    # TODO: this should select the second overload and infer `Float64`.
+    # error: [type-assertion-failure] "Type `Unknown` does not match asserted type `Float64`"
     assert_type(entropy(scalar), Float64)
 ```

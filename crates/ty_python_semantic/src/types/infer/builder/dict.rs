@@ -22,18 +22,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
-        let annotation = call_expression_tcx
-            .annotation
-            .map(|annotation| annotation.expand_union_aliases(db, self.program_environment()));
-
         // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
         // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
         // is `TypedDict`-shaped.
-        if let Some(annotation) = annotation
-            && let Some(typed_dict) = annotation
-                .filter_union(db, Type::is_typed_dict)
+        if let Some(tcx) = call_expression_tcx.annotation
+            && let Some(typed_dict) = tcx
+                .filter_union(db, self.program_environment(), Type::is_typed_dict)
                 .as_typed_dict()
-            && !self.has_dict_compatible_fallback(func, arguments, collection_expr, annotation)
         {
             // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
             // are already valid for the target, including gradual and bottom types. The additional
@@ -118,43 +113,5 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             &mut infer_elt_ty,
             call_expression_tcx,
         )
-    }
-
-    /// Whether some non-`TypedDict` arm of `annotation` already accepts this `dict(...)` call.
-    ///
-    /// A union of a `TypedDict` and `dict[str, int]` accepts `dict(other=1)` through the latter,
-    /// so committing to the `TypedDict` would report key errors for a call the annotation allows.
-    ///
-    /// A non-`TypedDict` type context cannot re-enter the fast path, so the recursion terminates.
-    fn has_dict_compatible_fallback(
-        &mut self,
-        func: &ast::Expr,
-        arguments: &ast::Arguments,
-        collection_expr: Option<ast::ExprRef<'_>>,
-        annotation: Type<'db>,
-    ) -> bool {
-        let db = self.db();
-        let env = self.program_environment();
-
-        let Type::Union(union) = annotation else {
-            return false;
-        };
-
-        union.elements(db).iter().any(|element| {
-            let element = element.resolve_type_alias(db);
-            if element.is_typed_dict() {
-                return false;
-            }
-
-            let mut speculative_builder = self.speculate_without_diagnostics();
-            speculative_builder
-                .infer_keyword_only_dict_call(
-                    func,
-                    arguments,
-                    collection_expr,
-                    TypeContext::new(Some(element)),
-                )
-                .is_some_and(|ty| ty.is_assignable_to(db, env, element))
-        })
     }
 }

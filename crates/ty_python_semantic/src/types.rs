@@ -2542,12 +2542,35 @@ impl<'db> Type<'db> {
     /// If the type is a union (or a type alias that resolves to a union), filters union elements
     /// based on the provided predicate.
     ///
+    /// Elements that are themselves aliases are expanded first: filtering is a set operation, so
+    /// it has to see an element's members rather than its name.
+    ///
     /// Otherwise, returns the type unchanged.
-    fn filter_union(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
-        if let Type::Union(union) = self.resolve_type_alias(db) {
-            union.filter(db, f)
-        } else {
-            self
+    fn filter_union(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut f: impl FnMut(&Type<'db>) -> bool,
+    ) -> Type<'db> {
+        let Type::Union(union) = self.resolve_type_alias(db) else {
+            return self;
+        };
+
+        if !union.has_aliases(db) {
+            return union.filter(db, f);
+        }
+
+        match union.expand_aliases(db, env) {
+            Type::Union(expanded) => expanded.filter(db, f),
+            // Expanding collapsed the union to a single type, leaving nothing to filter between,
+            // so apply the predicate to it directly.
+            expanded => {
+                if f(&expanded) {
+                    expanded
+                } else {
+                    Type::Never
+                }
+            }
         }
     }
 
@@ -2576,7 +2599,7 @@ impl<'db> Type<'db> {
         inferable: TypeVarSet<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
-        self.filter_union(db, |elem| {
+        self.filter_union(db, env, |elem| {
             !elem
                 .when_disjoint_from(db, env, target, &constraints, inferable)
                 .is_always_satisfied(db, env)
@@ -3577,7 +3600,7 @@ impl<'db> Type<'db> {
         Place::Defined(DefinedPlace {
             ty: declaration
                 .ty
-                .filter_union(db, |ty| ty.may_be_data_descriptor(db, env)),
+                .filter_union(db, env, |ty| ty.may_be_data_descriptor(db, env)),
             definedness: if all_arms_are_possible_data_descriptors {
                 declaration.definedness
             } else {
