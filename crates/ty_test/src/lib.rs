@@ -23,7 +23,6 @@ use ty_module_resolver::{
 use ty_python_core::TestProgramDb as _;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, ProgramSettings};
-use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
     Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
@@ -48,6 +47,7 @@ pub fn run(
     short_title: &str,
     test_name: &str,
     options: RunOptions,
+    pull_types: fn(&dyn ty_python_semantic::Db, ty_python_core::ProgramFile<'_>),
 ) -> anyhow::Result<()> {
     let mut db = db::Db::setup();
     let fixture_paths = FixturePaths {
@@ -74,6 +74,7 @@ pub fn run(
                 assertion,
                 output_format,
                 options,
+                pull_types,
             )
         },
     )
@@ -93,6 +94,7 @@ fn run_test(
     assertion: &mut String,
     output_format: OutputFormat,
     options: RunOptions,
+    pull_types: fn(&dyn ty_python_semantic::Db, ty_python_core::ProgramFile<'_>),
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     let FixturePaths {
         absolute: absolute_fixture_path,

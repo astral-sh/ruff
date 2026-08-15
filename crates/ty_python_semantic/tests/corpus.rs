@@ -7,14 +7,19 @@ use ruff_db::vendored::VendoredFileSystem;
 
 use ty_python_core::program::ProgramSettings;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
-    AnalysisSettings, Db as _, PythonVersionWithSource, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db, HasType, PythonVersionWithSource, SemanticModel, check_file_unwrap,
+    default_lint_registry,
 };
 
 use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
+
+#[path = "../src/pull_types.rs"]
+pub mod pull_types;
+
+use pull_types::pull_types;
 
 fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
     SystemPath::new(env!("CARGO_MANIFEST_DIR"))

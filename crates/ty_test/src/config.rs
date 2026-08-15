@@ -104,7 +104,25 @@ struct ScriptTool {
     ty: Option<ScriptOptions>,
 }
 
-pub(crate) type Rules = BTreeMap<String, Level>;
+pub(crate) type Rules = BTreeMap<String, RuleLevel>;
+
+#[derive(Copy, Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum RuleLevel {
+    Ignore,
+    Warn,
+    Error,
+}
+
+impl From<RuleLevel> for Level {
+    fn from(level: RuleLevel) -> Self {
+        match level {
+            RuleLevel::Ignore => Self::Ignore,
+            RuleLevel::Warn => Self::Warn,
+            RuleLevel::Error => Self::Error,
+        }
+    }
+}
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -199,4 +217,50 @@ pub(crate) struct Project {
     ///
     /// Example: `dependencies = ["pydantic==2.12.2"]`
     dependencies: Option<Vec<String>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MarkdownTestConfig;
+    use ty_python_semantic::lint::Level;
+
+    #[test]
+    fn rule_levels_deserialize_without_semantic_serde() {
+        let configuration = toml::from_str::<MarkdownTestConfig>(
+            r#"
+            [rules]
+            disabled = "ignore"
+            warning = "warn"
+            failure = "error"
+            "#,
+        )
+        .expect("valid rule levels");
+        let rules = configuration.rules.expect("configured rules");
+
+        assert_eq!(
+            rules.get("disabled").copied().map(Level::from),
+            Some(Level::Ignore)
+        );
+        assert_eq!(
+            rules.get("warning").copied().map(Level::from),
+            Some(Level::Warn)
+        );
+        assert_eq!(
+            rules.get("failure").copied().map(Level::from),
+            Some(Level::Error)
+        );
+    }
+
+    #[test]
+    fn unknown_rule_levels_are_rejected() {
+        assert!(
+            toml::from_str::<MarkdownTestConfig>(
+                r#"
+                [rules]
+                invalid = "information"
+                "#,
+            )
+            .is_err()
+        );
+    }
 }

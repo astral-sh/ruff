@@ -17,7 +17,7 @@ use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
 use ty_python_core::program::ProgramSettings;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
-use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::lint::{Level, LintRegistry, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
     default_lint_registry,
@@ -349,13 +349,14 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
     }
 
     if let Some(rules) = rules {
-        let set_lint_level =
-            |selection: &mut RuleSelection, lint, level| match Severity::try_from(level) {
-                Ok(severity) => {
-                    selection.enable(lint, severity, ty_python_semantic::lint::LintSource::File);
-                }
-                Err(()) => selection.disable(lint),
-            };
+        let set_lint_level = |selection: &mut RuleSelection, lint, level| match Severity::try_from(
+            Level::from(level),
+        ) {
+            Ok(severity) => {
+                selection.enable(lint, severity, ty_python_semantic::lint::LintSource::File);
+            }
+            Err(()) => selection.disable(lint),
+        };
 
         // If "all" key is present, use it's value as the default for all rules.
         if let Some(level) = rules.get("all") {

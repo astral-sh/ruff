@@ -3,7 +3,7 @@
 //! This is used in the "corpus" and (indirectly) the "mdtest" integration tests for this crate.
 //! (Mdtest uses the `pull_types` function via the `ty_test` crate.)
 
-use crate::{Db, HasType, SemanticModel};
+use super::{Db, HasType, SemanticModel};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{
     self as ast, visitor::source_order, visitor::source_order::SourceOrderVisitor,

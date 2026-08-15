@@ -1,5 +1,9 @@
 use anyhow::anyhow;
 use camino::Utf8Path;
+use ty_python_semantic::{Db, HasType, SemanticModel};
+
+#[path = "../src/pull_types.rs"]
+pub mod pull_types;
 
 thread_local! {
     // Restrict each fixture's Rayon work to one thread so concurrent tests do not compete for the
@@ -72,6 +76,7 @@ fn run(
                 short_title,
                 test_name,
                 options,
+                pull_types::pull_types,
             )
         })
     })?;
