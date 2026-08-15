@@ -49,7 +49,8 @@ use crate::{
         },
         generics::Specialization,
         infer::{
-            function_known_decorator_flags, implicit_attribute_expression_reads_member,
+            MemberDependency, function_known_decorator_flags,
+            implicit_attribute_expression_reads_member, implicit_attribute_member_dependencies,
             independent_assignment_constructor_seed, infer_unpack_types,
         },
         infer_expression_type, inferred_declaration,
@@ -2923,32 +2924,32 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> Option<Type<'db>> {
-        let class_body_scope = self.body_scope(db);
-        let program_file = class_body_scope.program_file(db);
+        let analysis = implicit_attribute_dependency_analysis(db, self);
+        let dependencies = analysis
+            .binary_search_by(|facts| facts.name.as_str().cmp(attribute.name(db).as_str()))
+            .ok()
+            .map(|index| &analysis[index])?;
+        let class_scope = self.body_scope(db);
+        let program_file = class_scope.program_file(db);
         let index = semantic_index(db, program_file);
         let module = parsed_module(db, program_file.python_file(db)).load(db);
-        let env = ProgramEnvironment::from_scope(class_body_scope);
-        let class_map = use_def_map(db, class_body_scope);
-        let class_table = place_table(db, class_body_scope);
-        let contains_attribute = |value: &ast::Expr| {
-            ast::helpers::any_over_expr(value, |expression| {
-                matches!(expression, ast::Expr::Attribute(_))
-            })
-        };
-        let matching_method = |method_scope_id: FileScopeId, final_binding: bool| {
-            let method_def = index.scope(method_scope_id).node().as_function()?;
-            let method = index.expect_single_definition(method_def);
+        let env = ProgramEnvironment::from_scope(class_scope);
+        let class_map = use_def_map(db, class_scope);
+        let class_table = place_table(db, class_scope);
+        let matching_method = |assignment: &ImplicitAttributeAssignment<'db>,
+                               final_binding: bool| {
+            let scope = assignment.definition.file_scope(db);
+            let function = index.scope(scope).node().as_function()?;
+            let method = index.expect_single_definition(function);
             if !implicit_attribute_matches_method(db, attribute, method) {
                 return None;
             }
-
-            let symbol = class_table.symbol_id(&method_def.node(&module).name)?;
+            let symbol = class_table.symbol_id(&function.node(&module).name)?;
             let mut bindings = if final_binding {
                 class_map.end_of_scope_symbol_bindings(symbol)
             } else {
                 class_map.reachable_symbol_bindings(symbol)
             };
-
             bindings
                 .any(|binding| {
                     binding
@@ -2956,7 +2957,7 @@ impl<'db> StaticClassLiteral<'db> {
                         .is_defined_and(|definition| definition == method)
                         && !binding_reachability(db, class_map, &binding).is_always_false()
                 })
-                .then_some(method_def)
+                .then_some(method)
         };
         let mut values = UnionBuilder::new(db, &env);
         let mut constructor_candidates = Vec::new();
@@ -2964,298 +2965,110 @@ impl<'db> StaticClassLiteral<'db> {
         let mut requires_anchor = false;
         let mut has_self_reference = false;
 
-        for (bindings, method_scope_id) in
-            attribute_assignments(db, class_body_scope, attribute.name(db).as_str())
-        {
-            let Some(method_def) = matching_method(method_scope_id, false) else {
+        for assignment in &dependencies.assignments {
+            if matching_method(assignment, false).is_none() {
+                continue;
+            }
+            let DefinitionKind::Assignment(binding) = assignment.definition.kind(db) else {
                 continue;
             };
-            let method_node = method_def.node(&module);
-            let first_parameter = method_node
-                .parameters
-                .iter_non_variadic_params()
-                .next()
-                .map(|parameter| parameter.name().as_str());
+            let independent = |read: &ImplicitAttributeMemberRead| {
+                implicit_attribute_member_is_independent(db, self, attribute, read, &module)
+            };
 
-            for binding in bindings {
-                let DefinitionState::Defined(definition) = binding.binding else {
-                    continue;
-                };
-                let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-                    continue;
-                };
-                if assignment.unpack().is_some() {
-                    continue;
-                }
-
-                let value = assignment.value(&module);
-                let is_independent_attribute = |access: &ast::ExprAttribute| {
-                    access.attr.as_str() != attribute.name(db).as_str()
-                        && access
-                            .value
-                            .as_name_expr()
-                            .is_some_and(|receiver| Some(receiver.id.as_str()) == first_parameter)
-                        && (class_table
-                            .symbol_id(access.attr.as_str())
-                            .is_some_and(|symbol| {
-                                class_map
-                                    .reachable_symbol_declarations(symbol)
-                                    .any(|declaration| {
-                                        matches!(
-                                            declaration.declaration,
-                                            DefinitionState::Defined(definition)
-                                                if matches!(
-                                                    definition.kind(db),
-                                                    DefinitionKind::AnnotatedAssignment(_)
-                                                )
-                                        )
-                                    })
-                                    || class_map.reachable_symbol_bindings(symbol).any(|binding| {
-                                        let Some(definition) = binding.binding.definition() else {
-                                            return false;
-                                        };
-                                        match definition.kind(db) {
-                                            DefinitionKind::Assignment(assignment) => {
-                                                !contains_attribute(assignment.value(&module))
-                                            }
-                                            DefinitionKind::Function(function) => {
-                                                let function = function.node(&module);
-                                                function.returns.as_ref().is_some_and(|returns| {
-                                                    !contains_attribute(returns)
-                                                }) && function.decorator_list.iter().any(
-                                                    |decorator| {
-                                                        decorator
-                                                            .expression
-                                                            .as_name_expr()
-                                                            .is_some_and(|name| {
-                                                                name.id == "property"
-                                                            })
-                                                    },
-                                                ) && function
-                                                    .parameters
-                                                    .iter_non_variadic_params()
-                                                    .all(|parameter| parameter.default().is_none())
-                                            }
-                                            _ => false,
-                                        }
-                                    })
-                            })
-                            || implicit_attribute_has_declaration(
-                                db,
-                                ImplicitAttributeName::new(
-                                    db,
-                                    class_body_scope,
-                                    Name::new(access.attr.as_str()),
-                                    attribute.target_method_decorator(db),
-                                ),
-                            ))
-                };
-                let reads_attribute =
-                    ast::helpers::any_over_expr(value, |expression| match expression {
-                        ast::Expr::Attribute(access) => !is_independent_attribute(access),
-                        ast::Expr::Lambda(lambda) => {
-                            lambda.parameters.as_ref().is_some_and(|parameters| {
-                                parameters.iter_non_variadic_params().any(|parameter| {
-                                    parameter.default().is_some_and(|default| {
-                                        ast::helpers::any_over_expr(default, |expression| {
-                                            matches!(
-                                                expression,
-                                                ast::Expr::Attribute(access)
-                                                    if !is_independent_attribute(access)
-                                            )
-                                        })
-                                    })
-                                })
-                            })
-                        }
-                        _ => false,
-                    });
-                let mut active_aliases = FxIndexSet::default();
-                let reads_local_alias = ast::helpers::any_over_expr(value, |expression| {
-                    matches!(expression, ast::Expr::Name(_))
-                        && implicit_attribute_expression_reads_member(
-                            db,
-                            index,
-                            (program_file, method_scope_id),
-                            &module,
-                            expression,
-                            &mut active_aliases,
-                            &is_independent_attribute,
-                        )
-                });
-                if reads_attribute || reads_local_alias {
-                    has_self_reference |= first_parameter.is_some_and(|receiver| {
-                        ast::helpers::any_over_expr(value, |expression| {
-                            matches!(
-                                expression,
-                                ast::Expr::Attribute(access)
-                                    if access.attr.as_str() == attribute.name(db).as_str()
-                                        && access.value.as_name_expr().is_some_and(|name| {
-                                            name.id.as_str() == receiver
-                                        })
-                            )
-                        })
-                    });
-                    let transfers_member = first_parameter.is_some_and(|receiver| {
-                        implicit_attribute_cross_member_transfer(
-                            value,
-                            receiver,
-                            attribute.name(db).as_str(),
-                        )
-                    });
-                    requires_anchor |= reads_local_alias
-                        || ast::helpers::any_over_expr(value, |expression| {
-                            let ast::Expr::Attribute(access) = expression else {
-                                return false;
-                            };
-                            let is_same_owner_parameter = |receiver_name: &str| {
-                                method_node
-                                    .parameters
-                                    .find(receiver_name)
-                                    .and_then(ast::ParameterWithDefault::annotation)
-                                    .is_some_and(|annotation| match annotation {
-                                        ast::Expr::Name(name) => name.id == *self.name(db),
-                                        ast::Expr::StringLiteral(literal) => {
-                                            literal.value.to_str() == self.name(db).as_str()
-                                        }
-                                        _ => false,
-                                    })
-                            };
-
-                            if access.attr.as_str() == attribute.name(db).as_str()
-                                && ast::helpers::any_over_expr(&access.value, |receiver| {
-                                    match receiver {
-                                        ast::Expr::Attribute(holder) => {
-                                            holder.attr.as_str() != attribute.name(db).as_str()
-                                                && holder.value.as_name_expr().is_some_and(|name| {
-                                                    Some(name.id.as_str()) == first_parameter
-                                                })
-                                        }
-                                        ast::Expr::Name(name) => {
-                                            Some(name.id.as_str()) != first_parameter
-                                                && method_node
-                                                    .parameters
-                                                    .find(name.id.as_str())
-                                                    .is_some()
-                                                && !is_same_owner_parameter(name.id.as_str())
-                                        }
-                                        _ => false,
-                                    }
-                                })
-                            {
-                                return true;
-                            }
-
-                            let mut receiver = access.value.as_ref();
-                            let mut crosses_receiver_attribute = false;
-                            let receiver_name = loop {
-                                match receiver {
-                                    ast::Expr::Name(name) => break Some(name.id.as_str()),
-                                    ast::Expr::Attribute(receiver_attribute) => {
-                                        crosses_receiver_attribute =
-                                            receiver_attribute.attr.as_str()
-                                                != attribute.name(db).as_str();
-                                        receiver = receiver_attribute.value.as_ref();
-                                    }
-                                    ast::Expr::Subscript(subscript) => {
-                                        receiver = subscript.value.as_ref();
-                                    }
-                                    ast::Expr::Call(call) => receiver = call.func.as_ref(),
-                                    _ => break None,
-                                }
-                            };
-
-                            let Some(receiver_name) = receiver_name else {
-                                return false;
-                            };
-                            if Some(receiver_name) == first_parameter {
-                                return crosses_receiver_attribute || transfers_member;
-                            }
-
-                            !is_same_owner_parameter(receiver_name)
-                        });
-                    requires_anchor |= transfers_member;
-                    if !has_independent_value && requires_anchor {
-                        constructor_candidates.push(definition);
-                    }
-                    continue;
-                }
-
-                let ty = infer_expression_type(db, index.expression(value), TypeContext::default());
+            if !assignment.has_unknown_alias && assignment.reads.iter().all(&independent) {
+                let ty = infer_expression_type(
+                    db,
+                    index.expression(binding.value(&module)),
+                    TypeContext::default(),
+                );
                 if !ty.is_divergent() {
                     has_independent_value = true;
                     values.add_in_place(ty);
                 }
+                continue;
+            }
+
+            has_self_reference |= assignment.reads.iter().any(|read| {
+                read.receiver == ImplicitAttributeReceiver::Owner
+                    && read.name == *attribute.name(db)
+            });
+            requires_anchor |= assignment.has_unknown_alias
+                || assignment.reads.iter().any(|read| {
+                    !independent(read)
+                        && (read.through_alias
+                            || read.receiver == ImplicitAttributeReceiver::External
+                            || read.receiver == ImplicitAttributeReceiver::Owner
+                                && read.name != *attribute.name(db))
+                });
+            if !has_independent_value && requires_anchor {
+                constructor_candidates.push(assignment.definition);
             }
         }
 
         if !requires_anchor && has_self_reference && has_independent_value {
-            requires_anchor = implicit_attribute_names(db, class_body_scope)
-                .iter()
-                .filter(|name| name.as_str() != attribute.name(db).as_str())
-                .any(|name| {
-                    attribute_assignments(db, class_body_scope, name.as_str()).any(
-                        |(mut bindings, method_scope_id)| {
-                            let Some(method_def) = matching_method(method_scope_id, true) else {
-                                return false;
-                            };
-                            let method_node = method_def.node(&module);
-                            let Some(receiver) = method_node
-                                .parameters
-                                .iter_non_variadic_params()
-                                .next()
-                                .map(|parameter| parameter.name().as_str())
-                            else {
-                                return false;
-                            };
-
-                            bindings.any(|binding| {
-                                if binding_reachability(
-                                    db,
-                                    index.use_def_map(method_scope_id),
-                                    &binding,
-                                )
-                                .is_always_false()
-                                {
-                                    return false;
-                                }
-                                let DefinitionState::Defined(definition) = binding.binding else {
-                                    return false;
-                                };
-                                let DefinitionKind::Assignment(assignment) = definition.kind(db)
-                                else {
-                                    return false;
-                                };
-                                implicit_attribute_expression_reads_member(
-                                    db,
-                                    index,
-                                    (program_file, method_scope_id),
-                                    &module,
-                                    assignment.value(&module),
-                                    &mut FxIndexSet::default(),
-                                    &|access| {
-                                        access.attr.as_str() != attribute.name(db).as_str()
-                                            || !implicit_attribute_receiver_is_alias(
-                                                db,
-                                                index,
-                                                (program_file, method_scope_id),
-                                                &module,
-                                                &access.value,
-                                                receiver,
-                                                &mut FxIndexSet::default(),
-                                            )
-                                    },
-                                )
-                            })
-                        },
-                    )
-                });
+            requires_anchor = dependencies.incoming.iter().any(|incoming| {
+                let source = &analysis[incoming.source];
+                let assignment = &source.assignments[incoming.assignment];
+                let Some(method) = matching_method(assignment, true) else {
+                    return false;
+                };
+                let scope = assignment.definition.file_scope(db);
+                let use_def = index.use_def_map(scope);
+                let table = index.place_table(scope);
+                let Some(member) = table.member_id_by_instance_attribute_name(source.name.as_str())
+                else {
+                    return false;
+                };
+                if !use_def.reachable_member_bindings(member).any(|binding| {
+                    binding
+                        .binding
+                        .is_defined_and(|definition| definition == assignment.definition)
+                        && !binding_reachability(db, use_def, &binding).is_always_false()
+                }) {
+                    return false;
+                }
+                let DefinitionKind::Function(method) = method.kind(db) else {
+                    return false;
+                };
+                let Some(receiver) = method
+                    .node(&module)
+                    .parameters
+                    .iter_non_variadic_params()
+                    .next()
+                    .map(|parameter| parameter.name().as_str())
+                else {
+                    return false;
+                };
+                let DefinitionKind::Assignment(binding) = assignment.definition.kind(db) else {
+                    return false;
+                };
+                implicit_attribute_expression_reads_member(
+                    db,
+                    index,
+                    (program_file, scope),
+                    &module,
+                    binding.value(&module),
+                    &mut FxIndexSet::default(),
+                    &|access| {
+                        access.attr.as_str() != attribute.name(db).as_str()
+                            || !implicit_attribute_receiver_is_alias(
+                                db,
+                                index,
+                                (program_file, scope),
+                                &module,
+                                &access.value,
+                                ImplicitAttributeReceiverResolution::Reachable(receiver),
+                                &mut FxIndexSet::default(),
+                            )
+                    },
+                )
+            });
         }
 
         if !requires_anchor {
             return None;
         }
-
         if !has_independent_value {
             for definition in constructor_candidates {
                 if let Some(seed) = independent_assignment_constructor_seed(db, definition)
@@ -3268,7 +3081,6 @@ impl<'db> StaticClassLiteral<'db> {
                 }
             }
         }
-
         has_independent_value.then(|| {
             values
                 .build()
@@ -3389,7 +3201,6 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> ImplicitAttribute<'db> {
         let class_body_scope = attribute.class_body_scope(db);
         let name = attribute.name(db).as_str();
-        let target_method_decorator = attribute.target_method_decorator(db);
         let program_file = class_body_scope.program_file(db);
         let python_file = program_file.python_file(db);
         let env = &ProgramEnvironment::from_file(program_file);
@@ -3409,45 +3220,13 @@ impl<'db> StaticClassLiteral<'db> {
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
         let is_valid_scope = |method_scope: &Scope| {
-            let Some(method_def) = method_scope.node().as_function() else {
-                return true;
-            };
-
-            // Check the decorators directly on the AST node to determine if this method
-            // is a classmethod or staticmethod. This is more reliable than checking the
-            // final evaluated type, which may be wrapped by other decorators like @cache.
-            let function_node = method_def.node(&module);
-            let definition = index.expect_single_definition(method_def);
-
-            let mut is_classmethod = false;
-            let mut is_staticmethod = false;
-
-            for decorator in &function_node.decorator_list {
-                let decorator_ty =
-                    definition_expression_type(db, definition, &decorator.expression);
-                if let Type::ClassLiteral(class) = decorator_ty {
-                    match class.known(db) {
-                        Some(KnownClass::Classmethod) => is_classmethod = true,
-                        Some(KnownClass::Staticmethod) => is_staticmethod = true,
-                        _ => {}
-                    }
-                }
-            }
-
-            // Also check for implicit classmethods/staticmethods based on method name
-            let method_name = function_node.name.as_str();
-            if is_implicit_classmethod(method_name) {
-                is_classmethod = true;
-            }
-            if is_implicit_staticmethod(method_name) {
-                is_staticmethod = true;
-            }
-
-            match target_method_decorator {
-                MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                MethodDecorator::ClassMethod => is_classmethod,
-                MethodDecorator::StaticMethod => is_staticmethod,
-            }
+            method_scope.node().as_function().is_none_or(|method| {
+                implicit_attribute_matches_method(
+                    db,
+                    attribute,
+                    index.expect_single_definition(method),
+                )
+            })
         };
 
         // First check declarations
@@ -4440,7 +4219,360 @@ struct ImplicitAttributeName<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
-/// Follows reachable local receiver aliases without inferring their assignments.
+/// Owner-local assignment dependencies, collected before any attribute inference runs.
+///
+/// ```python
+/// self.left = self.right
+/// self.right = self.left
+/// ```
+///
+/// Reverse references are indexed once so checking `right` never rescans `left`'s methods.
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct ImplicitAttributeDependencies<'db> {
+    name: Name,
+    assignments: Box<[ImplicitAttributeAssignment<'db>]>,
+    incoming: Box<[ImplicitAttributeIncoming]>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct ImplicitAttributeAssignment<'db> {
+    definition: Definition<'db>,
+    reads: Box<[ImplicitAttributeMemberRead]>,
+    has_unknown_alias: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct ImplicitAttributeMemberRead {
+    name: Name,
+    receiver: ImplicitAttributeReceiver,
+    through_alias: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+enum ImplicitAttributeReceiver {
+    Owner,
+    SameOwner,
+    External,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct ImplicitAttributeIncoming {
+    source: usize,
+    assignment: usize,
+}
+
+/// Indexes a class's structural member dependencies without inferring any semantic facts.
+#[salsa::tracked(
+    returns(deref),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn implicit_attribute_dependency_analysis<'db>(
+    db: &'db dyn Db,
+    owner: StaticClassLiteral<'db>,
+) -> Box<[ImplicitAttributeDependencies<'db>]> {
+    let class_scope = owner.body_scope(db);
+    let program_file = class_scope.program_file(db);
+    let index = semantic_index(db, program_file);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
+    let names = implicit_attribute_names(db, class_scope);
+    let mut assignments = vec![Vec::new(); names.len()];
+    let mut incoming = vec![Vec::new(); names.len()];
+
+    for scope in attribute_scopes(db, class_scope) {
+        let Some(method_node) = index.scope(scope).node().as_function() else {
+            continue;
+        };
+        let node = method_node.node(&module);
+        let table = index.place_table(scope);
+        let use_def = index.use_def_map(scope);
+
+        for member in table.members() {
+            let Some(name) = member.as_instance_attribute() else {
+                continue;
+            };
+            let Ok(position) = names.binary_search_by(|candidate| candidate.as_str().cmp(name))
+            else {
+                continue;
+            };
+            let Some(member_id) = table.member_id_by_instance_attribute_name(name) else {
+                continue;
+            };
+
+            for binding in use_def.reachable_member_bindings(member_id) {
+                let DefinitionState::Defined(definition) = binding.binding else {
+                    continue;
+                };
+                let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+                    continue;
+                };
+                if assignment.unpack().is_some() {
+                    continue;
+                }
+
+                let value = assignment.value(&module);
+                let mut reads = Vec::new();
+                let mut has_unknown_alias = false;
+                implicit_attribute_member_dependencies(
+                    db,
+                    index,
+                    (program_file, scope),
+                    &module,
+                    value,
+                    &mut FxIndexSet::default(),
+                    &mut |dependency| match dependency {
+                        MemberDependency::Attribute {
+                            attribute,
+                            through_alias,
+                        } => {
+                            let kind = implicit_attribute_dependency_receiver(
+                                db,
+                                index,
+                                (program_file, scope),
+                                &module,
+                                attribute,
+                                node,
+                                (owner.name(db).as_str(), name),
+                            );
+                            let read = ImplicitAttributeMemberRead {
+                                name: Name::new(attribute.attr.as_str()),
+                                receiver: kind,
+                                through_alias,
+                            };
+                            if !reads.contains(&read) {
+                                reads.push(read);
+                            }
+                        }
+                        MemberDependency::UnknownAlias => has_unknown_alias = true,
+                    },
+                );
+
+                let assignment_index = assignments[position].len();
+                for read in &reads {
+                    if read.receiver == ImplicitAttributeReceiver::Owner
+                        && let Ok(target) = names.binary_search_by(|candidate| {
+                            candidate.as_str().cmp(read.name.as_str())
+                        })
+                        && target != position
+                    {
+                        let edge = ImplicitAttributeIncoming {
+                            source: position,
+                            assignment: assignment_index,
+                        };
+                        if !incoming[target].contains(&edge) {
+                            incoming[target].push(edge);
+                        }
+                    }
+                }
+
+                assignments[position].push(ImplicitAttributeAssignment {
+                    definition,
+                    reads: reads.into_boxed_slice(),
+                    has_unknown_alias,
+                });
+            }
+        }
+    }
+
+    names
+        .iter()
+        .zip(assignments)
+        .zip(incoming)
+        .map(
+            |((name, assignments), incoming)| ImplicitAttributeDependencies {
+                name: name.clone(),
+                assignments: assignments.into_boxed_slice(),
+                incoming: incoming.into_boxed_slice(),
+            },
+        )
+        .collect()
+}
+
+/// Recognizes previously declared or class-body-established values after graph collection.
+fn implicit_attribute_member_is_independent<'db>(
+    db: &'db dyn Db,
+    owner: StaticClassLiteral<'db>,
+    target: ImplicitAttributeName<'db>,
+    read: &ImplicitAttributeMemberRead,
+    module: &ParsedModuleRef,
+) -> bool {
+    if read.receiver != ImplicitAttributeReceiver::Owner || read.name == *target.name(db) {
+        return false;
+    }
+
+    let class_scope = owner.body_scope(db);
+    let table = place_table(db, class_scope);
+    let use_def = use_def_map(db, class_scope);
+    table.symbol_id(read.name.as_str()).is_some_and(|symbol| {
+        use_def
+            .reachable_symbol_declarations(symbol)
+            .any(|declaration| {
+                matches!(
+                    declaration.declaration,
+                    DefinitionState::Defined(definition)
+                        if matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                )
+            })
+            || use_def.reachable_symbol_bindings(symbol).any(|binding| {
+                let Some(definition) = binding.binding.definition() else {
+                    return false;
+                };
+                let contains_attribute = |value: &ast::Expr| {
+                    ast::helpers::any_over_expr(value, |expression| {
+                        matches!(expression, ast::Expr::Attribute(_))
+                    })
+                };
+                match definition.kind(db) {
+                    DefinitionKind::Assignment(assignment) => {
+                        !contains_attribute(assignment.value(module))
+                    }
+                    DefinitionKind::Function(function) => {
+                        let function = function.node(module);
+                        function
+                            .returns
+                            .as_ref()
+                            .is_some_and(|returns| !contains_attribute(returns))
+                            && function.decorator_list.iter().any(|decorator| {
+                                decorator
+                                    .expression
+                                    .as_name_expr()
+                                    .is_some_and(|name| name.id == "property")
+                            })
+                            && function
+                                .parameters
+                                .iter_non_variadic_params()
+                                .all(|parameter| parameter.default().is_none())
+                    }
+                    _ => false,
+                }
+            })
+    }) || implicit_attribute_has_declaration(
+        db,
+        ImplicitAttributeName::new(
+            db,
+            class_scope,
+            read.name.clone(),
+            target.target_method_decorator(db),
+        ),
+    )
+}
+
+/// Classifies a syntactic receiver without querying decorators, types, or reachability.
+fn implicit_attribute_dependency_receiver<'db>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    scope: (ProgramFile<'db>, FileScopeId),
+    module: &ParsedModuleRef,
+    attribute: &ast::ExprAttribute,
+    method: &ast::StmtFunctionDef,
+    names: (&str, &str),
+) -> ImplicitAttributeReceiver {
+    let (owner, target) = names;
+    let first = method
+        .parameters
+        .iter_non_variadic_params()
+        .next()
+        .map(|parameter| parameter.name().as_str());
+    if first.is_some_and(|first| {
+        implicit_attribute_receiver_is_alias(
+            db,
+            index,
+            scope,
+            module,
+            &attribute.value,
+            ImplicitAttributeReceiverResolution::Structural(first),
+            &mut FxIndexSet::default(),
+        )
+    }) {
+        return ImplicitAttributeReceiver::Owner;
+    }
+
+    let mut receiver = attribute.value.as_ref();
+    let mut first_attribute = None;
+    loop {
+        match receiver {
+            ast::Expr::Attribute(access) => {
+                first_attribute = Some(access.attr.as_str());
+                receiver = access.value.as_ref();
+            }
+            ast::Expr::Subscript(subscript) => receiver = subscript.value.as_ref(),
+            ast::Expr::Call(call) => receiver = call.func.as_ref(),
+            _ => break,
+        }
+    }
+
+    let Some(name) = receiver.as_name_expr() else {
+        if !matches!(
+            receiver,
+            ast::Expr::List(_)
+                | ast::Expr::Tuple(_)
+                | ast::Expr::Set(_)
+                | ast::Expr::Dict(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::DictComp(_)
+                | ast::Expr::Generator(_)
+        ) {
+            return ImplicitAttributeReceiver::External;
+        }
+        let mut contains_target = false;
+        let contains_other_receiver =
+            ast::helpers::any_over_expr(receiver, |expression| match expression {
+                ast::Expr::Attribute(access)
+                    if access
+                        .value
+                        .as_name_expr()
+                        .is_some_and(|name| Some(name.id.as_str()) == first) =>
+                {
+                    if access.attr.as_str() == target {
+                        contains_target = true;
+                        false
+                    } else {
+                        true
+                    }
+                }
+                ast::Expr::Name(name) => {
+                    Some(name.id.as_str()) != first
+                        && method.parameters.find(name.id.as_str()).is_some()
+                }
+                _ => false,
+            });
+        return if contains_target && !contains_other_receiver {
+            ImplicitAttributeReceiver::SameOwner
+        } else {
+            ImplicitAttributeReceiver::External
+        };
+    };
+    if Some(name.id.as_str()) == first {
+        return if first_attribute.is_none() || first_attribute == Some(target) {
+            ImplicitAttributeReceiver::SameOwner
+        } else {
+            ImplicitAttributeReceiver::External
+        };
+    }
+
+    if method
+        .parameters
+        .find(name.id.as_str())
+        .and_then(ast::ParameterWithDefault::annotation)
+        .is_some_and(|annotation| match annotation {
+            ast::Expr::Name(name) => name.id == owner,
+            ast::Expr::StringLiteral(literal) => literal.value.to_str() == owner,
+            _ => false,
+        })
+    {
+        ImplicitAttributeReceiver::SameOwner
+    } else {
+        ImplicitAttributeReceiver::External
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ImplicitAttributeReceiverResolution<'a> {
+    Structural(&'a str),
+    Reachable(&'a str),
+}
+
+/// Follows local receiver aliases structurally or with lazy reachability validation.
 ///
 /// ```python
 /// source = self
@@ -4452,15 +4584,24 @@ fn implicit_attribute_receiver_is_alias<'db>(
     scope: (ProgramFile<'db>, FileScopeId),
     module: &ParsedModuleRef,
     expression: &ast::Expr,
-    receiver: &str,
+    resolution: ImplicitAttributeReceiverResolution<'_>,
     active_aliases: &mut FxIndexSet<Definition<'db>>,
 ) -> bool {
     let (program_file, method_scope) = scope;
+    let (receiver, evaluate_reachability) = match resolution {
+        ImplicitAttributeReceiverResolution::Structural(receiver) => (receiver, false),
+        ImplicitAttributeReceiverResolution::Reachable(receiver) => (receiver, true),
+    };
     let ast::Expr::Name(name) = expression else {
         return false;
     };
     if name.id.as_str() == receiver {
-        return true;
+        let expression_scope = index.expression_scope_id(expression);
+        let table = index.place_table(expression_scope);
+        return expression_scope == method_scope
+            || !table
+                .symbol_id(receiver)
+                .is_some_and(|symbol| table.symbol(symbol).is_local());
     }
     if name.ctx != ast::ExprContext::Load || index.expression_scope_id(expression) != method_scope {
         return false;
@@ -4478,7 +4619,9 @@ fn implicit_attribute_receiver_is_alias<'db>(
     use_def
         .bindings_at_use(name.scoped_use_id(db, program_file))
         .any(|binding| {
-            if binding_reachability(db, use_def, &binding).is_always_false() {
+            if evaluate_reachability
+                && binding_reachability(db, use_def, &binding).is_always_false()
+            {
                 return false;
             }
             let Some(definition) = binding.binding.definition() else {
@@ -4501,58 +4644,13 @@ fn implicit_attribute_receiver_is_alias<'db>(
                     scope,
                     module,
                     value,
-                    receiver,
+                    resolution,
                     active_aliases,
                 )
             });
             active_aliases.shift_remove(&definition);
             is_alias
         })
-}
-
-/// Detects another attribute through arbitrary wrappers and lambda parameter defaults.
-///
-/// ```python
-/// self.left = lambda value=self.right: value
-/// ```
-fn implicit_attribute_cross_member_transfer(
-    value: &ast::Expr,
-    receiver: &str,
-    target: &str,
-) -> bool {
-    let is_other_member = |expression: &ast::Expr| {
-        let ast::Expr::Attribute(attribute) = expression else {
-            return false;
-        };
-        attribute.attr.as_str() != target
-            && attribute
-                .value
-                .as_name_expr()
-                .is_some_and(|name| name.id.as_str() == receiver)
-    };
-    if let ast::Expr::Lambda(lambda) = value
-        && lambda
-            .parameters
-            .as_ref()
-            .is_some_and(|parameters| parameters.find(receiver).is_some())
-    {
-        return false;
-    }
-
-    ast::helpers::any_over_expr(value, |expression| {
-        is_other_member(expression)
-            || matches!(
-                expression,
-                ast::Expr::Lambda(lambda)
-                    if lambda.parameters.as_ref().is_some_and(|parameters| {
-                        parameters.iter_non_variadic_params().any(|parameter| {
-                            parameter.default().is_some_and(|default| {
-                                ast::helpers::any_over_expr(default, &is_other_member)
-                            })
-                        })
-                    })
-            )
-    })
 }
 
 /// Matches explicit and implicit method decorators to the attribute's receiver kind.

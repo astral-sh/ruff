@@ -636,25 +636,32 @@ class Right:
 
 ## Recursive attributes across conditionally selected receivers
 
-A conditional expression can choose between two parameters belonging to another class.
+A conditional expression can choose between two parameters belonging to another class, including
+when the classes use different attribute names.
 
 ```py
 class Left:
     def reset(self):
         self.values = [1]
+        self.left = [1]
 
     def update(self, other: "Right", alternate: "Right", flag: bool):
         self.values = [*(other if flag else alternate).values]
+        self.left = [*(other if flag else alternate).right]
 
 class Right:
     def reset(self):
         self.values = [1]
+        self.right = [1]
 
     def update(self, other: Left, alternate: Left, flag: bool):
         self.values = [*(other if flag else alternate).values, "added"]  # error: [invalid-assignment]
+        self.right = [*(other if flag else alternate).left, "added"]  # error: [invalid-assignment]
 
 reveal_type(Left().values)  # revealed: list[int]
 reveal_type(Right().values)  # revealed: list[int]
+reveal_type(Left().left)  # revealed: list[int]
+reveal_type(Right().right)  # revealed: list[int]
 ```
 
 ## Recursive attributes initialized from independently typed values
@@ -817,10 +824,12 @@ accept_original(ClassMethod().right[0])  # error: [invalid-argument-type]
 
 ## Recursive attributes retain elements through comprehensions and iterators
 
-Conditional and nested comprehensions, generator expressions, composed iterator operations, and
+Conditional and nested comprehensions, generator expressions, captured local aliases (including
+unpacked, loop, context-manager, and lambda-default bindings), composed iterator operations, and
 constant-condition branches all preserve independently introduced elements.
 
 ```py
+from contextlib import nullcontext
 from itertools import chain
 
 class Original: ...
@@ -835,6 +844,50 @@ class Generator:
     def update(self):
         self.left = [*self.right]
         self.right = list(value for value in [*self.left, Added()])
+
+class Captured:
+    def update(self):
+        self.left = [*self.right]
+        source = [*self.left, Added()]
+        self.right = [value for value in source]
+
+class CapturedGenerator:
+    def update(self):
+        self.left = [*self.right]
+        source = [*self.left, Added()]
+        self.right = list(value for value in source)
+
+class CapturedUnpacked:
+    def update(self):
+        self.left = [*self.right]
+        (source,) = ([*self.left, Added()],)
+        self.right = [value for value in source]
+
+class CapturedLoop:
+    def update(self):
+        self.left = [*self.right]
+        for source in [[*self.left, Added()]]:
+            self.right = [value for value in source]
+
+class CapturedContext:
+    def update(self):
+        self.left = [*self.right]
+        with nullcontext([*self.left, Added()]) as source:
+            self.right = [value for value in source]
+
+class LocallyImportedContext:
+    def update(self):
+        from contextlib import nullcontext
+
+        self.left = [*self.right]
+        with nullcontext([*self.left, Added()]) as source:
+            self.right = [value for value in source]
+
+class CapturedDefault:
+    def update(self):
+        self.left = [*self.right]
+        source = [*self.left, Added()]
+        self.right = [value for value in (lambda captured=source: captured)()]
 
 class Nested:
     def update(self):
@@ -860,6 +913,13 @@ def accept_original(value: Original) -> None: ...
 
 reveal_type(Conditional().right)  # revealed: list[Unknown | Added]
 reveal_type(Generator().right)  # revealed: list[Unknown | Added]
+reveal_type(Captured().right)  # revealed: list[Unknown | Added]
+reveal_type(CapturedGenerator().right)  # revealed: list[Unknown | Added]
+reveal_type(CapturedUnpacked().right)  # revealed: list[Unknown | Added]
+reveal_type(CapturedLoop().right)  # revealed: list[Unknown | Added]
+reveal_type(CapturedContext().right)  # revealed: list[Unknown | Added]
+reveal_type(LocallyImportedContext().right)  # revealed: list[Unknown | Added]
+reveal_type(CapturedDefault().right)  # revealed: list[Unknown | Added]
 reveal_type(Nested().right)  # revealed: list[Unknown | Added]
 reveal_type(Composed().right)  # revealed: list[Unknown | Added]
 reveal_type(SelectedTrue().right)  # revealed: list[Unknown | Added]
@@ -868,6 +928,20 @@ accept_original(Conditional().left[0])  # error: [invalid-argument-type]
 accept_original(Conditional().right[0])  # error: [invalid-argument-type]
 accept_original(Generator().left[0])  # error: [invalid-argument-type]
 accept_original(Generator().right[0])  # error: [invalid-argument-type]
+accept_original(Captured().left[0])  # error: [invalid-argument-type]
+accept_original(Captured().right[0])  # error: [invalid-argument-type]
+accept_original(CapturedGenerator().left[0])  # error: [invalid-argument-type]
+accept_original(CapturedGenerator().right[0])  # error: [invalid-argument-type]
+accept_original(CapturedUnpacked().left[0])  # error: [invalid-argument-type]
+accept_original(CapturedUnpacked().right[0])  # error: [invalid-argument-type]
+accept_original(CapturedLoop().left[0])  # error: [invalid-argument-type]
+accept_original(CapturedLoop().right[0])  # error: [invalid-argument-type]
+accept_original(CapturedContext().left[0])  # error: [invalid-argument-type]
+accept_original(CapturedContext().right[0])  # error: [invalid-argument-type]
+accept_original(LocallyImportedContext().left[0])  # error: [invalid-argument-type]
+accept_original(LocallyImportedContext().right[0])  # error: [invalid-argument-type]
+accept_original(CapturedDefault().left[0])  # error: [invalid-argument-type]
+accept_original(CapturedDefault().right[0])  # error: [invalid-argument-type]
 accept_original(Nested().left[0])  # error: [invalid-argument-type]
 accept_original(Nested().right[0])  # error: [invalid-argument-type]
 accept_original(Composed().left[0])  # error: [invalid-argument-type]
@@ -880,8 +954,9 @@ accept_original(SelectedFalse().right[0])  # error: [invalid-argument-type]
 
 ## Recursive mappings retain independently introduced entries
 
-Unpacking, identity and transformed comprehensions, keyword constructors, generated entries, and
-independent values paired with recursive keys all preserve their known mapping components.
+Unpacking, identity and transformed comprehensions, captured local aliases, keyword constructors,
+generated entries, and independent values paired with recursive keys all preserve their known
+mapping components.
 
 ```py
 class Original: ...
@@ -897,6 +972,12 @@ class Copied:
     def update(self):
         self.left = {**self.right}
         self.right = {key: value for key, value in {**self.left, "added": Added()}.items()}
+
+class Captured:
+    def update(self):
+        self.left = {**self.right}
+        source = {**self.left, "added": Added()}
+        self.right = {key: value for key, value in source.items()}
 
 class Transformed:
     def update(self):
@@ -922,6 +1003,7 @@ def accept_original(value: Original) -> None: ...
 
 reveal_type(Unpacked().right)  # revealed: dict[Unknown | str, Unknown | Added]
 reveal_type(Copied().right)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Captured().right)  # revealed: dict[Unknown | str, Unknown | Added]
 reveal_type(Transformed().right)  # revealed: dict[Unknown | str, Unknown | Added]
 reveal_type(Constructed().right)  # revealed: dict[Unknown | str, Unknown | Added]
 reveal_type(IndependentValue().right)  # revealed: dict[Unknown, Unknown | Added]
@@ -930,6 +1012,8 @@ accept_original(next(iter(Unpacked().left.values())))  # error: [invalid-argumen
 accept_original(next(iter(Unpacked().right.values())))  # error: [invalid-argument-type]
 accept_original(next(iter(Copied().left.values())))  # error: [invalid-argument-type]
 accept_original(next(iter(Copied().right.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Captured().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Captured().right.values())))  # error: [invalid-argument-type]
 accept_original(next(iter(Transformed().left.values())))  # error: [invalid-argument-type]
 accept_original(next(iter(Transformed().right.values())))  # error: [invalid-argument-type]
 accept_original(next(iter(Constructed().left.values())))  # error: [invalid-argument-type]

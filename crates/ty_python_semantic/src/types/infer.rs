@@ -71,7 +71,10 @@ use ty_python_core::expression::Expression;
 use ty_python_core::scope::{FileScopeId, ScopeId};
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{ExpressionNodeKey, ProgramFile, SemanticIndex, Statement, semantic_index};
+use ty_python_core::{
+    EnclosingSnapshotResult, ExpressionNodeKey, ProgramFile, SemanticIndex, Statement,
+    semantic_index,
+};
 
 mod builder;
 mod comparisons;
@@ -204,6 +207,65 @@ pub(crate) fn independent_assignment_constructor_seed<'db>(
     .infer_independent_assignment_constructor_seed(value)
 }
 
+/// An attribute access discovered while structurally inspecting an expression.
+pub(crate) enum MemberDependency<'ast> {
+    /// An access reached directly or through a flow-sensitive local alias.
+    Attribute {
+        attribute: &'ast ast::ExprAttribute,
+        through_alias: bool,
+    },
+    /// A local binding could not be resolved without entering type inference.
+    UnknownAlias,
+}
+
+/// Return the owner-local expression that supplies an assignment, iteration, or context binding.
+pub(super) fn implicit_attribute_binding_source<'ast>(
+    definition: &DefinitionKind<'_>,
+    module: &'ast ParsedModuleRef,
+) -> Option<&'ast ast::Expr> {
+    match definition {
+        DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
+        DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+        DefinitionKind::NamedExpression(named) => Some(named.node(module).value.as_ref()),
+        DefinitionKind::For(statement) => Some(statement.iterable(module)),
+        DefinitionKind::Comprehension(comprehension) => Some(comprehension.iterable(module)),
+        DefinitionKind::WithItem(item) => Some(item.context_expr(module)),
+        _ => None,
+    }
+}
+
+/// Visit every attribute dependency without inferring aliases or escaping their owning module.
+///
+/// ```python
+/// source = self.other
+/// self.value = lambda fallback=source: fallback.member
+/// ```
+///
+/// Local aliases use the definitions visible at their exact use, and eager lambda defaults are
+/// visited explicitly because the generic expression visitor only descends into lambda bodies.
+pub(crate) fn implicit_attribute_member_dependencies<'db>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    scope: (ProgramFile<'db>, FileScopeId),
+    module: &ParsedModuleRef,
+    value: &ast::Expr,
+    active_aliases: &mut FxIndexSet<Definition<'db>>,
+    callback: &mut impl FnMut(MemberDependency<'_>),
+) {
+    visit_implicit_attribute_member_dependencies(
+        db,
+        index,
+        scope,
+        module,
+        value,
+        (active_aliases, false),
+        &mut |dependency| {
+            callback(dependency);
+            false
+        },
+    );
+}
+
 /// Detect member dependencies through flow-sensitive local aliases and eager lambda defaults.
 ///
 /// ```python
@@ -222,24 +284,52 @@ pub(crate) fn implicit_attribute_expression_reads_member<'db>(
     active_aliases: &mut FxIndexSet<Definition<'db>>,
     is_independent_attribute: &impl Fn(&ast::ExprAttribute) -> bool,
 ) -> bool {
+    visit_implicit_attribute_member_dependencies(
+        db,
+        index,
+        scope,
+        module,
+        value,
+        (active_aliases, false),
+        &mut |dependency| match dependency {
+            MemberDependency::Attribute { attribute, .. } => !is_independent_attribute(attribute),
+            MemberDependency::UnknownAlias => true,
+        },
+    )
+}
+
+/// Walk structural dependencies until the callback requests early termination.
+fn visit_implicit_attribute_member_dependencies<'db>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    scope: (ProgramFile<'db>, FileScopeId),
+    module: &ParsedModuleRef,
+    value: &ast::Expr,
+    alias_state: (&mut FxIndexSet<Definition<'db>>, bool),
+    callback: &mut impl FnMut(MemberDependency<'_>) -> bool,
+) -> bool {
     let (program_file, method_scope) = scope;
+    let (active_aliases, through_alias) = alias_state;
     ast::helpers::any_over_expr(value, |expression| {
         let name = match expression {
             ast::Expr::Attribute(attribute) => {
-                return !is_independent_attribute(attribute);
+                return callback(MemberDependency::Attribute {
+                    attribute,
+                    through_alias,
+                });
             }
             ast::Expr::Lambda(lambda) => {
                 return lambda.parameters.as_ref().is_some_and(|parameters| {
                     parameters.iter_non_variadic_params().any(|parameter| {
                         parameter.default().is_some_and(|default| {
-                            implicit_attribute_expression_reads_member(
+                            visit_implicit_attribute_member_dependencies(
                                 db,
                                 index,
                                 scope,
                                 module,
                                 default,
-                                active_aliases,
-                                is_independent_attribute,
+                                (active_aliases, through_alias),
+                                callback,
                             )
                         })
                     })
@@ -249,9 +339,7 @@ pub(crate) fn implicit_attribute_expression_reads_member<'db>(
             _ => return false,
         };
 
-        if index.expression_scope_id(expression) != method_scope {
-            return false;
-        }
+        let expression_scope = index.expression_scope_id(expression);
         let table = index.place_table(method_scope);
         let Some(symbol) = table.symbol_id(name.id.as_str()) else {
             return false;
@@ -260,42 +348,60 @@ pub(crate) fn implicit_attribute_expression_reads_member<'db>(
             return false;
         }
 
-        index
-            .use_def_map(method_scope)
-            .bindings_at_use(name.scoped_use_id(db, program_file))
-            .any(|binding| {
-                let Some(definition) = binding.binding.definition() else {
-                    return true;
-                };
-                if matches!(definition.kind(db), DefinitionKind::Parameter(_)) {
-                    return false;
-                }
-                if !active_aliases.insert(definition) {
-                    return true;
-                }
+        let use_def = index.use_def_map(method_scope);
+        let mut bindings = if expression_scope == method_scope {
+            use_def.bindings_at_use(name.scoped_use_id(db, program_file))
+        } else {
+            if index
+                .ancestor_scopes(expression_scope)
+                .take_while(|(scope, _)| *scope != method_scope)
+                .any(|(scope, _)| {
+                    let table = index.place_table(scope);
+                    table
+                        .symbol_id(name.id.as_str())
+                        .is_some_and(|symbol| table.symbol(symbol).is_local())
+                })
+            {
+                return false;
+            }
 
-                let value = match definition.kind(db) {
-                    DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
-                    DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
-                    DefinitionKind::NamedExpression(named) => {
-                        Some(named.node(module).value.as_ref())
-                    }
-                    _ => None,
-                };
-                let depends = value.is_none_or(|value| {
-                    implicit_attribute_expression_reads_member(
-                        db,
-                        index,
-                        scope,
-                        module,
-                        value,
-                        active_aliases,
-                        is_independent_attribute,
-                    )
-                });
-                active_aliases.shift_remove(&definition);
-                depends
-            })
+            let EnclosingSnapshotResult::FoundBindings(bindings) =
+                index.enclosing_snapshot(method_scope, table.place(symbol), expression_scope)
+            else {
+                return callback(MemberDependency::UnknownAlias);
+            };
+            bindings
+        };
+
+        bindings.any(|binding| {
+            let Some(definition) = binding.binding.definition() else {
+                return callback(MemberDependency::UnknownAlias);
+            };
+            if matches!(definition.kind(db), DefinitionKind::Parameter(_))
+                || definition.kind(db).is_import()
+            {
+                return false;
+            }
+            if !active_aliases.insert(definition) {
+                return callback(MemberDependency::UnknownAlias);
+            }
+
+            let value = implicit_attribute_binding_source(definition.kind(db), module);
+            let depends = match value {
+                Some(value) => visit_implicit_attribute_member_dependencies(
+                    db,
+                    index,
+                    scope,
+                    module,
+                    value,
+                    (active_aliases, true),
+                    callback,
+                ),
+                None => callback(MemberDependency::UnknownAlias),
+            };
+            active_aliases.shift_remove(&definition);
+            depends
+        })
     })
 }
 

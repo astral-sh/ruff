@@ -140,8 +140,8 @@ use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
-    ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness,
-    unpack::UnpackPosition,
+    ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, ProgramFile, SemanticIndex,
+    Truthiness, unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -584,6 +584,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         match expression {
+            ast::Expr::Name(name) => {
+                let method_scope = self.scope().file_scope_id(db);
+                let table = self.index.place_table(method_scope);
+                let symbol = table.symbol_id(name.id.as_str())?;
+                if !table.symbol(symbol).is_local() {
+                    return Some(Type::unknown());
+                }
+
+                let expression_scope = self.index.expression_scope_id(expression);
+                let use_def = self.index.use_def_map(method_scope);
+                let definitions = if expression_scope == method_scope {
+                    use_def.bindings_at_use(name.scoped_use_id(db, self.program_file()))
+                } else {
+                    let EnclosingSnapshotResult::FoundBindings(definitions) = self
+                        .index
+                        .enclosing_snapshot(method_scope, table.place(symbol), expression_scope)
+                    else {
+                        return Some(Type::unknown());
+                    };
+                    definitions
+                };
+
+                let initial_bindings = bindings.len();
+                bindings.push((name.id.clone(), Type::unknown()));
+                let mut values = UnionBuilder::new(db, &env);
+                let mut has_value = false;
+                for binding in definitions {
+                    let Some(definition) = binding.binding.definition() else {
+                        continue;
+                    };
+                    if let Some(inferred) =
+                        self.infer_independent_binding_value(definition, bindings)
+                    {
+                        values.add_in_place(inferred);
+                        has_value = true;
+                    }
+                }
+                bindings.truncate(initial_bindings);
+                Some(if has_value {
+                    values.build()
+                } else {
+                    Type::unknown()
+                })
+            }
             ast::Expr::Tuple(tuple)
                 if tuple.elts.iter().all(|element| !element.is_starred_expr()) =>
             {
@@ -662,6 +706,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ))
             }
             ast::Expr::Call(call) => {
+                if let ast::Expr::Lambda(lambda) = call.func.as_ref() {
+                    let initial_bindings = bindings.len();
+                    let inferred = (|| {
+                        if let Some(parameters) = lambda.parameters.as_ref() {
+                            for (index, parameter) in
+                                parameters.iter_non_variadic_params().enumerate()
+                            {
+                                let argument = call.arguments.args.get(index).or_else(|| {
+                                    call.arguments
+                                        .keywords
+                                        .iter()
+                                        .find(|keyword| {
+                                            keyword.arg.as_deref()
+                                                == Some(parameter.name().as_str())
+                                        })
+                                        .map(|keyword| &keyword.value)
+                                });
+                                let value = argument.or_else(|| parameter.default())?;
+                                let inferred =
+                                    self.infer_independent_constructor_value(value, bindings)?;
+                                bindings.push((Name::new(parameter.name().as_str()), inferred));
+                            }
+                        }
+
+                        self.infer_independent_constructor_value(&lambda.body, bindings)
+                    })();
+                    bindings.truncate(initial_bindings);
+                    if let Some(inferred) = inferred {
+                        return Some(inferred);
+                    }
+                }
+
                 let arguments = CallArguments::from_arguments_typed(&call.arguments, |argument| {
                     self.infer_independent_constructor_value(argument, bindings)
                         .unwrap_or_else(Type::unknown)
@@ -728,7 +804,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Attribute(attribute) => {
                 if !self.constructor_attribute_is_independent(attribute)
                     && !references_bound_name
-                    && attribute.value.is_name_expr()
+                    && attribute.value.as_name_expr().is_some_and(|receiver| {
+                        self.index
+                            .scope(self.scope().file_scope_id(db))
+                            .node()
+                            .as_function()
+                            .is_some_and(|function| {
+                                function
+                                    .node(self.module())
+                                    .parameters
+                                    .find(receiver.id.as_str())
+                                    .is_some()
+                            })
+                    })
                 {
                     return Some(Type::unknown());
                 }
@@ -864,6 +952,119 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => Some(Type::unknown()),
         }
+    }
+
+    /// Resolve a local binding provisionally, retaining iteration and context-manager semantics.
+    fn infer_independent_binding_value(
+        &mut self,
+        definition: Definition<'db>,
+        bindings: &mut Vec<(Name, Type<'db>)>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment().clone();
+        let kind = definition.kind(db);
+        let source = super::implicit_attribute_binding_source(kind, self.module())?;
+        let value = self.infer_independent_constructor_value(source, bindings)?;
+
+        match kind {
+            DefinitionKind::Assignment(assignment) => {
+                if let Some(unpack) = assignment.unpack() {
+                    self.infer_independent_unpacked_target(
+                        value,
+                        unpack.target(db, self.module()),
+                        assignment.target(self.module()),
+                    )
+                } else {
+                    Some(value)
+                }
+            }
+            DefinitionKind::For(statement) => {
+                let element = value
+                    .try_iterate_with_mode(
+                        db,
+                        &env,
+                        EvaluationMode::from_is_async(statement.is_async()),
+                    )
+                    .ok()?
+                    .homogeneous_element_type(db, &env);
+                match statement.target_kind() {
+                    TargetKind::Single => Some(element),
+                    TargetKind::Sequence(_, unpack) => self.infer_independent_unpacked_target(
+                        element,
+                        unpack.target(db, self.module()),
+                        statement.target(self.module()),
+                    ),
+                }
+            }
+            DefinitionKind::Comprehension(comprehension) => {
+                let element = value
+                    .try_iterate_with_mode(
+                        db,
+                        &env,
+                        EvaluationMode::from_is_async(comprehension.is_async()),
+                    )
+                    .ok()?
+                    .homogeneous_element_type(db, &env);
+                match comprehension.target_kind() {
+                    TargetKind::Single => Some(element),
+                    TargetKind::Sequence(_, unpack) => self.infer_independent_unpacked_target(
+                        element,
+                        unpack.target(db, self.module()),
+                        comprehension.target(self.module()),
+                    ),
+                }
+            }
+            DefinitionKind::WithItem(item) => {
+                let entered = value
+                    .try_enter_with_mode(db, &env, EvaluationMode::from_is_async(item.is_async()))
+                    .ok()?;
+                match item.target_kind() {
+                    TargetKind::Single => Some(entered),
+                    TargetKind::Sequence(_, unpack) => self.infer_independent_unpacked_target(
+                        entered,
+                        unpack.target(db, self.module()),
+                        item.target(self.module()),
+                    ),
+                }
+            }
+            _ => Some(value),
+        }
+    }
+
+    /// Project the actual unpack target instead of merging unrelated tuple elements.
+    fn infer_independent_unpacked_target(
+        &self,
+        value: Type<'db>,
+        pattern: &ast::Expr,
+        target: &ast::Expr,
+    ) -> Option<Type<'db>> {
+        if pattern.range() == target.range() {
+            return Some(value);
+        }
+
+        let elements = match pattern {
+            ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
+            ast::Expr::List(list) => list.elts.as_slice(),
+            ast::Expr::Starred(starred) => {
+                return self.infer_independent_unpacked_target(value, &starred.value, target);
+            }
+            _ => return None,
+        };
+
+        let db = self.db();
+        let env = self.program_environment();
+        let iterable = value.try_iterate(db, env).ok()?;
+        for (index, element) in elements.iter().enumerate() {
+            if element.range().contains_range(target.range()) {
+                let element_type = iterable
+                    .as_fixed_length()
+                    .and_then(|fixed| fixed.all_elements().get(index).copied())
+                    .unwrap_or_else(|| iterable.homogeneous_element_type(db, env));
+                return self.infer_independent_unpacked_target(element_type, element, target);
+            }
+        }
+
+        None
     }
 
     /// Preserve known branch outcomes before singleton promotion obscures them.
