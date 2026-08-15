@@ -63,6 +63,9 @@ release = [
     "rooster==0.1.1",
 ]
 
+[tool.uv]
+exclude-newer = "P7D"
+
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
 release = { requires-python = ">=3.12" }

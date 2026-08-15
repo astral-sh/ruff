@@ -3,6 +3,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
 # ///
 
 """Collect the exact inputs used by a Ruff ty ecosystem-analyzer run."""

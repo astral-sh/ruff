@@ -78,3 +78,6 @@ unfixable = [
 [tool.ruff.lint.isort]
 combine-as-imports = true
 split-on-trailing-comma = false
+
+[tool.uv]
+exclude-newer = "P7D"

@@ -14,6 +14,9 @@ extend = "../pyproject.toml"
 # `ty_benchmark` is a standalone project with its own pyproject.toml files, search paths, etc.
 exclude = ["./ty_benchmark"]
 
+[tool.uv]
+exclude-newer = "P7D"
+
 [tool.uv.sources]
 mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
 
