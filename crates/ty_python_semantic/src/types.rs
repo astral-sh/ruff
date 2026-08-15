@@ -1,10 +1,10 @@
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -30,9 +30,10 @@ pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
-    InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
-    infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    InferredDeclaration, MemberInferenceContext, TypeContext, infer_complete_scope_types,
+    infer_deferred_types, infer_definition_types, infer_definition_types_with_member_context,
+    infer_expression_type, infer_expression_types, infer_same_file_expression_type,
+    infer_scope_types, is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -103,7 +104,7 @@ pub use crate::types::typevar::{
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{any_over_type, dynamic_content};
+use crate::types::visitor::{TypeVisitor, any_over_type, dynamic_content};
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
@@ -438,6 +439,20 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
+        if let TypeMapping::MarkAttributeRecurrence {
+            constructor_path, ..
+        } = type_mapping
+        {
+            let ancestor_count = constructor_path.len().saturating_sub(1);
+            if constructor_path[..ancestor_count].iter().any(|ancestor| {
+                ancestor.may_share_type_identity(db, ty)
+                    && ancestor.to_type_identity(db) == ty.to_type_identity(db)
+            }) {
+                return ty;
+            }
+            return func();
+        }
+
         let type_transformer = match type_mapping {
             TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
             TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
@@ -951,6 +966,81 @@ impl MemberLookupPolicy {
 impl Default for MemberLookupPolicy {
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+/// An implicit attribute belonging to one participant in a recursive inference component.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct AttributeInferenceMember<'db> {
+    pub(crate) owner: StaticClassLiteral<'db>,
+    pub(crate) target_method_decorator: MethodDecorator,
+    pub(crate) name: Name,
+}
+
+/// A canonically ordered group of mutually dependent implicit attributes.
+///
+/// One Salsa query infers the complete group so that selecting a different attribute or class
+/// first cannot change its fixed-point result.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct AttributeInferenceScc<'db> {
+    #[returns(copy)]
+    pub(crate) owner: StaticClassLiteral<'db>,
+    #[returns(deref)]
+    pub(crate) members: Box<[AttributeInferenceMember<'db>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for AttributeInferenceScc<'_> {}
+
+/// Finds the deepest constructor path without counting unions or intersections.
+struct AttributeConstructorDepthVisitor<'env, 'db> {
+    env: &'env ProgramEnvironment<'db>,
+    active: RefCell<FxHashSet<Type<'db>>>,
+    parent: Cell<Option<Type<'db>>>,
+    current_depth: Cell<usize>,
+    maximum_depth: Cell<usize>,
+}
+
+impl<'db> TypeVisitor<'db> for AttributeConstructorDepthVisitor<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        let visitor::TypeKind::NonAtomic(non_atomic) = visitor::TypeKind::from(ty) else {
+            return;
+        };
+        if !self.active.borrow_mut().insert(ty) {
+            return;
+        }
+
+        let previous_parent = self.parent.replace(Some(ty));
+        let represented_by_parent = match (previous_parent, ty) {
+            (Some(Type::NominalInstance(instance)), Type::GenericAlias(alias)) => {
+                instance.class_literal(db, self.env) == ClassLiteral::Static(alias.origin(db))
+            }
+            (Some(Type::SubclassOf(subclass)), Type::GenericAlias(alias)) => matches!(
+                subclass.subclass_of(),
+                SubclassOfInner::Class(class)
+                    if class.class_literal(db) == ClassLiteral::Static(alias.origin(db))
+            ),
+            _ => false,
+        };
+        let previous_depth = self.current_depth.get();
+        if ty.is_attribute_constructor(db) && !represented_by_parent {
+            let depth = previous_depth.saturating_add(1);
+            self.current_depth.set(depth);
+            self.maximum_depth.set(self.maximum_depth.get().max(depth));
+        }
+
+        visitor::walk_non_atomic_type(db, non_atomic, self);
+        self.parent.set(previous_parent);
+        self.current_depth.set(previous_depth);
+        self.active.borrow_mut().remove(&ty);
     }
 }
 
@@ -1733,6 +1823,121 @@ impl<'db> Type<'db> {
         cycle: &salsa::Cycle,
     ) -> Self {
         self.cycle_normalized_impl(db, env, previous, cycle)
+    }
+
+    /// Mark constructor growth only after all finite paths through a component were explored.
+    pub(crate) fn attribute_cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        previous_constructor_depth: usize,
+        finite_constructor_depth: usize,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::MarkAttributeRecurrence {
+                previous_constructor_depth,
+                finite_constructor_depth,
+                divergent: Type::divergent(cycle.id()),
+                constructor_path: Vec::new(),
+            },
+            TypeContext::default(),
+        )
+        .cycle_normalized(db, env, previous, cycle)
+    }
+
+    /// Replace only a component's provisional marker after real assignment evidence appears.
+    pub(crate) fn resolve_attribute_divergence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        divergent: Self,
+    ) -> Self {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::ResolveAttributeDivergence {
+                divergent,
+                replacement: Type::unknown(),
+            },
+            TypeContext::default(),
+        )
+    }
+
+    /// Remove provisional bottom materialization without losing the original cycle identity.
+    pub(crate) fn restore_attribute_divergence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        divergent: Self,
+    ) -> Self {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::ResolveAttributeDivergence {
+                divergent,
+                replacement: divergent,
+            },
+            TypeContext::default(),
+        )
+    }
+
+    /// Whether a provisional component contains a value beyond constructors and cycle markers.
+    pub(crate) fn contains_attribute_evidence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        divergent: Self,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| {
+            !ty.same_divergent_marker(divergent)
+                && !ty.is_divergent()
+                && !ty.is_attribute_constructor(db)
+                && !matches!(
+                    ty,
+                    Type::Union(_)
+                        | Type::Intersection(_)
+                        | Type::Dynamic(_)
+                        | Type::Never
+                        | Type::TypeVar(_)
+                )
+        })
+    }
+
+    fn is_attribute_constructor(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::NominalInstance(instance) => instance.is_definition_generic(db),
+            Type::Union(_)
+            | Type::Intersection(_)
+            | Type::EnumComplement(_)
+            | Type::KnownInstance(KnownInstanceType::UnionType(_))
+            | Type::TypeVar(_) => false,
+            _ => matches!(
+                visitor::TypeKind::from(self),
+                visitor::TypeKind::NonAtomic(_)
+            ),
+        }
+    }
+
+    pub(crate) fn maximum_attribute_constructor_depth(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        component: &[Self],
+    ) -> usize {
+        let visitor = AttributeConstructorDepthVisitor {
+            env,
+            active: RefCell::default(),
+            parent: Cell::default(),
+            current_depth: Cell::default(),
+            maximum_depth: Cell::default(),
+        };
+        for ty in component {
+            visitor.visit_type(db, *ty);
+        }
+        visitor.maximum_depth.get()
     }
 
     pub(super) fn cycle_normalized_impl(
@@ -4530,6 +4735,26 @@ impl<'db> Type<'db> {
             MemberLookupPolicy::default(),
             None,
         )
+    }
+
+    /// Returns the class and receiver kind participating in recursive member inference.
+    pub(crate) fn member_cycle_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<(ClassType<'db>, MethodDecorator)> {
+        match self {
+            Type::ClassLiteral(_) | Type::GenericAlias(_) => self
+                .to_class_type(db)
+                .map(|class| (class, MethodDecorator::ClassMethod)),
+            Type::SubclassOf(subclass) => subclass
+                .subclass_of()
+                .into_class(db, env)
+                .map(|class| (class, MethodDecorator::ClassMethod)),
+            _ => self
+                .nominal_class(db, env)
+                .map(|class| (class, MethodDecorator::None)),
+        }
     }
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
@@ -7633,6 +7858,44 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if let TypeMapping::ResolveAttributeDivergence {
+            divergent,
+            replacement,
+        } = type_mapping
+            && self.same_divergent_marker(*divergent)
+        {
+            return *replacement;
+        }
+        let nested_attribute_mapping;
+        let type_mapping = if let TypeMapping::MarkAttributeRecurrence {
+            previous_constructor_depth,
+            finite_constructor_depth,
+            divergent,
+            constructor_path,
+        } = type_mapping
+        {
+            if self.is_attribute_constructor(db) {
+                let depth = constructor_path.len().saturating_add(1);
+                if depth > *previous_constructor_depth && depth > *finite_constructor_depth {
+                    return *divergent;
+                }
+
+                let mut constructor_path = constructor_path.clone();
+                constructor_path.push(self);
+                nested_attribute_mapping = TypeMapping::MarkAttributeRecurrence {
+                    previous_constructor_depth: *previous_constructor_depth,
+                    finite_constructor_depth: *finite_constructor_depth,
+                    divergent: *divergent,
+                    constructor_path,
+                };
+                &nested_attribute_mapping
+            } else {
+                type_mapping
+            }
+        } else {
+            type_mapping
+        };
+
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -7946,6 +8209,8 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::MarkAttributeRecurrence { .. }
+                | TypeMapping::ResolveAttributeDivergence { .. }
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
                     PromotionMode::On,
@@ -7966,7 +8231,9 @@ impl<'db> Type<'db> {
                 | TypeMapping::Promote(..)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
-                | TypeMapping::RescopeReturnCallables(_) => self,
+                | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::MarkAttributeRecurrence { .. }
+                | TypeMapping::ResolveAttributeDivergence { .. } => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -9154,6 +9421,20 @@ pub enum TypeMapping<'a, 'db> {
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+
+    /// Introduces a recursion marker only below an expanding implicit-attribute constructor.
+    MarkAttributeRecurrence {
+        previous_constructor_depth: usize,
+        finite_constructor_depth: usize,
+        divergent: Type<'db>,
+        constructor_path: Vec<Type<'db>>,
+    },
+
+    /// Replace one rootless component's provisional marker while retaining all concrete evidence.
+    ResolveAttributeDivergence {
+        divergent: Type<'db>,
+        replacement: Type<'db>,
+    },
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -9201,7 +9482,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => context,
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::MarkAttributeRecurrence { .. }
+            | TypeMapping::ResolveAttributeDivergence { .. } => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
                     context.remove_self(db, binding.binding_context())
@@ -9248,7 +9531,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => self.clone(),
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::MarkAttributeRecurrence { .. }
+            | TypeMapping::ResolveAttributeDivergence { .. } => self.clone(),
         }
     }
 }

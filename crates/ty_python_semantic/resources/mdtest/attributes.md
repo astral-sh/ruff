@@ -1250,6 +1250,36 @@ class Child(Parent):
 reveal_type(Child.value)  # revealed: Before | After
 ```
 
+#### Inherited class variables preserve their public type
+
+An inferred superclass default constrains classmethod assignments without exposing its literal type.
+
+```py
+class Parent:
+    value = 1
+
+class Child(Parent):
+    @classmethod
+    def update(cls) -> None:
+        cls.value = str(cls.value)  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+```
+
+#### Self-referential class variables without an independent value
+
+An ordinary self-referential classmethod assignment retains its recursive type when no independent
+class attribute exists.
+
+```py
+class Example:
+    @classmethod
+    def update(cls) -> None:
+        cls.value = cls.value
+
+reveal_type(Example.value)  # revealed: Divergent
+```
+
 ### Instance variables with class-level default values
 
 These are instance attributes, but the fact that we can see that they have a binding (not a
@@ -1332,6 +1362,50 @@ class C:
 reveal_type(C().a)  # revealed: int
 reveal_type(C().b)  # revealed: int
 reveal_type(C().c)  # revealed: int
+```
+
+#### Inherited annotated descriptors are bound before self-referential assignments
+
+An inherited descriptor's annotation constrains assignments without changing the bound value read
+before an assignment.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "value"
+
+class Base:
+    value: Descriptor = Descriptor()
+
+class Child(Base):
+    def update(self) -> None:
+        self.value = self.value + "b"  # error: [invalid-assignment]
+
+    def get_value(self) -> str:
+        return self.value
+
+reveal_type(Child().value)  # revealed: str
+```
+
+#### Inherited descriptors are bound before self-referential class assignments
+
+Reading an inherited descriptor through a class invokes `__get__` with `None` before a classmethod
+stores its updated value.
+
+```py
+class Descriptor:
+    def __get__(self, instance: None, owner: type) -> str:
+        return "value"
+
+class Base:
+    value = Descriptor()
+
+class Child(Base):
+    @classmethod
+    def update(cls) -> None:
+        cls.value = cls.value + "b"
+
+reveal_type(Child.value)  # revealed: str
 ```
 
 ### Inheritance of class/instance attributes
@@ -1455,6 +1529,26 @@ reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
 reveal_type(Derived.undeclared)  # revealed: str
 reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
+```
+
+### Explicit subclass annotations override inferred inherited attributes
+
+A subclass's explicit instance-attribute annotation takes precedence over an inferred superclass
+attribute, even when its initializer reads the inherited value.
+
+```py
+class Parent:
+    def __init__(self, value: str) -> None:
+        self.extras = {value}
+
+class Child(Parent):
+    def __init__(self, value: str) -> None:
+        super().__init__(value)
+        self.extras: tuple[str, ...] = tuple(self.extras)
+
+def record(child: Child, values: dict[Child, tuple[str, ...]]) -> None:
+    reveal_type(child.extras)  # revealed: tuple[str, ...]
+    values[child] = child.extras
 ```
 
 ## Allow replacing ordinary methods with compatible functions
@@ -4510,8 +4604,7 @@ class C3:
     def replace_with(self, other: "C3"):
         self.x = [self.x[0].flip()]
 
-# TODO: should be `list[Sub] | list[Base]`
-reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Divergent]
+reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base]
 ```
 
 And cycles between many attributes:
@@ -4569,7 +4662,8 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown | list[Unknown]
+        # revealed: list[int] | list[Divergent] | Unknown | list[list[int] | list[list[int]] | int] | list[int | list[int]] | list[list[int] | list[list[int]]]
+        reveal_type(self.x3)
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -4688,8 +4782,8 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
-reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[list[int] | Unknown] | Unknown | list[Divergent]
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[list[int] | Unknown] | Unknown | list[Divergent]
 ```
 
 ### Builtin types attributes
@@ -4746,6 +4840,31 @@ class C:
         return t
 
 reveal_type(C().x)  # revealed: int
+```
+
+### Decorated methods on generic classes preserve instance binding
+
+An identity-decorated method on a generic class must see other instance methods as bound, and
+subclasses must be able to override those methods normally.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def callback[F](function: F) -> F:
+    return function
+
+class Base[T]:
+    def update(self) -> None: ...
+    @callback
+    def run(self) -> None:
+        reveal_type(self.update)  # revealed: bound method Self@run.update() -> None
+        self.update()
+
+class Child(Base[int]):
+    def update(self) -> None: ...
 ```
 
 ### Attributes defined in methods with unknown decorators
