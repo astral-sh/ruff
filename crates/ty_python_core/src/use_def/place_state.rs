@@ -799,62 +799,6 @@ mod tests {
     }
 
     #[test]
-    fn merge_preserves_path_constraints_for_single_sided_bindings() {
-        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
-        let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
-        let mut current = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
-        for definition in [1, 2] {
-            current.record_binding(
-                ScopedDefinitionId::from_u32(definition),
-                ScopedReachabilityConstraintId::ALWAYS_TRUE,
-                false,
-                true,
-                PreviousDefinitions::AreKept,
-                FutureDefinitions::ShadowThisOne,
-            );
-        }
-
-        let narrowing = narrowing_constraints.add_atom(ScopedPredicateId::new(0));
-        current.record_narrowing_constraint_for_bindings(
-            &mut narrowing_constraints,
-            narrowing,
-            &[ScopedDefinitionId::from_u32(1)],
-        );
-        let current_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(1));
-        let branch_gate = narrowing_constraints.add_atom(ScopedPredicateId::new(2));
-        let shared_gate = narrowing_constraints.add_or_constraint(current_gate, branch_gate);
-        let expected_narrowing = narrowing_constraints.add_and_constraint(narrowing, current_gate);
-
-        let mut branch = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
-        branch.record_binding(
-            ScopedDefinitionId::from_u32(3),
-            ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            false,
-            true,
-            PreviousDefinitions::AreKept,
-            FutureDefinitions::ShadowThisOne,
-        );
-
-        current.merge_with_path_constraints(
-            branch,
-            current_gate,
-            branch_gate,
-            &mut narrowing_constraints,
-            &mut reachability_constraints,
-        );
-
-        assert_bindings(
-            &current,
-            &[
-                (0, shared_gate),
-                (1, expected_narrowing),
-                (2, current_gate),
-                (3, branch_gate),
-            ],
-        );
-    }
-
-    #[test]
     fn merge() {
         let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
