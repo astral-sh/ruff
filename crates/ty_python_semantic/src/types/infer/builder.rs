@@ -7600,13 +7600,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         db,
                         env,
                         key_ty.identity(self.db()),
-                        unpacked_key_ty.promote(db, env),
+                        unpacked_key_ty.promote_for_generic_specialization(db, env),
                     );
                     tuple_size_promotion_constraints.record_unpromotable_type(
                         db,
                         env,
                         value_ty.identity(self.db()),
-                        unpacked_value_ty.promote(db, env),
+                        unpacked_value_ty.promote_for_generic_specialization(db, env),
                     );
 
                     builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
@@ -7660,7 +7660,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // A covariant context is an upper bound, so promotion must not widen an otherwise
                 // compatible element beyond that bound. In particular, promoting an exact float
                 // introduces `int`, which is not assignable to an exact-float context.
-                let promoted_elt_ty = inferred_elt_ty.promote(db, env);
+                let promoted_elt_ty = inferred_elt_ty.promote_for_generic_specialization(db, env);
                 let inferred_elt_ty = if let Some(elt_tcx) = elt_tcx
                     && elt_tcx_variance[&elt_ty_identity].is_covariant()
                     && promoted_elt_ty != inferred_elt_ty
@@ -7704,7 +7704,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // Constraints learned from later collection uses follow the same promotion
                         // policy as literal elements: promote element literal types in invariant
                         // position unless an explicit annotation made them unpromotable.
-                        lower.promote(db, env)
+                        lower.promote_for_generic_specialization(db, env)
                     } else {
                         lower
                     };

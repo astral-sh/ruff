@@ -6001,13 +6001,33 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             else {
                 return None;
             };
-            let promoted = solution.promote(db, self.env);
+            let promoted = solution.promote_for_generic_specialization(db, self.env);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(db, self.env, bound) {
-                    return None;
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
+                && !promoted.is_assignable_to(db, self.env, bound)
+            {
+                let ordinary = solution.promote(db, self.env);
+                return ordinary
+                    .is_assignable_to(db, self.env, bound)
+                    .then_some(ordinary);
+            }
+
+            // Widening a function-like callable beyond ordinary promotion can violate an inferred
+            // upper bound.
+            if bounds.has_upper() && promoted != solution {
+                let ordinary = solution.promote(db, self.env);
+                if promoted != ordinary {
+                    let mut promoted_bounds = bounds.clone();
+                    promoted_bounds.lower = Some(promoted);
+
+                    if !matches!(
+                        PathBounds::default_solve(db, self.env, constraints, &promoted_bounds),
+                        Ok(Some(validated)) if validated == promoted
+                    ) {
+                        return Some(ordinary);
+                    }
                 }
             }
 

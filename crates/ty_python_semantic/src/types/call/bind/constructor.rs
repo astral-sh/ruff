@@ -418,7 +418,7 @@ impl<'db> ConstructorBinding<'db> {
                             } else {
                                 without_unknown
                             };
-                            mapped_ty.promote(db, env)
+                            mapped_ty.promote_for_generic_specialization(db, env)
                         })
                         .collect();
                     Specialization::new(

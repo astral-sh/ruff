@@ -7,7 +7,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
+        PromotionMode, PromotionPolicy, StringLiteralType, Type, TypeAliasType, TypeContext,
         TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -439,6 +439,7 @@ impl<'db> KnownInstanceType<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::Promote(..)
+                | TypeMapping::PromoteSingletons(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
@@ -470,7 +471,9 @@ impl<'db> KnownInstanceType<'db> {
                 ))
             }
             KnownInstanceType::Range { .. } => match type_mapping {
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
+                TypeMapping::Promote(PromotionMode::On, policy)
+                    if policy.contains(PromotionPolicy::LITERALS) =>
+                {
                     self.instance_fallback(db, visitor.env)
                 }
                 _ => Type::KnownInstance(self),

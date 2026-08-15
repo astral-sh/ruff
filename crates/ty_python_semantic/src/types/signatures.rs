@@ -1689,9 +1689,22 @@ impl<'db> Signature<'db> {
         }
 
         Some(inference.specialization_with(db, |typevar, inferred| {
-            promoted_typevars
-                .contains(&typevar.identity(db))
-                .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db, env)))
+            promoted_typevars.contains(&typevar.identity(db)).then(|| {
+                inferred.map_or(Type::TypeVar(typevar), |inferred| {
+                    let promoted = inferred.promote_for_generic_specialization(db, env);
+                    match typevar.typevar(db).bound_or_constraints(db, env) {
+                        Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+                            inferred.promote(db, env)
+                        }
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound))
+                            if !promoted.is_assignable_to(db, env, bound) =>
+                        {
+                            inferred.promote(db, env)
+                        }
+                        _ => promoted,
+                    }
+                })
+            })
         }))
     }
 
