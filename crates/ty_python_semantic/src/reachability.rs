@@ -215,8 +215,8 @@ use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::{
-    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
+    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
+    FileScopeId, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
@@ -542,11 +542,13 @@ const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::Expression(expression) => expression.scope(db),
+        PredicateNode::Expression(expression)
+        | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
             callable.scope(db)
         }
         PredicateNode::Pattern(pattern) => pattern.scope(db),
+        PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
         PredicateNode::OrPatternAlternative(scope) => scope,
         PredicateNode::SubjectElementPattern(subject_element) => subject_element.pattern.scope(db),
         PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
@@ -701,6 +703,30 @@ fn evaluate_reachability_constraint<'db>(
         id,
         true,
     )
+}
+
+/// Evaluates the normal continuation captured by a deferred `finally` predicate.
+///
+/// Unlike other reachability predicates, a deferred `finally` predicate recursively evaluates
+/// another reachability constraint, which may contain earlier deferred `finally` predicates.
+/// Caching these continuations prevents a sequence of `finally` suites from repeatedly evaluating
+/// all preceding continuations, which would otherwise take exponential time.
+///
+/// Other expensive predicates already use tracked queries, while ordinary reachability
+/// constraints are cached within each inference region and at sparse checkpoints. Tracking
+/// [`evaluate_reachability_constraint`] itself would instead retain a Salsa query key and memo for
+/// every constraint.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn evaluate_finally_continuation<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    continuation: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    evaluate_reachability_constraint(db, scope, continuation)
 }
 
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
@@ -1134,7 +1160,12 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
 
-                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    if matches!(
+                        predicate.node,
+                        PredicateNode::IsNonTerminalCall(_)
+                            | PredicateNode::ContextManagerSuppresses { .. }
+                            | PredicateNode::FinallyNormalPathImpossible { .. }
+                    ) {
                         actions.push(Action::AnalyzeNonTerminal(id));
                         actions.push(Action::Visit(node.if_uncertain));
                     } else {
@@ -1151,7 +1182,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                            unreachable!(
+                                "statically decidable predicates should never be Ambiguous"
+                            )
                         }
                     };
 
@@ -1523,6 +1556,21 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
                 .bool(db, env)
                 .negate_if(!predicate.is_positive)
         }
+        PredicateNode::ContextManagerSuppresses {
+            expression,
+            is_async,
+        } => Truthiness::from(
+            infer_same_file_expression_type(db, expression, TypeContext::default())
+                .can_suppress_exceptions(db, env, EvaluationMode::from_is_async(is_async)),
+        )
+        .negate_if(!predicate.is_positive),
+        PredicateNode::FinallyNormalPathImpossible {
+            scope,
+            continuation,
+        } => Truthiness::from(
+            evaluate_finally_continuation(db, scope, continuation).is_always_false(),
+        )
+        .negate_if(!predicate.is_positive),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
             callable,
             call_expr,
