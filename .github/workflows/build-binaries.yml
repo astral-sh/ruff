@@ -411,6 +411,7 @@ jobs:
           - target: s390x-unknown-linux-gnu
             arch: s390x
             manylinux: 2_17
+            maturin_docker_options: -e CFLAGS_s390x_unknown_linux_gnu=-march=z10
           - target: powerpc64le-unknown-linux-gnu
             arch: ppc64le
             manylinux: 2_17
