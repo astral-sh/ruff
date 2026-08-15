@@ -204,6 +204,7 @@ wrong_range: custom.range = range(3)
 
 type Alias = int
 
+# TODO: PEP 695 aliases are actually instances of `typing.TypeAliasType`.
 # error: [invalid-assignment] "Object of type `typing_extensions.TypeAliasType` is not assignable to `custom.TypeAliasType`"
 wrong_alias: custom.TypeAliasType = Alias
 
@@ -232,6 +233,63 @@ accepts_range(range(4))
 
 # error: [invalid-argument-type] "Expected `custom.TypeVar`, found `typing.TypeVar`"
 accepts_typevar(T)
+```
+
+## Method wrappers and wrapper descriptors
+
+Bound method wrappers and unbound wrapper descriptors distinguish their owner classes from unrelated
+classes with the same names.
+
+`custom.py`:
+
+```py
+class property: ...
+class function: ...
+```
+
+```py
+import types
+
+import custom
+
+class Owner:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+    @value.deleter
+    def value(self) -> None: ...
+
+# error: [invalid-assignment] "Object of type `<method-wrapper '__get__' of builtins.property 'value'>` is not assignable to `custom.property`"
+wrong_get: custom.property = Owner.value.__get__
+
+# error: [invalid-assignment] "Object of type `<method-wrapper '__set__' of builtins.property 'value'>` is not assignable to `custom.property`"
+wrong_set: custom.property = Owner.value.__set__
+
+# error: [invalid-assignment] "Object of type `<method-wrapper '__delete__' of builtins.property 'value'>` is not assignable to `custom.property`"
+wrong_delete: custom.property = Owner.value.__delete__
+
+# error: [invalid-assignment] "Object of type `<wrapper-descriptor '__get__' of 'builtins.property' objects>` is not assignable to `custom.property`"
+wrong_property_descriptor_get: custom.property = property.__get__
+
+# error: [invalid-assignment] "Object of type `<wrapper-descriptor '__set__' of 'builtins.property' objects>` is not assignable to `custom.property`"
+wrong_property_descriptor_set: custom.property = property.__set__
+
+# error: [invalid-assignment] "Object of type `<wrapper-descriptor '__delete__' of 'builtins.property' objects>` is not assignable to `custom.property`"
+wrong_property_descriptor_delete: custom.property = property.__delete__
+
+def function() -> None: ...
+
+# error: [invalid-assignment] "Object of type `<method-wrapper '__get__' of types.FunctionType 'function'>` is not assignable to `custom.function`"
+wrong_function_get: custom.function = function.__get__
+
+# error: [invalid-assignment] "Object of type `<method-wrapper '__call__' of types.FunctionType 'function'>` is not assignable to `custom.function`"
+wrong_function_call: custom.function = function.__call__
+
+# error: [invalid-assignment] "Object of type `<wrapper-descriptor '__get__' of 'types.FunctionType' objects>` is not assignable to `custom.function`"
+wrong_function_descriptor_get: custom.function = types.FunctionType.__get__
 ```
 
 ## Generic aliases
@@ -300,6 +358,73 @@ wrong_argument: first.Model = Alias[second.Model]
 
 # error: [invalid-assignment] "Object of type `<type alias 'mdtest_snippet.Alias[Model]'>` is not assignable to `first.Alias`"
 wrong_alias: first.Alias = Alias[second.Model]
+```
+
+## Runtime wrappers with nested classes
+
+Runtime wrappers distinguish nested classes from unrelated classes with the same name.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+from functools import partial
+from typing import Annotated, Callable
+
+import first
+import second
+
+def accepts(value: second.Model) -> None: ...
+
+# error: [invalid-assignment] "Object of type `partial[(value: second.Model) -> None]` is not assignable to `first.Model`"
+wrong_partial: first.Model = partial(accepts)
+
+# error: [invalid-assignment] "Object of type `(value: second.Model) -> None` is not assignable to `first.Model`"
+wrong_partial_call: first.Model = partial(accepts).__call__
+
+# error: [invalid-assignment] "Object of type `<Callable special-form '(second.Model, /) -> int'>` is not assignable to `first.Model`"
+wrong_callable: first.Model = Callable[[second.Model], int]
+
+# error: [invalid-assignment] "Object of type `<special-form 'type[second.Model]'>` is not assignable to `first.Model`"
+wrong_type: first.Model = type[second.Model]
+
+# error: [invalid-assignment] "Object of type `<special-form 'typing.Annotated[second.Model, <metadata>]'>` is not assignable to `first.Model`"
+wrong_annotated: first.Model = Annotated[second.Model, 1]
+
+# error: [invalid-assignment] "Object of type `<types.UnionType special-form 'second.Model | int'>` is not assignable to `first.Model`"
+wrong_union: first.Model = second.Model | int
+```
+
+## Partial class instances
+
+Precisely modeled `functools.partial` instances remain distinct from unrelated classes with the same
+name.
+
+`custom.py`:
+
+```py
+class partial: ...
+```
+
+```py
+from functools import partial
+
+import custom
+
+def identity(value: int) -> int:
+    return value
+
+# error: [invalid-assignment] "Object of type `functools.partial[(value: int) -> int]` is not assignable to `custom.partial`"
+wrong: custom.partial = partial(identity)
 ```
 
 ## Protocols

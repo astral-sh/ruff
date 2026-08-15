@@ -37,7 +37,7 @@ use crate::types::{
     KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType,
     Protocol, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type,
     TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, TypingModule, UnionType,
-    WrapperDescriptorKind, visitor, walk_signature,
+    WrapperDescriptorKind, visitor, walk_property_instance_type, walk_signature,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -578,7 +578,16 @@ impl<'a, 'db> AmbiguousNameCollector<'a, 'db> {
     /// - Different qualified paths: `RequiresFullyQualifiedName`
     /// - Same qualified paths: `RequiresFileAndLineNumber`
     fn record(&self, db: &'db dyn Db, item: NamedItem<'db>) {
-        match self.names.borrow_mut().entry(item.name(db)) {
+        self.record_with_display_name(db, item, item.name(db));
+    }
+
+    fn record_with_display_name(
+        &self,
+        db: &'db dyn Db,
+        item: NamedItem<'db>,
+        display_name: &'db str,
+    ) {
+        match self.names.borrow_mut().entry(display_name) {
             Entry::Vacant(entry) => {
                 entry.insert(AmbiguityState::Unambiguous(item));
             }
@@ -622,6 +631,21 @@ impl<'a, 'db> AmbiguousNameCollector<'a, 'db> {
     fn record_known_class(&self, db: &'db dyn Db, class: KnownClass) {
         if let Some(class) = class.try_to_class_literal(db, self.env) {
             self.record_class(db, ClassLiteral::Static(class));
+        }
+    }
+
+    fn record_known_class_with_display_name(
+        &self,
+        db: &'db dyn Db,
+        class: KnownClass,
+        display_name: &'static str,
+    ) {
+        if let Some(class) = class.try_to_class_literal(db, self.env) {
+            self.record_with_display_name(
+                db,
+                NamedItem::Class(ClassLiteral::Static(class)),
+                display_name,
+            );
         }
     }
 
@@ -681,18 +705,35 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
         false
     }
 
+    fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
+        self.record_known_class(db, property.instance_class(db));
+        walk_property_instance_type(db, property, self);
+    }
+
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         let mut displayed_specialization = None;
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
-            Type::PropertyInstance(property) => {
-                self.record_known_class(db, property.instance_class(db));
-            }
-            Type::KnownInstance(KnownInstanceType::Range { .. }) => {
-                self.record_known_class(db, KnownClass::Range);
-            }
-            Type::KnownInstance(known_instance @ KnownInstanceType::TypeVar(_)) => {
+            Type::KnownInstance(
+                known_instance @ (KnownInstanceType::Range { .. }
+                | KnownInstanceType::FunctoolsPartial(_)
+                | KnownInstanceType::TypeVar(_)),
+            ) => {
                 self.record_known_class(db, known_instance.class(db));
+            }
+            Type::KnownBoundMethod(
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_),
+            )
+            | Type::WrapperDescriptor(WrapperDescriptorKind::FunctionTypeDunderGet) => {
+                self.record_known_class_with_display_name(db, KnownClass::FunctionType, "function");
+            }
+            Type::WrapperDescriptor(
+                WrapperDescriptorKind::PropertyDunderGet
+                | WrapperDescriptorKind::PropertyDunderSet
+                | WrapperDescriptorKind::PropertyDunderDelete,
+            ) => {
+                self.record_known_class(db, KnownClass::Property);
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
                 if let Some(specialization) = alias.specialization(db) {
@@ -1498,7 +1539,19 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     f.write_str(member_name)?;
                 }
                 f.write_str("' of ")?;
-                f.with_type(class_ty).write_str(cls_name)?;
+                if let Type::ClassLiteral(class) = class_ty
+                    && self.settings.qualified.contains_key(cls_name)
+                {
+                    write!(f.with_type(class_ty), "{}", class.qualified_name(db))?;
+                } else if let Type::PropertyInstance(_) = ty {
+                    write!(
+                        f.with_type(class_ty),
+                        "{}",
+                        ty.display_with(db, self.env, self.settings.clone())
+                    )?;
+                } else {
+                    f.with_type(class_ty).write_str(cls_name)?;
+                }
                 if let Some(name) = ty_name {
                     f.write_str(" '")?;
                     f.with_type(ty).write_str(name)?;
@@ -1529,8 +1582,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 f.write_str(" '")?;
                 f.write_str(method)?;
                 f.write_str("' of '")?;
-                f.with_type(cls.to_class_literal(db, self.env))
-                    .write_str(object)?;
+                let class_ty = cls.to_class_literal(db, self.env);
+                if let Type::ClassLiteral(class) = class_ty
+                    && self.settings.qualified.contains_key(object)
+                {
+                    write!(f.with_type(class_ty), "{}", class.qualified_name(db))?;
+                } else {
+                    f.with_type(class_ty).write_str(object)?;
+                }
                 f.write_str("' objects>")
             }
             Type::DataclassDecorator(_) => {
@@ -3811,7 +3870,11 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
 
                 if let Some(field_ty) = field_type {
                     f.write_char('[')?;
-                    write!(f.with_type(field_ty), "{}", field_ty.display(db, self.env))?;
+                    write!(
+                        f.with_type(field_ty),
+                        "{}",
+                        field_ty.display_with(db, self.env, self.settings.clone())
+                    )?;
                     f.write_char(']')?;
                 }
                 Ok(())
@@ -3864,7 +3927,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.write_str(" special-form")?;
                 if let Ok(ty) = union.union_type(db) {
                     f.write_str(" '")?;
-                    ty.display(db, self.env).fmt_detailed(f)?;
+                    ty.display_with(db, self.env, self.settings.clone())
+                        .fmt_detailed(f)?;
                     f.write_char('\'')?;
                 }
                 f.write_char('>')
@@ -3872,7 +3936,10 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::Literal(inner) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<special-form '")?;
-                inner.inner(db).display(db, self.env).fmt_detailed(f)?;
+                inner
+                    .inner(db)
+                    .display_with(db, self.env, self.settings.clone())
+                    .fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::Annotated(inner) => {
@@ -3881,7 +3948,10 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.with_type(Type::SpecialForm(SpecialFormType::Annotated))
                     .write_str("typing.Annotated")?;
                 f.write_char('[')?;
-                inner.inner(db).display(db, self.env).fmt_detailed(f)?;
+                inner
+                    .inner(db)
+                    .display_with(db, self.env, self.settings.clone())
+                    .fmt_detailed(f)?;
                 f.write_str(", <metadata>]'>")
             }
             KnownInstanceType::Callable(callable) => {
@@ -3905,7 +3975,10 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.with_type(KnownClass::Type.to_class_literal(db, self.env))
                     .write_str("type")?;
                 f.write_char('[')?;
-                inner.inner(db).display(db, self.env).fmt_detailed(f)?;
+                inner
+                    .inner(db)
+                    .display_with(db, self.env, self.settings.clone())
+                    .fmt_detailed(f)?;
                 f.write_str("]'>")
             }
             KnownInstanceType::LiteralStringAlias(_) => f
@@ -3925,9 +3998,19 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
             KnownInstanceType::FunctoolsPartial(partial) => {
-                f.write_str("partial[")?;
+                let class_ty = KnownClass::FunctoolsPartial.to_class_literal(db, self.env);
+                if let Type::ClassLiteral(class) = class_ty {
+                    write!(
+                        f.with_type(class_ty),
+                        "{}",
+                        class.display_with(db, self.settings.clone())
+                    )?;
+                } else {
+                    f.write_str("partial")?;
+                }
+                f.write_char('[')?;
                 Type::Callable(partial.partial(db))
-                    .display_with(db, self.env, DisplaySettings::default().singleline())
+                    .display_with(db, self.env, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
@@ -3944,7 +4027,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 }
             }
             KnownInstanceType::FunctoolsPartialCall(partial) => Type::Callable(partial.partial(db))
-                .display_with(db, self.env, DisplaySettings::default().singleline())
+                .display_with(db, self.env, self.settings.singleline())
                 .fmt_detailed(f),
         }
     }
