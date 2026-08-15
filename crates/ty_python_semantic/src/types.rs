@@ -3568,20 +3568,14 @@ impl<'db> Type<'db> {
         else {
             return dynamic_instance_fallback;
         };
-        let all_arms_are_possible_data_descriptors = declaration
-            .ty
-            .resolve_type_alias(db)
-            .as_union()
-            .is_none_or(|union| {
-                union
-                    .elements(db)
-                    .iter()
-                    .all(|ty| ty.may_be_data_descriptor(db, env))
-            });
+        let mut all_arms_are_possible_data_descriptors = true;
+        let descriptor_ty = declaration.ty.filter_union(db, env, |ty| {
+            let is_possible_data_descriptor = ty.may_be_data_descriptor(db, env);
+            all_arms_are_possible_data_descriptors &= is_possible_data_descriptor;
+            is_possible_data_descriptor
+        });
         Place::Defined(DefinedPlace {
-            ty: declaration
-                .ty
-                .filter_union(db, env, |ty| ty.may_be_data_descriptor(db, env)),
+            ty: descriptor_ty,
             definedness: if all_arms_are_possible_data_descriptors {
                 declaration.definedness
             } else {

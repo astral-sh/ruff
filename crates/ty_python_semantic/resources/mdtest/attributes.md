@@ -2077,6 +2077,22 @@ class UsesMaybeGeneratedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclas
 reveal_type(UsesMaybeGeneratedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
 ```
 
+A union alias must not hide a non-descriptor member: the same dynamic fallback remains possible
+after expanding it:
+
+```py
+from typing_extensions import TypeAliasType
+
+GeneratedDescriptorOrInt = TypeAliasType("GeneratedDescriptorOrInt", GeneratedDescriptor | int)
+
+class AliasedDescriptorMeta(MaybeDescriptorMeta):
+    generated_descriptor: GeneratedDescriptorOrInt | GeneratedDescriptor
+
+class UsesAliasedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclass=AliasedDescriptorMeta): ...
+
+reveal_type(UsesAliasedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
+```
+
 Dynamic bases are ignored when descriptor detection requires a concrete `__get__` method:
 
 ```py
