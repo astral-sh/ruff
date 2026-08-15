@@ -82,6 +82,74 @@ reveal_type(f)  # revealed: def f(_: int) -> int
 reveal_type(promote(f))  # revealed: list[(_: int) -> int]
 ```
 
+## Function values are promoted in invariant generic classes
+
+An invariant generic class initialized with a function should also accept other callable objects
+with the same signature, including callable protocols and concrete callable instances.
+
+```py
+from typing import Protocol
+
+class Box[T]:
+    value: T
+
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+    def set(self, value: T) -> None:
+        self.value = value
+
+class Callback(Protocol):
+    def __call__(self) -> None: ...
+
+class CallableObject:
+    def __call__(self) -> None: ...
+
+def default() -> None: ...
+def callback() -> Callback:
+    return default
+
+inferred_box = Box(default)
+inferred_box.set(callback())
+inferred_box.set(CallableObject())
+```
+
+Callable objects do not necessarily provide the attributes of a function.
+
+```py
+inferred_box.value.__name__  # error: [unresolved-attribute]
+```
+
+An explicit `FunctionType` bound must accept other real functions while preserving their guaranteed
+attributes.
+
+```py
+from types import FunctionType
+
+class FunctionBox[T: FunctionType]:
+    value: T
+
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+def another_default() -> None: ...
+
+function_box = FunctionBox(default)
+function_box.value = another_default
+reveal_type(function_box.value.__name__)  # revealed: str
+```
+
+Context variables infer their type arguments through overloaded `__new__` methods, rather than
+`__init__`, but must apply the same promotion.
+
+```py
+from contextvars import ContextVar
+
+context_callback = ContextVar("callback", default=default)
+context_callback.set(callback())
+context_callback.set(CallableObject())
+```
+
 ## Invariant collection literals are promoted
 
 The elements of invariant collection literals, i.e. lists, dictionaries, and sets, are promoted:
@@ -90,6 +158,30 @@ The elements of invariant collection literals, i.e. lists, dictionaries, and set
 reveal_type([1, 2, 3])  # revealed: list[int]
 reveal_type({"a": 1, "b": 2, "c": 3})  # revealed: dict[str, int]
 reveal_type({"a", "b", "c"})  # revealed: set[str]
+```
+
+Function values are promoted to ordinary callables in each invariant collection. Lambda expressions
+are already callable types and must undergo the same promotion.
+
+```py
+from collections.abc import Callable
+
+def callback() -> None: ...
+def accept_list(callbacks: list[Callable[[], None]]) -> None: ...
+def accept_dict(callbacks: dict[str, Callable[[], None]]) -> None: ...
+def accept_set(callbacks: set[Callable[[], None]]) -> None: ...
+
+list_callbacks = [callback]
+accept_list(list_callbacks)
+
+dict_callbacks = {"callback": callback}
+accept_dict(dict_callbacks)
+
+lambda_callbacks = {"callback": lambda: None}
+accept_dict(lambda_callbacks)
+
+set_callbacks = {callback}
+accept_set(set_callbacks)
 ```
 
 Covariant collection literals are not promoted:
@@ -650,6 +742,21 @@ def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
 def _(upper: Callable[[int], None]):
     # error: [invalid-argument-type]
     reveal_type(f("x", upper))  # revealed: list[str | int]
+```
+
+An inferred function-only upper bound must also prevent promotion from discarding function
+attributes:
+
+```py
+from types import FunctionType
+
+def callback() -> None: ...
+def another_callback() -> None: ...
+def accept_function(value: FunctionType) -> None: ...
+
+callbacks = f(callback, accept_function)
+callbacks.append(another_callback)
+reveal_type(callbacks[0].__name__)  # revealed: str
 ```
 
 This also applies when multiple inheritance contributes both static and gradual specializations:

@@ -393,6 +393,31 @@ reveal_type(p(2))  # revealed: tuple[int, int]
 reveal_type(p(2)[1])  # revealed: int
 ```
 
+A function bound to the generic parameter must not prevent another callable object from being passed
+to the remaining parameter:
+
+```py
+def default() -> None: ...
+
+class CallableObject:
+    def __call__(self) -> None: ...
+
+partial(pair, default)(CallableObject())
+```
+
+An explicit function bound must still preserve the attributes it guarantees:
+
+```py
+from types import FunctionType
+
+FunctionT = TypeVar("FunctionT", bound=FunctionType)
+
+def choose(first: FunctionT, second: FunctionT) -> FunctionT:
+    return second
+
+reveal_type(partial(choose, default)(default).__name__)  # revealed: str
+```
+
 ### Generic functions preserve defaults for no-longer-inferable type params
 
 ```py

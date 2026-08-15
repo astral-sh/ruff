@@ -25,10 +25,12 @@ x = [a, b]
 reveal_type(x)  # revealed: list[(_: int) -> int]
 ```
 
-The inferred `Callable` type is function-like, i.e. we can still access attributes like `__name__`:
+The original function retains its function-specific attributes, but the inferred callable element
+does not: other callable objects could later be stored in the list.
 
 ```py
-reveal_type(x[0].__name__)  # revealed: str
+reveal_type(a.__name__)  # revealed: str
+x[0].__name__  # error: [unresolved-attribute]
 ```
 
 ## Mixed list
@@ -62,6 +64,7 @@ reveal_type(z)  # revealed: list[Sequence[int | str | None]]
 
 xx: list[None] = reveal_type([None])  # revealed: list[None]
 reveal_type(xx)  # revealed: list[None]
+reveal_type([xx])  # revealed: list[list[None]]
 
 yy = reveal_type([None])  # revealed: list[None | Unknown]
 reveal_type(yy)  # revealed: list[None | Unknown]
