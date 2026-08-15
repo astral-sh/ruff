@@ -1098,7 +1098,7 @@ impl<'db> Bindings<'db> {
                 .bindings(db, env)
                 .match_parameters(db, env, &bound_call_arguments);
         for binding in partial_bindings.iter_flat_mut() {
-            binding.clear_missing_argument_errors_for_partial_application();
+            binding.prepare_for_partial_application();
         }
         for constructor in partial_bindings.iter_constructor_items_mut() {
             if let Some(downstream) = constructor.downstream_constructor_mut() {
@@ -3443,13 +3443,13 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    /// Ignore missing-argument errors when constructing `functools.partial(...)`.
+    /// Prepare these overloads for constructing `functools.partial(...)`.
     ///
     /// Partial application intentionally leaves some parameters unbound, so we still want to
-    /// type-check all explicitly bound arguments against each overload.
-    fn clear_missing_argument_errors_for_partial_application(&mut self) {
+    /// type-check all explicitly bound arguments without treating unbound parameters as absent.
+    fn prepare_for_partial_application(&mut self) {
         for overload in &mut self.overloads {
-            overload.clear_missing_argument_errors_for_partial_application();
+            overload.prepare_for_partial_application();
         }
     }
 
@@ -5422,6 +5422,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
+    is_partial_application: bool,
 
     inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
@@ -5531,6 +5532,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
+        is_partial_application: bool,
     ) -> Self {
         Self {
             db,
@@ -5545,6 +5547,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             call_expression_tcx,
             return_ty,
             errors,
+            is_partial_application,
             inferable_typevars: TypeVarSet::None,
             inference: None,
             constraint_set_errors: vec![false; arguments.len()],
@@ -6063,6 +6066,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return Ok(());
         };
         if !parameter.has_starred_annotation() {
+            return Ok(());
+        }
+
+        // An untouched variadic parameter remains available to future calls of a partial. In
+        // contrast, an ordinary completed call with no variadic arguments infers an empty pack.
+        if self.is_partial_application
+            && !self.argument_matches.iter().any(|argument| {
+                argument
+                    .iter()
+                    .any(|matched| matched.index == parameter_index)
+            })
+        {
             return Ok(());
         }
 
@@ -7192,6 +7207,9 @@ pub(crate) struct Binding<'db> {
     /// The type-variable inference result for this binding, if the callable is generic.
     inference: Option<TypeVarInference<'db>>,
 
+    /// Whether these arguments construct a partial instead of completing a call.
+    is_partial_application: bool,
+
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
     argument_matches: Box<[MatchedArgument<'db>]>,
@@ -7276,6 +7294,7 @@ impl<'db> Binding<'db> {
             constructor_context: None,
             inferable_typevars: TypeVarSet::None,
             inference: None,
+            is_partial_application: false,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
@@ -7821,6 +7840,7 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             self.return_ty,
             &mut self.errors,
+            self.is_partial_application,
         );
 
         // If this overload is generic, first see if we can infer a specialization of the function
@@ -7930,13 +7950,15 @@ impl<'db> Binding<'db> {
     }
 
     /// `functools.partial(...)` is allowed to leave required parameters unbound.
-    fn clear_missing_argument_errors_for_partial_application(&mut self) {
+    fn prepare_for_partial_application(&mut self) {
+        self.is_partial_application = true;
         self.errors
             .retain(|error| !matches!(error, BindingError::MissingArguments { .. }));
     }
 
     /// Downstream constructor validation is deferred until after partial signatures are merged.
     fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
+        self.is_partial_application = true;
         self.errors.retain(|error| {
             !matches!(
                 error,
