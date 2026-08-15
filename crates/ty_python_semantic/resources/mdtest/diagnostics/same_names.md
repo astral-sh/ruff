@@ -427,6 +427,42 @@ def identity(value: int) -> int:
 wrong: custom.partial = partial(identity)
 ```
 
+## Runtime object classes
+
+Module, generic alias, union, and `super()` objects remain distinct from unrelated classes with the
+same names.
+
+`custom.py`:
+
+```py
+class module: ...
+class type: ...
+class UnionType: ...
+class super: ...
+```
+
+```py
+import os
+
+import custom
+
+# error: [invalid-assignment] "Object of type `<module 'os'>` is not assignable to `custom.module`"
+module_object: custom.module = os
+
+# error: [invalid-assignment] "Object of type `<special-form 'builtins.type[int]'>` is not assignable to `custom.type`"
+type_object: custom.type = type[int]
+
+# error: [invalid-assignment] "Object of type `<types.UnionType special-form 'int | str'>` is not assignable to `custom.UnionType`"
+union_object: custom.UnionType = int | str
+
+class Base: ...
+
+class Child(Base):
+    def method(self) -> None:
+        # error: [invalid-assignment] "Object of type `<builtins.super: <class 'Child'>, Self@method>` is not assignable to `custom.super`"
+        super_object: custom.super = super()
+```
+
 ## Protocols
 
 ### Differing members

@@ -714,12 +714,20 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
         let mut displayed_specialization = None;
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
+            Type::ModuleLiteral(_) => {
+                self.record_known_class_with_display_name(db, KnownClass::ModuleType, "module");
+            }
+            Type::BoundSuper(_) => self.record_known_class(db, KnownClass::Super),
             Type::KnownInstance(
                 known_instance @ (KnownInstanceType::Range { .. }
                 | KnownInstanceType::FunctoolsPartial(_)
+                | KnownInstanceType::UnionType(_)
                 | KnownInstanceType::TypeVar(_)),
             ) => {
                 self.record_known_class(db, known_instance.class(db));
+            }
+            Type::KnownInstance(KnownInstanceType::TypeGenericAlias(_)) => {
+                self.record_known_class(db, KnownClass::Type);
             }
             Type::KnownBoundMethod(
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
@@ -1676,7 +1684,18 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             Type::AlwaysFalsy => f.with_type(self.ty).write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
                 f.set_invalid_type_annotation();
-                f.write_str("<super: ")?;
+                f.write_char('<')?;
+                let class_ty = KnownClass::Super.to_class_literal(db, self.env);
+                if let Type::ClassLiteral(class) = class_ty {
+                    write!(
+                        f.with_type(class_ty),
+                        "{}",
+                        class.display_with(db, self.settings.clone())
+                    )?;
+                } else {
+                    f.write_str("super")?;
+                }
+                f.write_str(": ")?;
                 Type::from(bound_super.pivot_class(db))
                     .display_with(db, self.env, self.settings.singleline())
                     .fmt_detailed(f)?;
@@ -3972,8 +3991,16 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::TypeGenericAlias(inner) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<special-form '")?;
-                f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                    .write_str("type")?;
+                let class_ty = KnownClass::Type.to_class_literal(db, self.env);
+                if let Type::ClassLiteral(class) = class_ty {
+                    write!(
+                        f.with_type(class_ty),
+                        "{}",
+                        class.display_with(db, self.settings.clone())
+                    )?;
+                } else {
+                    f.write_str("type")?;
+                }
                 f.write_char('[')?;
                 inner
                     .inner(db)
