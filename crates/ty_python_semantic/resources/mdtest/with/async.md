@@ -163,7 +163,7 @@ async def interrupted_return() -> str:  # error: [invalid-return-type]
 An overloaded async exit method can distinguish normal exits from exceptions:
 
 ```py
-from typing import Literal, overload
+from typing import Awaitable, Literal, overload
 from typing_extensions import Never
 
 async def may_raise() -> str:
@@ -229,6 +229,28 @@ class SuppressesValueError:
 async def mixed_exceptional_exits() -> None:
     result = None
     async with SuppressesValueError():
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
+An exceptional overload that returns a non-awaitable does not prevent a later awaitable overload
+from suppressing a different exception:
+
+```py
+class SuppressesAfterNonAwaitable:
+    async def __aenter__(self) -> None: ...
+    @overload
+    def __aexit__(self, exc_type: type[TypeError], exc_value: TypeError, traceback: object) -> bool: ...
+    @overload
+    def __aexit__(self, exc_type: type[ValueError], exc_value: ValueError, traceback: object) -> Awaitable[Literal[True]]: ...
+    @overload
+    def __aexit__(self, exc_type: None, exc_value: None, traceback: None) -> Awaitable[None]: ...
+    def __aexit__(self, exc_type, exc_value, traceback) -> bool | Awaitable[Literal[True]] | Awaitable[None]:
+        raise NotImplementedError
+
+async def suppresses_after_non_awaitable() -> None:
+    result = None
+    async with SuppressesAfterNonAwaitable():
         result = await may_raise()
     reveal_type(result)  # revealed: None | str
 ```

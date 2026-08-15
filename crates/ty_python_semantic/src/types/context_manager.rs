@@ -129,7 +129,7 @@ impl<'db> Type<'db> {
 
                 let return_type = if is_async {
                     let Ok(awaited) = signature.return_ty.try_await(db, &env) else {
-                        return false;
+                        continue;
                     };
                     awaited
                 } else {
