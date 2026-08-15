@@ -132,6 +132,33 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Fields declared in stubs
+
+An annotation-only field in a stub remains a required constructor argument. An explicit ellipsis
+assignment represents a default and makes its field optional.
+
+`records.pyi`:
+
+```pyi
+from typing import NamedTuple
+
+class Record(NamedTuple):
+    required: int
+    optional: str = ...
+```
+
+The generated constructor requires the first field but permits omitting the second:
+
+```py
+from records import Record
+
+reveal_type(Record.__new__)  # revealed: [Self](_cls: type[Self], required: int, optional: str = ...) -> Self
+
+Record(1)
+Record(1, "value")
+Record()  # error: [missing-argument]
+```
+
 ### Name mismatch diagnostics
 
 <!-- snapshot-diagnostics -->

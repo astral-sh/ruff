@@ -1888,6 +1888,75 @@ Derived(1, "a")
 Derived(True)
 ```
 
+### Required fields inherited from stub dataclasses
+
+An annotation without an assigned value in a stub does not give a dataclass field a default.
+
+`base.pyi`:
+
+```pyi
+from dataclasses import dataclass
+
+@dataclass
+class Base:
+    required: int
+```
+
+The inherited field remains required in both constructors, and adding another required field does
+not introduce a field-ordering violation.
+
+```py
+from dataclasses import dataclass
+from base import Base
+
+@dataclass
+class Child(Base):
+    added: str
+
+reveal_type(Base.__init__)  # revealed: (self: Base, required: int) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, required: int, added: str) -> None
+
+Base(1)
+Child(1, "value")
+
+# error: [missing-argument] "No argument provided for required parameter `required`"
+Base()
+
+# error: [missing-argument] "No argument provided for required parameter `added`"
+Child(1)
+```
+
+### Defaulted fields inherited from stub dataclasses
+
+An ellipsis assigned to a stub field indicates an actual default.
+
+`base.pyi`:
+
+```pyi
+from dataclasses import dataclass
+
+@dataclass
+class EllipsisDefault:
+    required: int
+    optional: int = ...
+```
+
+The field produces an optional constructor parameter, so adding a required field in a subclass is
+invalid.
+
+```py
+from dataclasses import dataclass
+from base import EllipsisDefault
+
+reveal_type(EllipsisDefault.__init__)  # revealed: (self: EllipsisDefault, required: int, optional: int = ...) -> None
+
+EllipsisDefault(1)
+
+@dataclass
+class InvalidEllipsisChild(EllipsisDefault):
+    added: str  # error: [dataclass-field-order]
+```
+
 ### Required fields after inherited defaults
 
 A required positional field cannot follow a positional field with a default inherited from a
