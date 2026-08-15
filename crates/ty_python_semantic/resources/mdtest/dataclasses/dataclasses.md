@@ -1699,7 +1699,7 @@ dataclass should produce only the dataclass error, not additional errors for its
 
 ```py
 @dataclass(slots=True)
-class ExistingSlots:  # error: [invalid-dataclass] "Dataclass `ExistingSlots` cannot combine `slots=True` with `__slots__`"
+class ExistingSlots:  # error: [invalid-dataclass] "Dataclass `ExistingSlots` cannot combine `slots=True` with manually assigned `__slots__`"
     value: int
     __slots__ = ()
 ```
@@ -1720,7 +1720,7 @@ def choose_slots() -> tuple[str, ...]:
     return ("value",)
 
 @dataclass(slots=True)
-class DynamicExistingSlots:  # error: [invalid-dataclass] "Dataclass `DynamicExistingSlots` cannot combine `slots=True` with `__slots__`"
+class DynamicExistingSlots:  # error: [invalid-dataclass] "Dataclass `DynamicExistingSlots` cannot combine `slots=True` with manually assigned `__slots__`"
     value: int
     __slots__ = choose_slots()
 ```
@@ -1746,7 +1746,7 @@ static analysis.
 from typing import TYPE_CHECKING
 
 @dataclass(slots=True)
-class TypeCheckingSlots:  # error: [invalid-dataclass] "Dataclass `TypeCheckingSlots` cannot combine `slots=True` with `__slots__`"
+class TypeCheckingSlots:  # error: [invalid-dataclass] "Dataclass `TypeCheckingSlots` cannot combine `slots=True` with manually assigned `__slots__`"
     value: int
 
     if TYPE_CHECKING:

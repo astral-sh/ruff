@@ -86,7 +86,7 @@ fn check_class_slots<'db>(
     {
         if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
             builder.into_diagnostic(format_args!(
-                "Dataclass `{}` cannot combine `slots=True` with `__slots__`",
+                "Dataclass `{}` cannot combine `slots=True` with manually assigned `__slots__`",
                 class.name(db),
             ));
         }
