@@ -198,3 +198,33 @@ class BadStringized:
         exc: "BaseException",
         tb: "TracebackType",
     ) -> None: ...  # PYI036: Second arg has bad annotation
+
+
+# Stringized annotations also flow through the other PYI036 paths:
+# the variadic `*args` check and the overloaded-method check.
+class GoodStringizedVariadic:
+    def __exit__(self, *args: "object") -> None: ...
+    async def __aexit__(self, *args: "object") -> None: ...
+
+
+class GoodStringizedOverload:
+    @overload
+    def __exit__(self, exc_typ: "None", exc: "None", exc_tb: "None") -> None: ...
+    @overload
+    def __exit__(
+        self,
+        exc_typ: "type[BaseException]",
+        exc: "BaseException",
+        exc_tb: "TracebackType",
+    ) -> None: ...
+    def __exit__(
+        self,
+        exc_typ: type[BaseException] | None,
+        exc: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None: ...
+
+
+class GoodStringizedObject:
+    def __exit__(self, typ: "object", exc: "object", tb: "object") -> None: ...
+    async def __aexit__(self, typ: object, exc: "object", tb: object) -> None: ...
