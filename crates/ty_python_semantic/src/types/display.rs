@@ -726,7 +726,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
             ) => {
                 self.record_known_class(db, known_instance.class(db));
             }
-            Type::KnownInstance(KnownInstanceType::TypeGenericAlias(_)) => {
+            Type::KnownInstance(KnownInstanceType::TypeGenericAlias(_)) | Type::SubclassOf(_) => {
                 self.record_known_class(db, KnownClass::Type);
             }
             Type::KnownBoundMethod(
@@ -1319,56 +1319,49 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    class
-                        .display_with(db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                    f.write_char(']')
-                }
-                SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    alias
-                        .display_with(db, self.env, self.settings.clone())
-                        .fmt_detailed(f)?;
-                    f.write_char(']')
-                }
-                SubclassOfInner::Dynamic(dynamic) => {
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
-                    f.write_char(']')
-                }
-                SubclassOfInner::Protocol(protocol) => {
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    Type::ProtocolInstance(protocol)
-                        .display_with(db, self.env, self.settings.clone())
-                        .fmt_detailed(f)?;
-                    f.write_char(']')
-                }
-                SubclassOfInner::TypeVar(bound_typevar) => {
+            Type::SubclassOf(subclass_of_ty) => {
+                if matches!(subclass_of_ty.subclass_of(), SubclassOfInner::TypeVar(_)) {
                     f.set_invalid_type_annotation();
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    write!(
-                        f.with_type(Type::TypeVar(bound_typevar)),
-                        "{}",
-                        bound_typevar
-                            .identity(db)
-                            .display_with(db, self.settings.clone())
-                    )?;
-                    f.write_char(']')
                 }
-            },
+
+                let class_ty = KnownClass::Type.to_class_literal(db, self.env);
+                if let Type::ClassLiteral(class) = class_ty {
+                    write!(
+                        f.with_type(class_ty),
+                        "{}",
+                        class.display_with(db, self.settings.clone())
+                    )?;
+                } else {
+                    f.with_type(class_ty).write_str("type")?;
+                }
+                f.write_char('[')?;
+
+                match subclass_of_ty.subclass_of() {
+                    SubclassOfInner::Class(ClassType::NonGeneric(class)) => class
+                        .display_with(db, self.settings.clone())
+                        .fmt_detailed(f)?,
+                    SubclassOfInner::Class(ClassType::Generic(alias)) => alias
+                        .display_with(db, self.env, self.settings.clone())
+                        .fmt_detailed(f)?,
+                    SubclassOfInner::Dynamic(dynamic) => {
+                        write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
+                    }
+                    SubclassOfInner::Protocol(protocol) => Type::ProtocolInstance(protocol)
+                        .display_with(db, self.env, self.settings.clone())
+                        .fmt_detailed(f)?,
+                    SubclassOfInner::TypeVar(bound_typevar) => {
+                        write!(
+                            f.with_type(Type::TypeVar(bound_typevar)),
+                            "{}",
+                            bound_typevar
+                                .identity(db)
+                                .display_with(db, self.settings.clone())
+                        )?;
+                    }
+                }
+
+                f.write_char(']')
+            }
             Type::SpecialForm(special_form) => {
                 f.set_invalid_type_annotation();
                 write!(f.with_type(self.ty), "<special-form '{special_form}'>")

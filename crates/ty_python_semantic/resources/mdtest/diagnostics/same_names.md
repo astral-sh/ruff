@@ -280,6 +280,12 @@ wrong_property_descriptor_set: custom.property = property.__set__
 # error: [invalid-assignment] "Object of type `<wrapper-descriptor '__delete__' of 'builtins.property' objects>` is not assignable to `custom.property`"
 wrong_property_descriptor_delete: custom.property = property.__delete__
 
+# error: [invalid-argument-type] "Argument to wrapper descriptor `builtins.property.__set__` is incorrect: Expected `builtins.property`, found `custom.property`"
+property.__set__(custom.property(), object(), object())
+
+# error: [invalid-argument-type] "Argument to wrapper descriptor `builtins.property.__delete__` is incorrect: Expected `builtins.property`, found `custom.property`"
+property.__delete__(custom.property(), object())
+
 def function() -> None: ...
 
 # error: [invalid-assignment] "Object of type `<method-wrapper '__get__' of types.FunctionType 'function'>` is not assignable to `custom.function`"
@@ -451,6 +457,14 @@ module_object: custom.module = os
 
 # error: [invalid-assignment] "Object of type `<special-form 'builtins.type[int]'>` is not assignable to `custom.type`"
 type_object: custom.type = type[int]
+
+def typed_class_object(value: type[int]) -> custom.type:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `custom.type`, found `builtins.type[int]`"
+    return value
+
+def assign_typed_class_object(value: type[int]) -> None:
+    # error: [invalid-assignment] "Object of type `builtins.type[int]` is not assignable to `custom.type`"
+    target: custom.type = value
 
 # error: [invalid-assignment] "Object of type `<types.UnionType special-form 'int | str'>` is not assignable to `custom.UnionType`"
 union_object: custom.UnionType = int | str

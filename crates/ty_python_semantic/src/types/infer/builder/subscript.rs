@@ -1120,7 +1120,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if !missing_typevars.is_empty() {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, subscript) {
-                let description = CallableDescription::new(db, value_ty);
+                let description = CallableDescription::new(&self.context, value_ty);
                 let s = if missing_typevars.len() > 1 { "s" } else { "" };
                 builder.into_diagnostic(format_args!(
                     "No type argument{s} provided for required type variable{s} `{}`{}",
@@ -1163,7 +1163,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 let node = expanded_type_arguments[first_excess_type_argument_index].node;
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node) {
-                    let description = CallableDescription::new(db, value_ty);
+                    let description = CallableDescription::new(&self.context, value_ty);
                     builder.into_diagnostic(format_args!(
                         "Too many type arguments{}: expected {}, got {}",
                         description

@@ -104,7 +104,7 @@ struct CallDiagnosticContext<'context, 'overrides, 'db, 'ast> {
 impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
     fn callable_description(&self, callable_type: Type<'db>) -> Option<CallableDescription<'db>> {
         CallableDescription::new_with_settings(
-            self.context.db(),
+            self.context,
             callable_type,
             self.overrides.map(|overrides| &overrides.display_settings),
         )
@@ -4639,7 +4639,7 @@ impl<'db> CallableBinding<'db> {
                 });
 
                 let callable_description = CallableDescription::new_with_settings(
-                    db,
+                    context,
                     self.callable_type,
                     context
                         .overrides
@@ -8408,14 +8408,14 @@ impl<'db> CallableDescription<'db> {
     }
 
     pub(crate) fn new(
-        db: &'db dyn Db,
+        context: &InferContext<'db, '_>,
         callable_type: Type<'db>,
     ) -> Option<CallableDescription<'db>> {
-        Self::new_with_settings(db, callable_type, None)
+        Self::new_with_settings(context, callable_type, None)
     }
 
     fn new_with_settings(
-        db: &'db dyn Db,
+        context: &InferContext<'db, '_>,
         callable_type: Type<'db>,
         settings: Option<&DisplaySettings<'db>>,
     ) -> Option<CallableDescription<'db>> {
@@ -8442,6 +8442,9 @@ impl<'db> CallableDescription<'db> {
                 Cow::Borrowed(function.name(db))
             }
         }
+
+        let db = context.db();
+        let env = context.program_environment();
 
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
@@ -8496,15 +8499,39 @@ impl<'db> CallableDescription<'db> {
                     name: Cow::Borrowed("`__delete__` of property"),
                 })
             }
-            Type::WrapperDescriptor(kind) => Some(CallableDescription {
-                kind: Some("wrapper descriptor"),
-                name: Cow::Borrowed(match kind {
-                    WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
-                    WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
-                    WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
-                    WrapperDescriptorKind::PropertyDunderDelete => "property.__delete__",
-                }),
-            }),
+            Type::WrapperDescriptor(kind) => {
+                let (owner, method, unqualified_name) = match kind {
+                    WrapperDescriptorKind::FunctionTypeDunderGet => {
+                        (KnownClass::FunctionType, "__get__", "FunctionType.__get__")
+                    }
+                    WrapperDescriptorKind::PropertyDunderGet => {
+                        (KnownClass::Property, "__get__", "property.__get__")
+                    }
+                    WrapperDescriptorKind::PropertyDunderSet => {
+                        (KnownClass::Property, "__set__", "property.__set__")
+                    }
+                    WrapperDescriptorKind::PropertyDunderDelete => {
+                        (KnownClass::Property, "__delete__", "property.__delete__")
+                    }
+                };
+
+                let name = settings
+                    .and_then(|settings| {
+                        owner.try_to_class_literal(db, env).map(|class| {
+                            Cow::Owned(format!(
+                                "{}.{}",
+                                ClassLiteral::Static(class).display_with(db, settings.clone()),
+                                method
+                            ))
+                        })
+                    })
+                    .unwrap_or(Cow::Borrowed(unqualified_name));
+
+                Some(CallableDescription {
+                    kind: Some("wrapper descriptor"),
+                    name,
+                })
+            }
             _ => None,
         }
     }
@@ -9000,7 +9027,7 @@ impl<'db> BindingError<'db> {
                         )
                     });
                 let qualified_callable_description = CallableDescription::new_with_settings(
-                    db,
+                    context,
                     callable_ty,
                     Some(&display_settings),
                 );
@@ -9397,7 +9424,7 @@ impl<'db> BindingError<'db> {
                 };
 
                 let qualified_callable_description = CallableDescription::new_with_settings(
-                    db,
+                    context,
                     callable_ty,
                     Some(&display_settings),
                 );
