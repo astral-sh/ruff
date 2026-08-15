@@ -35,21 +35,25 @@ impl ExceptionHandlers {
 
 /// Maintains a separate [`ExceptionContextStack`] for each scope.
 #[derive(Debug, Default)]
-pub(super) struct ExceptionContextStackManager(Vec<ExceptionContextStack>);
+pub(super) struct ExceptionContextStackManager {
+    stacks: Vec<ExceptionContextStack>,
+    /// Number of `try` and `with` contexts still collecting exception checkpoints.
+    active_handler_count: usize,
+}
 
 impl ExceptionContextStackManager {
     /// Push a new [`ExceptionContextStack`] onto the stack of stacks.
     ///
     /// Each [`ExceptionContextStack`] is only valid for a single scope.
     pub(super) fn enter_nested_scope(&mut self) {
-        self.0.push(ExceptionContextStack::default());
+        self.stacks.push(ExceptionContextStack::default());
     }
 
     /// Pop an [`ExceptionContextStack`] off the stack of stacks.
     ///
     /// Each [`ExceptionContextStack`] is only valid for a single scope.
     pub(super) fn exit_scope(&mut self) {
-        let popped_context = self.0.pop();
+        let popped_context = self.stacks.pop();
         debug_assert!(
             popped_context.is_some(),
             "exit_scope() should never be called on an empty stack \
@@ -57,25 +61,25 @@ impl ExceptionContextStackManager {
         );
     }
 
-    /// Push an [`ExceptionContext`] onto the [`ExceptionContextStack`] at the top of our stack of
-    /// stacks.
+    /// Registers a `try` statement on the current scope's exception-context stack.
     ///
     /// Only suites with handlers collect exception checkpoints; a bare handler prevents those
     /// exceptions from propagating to enclosing suites.
-    pub(super) fn push_context(&mut self, exception_handlers: ExceptionHandlers) {
+    pub(super) fn push_try_context(
+        &mut self,
+        exception_handlers: ExceptionHandlers,
+        has_finally: bool,
+    ) {
+        self.active_handler_count += usize::from(exception_handlers.is_active());
         self.current_exception_context_stack()
-            .push_context(exception_handlers);
+            .push_try_context(exception_handlers, has_finally);
     }
 
     /// Registers a context manager after it enters but before its target is assigned.
     pub(super) fn push_context_manager_context(&mut self) {
+        self.active_handler_count += 1;
         self.current_exception_context_stack()
-            .0
-            .push(ExceptionContext {
-                exception_handlers: ExceptionHandlers::propagating(),
-                kind: ExceptionContextKind::With,
-                ..ExceptionContext::default()
-            });
+            .push_context_manager_context();
     }
 
     /// Removes the innermost context manager and returns the exceptions it could suppress.
@@ -83,16 +87,18 @@ impl ExceptionContextStackManager {
     /// Removing the context before its exit method runs prevents it from suppressing exceptions
     /// raised by its own exit method.
     pub(super) fn finish_context_manager_context(&mut self) -> Vec<FlowSnapshot> {
-        let stack = self.current_exception_context_stack();
-        let snapshots = stack.take_exception_snapshots();
-        let context = stack.pop_context();
+        let snapshots = self.take_exception_snapshots();
+        let context = self.current_exception_context_stack().pop_context();
         debug_assert!(matches!(context.kind, ExceptionContextKind::With));
         snapshots
     }
 
-    /// Pop an [`ExceptionContext`] off the stack for the current scope.
-    pub(super) fn pop_context(&mut self) -> ExceptionContext {
-        self.current_exception_context_stack().pop_context()
+    /// Removes the current `try` context after its handlers have been deactivated.
+    pub(super) fn pop_try_context(&mut self) -> ExceptionContext {
+        let context = self.current_exception_context_stack().pop_context();
+        debug_assert!(matches!(context.kind, ExceptionContextKind::Try { .. }));
+        debug_assert!(!context.exception_handlers.is_active());
+        context
     }
 
     /// Retrieve the [`ExceptionContext`] at the top of the stack, and take all
@@ -100,8 +106,7 @@ impl ExceptionContextStackManager {
     ///
     /// Taking the snapshots deactivates the suite's handlers before their bodies are visited.
     pub(super) fn end_try_suite(&mut self) -> Vec<FlowSnapshot> {
-        self.current_exception_context_stack()
-            .take_exception_snapshots()
+        self.take_exception_snapshots()
     }
 
     /// Records a checkpoint for every active `try` or `with` context that could handle an
@@ -109,9 +114,11 @@ impl ExceptionContextStackManager {
     ///
     /// Crosses eager scopes, but stops at lazy scopes, unreachable flow, and bare handlers.
     pub(super) fn record_exception_checkpoint(&mut self, builder: &mut SemanticIndexBuilder) {
-        debug_assert_eq!(self.0.len(), builder.scope_stack.len());
+        debug_assert_eq!(self.stacks.len(), builder.scope_stack.len());
 
-        for (scope_stack_index, exception_context_stack) in self.0.iter_mut().enumerate().rev() {
+        let mut has_intervening_finally = false;
+        for (scope_stack_index, exception_context_stack) in self.stacks.iter_mut().enumerate().rev()
+        {
             let scope_id = builder.scope_stack[scope_stack_index].file_scope_id;
             let use_def_map = &builder.use_def_maps[scope_id];
 
@@ -121,7 +128,9 @@ impl ExceptionContextStackManager {
                 break;
             }
 
-            if !exception_context_stack.record_exception_checkpoint(use_def_map) {
+            if !exception_context_stack
+                .record_exception_checkpoint(use_def_map, &mut has_intervening_finally)
+            {
                 break;
             }
 
@@ -135,9 +144,13 @@ impl ExceptionContextStackManager {
     ///
     /// A context can remain on the stack for its `finally` suite after its handlers become inactive.
     pub(super) fn has_active_exception_handler(&self, builder: &SemanticIndexBuilder) -> bool {
-        debug_assert_eq!(self.0.len(), builder.scope_stack.len());
+        if self.active_handler_count == 0 {
+            return false;
+        }
 
-        for (scope_stack_index, exception_context_stack) in self.0.iter().enumerate().rev() {
+        debug_assert_eq!(self.stacks.len(), builder.scope_stack.len());
+
+        for (scope_stack_index, exception_context_stack) in self.stacks.iter().enumerate().rev() {
             if exception_context_stack.has_active_exception_handler() {
                 return true;
             }
@@ -153,7 +166,7 @@ impl ExceptionContextStackManager {
 
     /// Returns whether an enclosing context manager has already seen an exception checkpoint.
     pub(super) fn has_context_manager_exception_checkpoint(&self) -> bool {
-        self.0.last().is_some_and(|stack| {
+        self.stacks.last().is_some_and(|stack| {
             stack.0.iter().any(|context| {
                 matches!(context.kind, ExceptionContextKind::With)
                     && context.last_checkpoint_key.is_some()
@@ -161,20 +174,22 @@ impl ExceptionContextStackManager {
         })
     }
 
-    /// Records that a manager may have made a terminal `try` path appear to continue.
-    pub(super) fn record_suppressed_terminal_context_manager_exit(&mut self) {
+    /// Records that a context manager makes an apparently terminal control-flow path possibly
+    /// non-terminal because it may silence an earlier exception. Whether it actually suppresses
+    /// exceptions is determined during type inference.
+    pub(super) fn record_deferred_terminal_context_manager_exit(&mut self) {
         if let Some(context) = self.current_exception_context_stack().innermost_try() {
-            context.has_suppressed_terminal_context_manager_exit = true;
+            context.has_deferred_terminal_context_manager_exit = true;
         }
     }
 
-    /// Forwards a gated terminal state to the nearest enclosing `try`.
-    pub(super) fn propagate_suppressed_terminal_context_manager_exit(
+    /// Forwards a deferred terminal state to the nearest enclosing `try`.
+    pub(super) fn propagate_deferred_terminal_context_manager_exit(
         &mut self,
         terminal_snapshot: FlowSnapshot,
     ) {
         if let Some(context) = self.current_exception_context_stack().innermost_try() {
-            context.has_suppressed_terminal_context_manager_exit = true;
+            context.has_deferred_terminal_context_manager_exit = true;
             context
                 .terminal_finally_entry_snapshots
                 .push(terminal_snapshot);
@@ -187,9 +202,22 @@ impl ExceptionContextStackManager {
             .record_terminal_finally_entry(builder);
     }
 
+    /// Takes the current context's snapshots and updates the number of active handlers.
+    fn take_exception_snapshots(&mut self) -> Vec<FlowSnapshot> {
+        if let Some(snapshots) = self
+            .current_exception_context_stack()
+            .take_exception_snapshots()
+        {
+            self.active_handler_count -= 1;
+            snapshots
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Retrieve the [`ExceptionContextStack`] that is relevant for the current scope.
     fn current_exception_context_stack(&mut self) -> &mut ExceptionContextStack {
-        self.0
+        self.stacks
             .last_mut()
             .expect("There should always be at least one `ExceptionContextStack` on the stack")
     }
@@ -207,13 +235,20 @@ impl ExceptionContextStack {
             .any(|context| context.exception_handlers.is_active())
     }
 
-    /// Push a new [`ExceptionContext`] for recording exception checkpoints and terminal entries
-    /// while visiting a [`ruff_python_ast::StmtTry`] node.
-    fn push_context(&mut self, exception_handlers: ExceptionHandlers) {
-        self.0.push(ExceptionContext {
+    /// Registers a `try` statement and whether exceptions must first pass through cleanup.
+    fn push_try_context(&mut self, exception_handlers: ExceptionHandlers, has_finally: bool) {
+        self.0.push(ExceptionContext::new(
+            ExceptionContextKind::Try { has_finally },
             exception_handlers,
-            ..ExceptionContext::default()
-        });
+        ));
+    }
+
+    /// Registers a context manager that may receive exceptions from its body.
+    fn push_context_manager_context(&mut self) {
+        self.0.push(ExceptionContext::new(
+            ExceptionContextKind::With,
+            ExceptionHandlers::propagating(),
+        ));
     }
 
     /// Pop an [`ExceptionContext`] off the stack.
@@ -223,16 +258,16 @@ impl ExceptionContextStack {
             .expect("Cannot pop an exception context off an empty `ExceptionContextStack`")
     }
 
-    /// Takes all snapshots recorded by the innermost context and deactivates its handlers.
-    fn take_exception_snapshots(&mut self) -> Vec<FlowSnapshot> {
+    /// Takes the innermost context's snapshots if it has active handlers, deactivating them.
+    fn take_exception_snapshots(&mut self) -> Option<Vec<FlowSnapshot>> {
         let context = self
             .0
             .last_mut()
             .expect("Cannot take snapshots from an empty `ExceptionContextStack`");
         match std::mem::take(&mut context.exception_handlers) {
-            ExceptionHandlers::None => Vec::new(),
+            ExceptionHandlers::None => None,
             ExceptionHandlers::Propagating(snapshots) | ExceptionHandlers::CatchAll(snapshots) => {
-                snapshots
+                Some(snapshots)
             }
         }
     }
@@ -240,12 +275,22 @@ impl ExceptionContextStack {
     /// Records a checkpoint for every active `try` or `with` context in this scope.
     /// Returns whether the checkpoint should continue propagating to an enclosing scope.
     ///
-    /// A bare handler consumes the exception, preventing any outer handler from seeing it. The
-    /// snapshot is constructed only if a handler has not already observed the current flow state.
-    fn record_exception_checkpoint(&mut self, use_def_map: &UseDefMapBuilder<'_>) -> bool {
+    /// A bare handler consumes the exception, preventing any outer handler from seeing it. A
+    /// `finally` suite prevents enclosing context managers from receiving a checkpoint until its
+    /// cleanup has run, while preserving existing outer-`try` handler behavior. The snapshot is
+    /// constructed only if a handler has not already observed the current flow state.
+    fn record_exception_checkpoint(
+        &mut self,
+        use_def_map: &UseDefMapBuilder<'_>,
+        has_intervening_finally: &mut bool,
+    ) -> bool {
         let checkpoint_key = use_def_map.exception_checkpoint_key();
 
         for context in self.0.iter_mut().rev() {
+            if *has_intervening_finally && matches!(context.kind, ExceptionContextKind::With) {
+                continue;
+            }
+
             match &mut context.exception_handlers {
                 ExceptionHandlers::None => context.has_escaping_exception = true,
                 ExceptionHandlers::Propagating(snapshots)
@@ -260,6 +305,11 @@ impl ExceptionContextStack {
                     context.has_escaping_exception = true;
                 }
             }
+
+            *has_intervening_finally |= matches!(
+                context.kind,
+                ExceptionContextKind::Try { has_finally: true }
+            );
         }
 
         true
@@ -279,39 +329,52 @@ impl ExceptionContextStack {
         self.0
             .iter_mut()
             .rev()
-            .find(|context| matches!(context.kind, ExceptionContextKind::Try))
+            .find(|context| matches!(context.kind, ExceptionContextKind::Try { .. }))
     }
 }
 
-/// Distinguishes `try` contexts that may own a `finally` suite from `with` contexts.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+/// Distinguishes `try` exception contexts from `with` exception contexts.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum ExceptionContextKind {
-    #[default]
-    Try,
+    Try { has_finally: bool },
     With,
 }
 
 /// Exception-entry states for one `try` or `with` statement.
 ///
 /// Only `try` contexts also collect terminal entries for a `finally` suite.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(super) struct ExceptionContext {
     exception_handlers: ExceptionHandlers,
     kind: ExceptionContextKind,
     last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,
-    /// Whether a terminal manager body introduced a deferred suppression continuation.
-    has_suppressed_terminal_context_manager_exit: bool,
+    /// Whether apparently terminal control flow in a nested context-manager body, such as a
+    /// `return` or `raise`, may become non-terminal if type inference determines that the context
+    /// manager suppresses exceptions. This flag belongs to the enclosing `try` context because it
+    /// affects control flow into its `finally` suite.
+    has_deferred_terminal_context_manager_exit: bool,
     terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
 }
 
 impl ExceptionContext {
+    fn new(kind: ExceptionContextKind, exception_handlers: ExceptionHandlers) -> Self {
+        Self {
+            exception_handlers,
+            kind,
+            last_checkpoint_key: None,
+            has_escaping_exception: false,
+            has_deferred_terminal_context_manager_exit: false,
+            terminal_finally_entry_snapshots: Vec::new(),
+        }
+    }
+
     pub(super) fn into_finally_entry_state(self) -> (Vec<FlowSnapshot>, bool, bool) {
         (
             self.terminal_finally_entry_snapshots,
             self.has_escaping_exception,
-            self.has_suppressed_terminal_context_manager_exit,
+            self.has_deferred_terminal_context_manager_exit,
         )
     }
 }

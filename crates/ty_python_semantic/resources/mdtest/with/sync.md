@@ -217,6 +217,40 @@ def caught_before_suppression() -> int:
             return 1
 ```
 
+## A terminal `finally` prevents exception suppression
+
+A `return` in a `finally` block replaces the exception before it can reach an enclosing context
+manager:
+
+```py
+from contextlib import suppress
+
+def always_returns() -> int:
+    with suppress(ValueError):
+        try:
+            raise ValueError
+        finally:
+            return 1
+```
+
+## Cleanup runs before an enclosing context manager suppresses an exception
+
+Assignments in a `finally` block are visible after an enclosing context manager suppresses the
+exception:
+
+```py
+from contextlib import suppress
+
+def cleanup_before_suppression() -> None:
+    result = None
+    with suppress(ValueError):
+        try:
+            raise ValueError
+        finally:
+            result = "cleaned"
+    reveal_type(result)  # revealed: Literal["cleaned"]
+```
+
 ## Eager expressions inside a suppressing context manager
 
 A list comprehension evaluates its body eagerly, so a context manager can suppress an exception

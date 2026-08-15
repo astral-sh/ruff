@@ -226,7 +226,6 @@ impl ConditionFlowSnapshot {
     }
 }
 
-#[expect(clippy::struct_excessive_bools)]
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -247,8 +246,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Per-scope exception contexts for nested `try` and `with` statements.
     exception_context_stack_manager: ExceptionContextStackManager,
-    /// Whether an enclosing `with` statement can receive exception checkpoints.
-    in_with: bool,
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
@@ -260,7 +257,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
-    in_try: bool,
+    /// Whether the current statement is inside a `try` statement, including its `except`, `else`,
+    /// and `finally` suites. Used for semantic syntax checks independently of handler activity.
+    in_try_statement: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -320,7 +319,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_match_case: None,
             current_first_parameter_name: None,
             exception_context_stack_manager: ExceptionContextStackManager::default(),
-            in_with: false,
 
             has_future_annotations: false,
             in_type_checking_block: false,
@@ -353,7 +351,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             python_version: file.python_version(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
-            in_try: false,
+            in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: FxHashMap::default(),
             alias_predicates: FxHashMap::default(),
@@ -2251,10 +2249,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Skips snapshot construction when no enclosing `try` or `with` context can handle exceptions.
     fn record_exception_checkpoint(&mut self) {
-        if !(self.in_try || self.in_with)
-            || !self
-                .exception_context_stack_manager
-                .has_active_exception_handler(self)
+        if !self
+            .exception_context_stack_manager
+            .has_active_exception_handler(self)
         {
             return;
         }
@@ -2281,7 +2278,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         is_use
-            && (self.in_try || self.in_with)
             && self
                 .exception_context_stack_manager
                 .has_active_exception_handler(self)
@@ -4019,8 +4015,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 is_async,
                 ..
             }) => {
-                let was_in_with = std::mem::replace(&mut self.in_with, true);
-
                 for item @ ast::WithItem {
                     range: _,
                     node_index: _,
@@ -4059,7 +4053,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let normal_exit = self.flow_snapshot();
                         if normal_exit.is_always_unreachable() {
                             self.exception_context_stack_manager
-                                .record_suppressed_terminal_context_manager_exit();
+                                .record_deferred_terminal_context_manager_exit();
                         }
                         let context_expr = &item.context_expr;
                         let expression = self
@@ -4102,8 +4096,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // an earlier manager or enclosing `try` statement can still receive it.
                     self.record_exception_checkpoint();
                 }
-
-                self.in_with = was_in_with;
             }
 
             ast::Stmt::For(
@@ -4406,7 +4398,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 range: _,
                 node_index: _,
             }) => {
-                let was_in_try = std::mem::replace(&mut self.in_try, true);
+                let was_in_try_statement = std::mem::replace(&mut self.in_try_statement, true);
                 self.record_ambiguous_reachability();
 
                 let exception_handlers = if handlers.is_empty() {
@@ -4420,7 +4412,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ExceptionHandlers::propagating()
                 };
                 self.exception_context_stack_manager
-                    .push_context(exception_handlers);
+                    .push_try_context(exception_handlers, !finalbody.is_empty());
 
                 // Visit the `try` block!
                 self.visit_body(body);
@@ -4521,10 +4513,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let (
                     terminal_finally_entry_snapshots,
                     has_escaping_exception,
-                    has_suppressed_terminal_context_manager_exit,
+                    has_deferred_terminal_context_manager_exit,
                 ) = self
                     .exception_context_stack_manager
-                    .pop_context()
+                    .pop_try_context()
                     .into_finally_entry_state();
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit
@@ -4556,7 +4548,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     let mut post_finally_terminal_predicate = None;
                     let mut terminal_snapshots = terminal_finally_entry_snapshots.into_iter();
-                    if has_suppressed_terminal_context_manager_exit
+                    if has_deferred_terminal_context_manager_exit
                         && let Some(snapshot) = terminal_snapshots.next()
                     {
                         let continuation = self.current_use_def_map().reachability;
@@ -4593,7 +4585,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             let terminal_snapshot = self.flow_snapshot();
                             self.flow_restore(normal_pre_finally_state);
                             self.exception_context_stack_manager
-                                .propagate_suppressed_terminal_context_manager_exit(
+                                .propagate_deferred_terminal_context_manager_exit(
                                     terminal_snapshot,
                                 );
                         } else {
@@ -4632,7 +4624,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let terminal_snapshot = self.flow_snapshot();
                         self.flow_restore(post_finally_state);
                         self.exception_context_stack_manager
-                            .propagate_suppressed_terminal_context_manager_exit(terminal_snapshot);
+                            .propagate_deferred_terminal_context_manager_exit(terminal_snapshot);
 
                         let normal_reachability = self
                             .current_reachability_constraints_mut()
@@ -4648,7 +4640,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             );
                     }
                 }
-                self.in_try = was_in_try;
+                self.in_try_statement = was_in_try_statement;
             }
 
             ast::Stmt::Raise(_) => {
@@ -5544,7 +5536,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             | ScopeKind::TypeParams => {}
         }
 
-        if self.in_try {
+        if self.in_try_statement {
             return Some(LazyImportContext::TryExceptBlocks);
         }
 
