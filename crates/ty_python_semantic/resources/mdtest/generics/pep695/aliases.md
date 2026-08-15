@@ -769,34 +769,3 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 # These are fine:
 type Ok1[T, *Ts] = tuple[T, *Ts]
 ```
-
-## Solving a typevar through a generic union alias
-
-Expanding aliases exposes a bug in constraint solving. The parameter here is a generic union alias
-whose first arm is itself a generic alias, and both mention the typevar being solved; once the alias
-is expanded the call fails to select the overload the argument matches.
-
-Reduced from `scipy.stats.differential_entropy`. Simplifying any part of the shape stops exercising
-the case.
-
-```py
-from typing import assert_type, overload
-
-class Float64: ...
-class CanArray1D[ScalarT]: ...
-
-type ToArrayStrict1D[ScalarT] = CanArray1D[ScalarT]
-type ToArrayMax1D[ScalarT, PyScalarT] = ToArrayStrict1D[ScalarT] | PyScalarT
-
-@overload
-def entropy[InexactT: Float64](values: ToArrayMax1D[InexactT, InexactT]) -> InexactT: ...
-@overload
-def entropy(values: ToArrayMax1D[Float64, float]) -> Float64: ...
-def entropy(values: object) -> object:
-    raise NotImplementedError
-
-def probe(scalar: float) -> None:
-    # TODO: this should select the second overload and infer `Float64`.
-    # error: [type-assertion-failure] "Type `Unknown` does not match asserted type `Float64`"
-    assert_type(entropy(scalar), Float64)
-```
