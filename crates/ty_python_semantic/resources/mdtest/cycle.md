@@ -266,6 +266,1066 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Recursive instance attributes retain independently established types
+
+Mutually dependent attributes fall back to their independent values. An assignment that widens
+either value requires an explicit annotation.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = [1]
+        self.right = [1]
+
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left, "added"]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[int]
+reveal_type(Cyclic().right)  # revealed: list[int]
+```
+
+## Recursive instance attributes reject nested list growth
+
+Wrapping another independently initialized attribute creates an incompatible extra nesting level,
+even when both attributes begin with the same element type.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = [1]
+        self.right = [1]
+
+    def update(self):
+        self.left = [self.right]  # error: [invalid-assignment]
+        self.right = [self.left]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[int]
+reveal_type(Cyclic().right)  # revealed: list[int]
+```
+
+## Recursive instance attributes reject nested tuple growth
+
+Independently established tuple types remain distinct when mutually dependent assignments add an
+incompatible tuple layer.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = ("initial",)
+        self.right = (1,)
+
+    def update(self):
+        self.left = (self.right,)  # error: [invalid-assignment]
+        self.right = (self.left,)  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: tuple[str]
+reveal_type(Cyclic().right)  # revealed: tuple[int]
+```
+
+## Recursive instance attributes propagate self-growing dependencies
+
+A self-growing attribute still participates in the cycle when another independently initialized
+attribute reads it.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = ["initial"]
+        self.middle = [1]
+        self.right = [b"initial"]
+
+    def update(self):
+        self.left = [*self.middle]
+        self.middle = [*self.right]
+        self.right = [self.right]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[str] | list[int | bytes]
+reveal_type(Cyclic().middle)  # revealed: list[int] | list[bytes]
+reveal_type(Cyclic().right)  # revealed: list[bytes]
+```
+
+## Recursive attributes propagate dependencies through local aliases
+
+Aliases for an attribute value or its receiver do not hide a dependency on self-growing instance or
+class attributes.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.middle = [1]
+        self.right = [b"initial"]
+
+    def copy_value(self):
+        value = self.right
+        self.middle = [*value]
+
+    def copy_receiver(self):
+        receiver = self
+        self.middle = [*receiver.right]
+
+    def update(self):
+        self.right = [self.right]  # error: [invalid-assignment]
+
+class ClassCyclic:
+    @classmethod
+    def reset(cls):
+        cls.middle = [1]
+        cls.right = [b"initial"]
+
+    @classmethod
+    def update(cls):
+        value = cls.right
+        cls.middle = [*value]
+        cls.right = [cls.right]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().middle)  # revealed: list[int] | list[bytes]
+reveal_type(Cyclic().right)  # revealed: list[bytes]
+reveal_type(ClassCyclic.middle)  # revealed: list[int] | list[bytes]
+reveal_type(ClassCyclic.right)  # revealed: list[bytes]
+```
+
+## Recursive attributes ignore unreachable dependent assignments
+
+An overridden method and an unreachable branch do not turn standalone recursive growth into a
+cross-attribute dependency.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.values = [1]
+
+    def update(self):
+        self.values = [self.values]
+
+    def read(self):
+        self.other = [*self.values]
+
+    def read(self):
+        pass
+
+    def never_read(self):
+        if False:
+            self.another = [*self.values]
+
+reveal_type(Cyclic().values)  # revealed: list[int] | list[Divergent]
+```
+
+## Recursive instance attributes copied through dictionary unpacking
+
+Unpacking another attribute preserves its independently established dictionary type. Introducing an
+incompatible value requires an explicit annotation.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = {"left": "initial"}
+        self.right = {"right": "initial"}
+
+    def update(self):
+        self.left = {**self.right}
+        self.right = {**self.left, "added": 1}  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: dict[str, str]
+reveal_type(Cyclic().right)  # revealed: dict[str, str]
+```
+
+## Recursive instance attributes copied through comprehensions
+
+A comprehension can copy another attribute without changing its established element type. Adding an
+incompatible element still requires an explicit annotation.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = [1]
+        self.right = [1]
+
+    def update(self):
+        self.left = [value for value in self.right]
+        self.right = [value for value in self.left] + ["added"]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[int]
+reveal_type(Cyclic().right)  # revealed: list[int]
+```
+
+## Recursive instance attributes selected by conditional expressions
+
+Conditional and Boolean expressions can both transfer another independently initialized attribute.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = [1]
+        self.right = [1]
+
+    def update(self, flag: bool):
+        self.left = self.right if flag else self.right
+        self.right = self.left or ["added"]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[int]
+reveal_type(Cyclic().right)  # revealed: list[int]
+```
+
+## Recursive instance attributes copied by nested calls
+
+Nested collection constructors can copy another attribute without otherwise changing its element
+type.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = [1]
+        self.right = [1]
+
+    def update(self):
+        self.left = list(tuple(self.right))
+        self.right = list(tuple(self.left)) + ["added"]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[int]
+reveal_type(Cyclic().right)  # revealed: list[int]
+```
+
+## Recursive instance attributes copied through mapped lambdas
+
+Contextual inference of an identity lambda must not hide an incompatible assignment introduced by
+the surrounding recursive collection.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = [1]
+        self.right = [1]
+
+    def update(self):
+        self.left = list(map(lambda value: value, self.right))
+        self.right = list(map(lambda value: value, self.left)) + ["added"]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[int]
+reveal_type(Cyclic().right)  # revealed: list[int]
+```
+
+## Recursive attributes preserve valid contextual collection widening
+
+A copied `list[int]` can be contextually widened for an inferred `list[object]` attribute. The
+opposite assignment remains invalid.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = [object()]
+        self.right = [1]
+
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[object]
+reveal_type(Cyclic().right)  # revealed: list[int]
+```
+
+## Recursive attributes preserve widening into a union alternative
+
+A copied `list[int]` can be widened to the compatible `list[object]` alternative of an inferred
+union.
+
+```py
+class Cyclic:
+    def reset(self, flag: bool):
+        if flag:
+            self.left = [object()]
+        else:
+            self.left = ["initial"]
+        self.right = [1]
+
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: list[object] | list[str]
+reveal_type(Cyclic().right)  # revealed: list[int]
+```
+
+## Recursive attribute dependencies inside lambdas
+
+Inferring a lambda's return type can read another attribute even though calling the lambda is
+deferred.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = lambda: "initial"
+        self.right = lambda: 1
+
+    def update(self, flag: bool):
+        if flag:
+            self.left = lambda: self.right  # error: [invalid-assignment]
+        else:
+            self.right = lambda: self.left  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: () -> str
+reveal_type(Cyclic().right)  # revealed: () -> int
+```
+
+## Recursive attribute dependencies inside nested lambda scopes
+
+Nested lambdas and comprehensions can both capture the enclosing method's receiver.
+
+```py
+class Cyclic:
+    def reset(self):
+        self.left = lambda: "initial"
+        self.right = lambda: 1
+
+    def update(self, flag: bool):
+        if flag:
+            self.left = lambda: lambda: self.right  # error: [invalid-assignment]
+        else:
+            self.right = lambda: [self.left for _ in [0]][0]  # error: [invalid-assignment]
+
+reveal_type(Cyclic().left)  # revealed: () -> str
+reveal_type(Cyclic().right)  # revealed: () -> int
+```
+
+## Recursive attributes across classes when definitions are checked first
+
+The same conservative recovery applies across classes without needing to resolve receiver ownership
+before entering the attribute queries.
+
+`model.py`:
+
+```py
+class Left:
+    def reset(self):
+        self.values = [1]
+
+    def update(self, other: "Right"):
+        self.values = [*other.values]
+
+class Right:
+    def reset(self):
+        self.values = [1]
+
+    def update(self, other: Left):
+        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+```
+
+`consumer.py`:
+
+```py
+from model import Left, Right
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+## Recursive attributes across classes when uses are checked first
+
+Checking the consumer before the class definitions produces the same types and assignment error.
+
+`consumer.py`:
+
+```py
+from model import Left, Right
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+`model.py`:
+
+```py
+class Left:
+    def reset(self):
+        self.values = [1]
+
+    def update(self, other: "Right"):
+        self.values = [*other.values]
+
+class Right:
+    def reset(self):
+        self.values = [1]
+
+    def update(self, other: Left):
+        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+```
+
+## Recursive attributes across classes through an intermediate field
+
+An attribute chain beginning with `self` can still read a different instance. Checking the consumer
+first must not hide an incompatible assignment through that intermediate field.
+
+`consumer.py`:
+
+```py
+from model import Left, Right
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+`model.py`:
+
+```py
+class Left:
+    holder: "Right"
+
+    def reset(self):
+        self.values = [1]
+
+    def update(self):
+        self.values = [*self.holder.values]
+
+class Right:
+    holder: Left
+
+    def reset(self):
+        self.values = [1]
+
+    def update(self):
+        self.values = [*self.holder.values, "added"]  # error: [invalid-assignment]
+```
+
+## Recursive attributes across classes through conditional intermediate fields
+
+Both branches of a conditional receiver can point to another class. Checking the consumer first must
+retain the same independent roots and report an incompatible assignment.
+
+`consumer.py`:
+
+```py
+from model import Left, Right
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+`model.py`:
+
+```py
+class Left:
+    holder: "Right"
+    alternate: "Right"
+
+    def reset(self):
+        self.values = [1]
+
+    def update(self, flag: bool):
+        self.values = [*(self.holder if flag else self.alternate).values]
+
+class Right:
+    holder: Left
+    alternate: Left
+
+    def reset(self):
+        self.values = [1]
+
+    def update(self, flag: bool):
+        self.values = [*(self.holder if flag else self.alternate).values, "added"]  # error: [invalid-assignment]
+```
+
+## Recursive attributes across conditionally selected receivers
+
+A conditional expression can choose between two parameters belonging to another class.
+
+```py
+class Left:
+    def reset(self):
+        self.values = [1]
+
+    def update(self, other: "Right", alternate: "Right", flag: bool):
+        self.values = [*(other if flag else alternate).values]
+
+class Right:
+    def reset(self):
+        self.values = [1]
+
+    def update(self, other: Left, alternate: Left, flag: bool):
+        self.values = [*(other if flag else alternate).values, "added"]  # error: [invalid-assignment]
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+## Recursive attributes initialized through local aliases
+
+Local aliases of independent values remain valid initial attribute types, even when the alias chain
+contains more than one assignment.
+
+```py
+class Left:
+    def reset(self):
+        first = 1
+        initial = first
+        self.values = [initial]
+
+    def update(self, other: "Right"):
+        self.values = [*other.values]
+
+class Right:
+    def reset(self):
+        first = 1
+        initial = first
+        self.values = [initial]
+
+    def update(self, other: Left):
+        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+## Recursive attributes initialized from declared attributes
+
+A declared attribute supplies an independent initial value without relying on recursive attribute
+inference.
+
+```py
+class Left:
+    default: int = 1
+
+    def reset(self):
+        self.values = [self.default]
+
+    def update(self, other: "Right"):
+        self.values = [*other.values]
+
+class Right:
+    default: int = 1
+
+    def reset(self):
+        self.values = [self.default]
+
+    def update(self, other: Left):
+        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+## Recursive attributes initialized from method-level declarations
+
+An instance attribute explicitly annotated inside a method supplies a concrete initial value.
+
+```py
+class Left:
+    def reset(self):
+        self.default: int = 1
+        self.values = [self.default]
+
+    def update(self, other: "Right"):
+        self.values = [*other.values]
+
+class Right:
+    def reset(self):
+        self.default: int = 1
+        self.values = [self.default]
+
+    def update(self, other: Left):
+        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+## Recursive attributes initialized from inferred class attributes
+
+An unannotated class attribute can also establish an independent initial value.
+
+```py
+class Left:
+    default = 1
+
+    def reset(self):
+        self.values = [self.default]
+
+    def update(self, other: "Right"):
+        self.values = [*other.values]
+
+class Right:
+    default = 1
+
+    def reset(self):
+        self.values = [self.default]
+
+    def update(self, other: Left):
+        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+## Recursive attributes initialized from typed properties
+
+A property's declared return type establishes an independent initial value without evaluating its
+getter.
+
+```py
+class Left:
+    @property
+    def default(self) -> int:
+        return 1
+
+    def reset(self):
+        self.values = [self.default]
+
+    def update(self, other: "Right"):
+        self.values = [*other.values]
+
+class Right:
+    @property
+    def default(self) -> int:
+        return 1
+
+    def reset(self):
+        self.values = [self.default]
+
+    def update(self, other: Left):
+        self.values = [*other.values, "added"]  # error: [invalid-assignment]
+
+reveal_type(Left().values)  # revealed: list[int]
+reveal_type(Right().values)  # revealed: list[int]
+```
+
+## Acyclic instance attributes on another receiver
+
+Reading another instance's attribute does not make an otherwise acyclic assignment an error.
+
+```py
+class Source:
+    def __init__(self):
+        self.values = [1]
+
+class Target:
+    def reset(self):
+        self.values = [0]
+
+    def update(self, source: Source):
+        self.values = [*source.values]
+
+reveal_type(Target().values)  # revealed: list[int]
+```
+
+## Recursive instance attributes without an independent value
+
+When no assignment establishes the attribute independently, existing cycle recovery still applies.
+
+```py
+class Rootless:
+    def update(self):
+        self.values = [*self.values]
+
+reveal_type(Rootless().values)  # revealed: list[Divergent]
+```
+
+## Recursive attributes retain elements introduced without an initializer
+
+When recursive assignments have no independent initial value, an explicitly inserted element remains
+known even though the other elements are unknown.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left, Added()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
+reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain locally aliased elements without an initializer
+
+An independent element does not become recursive when it is first assigned to a local variable.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        candidate = Added()
+        self.left = [*self.right]
+        self.right = [*self.left, candidate]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
+reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain constructed elements without an initializer
+
+A constructor remains independent when its arguments do not refer to recursive attributes.
+
+```py
+class Original: ...
+
+class Added:
+    def __init__(self, value: int): ...
+
+class Rootless:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left, Added(1)]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
+reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain unary literals without an initializer
+
+Applying a unary operator to a literal does not hide its independent element type.
+
+```py
+class Original: ...
+
+class Rootless:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left, -1]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | int]
+reveal_type(Rootless().right)  # revealed: list[Unknown | int]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain elements returned by class methods
+
+A class method can provide independent evidence without accessing either recursive attribute.
+
+```py
+class Original: ...
+
+class Added:
+    @classmethod
+    def create(cls) -> "Added":
+        return cls()
+
+class Rootless:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left, Added.create()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
+reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain evidence inside conditional comprehensions
+
+An independent element remains visible when its collection is copied inside a comprehension and
+selected by a conditional expression.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self, flag: bool):
+        self.left = [*self.right]
+        self.right = [value for value in [*self.left, Added()]] if flag else [value for value in [*self.left, Added()]]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
+reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain elements inside generator expressions
+
+Copying a collection through a generator does not erase an independently inserted element.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        self.left = [*self.right]
+        self.right = list(value for value in [*self.left, Added()])
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
+reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain independently unpacked mapping entries
+
+Unpacking an independent mapping preserves its key and value evidence, including through a local
+alias.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        additional = {"added": Added()}
+        self.left = {**self.right, **{"other": Added()}}
+        self.right = {**self.left, **additional}
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Rootless().right)  # revealed: dict[Unknown | str, Unknown | Added]
+accept_original(next(iter(Rootless().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Rootless().right.values())))  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain entries copied through mapping comprehensions
+
+A mapping comprehension preserves independently inserted keys and values.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        self.left = {**self.right}
+        self.right = {key: value for key, value in {**self.left, "added": Added()}.items()}
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Rootless().right)  # revealed: dict[Unknown | str, Unknown | Added]
+accept_original(next(iter(Rootless().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Rootless().right.values())))  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain evidence across nested comprehension generators
+
+Independent elements remain visible when multiple comprehension generators flatten nested
+collections.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [value for group in [[*self.left, Added()]] for value in group]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
+reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain evidence through composed iterator operations
+
+Iterator chaining, reversal, and slicing do not erase an independently inserted element.
+
+```py
+from itertools import chain
+
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        self.left = [*self.right]
+        self.right = list(reversed(list(chain(self.left, [Added()]))))[:]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: list[Unknown | Added]
+reveal_type(Rootless().right)  # revealed: list[Unknown | Added]
+accept_original(Rootless().left[0])  # error: [invalid-argument-type]
+accept_original(Rootless().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain transformed mapping entries
+
+Transforming comprehension keys or supplying independent keyword entries preserves their value
+evidence.
+
+```py
+class Original: ...
+class Added: ...
+
+class Transformed:
+    def update(self):
+        self.left = {**self.right}
+        self.right = {key.upper(): value for key, value in {**self.left, "added": Added()}.items()}
+
+class Constructed:
+    def update(self):
+        self.left = {**self.right}
+        self.right = dict(self.left, added=Added())
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Transformed().right)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Constructed().right)  # revealed: dict[Unknown | str, Unknown | Added]
+accept_original(next(iter(Transformed().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Transformed().right.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Constructed().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Constructed().right.values())))  # error: [invalid-argument-type]
+```
+
+## Recursive mapping comprehensions preserve independently constructed values
+
+An independent value remains visible when the comprehension keys come from a recursive mapping.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        self.left = {**self.right}
+        self.right = {key: Added() for key in self.left}
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().left)  # revealed: dict[Unknown, Unknown | Added]
+reveal_type(Rootless().right)  # revealed: dict[Unknown, Unknown | Added]
+accept_original(next(iter(Rootless().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Rootless().right.values())))  # error: [invalid-argument-type]
+```
+
+## Recursive collections preserve independently added operands
+
+Concatenation and collection unions retain elements introduced by independent operands.
+
+```py
+class Original: ...
+class Added: ...
+
+class Lists:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left] + [Added()]
+
+class Mappings:
+    def update(self):
+        self.left = {**self.right}
+        self.right = self.left | {"added": Added()}
+
+class Sets:
+    def update(self):
+        self.left = {*self.right}
+        self.right = self.left | {Added()}
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Lists().right)  # revealed: list[Unknown | Added]
+reveal_type(Mappings().right)  # revealed: dict[Unknown | str, Unknown | Added]
+reveal_type(Sets().right)  # revealed: set[Unknown | Added]
+accept_original(Lists().left[0])  # error: [invalid-argument-type]
+accept_original(Lists().right[0])  # error: [invalid-argument-type]
+accept_original(next(iter(Mappings().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Mappings().right.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Sets().left)))  # error: [invalid-argument-type]
+accept_original(next(iter(Sets().right)))  # error: [invalid-argument-type]
+```
+
+## Recursive attributes retain evidence selected by constant conditions
+
+Both true and false conditions preserve independent elements from their selected branches.
+
+```py
+class Original: ...
+class Added: ...
+
+class SelectedTrue:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left, Added()] if True else [*self.left]
+
+class SelectedFalse:
+    def update(self):
+        self.left = [*self.right]
+        self.right = [*self.left] if False else [*self.left, Added()]
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(SelectedTrue().right)  # revealed: list[Unknown | Added]
+reveal_type(SelectedFalse().right)  # revealed: list[Unknown | Added]
+accept_original(SelectedTrue().left[0])  # error: [invalid-argument-type]
+accept_original(SelectedTrue().right[0])  # error: [invalid-argument-type]
+accept_original(SelectedFalse().left[0])  # error: [invalid-argument-type]
+accept_original(SelectedFalse().right[0])  # error: [invalid-argument-type]
+```
+
+## Recursive mappings retain entries copied by generator expressions
+
+Constructing a mapping from generated key-value pairs preserves its independent entries.
+
+```py
+class Original: ...
+class Added: ...
+
+class Rootless:
+    def update(self):
+        self.left = {**self.right}
+        self.right = dict((key, value) for key, value in {**self.left, "added": Added()}.items())
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Rootless().right)  # revealed: dict[Unknown | str, Unknown | Added]
+accept_original(next(iter(Rootless().left.values())))  # error: [invalid-argument-type]
+accept_original(next(iter(Rootless().right.values())))  # error: [invalid-argument-type]
+```
+
+## Recursive collections preserve semantic method and operator results
+
+Bound collection methods and operator helpers retain independently supplied elements.
+
+```py
+from operator import add
+
+class Original: ...
+class Added: ...
+
+class Lists:
+    def update(self):
+        self.left = [*self.right]
+        self.right = add([*self.left], [Added()])
+
+class Sets:
+    def update(self):
+        self.left = {*self.right}
+        self.right = self.left.union({Added()})
+
+def accept_original(value: Original) -> None: ...
+
+reveal_type(Lists().right)  # revealed: list[Unknown | Added]
+reveal_type(Sets().right)  # revealed: set[Unknown | Added]
+accept_original(Lists().left[0])  # error: [invalid-argument-type]
+accept_original(Lists().right[0])  # error: [invalid-argument-type]
+accept_original(next(iter(Sets().left)))  # error: [invalid-argument-type]
+accept_original(next(iter(Sets().right)))  # error: [invalid-argument-type]
+```
+
 ## Cycle normalization preserves non-gradual variadic parameters
 
 Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters
@@ -530,3627 +1590,6 @@ class Parent(Base):
 
     def get_values(self) -> list[str]:
         return self.values
-```
-
-## Same-class and final attributes when the base is checked first
-
-A same-class initializer can follow an update through a local alias. A bare `Final` declaration
-without a value does not replace an inherited initializer.
-
-```toml
-[rules]
-unsound-return-statement = "error"
-```
-
-`base.py`:
-
-```py
-from typing import Final
-
-class Parent:
-    def update(self):
-        previous = self.values
-        self.values = [*previous]
-
-    def __init__(self):
-        self.values = ["a"]
-
-    def get_values(self) -> list[str]:
-        return self.values
-
-class FinalBase:
-    values = ["a"]
-
-class FinalParent(FinalBase):
-    def __init__(self):
-        self.values: Final
-        self.values = [*self.values]
-
-    def get_values(self) -> list[str]:
-        return self.values
-```
-
-`child.py`:
-
-```py
-from base import FinalParent, Parent
-
-class Child(Parent):
-    def update(self):
-        self.values = [*self.values]
-
-class FinalChild(FinalParent):
-    def __init__(self):
-        self.values = self.values + ["b"]
-```
-
-## Same-class and final attributes when the subclass is checked first
-
-Reversing file order preserves both the same-class initializer and the inherited bare `Final` value.
-
-```toml
-[rules]
-unsound-return-statement = "error"
-```
-
-`child.py`:
-
-```py
-from base import FinalParent, Parent
-
-class Child(Parent):
-    def update(self):
-        self.values = [*self.values]
-
-class FinalChild(FinalParent):
-    def __init__(self):
-        self.values = self.values + ["b"]
-```
-
-`base.py`:
-
-```py
-from typing import Final
-
-class Parent:
-    def update(self):
-        previous = self.values
-        self.values = [*previous]
-
-    def __init__(self):
-        self.values = ["a"]
-
-    def get_values(self) -> list[str]:
-        return self.values
-
-class FinalBase:
-    values = ["a"]
-
-class FinalParent(FinalBase):
-    def __init__(self):
-        self.values: Final
-        self.values = [*self.values]
-
-    def get_values(self) -> list[str]:
-        return self.values
-```
-
-## Mutually dependent attributes when the left attribute is checked first
-
-Independently initialized attributes can depend on each other through different branches.
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-```
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[str]
-```
-
-## Mutually dependent attributes when the right attribute is checked first
-
-Checking the opposite attribute first preserves both independently initialized types.
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[str]
-```
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-```
-
-## Mutually dependent attributes reached through an annotated local alias
-
-A local alias can read either attribute, so both possible dependencies contribute to the same
-recursive attribute group.
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        previous: list[str] = self.right if flag else self.left
-        if flag:
-            self.left = [*previous]
-        else:
-            self.right = [*previous]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-reveal_type(Example().right)  # revealed: list[str]
-```
-
-## Widening mutually dependent attributes when the left attribute is checked first
-
-A dependent assignment can introduce a type absent from both independently initialized attributes.
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left, 1]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str | int] | list[str]
-```
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[str | int] | list[str]
-```
-
-## Widening mutually dependent attributes when the right attribute is checked first
-
-Checking the opposite attribute first preserves the type introduced by the dependent assignment.
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[str | int] | list[str]
-```
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left, 1]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str | int] | list[str]
-```
-
-## Widening mutually dependent attributes with user-defined types, left first
-
-A recursive assignment must retain a new user-defined type even when neither class is final.
-
-`left.py`:
-
-```py
-class Original: ...
-class Added: ...
-
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left, Added()]
-
-    def initialize(self) -> None:
-        self.left = [Original()]
-        self.right = [Original()]
-
-reveal_type(Example().left)  # revealed: list[Original | Added] | list[Original]
-```
-
-`right.py`:
-
-```py
-from left import Example, Original
-
-def accepts_original(value: Original) -> None: ...
-
-accepts_original(Example().right[0])  # error: [invalid-argument-type]
-reveal_type(Example().right)  # revealed: list[Original | Added] | list[Original]
-```
-
-## Widening mutually dependent attributes with user-defined types, right first
-
-Checking the opposite attribute first must not suppress the incompatible-argument diagnostic.
-
-`right.py`:
-
-```py
-from left import Example, Original
-
-def accepts_original(value: Original) -> None: ...
-
-accepts_original(Example().right[0])  # error: [invalid-argument-type]
-reveal_type(Example().right)  # revealed: list[Original | Added] | list[Original]
-```
-
-`left.py`:
-
-```py
-class Original: ...
-class Added: ...
-
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left, Added()]
-
-    def initialize(self) -> None:
-        self.left = [Original()]
-        self.right = [Original()]
-
-reveal_type(Example().left)  # revealed: list[Original | Added] | list[Original]
-```
-
-## Mutually dependent attributes introducing a collection type, left first
-
-A recursive assignment may introduce a new collection type without creating unbounded nesting.
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = set(self.left)
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-```
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: set[str] | list[str]
-```
-
-## Mutually dependent attributes introducing a collection type, right first
-
-Checking the opposite attribute first must preserve the independently initialized list.
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: set[str] | list[str]
-```
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = set(self.left)
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-```
-
-## Mutually dependent attributes introducing a collection around an atomic value
-
-A collection introduced around another attribute's value can remain finite when the other assignment
-immediately extracts its element.
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = self.right[0]
-        else:
-            self.right = [self.left]
-
-    def initialize(self) -> None:
-        self.left = "a"
-        self.right = "a"
-
-reveal_type(Example().left)  # revealed: str
-reveal_type(Example().right)  # revealed: list[str] | str
-```
-
-## Mutually dependent attributes captured by lazy callables, defining class first
-
-A lambda's body is executed lazily, but its return type can still depend on another attribute in the
-same recursive component. Both callable alternatives must remain visible to diagnostics.
-
-`model.py`:
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = lambda: "a"
-        self.right = lambda: 1
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = lambda: self.right
-        else:
-            self.right = lambda: self.left
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Example().left())  # revealed: str | Divergent | (() -> int)
-accept_string(Example().left())  # error: [invalid-argument-type]
-```
-
-`consumer.py`:
-
-```py
-from model import Example
-
-def accept_int(value: int) -> None: ...
-
-reveal_type(Example().right())  # revealed: int | Divergent | (() -> str)
-accept_int(Example().right())  # error: [invalid-argument-type]
-```
-
-## Mutually dependent attributes captured by lazy callables, consumer first
-
-Checking the other callable first must not hide either callable alternative or suppress its invalid
-argument diagnostic.
-
-`consumer.py`:
-
-```py
-from model import Example
-
-def accept_int(value: int) -> None: ...
-
-reveal_type(Example().right())  # revealed: int | Divergent | (() -> str)
-accept_int(Example().right())  # error: [invalid-argument-type]
-```
-
-`model.py`:
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = lambda: "a"
-        self.right = lambda: 1
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = lambda: self.right
-        else:
-            self.right = lambda: self.left
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Example().left())  # revealed: str | Divergent | (() -> int)
-accept_string(Example().left())  # error: [invalid-argument-type]
-```
-
-## Mutually dependent lazy callables with finite return types
-
-Calling the other attribute inside each lambda does not repeatedly wrap its return type. This finite
-dependency must converge without introducing a divergent callable.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = lambda: "a"
-        self.right = lambda: 1
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = lambda: self.right()
-        else:
-            self.right = lambda: self.left()
-
-def accept_int(value: int) -> None: ...
-
-reveal_type(Example().left)  # revealed: () -> int | str
-reveal_type(Example().right)  # revealed: () -> str | int
-reveal_type(Example().right())  # revealed: str | int
-accept_int(Example().right())  # error: [invalid-argument-type]
-```
-
-## Lazy callables capturing attributes on another class
-
-A deferred lambda can capture an attribute on an annotated receiver belonging to another class. Its
-type dependency still participates in the shared cross-class component.
-
-```py
-from __future__ import annotations
-
-class Left:
-    def initialize(self) -> None:
-        self.callback = lambda: "a"
-
-    def update(self, other: Right) -> None:
-        self.callback = lambda: other.callback
-
-class Right:
-    def initialize(self) -> None:
-        self.callback = lambda: 1
-
-    def update(self, other: Left) -> None:
-        self.callback = lambda: other.callback
-
-def accept_string(value: str) -> None: ...
-def accept_int(value: int) -> None: ...
-
-accept_string(Left().callback())  # error: [invalid-argument-type]
-accept_int(Right().callback())  # error: [invalid-argument-type]
-```
-
-## Lazy callable parameters that shadow the enclosing receiver
-
-A lambda parameter named `self` shadows the method receiver. Its attribute read must not create a
-false dependency on the enclosing class's attribute.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = lambda: "a"
-        self.right = lambda: 1
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = lambda self: self.right
-        else:
-            self.right = lambda self: self.left
-
-reveal_type(Example().left)  # revealed: (() -> str) | ((self) -> Unknown)
-reveal_type(Example().right)  # revealed: (() -> int) | ((self) -> Unknown)
-```
-
-## Recursive attributes that repeatedly introduce a callable
-
-A callable that returns the previous attribute value produces an unbounded recursive type without
-preventing inference from terminating.
-
-```py
-from collections.abc import Callable
-from typing import TypeVar
-
-T = TypeVar("T")
-
-def wrap(value: T) -> Callable[[], T]:
-    return lambda: value
-
-class Example:
-    def initialize(self) -> None:
-        self.value = 1
-
-    def update(self) -> None:
-        self.value = wrap(self.value)
-
-reveal_type(Example().value)  # revealed: int | (() -> Divergent)
-```
-
-## Recursive attributes in callable parameter types
-
-Recursive growth in a callable's parameter type is normalized just like growth in its return type.
-
-```py
-from collections.abc import Callable
-from typing import TypeVar
-
-T = TypeVar("T")
-
-def wrap(value: T) -> Callable[[T], int]:
-    return lambda _: 1
-
-class Example:
-    def initialize(self) -> None:
-        self.value = 1
-
-    def update(self) -> None:
-        self.value = wrap(self.value)
-
-reveal_type(Example().value)  # revealed: int | ((Divergent, /) -> int)
-```
-
-## Recursive attributes nested in a class object
-
-Recursion remains guarded when the attribute value appears beneath both a list and a class object.
-
-```py
-from typing import TypeVar
-
-T = TypeVar("T")
-
-def wrap(value: T) -> list[type[T]]:
-    return [type(value)]
-
-class Example:
-    def initialize(self) -> None:
-        self.value = 1
-
-    def update(self) -> None:
-        self.value = wrap(self.value)
-
-reveal_type(Example().value)  # revealed: int | list[Divergent]
-```
-
-## Recursive attributes nested in a structural protocol
-
-Protocol specializations preserve the recursive marker without repeatedly expanding their type
-argument.
-
-```py
-from typing import Protocol, TypeVar
-
-T = TypeVar("T")
-
-class Wrapper(Protocol[T]):
-    def wrap(self, value: T) -> T: ...
-
-def wrap(value: T) -> Wrapper[T]:
-    raise NotImplementedError
-
-class Example:
-    def initialize(self) -> None:
-        self.value = 1
-
-    def update(self) -> None:
-        self.value = wrap(self.value)
-
-reveal_type(Example().value)  # revealed: int | Wrapper[Divergent]
-```
-
-## Recursive attributes that repeatedly wrap a projected element
-
-Recursion can expand an extracted element without ever containing the preceding complete attribute
-type as a nested value.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.value = ["a"]
-
-    def update(self) -> None:
-        self.value = [(self.value[0],)]
-
-reveal_type(Example().value)  # revealed: list[str] | list[Divergent]
-```
-
-## Recursive attributes that wrap comprehension elements
-
-An eagerly executed comprehension can introduce the same unbounded element recursion from a nested
-inference scope.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.value = ["a"]
-
-    def update(self) -> None:
-        self.value = [(item,) for item in self.value]
-
-reveal_type(Example().value)  # revealed: list[str] | list[Divergent]
-```
-
-## Mutually recursive attributes with alternating collection types
-
-Different attributes can grow the same recursive type through alternating list and tuple
-constructors.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = 1
-        self.right = "a"
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [self.right]
-        else:
-            self.right = (self.left,)
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Example().left)  # revealed: int | list[Divergent] | list[str]
-reveal_type(Example().right)  # revealed: str | tuple[Divergent] | tuple[int]
-accept_string(Example().right[0])  # error: [invalid-argument-type]
-```
-
-## Finite mutually dependent attributes that wrap an initially nested value
-
-Wrapping another attribute and then extracting the result reaches a finite fixed point even when the
-independently initialized values already contain the same collection constructor.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [self.right]
-        else:
-            self.right = self.left[0]
-
-reveal_type(Example().left)  # revealed: list[str] | list[list[str] | str]
-reveal_type(Example().right)  # revealed: list[str] | str
-```
-
-## Finite mutually dependent attributes that unwrap several collections
-
-A cycle can introduce several nested collections through different attributes and then remove all of
-them again without constructing an infinitely recursive type.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.middle = ["a"]
-        self.right = ["a"]
-
-    def update(self, mode: int) -> None:
-        if mode == 0:
-            self.left = [self.middle]
-        elif mode == 1:
-            self.middle = [self.right]
-        else:
-            self.right = self.left[0][0]
-
-reveal_type(Example().left)  # revealed: list[str] | list[list[str] | list[list[str] | str]]
-reveal_type(Example().middle)  # revealed: list[str] | list[list[str] | str]
-reveal_type(Example().right)  # revealed: list[str] | str
-```
-
-## Finite mutually dependent attributes that wrap several times per assignment
-
-A finite cycle can add several collection layers in each of two assignments before a third
-assignment removes those layers. Its propagated element type must remain available to diagnostics.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = 1
-        self.middle = "a"
-        self.right = b"a"
-
-    def update(self, mode: int) -> None:
-        if mode == 0:
-            self.left = [[[self.middle]]]
-        elif mode == 1:
-            self.middle = [[[self.right]]]
-        else:
-            self.right = self.left[0][0][0][0][0][0] if isinstance(self.left, list) else False
-
-def accept_initial(value: bytes | bool) -> None: ...
-
-# revealed: int | list[list[list[str | list[list[list[bytes | str | bool]]]]]]
-reveal_type(Example().left)
-accept_initial(Example().right)  # error: [invalid-argument-type]
-reveal_type(Example().right)  # revealed: bytes | str | bool
-```
-
-## Finite mutually dependent attributes that unwrap a collection
-
-Wrapping one attribute and immediately unwrapping it in the other remains finite, even when a new
-element type appears after the first iteration.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = 1
-        self.right = "a"
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [self.right]
-        else:
-            self.right = self.left[0] if isinstance(self.left, list) else b"a"
-
-reveal_type(Example().left)  # revealed: int | list[str | bytes]
-reveal_type(Example().right)  # revealed: str | bytes
-```
-
-## Mutually dependent attributes in comprehensions, left first
-
-Eager comprehension scopes retain dependencies on the enclosing method's receiver.
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [item for item in self.right]
-        else:
-            self.right = [item for item in self.left]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-```
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[str]
-```
-
-## Mutually dependent attributes in comprehensions, right first
-
-Checking the opposite attribute first must preserve both comprehension element types.
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[str]
-```
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [item for item in self.right]
-        else:
-            self.right = [item for item in self.left]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-```
-
-## Mutually dependent attributes captured by comprehension bodies
-
-An attribute accessed only inside a comprehension body still belongs to the enclosing method's
-recursive attribute group.
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [self.right[0] for _ in [0]]
-        else:
-            self.right = [self.left[0] for _ in [0]]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-reveal_type(Example().right)  # revealed: list[str]
-```
-
-## Mutually dependent attributes captured through local aliases, left first
-
-A comprehension can capture an enclosing local variable that aliases another attribute in the same
-recursive component.
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            previous = self.right
-            self.left = [previous[0] for _ in [0]]
-        else:
-            previous = self.left
-            self.right = [previous[0] for _ in [0]]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-```
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[str]
-```
-
-## Mutually dependent attributes captured through local aliases, right first
-
-Reading the opposite attribute first must not change dependencies captured through a local alias.
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[str]
-```
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            previous = self.right
-            self.left = [previous[0] for _ in [0]]
-        else:
-            previous = self.left
-            self.right = [previous[0] for _ in [0]]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[str]
-```
-
-## Differently initialized attributes when the left attribute is checked first
-
-Mutually dependent attributes retain both independently initialized types.
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = [1]
-
-reveal_type(Example().left)  # revealed: list[str | int] | list[str]
-```
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[int | str] | list[int]
-```
-
-## Differently initialized attributes when the right attribute is checked first
-
-Checking the opposite attribute first preserves both independently initialized types.
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example().right)  # revealed: list[int | str] | list[int]
-```
-
-`left.py`:
-
-```py
-class Example:
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = [1]
-
-reveal_type(Example().left)  # revealed: list[str | int] | list[str]
-```
-
-## Three mutually dependent attributes with different initial types
-
-Three differently initialized attributes converge without dropping any of their initial types.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.middle = [1]
-        self.right = [b"a"]
-
-    def update(self) -> None:
-        self.left = [*self.middle]
-        self.middle = [*self.right]
-        self.right = [*self.left]
-
-    def get_left(self) -> list[str]:
-        return self.left  # error: [invalid-return-type]
-
-reveal_type(Example().left)  # revealed: list[str] | list[int | bytes | str]
-```
-
-## Mutually dependent class attributes when the left attribute is checked first
-
-Independently initialized class attributes can depend on each other through different branches.
-
-`left.py`:
-
-```py
-class Example:
-    @classmethod
-    def update(cls, flag: bool) -> None:
-        if flag:
-            cls.left = [*cls.right]
-        else:
-            cls.right = [*cls.left]
-
-    @classmethod
-    def initialize(cls) -> None:
-        cls.left = ["a"]
-        cls.right = ["a"]
-
-reveal_type(Example.left)  # revealed: list[str]
-```
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example.right)  # revealed: list[str]
-```
-
-## Mutually dependent class attributes when the right attribute is checked first
-
-Checking the opposite class attribute first preserves both independently initialized types.
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example.right)  # revealed: list[str]
-```
-
-`left.py`:
-
-```py
-class Example:
-    @classmethod
-    def update(cls, flag: bool) -> None:
-        if flag:
-            cls.left = [*cls.right]
-        else:
-            cls.right = [*cls.left]
-
-    @classmethod
-    def initialize(cls) -> None:
-        cls.left = ["a"]
-        cls.right = ["a"]
-
-reveal_type(Example.left)  # revealed: list[str]
-```
-
-## Mutually dependent class attributes with different initial types
-
-Class attributes with different initial types converge together across class methods.
-
-```py
-class Example:
-    @classmethod
-    def initialize(cls) -> None:
-        cls.left = ["a"]
-        cls.right = [1]
-
-    @classmethod
-    def update(cls, flag: bool) -> None:
-        if flag:
-            cls.left = [*cls.right]
-        else:
-            cls.right = [*cls.left]
-
-reveal_type(Example.left)  # revealed: list[str] | list[int | str]
-```
-
-## Mutually dependent class attributes on a differently specialized receiver
-
-A class method can read a recursive class attribute through a class object with a different generic
-specialization.
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Example(Generic[T]):
-    @classmethod
-    def update(cls, other: "type[Example[int]]", flag: bool) -> None:
-        if flag:
-            cls.left = [*other.right]
-        else:
-            cls.right = [*cls.left]
-
-    @classmethod
-    def initialize(cls, value: T) -> None:
-        cls.left = [value]
-        cls.right = [value]
-
-reveal_type(Example[str].left)  # revealed: list[int] | list[str]
-reveal_type(Example[str].right)  # revealed: list[int | str] | list[str]
-```
-
-## Mutually dependent class attributes with a metaclass data descriptor
-
-A metaclass data descriptor takes precedence over provisional class-attribute values.
-
-```py
-class Descriptor:
-    def __get__(self, instance: object, owner: type | None = None) -> list[int]:
-        return [1]
-
-    def __set__(self, instance: object, value: list[int]) -> None:
-        pass
-
-class Meta(type):
-    right = Descriptor()
-
-class Example(metaclass=Meta):
-    @classmethod
-    def initialize(cls) -> None:
-        cls.left = ["a"]
-        cls.right = ["a"]  # error: [invalid-assignment]
-
-    @classmethod
-    def update(cls, flag: bool) -> None:
-        if flag:
-            cls.left = [*cls.right]
-        else:
-            cls.right = [*cls.left]  # error: [invalid-assignment]
-
-    @classmethod
-    def get_left(cls) -> list[str]:
-        return cls.left  # error: [invalid-return-type]
-
-reveal_type(Example.left)  # revealed: list[str] | list[int]
-reveal_type(Example.right)  # revealed: list[int]
-```
-
-## Mutually dependent class attributes with a metaclass declaration
-
-A metaclass declaration takes precedence over provisional class-attribute values.
-
-```py
-class Meta(type):
-    right: list[int]
-
-class Example(metaclass=Meta):
-    @classmethod
-    def initialize(cls) -> None:
-        cls.left = ["a"]
-        cls.right = ["a"]
-
-    @classmethod
-    def update(cls, flag: bool) -> None:
-        if flag:
-            cls.left = [*cls.right]
-        else:
-            cls.right = [*cls.left]
-
-    @classmethod
-    def get_left(cls) -> list[str]:
-        return cls.left  # error: [invalid-return-type]
-
-reveal_type(Example.left)  # revealed: list[str] | list[int]
-reveal_type(Example.right)  # revealed: list[int]
-```
-
-## Mutually dependent attributes that widen an initial value
-
-Widening one attribute invalidates provisional values for other attributes that depend on it.
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = self.right
-        else:
-            self.right = self.left + [1]
-
-    def get_left(self) -> list[str]:
-        return self.left  # error: [invalid-return-type]
-
-reveal_type(Example().left)  # revealed: list[str] | list[int | str]
-reveal_type(Example().right)  # revealed: list[str] | list[int | str]
-```
-
-## Mutually dependent attributes with a class-body declaration
-
-A class-body declaration takes precedence over a provisional instance-attribute value.
-
-```py
-class Example:
-    right: list[int]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]  # error: [invalid-assignment]
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left]  # error: [invalid-assignment]
-
-    def get_left(self) -> list[str]:
-        return self.left  # error: [invalid-return-type]
-
-reveal_type(Example().left)  # revealed: list[str] | list[int]
-reveal_type(Example().right)  # revealed: list[int]
-```
-
-## Mutually dependent attributes with an inherited data descriptor
-
-An inherited data descriptor retains precedence over provisional instance-attribute values.
-
-```py
-class Descriptor:
-    def __get__(self, instance: object, owner: type | None = None) -> list[int]:
-        return [1]
-
-    def __set__(self, instance: object, value: list[int]) -> None:
-        pass
-
-class Base:
-    right = Descriptor()
-
-class Example(Base):
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]  # error: [invalid-assignment]
-
-    def update(self, flag: bool) -> None:
-        if flag:
-            self.left = [*self.right]
-        else:
-            self.right = [*self.left]  # error: [invalid-assignment]
-
-    def get_left(self) -> list[str]:
-        return self.left  # error: [invalid-return-type]
-
-reveal_type(Example().left)  # revealed: list[str] | list[int]
-reveal_type(Example().right)  # revealed: list[int]
-```
-
-## Mutually dependent attributes on different instances of the same class
-
-A provisional value for `self.right` cannot replace a value assigned to another instance.
-
-```toml
-[rules]
-unsound-return-statement = "error"
-```
-
-```py
-class Example:
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-    def update(self, other: "Example", flag: bool) -> None:
-        if flag:
-            other.right = [1]
-            self.left = [*other.right]
-        else:
-            self.right = [*self.left]
-
-    def get_left(self) -> list[str]:
-        return self.left  # error: [invalid-return-type]
-
-reveal_type(Example().left)  # revealed: list[str] | list[int]
-```
-
-## Mutually dependent attributes on differently specialized instances, left first
-
-A recursive attribute read through another instance uses that instance's generic specialization,
-even when the attribute on the current instance is checked first.
-
-`left.py`:
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Example(Generic[T]):
-    def update(self, other: "Example[int]", flag: bool) -> None:
-        if flag:
-            self.left = [*other.right]
-        else:
-            self.right = [*self.left]
-
-    def __init__(self, item: T) -> None:
-        self.left = [item]
-        self.right = [item]
-
-reveal_type(Example("a").left)  # revealed: list[int] | list[str]
-```
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example("a").right)  # revealed: list[int | str] | list[str]
-```
-
-## Mutually dependent attributes on differently specialized instances, right first
-
-Checking the other attribute first must retain both the current instance's type argument and the
-type argument of the other instance.
-
-`right.py`:
-
-```py
-from left import Example
-
-reveal_type(Example("a").right)  # revealed: list[int | str] | list[str]
-```
-
-`left.py`:
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Example(Generic[T]):
-    def update(self, other: "Example[int]", flag: bool) -> None:
-        if flag:
-            self.left = [*other.right]
-        else:
-            self.right = [*self.left]
-
-    def __init__(self, item: T) -> None:
-        self.left = [item]
-        self.right = [item]
-
-reveal_type(Example("a").left)  # revealed: list[int] | list[str]
-```
-
-## Mutually dependent attributes on an aliased specialized instance
-
-A local alias retains the other instance's specialization while participating in the recursive
-attribute component.
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Example(Generic[T]):
-    def update(self, other: "Example[int]", flag: bool) -> None:
-        if flag:
-            source = other
-            self.left = [*source.right]
-        else:
-            self.right = [*self.left]
-
-    def __init__(self, item: T) -> None:
-        self.left = [item]
-        self.right = [item]
-
-reveal_type(Example("a").left)  # revealed: list[int] | list[str]
-reveal_type(Example("a").right)  # revealed: list[int | str] | list[str]
-```
-
-## Mutually dependent attributes captured from a specialized instance
-
-An eager comprehension can capture a receiver other than the enclosing method's first parameter. Its
-recursive attribute read still uses the captured receiver's specialization.
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Example(Generic[T]):
-    def update(self, other: "Example[int]", flag: bool) -> None:
-        if flag:
-            self.left = [other.right[0] for _ in [0]]
-        else:
-            self.right = [self.left[0] for _ in [0]]
-
-    def __init__(self, item: T) -> None:
-        self.left = [item]
-        self.right = [item]
-
-reveal_type(Example("a").left)  # revealed: list[int] | list[str]
-reveal_type(Example("a").right)  # revealed: list[int | str] | list[str]
-```
-
-## Mutually dependent attributes preserve assignments on another instance
-
-A value assigned directly to another instance must take precedence over the symbolic component's
-value for that instance.
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Example(Generic[T]):
-    def update(self, other: "Example[str]", flag: bool) -> None:
-        if flag:
-            other.right = [1]
-            self.left = [*other.right]
-        else:
-            self.right = [*self.left]
-
-    def __init__(self, item: T) -> None:
-        self.left = [item]
-        self.right = [item]
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Example("a").left)  # revealed: list[int] | list[str]
-accept_string(Example("a").left[0])  # error: [invalid-argument-type]
-```
-
-## Mutually dependent attributes preserve assignments through receiver aliases
-
-Assigning through a local alias of another instance retains the same concrete value as assigning
-through the original receiver.
-
-```py
-class Example:
-    def update(self, other: "Example", flag: bool) -> None:
-        if flag:
-            source = other
-            source.right = [1]
-            self.left = [*source.right]
-        else:
-            self.right = [*self.left]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Example().left)  # revealed: list[int] | list[str]
-accept_string(Example().left[0])  # error: [invalid-argument-type]
-```
-
-## Captured attributes preserve assignments on another instance
-
-An eager comprehension must retain a value assigned to its captured receiver in the enclosing
-method.
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Example(Generic[T]):
-    def update(self, other: "Example[str]", flag: bool) -> None:
-        if flag:
-            other.right = [1]
-            self.left = [other.right[0] for _ in [0]]
-        else:
-            self.right = [self.left[0] for _ in [0]]
-
-    def __init__(self, item: T) -> None:
-        self.left = [item]
-        self.right = [item]
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Example("a").left)  # revealed: list[int] | list[str]
-accept_string(Example("a").left[0])  # error: [invalid-argument-type]
-```
-
-## Mutually dependent attributes distinguish unrelated receivers
-
-Another class can have an attribute with the same name without its value being replaced by the
-current class's provisional attribute.
-
-```py
-class Other:
-    def __init__(self) -> None:
-        self.right = [b"a"]
-
-class Example:
-    def update(self, other: Other, flag: bool) -> None:
-        if flag:
-            self.left = [*other.right]
-        else:
-            self.right = [*self.left]
-
-    def initialize(self) -> None:
-        self.left = ["a"]
-        self.right = ["a"]
-
-reveal_type(Example().left)  # revealed: list[bytes] | list[str]
-reveal_type(Example().right)  # revealed: list[bytes | str] | list[str]
-```
-
-## Finite attributes that read a deeply nested value from another class
-
-A same-named attribute on an unrelated receiver does not prove that the current class has a
-recursively growing attribute. Its finite nested value must remain available to diagnostics.
-
-```py
-class Other:
-    def __init__(self) -> None:
-        self.right = [[[1]]]
-
-class Example:
-    def __init__(self) -> None:
-        self.left = "a"
-        self.right = "a"
-
-    def update(self, other: Other, flag: bool) -> None:
-        if flag:
-            self.left = [other.right]
-        else:
-            self.right = [self.left]
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Example().left)  # revealed: str | list[list[list[list[int]]]]
-reveal_type(Example().right)  # revealed: str | list[str | list[list[list[list[int]]]]]
-accept_string(Example().right[0])  # error: [invalid-argument-type]
-```
-
-## Finite cross-class attributes distinguish unrelated receiver contributions
-
-A deeply nested value from a third class must not be mistaken for constructor growth on a separate
-finite cycle. The resulting concrete value must remain available to diagnostics.
-
-```py
-from __future__ import annotations
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [[[[1]]]]
-
-class Left:
-    def initialize(self) -> None:
-        self.values = "left"
-
-    def update(self, other: Right) -> None:
-        self.values = [other.values]
-
-class Right:
-    def initialize(self) -> None:
-        self.values = "right"
-
-    def update(self, other: Left, foreign: Foreign, choose: bool) -> None:
-        if choose:
-            self.values = other.values[0]
-        else:
-            self.values = [foreign.values]
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Left().values)  # revealed: str | list[str | list[list[list[list[list[int]]]]]]
-reveal_type(Right().values)  # revealed: str | list[list[list[list[list[int]]]]]
-accept_string(Left().values[0])  # error: [invalid-argument-type]
-```
-
-## Mutually dependent attributes on different classes, defining class first
-
-Attributes on two classes can form one recursive dependency. A value introduced on either side must
-remain available to diagnostics when the class definitions are checked first.
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: Right) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-```
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-```
-
-## Mutually dependent attributes on different classes, consumer first
-
-Checking the consumer first must not discard the type introduced by the other class or suppress the
-resulting invalid-argument diagnostic.
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-```
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: Right) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-```
-
-## Cross-class recursive attributes with different names
-
-An attribute can depend on a differently named attribute owned by another class. Both members must
-retain values introduced anywhere in their shared component.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: Right) -> None:
-        self.left = [*other.right]
-
-    def initialize(self) -> None:
-        self.left = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.right = [*other.left, Added()]
-
-    def initialize(self) -> None:
-        self.right = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().left)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().right)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().right[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes accessed through receiver aliases
-
-A local alias of an annotated receiver must resolve to the same owning class as the original
-parameter when discovering the recursive component.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: Right) -> None:
-        source = other
-        self.values = [*source.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        source = other
-        self.values = [*source.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on annotated local receivers, defining class first
-
-A receiver's class can be established by a local annotation instead of a parameter annotation.
-Checking the defining module first must retain concrete values introduced by either class.
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self) -> None:
-        other: Right = Right()
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`consumer.py`:
-
-```py
-from model import Right, accept_original
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on annotated local receivers, consumer first
-
-Checking the other class first must not discard the owner established by the local annotation or
-hide either invalid argument.
-
-`consumer.py`:
-
-```py
-from model import Right, accept_original
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self) -> None:
-        other: Right = Right()
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on narrowed receivers
-
-An `isinstance` check can establish the owner of an attribute even when its receiver's declared type
-is only `object`.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: object) -> None:
-        if isinstance(other, Right):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers narrowed by qualified builtins
-
-Referring to `isinstance` through its defining module still establishes the receiver's class.
-
-```py
-from __future__ import annotations
-import builtins
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: object) -> None:
-        if builtins.isinstance(other, Right):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers narrowed to multiple classes
-
-Every class in an `isinstance` class-information tuple can own the accessed attribute.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Left:
-    def update(self, other: object) -> None:
-        if isinstance(other, (Right, Foreign)):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers narrowed by computed class information
-
-A class supplied by a typed helper can establish the receiver's owner even when computing the class
-also accesses the recursive attribute.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-def choose_class(value: object) -> type[Right]:
-    return Right
-
-class Left:
-    def update(self, other: object) -> None:
-        klass = choose_class(self.values)
-        if isinstance(other, klass):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers narrowed by chained class aliases
-
-A class supplied to `isinstance` can be reached through multiple unannotated local aliases.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: object) -> None:
-        first = Right
-        klass = first
-        if isinstance(other, klass):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers narrowed by conditional class aliases
-
-Every class that can reach a conditional `isinstance` argument is a possible attribute owner.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Left:
-    def update(self, other: object, flag: bool) -> None:
-        klass = Right if flag else Foreign
-        if isinstance(other, klass):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers returned by typed factories
-
-A factory's return annotation identifies the receiver's owner without evaluating an argument that
-accesses the recursive attribute.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-def make_right(value: object) -> Right:
-    return Right()
-
-class Left:
-    def update(self) -> None:
-        other = make_right(self.values)
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on annotated module-global receivers
-
-A module-level annotation can identify an attribute receiver used inside a method.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-module_receiver: Right = Right()
-
-class Left:
-    def update(self) -> None:
-        self.values = [*module_receiver.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-module recursive attributes through qualified annotated globals
-
-A module-qualified global preserves the owner established by its annotation.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-import right as module
-from right import Original
-
-class Left:
-    def update(self) -> None:
-        self.values = [*module.module_receiver.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-module_receiver: Right = Right()
-```
-
-## Cross-module recursive attributes through qualified typed factories
-
-A factory accessed through its module still establishes its receiver through its return annotation.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-import right as module
-from right import Original
-
-class Left:
-    def update(self) -> None:
-        self.values = [*module.make_right().values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def make_right() -> Right:
-    return Right()
-```
-
-## Cross-module recursive attributes through qualified TypeIs guards
-
-A module-qualified `TypeIs` guard identifies the receiver without evaluating its function body.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-import right as module
-from right import Original
-
-class Left:
-    def update(self, other: object) -> None:
-        if module.is_right(other):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from typing_extensions import TypeIs
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def is_right(value: object) -> TypeIs[Right]:
-    return isinstance(value, Right)
-```
-
-## Cross-module recursive attributes through qualified TypeGuard guards
-
-A module-qualified `TypeGuard` provides the same receiver information as a direct import.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-import right as module
-from right import Original
-
-class Left:
-    def update(self, other: object) -> None:
-        if module.is_right(other):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from typing import TypeGuard
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def is_right(value: object) -> TypeGuard[Right]:
-    return isinstance(value, Right)
-```
-
-## Cross-module recursive attributes through imported annotated globals
-
-An imported module-global annotation identifies the receiver before evaluating its initializer.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-from right import Original, module_receiver
-
-class Left:
-    def update(self) -> None:
-        self.values = [*module_receiver.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-module_receiver: Right = Right()
-```
-
-## Cross-module recursive attributes through imported typed factories
-
-An imported factory's return annotation establishes the owner of its result.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-from right import Original, make_right
-
-class Left:
-    def update(self) -> None:
-        self.values = [*make_right().values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def make_right() -> Right:
-    return Right()
-```
-
-## Cross-module recursive attributes through imported TypeIs guards
-
-An imported `TypeIs` annotation identifies the class established by a custom guard.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-from right import Original, is_right
-
-class Left:
-    def update(self, other: object) -> None:
-        if is_right(other):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from typing_extensions import TypeIs
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def is_right(value: object) -> TypeIs[Right]:
-    return isinstance(value, Right)
-```
-
-## Cross-module recursive attributes through imported TypeGuard guards
-
-An imported `TypeGuard` annotation identifies the class established by a custom guard.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-from right import Original, is_right
-
-class Left:
-    def update(self, other: object) -> None:
-        if is_right(other):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from typing import TypeGuard
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def is_right(value: object) -> TypeGuard[Right]:
-    return isinstance(value, Right)
-```
-
-## Cross-class recursive attributes on receivers narrowed by TypeIs
-
-A `TypeIs` return annotation can identify a receiver without evaluating the guard.
-
-```py
-from __future__ import annotations
-from typing_extensions import TypeIs
-
-class Original: ...
-class Added: ...
-
-def is_right(value: object) -> TypeIs[Right]:
-    return isinstance(value, Right)
-
-class Left:
-    def update(self, other: object) -> None:
-        if is_right(other):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers narrowed by TypeGuard
-
-A `TypeGuard` return annotation can identify the class established by a custom guard.
-
-```py
-from __future__ import annotations
-from typing import TypeGuard
-
-class Original: ...
-class Added: ...
-
-def is_right(value: object) -> TypeGuard[Right]:
-    return isinstance(value, Right)
-
-class Left:
-    def update(self, other: object) -> None:
-        if is_right(other):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on tuple-element receivers
-
-The class of a tuple element determines the owner of its accessed attribute.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, others: tuple[Right]) -> None:
-        self.values = [*others[0].values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on list-element receivers
-
-The class of a list element determines the owner of its accessed attribute.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, others: list[Right]) -> None:
-        self.values = [*others[0].values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on elements of union-typed containers
-
-Each possible container contributes its element type when determining the receiver's owner.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-class ForeignValue: ...
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [ForeignValue()]
-
-class Left:
-    def update(self, others: list[Right] | list[Foreign]) -> None:
-        self.values = [*others[0].values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added | ForeignValue] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | ForeignValue | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on dictionary-value receivers
-
-The value type of a dictionary determines the owner of an accessed element attribute.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, others: dict[str, Right]) -> None:
-        self.values = [*others["right"].values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on direct factory-call receivers
-
-A factory call can be the attribute receiver without first binding its result to a local name.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-def make_right() -> Right:
-    return Right()
-
-class Left:
-    def update(self) -> None:
-        self.values = [*make_right().values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on property-result receiver aliases
-
-A property's return annotation establishes the owner of an attribute accessed through its result.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Holder:
-    @property
-    def current(self) -> Right:
-        return Right()
-
-class Left:
-    def update(self, holder: Holder) -> None:
-        other = holder.current
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on chained property receivers
-
-An attribute can be read directly from a property without first binding the property's result.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Holder:
-    @property
-    def current(self) -> Right:
-        return Right()
-
-class Left:
-    def update(self, holder: Holder) -> None:
-        self.values = [*holder.current.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers narrowed by compound conditions
-
-A receiver can be narrowed by `isinstance` within a condition that also contains an unrelated
-boolean expression.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: object, flag: bool) -> None:
-        if flag and isinstance(other, Right):
-            self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on constrained type variables
-
-Every class allowed by a constrained type variable is a possible owner of the receiver's attribute.
-
-```py
-from __future__ import annotations
-from typing import TypeVar
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-T = TypeVar("T", Right, Foreign)
-
-class Left:
-    def update(self, other: T) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on union-bounded type variables
-
-A type variable bounded by a union can access an attribute on any of the classes in that bound.
-
-```py
-from __future__ import annotations
-from typing import TypeVar
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-T = TypeVar("T", bound=Right | Foreign)
-
-class Left:
-    def update(self, other: T) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on cast receivers
-
-A typed cast can establish the receiver's owner without requiring a parameter or local annotation.
-
-```py
-from __future__ import annotations
-from typing import cast
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, value: object) -> None:
-        other = cast(Right, value)
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on casts with dependent annotation metadata
-
-An `Annotated` cast can include metadata that accesses the recursive attribute without changing the
-class established by the annotation itself.
-
-```py
-from __future__ import annotations
-from typing import Annotated, cast
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, value: object) -> None:
-        other = cast(Annotated[Right, self.values], value)
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes on receivers established by renamed casts
-
-Renaming `typing.cast` does not change the class established by its target type.
-
-```py
-from __future__ import annotations
-from typing import cast as coerce
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, value: object) -> None:
-        other = coerce(Right, value)
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes with specialized generic receivers
-
-The shared component is independent of receiver specialization, but every attribute read must apply
-the actual type arguments of the class being accessed.
-
-```py
-from __future__ import annotations
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Left(Generic[T]):
-    def update(self, other: Right[int]) -> None:
-        self.values = [*other.values]
-
-    def __init__(self, item: T) -> None:
-        self.values = [item]
-
-class Right(Generic[T]):
-    def update(self, other: Left[str]) -> None:
-        self.values = [*other.values]
-
-    def __init__(self, item: T) -> None:
-        self.values = [item]
-
-def accept_string(value: str) -> None: ...
-
-reveal_type(Left("x").values)  # revealed: list[str | int] | list[str]
-reveal_type(Right(1).values)  # revealed: list[int | str] | list[int]
-accept_string(Left("x").values[0])  # error: [invalid-argument-type]
-```
-
-## Recursive attributes shared by three classes
-
-Discovering a component must follow attribute dependencies transitively instead of handling only
-pairs of directly connected classes.
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class First:
-    def update(self, other: Second) -> None:
-        self.first = [*other.second]
-
-    def initialize(self) -> None:
-        self.first = [Original()]
-
-class Second:
-    def update(self, other: Third) -> None:
-        self.second = [*other.third]
-
-    def initialize(self) -> None:
-        self.second = [Original()]
-
-class Third:
-    def update(self, other: First) -> None:
-        self.third = [*other.first, Added()]
-
-    def initialize(self) -> None:
-        self.third = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(First().first)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Second().second)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Third().third)  # revealed: list[Original | Added] | list[Original]
-accept_original(Third().third[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes inherited by a subclass
-
-An annotation naming a subclass must identify the base class that actually defines the recursive
-attribute, including when the consumer is checked first.
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-```
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Left:
-    def update(self, other: RightChild) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class RightChild(Right): ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-```
-
-## Cross-class recursive attributes with union-annotated receivers, defining class first
-
-Each class named by a receiver's union annotation can contribute to a recursive attribute. Checking
-the defining classes first must preserve values introduced on either side of that dependency.
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Left:
-    def update(self, other: Right | Foreign) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes with union-annotated receivers, consumer first
-
-Checking the consumer before the classes must not discard the value introduced through the
-union-annotated receiver or suppress either invalid-argument diagnostic.
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Left:
-    def update(self, other: Right | Foreign) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes with aliased union receivers
-
-A type alias for a union receiver names the same possible attribute owners as the union itself.
-Resolving the alias must retain the shared component and its concrete invalid-argument diagnostic.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-type Receiver = Right | Foreign
-
-class Left:
-    def update(self, other: Receiver) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Left().values[0])  # error: [invalid-argument-type]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class recursive attributes through conditional receiver aliases
-
-A receiver alias can refer to multiple classes on different branches. Every reachable owner must
-contribute an edge to the component, rather than only the first annotated receiver.
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-reveal_type(Right().values)  # revealed: list[Original] | list[Original | Added]
-```
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Left:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-    def update(self, other: Right, foreign: Foreign, choose: bool) -> None:
-        if choose:
-            source = foreign
-        else:
-            source = other
-        self.values = [*source.values]
-
-class Right:
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-reveal_type(Left().values)  # revealed: list[Original] | list[Original | Added]
-```
-
-## Cross-class recursive attributes after writes through conditional receivers
-
-A conditional receiver can be assigned before its attribute is captured by an eager comprehension.
-The concrete local assignment must remain visible to every class in the recursive component.
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-reveal_type(Right().values)  # revealed: list[Added | Original] | list[Original]
-```
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Foreign:
-    def initialize(self) -> None:
-        self.values = [Added()]
-
-class Left:
-    def update(self, other: Right, foreign: Foreign, choose: bool) -> None:
-        source = other if choose else foreign
-        source.values = [Added()]
-        self.values = [source.values[0] for _ in [0]]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-reveal_type(Left().values)  # revealed: list[Added] | list[Original]
-```
-
-## Cross-class receiver annotations with recursive defaults, defining class first
-
-Discovering the class named by a receiver annotation must not infer an unrelated parameter default
-before the shared attribute component has been established.
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def make_right(value: object) -> Right:
-    return Right()
-
-class Left:
-    def update(self, other: Right = make_right(Right().values[0])) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-```
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-## Cross-class receiver annotations with recursive defaults, consumer first
-
-Checking the consumer first must produce the same component even when the other class's method has a
-default value that reads the recursive attribute.
-
-`consumer.py`:
-
-```py
-from model import Original, Right
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-`model.py`:
-
-```py
-from __future__ import annotations
-
-class Original: ...
-class Added: ...
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-def make_right(value: object) -> Right:
-    return Right()
-
-class Left:
-    def update(self, other: Right = make_right(Right().values[0])) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-```
-
-## Cross-class recursive attributes defined in separate modules
-
-Recursive components can cross a module boundary. Each class's assignments must be discovered
-through its own tracked query, and the consumer must retain values introduced by either module.
-
-`consumer.py`:
-
-```py
-from left import Left
-from right import Right
-from shared import Original
-
-def accept_original(value: Original) -> None: ...
-
-reveal_type(Left().values)  # revealed: list[Original | Added] | list[Original]
-reveal_type(Right().values)  # revealed: list[Original | Added] | list[Original]
-accept_original(Right().values[0])  # error: [invalid-argument-type]
-```
-
-`left.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from shared import Original
-
-if TYPE_CHECKING:
-    from right import Right
-
-class Left:
-    def update(self, other: Right) -> None:
-        self.values = [*other.values]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`right.py`:
-
-```py
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from shared import Added, Original
-
-if TYPE_CHECKING:
-    from left import Left
-
-class Right:
-    def update(self, other: Left) -> None:
-        self.values = [*other.values, Added()]
-
-    def initialize(self) -> None:
-        self.values = [Original()]
-```
-
-`shared.py`:
-
-```py
-class Original: ...
-class Added: ...
-```
-
-## Final annotations that establish an attribute type
-
-An initialized bare `Final` infers its value, while `Final[T]` retains its explicit declared type.
-
-```py
-from typing import Final
-
-class Initialized:
-    def __init__(self):
-        self.values: Final = ["a"]
-
-class Declared:
-    def __init__(self):
-        self.values: Final[list[str]]
-        self.values = ["a"]
-
-reveal_type(Initialized().values)  # revealed: list[str]
-reveal_type(Declared().values)  # revealed: list[str]
-```
-
-## Same-named attributes on unrelated receivers
-
-An independently initialized attribute must not replace a different receiver's same-named attribute.
-
-```py
-class Other:
-    def __init__(self):
-        self.values = [1]
-
-class Example:
-    def __init__(self):
-        self.values = ["a"]
-
-    def update(self, other: Other):
-        self.values = [*other.values]
-
-reveal_type(Example().values)  # revealed: list[str] | list[int]
 ```
 
 ## Inherited attributes remain stable across assignment forms

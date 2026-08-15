@@ -12,9 +12,8 @@ use crate::reachability::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberInferenceContext, MemberLookupPolicy, Type, TypeAndQualifiers,
-    TypeQualifiers, UnionBuilder, UnionType, binding_type, exists_at_runtime,
-    infer_definition_types_with_member_context, inferred_declaration,
+    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
+    UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
@@ -796,7 +795,6 @@ pub(super) fn place_from_bindings<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         None,
-        None,
     )
 }
 
@@ -812,24 +810,6 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         Some(reachability_cache),
-        None,
-    )
-}
-
-pub(super) fn place_from_bindings_with_reachability_cache_and_member_context<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-    reachability_cache: &ReachabilityEvaluationCache<'db>,
-    member_context: Option<MemberInferenceContext<'db>>,
-) -> PlaceWithDefinition<'db> {
-    place_from_bindings_impl(
-        db,
-        env,
-        bindings_with_constraints,
-        RequiresExplicitReExport::No,
-        Some(reachability_cache),
-        member_context,
     )
 }
 
@@ -1175,16 +1155,9 @@ pub(crate) fn place_by_id<'db>(
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return place_from_bindings_impl(
-            db,
-            &env,
-            bindings,
-            requires_explicit_reexport,
-            None,
-            None,
-        )
-        .place
-        .with_qualifiers(qualifiers);
+        return place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
+            .place
+            .with_qualifiers(qualifiers);
     }
 
     match declared {
@@ -1202,15 +1175,8 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(
-                db,
-                &env,
-                bindings,
-                requires_explicit_reexport,
-                None,
-                None,
-            )
-            .place
+            match place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
+                .place
             {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
@@ -1259,14 +1225,8 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let inferred = place_from_bindings_impl(
-                db,
-                &env,
-                bindings,
-                requires_explicit_reexport,
-                None,
-                None,
-            );
+            let inferred =
+                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None);
 
             let place = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
@@ -1311,15 +1271,9 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let mut inferred = place_from_bindings_impl(
-                db,
-                &env,
-                bindings,
-                requires_explicit_reexport,
-                None,
-                None,
-            )
-            .place;
+            let mut inferred =
+                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
+                    .place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1662,7 +1616,6 @@ fn place_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
-    member_context: Option<MemberInferenceContext<'db>>,
 ) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
@@ -1826,15 +1779,7 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
-            let binding_ty = if let Some(member_context) = member_context
-                && use_def_map(db, binding.scope(db))
-                    .definition_may_depend_on_instance_member(binding)
-            {
-                infer_definition_types_with_member_context(db, binding, member_context)
-                    .binding_type(binding)
-            } else {
-                binding_type(db, binding)
-            };
+            let binding_ty = binding_type(db, binding);
             Some((
                 narrowing_constraint.narrow(db, env, binding_ty, binding.place(db)),
                 static_reachability,

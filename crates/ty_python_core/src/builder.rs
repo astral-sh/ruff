@@ -38,7 +38,7 @@ use crate::definition::{
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
-use crate::member::{MemberExprBuilder, ScopedMemberId};
+use crate::member::MemberExprBuilder;
 use crate::place::{
     PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
@@ -239,8 +239,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
-    /// Attribute-read dependency of the ordinary assignment value currently being evaluated.
-    assignment_member_dependency: Option<AssignmentMemberDependency>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
@@ -316,7 +314,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
             current_statements: Vec::new(),
-            assignment_member_dependency: None,
             current_match_case: None,
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
@@ -457,51 +454,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Identify a method whose active assignment contains the current attribute read.
-    ///
-    /// Lambda bodies execute lazily, but their return types are inferred when the enclosing
-    /// callable is constructed. Their captured member reads therefore contribute to the
-    /// assignment's type without creating an eager runtime use in the method scope.
-    fn assignment_dependency_method_scope(&self) -> Option<FileScopeId> {
-        if let Some(method_scope) = self.is_method_or_eagerly_executed_in_method() {
-            return Some(method_scope);
-        }
-
-        let frame = self.assignment_member_dependency.as_ref()?;
-        if !frame.collecting || self.scopes[frame.scope].kind() != ScopeKind::Function {
-            return None;
-        }
-
-        let parent = self.scopes[frame.scope].parent()?;
-        let class = if self.scopes[parent].kind() == ScopeKind::TypeParams {
-            self.scopes[parent].parent()?
-        } else {
-            parent
-        };
-        if self.scopes[class].kind() != ScopeKind::Class {
-            return None;
-        }
-
-        let mut contains_lambda = false;
-        for scope in self.scope_stack.iter().rev() {
-            if scope.file_scope_id == frame.scope {
-                return contains_lambda.then_some(frame.scope);
-            }
-
-            match self.scopes[scope.file_scope_id].kind() {
-                ScopeKind::Lambda => contains_lambda = true,
-                kind if kind.is_eager() => {}
-                _ => return None,
-            }
-        }
-
-        None
-    }
-
-    /// Checks if a symbol name is bound in any intermediate scopes
+    /// Checks if a symbol name is bound in any intermediate eager scopes
     /// between the current scope and the specified method scope.
     ///
-    fn is_symbol_bound_in_intermediate_scopes(
+    fn is_symbol_bound_in_intermediate_eager_scopes(
         &self,
         symbol_name: &str,
         method_scope_id: FileScopeId,
@@ -1442,158 +1398,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
-        self.record_assignment_member_dependency(place_id, use_id);
-    }
-
-    /// Record a possible attribute read while evaluating an ordinary assignment value.
-    fn record_assignment_member_dependency(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
-        let Some(frame) = self.assignment_member_dependency.as_ref() else {
-            return;
-        };
-        if !frame.collecting {
-            return;
-        }
-
-        let assignment_scope = frame.scope;
-        if assignment_scope != self.current_scope() {
-            if self.assignment_dependency_method_scope() != Some(assignment_scope) {
-                return;
-            }
-
-            match place {
-                ScopedPlaceId::Member(member) => {
-                    let member = self.current_place_table().member(member);
-                    let Some((receiver, _)) = member.as_direct_attribute() else {
-                        return;
-                    };
-
-                    if !member.is_instance_attribute()
-                        && (self.is_symbol_bound_in_intermediate_scopes(receiver, assignment_scope)
-                            || self.place_tables[assignment_scope]
-                                .symbol_id(receiver)
-                                .is_none())
-                    {
-                        return;
-                    }
-
-                    // Member IDs are scoped. Canonicalize a captured method-local receiver into
-                    // the enclosing method so each dependency belongs to its definition's scope.
-                    let member = member.clone();
-                    let (place, added) =
-                        self.place_tables[assignment_scope].add_place(PlaceExpr::Member(member));
-                    if added {
-                        self.use_def_maps[assignment_scope].add_place(place);
-                    }
-
-                    if let ScopedPlaceId::Member(member) = place
-                        && let Some(frame) = self.assignment_member_dependency.as_mut()
-                    {
-                        frame.has_dependency = true;
-                        if !frame.members.contains(&member) {
-                            frame.members.push(member);
-                        }
-                    }
-                }
-                ScopedPlaceId::Symbol(symbol) => {
-                    let name = self.current_place_table().symbol(symbol).name();
-                    if self.is_symbol_bound_in_intermediate_scopes(name, assignment_scope) {
-                        return;
-                    }
-
-                    let Some(symbol) = self.place_tables[assignment_scope].symbol_id(name) else {
-                        return;
-                    };
-                    let use_def = &self.use_def_maps[assignment_scope];
-                    let dependencies = use_def
-                        .symbol_binding_definition_ids(symbol)
-                        .filter_map(|binding| use_def.definition(binding).definition())
-                        .filter_map(|definition| use_def.definition_member_dependencies(definition))
-                        .flatten()
-                        .copied()
-                        .collect::<SmallVec<[ScopedMemberId; 2]>>();
-
-                    if !dependencies.is_empty()
-                        && let Some(frame) = self.assignment_member_dependency.as_mut()
-                    {
-                        frame.has_dependency = true;
-                        for member in dependencies {
-                            if !frame.members.contains(&member) {
-                                frame.members.push(member);
-                            }
-                        }
-                    }
-                }
-            }
-            return;
-        }
-
-        let mut dependencies = SmallVec::<[ScopedMemberId; 2]>::new();
-        let has_dependency = match place {
-            ScopedPlaceId::Member(member) => {
-                if self
-                    .current_place_table()
-                    .member(member)
-                    .as_direct_attribute()
-                    .is_some()
-                {
-                    dependencies.push(member);
-                }
-                true
-            }
-            ScopedPlaceId::Symbol(_) => {
-                let use_def = self.current_use_def_map();
-                let has_dependency = use_def.use_may_depend_on_instance_member(use_id);
-                if has_dependency {
-                    for binding in use_def.bindings_at_use(use_id) {
-                        let Some(definition) = use_def.definition(binding.binding()).definition()
-                        else {
-                            continue;
-                        };
-                        let Some(members) = use_def.definition_member_dependencies(definition)
-                        else {
-                            continue;
-                        };
-                        for member in members {
-                            if !dependencies.contains(member) {
-                                dependencies.push(*member);
-                            }
-                        }
-                    }
-                }
-                has_dependency
-            }
-        };
-
-        if let Some(frame) = self.assignment_member_dependency.as_mut() {
-            frame.has_dependency |= has_dependency;
-            for member in dependencies {
-                if !frame.members.contains(&member) {
-                    frame.members.push(member);
-                }
-            }
-        }
-    }
-
-    /// Preserve both broad dependency classification and precise same-scope member edges.
-    fn record_definition_member_dependencies(&mut self, definition: Definition<'db>) {
-        let scope = self.current_scope();
-        let Some((has_dependency, members)) = self
-            .assignment_member_dependency
-            .as_ref()
-            .filter(|frame| frame.scope == scope)
-            .map(|frame| (frame.has_dependency, frame.members.clone()))
-        else {
-            return;
-        };
-
-        if has_dependency {
-            self.current_use_def_map_mut()
-                .record_member_dependent_definition(definition);
-        }
-        if !members.is_empty() {
-            self.current_use_def_map_mut()
-                .record_definition_member_dependencies(definition, members);
-        }
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -1608,8 +1412,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     },
                 );
 
-                self.record_definition_member_dependencies(assignment);
-
                 self.add_dict_key_assignment_definitions(&node.targets, &node.value, assignment);
             }
             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
@@ -1618,9 +1420,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     place_id,
                     AnnotatedAssignmentDefinitionNodeRef { node: ann_assign },
                 );
-                if place_id.is_symbol() {
-                    self.record_definition_member_dependencies(assignment);
-                }
 
                 if let Some(value) = ann_assign.value.as_deref() {
                     self.add_dict_key_assignment_definitions(
@@ -3876,20 +3675,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::Assign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
-                let track_dependency = self.is_method_or_eagerly_executed_in_method().is_some();
-                if track_dependency {
-                    self.assignment_member_dependency = Some(AssignmentMemberDependency {
-                        scope: self.current_scope(),
-                        has_dependency: false,
-                        members: SmallVec::new(),
-                        collecting: true,
-                    });
-                }
                 self.visit_expr(&node.value);
-                if track_dependency && let Some(frame) = self.assignment_member_dependency.as_mut()
-                {
-                    frame.collecting = false;
-                }
 
                 // Unannotated collection initializers must be standalone expressions to participate
                 // in full-scope bidirectional inference.
@@ -3915,32 +3701,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
                     }
                 }
-
-                if track_dependency {
-                    self.assignment_member_dependency.take();
-                }
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(&node.annotation);
-                let track_dependency = node.target.is_name_expr()
-                    && node.value.is_some()
-                    && self.is_method_or_eagerly_executed_in_method().is_some();
-                if track_dependency {
-                    self.assignment_member_dependency = Some(AssignmentMemberDependency {
-                        scope: self.current_scope(),
-                        has_dependency: false,
-                        members: SmallVec::new(),
-                        collecting: true,
-                    });
-                }
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
-                    if track_dependency
-                        && let Some(frame) = self.assignment_member_dependency.as_mut()
-                    {
-                        frame.collecting = false;
-                    }
                     if self.is_method_or_eagerly_executed_in_method().is_some() {
                         // Record the right-hand side of the assignment as a standalone expression
                         // if we're inside a method. This allows type inference to infer the type
@@ -3985,10 +3751,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.try_register_narrowing_alias(&node.target, node.value.as_deref());
                 } else {
                     self.visit_expr(&node.target);
-                }
-
-                if track_dependency {
-                    self.assignment_member_dependency.take();
                 }
             }
             ast::Stmt::AugAssign(
@@ -5151,7 +4913,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // and those bindings need to exist before we register parent/member associations.
                 let mut deferred_effects = None;
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.assignment_dependency_method_scope()
+                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
                         && let PlaceExpr::Member(member) = &mut place_expr
                         && member.is_instance_attribute_candidate()
                         && let Some(attribute) = expr.as_attribute_expr()
@@ -5168,7 +4930,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     .value
                                     .as_name_expr()
                                     .is_some_and(|name| name.id == first)
-                                    && !self.is_symbol_bound_in_intermediate_scopes(
+                                    && !self.is_symbol_bound_in_intermediate_eager_scopes(
                                         first,
                                         method_scope_id,
                                     )
@@ -5191,19 +4953,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
                     deferred_effects = Some((place_expr, is_use, is_definition));
-                } else if matches!(expr, ast::Expr::Attribute(_))
-                    && matches!(ctx, ast::ExprContext::Load)
-                    && let Some(frame_scope) = self
-                        .assignment_member_dependency
-                        .as_ref()
-                        .filter(|frame| frame.collecting)
-                        .map(|frame| frame.scope)
-                    && self.assignment_dependency_method_scope() == Some(frame_scope)
-                    && let Some(frame) = self.assignment_member_dependency.as_mut()
-                {
-                    // Computed receivers such as `factory().value` cannot be represented as
-                    // places, but their attribute reads still make the assignment dependent.
-                    frame.has_dependency = true;
                 }
 
                 walk_expr(self, expr);
@@ -5837,14 +5586,6 @@ struct CurrentStatement<'ast, 'db> {
     lambda_expressions: Vec<&'ast ast::ExprLambda>,
     /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
-}
-
-/// Whether an ordinary assignment value might depend on an attribute read.
-struct AssignmentMemberDependency {
-    scope: FileScopeId,
-    has_dependency: bool,
-    members: SmallVec<[ScopedMemberId; 2]>,
-    collecting: bool,
 }
 
 #[derive(Debug, PartialEq)]

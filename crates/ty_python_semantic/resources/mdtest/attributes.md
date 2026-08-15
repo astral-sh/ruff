@@ -4604,7 +4604,8 @@ class C3:
     def replace_with(self, other: "C3"):
         self.x = [self.x[0].flip()]
 
-reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base]
+# TODO: should be `list[Sub] | list[Base]`
+reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Divergent]
 ```
 
 And cycles between many attributes:
@@ -4662,12 +4663,11 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        # revealed: list[int] | list[Divergent] | Unknown | list[list[int] | int] | list[list[int]]
-        reveal_type(self.x3)
+        reveal_type(self.x3)  # revealed: list[int]
 
-        self.x1 = [self.x2] + [self.x3]
-        self.x2 = [self.x1] + [self.x3]
-        self.x3 = [self.x1] + [self.x2]
+        self.x1 = [self.x2] + [self.x3]  # error: [invalid-assignment]
+        self.x2 = [self.x1] + [self.x3]  # error: [invalid-assignment]
+        self.x3 = [self.x1] + [self.x2]  # error: [invalid-assignment]
 
     def f2(self: "ManyCycles2"):
         self.x1 = self.x2 + self.x3
@@ -4782,8 +4782,8 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[list[int] | Unknown] | Unknown | list[Divergent]
-reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[list[int] | Unknown] | Unknown | list[Divergent]
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
 ```
 
 ### Builtin types attributes

@@ -91,15 +91,6 @@ impl Member {
         }
     }
 
-    /// Return the receiver and attribute names for a direct member access.
-    ///
-    /// Unlike [`Self::as_instance_attribute`], this also includes receivers other than a
-    /// method's first parameter, such as `other.value`.
-    pub fn as_direct_attribute(&self) -> Option<(&str, &str)> {
-        self.as_instance_attribute_candidate()
-            .map(|attribute| (self.expression.symbol_name(), attribute))
-    }
-
     /// Return `true` if the place expression has the form `<NAME>.<MEMBER>`,
     /// indicating that it *may* be an instance attribute if we are in a method context.
     ///
@@ -497,7 +488,7 @@ impl Hash for MemberExprRef<'_> {
 
 /// Uniquely identifies a member in a scope.
 #[newtype_index]
-#[derive(Ord, PartialOrd, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedMemberId;
 
 /// Map from member path to its ID.
