@@ -220,13 +220,16 @@ jobs:
 
           mkdir dist
 
+          # Upload a structured JSON report alongside the HTML report to make
+          # ecosystem changes easier for agents to analyze.
           ecosystem-analyzer \
             generate-diff \
             diagnostics-base.json \
             diagnostics-PR.json \
             --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
-            --output-html dist/diff.html
+            --output-html dist/diff.html \
+            --output-json dist/diff.json
 
           set +e
           ecosystem-analyzer \
@@ -254,8 +257,8 @@ jobs:
 
           echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      # NOTE: astral-bot deploys both HTML files in this artifact and uses the
-      # deployed URLs for the report links in its PR comment.
+      # NOTE: astral-bot deploys every file in this artifact and uses the
+      # deployed HTML URLs for the report links in its PR comment.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
