@@ -702,6 +702,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 node,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
+                has_value: node.value.is_some(),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
@@ -1142,7 +1143,7 @@ impl<'db> DefinitionKind<'db> {
             // Annotated assignment is always a declaration. It is also a binding if there is a RHS
             // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                if in_stub || ann_assign.value(module).is_some() {
+                if in_stub || ann_assign.has_value() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Declaration
@@ -1445,6 +1446,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AnnotatedAssignmentDefinitionKind {
     node: AstNodeRef<ast::StmtAnnAssign>,
+    has_value: bool,
 }
 
 impl AnnotatedAssignmentDefinitionKind {
@@ -1454,6 +1456,11 @@ impl AnnotatedAssignmentDefinitionKind {
 
     pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
         self.node(module).value.as_deref()
+    }
+
+    /// Returns whether this annotated assignment has a right-hand-side value.
+    pub const fn has_value(&self) -> bool {
+        self.has_value
     }
 
     pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {

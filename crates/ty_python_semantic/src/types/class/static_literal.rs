@@ -2630,14 +2630,15 @@ impl<'db> StaticClassLiteral<'db> {
                 } else {
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                     let has_default = !self.file(db).is_stub(db) || {
-                        let module = parsed_module(db, self.python_file(db)).load(db);
                         bindings.clone().any(|binding| {
                             binding.binding.is_defined_and(|definition| {
                                 // Annotation-only declarations in stubs also act as bindings for
                                 // attribute lookup, but they do not supply field defaults.
-                                definition.kind(db).category(false, &module).is_binding()
-                                    && !binding_reachability(db, use_def, &binding)
-                                        .is_always_false()
+                                !matches!(
+                                    definition.kind(db),
+                                    DefinitionKind::AnnotatedAssignment(annotation)
+                                        if !annotation.has_value()
+                                ) && !binding_reachability(db, use_def, &binding).is_always_false()
                             })
                         })
                     };
