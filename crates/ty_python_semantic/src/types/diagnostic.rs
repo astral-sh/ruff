@@ -2178,12 +2178,15 @@ pub(super) fn report_invalid_generator_function_return_type(
         return;
     };
 
-    let env = &context.program_environment();
+    let env = context.program_environment();
+    let inferred_class = inferred_return.to_class_literal(db, env);
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(context, [expected_ty, inferred_class]);
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     let inferred_ty = inferred_return.display(env.python_version(db));
     diag.set_primary_annotation_message(format_args!(
         "expected `{expected_ty}`, found `{inferred_ty}`",
-        expected_ty = expected_ty.display(db, env),
+        expected_ty = expected_ty.display_with(db, env, settings),
     ));
 
     let (description, link) = if inferred_return == KnownClass::AsyncGeneratorType {

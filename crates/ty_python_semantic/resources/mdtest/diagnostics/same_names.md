@@ -1263,6 +1263,30 @@ def inherited(value: Child) -> None:
     value.constrained(1)
 ```
 
+## Generator return types
+
+Generator return diagnostics distinguish their inferred generator classes from unrelated annotated
+classes with the same names.
+
+`custom.py`:
+
+```py
+class GeneratorType: ...
+class AsyncGeneratorType: ...
+```
+
+```py
+import custom
+
+# error: [invalid-return-type] "Return type does not match returned value: expected `custom.GeneratorType`, found `types.GeneratorType`"
+def synchronous() -> custom.GeneratorType:
+    yield 1
+
+# error: [invalid-return-type] "Return type does not match returned value: expected `custom.AsyncGeneratorType`, found `types.AsyncGeneratorType`"
+async def asynchronous() -> custom.AsyncGeneratorType:
+    yield 1
+```
+
 ## Function defaults, assertions, and narrowing
 
 The expected and actual types remain distinct in parameter defaults, `assert_type`, and `TypeIs`
