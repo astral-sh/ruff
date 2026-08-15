@@ -2542,8 +2542,9 @@ impl<'db> Type<'db> {
     /// If the type is a union (or a type alias that resolves to a union), filters union elements
     /// based on the provided predicate.
     ///
-    /// Elements that are themselves aliases are expanded first: filtering is a set operation, so
-    /// it has to see an element's members rather than its name.
+    /// Aliases among the elements are expanded first. An element may itself be an alias for a
+    /// union, which is otherwise left unexpanded so diagnostics can name it, but filtering is a
+    /// set operation and has to see the members rather than the name.
     ///
     /// Otherwise, returns the type unchanged.
     fn filter_union(
@@ -2555,37 +2556,17 @@ impl<'db> Type<'db> {
         let Type::Union(union) = self.resolve_type_alias(db) else {
             return self;
         };
-
-        if !union.has_aliases(db) {
-            return union.filter(db, f);
-        }
-
-        match union.expand_aliases(db, env) {
-            Type::Union(expanded) => expanded.filter(db, f),
-            // Expanding collapsed the union to a single type, leaving nothing to filter between,
-            // so apply the predicate to it directly.
-            expanded => {
-                if f(&expanded) {
-                    expanded
-                } else {
-                    Type::Never
-                }
+        let union = if union.has_aliases(db) {
+            match union.expand_aliases(db, env) {
+                Type::Union(expanded) => expanded,
+                // Expanding collapsed the union to a single type, leaving nothing to filter
+                // between, so apply the predicate to it directly.
+                expanded => return if f(&expanded) { expanded } else { Type::Never },
             }
-        }
-    }
-
-    /// If the type is a union (or a type alias that resolves to one) with elements that are
-    /// themselves aliases, expands those elements into the union.
-    ///
-    /// Otherwise, returns the type unchanged.
-    ///
-    /// Alias elements are otherwise left unexpanded so diagnostics can name them, which hides
-    /// their members from anything inspecting the union.
-    fn expand_union_aliases(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        match self.resolve_type_alias(db) {
-            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
-            _ => self,
-        }
+        } else {
+            union
+        };
+        union.filter(db, f)
     }
 
     /// If the type is a union, removes union elements that are disjoint from `target`.
