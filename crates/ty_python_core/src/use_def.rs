@@ -1674,11 +1674,9 @@ fn pending_place_state_mut<'a>(
 impl PendingReachability {
     /// Merges an alternative branch's place states into the current control-flow path.
     ///
-    /// States shared by both branches only need their path constraints merged. For states that
-    /// differ, reachability is materialized while narrowing gates stay separate until individual
-    /// bindings are merged. These gates must be preserved even on initially unnarrowed bindings,
-    /// since they may later join a path where the same binding is narrowed. Places absent from the
-    /// alternative branch are undefined on that path.
+    /// States shared by both branches only need their path constraints merged. States that differ
+    /// are materialized before their bindings and declarations are merged, while places absent
+    /// from the alternative branch are treated as undefined on that path.
     fn merge_place_states<I: Idx>(
         &self,
         current_states: &mut IndexVec<I, PendingPlaceState>,
@@ -1698,17 +1696,14 @@ impl PendingReachability {
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
             let Some(mut branch_state) = branch_states.next() else {
-                let current_path_constraint = self.narrowing_constraint_between(
-                    current.narrowing,
+                let current = self.materialize(
+                    current,
                     self.current,
                     narrowing_constraints,
+                    reachability_constraints,
                 );
-                self.materialize_reachability(current, self.current, reachability_constraints);
-                current.narrowing = self.current;
-                Rc::make_mut(&mut current.state).merge_with_path_constraints(
+                current.merge(
                     PlaceState::undefined(branch_reachability),
-                    current_path_constraint,
-                    ScopedNarrowingConstraint::ALWAYS_TRUE,
                     narrowing_constraints,
                     reachability_constraints,
                 );
@@ -1758,24 +1753,21 @@ impl PendingReachability {
                 continue;
             }
 
-            let current_path_constraint = self.narrowing_constraint_between(
-                current.narrowing,
-                self.current,
-                narrowing_constraints,
-            );
-            let branch_path_constraint = self.narrowing_constraint_between(
-                branch_state.narrowing,
+            self.materialize(
+                &mut branch_state,
                 branch,
                 narrowing_constraints,
+                reachability_constraints,
             );
-            self.materialize_reachability(&mut branch_state, branch, reachability_constraints);
             let branch_state = Rc::unwrap_or_clone(branch_state.state);
-            self.materialize_reachability(current, self.current, reachability_constraints);
-            current.narrowing = self.current;
-            Rc::make_mut(&mut current.state).merge_with_path_constraints(
+            let current = self.materialize(
+                current,
+                self.current,
+                narrowing_constraints,
+                reachability_constraints,
+            );
+            current.merge(
                 branch_state,
-                current_path_constraint,
-                branch_path_constraint,
                 narrowing_constraints,
                 reachability_constraints,
             );

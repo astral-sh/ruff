@@ -425,70 +425,28 @@ impl Bindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
-        self.merge_with_path_constraints(
-            b,
-            ScopedNarrowingConstraint::ALWAYS_TRUE,
-            ScopedNarrowingConstraint::ALWAYS_TRUE,
-            narrowing_constraints,
-            reachability_constraints,
-        );
-    }
-
-    /// Merges two paths while preserving each binding's applicable path constraints.
-    ///
-    /// A binding from only one path needs its gate even when it is not yet narrowed: a later merge
-    /// can combine that binding with another path that does narrow it. For a binding present on both
-    /// paths, gates matter when the paths narrow it differently or when neither path is
-    /// unconditional.
-    fn merge_with_path_constraints(
-        &mut self,
-        b: Self,
-        a_path_constraint: ScopedNarrowingConstraint,
-        b_path_constraint: ScopedNarrowingConstraint,
-        narrowing_constraints: &mut NarrowingConstraintsBuilder,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
         let a = std::mem::take(self);
 
         if let Some((a, b)) = a
             .unbound_narrowing_constraint
             .zip(b.unbound_narrowing_constraint)
         {
-            self.unbound_narrowing_constraint = Some(if a == b {
-                let path_constraint =
-                    narrowing_constraints.add_or_constraint(a_path_constraint, b_path_constraint);
-                narrowing_constraints.add_and_constraint(a, path_constraint)
-            } else {
-                let a = narrowing_constraints.add_and_constraint(a, a_path_constraint);
-                let b = narrowing_constraints.add_and_constraint(b, b_path_constraint);
-                narrowing_constraints.add_or_constraint(a, b)
-            });
+            self.unbound_narrowing_constraint = Some(narrowing_constraints.add_or_constraint(a, b));
         }
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
         // the merged `live_bindings` vec remains sorted. If a definition is found in both `a` and
         // `b`, we combine its boolean narrowing constraints and its ternary reachability
-        // constraints. If a definition is found in only one path, its path constraint is retained
-        // in case it later joins a differently narrowed path.
+        // constraints. If a definition is found in only one path, it is used as-is.
         let a = a.live_bindings.into_iter();
         let b = b.live_bindings.into_iter();
         for zipped in a.merge_join_by(b, |a, b| a.binding().cmp(&b.binding())) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {
-                    // If the same definition is visible through both paths, apply their gates as
-                    // needed and OR the narrowing constraints for whichever path was taken.
-                    let narrowing_constraint = if a.narrowing_constraint == b.narrowing_constraint {
-                        let path_constraint = narrowing_constraints
-                            .add_or_constraint(a_path_constraint, b_path_constraint);
-                        narrowing_constraints
-                            .add_and_constraint(a.narrowing_constraint, path_constraint)
-                    } else {
-                        let a = narrowing_constraints
-                            .add_and_constraint(a.narrowing_constraint, a_path_constraint);
-                        let b = narrowing_constraints
-                            .add_and_constraint(b.narrowing_constraint, b_path_constraint);
-                        narrowing_constraints.add_or_constraint(a, b)
-                    };
+                    // If the same definition is visible through both paths, we OR the narrowing
+                    // constraints: the type should be narrowed by whichever path was taken.
+                    let narrowing_constraint = narrowing_constraints
+                        .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint);
 
                     // For reachability constraints, we also merge using a ternary OR operation:
                     let reachability_constraint = reachability_constraints
@@ -503,15 +461,7 @@ impl Bindings {
                     ));
                 }
 
-                EitherOrBoth::Left(mut binding) => {
-                    binding.narrowing_constraint = narrowing_constraints
-                        .add_and_constraint(binding.narrowing_constraint, a_path_constraint);
-                    self.live_bindings.push(binding);
-                }
-
-                EitherOrBoth::Right(mut binding) => {
-                    binding.narrowing_constraint = narrowing_constraints
-                        .add_and_constraint(binding.narrowing_constraint, b_path_constraint);
+                EitherOrBoth::Left(binding) | EitherOrBoth::Right(binding) => {
                     self.live_bindings.push(binding);
                 }
             }
@@ -632,26 +582,6 @@ impl PlaceState {
     ) {
         self.bindings
             .merge(b.bindings, narrowing_constraints, reachability_constraints);
-        self.declarations
-            .merge(b.declarations, reachability_constraints);
-    }
-
-    /// Merges paths while preserving deferred control-flow gates on live bindings.
-    pub(super) fn merge_with_path_constraints(
-        &mut self,
-        b: PlaceState,
-        current_path_constraint: ScopedNarrowingConstraint,
-        branch_path_constraint: ScopedNarrowingConstraint,
-        narrowing_constraints: &mut NarrowingConstraintsBuilder,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
-        self.bindings.merge_with_path_constraints(
-            b.bindings,
-            current_path_constraint,
-            branch_path_constraint,
-            narrowing_constraints,
-            reachability_constraints,
-        );
         self.declarations
             .merge(b.declarations, reachability_constraints);
     }
