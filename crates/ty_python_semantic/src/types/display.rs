@@ -722,7 +722,9 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 known_instance @ (KnownInstanceType::Range { .. }
                 | KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::UnionType(_)
-                | KnownInstanceType::TypeVar(_)),
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Deprecated(_)
+                | KnownInstanceType::Field(_)),
             ) => {
                 self.record_known_class(db, known_instance.class(db));
             }

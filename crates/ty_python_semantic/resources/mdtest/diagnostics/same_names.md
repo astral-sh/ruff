@@ -167,8 +167,8 @@ class Config:
 
 ## Specialized class instances
 
-Precisely modeled `property`, `range`, `TypeAliasType`, `TypeVar`, `ParamSpec`, and `TypeVarTuple`
-instances remain distinct from user-defined classes with the same names.
+Precisely modeled standard-library class instances remain distinct from user-defined classes with
+the same names.
 
 ```toml
 [environment]
@@ -184,10 +184,12 @@ class TypeAliasType: ...
 class TypeVar: ...
 class ParamSpec: ...
 class TypeVarTuple: ...
+class deprecated: ...
 ```
 
 ```py
 from typing import ParamSpec, TypeVar, TypeVarTuple
+from warnings import deprecated
 
 import custom
 
@@ -221,9 +223,13 @@ wrong_paramspec: custom.ParamSpec = P
 # error: [invalid-assignment] "Object of type `typing.TypeVarTuple` is not assignable to `custom.TypeVarTuple`"
 wrong_typevartuple: custom.TypeVarTuple = Ts
 
+# error: [invalid-assignment] "Object of type `warnings.deprecated` is not assignable to `custom.deprecated`"
+wrong_deprecated: custom.deprecated = deprecated("old")
+
 def accepts_property(value: custom.property) -> None: ...
 def accepts_range(value: custom.range) -> None: ...
 def accepts_typevar(value: custom.TypeVar) -> None: ...
+def accepts_deprecated(value: custom.deprecated) -> None: ...
 
 # error: [invalid-argument-type] "Expected `custom.property`, found `builtins.property`"
 accepts_property(Owner.value)
@@ -233,6 +239,46 @@ accepts_range(range(4))
 
 # error: [invalid-argument-type] "Expected `custom.TypeVar`, found `typing.TypeVar`"
 accepts_typevar(T)
+
+# error: [invalid-argument-type] "Expected `custom.deprecated`, found `warnings.deprecated`"
+accepts_deprecated(deprecated("old"))
+```
+
+## Dataclass field instances
+
+Dataclass field specifiers distinguish the resulting `dataclasses.Field` instance from unrelated
+classes named `Field`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`custom.py`:
+
+```py
+class Field: ...
+```
+
+```py
+from typing import Callable, dataclass_transform
+
+import custom
+
+def field[T, R](*, converter: Callable[[T], R]) -> R:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(field,))
+def dataclass[T](cls: type[T]) -> type[T]:
+    return cls
+
+def convert(value: str) -> int:
+    return int(value)
+
+@dataclass
+class Model:
+    # error: [invalid-assignment] "Object of type `dataclasses.Field[int]` is not assignable to `custom.Field`"
+    value: custom.Field = field(converter=convert)
 ```
 
 ## Method wrappers and wrapper descriptors
@@ -2475,6 +2521,65 @@ info: Non-matching overloads for function `partial`:
 info:   (value: second.Model) -> None
 info:   (value: first.Interface) -> None
 info:   (value: second.Interface, extra: int, more: int) -> None
+```
+
+## Callable unions
+
+Diagnostics identify each same-named callable in a union and distinguish their same-named parameter
+types in headlines, annotations, and explanatory notes.
+
+`first.py`:
+
+```py
+class Model: ...
+
+class Handler:
+    def __call__(self, value: Model) -> None: ...
+
+class MaybeCallable: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+
+class Handler:
+    def __call__(self, value: Model) -> None: ...
+
+class MaybeCallable:
+    def __call__(self) -> None: ...
+```
+
+```py
+import first
+import second
+
+def invoke(handler: first.Handler | second.Handler) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `first.Handler.__call__` is incorrect: Expected `first.Model`, found `None`"
+    # error: [invalid-argument-type] "Argument to bound method `second.Handler.__call__` is incorrect: Expected `second.Model`, found `None`"
+    handler(None)
+
+    handler(first.Model())  # snapshot: invalid-argument-type
+
+def invoke_possibly_callable(value: first.MaybeCallable | second.MaybeCallable) -> None:
+    # error: [call-non-callable] "Object of type `first.MaybeCallable` is not callable"
+    value()
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `second.Handler.__call__` is incorrect
+ --> src/mdtest_snippet.py:9:13
+  |
+9 |     handler(first.Model())  # snapshot: invalid-argument-type
+  |             ^^^^^^^^^^^^^ Expected `second.Model`, found `first.Model`
+info: Method defined here
+ --> src/second.py:4:9
+  |
+4 |     def __call__(self, value: Model) -> None: ...
+  |         ^^^^^^^^       ------------ Parameter declared here
+info: Union variant `second.Handler` is incompatible with this call site
+info: Attempted to call union type `first.Handler | second.Handler`
 ```
 
 ## Invalid super arguments
