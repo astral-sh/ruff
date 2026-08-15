@@ -1473,13 +1473,14 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
 
 // We avoid emitting invalid assignment diagnostic for literal assignments to a `TypedDict`, as
 // they can only occur if we already failed to validate the dict (and emitted some diagnostic).
-pub(crate) fn is_invalid_typed_dict_literal(
-    db: &dyn Db,
-    target_ty: Type,
+pub(crate) fn is_invalid_typed_dict_literal<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    target_ty: Type<'db>,
     source: AnyNodeRef<'_>,
 ) -> bool {
     target_ty
-        .filter_union(db, Type::is_typed_dict)
+        .filter_union(db, env, Type::is_typed_dict)
         .as_typed_dict()
         .is_some()
         && matches!(source, AnyNodeRef::ExprDict(_))
@@ -1650,7 +1651,12 @@ pub(super) fn report_invalid_assignment<'db>(
     };
 
     if let Some(value_node) = value_node
-        && is_invalid_typed_dict_literal(db, target_ty, value_node.into())
+        && is_invalid_typed_dict_literal(
+            db,
+            context.program_environment(),
+            target_ty,
+            value_node.into(),
+        )
     {
         return;
     }
