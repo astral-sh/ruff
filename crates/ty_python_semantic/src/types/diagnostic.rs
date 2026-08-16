@@ -190,6 +190,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&PYTEST_TEST_ARGUMENT_WRONG_KIND);
     registry.register_lint(&PYTEST_TEST_OPTIONAL_ARGUMENT);
     registry.register_lint(&PYTEST_DUPLICATE_ARGNAME);
+    registry.register_lint(&PYTEST_PARAM_MISMATCHED_TYPE);
 }
 
 declare_lint! {
@@ -1370,6 +1371,15 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/pytest-duplicate-argname.md")]
     pub(crate) static PYTEST_DUPLICATE_ARGNAME = {
         summary: "Same argname used multiple times in `pytest.mark.parametrize`",
+        status: LintStatus::stable("unknown"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/pytest-param-argvalue.md")]
+    pub(crate) static PYTEST_PARAM_MISMATCHED_TYPE = {
+        summary: "`pytest.mark.parametrize` contains arvalue with wrong type.",
         status: LintStatus::stable("unknown"),
         default_level: Level::Error,
     }

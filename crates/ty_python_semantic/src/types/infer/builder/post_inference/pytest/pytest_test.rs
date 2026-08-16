@@ -1,14 +1,22 @@
 use crate::types::{
-    KnownClass, Type,
-    diagnostic::PYTEST_DUPLICATE_ARGNAME,
+    CallArguments, KnownClass, Type, TypeContext,
+    call::{CallDiagnosticOverride, CallErrorKind},
+    diagnostic::{PYTEST_DUPLICATE_ARGNAME, PYTEST_PARAM_MISMATCHED_TYPE},
     infer::{
         TypeInferenceBuilder,
-        builder::post_inference::pytest::{parametrization::Parametrization, request::Request},
+        builder::{
+            ArgumentsIter,
+            post_inference::pytest::{
+                parametrization::Parametrization, request::Request, sub_signature::SubSignature,
+            },
+        },
     },
 };
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, AtomicNodeIndex};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
+use std::debug_assert_matches;
 
 /// Representation of a pytest test.
 /// It is only used when the argnames and argvalues should be checked, and for that purpose only.
@@ -16,6 +24,16 @@ pub(crate) struct CheckablePytestTest<'db, 'ast> {
     name: &'ast ast::Identifier,
     requests: Vec<Request<'db, 'ast>>,
     parametrizations: Vec<Parametrization<'ast>>,
+}
+
+impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
+    pub(crate) fn name(&self) -> &'ast ast::Identifier {
+        self.name
+    }
+
+    pub(crate) fn requests(&self) -> &[Request<'db, 'ast>] {
+        &self.requests
+    }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -55,7 +73,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
     }
 
-    pub(crate) fn check_duplicate_argnames<'a>(&self, test: &CheckablePytestTest) {
+    pub(crate) fn check_duplicate_argnames(&self, test: &CheckablePytestTest) {
         let mut argname_locations = FxHashMap::default();
         for parametrization in &test.parametrizations {
             for argname in parametrization.argnames() {
@@ -78,5 +96,86 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+    }
+
+    pub(crate) fn check_pytest_test(&mut self, test: &CheckablePytestTest<'db, 'ast>) {
+        for parametrization in &test.parametrizations {
+            self.check_parametrization(parametrization, test);
+        }
+    }
+
+    fn check_parametrization(
+        &mut self,
+        parametrization: &Parametrization<'ast>,
+        test: &CheckablePytestTest<'db, 'ast>,
+    ) {
+        if let Some(sub_signature) = test.sub_signature(parametrization.argnames()) {
+            self.check_argvalues_against(sub_signature, parametrization.argvalues());
+        }
+    }
+
+    fn check_argvalues_against(
+        &mut self,
+        sub_signature: SubSignature<'db, 'ast>,
+        argvalues: &'ast ast::Expr,
+    ) {
+        if let Some(list) = argvalues.as_list_expr() {
+            self.check_argvalue_sequence(sub_signature, &list.elts);
+        } else if let Some(tuple) = argvalues.as_tuple_expr() {
+            self.check_argvalue_sequence(sub_signature, &tuple.elts);
+        } else {
+            todo!()
+        }
+    }
+
+    fn check_argvalue_sequence(
+        &mut self,
+        sub_signature: SubSignature<'db, 'ast>,
+        argvalues: &'ast [ast::Expr],
+    ) {
+        let signature = self.single_item_fn_type(sub_signature);
+        for argvalue in argvalues {
+            self.check_pytest_fn_call(sub_signature.test_name(), signature, argvalue);
+        }
+    }
+
+    fn check_pytest_fn_call(
+        &mut self,
+        test_name: &ast::Identifier,
+        fn_type: Type<'db>,
+        argvalue: &'ast ast::Expr,
+    ) {
+        let arguments = ast::Arguments {
+            range: argvalue.range(),
+            node_index: AtomicNodeIndex::default(),
+            args: Box::new([argvalue.to_owned()]),
+            keywords: Default::default(),
+        };
+        let mut call_arguments = CallArguments::from_arguments(&arguments, |_, _| unreachable!());
+        let mut bindings = self.bindings_for_call(fn_type).match_parameters(
+            self.db(),
+            self.program_environment(),
+            &call_arguments,
+        );
+        let bindings_result = self.infer_and_check_argument_types(
+            ArgumentsIter::from_ast(&arguments),
+            &mut call_arguments,
+            &mut |builder, (_, expr, _tcx)| builder.expression_type(expr),
+            &mut bindings,
+            TypeContext::default(),
+        );
+        if bindings_result.is_err() {
+            debug_assert_matches!(bindings_result, Err(CallErrorKind::BindingError));
+            bindings.report_diagnostics_with_override(
+                &self.context,
+                (&arguments).into(),
+                &CallDiagnosticOverride {
+                    lint: &PYTEST_PARAM_MISMATCHED_TYPE,
+                    message: format!("Invalid parameter passed to {test_name}."),
+                    info: "",
+                    argument_ranges: &[argvalue.range()],
+                },
+            );
+        };
     }
 }

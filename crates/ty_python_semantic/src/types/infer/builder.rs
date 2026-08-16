@@ -1113,7 +1113,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ty,
                             function.node(self.module()),
                         );
-                        self.post_inference_pytest_check_function(ty, function.node(self.module()));
                     }
                     DefinitionKind::Class(class_node) => {
                         let original_ty = match self.region {
@@ -1164,6 +1163,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             post_inference::final_variable::check_final_without_value(&self.context, self.index);
+
+            // Pytest checks require a mutable reference to verify function calls.
+            // However, the internal state is not changed.
+            // It is simplest to clone the declarations.
+            for (&definition, ty_and_quals) in &self.declarations.clone() {
+                let ty = ty_and_quals.inner_type();
+                if let Some(function) = definition.kind(self.db()).as_function() {
+                    self.post_inference_pytest_check_function(ty, function.node(self.module()));
+                }
+            }
         }
     }
 

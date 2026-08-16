@@ -28,9 +28,20 @@ use ruff_text_size::{Ranged, TextRange};
 ///     """
 ///     ...
 /// ```
+#[derive(Clone, Copy)]
 pub(crate) struct Request<'db, 'ast> {
     name: &'ast ast::Identifier,
     expected_type: Type<'db>,
+}
+
+impl<'db, 'ast> Request<'db, 'ast> {
+    pub(crate) fn name(&self) -> &'ast ast::Identifier {
+        self.name
+    }
+
+    pub(crate) fn ty(&self) -> Type<'db> {
+        self.expected_type
+    }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {

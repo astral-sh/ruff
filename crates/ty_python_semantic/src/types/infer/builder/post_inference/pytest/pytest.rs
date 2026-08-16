@@ -7,12 +7,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// All other methods are encapsulated.
     /// This may change in the future if a different interface is needed.
     pub(crate) fn post_inference_pytest_check_function(
-        &self,
+        &mut self,
         ty: Type<'db>,
         node: &'ast ast::StmtFunctionDef,
     ) {
         if let Some(test) = self.build_pytest_test(node, ty) {
             self.check_duplicate_argnames(&test);
+            self.check_pytest_test(&test);
         }
     }
 }

@@ -15,9 +15,13 @@ pub(crate) struct Parametrization<'ast> {
     argvalues: &'ast ast::Expr,
 }
 
-impl Parametrization<'_> {
+impl<'ast> Parametrization<'ast> {
     pub(crate) fn argnames(&self) -> &KnownArgnames {
         &self.argnames
+    }
+
+    pub(crate) fn argvalues(&self) -> &'ast ast::Expr {
+        self.argvalues
     }
 }
 
