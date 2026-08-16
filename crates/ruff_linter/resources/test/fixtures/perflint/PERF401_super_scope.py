@@ -34,6 +34,20 @@ class B(A):
             result.append(super(B, self).foo())  # explicit args: fine, still flagged
         return result
 
+    def with_variadic_super(self):
+        result = []
+        for _ in range(10):
+            # `super(*())` / `super(**{})` may expand to zero runtime arguments, so they
+            # still rely on the `__class__` cell: unsafe below 3.12.
+            result.append(super(*()).foo())
+        return result
+
+    def with_variadic_super_kwargs(self):
+        result = []
+        for _ in range(10):
+            result.append(super(**{}).foo())
+        return result
+
     def without_super(self):
         result = []
         for x in range(10):

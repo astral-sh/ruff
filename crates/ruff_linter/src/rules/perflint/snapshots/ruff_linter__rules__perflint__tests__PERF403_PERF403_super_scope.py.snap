@@ -13,12 +13,12 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
-  --> PERF403_super_scope.py:38:17
+  --> PERF403_super_scope.py:53:17
    |
-36 |         for i in range(10):
-37 |             if i % 2:  # no class cell: always flagged
-38 |                 result[i] = i
+51 |         for i in range(10):
+52 |             if i % 2:  # no class cell: always flagged
+53 |                 result[i] = i
    |                 ^^^^^^^^^^^^^
-39 |         return result
+54 |         return result
    |
 help: Replace for loop with dict comprehension

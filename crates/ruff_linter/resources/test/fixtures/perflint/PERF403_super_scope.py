@@ -31,6 +31,21 @@ class B(A):
                 result[i] = i
         return result
 
+    def filter_variadic_super(self):
+        result = {}
+        for i in range(10):
+            # `super(*())` may expand to zero runtime arguments: unsafe below 3.12.
+            if super(*()).cond():
+                result[i] = i
+        return result
+
+    def filter_variadic_super_kwargs(self):
+        result = {}
+        for i in range(10):
+            if super(**{}).cond():
+                result[i] = i
+        return result
+
     def filter_plain(self):
         result = {}
         for i in range(10):

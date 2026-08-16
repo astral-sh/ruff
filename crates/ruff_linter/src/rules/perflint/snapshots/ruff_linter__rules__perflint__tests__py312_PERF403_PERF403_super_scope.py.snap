@@ -35,12 +35,34 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 help: Replace for loop with dict comprehension
 
 PERF403 Use a dictionary comprehension instead of a for-loop
-  --> PERF403_super_scope.py:38:17
+  --> PERF403_super_scope.py:39:17
    |
-36 |         for i in range(10):
-37 |             if i % 2:  # no class cell: always flagged
-38 |                 result[i] = i
+37 |             # `super(*())` may expand to zero runtime arguments: unsafe below 3.12.
+38 |             if super(*()).cond():
+39 |                 result[i] = i
    |                 ^^^^^^^^^^^^^
-39 |         return result
+40 |         return result
+   |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super_scope.py:46:17
+   |
+44 |         for i in range(10):
+45 |             if super(**{}).cond():
+46 |                 result[i] = i
+   |                 ^^^^^^^^^^^^^
+47 |         return result
+   |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super_scope.py:53:17
+   |
+51 |         for i in range(10):
+52 |             if i % 2:  # no class cell: always flagged
+53 |                 result[i] = i
+   |                 ^^^^^^^^^^^^^
+54 |         return result
    |
 help: Replace for loop with dict comprehension

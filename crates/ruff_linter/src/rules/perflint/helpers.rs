@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, helpers::any_over_expr};
+use ruff_python_ast::{Arguments, Expr, helpers::any_over_expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{
     BackwardsTokenizer, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -19,14 +19,27 @@ use crate::checkers::ast::Checker;
 pub(super) fn references_class_cell(expr: &Expr, semantic: &SemanticModel) -> bool {
     any_over_expr(expr, |expr| match expr {
         // A zero-argument `super()` call. `super(cls, self)` takes explicit arguments and does
-        // not rely on the `__class__` cell, so it is unaffected.
+        // not rely on the `__class__` cell, so it is unaffected. Variadic calls such as
+        // `super(*())` or `super(**{})` may still expand to zero runtime arguments, so they are
+        // treated conservatively as potentially cell-dependent.
         Expr::Call(call) => {
-            call.arguments.is_empty() && semantic.match_builtin_expr(&call.func, "super")
+            super_may_have_zero_args(&call.arguments)
+                && semantic.match_builtin_expr(&call.func, "super")
         }
         // A direct `__class__` load.
         Expr::Name(name) => name.id.as_str() == "__class__" && name.ctx.is_load(),
         _ => false,
     })
+}
+
+/// Returns `true` if a call with these `arguments` may be invoked with zero runtime arguments.
+///
+/// A non-starred positional argument (e.g. `super(cls, self)`) guarantees at least one runtime
+/// argument. Unpackings such as `*()` or `**{}` may expand to nothing, so a call whose only
+/// arguments are unpackings — or which has no arguments at all — is treated as possibly
+/// zero-argument.
+fn super_may_have_zero_args(arguments: &Arguments) -> bool {
+    !arguments.args.iter().any(|arg| !arg.is_starred_expr())
 }
 
 pub(super) fn comment_strings_in_range<'a>(
