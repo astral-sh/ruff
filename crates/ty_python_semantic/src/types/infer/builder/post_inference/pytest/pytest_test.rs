@@ -191,14 +191,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         fn_type: Type<'db>,
         arguments: &ast::Arguments,
     ) {
-        let mut call_arguments = CallArguments::from_arguments(&arguments, |_, _| unreachable!());
+        let mut call_arguments = CallArguments::from_arguments(arguments, |_, _| unreachable!());
         let mut bindings = self.bindings_for_call(fn_type).match_parameters(
             self.db(),
             self.program_environment(),
             &call_arguments,
         );
         let bindings_result = self.infer_and_check_argument_types(
-            ArgumentsIter::from_ast(&arguments),
+            ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, _tcx)| builder.expression_type(expr),
             &mut bindings,

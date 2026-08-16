@@ -267,4 +267,31 @@ x_range = pytest.mark.parametrize("x", range(5))
 
 @x_range
 def _(x: bool) -> None: ...
+
+# When a `pytest.Parameter` is used, it is ignored.
+@pytest.mark.parametrize("x", [pytest.param(1), pytest.param("4"), pytest.param(None, id="skipped-test")])
+@pytest.mark.parametrize(("y",), [pytest.param(2, marks=pytest.mark.xfail), pytest.param(1, 2, 3)])
+def _(x: int, y: str) -> None: ...
+
+# Interspersed values are checked.
+bool_params = [True, pytest.param(False)]
+
+@pytest.mark.parametrize(
+    "x",
+    [
+        pytest.param(1),
+        "4",  # error: [pytest-param-mismatched-type]
+        pytest.param(None, marks=[pytest.mark.skip]),
+    ],
+)
+@pytest.mark.parametrize(
+    ("y",),
+    [
+        pytest.param(2, marks=pytest.mark.xfail),
+        pytest.param(1, 2, 3),
+        ("2", "3"),  # error: [pytest-param-mismatched-type]
+    ],
+)
+@pytest.mark.parametrize("z", bool_params)
+def _(x: int, y: str, z: bool) -> None: ...
 ```

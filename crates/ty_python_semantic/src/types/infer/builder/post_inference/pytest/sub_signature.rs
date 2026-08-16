@@ -1,5 +1,5 @@
 use crate::types::{
-    KnownClass, Parameter, Parameters, Signature, Type,
+    KnownClass, Parameter, Parameters, Signature, Type, UnionType,
     infer::{
         TypeInferenceBuilder,
         builder::post_inference::pytest::{
@@ -156,15 +156,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn single_item_type(&self, parameter: &TestParameter<'db, 'ast>) -> Type<'db> {
-        parameter.ty()
+        self.union_with_param_set(parameter.ty())
     }
 
     fn tuple_item_type(&self, parameter: &[TestParameter<'db, 'ast>]) -> Type<'db> {
-        Type::tuple(TupleType::heterogeneous(
+        self.union_with_param_set(Type::tuple(TupleType::heterogeneous(
             self.db(),
             self.program_environment(),
             parameter.iter().map(TestParameter::ty),
-        ))
+        )))
+    }
+
+    fn union_with_param_set(&self, ty: impl Into<Type<'db>>) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        UnionType::from_two_elements(
+            db,
+            env,
+            ty.into(),
+            KnownClass::PytestParameterSet.to_instance(db, env),
+        )
     }
 }
 

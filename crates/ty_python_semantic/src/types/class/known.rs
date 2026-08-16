@@ -166,6 +166,7 @@ pub enum KnownClass {
     // Pytest
     PytestMarkDecorator,
     PytestParametrizeMarkDecorator,
+    PytestParameterSet,
 }
 
 impl KnownClass {
@@ -300,7 +301,8 @@ impl KnownClass {
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestMarkDecorator
-            | Self::PytestParametrizeMarkDecorator => Some(Truthiness::Ambiguous),
+            | Self::PytestParametrizeMarkDecorator
+            | Self::PytestParameterSet => Some(Truthiness::Ambiguous),
 
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
@@ -424,6 +426,7 @@ impl KnownClass {
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestMarkDecorator
+            | KnownClass::PytestParameterSet
             | KnownClass::PytestParametrizeMarkDecorator => false,
         }
     }
@@ -540,6 +543,7 @@ impl KnownClass {
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestMarkDecorator
+            | KnownClass::PytestParameterSet
             | KnownClass::PytestParametrizeMarkDecorator => false,
 
             KnownClass::PydanticConfigDict => true,
@@ -658,6 +662,7 @@ impl KnownClass {
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestMarkDecorator
+            | KnownClass::PytestParameterSet
             | KnownClass::PytestParametrizeMarkDecorator => false,
         }
     }
@@ -787,6 +792,7 @@ impl KnownClass {
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestMarkDecorator
+            | Self::PytestParameterSet
             | Self::PytestParametrizeMarkDecorator => false,
         }
     }
@@ -905,6 +911,7 @@ impl KnownClass {
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestMarkDecorator
+            | KnownClass::PytestParameterSet
             | KnownClass::PytestParametrizeMarkDecorator => false,
             KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback
@@ -1035,6 +1042,7 @@ impl KnownClass {
             Self::PydanticRootModel => "RootModel",
             Self::PydanticStrict => "Strict",
             Self::PytestMarkDecorator => "MarkDecorator",
+            Self::PytestParameterSet => "ParameterSet",
             Self::PytestParametrizeMarkDecorator => "_ParametrizeMarkDecorator",
         }
     }
@@ -1461,9 +1469,9 @@ impl KnownClass {
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
             Self::PydanticRootModel => KnownModule::PydanticRootModel,
             Self::PydanticStrict => KnownModule::PydanticTypes,
-            Self::PytestMarkDecorator | Self::PytestParametrizeMarkDecorator => {
-                KnownModule::PytestMarkStructures
-            }
+            Self::PytestMarkDecorator
+            | Self::PytestParameterSet
+            | Self::PytestParametrizeMarkDecorator => KnownModule::PytestMarkStructures,
         }
     }
 
@@ -1583,6 +1591,7 @@ impl KnownClass {
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestMarkDecorator
+            | Self::PytestParameterSet
             | Self::PytestParametrizeMarkDecorator => false,
         }
     }
@@ -1700,6 +1709,7 @@ impl KnownClass {
             "RootModel" => &[Self::PydanticRootModel],
             "Strict" => &[Self::PydanticStrict],
             "MarkDecorator" => &[Self::PytestMarkDecorator],
+            "ParameterSet" => &[Self::PytestParameterSet],
             "_ParametrizeMarkDecorator" => &[Self::PytestParametrizeMarkDecorator],
             _ => return None,
         };
@@ -1808,6 +1818,7 @@ impl KnownClass {
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestMarkDecorator
+            | Self::PytestParameterSet
             | Self::PytestParametrizeMarkDecorator => {
                 module == self.canonical_module(python_version)
             }
