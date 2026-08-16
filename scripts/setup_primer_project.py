@@ -9,7 +9,7 @@
 # # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
 # # revision and project Python version, as shown in the module docstring.
 # # `exclude-newer` still constrains mypy-primer's registry dependencies.
-# exclude-newer = "7 days"
+# exclude-newer = "P7D"
 #
 # [tool.uv.sources]
 # # Keep this revision and the script's lockfile in sync with ecosystem-analyzer's

@@ -23,3 +23,6 @@ linter = [
     "pylint",
     "isort",
 ]
+
+[tool.uv]
+exclude-newer = "P7D"

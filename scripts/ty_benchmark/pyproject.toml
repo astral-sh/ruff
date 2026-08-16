@@ -35,3 +35,6 @@ ignore = [
 possibly-unresolved-reference = "error"
 division-by-zero = "error"
 unused-ignore-comment = "error"
+
+[tool.uv]
+exclude-newer = "P7D"

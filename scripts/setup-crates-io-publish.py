@@ -20,6 +20,9 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = ["httpx"]
+#
+# [tool.uv]
+# exclude-newer = "P7D"
 # ///
 
 from __future__ import annotations
