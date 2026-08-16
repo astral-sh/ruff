@@ -16,6 +16,7 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast};
 
 #[derive(Clone, Copy, Constructor)]
+/// The name and type expected in a test.
 struct TestParameter<'db, 'ast> {
     name: &'ast ast::Identifier,
     ty: Type<'db>,
@@ -42,19 +43,22 @@ impl<'db, 'ast> From<Request<'db, 'ast>> for TestParameter<'db, 'ast> {
 }
 
 #[derive(Clone)]
+/// The parameters expected to the test in a `PartialSignature`.
 enum TestParameters<'db, 'ast> {
+    // Edge case with one argname as a string.
     Single(TestParameter<'db, 'ast>),
     Multiple(Vec<TestParameter<'db, 'ast>>),
 }
 
 #[derive(Clone)]
-pub(crate) struct SubSignature<'db, 'ast> {
+/// The parameters expected to the test in a `PartialSignature`.
+pub(crate) struct PartialSignature<'db, 'ast> {
     test_name: &'ast ast::Identifier,
     generic_context: Option<GenericContext<'db>>,
     parameters: TestParameters<'db, 'ast>,
 }
 
-impl<'db, 'ast> SubSignature<'db, 'ast> {
+impl<'db, 'ast> PartialSignature<'db, 'ast> {
     pub(crate) fn single(test_name: &'ast ast::Identifier, request: Request<'db, 'ast>) -> Self {
         Self {
             test_name,
@@ -89,21 +93,24 @@ impl<'db, 'ast> SubSignature<'db, 'ast> {
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    pub(crate) fn single_item_fn_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+    /// The function type for checking a single item at once.
+    pub(crate) fn single_item_fn_type(&self, signature: &PartialSignature<'db, 'ast>) -> Type<'db> {
         self.single_parameter_fn(signature.generic_context(), self.item_parameter(signature))
     }
 
-    pub(crate) fn test_cases_fn_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+    /// The function type for checking all the test cases at once.
+    pub(crate) fn test_cases_fn_type(&self, signature: &PartialSignature<'db, 'ast>) -> Type<'db> {
         self.single_parameter_fn(
             signature.generic_context(),
             self.test_cases_parameter(signature),
         )
     }
 
-    /// The test case can only be checked together if there are multiple argnames.
+    /// The function type for checking all the parameters as different arguments.
+    /// The test case can only be checked as a function if there are multiple argnames.
     pub(crate) fn test_case_fn_type(
         &self,
-        signature: &SubSignature<'db, 'ast>,
+        signature: &PartialSignature<'db, 'ast>,
     ) -> Option<Type<'db>> {
         let parameters = self.test_case_parameters(signature)?;
         Some(self.fn_type_from_parameters(signature.generic_context(), parameters))
@@ -129,7 +136,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::single_callable(db, signature)
     }
 
-    fn item_parameter(&self, signature: &SubSignature<'db, 'ast>) -> Parameter<'db> {
+    /// The parameter of the function when each item is checked individually.
+    /// If there is one argname, it is named and has that time.
+    /// If there are multiple, it is converted to an unnamed tuple.
+    fn item_parameter(&self, signature: &PartialSignature<'db, 'ast>) -> Parameter<'db> {
         let parameter = match signature.parameters {
             TestParameters::Single(parameter) => {
                 Parameter::positional_or_keyword(parameter.raw_name())
@@ -139,9 +149,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parameter.with_annotated_type(self.item_type(signature))
     }
 
+    /// The parameter of the function when the test case is checked with multiple arguments.
+    /// Each argname corresponds to a unique argument.
     fn test_case_parameters(
         &self,
-        signature: &SubSignature<'db, 'ast>,
+        signature: &PartialSignature<'db, 'ast>,
     ) -> Option<Vec<Parameter<'db>>> {
         if let TestParameters::Multiple(parameters) = &signature.parameters {
             let parameters = parameters
@@ -157,12 +169,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn test_cases_parameter(&self, signature: &SubSignature<'db, 'ast>) -> Parameter<'db> {
+    /// The parameter of the function when everything is checked together.
+    /// This is an iterable that accepts a tuple of the argnames or one item.
+    fn test_cases_parameter(&self, signature: &PartialSignature<'db, 'ast>) -> Parameter<'db> {
         let parameter = Parameter::positional_only(None);
         parameter.with_annotated_type(self.test_cases_type(signature))
     }
 
-    fn test_cases_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+    fn test_cases_type(&self, signature: &PartialSignature<'db, 'ast>) -> Type<'db> {
         KnownClass::Iterable.to_specialized_instance(
             self.db(),
             self.program_environment(),
@@ -170,7 +184,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    fn item_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+    fn item_type(&self, signature: &PartialSignature<'db, 'ast>) -> Type<'db> {
         match &signature.parameters {
             TestParameters::Single(parameter) => self.single_item_type(parameter),
             TestParameters::Multiple(parameters) => self.tuple_item_type(parameters),
@@ -189,6 +203,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )))
     }
 
+    /// Union of a type with the `ParameterSet`.
+    /// `ParameterSet` is universally accepted by tests.
     fn union_with_param_set(&self, ty: impl Into<Type<'db>>) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
@@ -206,7 +222,7 @@ impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
         &self,
         db: &'db dyn Db,
         argnames: &KnownArgnames,
-    ) -> Option<SubSignature<'db, 'ast>> {
+    ) -> Option<PartialSignature<'db, 'ast>> {
         match argnames {
             KnownArgnames::Single(argname) => self.single_item_test_signature(argname),
             KnownArgnames::Multiple(argnames) => {
@@ -218,27 +234,28 @@ impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
     fn single_item_test_signature(
         &self,
         argname: &SingleArgname,
-    ) -> Option<SubSignature<'db, 'ast>> {
+    ) -> Option<PartialSignature<'db, 'ast>> {
         let request = self.request_for(argname.name())?;
-        Some(SubSignature::single(self.name(), request))
+        Some(PartialSignature::single(self.name(), request))
     }
 
     fn multiple_items_test_signature<'a>(
         &self,
         db: &'db dyn Db,
         argnames: impl Iterator<Item = &'a SingleArgname>,
-    ) -> Option<SubSignature<'db, 'ast>> {
+    ) -> Option<PartialSignature<'db, 'ast>> {
         let requests = argnames
             .into_iter()
             .map(|argname| self.request_for(argname.name()))
             .collect::<Option<Vec<_>>>()?;
-        Some(SubSignature::multiple(db, self.name(), requests))
+        Some(PartialSignature::multiple(db, self.name(), requests))
     }
 
-    fn request_for(&self, name: &str) -> Option<Request<'db, 'ast>> {
+    /// Lookup the request for a given argname.
+    fn request_for(&self, argname: &str) -> Option<Request<'db, 'ast>> {
         self.requests()
             .iter()
-            .find(|request| request.name() == name)
+            .find(|request| request.name() == argname)
             .copied()
     }
 }

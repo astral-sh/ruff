@@ -13,7 +13,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         if let Some(test) = self.build_pytest_test(node, ty) {
             self.check_duplicate_argnames(&test);
-            self.check_pytest_test(&test);
+            self.check_pytest_argvalues(&test);
         }
     }
 }

@@ -7,7 +7,8 @@ use crate::types::{
         builder::{
             ArgumentsIter,
             post_inference::pytest::{
-                parametrization::Parametrization, request::Request, sub_signature::SubSignature,
+                parametrization::Parametrization, partial_signature::PartialSignature,
+                request::Request,
             },
         },
     },
@@ -99,7 +100,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(crate) fn check_pytest_test(&mut self, test: &CheckablePytestTest<'db, 'ast>) {
+    /// Check that the argvalues all have the correct types.
+    ///
+    /// This is done by creating partial-signatures for the function being checked.
+    /// Then, each set of parameters is checked against this signature
+    /// with a synthetic function call.
+    pub(crate) fn check_pytest_argvalues(&mut self, test: &CheckablePytestTest<'db, 'ast>) {
         for parametrization in &test.parametrizations {
             self.check_parametrization(parametrization, test);
         }
@@ -110,43 +116,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parametrization: &Parametrization<'ast>,
         test: &CheckablePytestTest<'db, 'ast>,
     ) {
-        if let Some(sub_signature) = test.sub_signature(self.db(), parametrization.argnames()) {
-            self.check_argvalues_against(&sub_signature, parametrization.argvalues());
+        if let Some(partial_signature) =
+            test.partial_signature(self.db(), parametrization.argnames())
+        {
+            self.check_argvalues_against(&partial_signature, parametrization.argvalues());
         }
     }
 
     fn check_argvalues_against(
         &mut self,
-        sub_signature: &SubSignature<'db, 'ast>,
+        partial_signature: &PartialSignature<'db, 'ast>,
         argvalues: &'ast ast::Expr,
     ) {
+        // There are two cases to consider here:
+        // - the argvalues are a sequence => check each item individually
         if let Some(list) = argvalues.as_list_expr() {
-            self.check_argvalue_items(sub_signature, &list.elts);
+            self.check_argvalue_items(partial_signature, &list.elts);
         } else if let Some(tuple) = argvalues.as_tuple_expr() {
-            self.check_argvalue_items(sub_signature, &tuple.elts);
+            self.check_argvalue_items(partial_signature, &tuple.elts);
         } else {
-            self.check_argvalue_test_cases(sub_signature, argvalues);
+            // - otherwise => check all the test cases together
+            self.check_argvalue_test_cases(partial_signature, argvalues);
         }
     }
 
     fn check_argvalue_items(
         &mut self,
-        sub_signature: &SubSignature<'db, 'ast>,
+        partial_signature: &PartialSignature<'db, 'ast>,
         argvalues: &'ast [ast::Expr],
     ) {
-        let signature = self.single_item_fn_type(sub_signature);
+        // There are two sub-cases to consider here:
+        let signature = self.single_item_fn_type(partial_signature);
         for argvalue in argvalues {
             if let Some(args) = argvalue.as_tuple_expr()
-                && let Some(signature) = self.test_case_fn_type(sub_signature)
+                && let Some(signature) = self.test_case_fn_type(partial_signature)
             {
+                // - each item is a raw tuple (and it is accepted) => call a function with multiple args
                 self.check_pytest_fn_call(
-                    sub_signature.test_name(),
+                    partial_signature.test_name(),
                     signature,
                     &Self::multiple_argvalue_arguments(args),
                 );
             } else {
+                // - otherwise => check the entire test case as a tuple
                 self.check_pytest_fn_call(
-                    sub_signature.test_name(),
+                    partial_signature.test_name(),
                     signature,
                     &Self::single_argvalue_argument(argvalue),
                 );
@@ -156,17 +170,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn check_argvalue_test_cases(
         &mut self,
-        sub_signature: &SubSignature<'db, 'ast>,
+        partial_signature: &PartialSignature<'db, 'ast>,
         argvalues: &'ast ast::Expr,
     ) {
-        let signature = self.test_cases_fn_type(sub_signature);
+        let signature = self.test_cases_fn_type(partial_signature);
         self.check_pytest_fn_call(
-            sub_signature.test_name(),
+            partial_signature.test_name(),
             signature,
             &Self::single_argvalue_argument(argvalues),
         );
     }
 
+    /// Convert a single argvalue into an argument.
+    /// This then calls the partial-signature with one argument.
     fn single_argvalue_argument(argvalue: &'ast ast::Expr) -> ast::Arguments {
         ast::Arguments {
             range: argvalue.range(),
@@ -176,6 +192,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Convert the argvalues into multiple arguments.
+    /// This then gives more-specific errors, such as including the name.
     fn multiple_argvalue_arguments(argvalues: &'ast ast::ExprTuple) -> ast::Arguments {
         ast::Arguments {
             range: argvalues.range(),
