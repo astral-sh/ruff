@@ -110,7 +110,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parametrization: &Parametrization<'ast>,
         test: &CheckablePytestTest<'db, 'ast>,
     ) {
-        if let Some(sub_signature) = test.sub_signature(parametrization.argnames()) {
+        if let Some(sub_signature) = test.sub_signature(self.db(), parametrization.argnames()) {
             self.check_argvalues_against(&sub_signature, parametrization.argvalues());
         }
     }
@@ -185,6 +185,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Check the synthetic function call with the default type-checking machinery.
+    /// The diagnostic contains relevant information, as well as type errors.
+    /// Type variables are included in the context, but they are bound to the original definition.
+    /// As a result, they always default to `object`, so are effectively ignored.
     fn check_pytest_fn_call(
         &mut self,
         test_name: &ast::Identifier,

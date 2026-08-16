@@ -1,5 +1,6 @@
+use crate::Db;
 use crate::types::{
-    KnownClass, Parameter, Parameters, Signature, Type, UnionType,
+    GenericContext, KnownClass, Parameter, Parameters, Signature, Type, UnionType,
     infer::{
         TypeInferenceBuilder,
         builder::post_inference::pytest::{
@@ -49,6 +50,7 @@ enum TestParameters<'db, 'ast> {
 #[derive(Clone)]
 pub(crate) struct SubSignature<'db, 'ast> {
     test_name: &'ast ast::Identifier,
+    generic_context: Option<GenericContext<'db>>,
     parameters: TestParameters<'db, 'ast>,
 }
 
@@ -56,16 +58,23 @@ impl<'db, 'ast> SubSignature<'db, 'ast> {
     pub(crate) fn single(test_name: &'ast ast::Identifier, request: Request<'db, 'ast>) -> Self {
         Self {
             test_name,
+            generic_context: request.generic_context(),
             parameters: TestParameters::Single(TestParameter::from(request)),
         }
     }
 
     pub(crate) fn multiple(
+        db: &'db dyn Db,
         test_name: &'ast ast::Identifier,
         requests: Vec<Request<'db, 'ast>>,
     ) -> Self {
         Self {
             test_name,
+            generic_context: requests
+                .iter()
+                .map(Request::generic_context)
+                .reduce(|left, right| GenericContext::merge_optional(db, left, right))
+                .flatten(),
             parameters: TestParameters::Multiple(requests.into_iter().map_into().collect_vec()),
         }
     }
@@ -73,15 +82,22 @@ impl<'db, 'ast> SubSignature<'db, 'ast> {
     pub(crate) fn test_name(&self) -> &'ast ast::Identifier {
         self.test_name
     }
+
+    pub(crate) fn generic_context(&self) -> Option<GenericContext<'db>> {
+        self.generic_context
+    }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(crate) fn single_item_fn_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
-        self.single_parameter_fn(self.item_parameter(signature))
+        self.single_parameter_fn(signature.generic_context(), self.item_parameter(signature))
     }
 
     pub(crate) fn test_cases_fn_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
-        self.single_parameter_fn(self.test_cases_parameter(signature))
+        self.single_parameter_fn(
+            signature.generic_context(),
+            self.test_cases_parameter(signature),
+        )
     }
 
     /// The test case can only be checked together if there are multiple argnames.
@@ -90,20 +106,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         signature: &SubSignature<'db, 'ast>,
     ) -> Option<Type<'db>> {
         let parameters = self.test_case_parameters(signature)?;
-        Some(self.fn_type_from_parameters(parameters))
+        Some(self.fn_type_from_parameters(signature.generic_context(), parameters))
     }
 
-    fn single_parameter_fn(&self, parameter: Parameter<'db>) -> Type<'db> {
-        self.fn_type_from_parameters([parameter])
+    fn single_parameter_fn(
+        &self,
+        generic_context: Option<GenericContext<'db>>,
+        parameter: Parameter<'db>,
+    ) -> Type<'db> {
+        self.fn_type_from_parameters(generic_context, [parameter])
     }
 
     fn fn_type_from_parameters(
         &self,
+        generic_context: Option<GenericContext<'db>>,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Type<'db> {
         let db = self.db();
+        let env = self.program_environment();
         let parameters = Parameters::standard(parameters);
-        let signature = Signature::new(parameters, Type::none(db, self.program_environment()));
+        let signature = Signature::new_generic(generic_context, parameters, Type::none(db, env));
         Type::single_callable(db, signature)
     }
 
@@ -182,12 +204,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
     pub(crate) fn sub_signature(
         &self,
+        db: &'db dyn Db,
         argnames: &KnownArgnames,
     ) -> Option<SubSignature<'db, 'ast>> {
         match argnames {
             KnownArgnames::Single(argname) => self.single_item_test_signature(argname),
             KnownArgnames::Multiple(argnames) => {
-                self.multiple_items_test_signature(argnames.iter())
+                self.multiple_items_test_signature(db, argnames.iter())
             }
         }
     }
@@ -202,13 +225,14 @@ impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
 
     fn multiple_items_test_signature<'a>(
         &self,
+        db: &'db dyn Db,
         argnames: impl Iterator<Item = &'a SingleArgname>,
     ) -> Option<SubSignature<'db, 'ast>> {
         let requests = argnames
             .into_iter()
             .map(|argname| self.request_for(argname.name()))
             .collect::<Option<Vec<_>>>()?;
-        Some(SubSignature::multiple(self.name(), requests))
+        Some(SubSignature::multiple(db, self.name(), requests))
     }
 
     fn request_for(&self, name: &str) -> Option<Request<'db, 'ast>> {

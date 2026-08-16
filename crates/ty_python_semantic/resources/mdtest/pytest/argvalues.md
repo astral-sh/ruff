@@ -222,7 +222,7 @@ incorrect, but on errors are changed. If you update the `pytest` implementation,
 
 ```py
 import pytest
-from typing import cast, overload
+from typing import cast, overload, Any, Iterable
 
 def identity[T](x: T, /) -> T:
     return x
@@ -324,4 +324,8 @@ def overloaded_test(x: str | None) -> None: ...
 # error: [pytest-test-optional-argument]
 # error: [pytest-test-argument-wrong-kind]
 def _(x: int, /, y: int, *, z: int, optional=None, **kwargs) -> None: ...
+
+# Type variables are ignored, and treated as `object`.
+@pytest.mark.parametrize("x", [[], None])
+def _[T: Iterable[Any]](x: T) -> None: ...
 ```

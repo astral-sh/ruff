@@ -1,5 +1,5 @@
 use crate::types::{
-    Parameter, Parameters, Type,
+    GenericContext, Parameter, Parameters, Type,
     diagnostic::{PYTEST_TEST_ARGUMENT_WRONG_KIND, PYTEST_TEST_OPTIONAL_ARGUMENT},
     infer::TypeInferenceBuilder,
 };
@@ -32,6 +32,7 @@ use ruff_text_size::{Ranged, TextRange};
 pub(crate) struct Request<'db, 'ast> {
     name: &'ast ast::Identifier,
     expected_type: Type<'db>,
+    generic_context: Option<GenericContext<'db>>,
 }
 
 impl<'db, 'ast> Request<'db, 'ast> {
@@ -41,6 +42,10 @@ impl<'db, 'ast> Request<'db, 'ast> {
 
     pub(crate) fn ty(&self) -> Type<'db> {
         self.expected_type
+    }
+
+    pub(crate) fn generic_context(&self) -> Option<GenericContext<'db>> {
+        self.generic_context
     }
 }
 
@@ -53,7 +58,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         if let Some(ty) = ty.as_function_literal() {
             let signature = ty.literal(db).last_definition.signature(db);
-            Some(self.build_requests_from_parameters(&fn_def.parameters, signature.parameters()))
+            Some(self.build_requests_from_parameters(
+                &fn_def.parameters,
+                signature.parameters(),
+                signature.generic_context,
+            ))
         } else {
             None
         }
@@ -63,13 +72,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         ast_parameters: &'ast ast::Parameters,
         ty_parameters: &Parameters<'db>,
+        generic_context: Option<GenericContext<'db>>,
     ) -> Vec<Request<'db, 'ast>> {
         // Collect to display all errors.
         ast_parameters
             .iter()
             .zip_eq(ty_parameters)
-            .flat_map(|(ast_parameter, ty_parameter)| {
-                self.request_from_parameter(ast_parameter.as_parameter(), ty_parameter)
+            .filter_map(|(ast_parameter, ty_parameter)| {
+                self.request_from_parameter(
+                    ast_parameter.as_parameter(),
+                    ty_parameter,
+                    generic_context,
+                )
             })
             .collect_vec()
     }
@@ -78,12 +92,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         ast_parameter: &'ast ast::Parameter,
         ty_parameter: &Parameter<'db>,
+        generic_context: Option<GenericContext<'db>>,
     ) -> Option<Request<'db, 'ast>> {
         self.check_parameter_kind(ty_parameter, ast_parameter.range())
             .then(move || Request {
                 // It is a keyword argument, so the name will exist.
                 name: ast_parameter.name(),
                 expected_type: ty_parameter.annotated_type(),
+                generic_context,
             })
     }
 
