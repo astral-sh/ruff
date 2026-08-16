@@ -12,6 +12,7 @@ use crate::types::{
         },
     },
 };
+use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AtomicNodeIndex};
 use ruff_text_size::Ranged;
@@ -124,7 +125,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else if let Some(tuple) = argvalues.as_tuple_expr() {
             self.check_argvalue_items(sub_signature, &tuple.elts);
         } else {
-            self.check_argvalue_test_case(&sub_signature, argvalues);
+            self.check_argvalue_test_cases(sub_signature, argvalues);
         }
     }
 
@@ -135,31 +136,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let signature = self.single_item_fn_type(sub_signature);
         for argvalue in argvalues {
-            self.check_pytest_fn_call(sub_signature.test_name(), signature, argvalue);
+            if let Some(args) = argvalue.as_tuple_expr()
+                && let Some(signature) = self.test_case_fn_type(sub_signature)
+            {
+                self.check_pytest_fn_call(
+                    sub_signature.test_name(),
+                    signature,
+                    &Self::multiple_argvalue_arguments(args),
+                );
+            } else {
+                self.check_pytest_fn_call(
+                    sub_signature.test_name(),
+                    signature,
+                    &Self::single_argvalue_argument(argvalue),
+                );
+            }
         }
     }
 
-    fn check_argvalue_test_case(
+    fn check_argvalue_test_cases(
         &mut self,
         sub_signature: &SubSignature<'db, 'ast>,
         argvalues: &'ast ast::Expr,
     ) {
-        let signature = self.test_case_fn_type(sub_signature);
-        self.check_pytest_fn_call(sub_signature.test_name(), signature, argvalues);
+        let signature = self.test_cases_fn_type(sub_signature);
+        self.check_pytest_fn_call(
+            sub_signature.test_name(),
+            signature,
+            &Self::single_argvalue_argument(argvalues),
+        );
+    }
+
+    fn single_argvalue_argument(argvalue: &'ast ast::Expr) -> ast::Arguments {
+        ast::Arguments {
+            range: argvalue.range(),
+            node_index: AtomicNodeIndex::default(),
+            args: Box::new([argvalue.to_owned()]),
+            keywords: Default::default(),
+        }
+    }
+
+    fn multiple_argvalue_arguments(argvalues: &'ast ast::ExprTuple) -> ast::Arguments {
+        ast::Arguments {
+            range: argvalues.range(),
+            node_index: AtomicNodeIndex::default(),
+            args: argvalues.elts.clone().into_boxed_slice(),
+            keywords: Default::default(),
+        }
     }
 
     fn check_pytest_fn_call(
         &mut self,
         test_name: &ast::Identifier,
         fn_type: Type<'db>,
-        argvalue: &'ast ast::Expr,
+        arguments: &ast::Arguments,
     ) {
-        let arguments = ast::Arguments {
-            range: argvalue.range(),
-            node_index: AtomicNodeIndex::default(),
-            args: Box::new([argvalue.to_owned()]),
-            keywords: Default::default(),
-        };
         let mut call_arguments = CallArguments::from_arguments(&arguments, |_, _| unreachable!());
         let mut bindings = self.bindings_for_call(fn_type).match_parameters(
             self.db(),
@@ -177,12 +208,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             debug_assert_matches!(bindings_result, Err(CallErrorKind::BindingError));
             bindings.report_diagnostics_with_override(
                 &self.context,
-                (&arguments).into(),
+                arguments.into(),
                 &CallDiagnosticOverride {
                     lint: &PYTEST_PARAM_MISMATCHED_TYPE,
                     message: format!("Invalid parameter passed to {test_name}."),
                     info: "",
-                    argument_ranges: &[argvalue.range()],
+                    argument_ranges: &arguments
+                        .iter_source_order()
+                        .map(|arg| arg.range())
+                        .collect_vec(),
                 },
             );
         }

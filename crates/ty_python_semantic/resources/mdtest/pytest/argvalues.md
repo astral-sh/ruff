@@ -19,15 +19,15 @@ When there is a single argname, each item must have that type.
 ```py
 import pytest
 
-# All valid
+# All valid.
 @pytest.mark.parametrize("x", [1, 2, 3, 4])
 def _(x: int) -> None: ...
 
-# No argnames
+# No argnames.
 @pytest.mark.parametrize("x", [])
 def _(x: int) -> None: ...
 
-# All invalid
+# All invalid.
 @pytest.mark.parametrize(
     "x",
     [
@@ -37,7 +37,7 @@ def _(x: int) -> None: ...
 )
 def _(x: int) -> None: ...
 
-# Mix of valid and invalid
+# Mix of valid and invalid.
 @pytest.mark.parametrize(
     "y",
     (
@@ -48,6 +48,19 @@ def _(x: int) -> None: ...
     ),
 )
 def _(x: int, y: str) -> None: ...
+
+# The single-item tuple is a special case.
+# But it only applies when the argnames are not a string.
+@pytest.mark.parametrize(
+    "x",
+    (
+        1,  # error: [pytest-param-mismatched-type]
+        2,  # error: [pytest-param-mismatched-type]
+        (3,),
+        ((4,),),  # error: [pytest-param-mismatched-type]
+    ),
+)
+def _(x: tuple[int]) -> None: ...
 ```
 
 ## Empty
@@ -59,7 +72,7 @@ import pytest
 from collections import namedtuple
 
 # Different kinds of empty tuples.
-@pytest.mark.parametrize("", [(), (), namedtuple("Named", [])()])
+@pytest.mark.parametrize("", [(), (), namedtuple("Named", [])(), tuple()])
 def _() -> None: ...
 
 # An empty list is also allowed.
@@ -95,13 +108,44 @@ def _(x: int, y: str) -> None: ...
     [
         [1, "2"],  # error: [pytest-param-mismatched-type]
         {3, "4"},  # error: [pytest-param-mismatched-type]
-        ("5", 6),  # error: [pytest-param-mismatched-type]
         None,  # error: [pytest-param-mismatched-type]
     ],
 )
 def _(x: int, y: str) -> None: ...
 
+# When the argvalues are passed as a tuple, there is potential for multiple errors.
+# The error is for each individual argument.
+
+@pytest.mark.parametrize(
+    ("x", "y", "z"),
+    [
+        (1, "2", True),
+        # error: [pytest-param-mismatched-type]
+        (1, "2", None),
+        # error: [pytest-param-mismatched-type]
+        (1, None, True),
+        # error: [pytest-param-mismatched-type]
+        (None, "2", True),
+        # error: [pytest-param-mismatched-type]
+        # error: [pytest-param-mismatched-type]
+        (1, None, None),
+        # error: [pytest-param-mismatched-type]
+        # error: [pytest-param-mismatched-type]
+        (None, "2", None),
+        # error: [pytest-param-mismatched-type]
+        # error: [pytest-param-mismatched-type]
+        (None, None, True),
+        # error: [pytest-param-mismatched-type]
+        # error: [pytest-param-mismatched-type]
+        # error: [pytest-param-mismatched-type]
+        (None, None, None),
+    ],
+)
+def _(x: int, y: str, z: bool) -> None: ...
+
 # The number of arguments needs to be correct too.
+valid_value = (0, "0.0", False)
+
 @pytest.mark.parametrize(
     ("x", "y", "z"),
     [
@@ -109,6 +153,7 @@ def _(x: int, y: str) -> None: ...
         (1,),  # error: [pytest-param-mismatched-type]
         (1, "2"),  # error: [pytest-param-mismatched-type]
         (1, "2", True),
+        valid_value,
         (1, "2", True, 4),  # error: [pytest-param-mismatched-type]
     ],
 )

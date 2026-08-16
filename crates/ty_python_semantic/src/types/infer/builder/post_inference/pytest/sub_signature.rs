@@ -21,6 +21,10 @@ struct TestParameter<'db, 'ast> {
 }
 
 impl<'db, 'ast> TestParameter<'db, 'ast> {
+    fn raw_name(&self) -> ast::name::Name {
+        self.name().id().clone()
+    }
+
     fn name(&self) -> &'ast ast::Identifier {
         self.name
     }
@@ -76,13 +80,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.single_parameter_fn(self.item_parameter(signature))
     }
 
-    pub(crate) fn test_case_fn_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
-        self.single_parameter_fn(self.test_case_parameter(signature))
+    pub(crate) fn test_cases_fn_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+        self.single_parameter_fn(self.test_cases_parameter(signature))
+    }
+
+    /// The test case can only be checked together if there are multiple argnames.
+    pub(crate) fn test_case_fn_type(
+        &self,
+        signature: &SubSignature<'db, 'ast>,
+    ) -> Option<Type<'db>> {
+        let parameters = self.test_case_parameters(signature)?;
+        Some(self.fn_type_from_parameters(parameters))
     }
 
     fn single_parameter_fn(&self, parameter: Parameter<'db>) -> Type<'db> {
+        self.fn_type_from_parameters([parameter])
+    }
+
+    fn fn_type_from_parameters(
+        &self,
+        parameters: impl IntoIterator<Item = Parameter<'db>>,
+    ) -> Type<'db> {
         let db = self.db();
-        let parameters = [parameter];
         let parameters = Parameters::standard(parameters);
         let signature = Signature::new(parameters, Type::none(db, self.program_environment()));
         Type::single_callable(db, signature)
@@ -91,19 +110,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn item_parameter(&self, signature: &SubSignature<'db, 'ast>) -> Parameter<'db> {
         let parameter = match signature.parameters {
             TestParameters::Single(parameter) => {
-                Parameter::positional_or_keyword(parameter.name().id().clone())
+                Parameter::positional_or_keyword(parameter.raw_name())
             }
             TestParameters::Multiple(_) => Parameter::positional_only(None),
         };
         parameter.with_annotated_type(self.item_type(signature))
     }
 
-    fn test_case_parameter(&self, signature: &SubSignature<'db, 'ast>) -> Parameter<'db> {
-        let parameter = Parameter::positional_only(None);
-        parameter.with_annotated_type(self.test_case_type(signature))
+    fn test_case_parameters(
+        &self,
+        signature: &SubSignature<'db, 'ast>,
+    ) -> Option<Vec<Parameter<'db>>> {
+        if let TestParameters::Multiple(parameters) = &signature.parameters {
+            let parameters = parameters
+                .iter()
+                .map(|parameter| {
+                    Parameter::positional_or_keyword(parameter.raw_name())
+                        .with_annotated_type(parameter.ty())
+                })
+                .collect_vec();
+            Some(parameters)
+        } else {
+            None
+        }
     }
 
-    fn test_case_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+    fn test_cases_parameter(&self, signature: &SubSignature<'db, 'ast>) -> Parameter<'db> {
+        let parameter = Parameter::positional_only(None);
+        parameter.with_annotated_type(self.test_cases_type(signature))
+    }
+
+    fn test_cases_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
         KnownClass::Iterable.to_specialized_instance(
             self.db(),
             self.program_environment(),
