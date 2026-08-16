@@ -1377,7 +1377,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/pytest-param-argvalue.md")]
+    #[doc = include_str!("../../resources/lint_docs/pytest-param-mismatched-type.md")]
     pub(crate) static PYTEST_PARAM_MISMATCHED_TYPE = {
         summary: "`pytest.mark.parametrize` contains arvalue with wrong type.",
         status: LintStatus::stable("unknown"),
