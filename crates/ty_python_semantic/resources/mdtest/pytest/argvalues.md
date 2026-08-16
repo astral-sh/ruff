@@ -294,4 +294,13 @@ bool_params = [True, pytest.param(False)]
 )
 @pytest.mark.parametrize("z", bool_params)
 def _(x: int, y: str, z: bool) -> None: ...
+
+# Request is a reserved word in Pytest.
+# Therefore, it is disallowed as an argname.
+# As an argvalue, it always has the type `_pytest.fixtures.FixtureRequest` (but this is not checked).
+@pytest.mark.parametrize(
+    "request",  # error: [pytest-request-keyword]
+    [None],
+)
+def _(request: tuple[()]) -> None: ...
 ```
