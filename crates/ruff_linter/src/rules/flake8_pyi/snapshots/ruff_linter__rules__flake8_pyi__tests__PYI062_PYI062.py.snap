@@ -303,4 +303,38 @@ help: Remove duplicates
 32 | Literal[Literal[Literal[1], Literal[1]]]  # once
    - Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
 33 + Literal[1]  # once
+34 |
    |
+
+PYI062 [*] Duplicate literal member `items[0]`
+  --> PYI062.py:40:19
+   |
+38 | # but `items[0]` evaluates `__getitem__` each time, so removing a "duplicate" may change behavior.
+39 | # The diagnostic is still raised, but its fix must be marked unsafe.
+40 | Literal[items[0], items[0]]  # once, unsafe fix
+   |                   ^^^^^^^^
+41 | Literal[foo(), foo()]  # once, unsafe fix
+   |
+help: Remove duplicates
+   |
+39 | # The diagnostic is still raised, but its fix must be marked unsafe.
+   - Literal[items[0], items[0]]  # once, unsafe fix
+40 + Literal[items[0]]  # once, unsafe fix
+41 | Literal[foo(), foo()]  # once, unsafe fix
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PYI062 [*] Duplicate literal member `foo()`
+  --> PYI062.py:41:16
+   |
+39 | # The diagnostic is still raised, but its fix must be marked unsafe.
+40 | Literal[items[0], items[0]]  # once, unsafe fix
+41 | Literal[foo(), foo()]  # once, unsafe fix
+   |                ^^^^^
+help: Remove duplicates
+   |
+40 | Literal[items[0], items[0]]  # once, unsafe fix
+   - Literal[foo(), foo()]  # once, unsafe fix
+41 + Literal[foo()]  # once, unsafe fix
+   |
+note: This is an unsafe fix and may change runtime behavior
