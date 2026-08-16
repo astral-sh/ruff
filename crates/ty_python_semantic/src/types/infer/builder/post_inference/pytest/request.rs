@@ -53,7 +53,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         if let Some(ty) = ty.as_function_literal() {
             let signature = ty.literal(db).last_definition.signature(db);
-            self.build_requests_from_parameters(&fn_def.parameters, signature.parameters())
+            Some(self.build_requests_from_parameters(&fn_def.parameters, signature.parameters()))
         } else {
             None
         }
@@ -63,16 +63,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         ast_parameters: &'ast ast::Parameters,
         ty_parameters: &Parameters<'db>,
-    ) -> Option<Vec<Request<'db, 'ast>>> {
+    ) -> Vec<Request<'db, 'ast>> {
         // Collect to display all errors.
-        let checked_requests = ast_parameters
+        ast_parameters
             .iter()
             .zip_eq(ty_parameters)
-            .map(|(ast_parameter, ty_parameter)| {
+            .flat_map(|(ast_parameter, ty_parameter)| {
                 self.request_from_parameter(ast_parameter.as_parameter(), ty_parameter)
             })
-            .collect_vec();
-        Option::from_iter(checked_requests)
+            .collect_vec()
     }
 
     fn request_from_parameter(
@@ -110,16 +109,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             false
         } else {
-            // Optional arguments are ignored, so we can continue checking.
-            self.check_optional_argument(parameter, range);
-            true
+            // Optional arguments are ignored.
+            !self.check_optional_argument(parameter, range)
         }
     }
 
     /// Check whether argument is optional.
     /// This generates a warning if it is.
-    fn check_optional_argument(&self, parameter: &Parameter<'_>, range: TextRange) {
-        if parameter.default_type().is_some() {
+    /// Returns whether this is an optional argument.
+    fn check_optional_argument(&self, parameter: &Parameter<'_>, range: TextRange) -> bool {
+        let has_default_value = parameter.default_type().is_some();
+        if has_default_value {
             if let Some(builder) = self
                 .context
                 .report_lint(&PYTEST_TEST_OPTIONAL_ARGUMENT, range)
@@ -130,5 +130,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ));
             }
         }
+        has_default_value
     }
 }

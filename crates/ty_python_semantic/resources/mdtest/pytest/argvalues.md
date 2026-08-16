@@ -313,4 +313,15 @@ def overloaded_test(x: int) -> None:  # error: [invalid-overload]
     ...
 @pytest.mark.parametrize("x", ["a", None, 3])  # error: [pytest-param-mismatched-type]
 def overloaded_test(x: str | None) -> None: ...
+
+# Optional arguments are ignored (but generate a separate warning).
+# Other kinds of arguments are also ignored.
+@pytest.mark.parametrize("x", ["1"])
+@pytest.mark.parametrize("y", ["2"])  # error: [pytest-param-mismatched-type]
+@pytest.mark.parametrize("z", ["3"])  # error: [pytest-param-mismatched-type]
+@pytest.mark.parametrize("optional", ["4"])
+# error: [pytest-test-argument-wrong-kind]
+# error: [pytest-test-optional-argument]
+# error: [pytest-test-argument-wrong-kind]
+def _(x: int, /, y: int, *, z: int, optional=None, **kwargs) -> None: ...
 ```

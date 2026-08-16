@@ -1354,7 +1354,7 @@ declare_lint! {
     pub(crate) static PYTEST_TEST_ARGUMENT_WRONG_KIND = {
         summary: "Pytest tests only use positional arguments",
         status: LintStatus::stable("unknown"),
-        default_level: Level::Error,
+        default_level: Level::Warn,
     }
 }
 
