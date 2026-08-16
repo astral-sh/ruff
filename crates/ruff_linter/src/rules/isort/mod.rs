@@ -80,6 +80,7 @@ pub(crate) fn format_imports(
     tokens: &Tokens,
 ) -> String {
     let trailer = &block.trailer;
+    let nested = block.nested;
     let block = annotate_imports(
         &block.imports,
         comments,
@@ -93,6 +94,13 @@ pub(crate) fn format_imports(
 
     // Categorize imports.
     let mut output = String::new();
+    let mut output_empty = true;
+
+    if settings.lines_before_imports >= 0 && !nested {
+        for _ in 0..settings.lines_before_imports {
+            output.push_str(&stylist.line_ending());
+        }
+    }
 
     for block in split::split_by_forced_separate(block, &settings.forced_separate) {
         let block_output = format_import_block(
@@ -106,12 +114,15 @@ pub(crate) fn format_imports(
             settings,
         );
 
-        if !block_output.is_empty() && !output.is_empty() {
-            // If we are about to output something, and had already
-            // output a block, separate them.
-            output.push_str(&stylist.line_ending());
+        if !block_output.is_empty() {
+            if !output_empty {
+                // If we are about to output something, and had already
+                // output a block, separate them.
+                output.push_str(&stylist.line_ending());
+            }
+            output.push_str(block_output.as_str());
+            output_empty = false;
         }
-        output.push_str(block_output.as_str());
     }
 
     let lines_after_imports = if source_type.is_stub() {
@@ -1415,6 +1426,46 @@ mod tests {
                     ..isort_settings_with_all_headings()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(2, Path::new("lines_before_imports_nothing_before.py"))]
+    #[test_case(2, Path::new("lines_before_imports_comment_before.py"))]
+    #[test_case(-1, Path::new("lines_before_imports_nothing_before.py"))]
+    #[test_case(-1, Path::new("lines_before_imports_comment_before.py"))]
+    fn lines_before_imports(value: isize, path: &Path) -> Result<()> {
+        let snapshot = format!("lines_before_imports_{}_{}", value, path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    lines_before_imports: value,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(1, Path::new("import_heading.py"))]
+    #[test_case(1, Path::new("import_heading_already_present.py"))]
+    fn lines_before_imports_with_headings(value: isize, path: &Path) -> Result<()> {
+        let snapshot = format!("lines_before_imports_{}_{}", value, path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    lines_before_imports: value,
+                    ..isort_settings_with_all_headings()
+                },
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
