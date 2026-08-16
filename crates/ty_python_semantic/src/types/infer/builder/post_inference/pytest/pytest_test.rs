@@ -1,5 +1,5 @@
 use crate::types::{
-    CallArguments, KnownClass, Type, TypeContext,
+    CallArguments, InferContext, KnownClass, Type, TypeContext,
     call::{CallDiagnosticOverride, CallErrorKind},
     diagnostic::{PYTEST_DUPLICATE_ARGNAME, PYTEST_PARAM_MISMATCHED_TYPE},
     infer::{
@@ -35,6 +35,30 @@ impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
 
     pub(crate) fn requests(&self) -> &[Request<'db, 'ast>] {
         &self.requests
+    }
+
+    pub(crate) fn check_duplicate_argnames(&self, context: &InferContext<'db, 'ast>) {
+        let mut argname_locations = FxHashMap::default();
+        for parametrization in &self.parametrizations {
+            for argname in parametrization.argnames() {
+                if let Some(previous_range) =
+                    argname_locations.insert(argname.name(), argname.range())
+                {
+                    if let Some(builder) =
+                        context.report_lint(&PYTEST_DUPLICATE_ARGNAME, argname.range())
+                    {
+                        let mut diagnostic = builder
+                            .into_diagnostic(format!("Duplicate argname `{}`", argname.name()));
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!("`{}` already used here", argname.name()),
+                        );
+                        sub.annotate(Annotation::primary(context.span(previous_range)));
+                        diagnostic.sub(sub);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -73,31 +97,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownClass::PytestMarkDecorator.to_instance(db, env),
                 )
             })
-    }
-
-    pub(crate) fn check_duplicate_argnames(&self, test: &CheckablePytestTest) {
-        let mut argname_locations = FxHashMap::default();
-        for parametrization in &test.parametrizations {
-            for argname in parametrization.argnames() {
-                if let Some(previous_range) =
-                    argname_locations.insert(argname.name(), argname.range())
-                {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&PYTEST_DUPLICATE_ARGNAME, argname.range())
-                    {
-                        let mut diagnostic = builder
-                            .into_diagnostic(format!("Duplicate argname `{}`", argname.name()));
-                        let mut sub = SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            format_args!("`{}` already used here", argname.name()),
-                        );
-                        sub.annotate(Annotation::primary(self.context.span(previous_range)));
-                        diagnostic.sub(sub);
-                    }
-                }
-            }
-        }
     }
 
     /// Check that the argvalues all have the correct types.
@@ -146,10 +145,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         argvalues: &'ast [ast::Expr],
     ) {
         // There are two sub-cases to consider here:
-        let signature = self.single_item_fn_type(partial_signature);
+        let signature = partial_signature.single_item_fn_type(&self.context);
         for argvalue in argvalues {
             if let Some(args) = argvalue.as_tuple_expr()
-                && let Some(signature) = self.test_case_fn_type(partial_signature)
+                && let Some(signature) = partial_signature.test_case_fn_type(&self.context)
             {
                 // - each item is a raw tuple (and it is accepted) => call a function with multiple args
                 self.check_pytest_fn_call(
@@ -173,7 +172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         partial_signature: &PartialSignature<'db, 'ast>,
         argvalues: &'ast ast::Expr,
     ) {
-        let signature = self.test_cases_fn_type(partial_signature);
+        let signature = partial_signature.test_cases_fn_type(&self.context);
         self.check_pytest_fn_call(
             partial_signature.test_name(),
             signature,

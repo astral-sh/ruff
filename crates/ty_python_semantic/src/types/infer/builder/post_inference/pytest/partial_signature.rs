@@ -1,13 +1,10 @@
 use crate::Db;
 use crate::types::{
-    GenericContext, KnownClass, Parameter, Parameters, Signature, Type, UnionType,
-    infer::{
-        TypeInferenceBuilder,
-        builder::post_inference::pytest::{
-            argnames::{KnownArgnames, SingleArgname},
-            pytest_test::CheckablePytestTest,
-            request::Request,
-        },
+    GenericContext, InferContext, KnownClass, Parameter, Parameters, Signature, Type, UnionType,
+    infer::builder::post_inference::pytest::{
+        argnames::{KnownArgnames, SingleArgname},
+        pytest_test::CheckablePytestTest,
+        request::Request,
     },
     tuple::TupleType,
 };
@@ -92,70 +89,62 @@ impl<'db, 'ast> PartialSignature<'db, 'ast> {
     }
 }
 
-impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
+impl<'db, 'ast> PartialSignature<'db, 'ast> {
     /// The function type for checking a single item at once.
-    pub(crate) fn single_item_fn_type(&self, signature: &PartialSignature<'db, 'ast>) -> Type<'db> {
-        self.single_parameter_fn(signature.generic_context(), self.item_parameter(signature))
+    pub(crate) fn single_item_fn_type(&self, context: &InferContext<'db, 'ast>) -> Type<'db> {
+        self.single_parameter_fn(context, self.item_parameter(context))
     }
 
     /// The function type for checking all the test cases at once.
-    pub(crate) fn test_cases_fn_type(&self, signature: &PartialSignature<'db, 'ast>) -> Type<'db> {
-        self.single_parameter_fn(
-            signature.generic_context(),
-            self.test_cases_parameter(signature),
-        )
+    pub(crate) fn test_cases_fn_type(&self, context: &InferContext<'db, 'ast>) -> Type<'db> {
+        self.single_parameter_fn(context, self.test_cases_parameter(context))
     }
 
     /// The function type for checking all the parameters as different arguments.
     /// The test case can only be checked as a function if there are multiple argnames.
-    pub(crate) fn test_case_fn_type(
-        &self,
-        signature: &PartialSignature<'db, 'ast>,
-    ) -> Option<Type<'db>> {
-        let parameters = self.test_case_parameters(signature)?;
-        Some(self.fn_type_from_parameters(signature.generic_context(), parameters))
+    pub(crate) fn test_case_fn_type(&self, context: &InferContext<'db, 'ast>) -> Option<Type<'db>> {
+        let parameters = self.test_case_parameters()?;
+        Some(self.fn_type_from_parameters(context, parameters))
     }
 
     fn single_parameter_fn(
         &self,
-        generic_context: Option<GenericContext<'db>>,
+        context: &InferContext<'db, 'ast>,
         parameter: Parameter<'db>,
     ) -> Type<'db> {
-        self.fn_type_from_parameters(generic_context, [parameter])
+        self.fn_type_from_parameters(context, [parameter])
     }
 
     fn fn_type_from_parameters(
         &self,
-        generic_context: Option<GenericContext<'db>>,
+        context: &InferContext<'db, 'ast>,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Type<'db> {
-        let db = self.db();
-        let env = self.program_environment();
+        let db = context.db();
+        let env = context.program_environment();
         let parameters = Parameters::standard(parameters);
-        let signature = Signature::new_generic(generic_context, parameters, Type::none(db, env));
+        let signature =
+            Signature::new_generic(self.generic_context(), parameters, Type::none(db, env));
         Type::single_callable(db, signature)
     }
 
     /// The parameter of the function when each item is checked individually.
     /// If there is one argname, it is named and has that time.
     /// If there are multiple, it is converted to an unnamed tuple.
-    fn item_parameter(&self, signature: &PartialSignature<'db, 'ast>) -> Parameter<'db> {
-        let parameter = match signature.parameters {
+    fn item_parameter(&self, context: &InferContext<'db, 'ast>) -> Parameter<'db> {
+        let parameter = match self.parameters {
             TestParameters::Single(parameter) => {
                 Parameter::positional_or_keyword(parameter.raw_name())
             }
             TestParameters::Multiple(_) => Parameter::positional_only(None),
         };
-        parameter.with_annotated_type(self.item_type(signature))
+        parameter.with_annotated_type(self.item_type(context))
     }
 
     /// The parameter of the function when the test case is checked with multiple arguments.
     /// Each argname corresponds to a unique argument.
-    fn test_case_parameters(
-        &self,
-        signature: &PartialSignature<'db, 'ast>,
-    ) -> Option<Vec<Parameter<'db>>> {
-        if let TestParameters::Multiple(parameters) = &signature.parameters {
+    fn test_case_parameters(&self) -> Option<Vec<Parameter<'db>>> {
+        if let TestParameters::Multiple(parameters) = &self.parameters {
             let parameters = parameters
                 .iter()
                 .map(|parameter| {
@@ -171,43 +160,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// The parameter of the function when everything is checked together.
     /// This is an iterable that accepts a tuple of the argnames or one item.
-    fn test_cases_parameter(&self, signature: &PartialSignature<'db, 'ast>) -> Parameter<'db> {
+    fn test_cases_parameter(&self, context: &InferContext<'db, 'ast>) -> Parameter<'db> {
         let parameter = Parameter::positional_only(None);
-        parameter.with_annotated_type(self.test_cases_type(signature))
+        parameter.with_annotated_type(self.test_cases_type(context))
     }
 
-    fn test_cases_type(&self, signature: &PartialSignature<'db, 'ast>) -> Type<'db> {
+    fn test_cases_type(&self, context: &InferContext<'db, 'ast>) -> Type<'db> {
         KnownClass::Iterable.to_specialized_instance(
-            self.db(),
-            self.program_environment(),
-            &[self.item_type(signature)],
+            context.db(),
+            context.program_environment(),
+            &[self.item_type(context)],
         )
     }
 
-    fn item_type(&self, signature: &PartialSignature<'db, 'ast>) -> Type<'db> {
-        match &signature.parameters {
-            TestParameters::Single(parameter) => self.single_item_type(parameter),
-            TestParameters::Multiple(parameters) => self.tuple_item_type(parameters),
+    fn item_type(&self, context: &InferContext<'db, 'ast>) -> Type<'db> {
+        match &self.parameters {
+            TestParameters::Single(parameter) => Self::single_item_type(context, parameter),
+            TestParameters::Multiple(parameters) => Self::tuple_item_type(context, parameters),
         }
     }
 
-    fn single_item_type(&self, parameter: &TestParameter<'db, 'ast>) -> Type<'db> {
-        self.union_with_param_set(parameter.ty())
+    fn single_item_type(
+        context: &InferContext<'db, 'ast>,
+        parameter: &TestParameter<'db, 'ast>,
+    ) -> Type<'db> {
+        Self::union_with_param_set(context, parameter.ty())
     }
 
-    fn tuple_item_type(&self, parameter: &[TestParameter<'db, 'ast>]) -> Type<'db> {
-        self.union_with_param_set(Type::tuple(TupleType::heterogeneous(
-            self.db(),
-            self.program_environment(),
-            parameter.iter().map(TestParameter::ty),
-        )))
+    fn tuple_item_type(
+        context: &InferContext<'db, 'ast>,
+        parameter: &[TestParameter<'db, 'ast>],
+    ) -> Type<'db> {
+        Self::union_with_param_set(
+            context,
+            Type::tuple(TupleType::heterogeneous(
+                context.db(),
+                context.program_environment(),
+                parameter.iter().map(TestParameter::ty),
+            )),
+        )
     }
 
     /// Union of a type with the `ParameterSet`.
     /// `ParameterSet` is universally accepted by tests.
-    fn union_with_param_set(&self, ty: impl Into<Type<'db>>) -> Type<'db> {
-        let db = self.db();
-        let env = self.program_environment();
+    fn union_with_param_set(
+        context: &InferContext<'db, 'ast>,
+        ty: impl Into<Type<'db>>,
+    ) -> Type<'db> {
+        let db = context.db();
+        let env = context.program_environment();
         UnionType::from_two_elements(
             db,
             env,
@@ -218,7 +219,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 }
 
 impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
-    pub(crate) fn sub_signature(
+    pub(crate) fn partial_signature(
         &self,
         db: &'db dyn Db,
         argnames: &KnownArgnames,
