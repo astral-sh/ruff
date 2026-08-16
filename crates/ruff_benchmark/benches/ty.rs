@@ -1403,11 +1403,6 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
             "value: str, flag: bool",
             "        if flag is True:\n            pass\n        value.upper()\n",
         ),
-        (
-            "ty_micro[repeated_statement_calls_in_try_with_short_circuits]",
-            "value: str, flag: bool",
-            "        flag is True and 1\n        value.upper()\n",
-        ),
     ] {
         let mut code = format!("def f({parameters}) -> None:\n");
         for index in 0..800 {
