@@ -59,6 +59,7 @@ mod tests {
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_3.py"))]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_4.py"))]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_5.py"))]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_6.py"))]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
@@ -233,6 +234,7 @@ mod tests {
     }
 
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_6.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview", path.to_string_lossy());
         let diagnostics = test_path(
