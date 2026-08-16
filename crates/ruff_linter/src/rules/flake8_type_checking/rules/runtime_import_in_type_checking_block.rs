@@ -127,6 +127,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                 let reference = checker.semantic().reference(reference_id);
 
                 (reference.in_runtime_context()
+                    && !reference.in_runtime_ambiguous_annotation()
                     && !(ignore_dunder_all_references && reference.in_dunder_all_definition()))
                 .then_some(reference)
             })

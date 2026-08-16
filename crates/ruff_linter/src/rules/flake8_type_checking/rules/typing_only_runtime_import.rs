@@ -310,7 +310,7 @@ pub(crate) fn typing_only_runtime_import(
             TypingReference::from_references(binding, checker.semantic(), checker.settings());
 
         let needs_future_import = match typing_reference {
-            TypingReference::Runtime => continue,
+            TypingReference::Runtime | TypingReference::RuntimeAmbiguous => continue,
             // We can only get the `Future` variant if `future_annotations` is
             // enabled, so we can unconditionally set this here.
             TypingReference::Future => true,
