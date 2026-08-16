@@ -136,6 +136,7 @@ version_files = [
     "pyproject.toml",
     # Might become unneeded once Markdown formatting is stabilized.
     "docs/formatter.md",
+    "docs/installation.md",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
