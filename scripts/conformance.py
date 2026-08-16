@@ -10,9 +10,6 @@ links to the corresponding line in the conformance repository for each
 diagnostic. Otherwise, it will default to `main'.
 
 Examples:
-    # Compare an older version of ty to the default version
-    %(prog)s --old-ty uvx ty@0.0.1a35
-
     # Compare two specific ty versions
     %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
 
