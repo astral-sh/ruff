@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_long_strings__regression.py
 ---
 ## Input
 
@@ -574,7 +573,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 ```diff
 --- Black
 +++ Ruff
-@@ -25,20 +25,17 @@
+@@ -25,20 +25,20 @@
      "Jaguar",
  )
  
@@ -584,7 +583,8 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -        "perfect", "length"
 -    )
 +stupid_format_method_bug = "Some really long string that just so happens to be the {} {} to force the 'format' method to hang over the line length boundary. This is pretty annoying.".format(
-+    "perfect", "length"
++    "perfect",
++    "length",
  )
  
  
@@ -595,12 +595,25 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -            " xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx"
 -            " xxxx.".format("xxxxxxxxxx", "xxxxxx", "xxxxxxxxxx")
 +            "This is a regression test. xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxxx.".format(
-+                "xxxxxxxxxx", "xxxxxx", "xxxxxxxxxx"
++                "xxxxxxxxxx",
++                "xxxxxx",
++                "xxxxxxxxxx",
 +            )
          )
  
  
-@@ -57,9 +54,11 @@
+@@ -46,7 +46,9 @@
+     def foo():
+         XXXXXXXXXXXX.append((
+             "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
+-                xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
++                xxxxx,
++                xxxx,
++                xxxx_xxxx_xxxxxxxxxx,
+             ),
+             my_var,
+             my_other_var,
+@@ -57,9 +59,15 @@
      class B:
          def foo():
              bar(
@@ -610,24 +623,30 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +                (
 +                    "[{}]: xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx={}"
 +                    " xxxx_xxxx_xxxxxxxxxx={}, xxxx={})".format(
-+                        xxxx._xxxxxxxxxxxxxx, xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx, xxxxxxx
++                        xxxx._xxxxxxxxxxxxxx,
++                        xxxxx,
++                        xxxx,
++                        xxxx_xxxx_xxxxxxxxxx,
++                        xxxxxxx,
 +                    )
                  ),
                  varX,
                  varY,
-@@ -71,8 +70,9 @@
+@@ -71,8 +79,11 @@
      for xxx_xxxx, _xxx_xxx, _xxx_xxxxx, xxx_xxxx in xxxx:
          for xxx in xxx_xxxx:
              assert ("x" in xxx) or (xxx in xxx_xxx_xxxxx), (
 -                "{0} xxxxxxx xx {1}, xxx {1} xx xxx xx xxxx xx xxx xxxx: xxx xxxx {2}"
 -                .format(xxx_xxxx, xxx, xxxxxx.xxxxxxx(xxx_xxx_xxxxx))
 +                "{0} xxxxxxx xx {1}, xxx {1} xx xxx xx xxxx xx xxx xxxx: xxx xxxx {2}".format(
-+                    xxx_xxxx, xxx, xxxxxx.xxxxxxx(xxx_xxx_xxxxx)
++                    xxx_xxxx,
++                    xxx,
++                    xxxxxx.xxxxxxx(xxx_xxx_xxxxx),
 +                )
              )
  
  
-@@ -83,7 +83,8 @@
+@@ -83,7 +94,8 @@
                  "{{xxx_xxxxxxxxxx_xxxxxxxx}} xxx xxxx {} {{xxxx}} >&2".format(
                      "{xxxx} {xxxxxx}"
                      if xxxxx.xx_xxxxxxxxxx
@@ -637,7 +656,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
                          "--xxxxxxx --xxxxxx=x --xxxxxx-xxxxx=xxxxxx"
                          " --xxxxxx-xxxx=xxxxxxxxxxx.xxx"
                      )
-@@ -113,18 +114,25 @@
+@@ -113,18 +125,25 @@
  
  
  func_call_where_string_arg_has_method_call_and_bad_parens(
@@ -669,7 +688,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  
-@@ -132,52 +140,60 @@
+@@ -132,52 +151,60 @@
      def append(self):
          if True:
              xxxx.xxxxxxx.xxxxx(
@@ -763,7 +782,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  }
  
  
-@@ -185,10 +201,10 @@
+@@ -185,10 +212,10 @@
      def foo(self):
          if True:
              xxxxx_xxxxxxxxxxxx(
@@ -778,7 +797,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
              )
  
  
-@@ -232,36 +248,21 @@
+@@ -232,36 +259,21 @@
  
  some_dictionary = {
      "xxxxx006": [
@@ -823,7 +842,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  
  some_tuple = ("some string", "some string which should be joined")
-@@ -279,34 +280,21 @@
+@@ -279,34 +291,21 @@
  )
  
  lpar_and_rpar_have_comments = func_call(  # LPAR Comment
@@ -864,7 +883,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
  
-@@ -364,10 +352,7 @@
+@@ -364,10 +363,7 @@
          def foo():
              if not hasattr(module, name):
                  raise ValueError(
@@ -876,7 +895,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
                      % (name, module_name, get_docs_version())
                  )
  
-@@ -382,23 +367,19 @@
+@@ -382,23 +378,19 @@
  
  class Step(StepBase):
      def who(self):
@@ -907,7 +926,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
              # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
              "(x.bbbbbbbbbbbb.xxx != "
              '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
-@@ -409,8 +390,8 @@
+@@ -409,8 +401,8 @@
  if __name__ == "__main__":
      for i in range(4, 8):
          cmd = (
@@ -918,7 +937,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
-@@ -432,9 +413,7 @@
+@@ -432,9 +424,7 @@
          assert xxxxxxx_xxxx in [
              x.xxxxx.xxxxxx.xxxxx.xxxxxx,
              x.xxxxx.xxxxxx.xxxxx.xxxx,
@@ -929,7 +948,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  
  value.__dict__[key] = (
-@@ -449,8 +428,7 @@
+@@ -449,8 +439,7 @@
  
  RE_TWO_BACKSLASHES = {
      "asdf_hjkl_jkl": re.compile(
@@ -939,23 +958,23 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      ),
  }
  
-@@ -462,13 +440,9 @@
+@@ -462,13 +451,9 @@
  
  # We do NOT split on f-string expressions.
  print(
 -    "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam."
 -    f" {[f'{i}' for i in range(10)]}"
--)
++    f"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam. {[f'{i}' for i in range(10)]}"
+ )
 -x = (
 -    "This is a long string which contains an f-expr that should not split"
 -    f" {{{[i for i in range(5)]}}}."
-+    f"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam. {[f'{i}' for i in range(10)]}"
- )
+-)
 +x = f"This is a long string which contains an f-expr that should not split {{{[i for i in range(5)]}}}."
  
  # The parens should NOT be removed in this case.
  (
-@@ -478,8 +452,8 @@
+@@ -478,8 +463,8 @@
  
  # The parens should NOT be removed in this case.
  (
@@ -966,7 +985,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # The parens should NOT be removed in this case.
-@@ -513,93 +487,83 @@
+@@ -513,93 +498,83 @@
  
  
  temp_msg = (
@@ -1096,7 +1115,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      "6. Click on Create Credential at the top."
      '7. At the top click the link for "API key".'
      "8. No application restrictions are needed. Click Create at the bottom."
-@@ -608,7 +572,7 @@
+@@ -608,7 +583,7 @@
  
  # It shouldn't matter if the string prefixes are capitalized.
  temp_msg = (
@@ -1105,7 +1124,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      f"{balance: <{bal_len + 5}} "
      f"<<{author.display_name}>>\n"
  )
-@@ -617,51 +581,34 @@
+@@ -617,51 +592,34 @@
  
  welcome_to_programming = R"hello," R" world!"
  
@@ -1171,7 +1190,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # Regression test for https://github.com/psf/black/issues/3455.
-@@ -673,14 +620,6 @@
+@@ -673,14 +631,6 @@
  
  # Regression test for https://github.com/psf/black/issues/3506.
  # Regressed again by https://github.com/psf/black/pull/4498
@@ -1221,7 +1240,8 @@ long_tuple = (
 )
 
 stupid_format_method_bug = "Some really long string that just so happens to be the {} {} to force the 'format' method to hang over the line length boundary. This is pretty annoying.".format(
-    "perfect", "length"
+    "perfect",
+    "length",
 )
 
 
@@ -1229,7 +1249,9 @@ class A:
     def foo():
         os.system(
             "This is a regression test. xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxx xxxx.".format(
-                "xxxxxxxxxx", "xxxxxx", "xxxxxxxxxx"
+                "xxxxxxxxxx",
+                "xxxxxx",
+                "xxxxxxxxxx",
             )
         )
 
@@ -1238,7 +1260,9 @@ class A:
     def foo():
         XXXXXXXXXXXX.append((
             "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
-                xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
+                xxxxx,
+                xxxx,
+                xxxx_xxxx_xxxxxxxxxx,
             ),
             my_var,
             my_other_var,
@@ -1252,7 +1276,11 @@ class A:
                 (
                     "[{}]: xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx={}"
                     " xxxx_xxxx_xxxxxxxxxx={}, xxxx={})".format(
-                        xxxx._xxxxxxxxxxxxxx, xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx, xxxxxxx
+                        xxxx._xxxxxxxxxxxxxx,
+                        xxxxx,
+                        xxxx,
+                        xxxx_xxxx_xxxxxxxxxx,
+                        xxxxxxx,
                     )
                 ),
                 varX,
@@ -1266,7 +1294,9 @@ def foo(xxxx):
         for xxx in xxx_xxxx:
             assert ("x" in xxx) or (xxx in xxx_xxx_xxxxx), (
                 "{0} xxxxxxx xx {1}, xxx {1} xx xxx xx xxxx xx xxx xxxx: xxx xxxx {2}".format(
-                    xxx_xxxx, xxx, xxxxxx.xxxxxxx(xxx_xxx_xxxxx)
+                    xxx_xxxx,
+                    xxx,
+                    xxxxxx.xxxxxxx(xxx_xxx_xxxxx),
                 )
             )
 
