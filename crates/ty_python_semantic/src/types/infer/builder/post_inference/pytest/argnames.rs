@@ -97,9 +97,9 @@ impl TypeInferenceBuilder<'_, '_> {
         if let Some(literal) = self.expression_type(argnames_argument).as_string_literal() {
             self.parse_argnames_string(literal.value(db), argnames_argument.range())
         } else if let Some(list_expr) = argnames_argument.as_list_expr() {
-            self.parse_argnames_sequence(&list_expr.elts, list_expr.range())
+            self.parse_argnames_sequence(&list_expr.elts)
         } else if let Some(tuple_expr) = argnames_argument.as_tuple_expr() {
-            self.parse_argnames_sequence(&tuple_expr.elts, tuple_expr.range())
+            self.parse_argnames_sequence(&tuple_expr.elts)
         } else {
             Argnames::Unknown
         }
@@ -135,21 +135,18 @@ impl TypeInferenceBuilder<'_, '_> {
 
     /// Converts the sequence (list or tuple elements) into multiple argnames.
     /// If there is an error, `None` is returned and a diagnostic is generated.
-    fn parse_argnames_sequence(&self, sequence: &[ast::Expr], range: TextRange) -> Argnames {
-        self.parse_multiple_argnames_sequence(sequence, range)
+    fn parse_argnames_sequence(&self, sequence: &[ast::Expr]) -> Argnames {
+        self.parse_multiple_argnames_sequence(sequence)
             .map(Into::into)
             .unwrap_or_default()
     }
 
-    fn parse_multiple_argnames_sequence(
-        &self,
-        sequence: &[ast::Expr],
-        range: TextRange,
-    ) -> Option<MultipleArgnames> {
+    fn parse_multiple_argnames_sequence(&self, sequence: &[ast::Expr]) -> Option<MultipleArgnames> {
         // Collect so that all errors are reported.
         let identifiers = sequence
             .iter()
             .map(|element| {
+                let range = element.range();
                 if let Some(literal_type) = self.expression_type(element).as_string_literal() {
                     let name = literal_type.value(self.db());
                     self.check_valid_identifier(name, range)
