@@ -3696,6 +3696,7 @@ version = "0.0.9"
 dependencies = [
  "get-size2",
  "ruff_db",
+ "ruff_python_ast",
  "ruff_text_size",
  "schemars",
  "serde",
