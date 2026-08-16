@@ -369,9 +369,9 @@ T = f()
 
 ## Guarded instance attributes when the base is checked first
 
-A guarded bound-method initializer remains valid, while another initializer still reports an
-attribute that is missing from the base class. This reproduces
-<https://github.com/astral-sh/ty/issues/4076>.
+A guarded bound-method initializer remains valid, including when its receiver is explicitly
+annotated, while another initializer still reports an attribute that is missing from the base class.
+This reproduces <https://github.com/astral-sh/ty/issues/4076>.
 
 `base.py`:
 
@@ -386,18 +386,27 @@ class Base:
             self.missing
         if not hasattr(self, "z"):
             self.z = self.y  # error: [unresolved-attribute]
+
+class Annotated:
+    def __init__(self: "Annotated"):
+        if not hasattr(self, "value"):
+            self.value = self.__str__
+            self.missing  # error: [unresolved-attribute]
 ```
 
 `child.py`:
 
 ```py
-from base import Base
+from base import Annotated, Base
 
 class Child(Base):
     x = Base.__str__
 
     def z(self): ...
     def y(self): ...
+
+class AnnotatedChild(Annotated):
+    value = Annotated.__str__
 ```
 
 ## Guarded instance attributes when the subclass is checked first
@@ -407,13 +416,16 @@ Checking the subclass first preserves the valid initializer and the missing-attr
 `child.py`:
 
 ```py
-from base import Base
+from base import Annotated, Base
 
 class Child(Base):
     x = Base.__str__
 
     def z(self): ...
     def y(self): ...
+
+class AnnotatedChild(Annotated):
+    value = Annotated.__str__
 ```
 
 `base.py`:
@@ -429,16 +441,25 @@ class Base:
             self.missing
         if not hasattr(self, "z"):
             self.z = self.y  # error: [unresolved-attribute]
+
+class Annotated:
+    def __init__(self: "Annotated"):
+        if not hasattr(self, "value"):
+            self.value = self.__str__
+            self.missing  # error: [unresolved-attribute]
 ```
 
 ## Nested and compound attribute guards when the base is checked first
 
 An unrelated condition can appear outside an attribute guard, inside it, or on either side of a
-compound condition without making a guarded initializer invalid.
+compound condition without making a guarded initializer invalid. Previous narrowing of the receiver
+must also preserve real diagnostics in the guarded branch.
 
 `base.py`:
 
 ```py
+class Marker: ...
+
 class Base:
     def __init__(self, enabled: bool):
         if enabled:
@@ -451,18 +472,33 @@ class Base:
             self.leading = self.__str__
         if not hasattr(self, "trailing") and enabled:
             self.trailing = self.__str__
+        if self is not None:
+            if not hasattr(self, "nonnull"):
+                self.nonnull = self.__str__
+                self.nonnull_missing  # error: [unresolved-attribute]
+        if not hasattr(self, "other"):
+            if not hasattr(self, "unrelated"):
+                self.unrelated = self.__str__
+                self.unrelated_missing  # error: [unresolved-attribute]
+        if isinstance(self, Marker):
+            if not hasattr(self, "narrowed"):
+                self.narrowed = self.__str__
+                self.narrowed_missing  # error: [unresolved-attribute]
 ```
 
 `child.py`:
 
 ```py
-from base import Base
+from base import Base, Marker
 
-class Child(Base):
+class Child(Base, Marker):
     outer = Base.__str__
     inner = Base.__str__
     leading = Base.__str__
     trailing = Base.__str__
+    nonnull = Base.__str__
+    unrelated = Base.__str__
+    narrowed = Base.__str__
 ```
 
 ## Nested and compound attribute guards when the subclass is checked first
@@ -472,18 +508,23 @@ Checking the subclass first must preserve the same nested and compound guarded i
 `child.py`:
 
 ```py
-from base import Base
+from base import Base, Marker
 
-class Child(Base):
+class Child(Base, Marker):
     outer = Base.__str__
     inner = Base.__str__
     leading = Base.__str__
     trailing = Base.__str__
+    nonnull = Base.__str__
+    unrelated = Base.__str__
+    narrowed = Base.__str__
 ```
 
 `base.py`:
 
 ```py
+class Marker: ...
+
 class Base:
     def __init__(self, enabled: bool):
         if enabled:
@@ -496,6 +537,18 @@ class Base:
             self.leading = self.__str__
         if not hasattr(self, "trailing") and enabled:
             self.trailing = self.__str__
+        if self is not None:
+            if not hasattr(self, "nonnull"):
+                self.nonnull = self.__str__
+                self.nonnull_missing  # error: [unresolved-attribute]
+        if not hasattr(self, "other"):
+            if not hasattr(self, "unrelated"):
+                self.unrelated = self.__str__
+                self.unrelated_missing  # error: [unresolved-attribute]
+        if isinstance(self, Marker):
+            if not hasattr(self, "narrowed"):
+                self.narrowed = self.__str__
+                self.narrowed_missing  # error: [unresolved-attribute]
 ```
 
 ## Unreachable and deleted class attributes do not prevent guarded initialization

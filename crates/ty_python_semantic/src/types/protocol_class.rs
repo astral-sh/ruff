@@ -3730,6 +3730,42 @@ fn callable_has_only_non_never_returns<'db>(db: &'db dyn Db, callable: CallableT
         && signatures.all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
 }
 
+/// Check synthesized protocol members without treating a cyclic implicit attribute as present.
+///
+/// A `Divergent` member is only a provisional cycle value, not proof that the attribute exists.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _, _| false,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn synthesized_protocol_members_are_definitely_present<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    ty: Type<'db>,
+    protocol: ProtocolInstanceType<'db>,
+) -> bool {
+    let env = ProgramEnvironment::from_program(program);
+
+    protocol.interface(db).members(db).all(|member| {
+        ty.member_lookup_with_policy(
+            db,
+            &env,
+            member.name(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .place
+        .is_definitely_bound()
+            || matches!(
+                ty.member(db, &env, member.name()).place,
+                Place::Defined(DefinedPlace {
+                    ty,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) if !ty.is_divergent()
+            )
+    })
+}
+
 /// Protocol compatibility can only succeed if every required member is present.
 ///
 /// Check that necessary condition up front so we can avoid expensive per-member type
@@ -3752,6 +3788,9 @@ pub(super) fn has_all_protocol_members_defined<'db>(
                 && target_interface.members(db).all(|member| {
                     source_interface.includes_member_or_object_fallback(db, env, member.name())
                 })
+        }
+        _ if protocol.class_origin(db).is_none() => {
+            synthesized_protocol_members_are_definitely_present(db, env.program(db), ty, protocol)
         }
         _ => target_interface.members(db).all(|member| {
             matches!(

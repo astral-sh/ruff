@@ -11,15 +11,14 @@ use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDict
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    Parameter, Parameters, Signature, SpecialFormType, StringLiteralType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
-    callable_pattern_type, class_pattern_positional_sources,
-    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
+    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
-use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -29,9 +28,7 @@ use ty_python_core::predicate::{
     SubjectElementPatternPredicate,
 };
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{
-    ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index, use_def_map,
-};
+use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
@@ -149,45 +146,6 @@ fn all_narrowing_constraints_for_expression<'db>(
     ExpressionNarrowingConstraints {
         positive: NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true).finish(),
         negative: NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false).finish(),
-    }
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-enum AttributePresence {
-    Present,
-    Absent,
-    Indeterminate,
-}
-
-/// Checks attribute presence without allowing a guarded initializer to prove its own absence.
-///
-/// ```python
-/// if not hasattr(self, "value"):
-///     self.value = self.__str__
-/// ```
-///
-/// A cyclic presence check recovers to `Indeterminate`, independently of file order. Including the
-/// predicate in the query identity prevents recovery from affecting unrelated `hasattr` checks.
-#[salsa::tracked(
-    returns(copy),
-    cycle_result=|_, _, _, _, _| AttributePresence::Indeterminate,
-    heap_size=ruff_memory_usage::heap_size,
-)]
-fn negative_hasattr_presence_proof<'db>(
-    db: &'db dyn Db,
-    predicate: Expression<'db>,
-    receiver: Type<'db>,
-    attribute: StringLiteralType<'db>,
-) -> AttributePresence {
-    let env = ProgramEnvironment::from_file(predicate.program_file(db));
-    if receiver
-        .member(db, &env, attribute.value(db))
-        .place
-        .is_definitely_bound()
-    {
-        AttributePresence::Present
-    } else {
-        AttributePresence::Absent
     }
 }
 
@@ -4316,44 +4274,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg_place = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(db)?;
-                let place = self.expect_place(&first_arg_place);
+                let place = self.expect_place(&first_arg);
 
                 if function == KnownFunction::HasAttr {
-                    let attribute = inference.expression_type(second_arg).as_string_literal()?;
-                    let attr = attribute.value(db);
+                    let attr = inference
+                        .expression_type(second_arg)
+                        .as_string_literal()?
+                        .value(db);
 
                     if !is_identifier(attr) {
-                        return None;
-                    }
-
-                    let places = self.places();
-                    let receiver = inference.expression_type(first_arg);
-                    if !is_positive
-                        && let Some(member) = places.member_id_by_instance_attribute_name(attr)
-                        && places.place(member).is_bound()
-                        && places
-                            .parents(places.place(member))
-                            .any(|parent| parent == place)
-                        && matches!(receiver, Type::TypeVar(typevar) if typevar.typevar(db).is_self(db))
-                        && let PredicateNode::Expression(predicate) = self.predicate
-                        && let Some(receiver_name) = first_arg.as_name_expr()
-                        && {
-                            let use_def = use_def_map(db, self.scope());
-                            let use_id =
-                                receiver_name.scoped_use_id(db, predicate.program_file(db));
-                            // An earlier narrowing of this receiver can already establish that
-                            // the attribute exists, making the negative guard unreachable.
-                            use_def.bindings_at_use(use_id).all(|binding| {
-                                binding.narrowing_constraint.constraint().is_terminal()
-                            })
-                        }
-                        && negative_hasattr_presence_proof(db, predicate, receiver, attribute)
-                            == AttributePresence::Indeterminate
-                    {
-                        // An implicit attribute cannot establish its own absence when proving its
-                        // presence requires inferring the initializer narrowed by this predicate.
                         return None;
                     }
 
