@@ -1,5 +1,5 @@
 use crate::types::{
-    Parameter, Parameters, Signature, Type,
+    KnownClass, Parameter, Parameters, Signature, Type,
     infer::{
         TypeInferenceBuilder,
         builder::post_inference::pytest::{
@@ -73,8 +73,16 @@ impl<'db, 'ast> SubSignature<'db, 'ast> {
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(crate) fn single_item_fn_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+        self.single_parameter_fn(self.item_parameter(signature))
+    }
+
+    pub(crate) fn test_case_fn_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+        self.single_parameter_fn(self.test_case_parameter(signature))
+    }
+
+    fn single_parameter_fn(&self, parameter: Parameter<'db>) -> Type<'db> {
         let db = self.db();
-        let parameters = [self.item_parameter(signature)];
+        let parameters = [parameter];
         let parameters = Parameters::standard(parameters);
         let signature = Signature::new(parameters, Type::none(db, self.program_environment()));
         Type::single_callable(db, signature)
@@ -88,6 +96,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TestParameters::Multiple(_) => Parameter::positional_only(None),
         };
         parameter.with_annotated_type(self.item_type(signature))
+    }
+
+    fn test_case_parameter(&self, signature: &SubSignature<'db, 'ast>) -> Parameter<'db> {
+        let parameter = Parameter::positional_only(None);
+        parameter.with_annotated_type(self.test_case_type(signature))
+    }
+
+    fn test_case_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {
+        KnownClass::Iterable.to_specialized_instance(
+            self.db(),
+            self.program_environment(),
+            &[self.item_type(signature)],
+        )
     }
 
     fn item_type(&self, signature: &SubSignature<'db, 'ast>) -> Type<'db> {

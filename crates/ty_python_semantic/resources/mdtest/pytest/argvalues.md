@@ -84,7 +84,6 @@ The argvalues must be in a tuple when there are multiple argnames.
 
 ```py
 import pytest
-from collections import namedtuple
 
 # All valid.
 @pytest.mark.parametrize("x, y", [(1, "2"), (3, "4")])
@@ -127,4 +126,46 @@ def _(x: int, y: str, z: bool) -> None: ...
     ],
 )
 def _(x: int) -> None: ...
+```
+
+## Sequences
+
+In each of the previous examples, every test case is checked. However, sometimes we just check the
+sequence.
+
+```py
+import pytest
+
+# We can't check every item in the range, just the sequence as a whole.
+@pytest.mark.parametrize("x", range(5))
+def _(x: int) -> None: ...
+
+# The same with a broken list.
+@pytest.mark.parametrize(
+    "x",
+    [1, 2] + [3.0],  # error: [pytest-param-mismatched-type]
+)
+def _(x: int) -> None: ...
+
+# There are other ways to "hide" the whole sequence.
+test_cases = [(1, "1"), (2, b"2")]
+
+@pytest.mark.parametrize(
+    "x, s",
+    test_cases,  # error: [pytest-param-mismatched-type]
+)
+def _(x: int, s: str) -> None: ...
+
+# The single-item list is still an edge case.
+test_cases = range(3)
+
+@pytest.mark.parametrize(
+    ["x"],
+    test_cases,  # error: [pytest-param-mismatched-type]
+)
+def _(x: int) -> None: ...
+
+# And while this might be a bug, it still type checks.
+@pytest.mark.parametrize("s", "test-value")
+def _(s: str) -> None: ...
 ```

@@ -42,7 +42,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         fn_def: &'ast ast::StmtFunctionDef,
         ty: Type<'db>,
     ) -> Option<CheckablePytestTest<'db, 'ast>> {
-        // Check parametrize decorators (argnames) unconditionally.
+        // Check parameterize decorators (argnames) unconditionally.
         let parametrizations = self.build_parametrizations(&fn_def.decorator_list);
         if self.has_only_pytest_decorators(fn_def)
             // Do not build the requests unless all the decorators are Pytest marks.
@@ -91,7 +91,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             format_args!("`{}` already used here", argname.name()),
                         );
                         sub.annotate(Annotation::primary(self.context.span(previous_range)));
-                        diagnostic.sub(sub)
+                        diagnostic.sub(sub);
                     }
                 }
             }
@@ -110,33 +110,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         test: &CheckablePytestTest<'db, 'ast>,
     ) {
         if let Some(sub_signature) = test.sub_signature(parametrization.argnames()) {
-            self.check_argvalues_against(sub_signature, parametrization.argvalues());
+            self.check_argvalues_against(&sub_signature, parametrization.argvalues());
         }
     }
 
     fn check_argvalues_against(
         &mut self,
-        sub_signature: SubSignature<'db, 'ast>,
+        sub_signature: &SubSignature<'db, 'ast>,
         argvalues: &'ast ast::Expr,
     ) {
         if let Some(list) = argvalues.as_list_expr() {
-            self.check_argvalue_sequence(sub_signature, &list.elts);
+            self.check_argvalue_items(sub_signature, &list.elts);
         } else if let Some(tuple) = argvalues.as_tuple_expr() {
-            self.check_argvalue_sequence(sub_signature, &tuple.elts);
+            self.check_argvalue_items(sub_signature, &tuple.elts);
         } else {
-            todo!()
+            self.check_argvalue_test_case(&sub_signature, argvalues);
         }
     }
 
-    fn check_argvalue_sequence(
+    fn check_argvalue_items(
         &mut self,
-        sub_signature: SubSignature<'db, 'ast>,
+        sub_signature: &SubSignature<'db, 'ast>,
         argvalues: &'ast [ast::Expr],
     ) {
-        let signature = self.single_item_fn_type(&sub_signature);
+        let signature = self.single_item_fn_type(sub_signature);
         for argvalue in argvalues {
             self.check_pytest_fn_call(sub_signature.test_name(), signature, argvalue);
         }
+    }
+
+    fn check_argvalue_test_case(
+        &mut self,
+        sub_signature: &SubSignature<'db, 'ast>,
+        argvalues: &'ast ast::Expr,
+    ) {
+        let signature = self.test_case_fn_type(sub_signature);
+        self.check_pytest_fn_call(sub_signature.test_name(), signature, argvalues);
     }
 
     fn check_pytest_fn_call(
@@ -176,6 +185,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     argument_ranges: &[argvalue.range()],
                 },
             );
-        };
+        }
     }
 }
