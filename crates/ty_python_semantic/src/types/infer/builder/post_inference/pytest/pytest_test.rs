@@ -133,7 +133,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         sub_signature: SubSignature<'db, 'ast>,
         argvalues: &'ast [ast::Expr],
     ) {
-        let signature = self.single_item_fn_type(sub_signature);
+        let signature = self.single_item_fn_type(&sub_signature);
         for argvalue in argvalues {
             self.check_pytest_fn_call(sub_signature.test_name(), signature, argvalue);
         }
