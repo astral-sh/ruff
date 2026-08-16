@@ -4348,6 +4348,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 guard_predicate_id,
                                 &possibly_narrowed,
                             );
+                        self.current_use_def_map_mut()
+                            .record_exception_checkpoint_binding_change();
                         let match_success_guard_failure = self.flow_snapshot();
                         self.flow_restore(truthy);
                         self.current_use_def_map_mut()
@@ -4355,6 +4357,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 guard_predicate_id,
                                 &possibly_narrowed,
                             );
+                        self.current_use_def_map_mut()
+                            .record_exception_checkpoint_binding_change();
                         match_success_guard_failure
                     });
 

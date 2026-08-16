@@ -332,6 +332,54 @@ def call_never_returns() -> None:
         reveal_type(state)  # revealed: Literal[0]
 ```
 
+## Nested handlers with merged bindings
+
+An inner handler can preserve the original binding while its `else` suite sees a later assignment.
+After those paths merge, an exception must expose both bindings to the outer handler:
+
+```py
+def may_raise() -> None: ...
+def nested_try() -> None:
+    state = 0
+    try:
+        try:
+            may_raise()
+            state = "changed"
+        except:
+            pass
+        else:
+            may_raise()
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0, "changed"]
+```
+
+## Caught calls that never return
+
+Catching an exception from a `NoReturn` call makes the following code reachable again, even if no
+bindings changed. The unreachable inner `else` suite must not hide the later exception:
+
+```py
+from typing import NoReturn
+
+def may_raise() -> None: ...
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def nested_terminal() -> None:
+    state = 0
+    try:
+        try:
+            stop()
+        except:
+            pass
+        else:
+            may_raise()
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
 ## Operators and augmented assignments
 
 An arithmetic operator can raise after evaluating both operands:
