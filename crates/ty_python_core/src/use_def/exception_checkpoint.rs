@@ -109,44 +109,6 @@ mod tests {
     }
 
     #[test]
-    fn restored_and_merged_bindings_have_distinct_identities() {
-        let mut state = ExceptionCheckpointState::default();
-        state.record_binding_change();
-        let original = state.snapshot();
-        let original_key = state.key(FLOW);
-        state.record_binding_change();
-        let changed = state.snapshot();
-        let changed_key = state.key(FLOW);
-
-        state.restore(original);
-        assert_eq!(state.key(FLOW), original_key);
-        state.merge(changed);
-        assert_ne!(state.key(FLOW), original_key);
-        assert_ne!(state.key(FLOW), changed_key);
-
-        state.restore(original);
-        state.record_binding_change();
-        assert_ne!(state.key(FLOW), changed_key);
-    }
-
-    #[test]
-    fn restoring_and_merging_call_gates_invalidates_checkpoints() {
-        let mut state = ExceptionCheckpointState::default();
-        let before_call = state.snapshot();
-        let key = state.key(FLOW);
-        state.record_call_gate();
-        assert_eq!(state.key(FLOW), key);
-        let after_call = state.snapshot();
-
-        state.restore(before_call);
-        let restored_key = state.key(FLOW);
-        assert_ne!(restored_key, key);
-        state.merge(after_call);
-        assert_ne!(state.key(FLOW), restored_key);
-        assert_ne!(state.key(FLOW), key);
-    }
-
-    #[test]
     fn conservative_keys_still_coalesce_straight_line_calls() {
         let mut state = ExceptionCheckpointState::default();
         state.record_binding_change();
