@@ -469,6 +469,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-async
         (Flake8Async, "100") => rules::flake8_async::rules::CancelScopeNoCheckpoint,
+        (Flake8Async, "103") => rules::flake8_async::rules::CancellationExceptionWithoutReraise,
         (Flake8Async, "105") => rules::flake8_async::rules::TrioSyncCall,
         (Flake8Async, "109") => rules::flake8_async::rules::AsyncFunctionWithTimeout,
         (Flake8Async, "110") => rules::flake8_async::rules::AsyncBusyWait,
