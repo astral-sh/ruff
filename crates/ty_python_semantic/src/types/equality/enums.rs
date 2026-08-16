@@ -7,7 +7,7 @@ use ty_python_core::Truthiness;
 use crate::types::literal::IntLiteralType;
 use crate::types::{
     EnumClassLiteral, EnumComplementType, EnumLiteralType, IntersectionBuilder, IntersectionType,
-    LiteralValueType, LiteralValueTypeKind, Type, UnionBuilder,
+    LiteralValueType, LiteralValueTypeKind, Type, UnionBuilder, enums::EnumClassLiteralFlags,
 };
 use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 
@@ -1070,7 +1070,7 @@ impl<'db> EnumValueSet<'db> {
             }
         }
 
-        if !self.is_closed(profile.members_are_exhaustive) {
+        if !self.is_closed(profile.flags.members_are_exhaustive()) {
             projection.unknown_domains.insert(key_domain);
         }
         Some(())
@@ -1098,7 +1098,8 @@ impl<'db> EnumValueSet<'db> {
                 Self::insert_member(&mut included, name, promotable);
             }
         }
-        if included.len() == self.member_count(db) && self.is_closed(profile.members_are_exhaustive)
+        if included.len() == self.member_count(db)
+            && self.is_closed(profile.flags.members_are_exhaustive())
         {
             return Ok(Some(self.clone()));
         }
@@ -1109,7 +1110,7 @@ impl<'db> EnumValueSet<'db> {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct EnumClassKeyProfile<'db> {
-    members_are_exhaustive: bool,
+    flags: EnumClassLiteralFlags,
     semantics: Option<KnownComparisonSemantics>,
     members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]>,
 }
@@ -1144,7 +1145,7 @@ fn enum_class_key_profile<'db>(
         })
         .collect();
     EnumClassKeyProfile {
-        members_are_exhaustive: enum_class.members_are_exhaustive(db),
+        flags: enum_class.flags(db),
         semantics,
         members,
     }
@@ -1176,7 +1177,7 @@ fn same_enum_comparison_profile<'db>(
     let profile = enum_class_key_profile(db, enum_class, operator);
     let (comparison_keys, members_compare_by_identity) = match profile.semantics {
         None => (None, false),
-        Some(KnownComparisonSemantics::Object) if !enum_class.aliases_are_known(db) => {
+        Some(KnownComparisonSemantics::Object) if !profile.flags.aliases_are_known() => {
             (Some(SameEnumComparisonKeys::UnknownOrRepeated), true)
         }
         Some(KnownComparisonSemantics::Object) => (Some(SameEnumComparisonKeys::Distinct), true),
@@ -1202,7 +1203,7 @@ fn same_enum_comparison_profile<'db>(
         Some(_) => (Some(SameEnumComparisonKeys::UnknownOrRepeated), false),
     };
     SameEnumComparisonProfile {
-        members_are_exhaustive: profile.members_are_exhaustive,
+        members_are_exhaustive: profile.flags.members_are_exhaustive(),
         members_compare_by_identity,
         comparison_keys,
     }

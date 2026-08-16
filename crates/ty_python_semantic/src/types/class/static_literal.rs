@@ -71,6 +71,27 @@ use ty_python_core::{
     use_def_map,
 };
 
+bitflags::bitflags! {
+    /// Metadata inferred from a class definition and its decorators.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub struct StaticClassLiteralFlags: u8 {
+        /// The class is decorated with `@typing.type_check_only`.
+        const TYPE_CHECK_ONLY = 1 << 0;
+        /// The class is decorated with `@functools.total_ordering`.
+        const TOTAL_ORDERING = 1 << 1;
+        /// The class has at least one decorator.
+        const HAS_DECORATORS = 1 << 2;
+        /// The class has PEP 695 type parameters.
+        const HAS_TYPE_PARAMS = 1 << 3;
+        /// The class has at least one explicit base class.
+        const HAS_EXPLICIT_BASES = 1 << 4;
+        /// The class has an explicit `metaclass` keyword argument.
+        const HAS_EXPLICIT_METACLASS = 1 << 5;
+    }
+}
+
+impl get_size2::GetSize for StaticClassLiteralFlags {}
+
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
 /// generic class that has not been specialized.
 ///
@@ -93,32 +114,12 @@ pub struct StaticClassLiteral<'db> {
     pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
     #[returns(copy)]
-    pub(crate) type_check_only: bool,
-
-    #[returns(copy)]
     pub(crate) dataclass_params: Option<DataclassParams<'db>>,
     #[returns(copy)]
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 
-    /// Whether this class is decorated with `@functools.total_ordering`
     #[returns(copy)]
-    pub(crate) total_ordering: bool,
-
-    /// Whether this class has any decorators.
-    #[returns(copy)]
-    pub(crate) has_decorators: bool,
-
-    /// Whether this class has PEP 695 type parameters.
-    #[returns(copy)]
-    pub(crate) has_type_params: bool,
-
-    /// Whether this class has any explicit base classes.
-    #[returns(copy)]
-    pub(crate) has_explicit_bases: bool,
-
-    /// Whether this class has an explicit `metaclass` keyword argument.
-    #[returns(copy)]
-    pub(crate) has_explicit_metaclass: bool,
+    pub(crate) flags: StaticClassLiteralFlags,
 }
 
 // The Salsa heap is tracked separately.
@@ -218,6 +219,42 @@ struct OwnClassFields<'db> {
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
+    /// Returns whether this class is decorated with `@typing.type_check_only`.
+    pub(crate) fn type_check_only(self, db: &'db dyn Db) -> bool {
+        self.flags(db)
+            .contains(StaticClassLiteralFlags::TYPE_CHECK_ONLY)
+    }
+
+    /// Returns whether this class is decorated with `@functools.total_ordering`.
+    pub(crate) fn total_ordering(self, db: &'db dyn Db) -> bool {
+        self.flags(db)
+            .contains(StaticClassLiteralFlags::TOTAL_ORDERING)
+    }
+
+    /// Returns whether this class has any decorators.
+    pub(crate) fn has_decorators(self, db: &'db dyn Db) -> bool {
+        self.flags(db)
+            .contains(StaticClassLiteralFlags::HAS_DECORATORS)
+    }
+
+    /// Returns whether this class has PEP 695 type parameters.
+    pub(crate) fn has_type_params(self, db: &'db dyn Db) -> bool {
+        self.flags(db)
+            .contains(StaticClassLiteralFlags::HAS_TYPE_PARAMS)
+    }
+
+    /// Returns whether this class has any explicit base classes.
+    pub(crate) fn has_explicit_bases(self, db: &'db dyn Db) -> bool {
+        self.flags(db)
+            .contains(StaticClassLiteralFlags::HAS_EXPLICIT_BASES)
+    }
+
+    /// Returns whether this class has an explicit `metaclass` keyword argument.
+    pub(crate) fn has_explicit_metaclass(self, db: &'db dyn Db) -> bool {
+        self.flags(db)
+            .contains(StaticClassLiteralFlags::HAS_EXPLICIT_METACLASS)
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -272,14 +309,9 @@ impl<'db> StaticClassLiteral<'db> {
             self.body_scope(db),
             self.known(db),
             self.deprecated(db),
-            self.type_check_only(db),
             dataclass_params,
             self.dataclass_transformer_params(db),
-            self.total_ordering(db),
-            self.has_decorators(db),
-            self.has_type_params(db),
-            self.has_explicit_bases(db),
-            self.has_explicit_metaclass(db),
+            self.flags(db),
         )
     }
 
@@ -1318,7 +1350,10 @@ impl<'db> StaticClassLiteral<'db> {
             Ok((candidate.metaclass.into(), transform_info))
         }
 
-        if !self.has_explicit_bases(db) && !self.has_explicit_metaclass(db) {
+        if !self.flags(db).intersects(
+            StaticClassLiteralFlags::HAS_EXPLICIT_BASES
+                | StaticClassLiteralFlags::HAS_EXPLICIT_METACLASS,
+        ) {
             let env = ProgramEnvironment::from_scope(self.body_scope(db));
             return Ok((KnownClass::Type.to_class_literal(db, &env), None));
         }

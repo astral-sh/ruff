@@ -12,7 +12,7 @@ pub(super) use self::named_tuple::{
 };
 use self::static_literal::{AugmentedBindings, ImplicitAttribute};
 pub(crate) use self::static_literal::{
-    ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
+    ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral, StaticClassLiteralFlags,
     expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{
@@ -164,8 +164,10 @@ impl<'db> CodeGeneratorKind<'db> {
     fn from_static_class(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<Self> {
         if class.dataclass_params(db).is_none()
             && class.known(db).is_none()
-            && !class.has_explicit_bases(db)
-            && !class.has_explicit_metaclass(db)
+            && !class.flags(db).intersects(
+                StaticClassLiteralFlags::HAS_EXPLICIT_BASES
+                    | StaticClassLiteralFlags::HAS_EXPLICIT_METACLASS,
+            )
         {
             return None;
         }

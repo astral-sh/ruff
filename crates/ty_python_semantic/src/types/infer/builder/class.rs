@@ -6,6 +6,7 @@ use crate::types::{
     SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypedDictModule,
     call::CallError,
     callable::CallableFunctionProvenance,
+    class::StaticClassLiteralFlags,
     function::KnownFunction,
     infer::{
         TypeInferenceBuilder,
@@ -126,24 +127,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut decorators_to_apply = Vec::with_capacity(decorator_types_and_nodes.len());
         let mut metadata_applies_to_original_class = true;
         let mut deprecated = None;
-        let mut type_check_only = false;
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
-        let mut total_ordering = false;
-        let has_explicit_bases = class_node
-            .arguments
-            .as_deref()
-            .is_some_and(|arguments| !arguments.args.is_empty());
-        let has_explicit_metaclass = class_node
-            .arguments
-            .as_deref()
-            .is_some_and(|arguments| arguments.find_keyword("metaclass").is_some());
-        let infer_original_class_ty = |deprecated,
-                                       type_check_only,
-                                       dataclass_params,
-                                       dataclass_transformer_params,
-                                       total_ordering| {
-            match (maybe_known_class, &*name.id) {
+        let mut class_flags = StaticClassLiteralFlags::empty();
+        class_flags.set(
+            StaticClassLiteralFlags::HAS_DECORATORS,
+            !class_node.decorator_list.is_empty(),
+        );
+        class_flags.set(
+            StaticClassLiteralFlags::HAS_TYPE_PARAMS,
+            class_node.type_params.is_some(),
+        );
+        class_flags.set(
+            StaticClassLiteralFlags::HAS_EXPLICIT_BASES,
+            class_node
+                .arguments
+                .as_deref()
+                .is_some_and(|arguments| !arguments.args.is_empty()),
+        );
+        class_flags.set(
+            StaticClassLiteralFlags::HAS_EXPLICIT_METACLASS,
+            class_node
+                .arguments
+                .as_deref()
+                .is_some_and(|arguments| arguments.find_keyword("metaclass").is_some()),
+        );
+        let infer_original_class_ty =
+            |deprecated, dataclass_params, dataclass_transformer_params, class_flags| match (
+                maybe_known_class,
+                &*name.id,
+            ) {
                 (None, "NamedTuple") if in_typing_module() => {
                     Type::SpecialForm(SpecialFormType::NamedTuple)
                 }
@@ -157,17 +170,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     body_scope,
                     maybe_known_class,
                     deprecated,
-                    type_check_only,
                     dataclass_params,
                     dataclass_transformer_params,
-                    total_ordering,
-                    !class_node.decorator_list.is_empty(),
-                    class_node.type_params.is_some(),
-                    has_explicit_bases,
-                    has_explicit_metaclass,
+                    class_flags,
                 )),
-            }
-        };
+            };
         let decorator_call_ty = |decorator: &ast::Decorator| match &decorator.expression {
             ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
             _ => None,
@@ -196,7 +203,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(db, KnownFunction::TotalOrdering))
             {
-                total_ordering = true;
+                class_flags.insert(StaticClassLiteralFlags::TOTAL_ORDERING);
                 continue;
             }
 
@@ -226,7 +233,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(db, KnownFunction::TypeCheckOnly))
             {
-                type_check_only = true;
+                class_flags.insert(StaticClassLiteralFlags::TYPE_CHECK_ONLY);
                 continue;
             }
 
@@ -275,10 +282,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let original_class_ty = infer_original_class_ty(
                 deprecated,
-                type_check_only,
                 dataclass_params,
                 dataclass_transformer_params,
-                total_ordering,
+                class_flags,
             );
             let decorator_result = apply_class_decorator(db, env, decorator_ty, original_class_ty);
             let decorated_ty = match &decorator_result {
@@ -308,10 +314,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let mut inferred_ty = infer_original_class_ty(
             deprecated,
-            type_check_only,
             dataclass_params,
             dataclass_transformer_params,
-            total_ordering,
+            class_flags,
         );
 
         let original_class_ty = inferred_ty;

@@ -294,6 +294,35 @@ pub(super) fn class_defines_property<'db>(
     false
 }
 
+bitflags::bitflags! {
+    /// Properties of an enum class and its canonical members.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    pub struct EnumClassLiteralFlags: u8 {
+        /// The canonical member and alias sets are known exactly.
+        const ALIASES_ARE_KNOWN = 1 << 0;
+
+        /// The canonical members exhaust the runtime values of this enum class.
+        ///
+        /// `Flag` classes and transforming metaclasses can create runtime members beyond those
+        /// declared in the class body, so their declared members are not a closed value set.
+        const MEMBERS_ARE_EXHAUSTIVE = 1 << 1;
+    }
+}
+
+impl EnumClassLiteralFlags {
+    /// Returns whether the canonical member and alias sets are known exactly.
+    pub(super) const fn aliases_are_known(self) -> bool {
+        self.contains(Self::ALIASES_ARE_KNOWN)
+    }
+
+    /// Returns whether the canonical members exhaust the enum's possible runtime values.
+    pub(super) const fn members_are_exhaustive(self) -> bool {
+        self.contains(Self::MEMBERS_ARE_EXHAUSTIVE)
+    }
+}
+
+impl get_size2::GetSize for EnumClassLiteralFlags {}
+
 /// An enum class literal with its canonical members, value types, and aliases.
 ///
 /// This keeps the enum-specific information used by enum literals and enum complements alongside
@@ -306,15 +335,8 @@ pub struct EnumClassLiteral<'db> {
     pub(crate) members: Box<[(Name, Type<'db>)]>,
     #[returns(ref)]
     pub(crate) aliases: Box<[(Name, Name)]>,
-    /// Whether the canonical member and alias sets are known exactly.
     #[returns(copy)]
-    pub(super) aliases_are_known: bool,
-    /// Whether the canonical members exhaust the runtime values of this enum class.
-    ///
-    /// `Flag` classes and transforming metaclasses can create runtime members beyond those
-    /// declared in the class body, so their declared members are not a closed value set.
-    #[returns(copy)]
-    pub(crate) members_are_exhaustive: bool,
+    pub(super) flags: EnumClassLiteralFlags,
 }
 
 // The Salsa heap is tracked separately.
@@ -348,24 +370,41 @@ fn enum_class_literal<'db>(
         .map(|(alias, member)| (alias.clone(), member.clone()))
         .collect();
     aliases.sort_unstable();
-    let members_are_exhaustive = !metadata.value_construction.metaclass_may_transform_values
-        && !Type::ClassLiteral(class).is_subtype_of(
-            db,
-            &env,
-            KnownClass::Flag.to_subclass_of(db, &env),
-        );
+    let mut flags = EnumClassLiteralFlags::empty();
+    flags.set(
+        EnumClassLiteralFlags::ALIASES_ARE_KNOWN,
+        metadata.aliases_are_known,
+    );
+    flags.set(
+        EnumClassLiteralFlags::MEMBERS_ARE_EXHAUSTIVE,
+        !metadata.value_construction.metaclass_may_transform_values
+            && !Type::ClassLiteral(class).is_subtype_of(
+                db,
+                &env,
+                KnownClass::Flag.to_subclass_of(db, &env),
+            ),
+    );
 
     Some(EnumClassLiteral::new(
         db,
         class,
         members,
         aliases.into_boxed_slice(),
-        metadata.aliases_are_known,
-        members_are_exhaustive,
+        flags,
     ))
 }
 
 impl<'db> EnumClassLiteral<'db> {
+    /// Returns whether the canonical member and alias sets are known exactly.
+    pub(super) fn aliases_are_known(self, db: &'db dyn Db) -> bool {
+        self.flags(db).aliases_are_known()
+    }
+
+    /// Returns whether the canonical members exhaust the runtime values of this enum class.
+    pub(crate) fn members_are_exhaustive(self, db: &'db dyn Db) -> bool {
+        self.flags(db).members_are_exhaustive()
+    }
+
     pub(crate) fn member_count(self, db: &'db dyn Db) -> usize {
         self.members(db).len()
     }
