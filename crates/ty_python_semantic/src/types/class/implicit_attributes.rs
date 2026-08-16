@@ -2,12 +2,11 @@
 
 use super::{MethodDecorator, static_literal::StaticClassLiteral};
 use crate::{
-    Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
+    Db, ProgramEnvironment, TypeQualifiers,
     place::{Place, Provenance},
     reachability::binding_reachability,
     types::{
-        ClassBase, ClassLiteral, KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
-        definition_expression_type,
+        ClassBase, ClassLiteral, Type, TypeContext, UnionBuilder,
         function::{FunctionDecorators, is_implicit_classmethod, is_implicit_staticmethod},
         infer::{function_known_decorator_flags, infer_unpack_types},
         infer_expression_type, inferred_declaration,
@@ -20,7 +19,7 @@ use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
-    scope::{Scope, ScopeId},
+    scope::ScopeId,
     semantic_index, use_def_map,
 };
 
@@ -75,12 +74,13 @@ impl<'db> StaticClassLiteral<'db> {
             target_method_decorator,
         );
 
-        if !implicit_attribute_has_declaration(db, attribute)
+        let facts = implicit_attribute_facts(db, attribute);
+        if facts.declarations.is_empty()
             && let Some(incoming) = self.independent_attribute_value(db, attribute)
         {
             let env = ProgramEnvironment::from_scope(class_body_scope);
             let mut incoming_values = UnionBuilder::new(db, &env).add(incoming);
-            for &definition in implicit_attribute_assignment_definitions(db, attribute) {
+            for &definition in &facts.bindings {
                 if let Some(ty) = independent_attribute_assignment_type(db, attribute, definition) {
                     incoming_values.add_in_place(ty);
                 }
@@ -195,11 +195,10 @@ impl<'db> StaticClassLiteral<'db> {
         attribute: ImplicitAttributeName<'db>,
     ) -> ImplicitAttribute<'db> {
         let class_body_scope = attribute.class_body_scope(db);
-        let name = attribute.name(db).as_str();
-        let target_method_decorator = attribute.target_method_decorator(db);
         let program_file = class_body_scope.program_file(db);
         let python_file = program_file.python_file(db);
         let env = &ProgramEnvironment::from_file(program_file);
+        let facts = implicit_attribute_facts(db, attribute);
 
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of the raw types inferred from all bindings of that
@@ -213,186 +212,66 @@ impl<'db> StaticClassLiteral<'db> {
 
         let module = parsed_module(db, python_file).load(db);
         let index = semantic_index(db, program_file);
-        let class_map = use_def_map(db, class_body_scope);
-        let class_table = place_table(db, class_body_scope);
-        let is_valid_scope = |method_scope: &Scope| {
-            let Some(method_def) = method_scope.node().as_function() else {
-                return true;
+
+        for &declaration in &facts.declarations {
+            let DefinitionKind::AnnotatedAssignment(assignment) = declaration.kind(db) else {
+                continue;
             };
 
-            // Check the decorators directly on the AST node to determine if this method
-            // is a classmethod or staticmethod. This is more reliable than checking the
-            // final evaluated type, which may be wrapped by other decorators like @cache.
-            let function_node = method_def.node(&module);
-            let definition = index.expect_single_definition(method_def);
+            // We found an annotated assignment of one of the following forms (using 'self' in these
+            // examples, but we support arbitrary names for the first parameters of methods):
+            //
+            //     self.name: <annotation>
+            //     self.name: <annotation> = …
 
-            let mut is_classmethod = false;
-            let mut is_staticmethod = false;
+            let Some(annotation) = inferred_declaration(db, declaration).declared() else {
+                continue;
+            };
+            let annotation = Place::declared(annotation.inner)
+                .with_definition(declaration)
+                .with_qualifiers(
+                    annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
+                );
 
-            for decorator in &function_node.decorator_list {
-                let decorator_ty =
-                    definition_expression_type(db, definition, &decorator.expression);
-                if let Type::ClassLiteral(class) = decorator_ty {
-                    match class.known(db) {
-                        Some(KnownClass::Classmethod) => is_classmethod = true,
-                        Some(KnownClass::Staticmethod) => is_staticmethod = true,
-                        _ => {}
-                    }
+            if let Some(all_qualifiers) = annotation.is_bare_final() {
+                if let Some(value) = assignment.value(&module) {
+                    // If we see an annotated assignment with a bare `Final` as in
+                    // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
+                    // on the right-hand side.
+
+                    let inferred_ty =
+                        infer_expression_type(db, index.expression(value), TypeContext::default());
+                    return ImplicitAttribute {
+                        member: Member {
+                            inner: Place::bound(inferred_ty)
+                                .with_definition(declaration)
+                                .with_qualifiers(all_qualifiers),
+                        },
+                        augmented_bindings: None,
+                    };
                 }
-            }
 
-            // Also check for implicit classmethods/staticmethods based on method name
-            let method_name = function_node.name.as_str();
-            if is_implicit_classmethod(method_name) {
-                is_classmethod = true;
-            }
-            if is_implicit_staticmethod(method_name) {
-                is_staticmethod = true;
-            }
-
-            match target_method_decorator {
-                MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                MethodDecorator::ClassMethod => is_classmethod,
-                MethodDecorator::StaticMethod => is_staticmethod,
-            }
-        };
-
-        // First check declarations
-        for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, name)
-        {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+                // If there is no right-hand side, just record that we saw a `Final` qualifier
+                qualifiers |= all_qualifiers;
                 continue;
             }
 
-            for attribute_declaration in attribute_declarations {
-                let DefinitionState::Defined(declaration) = attribute_declaration.declaration
-                else {
-                    continue;
-                };
-
-                let DefinitionKind::AnnotatedAssignment(assignment) = declaration.kind(db) else {
-                    continue;
-                };
-
-                // We found an annotated assignment of one of the following forms (using 'self' in these
-                // examples, but we support arbitrary names for the first parameters of methods):
-                //
-                //     self.name: <annotation>
-                //     self.name: <annotation> = …
-
-                let Some(annotation) = inferred_declaration(db, declaration).declared() else {
-                    continue;
-                };
-                let annotation = Place::declared(annotation.inner)
-                    .with_definition(declaration)
-                    .with_qualifiers(
-                        annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
-                    );
-
-                if let Some(all_qualifiers) = annotation.is_bare_final() {
-                    if let Some(value) = assignment.value(&module) {
-                        // If we see an annotated assignment with a bare `Final` as in
-                        // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
-                        // on the right-hand side.
-
-                        let inferred_ty = infer_expression_type(
-                            db,
-                            index.expression(value),
-                            TypeContext::default(),
-                        );
-                        return ImplicitAttribute {
-                            member: Member {
-                                inner: Place::bound(inferred_ty)
-                                    .with_definition(declaration)
-                                    .with_qualifiers(all_qualifiers),
-                            },
-                            augmented_bindings: None,
-                        };
-                    }
-
-                    // If there is no right-hand side, just record that we saw a `Final` qualifier
-                    qualifiers |= all_qualifiers;
-                    continue;
-                }
-
-                return ImplicitAttribute {
-                    member: Member { inner: annotation },
-                    augmented_bindings: None,
-                };
-            }
+            return ImplicitAttribute {
+                member: Member { inner: annotation },
+                augmented_bindings: None,
+            };
         }
 
-        for (attribute_assignments, attribute_binding_scope_id) in
-            attribute_assignments(db, class_body_scope, name)
-        {
-            let binding_scope = index.scope(attribute_binding_scope_id);
-            if !is_valid_scope(binding_scope) {
+        for &binding in &facts.bindings {
+            if matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_)) {
+                augmented_bindings.push(binding);
                 continue;
             }
 
-            let scope_for_reachability_analysis = {
-                if binding_scope.node().as_function().is_some() {
-                    binding_scope
-                } else if binding_scope.is_eager() {
-                    let mut eager_scope_parent = binding_scope;
-                    while eager_scope_parent.is_eager()
-                        && let Some(parent) = eager_scope_parent.parent()
-                    {
-                        eager_scope_parent = index.scope(parent);
-                    }
-                    eager_scope_parent
-                } else {
-                    binding_scope
-                }
-            };
-
-            // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable =
-                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
-                    let method = index.expect_single_definition(method_def);
-                    let method_place = class_table
-                        .symbol_id(&method_def.node(&module).name)
-                        .unwrap();
-                    class_map
-                        .reachable_symbol_bindings(method_place)
-                        .find_map(|bind| {
-                            (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| binding_reachability(db, class_map, &bind))
-                        })
-                        .unwrap_or(Truthiness::AlwaysFalse)
-                } else {
-                    Truthiness::AlwaysFalse
-                };
-            if is_method_reachable.is_always_false() {
-                continue;
-            }
-
-            for attribute_assignment in attribute_assignments {
-                if let DefinitionState::Undefined = attribute_assignment.binding {
-                    continue;
-                }
-
-                let DefinitionState::Defined(binding) = attribute_assignment.binding else {
-                    continue;
-                };
-
-                if matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_)) {
-                    augmented_bindings.push(binding);
-                    continue;
-                }
-
-                if !is_method_reachable.is_always_false() {
-                    is_attribute_bound = true;
-                }
-
-                let inferred_ty = implicit_attribute_binding_type(db, binding);
-
-                if let Some(inferred_ty) = inferred_ty {
-                    provenance = provenance.or(Provenance::SingleDefinition(binding));
-                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                }
+            is_attribute_bound = true;
+            if let Some(inferred_ty) = implicit_attribute_binding_type(db, binding) {
+                provenance = provenance.or(Provenance::SingleDefinition(binding));
+                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
             }
         }
 
@@ -455,70 +334,37 @@ struct ImplicitAttributeName<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
-/// Returns whether a matching method explicitly declares this attribute.
-///
-/// Local declarations take precedence over inherited values used for cycle recovery.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn implicit_attribute_has_declaration<'db>(
-    db: &'db dyn Db,
-    attribute: ImplicitAttributeName<'db>,
-) -> bool {
-    let class_body_scope = attribute.class_body_scope(db);
-    let index = semantic_index(db, class_body_scope.program_file(db));
-
-    attribute_declarations(db, class_body_scope, attribute.name(db).as_str()).any(
-        |(mut declarations, method_scope_id)| {
-            let method_scope = index.scope(method_scope_id);
-            if let Some(method_def) = method_scope.node().as_function() {
-                let definition = index.expect_single_definition(method_def);
-                let decorators = function_known_decorator_flags(db, definition);
-                let method_name = definition.name(db);
-                let is_classmethod = decorators.contains(FunctionDecorators::CLASSMETHOD)
-                    || method_name.as_deref().is_some_and(is_implicit_classmethod);
-                let is_staticmethod = decorators.contains(FunctionDecorators::STATICMETHOD)
-                    || method_name.as_deref().is_some_and(is_implicit_staticmethod);
-
-                let is_valid_scope = match attribute.target_method_decorator(db) {
-                    MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                    MethodDecorator::ClassMethod => is_classmethod,
-                    MethodDecorator::StaticMethod => is_staticmethod,
-                };
-                if !is_valid_scope {
-                    return false;
-                }
-            }
-
-            declarations.any(|declaration| {
-                matches!(
-                    declaration.declaration,
-                    DefinitionState::Defined(definition)
-                        if matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
-                )
-            })
-        },
-    )
+/// Definitions from methods whose receivers can establish this attribute.
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct ImplicitAttributeFacts<'db> {
+    declarations: Box<[Definition<'db>]>,
+    bindings: Box<[Definition<'db>]>,
 }
 
-/// Return independently inferrable assignments in matching, reachable methods.
+/// Collect declarations and reachable bindings once for ordinary inference and cycle recovery.
 ///
-/// Keeping the definitions in an owner-local query prevents lookups from depending directly on
-/// another file's syntax tree.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-fn implicit_attribute_assignment_definitions<'db>(
+/// Keeping this shared scan owner-local avoids dependencies on another file's syntax tree and
+/// ensures that both inference paths apply the same decorator and method-reachability rules.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn implicit_attribute_facts<'db>(
     db: &'db dyn Db,
     attribute: ImplicitAttributeName<'db>,
-) -> Box<[Definition<'db>]> {
+) -> ImplicitAttributeFacts<'db> {
     let class_body_scope = attribute.class_body_scope(db);
     let program_file = class_body_scope.program_file(db);
-    let module = parsed_module(db, program_file.python_file(db)).load(db);
     let index = semantic_index(db, program_file);
     let class_map = use_def_map(db, class_body_scope);
     let class_table = place_table(db, class_body_scope);
-    let mut definitions = Vec::new();
+    let mut declarations = Vec::new();
+    let mut bindings = Vec::new();
 
-    for (assignments, method_scope_id) in
-        attribute_assignments(db, class_body_scope, attribute.name(db).as_str())
-    {
+    for method_scope_id in attribute_scopes(db, class_body_scope) {
+        let method_table = index.place_table(method_scope_id);
+        let Some(member) =
+            method_table.member_id_by_instance_attribute_name(attribute.name(db).as_str())
+        else {
+            continue;
+        };
         let mut method_scope = index.scope(method_scope_id);
         while method_scope.is_eager()
             && let Some(parent) = method_scope.parent()
@@ -529,12 +375,14 @@ fn implicit_attribute_assignment_definitions<'db>(
             continue;
         };
         let method = index.expect_single_definition(method_def);
+        let Some(method_name) = method.name(db) else {
+            continue;
+        };
         let decorators = function_known_decorator_flags(db, method);
-        let method_name = method.name(db);
         let is_classmethod = decorators.contains(FunctionDecorators::CLASSMETHOD)
-            || method_name.as_deref().is_some_and(is_implicit_classmethod);
+            || is_implicit_classmethod(&method_name);
         let is_staticmethod = decorators.contains(FunctionDecorators::STATICMETHOD)
-            || method_name.as_deref().is_some_and(is_implicit_staticmethod);
+            || is_implicit_staticmethod(&method_name);
         let is_valid_scope = match attribute.target_method_decorator(db) {
             MethodDecorator::None => !is_classmethod && !is_staticmethod,
             MethodDecorator::ClassMethod => is_classmethod,
@@ -544,7 +392,18 @@ fn implicit_attribute_assignment_definitions<'db>(
             continue;
         }
 
-        let Some(method_place) = class_table.symbol_id(&method_def.node(&module).name) else {
+        let method_map = index.use_def_map(method_scope_id);
+        declarations.extend(method_map.reachable_member_declarations(member).filter_map(
+            |declaration| {
+                let DefinitionState::Defined(definition) = declaration.declaration else {
+                    return None;
+                };
+                matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                    .then_some(definition)
+            },
+        ));
+
+        let Some(method_place) = class_table.symbol_id(&method_name) else {
             continue;
         };
         if !class_map
@@ -559,22 +418,20 @@ fn implicit_attribute_assignment_definitions<'db>(
             continue;
         }
 
-        for assignment in assignments {
-            if let DefinitionState::Defined(definition) = assignment.binding
-                && matches!(
-                    definition.kind(db),
-                    DefinitionKind::Assignment(_)
-                        | DefinitionKind::For(_)
-                        | DefinitionKind::WithItem(_)
-                        | DefinitionKind::Comprehension(_)
-                )
-            {
-                definitions.push(definition);
-            }
-        }
+        bindings.extend(
+            method_map
+                .reachable_member_bindings(member)
+                .filter_map(|binding| match binding.binding {
+                    DefinitionState::Defined(definition) => Some(definition),
+                    DefinitionState::Undefined | DefinitionState::Deleted => None,
+                }),
+        );
     }
 
-    definitions.into_boxed_slice()
+    ImplicitAttributeFacts {
+        declarations: declarations.into_boxed_slice(),
+        bindings: bindings.into_boxed_slice(),
+    }
 }
 
 /// Infer one assignment without allowing a recursive read to establish its own value.
