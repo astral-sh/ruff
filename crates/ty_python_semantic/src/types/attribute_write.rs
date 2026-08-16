@@ -14,7 +14,9 @@ use ty_python_core::use_def_map;
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
 use super::{
-    IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
+    IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    ReceiverMemberShadowsNonDataDescriptor, Type, TypeQualifiers,
+    receiver_member_shadows_type_member,
 };
 use crate::ProgramEnvironment;
 use crate::place::{
@@ -697,7 +699,7 @@ pub(super) fn property_setter_returns_never<'db>(
 ///     attribute = object()
 ///
 /// class C(metaclass=Meta):
-///     attribute: int
+///     attribute: int = 0
 ///
 /// C.attribute = 1
 /// ```
@@ -715,32 +717,34 @@ fn class_object_assignment_members<'db>(
         return None;
     }
 
-    let type_member_ty = type_member.place.ignore_possibly_undefined()?;
-    let definitely_non_data_descriptor = type_member_ty.is_definitely_non_data_descriptor(db, env);
-    if !definitely_non_data_descriptor
-        && (type_member_ty.is_divergent() || type_member_ty.is_data_descriptor(db, env))
+    let receiver_member =
+        object_ty.class_object_member(db, env, attribute, MemberLookupPolicy::default());
+    if receiver_member_shadows_type_member(
+        db,
+        env,
+        type_member,
+        receiver_member,
+        ReceiverMemberShadowsNonDataDescriptor::Yes,
+    ) {
+        Some(AssignmentAttributeMembers::ReceiverMember(receiver_member))
+    } else if !receiver_member.place.is_undefined()
+        && let Some(type_member_ty) = type_member.place.ignore_possibly_undefined()
+        && !type_member_ty.is_divergent()
+        && !type_member_ty.is_data_descriptor(db, env)
     {
-        return None;
-    }
-
-    let receiver_member = object_ty
-        .find_name_in_mro_with_policy(db, env, attribute, MemberLookupPolicy::default())
-        .filter(|class_attr| !class_attr.place.is_undefined())?;
-
-    Some(if definitely_non_data_descriptor {
-        AssignmentAttributeMembers::ReceiverMember(receiver_member)
-    } else {
-        AssignmentAttributeMembers::TypeMember {
+        Some(AssignmentAttributeMembers::TypeMember {
             member: type_member,
             receiver_fallback: Some(receiver_member),
-        }
-    })
+        })
+    } else {
+        None
+    }
 }
 
 /// Return the members considered by attribute assignment in lookup-precedence order.
 ///
 /// The type member comes from class-member lookup. A member found directly on the receiver is
-/// queried when the type member is absent or possibly undefined. For class objects, a class-MRO
+/// queried when the type member is absent or possibly undefined. For class objects, a class-object
 /// member instead takes precedence over a definitely non-data metaclass member and remains an
 /// alternative when the metaclass member's descriptor status is uncertain. Composite and dynamic
 /// receiver types return `None`; their callers either decompose them before this point or handle
