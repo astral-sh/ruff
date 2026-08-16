@@ -222,7 +222,7 @@ incorrect, but on errors are changed. If you update the `pytest` implementation,
 
 ```py
 import pytest
-from typing import cast
+from typing import cast, overload
 
 def identity[T](x: T, /) -> T:
     return x
@@ -303,4 +303,14 @@ def _(x: int, y: str, z: bool) -> None: ...
     [None],
 )
 def _(request: tuple[()]) -> None: ...
+
+# Overloaded functions are not ignored (it's easier to include them).
+# The additional decorator mean that only the final version is checked.
+@overload
+def overloaded_test(x: None) -> None: ...
+@overload
+def overloaded_test(x: int) -> None:  # error: [invalid-overload]
+    ...
+@pytest.mark.parametrize("x", ["a", None, 3])  # error: [pytest-param-mismatched-type]
+def overloaded_test(x: str | None) -> None: ...
 ```
