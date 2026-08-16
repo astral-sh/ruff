@@ -214,3 +214,34 @@ def _():
     with open("file", "w") as f:
         for line in ((1,) if True else (2,)):
             f.write(f"{line}")
+
+
+# https://github.com/astral-sh/ruff/issues/21107
+# OK — walrus rebinds the loop variable; converting to a generator expression would
+# produce a SyntaxError (PEP 572 forbids rebinding a comprehension iteration variable).
+
+def _():
+    with open("file", "w") as f:
+        for line in src:
+            f.write(line := line.upper())
+
+
+def _():
+    with open("file", "w") as f:
+        for first, *rest in src:
+            f.write(rest := "".join(rest))
+
+
+def _():
+    with open("file", "w") as f:
+        for a, b in src:
+            # walrus rebinds `a`, one of the two loop vars
+            f.write(a := a.upper())
+
+
+# Error — walrus rebinds `other`, not a loop variable; fix is still valid.
+
+def _():
+    with open("file", "w") as f:
+        for line in src:
+            f.write(other := line.upper())
