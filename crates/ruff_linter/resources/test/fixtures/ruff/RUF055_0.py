@@ -124,3 +124,10 @@ if re.search(b"ab", b"abc"):  # safe: bytes-literal target
 b_literal = b"abc"
 if re.search(b"ab", b_literal):  # safe: `b_literal` resolves to a bytes literal
     pass
+
+
+# Cross-kind: a `bytes` pattern with a `str`-literal target. `re.fullmatch(b"ab", "ab")`
+# raises `TypeError` at runtime, whereas the generated `"ab" == b"ab"` returns `False`, so
+# the fix must be marked unsafe.
+if re.fullmatch(b"ab", "ab"):  # unsafe: bytes pattern, str-literal target
+    pass

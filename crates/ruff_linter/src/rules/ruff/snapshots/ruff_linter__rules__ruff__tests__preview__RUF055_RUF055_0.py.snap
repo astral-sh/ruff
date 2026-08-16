@@ -343,3 +343,21 @@ help: Replace with `b"ab" in b_literal`
 125 + if b"ab" in b_literal:  # safe: `b_literal` resolves to a bytes literal
 126 |     pass
     |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:132:4
+    |
+130 | # raises `TypeError` at runtime, whereas the generated `"ab" == b"ab"` returns `False`, so
+131 | # the fix must be marked unsafe.
+132 | if re.fullmatch(b"ab", "ab"):  # unsafe: bytes pattern, str-literal target
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+133 |     pass
+    |
+help: Replace with `"ab" == b"ab"`
+    |
+131 | # the fix must be marked unsafe.
+    - if re.fullmatch(b"ab", "ab"):  # unsafe: bytes pattern, str-literal target
+132 + if "ab" == b"ab":  # unsafe: bytes pattern, str-literal target
+133 |     pass
+    |
+note: This is an unsafe fix and may change runtime behavior
