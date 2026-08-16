@@ -19,6 +19,7 @@ use crate::types::{
     singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
+use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -27,9 +28,10 @@ use ty_python_core::predicate::{
     PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
     SubjectElementPatternPredicate,
 };
-use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
+use ty_python_core::{
+    ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index, use_def_map,
+};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
@@ -3235,72 +3237,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         place_table(db, self.scope())
     }
 
-    /// Returns whether every reachable assignment to this member depends on the current guard.
-    fn predicate_initializes_member(&self, member: ScopedPlaceId) -> bool {
-        let db = self.db;
-        let scope = self.scope();
-        let index = semantic_index(db, scope.program_file(db));
-        let use_def = index.use_def_map(scope.file_scope_id(db));
-        let constraints = use_def.reachability_constraints();
-        let predicates = use_def.predicates();
-        let is_terminal = |constraint| {
-            matches!(
-                constraint,
-                ScopedReachabilityConstraintId::ALWAYS_TRUE
-                    | ScopedReachabilityConstraintId::AMBIGUOUS
-                    | ScopedReachabilityConstraintId::ALWAYS_FALSE
-            )
-        };
-
-        let mut initialized_by_predicate = false;
-        for binding in use_def.reachable_bindings(member) {
-            if binding.binding.definition().is_none() {
-                continue;
-            }
-
-            let mut constraint = binding.reachability_constraint;
-            while !is_terminal(constraint) {
-                let node = constraints.get_interior_node(constraint);
-                let predicate = predicates[node.atom()];
-
-                if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    // A non-terminal-call predicate cannot evaluate to ambiguous.
-                    if !predicate.is_positive
-                        || node.if_false() != ScopedReachabilityConstraintId::ALWAYS_FALSE
-                    {
-                        return false;
-                    }
-                    constraint = node.if_true();
-                    continue;
-                }
-
-                let opposing_branch = if self.is_positive == predicate.is_positive {
-                    node.if_false()
-                } else {
-                    node.if_true()
-                };
-
-                if predicate.node != self.predicate
-                    || opposing_branch != ScopedReachabilityConstraintId::ALWAYS_FALSE
-                    || ![node.if_true(), node.if_ambiguous(), node.if_false()]
-                        .into_iter()
-                        .all(is_terminal)
-                {
-                    return false;
-                }
-
-                initialized_by_predicate = true;
-                break;
-            }
-
-            if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
-                return false;
-            }
-        }
-
-        initialized_by_predicate
-    }
-
     fn scope(&self) -> ScopeId<'db> {
         let db = self.db;
         match self.predicate {
@@ -4402,23 +4338,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                             .any(|parent| parent == place)
                         && matches!(receiver, Type::TypeVar(typevar) if typevar.typevar(db).is_self(db))
                         && let PredicateNode::Expression(predicate) = self.predicate
-                        && !matches!(
-                            predicate.node_ref(db).node(self.module),
-                            ast::Expr::BoolOp(_)
-                        )
-                        && self.predicate_initializes_member(member.into())
-                        && !receiver.nominal_class(db, &self.env).is_some_and(|class| {
-                            class
-                                .iter_mro(db)
-                                .filter_map(ClassBase::into_class)
-                                .filter_map(|base| base.static_class_literal(db))
-                                .any(|(base, _)| {
-                                    let places = place_table(db, base.body_scope(db));
-                                    places
-                                        .symbol_id(attr)
-                                        .is_some_and(|symbol| places.symbol(symbol).is_bound())
-                                })
-                        })
+                        && let Some(receiver_name) = first_arg.as_name_expr()
+                        && {
+                            let use_def = use_def_map(db, self.scope());
+                            let use_id =
+                                receiver_name.scoped_use_id(db, predicate.program_file(db));
+                            // An earlier narrowing of this receiver can already establish that
+                            // the attribute exists, making the negative guard unreachable.
+                            use_def.bindings_at_use(use_id).all(|binding| {
+                                binding.narrowing_constraint.constraint().is_terminal()
+                            })
+                        }
                         && negative_hasattr_presence_proof(db, predicate, receiver, attribute)
                             == AttributePresence::Indeterminate
                     {

@@ -431,6 +431,105 @@ class Base:
             self.z = self.y  # error: [unresolved-attribute]
 ```
 
+## Nested and compound attribute guards when the base is checked first
+
+An unrelated condition can appear outside an attribute guard, inside it, or on either side of a
+compound condition without making a guarded initializer invalid.
+
+`base.py`:
+
+```py
+class Base:
+    def __init__(self, enabled: bool):
+        if enabled:
+            if not hasattr(self, "outer"):
+                self.outer = self.__str__
+        if not hasattr(self, "inner"):
+            if enabled:
+                self.inner = self.__str__
+        if enabled and not hasattr(self, "leading"):
+            self.leading = self.__str__
+        if not hasattr(self, "trailing") and enabled:
+            self.trailing = self.__str__
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    outer = Base.__str__
+    inner = Base.__str__
+    leading = Base.__str__
+    trailing = Base.__str__
+```
+
+## Nested and compound attribute guards when the subclass is checked first
+
+Checking the subclass first must preserve the same nested and compound guarded initializers.
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    outer = Base.__str__
+    inner = Base.__str__
+    leading = Base.__str__
+    trailing = Base.__str__
+```
+
+`base.py`:
+
+```py
+class Base:
+    def __init__(self, enabled: bool):
+        if enabled:
+            if not hasattr(self, "outer"):
+                self.outer = self.__str__
+        if not hasattr(self, "inner"):
+            if enabled:
+                self.inner = self.__str__
+        if enabled and not hasattr(self, "leading"):
+            self.leading = self.__str__
+        if not hasattr(self, "trailing") and enabled:
+            self.trailing = self.__str__
+```
+
+## Unreachable and deleted class attributes do not prevent guarded initialization
+
+A class attribute that was never assigned or was deleted cannot make a later instance initializer
+unreachable.
+
+`base.py`:
+
+```py
+class Base:
+    if False:
+        unreachable = 1
+
+    deleted = 1
+    del deleted
+
+    def __init__(self):
+        if not hasattr(self, "unreachable"):
+            self.unreachable = self.__str__
+        if not hasattr(self, "deleted"):
+            self.deleted = self.__str__
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    unreachable = Base.__str__
+    deleted = Base.__str__
+```
+
 ## Guarded instance attributes after a call when the base is checked first
 
 A call before a guarded initializer must not make its validity or later diagnostics depend on file
