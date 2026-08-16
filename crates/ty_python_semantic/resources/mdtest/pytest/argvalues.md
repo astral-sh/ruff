@@ -214,3 +214,57 @@ def _(x: int) -> None: ...
 @pytest.mark.parametrize("s", "test-value")
 def _(s: str) -> None: ...
 ```
+
+## Unchecked Cases
+
+In the current setup, there are cases where tests do not get checked. These are deliberately
+incorrect, but on errors are changed. If you update the `pytest` implementation, this may change.
+
+```py
+import pytest
+from typing import cast
+
+def identity[T](x: T, /) -> T:
+    return x
+
+# If there are other decorators, nothing gets checked.
+@identity
+@pytest.mark.parametrize("x", ["oops"])
+def _(x: str) -> None: ...
+
+# Incorrect argument names are not checked.
+# They may be requested by fixtures, and this is not currently implemented.
+@pytest.mark.parametrize("y", ["oops"])
+def _(x: int) -> None: ...
+
+# Extra arguments to `pytest.mark.parametrize` also prevents checking.
+# This is overly strict for now, as you may just be adding `ids`.
+# But prevents issues with indirect/scoped parametrizations.
+@pytest.mark.parametrize("x", ["oops"], ids=["test"])
+@pytest.mark.parametrize("y", [lambda x: x + x], indirect=True)
+def _(x: int, y: str) -> None: ...
+
+# If you use args or kwargs, it's also too difficult to check.
+# In this case, you get an error that's not related to the pytest-specific checking.
+args = ("x", [1, 2, 3])
+kwargs = dict(argnames="y", argvalues=["a", "b", "c"])
+
+@pytest.mark.parametrize(*args)
+@pytest.mark.parametrize(**kwargs)  # error: [invalid-argument-type]
+def _(x: int, y: str) -> None: ...
+
+# If the argnames are a string literal, the types can be checked.
+# But otherwise, it's not possible.
+readable_argnames = "x, y"
+unreadable_argnames = cast(str, "x, y")
+
+@pytest.mark.parametrize(readable_argnames, [None])  # error: [pytest-param-mismatched-type]
+@pytest.mark.parametrize(unreadable_argnames, [None])
+def _(x: int, y: str) -> None: ...
+
+# Fixtures are also only checked in place.
+x_range = pytest.mark.parametrize("x", range(5))
+
+@x_range
+def _(x: bool) -> None: ...
+```
