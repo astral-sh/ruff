@@ -360,7 +360,7 @@ impl ReachabilityConstraintsBuilder {
         match (a, b) {
             (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
             (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
-            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+            _ if a == b => return a,
             _ => {}
         }
 
@@ -430,7 +430,7 @@ impl ReachabilityConstraintsBuilder {
         match (a, b) {
             (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
             (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
-            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+            _ if a == b => return a,
             _ => {}
         }
 
@@ -489,5 +489,52 @@ impl ReachabilityConstraintsBuilder {
         });
         self.and_cache.insert((a, b), result);
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn identical_operands_do_not_grow_operation_caches() {
+        let mut constraints = ReachabilityConstraintsBuilder::default();
+        let a = constraints.add_atom(ScopedPredicateId::new(0));
+        let b = constraints.add_atom(ScopedPredicateId::new(1));
+        let c = constraints.add_atom(ScopedPredicateId::new(2));
+        let disjunction = constraints.add_or_constraint(a, b);
+        let conjunction = constraints.add_and_constraint(disjunction, c);
+        let counts = (
+            constraints.interiors.len(),
+            constraints.and_cache.len(),
+            constraints.or_cache.len(),
+        );
+
+        for constraint in [
+            ALWAYS_FALSE,
+            AMBIGUOUS,
+            ALWAYS_TRUE,
+            a,
+            disjunction,
+            conjunction,
+        ] {
+            assert_eq!(
+                constraints.add_or_constraint(constraint, constraint),
+                constraint
+            );
+            assert_eq!(
+                constraints.add_and_constraint(constraint, constraint),
+                constraint
+            );
+        }
+
+        assert_eq!(
+            counts,
+            (
+                constraints.interiors.len(),
+                constraints.and_cache.len(),
+                constraints.or_cache.len(),
+            )
+        );
     }
 }
