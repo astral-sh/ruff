@@ -314,6 +314,23 @@ def conditional_global_factory(flag: bool):
         reveal_type(value)  # revealed: Literal["updated", 0]
 ```
 
+If the condition is known to be false, the nested class should see only the original module-level
+binding and should not report an unresolved reference:
+
+```py
+from typing import Literal
+
+known_false_value = 0
+
+def known_false_global_factory(flag: Literal[False]):
+    global known_false_value
+    if flag:
+        known_false_value = "updated"
+
+    class Nested:
+        reveal_type(known_false_value)  # revealed: Literal[0]
+```
+
 A module-level declaration also remains visible when the enclosing function only conditionally binds
 that global:
 
