@@ -39,6 +39,8 @@ pub(super) struct ExceptionContextStackManager {
     stacks: Vec<ExceptionContextStack>,
     /// Number of `try` and `with` contexts still collecting exception checkpoints.
     active_handler_count: usize,
+    /// Whether the current traversal is unevaluated and cannot raise into a handler.
+    checkpoints_suppressed: bool,
 }
 
 impl ExceptionContextStackManager {
@@ -109,6 +111,19 @@ impl ExceptionContextStackManager {
         self.take_exception_snapshots()
     }
 
+    /// Suppress checkpoints without clearing an enclosing suppression or changing active contexts.
+    /// Returns the previous suppression state, which must be restored after the visit.
+    pub(super) fn suppress_exception_checkpoints_if(&mut self, suppress: bool) -> bool {
+        let previous = self.checkpoints_suppressed;
+        self.checkpoints_suppressed |= suppress;
+        previous
+    }
+
+    /// Restore the state saved by [`Self::suppress_exception_checkpoints_if`].
+    pub(super) fn restore_exception_checkpoint_suppression(&mut self, previous: bool) {
+        self.checkpoints_suppressed = previous;
+    }
+
     /// Records a checkpoint for every active `try` or `with` context that could handle an
     /// exception raised at the current point in control flow.
     ///
@@ -144,7 +159,7 @@ impl ExceptionContextStackManager {
     ///
     /// A context can remain on the stack for its `finally` suite after its handlers become inactive.
     pub(super) fn has_active_exception_handler(&self, builder: &SemanticIndexBuilder) -> bool {
-        if self.active_handler_count == 0 {
+        if self.checkpoints_suppressed || self.active_handler_count == 0 {
             return false;
         }
 

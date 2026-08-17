@@ -246,8 +246,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Per-scope exception contexts for nested `try` and `with` statements.
     exception_context_stack_manager: ExceptionContextStackManager,
-    /// Whether we are visiting an annotation that is not evaluated at runtime.
-    in_unevaluated_annotation: bool,
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
@@ -321,7 +319,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_match_case: None,
             current_first_parameter_name: None,
             exception_context_stack_manager: ExceptionContextStackManager::default(),
-            in_unevaluated_annotation: false,
 
             has_future_annotations: false,
             in_type_checking_block: false,
@@ -2323,10 +2320,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         ) && !self.has_future_annotations
             && !self.source_type.is_stub()
             && !self.python_version.defers_annotations();
-        let was_unevaluated = self.in_unevaluated_annotation;
-        self.in_unevaluated_annotation |= !is_eager;
+        let was_suppressed = self
+            .exception_context_stack_manager
+            .suppress_exception_checkpoints_if(!is_eager);
         self.visit_annotation(annotation);
-        self.in_unevaluated_annotation = was_unevaluated;
+        self.exception_context_stack_manager
+            .restore_exception_checkpoint_suppression(was_suppressed);
     }
 
     /// Records the current flow state immediately before an operation that may raise an exception.
@@ -2348,10 +2347,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Skips snapshot construction when no enclosing `try` or `with` context can handle exceptions.
     fn record_exception_checkpoint(&mut self) {
-        if self.in_unevaluated_annotation
-            || !self
-                .exception_context_stack_manager
-                .has_active_exception_handler(self)
+        if !self
+            .exception_context_stack_manager
+            .has_active_exception_handler(self)
         {
             return;
         }
