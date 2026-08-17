@@ -7,6 +7,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use ruff_db::files::{
     File, FilePath, directory_listing, system_path_to_file, vendored_path_to_file,
 };
+use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
@@ -172,18 +173,25 @@ impl ModulePath {
 
     /// Get the `py.typed` info for this package (not considering parent packages)
     pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
-        let Some(py_typed_contents) = self.to_system_path().and_then(|path| {
+        let Some(py_typed_file) = self.to_system_path().and_then(|path| {
             if !directory_contains_file(resolver.db, &path, &["py.typed"]) {
                 return None;
             }
             let py_typed_path = path.join("py.typed");
-            let py_typed_file = system_path_to_file(resolver.db, py_typed_path).ok()?;
-            // If we fail to read it let's say that's like it doesn't exist
-            // (right now the difference between Untyped and Full is academic)
-            py_typed_file.read_to_string(resolver.db).ok()
+            system_path_to_file(resolver.db, py_typed_path).ok()
         }) else {
             return PyTyped::Untyped;
         };
+
+        // Different module names revisit the same package. Share the tracked contents instead of
+        // reading its marker from disk again for every module resolution.
+        let py_typed_contents = source_text(resolver.db, py_typed_file);
+        // If we fail to read it let's say that's like it doesn't exist
+        // (right now the difference between Untyped and Full is academic)
+        if py_typed_contents.read_error().is_some() {
+            return PyTyped::Untyped;
+        }
+
         // The python typing spec says to look for "partial\n" but in the wild we've seen:
         //
         // * PARTIAL\n
