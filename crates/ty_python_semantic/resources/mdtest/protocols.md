@@ -5691,6 +5691,57 @@ class Constructor(Protocol):
 constructor: Constructor = Product
 ```
 
+## Generic constructor callback inference
+
+Passing `type[T]` to a generic callback protocol must preserve the type variable returned by the
+class's constructor.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Callback[T](Protocol):
+    def __call__(self) -> T: ...
+
+def invoke[T](callback: Callback[T]) -> T:
+    return callback()
+
+def create[T](cls: type[T]) -> T:
+    reveal_type(invoke(cls))  # revealed: T@create
+    return invoke(cls)
+```
+
+## Generic callback inference from other members
+
+A callable protocol can infer a type argument from another member. Comparing only its `__call__`
+signature would miss the class attribute that determines `T` here.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class ConstructorWithValue[T](Protocol):
+    value: T
+
+    def __call__(self) -> object: ...
+
+class Product:
+    value: int = 1
+
+def get_value[T](factory: ConstructorWithValue[T]) -> T:
+    return factory.value
+
+reveal_type(get_value(Product))  # revealed: int
+```
+
 ## Generic protocols and union arguments
 
 When a union is passed to a parameter annotated as a generic protocol, each union element can
