@@ -50,7 +50,8 @@ use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
-/// A newtype-index for a definition in a particular scope.
+/// An index into a scope's use-def history. A combined definition can have separate declaration
+/// and binding entries when they take effect at different points in control flow.
 #[newtype_index]
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedDefinitionId;
