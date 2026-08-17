@@ -1034,7 +1034,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
         if remaining == element {
             return Ok(Some(subject_ty));
         }
-        if remaining.is_uninhabited(db, env) {
+        if remaining == Type::Never {
             continue;
         }
 

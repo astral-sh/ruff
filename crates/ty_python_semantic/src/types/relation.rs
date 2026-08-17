@@ -1254,10 +1254,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> bool {
         !instance.is_typevartuple_pack(db)
             && instance.tuple_spec(db, self.env).is_some_and(|tuple| {
-                self.with_recursion_guard(db, Type::NominalInstance(instance), Type::Never, || {
-                    self.check_tuple_spec_is_uninhabited(db, tuple.as_ref())
-                })
-                .is_always_satisfied(db, self.env)
+                tuple.fixed_elements().any(Type::may_be_uninhabited)
+                    && self
+                        .with_recursion_guard(
+                            db,
+                            Type::NominalInstance(instance),
+                            Type::Never,
+                            || self.check_tuple_spec_is_uninhabited(db, tuple.as_ref()),
+                        )
+                        .is_always_satisfied(db, self.env)
             })
     }
 
@@ -2836,19 +2841,34 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // `Never` is a subtype of every type, so equivalence to it only requires checking the
+        // opposite direction. Avoid constructing a second materialization root for this common
+        // inhabitance check.
+        if left == Type::Never {
+            let materialization_visitor = self.materialization_visitor.for_new_mapping_root();
+            return self
+                .as_relation_checker(&materialization_visitor)
+                .check_type_pair(db, right, left);
+        }
+
         // Recursive materialization fallbacks depend on the comparison root, so each directional
         // pass needs fresh materialization caches. Nested equivalence checks still share the
         // materialization-equivalence recursion guard to avoid re-entering the same comparison.
         let left_to_right_materialization_visitor =
             self.materialization_visitor.for_new_mapping_root();
-        self.as_relation_checker(&left_to_right_materialization_visitor)
-            .check_type_pair(db, left, right)
-            .and(db, self.constraints, || {
-                let right_to_left_materialization_visitor =
-                    self.materialization_visitor.for_new_mapping_root();
-                self.as_relation_checker(&right_to_left_materialization_visitor)
-                    .check_type_pair(db, right, left)
-            })
+        let left_to_right = self
+            .as_relation_checker(&left_to_right_materialization_visitor)
+            .check_type_pair(db, left, right);
+        if right == Type::Never {
+            return left_to_right;
+        }
+
+        left_to_right.and(db, self.constraints, || {
+            let right_to_left_materialization_visitor =
+                self.materialization_visitor.for_new_mapping_root();
+            self.as_relation_checker(&right_to_left_materialization_visitor)
+                .check_type_pair(db, right, left)
+        })
     }
 }
 

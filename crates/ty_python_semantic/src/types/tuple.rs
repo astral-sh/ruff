@@ -380,9 +380,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         tuple: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let check_element = |element| {
-            self.as_equivalence_checker()
-                .check_type_pair(db, element, Type::Never)
+        let check_element = |element: Type<'db>| {
+            if element == Type::Never {
+                self.always()
+            } else if element.may_be_uninhabited() {
+                self.as_equivalence_checker()
+                    .check_type_pair(db, element, Type::Never)
+            } else {
+                self.never()
+            }
         };
 
         match tuple {

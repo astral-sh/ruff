@@ -5905,8 +5905,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // useful concrete information and would cause over-expansion.
                         let concrete_content = inferred_ty
                             .filter_union(db, self.env, |ty| !ty.has_typevar(db, self.env));
-                        if concrete_content.is_uninhabited(db, self.env)
-                            && inferred_ty.has_typevar(db, self.env)
+                        if concrete_content == Type::Never && inferred_ty.has_typevar(db, self.env)
                         {
                             continue;
                         }

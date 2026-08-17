@@ -922,7 +922,7 @@ impl<'db> IntersectionType<'db> {
         let non_union_elements = elements.clone().filter(|element| !element.is_union());
         let initial = Self::from_elements(db, env, non_union_elements);
         let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
-            if new_ty.is_uninhabited(db, env)
+            if new_ty == Type::Never
                 || candidates
                     .iter()
                     .any(|old| new_ty.is_redundant_with(db, env, *old))

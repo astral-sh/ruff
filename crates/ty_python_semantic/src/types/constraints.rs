@@ -4757,7 +4757,7 @@ impl ConstraintAssignment {
                 );
             }
 
-            if lower.is_uninhabited(db, env) && upper.is_object() {
+            if upper.is_object() && lower.is_uninhabited(db, env) {
                 return write!(
                     f,
                     "({} {} *)",
@@ -5006,7 +5006,7 @@ impl SequentMap {
         let constraint_data = storage.constraint_data(constraint);
         let lower = constraint_data.bounds.materialized_lower();
         let upper = constraint_data.bounds.materialized_upper();
-        if lower.is_uninhabited(db, env) && upper.is_object() {
+        if upper.is_object() && lower.is_uninhabited(db, env) {
             self.add_single_tautology(constraint);
             return;
         }
@@ -5275,8 +5275,8 @@ impl SequentMap {
 
             // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
             (constrained_lower, Some(constrained_upper), Some(bound_lower), _)
-                if !constrained_upper.is_uninhabited(db, env)
-                    && !constrained_upper.is_object()
+                if !constrained_upper.is_object()
+                    && !constrained_upper.is_uninhabited(db, env)
                     && storage.cached_is_constraint_set_subtype_of(
                         db,
                         env,
@@ -5289,8 +5289,8 @@ impl SequentMap {
 
             // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
             (Some(constrained_lower), constrained_upper, _, Some(bound_upper))
-                if !constrained_lower.is_uninhabited(db, env)
-                    && !constrained_lower.is_object()
+                if !constrained_lower.is_object()
+                    && !constrained_lower.is_uninhabited(db, env)
                     && storage.cached_is_constraint_set_subtype_of(
                         db,
                         env,
@@ -5637,9 +5637,9 @@ impl SequentMap {
                     //   - Contravariant + S is B's upper bound (B ≤ S): G[S] ≤ G[B] → weaker. Emit.
                     //   - Other combinations tighten rather than weaken. Skip.
                     let should_weaken_upper = !constrained_upper.is_type_var()
-                        && !constrained_upper.is_uninhabited(db, env)
                         && !constrained_upper.is_object()
                         && !constrained_upper.is_dynamic()
+                        && !constrained_upper.is_uninhabited(db, env)
                         && match constrained_upper.variance_of(db, env, nested_typevar.identity(db))
                         {
                             TypeVarVariance::Bivariant => false,
@@ -5679,9 +5679,9 @@ impl SequentMap {
 
                     // Ditto for the lower bound.
                     let should_weaken_lower = !constrained_lower.is_type_var()
-                        && !constrained_lower.is_uninhabited(db, env)
                         && !constrained_lower.is_object()
                         && !constrained_lower.is_dynamic()
+                        && !constrained_lower.is_uninhabited(db, env)
                         && match constrained_lower.variance_of(db, env, nested_typevar.identity(db))
                         {
                             TypeVarVariance::Bivariant => false,

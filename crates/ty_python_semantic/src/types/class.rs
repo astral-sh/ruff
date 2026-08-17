@@ -128,6 +128,8 @@ bitflags::bitflags! {
         const HAS_CUSTOM_GETATTRIBUTE = 1 << 2;
         /// An unknown base may provide an attribute-interception method.
         const HAS_DYNAMIC_GETATTRIBUTE = 1 << 3;
+        /// The class is, or inherits from, `tuple`.
+        const TUPLE_SUBCLASS = 1 << 4;
     }
 }
 
@@ -622,7 +624,7 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(literal) => literal.instance_flags(db),
             Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
-            Self::DynamicNamedTuple(_) => ClassInstanceFlags::empty(),
+            Self::DynamicNamedTuple(_) => ClassInstanceFlags::TUPLE_SUBCLASS,
             Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => {
                 ClassInstanceFlags::empty()
             }
@@ -630,11 +632,19 @@ impl<'db> ClassLiteral<'db> {
                 ClassInstanceFlags::empty()
             }
             Self::Dynamic(_) | Self::DynamicEnum(_) => {
-                if self.iter_mro(db).any(ClassBase::is_explicit_any_base) {
-                    ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY
-                } else {
-                    ClassInstanceFlags::empty()
+                let mut flags = ClassInstanceFlags::empty();
+                for base in self.iter_mro(db) {
+                    if base.is_explicit_any_base() {
+                        flags.insert(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY);
+                    }
+                    if base
+                        .into_class()
+                        .is_some_and(|class| class.known(db) == Some(KnownClass::Tuple))
+                    {
+                        flags.insert(ClassInstanceFlags::TUPLE_SUBCLASS);
+                    }
                 }
+                flags
             }
         }
     }

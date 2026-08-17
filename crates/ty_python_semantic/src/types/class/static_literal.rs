@@ -927,25 +927,34 @@ impl<'db> StaticClassLiteral<'db> {
                         flags.insert(ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE);
                     }
                     ClassBase::TypedDict(_) => flags.insert(ClassInstanceFlags::TYPED_DICT),
-                    ClassBase::Class(class)
+                    ClassBase::Class(class) => {
+                        if class.known(db) == Some(KnownClass::Tuple) {
+                            flags.insert(ClassInstanceFlags::TUPLE_SUBCLASS);
+                        }
                         if class
                             .static_class_literal(db)
-                            .is_none_or(|(class, _)| class.has_own_custom_getattribute(db)) =>
-                    {
-                        flags.insert(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE);
+                            .is_none_or(|(class, _)| class.has_own_custom_getattribute(db))
+                        {
+                            flags.insert(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE);
+                        }
                     }
-                    ClassBase::Class(_) | ClassBase::Generic | ClassBase::Protocol => {}
+                    ClassBase::Generic | ClassBase::Protocol => {}
                 }
             }
             flags
         }
 
         let mut flags = if let Some(known) = self.known(db) {
-            if known.is_typed_dict_subclass() {
-                ClassInstanceFlags::TYPED_DICT
-            } else {
-                ClassInstanceFlags::empty()
-            }
+            let mut flags = ClassInstanceFlags::empty();
+            flags.set(
+                ClassInstanceFlags::TYPED_DICT,
+                known.is_typed_dict_subclass(),
+            );
+            flags.set(
+                ClassInstanceFlags::TUPLE_SUBCLASS,
+                known.is_tuple_subclass(),
+            );
+            flags
         } else if self.has_explicit_bases(db) {
             return instance_flags_inner(db, self);
         } else {

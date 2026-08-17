@@ -14,6 +14,7 @@ use super::{
     MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
+use crate::types::class::ClassInstanceFlags;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
 };
@@ -317,18 +318,6 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Cow<'db, TupleSpec<'db>>> {
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial = |_, _, _| false,
-            heap_size = ruff_memory_usage::heap_size
-        )]
-        fn is_tuple_subclass<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-            class
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .any(|base| base.known(db) == Some(KnownClass::Tuple))
-        }
-
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::SysVersionInfo => {
@@ -340,13 +329,16 @@ impl<'db> NominalInstanceType<'db> {
                 let class_literal = class.class_literal(db);
                 let known_class = class_literal.known(db);
                 // Known non-tuple classes and user-defined classes without explicit bases cannot
-                // have a tuple ancestor. Cache the answer by class origin for all other classes.
+                // have a tuple ancestor. Other classes already cache this property with their
+                // remaining instance flags.
                 if known_class.is_some_and(|known_class| !known_class.is_tuple_subclass())
                     || known_class.is_none()
                         && class_literal
                             .as_static()
                             .is_some_and(|class| !class.has_explicit_bases(db))
-                    || !is_tuple_subclass(db, class_literal)
+                    || !class_literal
+                        .instance_flags(db)
+                        .contains(ClassInstanceFlags::TUPLE_SUBCLASS)
                 {
                     return None;
                 }

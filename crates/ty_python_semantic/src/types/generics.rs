@@ -3519,7 +3519,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
                 let remaining_actual =
                     actual_union.filter(db, |ty| !ty.is_subtype_of(db, self.env, formal));
-                if remaining_actual.is_uninhabited(db, self.env) {
+                if remaining_actual == Type::Never {
                     return Ok(());
                 }
                 // Infer through the TypeVar arm so its bound or constraints are still enforced.
@@ -3555,7 +3555,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // ```
                 //
                 // without specializing `T` to `None`.
-                if !actual.is_uninhabited(db, self.env) {
+                if actual != Type::Never {
                     let assignable_elements = union_formal.elements(db).iter().filter(|ty| {
                         actual
                             .when_subtype_of(db, self.env, **ty, self.constraints, self.inferable)

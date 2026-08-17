@@ -474,7 +474,9 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
     }
 
     fn is_uninhabited(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        ty == Type::Never || ty.is_equivalent_to_with_materialization_visitor(db, Type::Never, self)
+        ty.may_be_uninhabited()
+            && (ty == Type::Never
+                || ty.is_equivalent_to_with_materialization_visitor(db, Type::Never, self))
     }
 
     /// Keep alias recursion visible through wrappers such as tuples, unions, and materialization.
@@ -1756,7 +1758,24 @@ impl<'db> Type<'db> {
     /// its tuple shape is preserved for display. Type aliases do not change inhabitance. Variadic
     /// type argument packs are not runtime tuples, so their `Never` elements remain meaningful.
     pub(crate) fn is_uninhabited(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        *self == Type::Never || self.is_equivalent_to(db, env, Type::Never)
+        self.may_be_uninhabited()
+            && (*self == Type::Never || self.is_equivalent_to(db, env, Type::Never))
+    }
+
+    /// Avoid relation checks for type variants that always have at least one possible value.
+    const fn may_be_uninhabited(&self) -> bool {
+        matches!(
+            self,
+            Type::Never
+                | Type::Divergent(_)
+                | Type::NominalInstance(_)
+                | Type::SubclassOf(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::EnumComplement(_)
+                | Type::TypeVar(_)
+                | Type::TypeAlias(_)
+        )
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -2527,6 +2546,12 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
+            Type::NominalInstance(instance) if instance.tuple_spec(db, env).is_some() => {
+                IntersectionBuilder::new(db, env)
+                    .add_negative(*self)
+                    .build()
+            }
+
             Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::KnownBoundMethod(_)
@@ -2552,18 +2577,18 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::WrapperDescriptor(_)
             | Type::TypeAlias(_)
+            | Type::NominalInstance(_)
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
                 FxOrderSet::default(),
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::NominalInstance(_)
-            | Type::Union(_)
-            | Type::Intersection(_)
-            | Type::EnumComplement(_) => IntersectionBuilder::new(db, env)
-                .add_negative(*self)
-                .build(),
+            Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_) => {
+                IntersectionBuilder::new(db, env)
+                    .add_negative(*self)
+                    .build()
+            }
         }
     }
 
