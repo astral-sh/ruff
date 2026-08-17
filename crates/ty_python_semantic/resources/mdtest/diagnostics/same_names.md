@@ -304,3 +304,260 @@ def get_models_tuple() -> tuple[Model]:
     # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[mdtest_snippet.Model]`, found `tuple[module.Model]`"
     return (Model(),)
 ```
+
+## Callable special forms
+
+ty distinguishes same-named classes nested in the signatures of two callable special forms.
+
+`first.py`:
+
+```py
+from typing import Callable
+
+class StartResponse: ...
+
+Application = Callable[[StartResponse], int]
+```
+
+```py
+from typing import Callable
+
+try:
+    from first import Application, StartResponse
+except ImportError:
+    class StartResponse: ...
+
+    # error: [invalid-assignment] "Object of type `<Callable special-form '(mdtest_snippet.StartResponse, /) -> int'>` is not assignable to `<Callable special-form '(first.StartResponse, /) -> int'>`"
+    Application = Callable[[StartResponse], int]
+```
+
+## Method and constructor descriptions
+
+ty distinguishes the defining class of a method or constructor from a same-named argument type.
+Method owners with no visible ambiguity remain unqualified.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+import first
+
+class Model:
+    def __init__(self, value: first.Model) -> None: ...
+    def method(self, value: first.Model) -> None: ...
+
+class Other:
+    def method(self, value: first.Model) -> None: ...
+```
+
+```py
+import second
+
+def calls(value: second.Model, other: second.Other) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `second.Model.method` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    value.method(1)
+
+    # error: [invalid-argument-type] "Argument to `second.Model.__init__` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    second.Model(1)
+
+    # No competing type named `Other` appears in this diagnostic, so its method owner stays unqualified.
+    # error: [invalid-argument-type] "Argument to bound method `Other.method` is incorrect: Expected `Model`, found `Literal[1]`"
+    other.method(1)
+```
+
+## Identifying union members
+
+ty uses the same qualification for a union member missing an attribute as for the complete union.
+
+`first.py`:
+
+```py
+class Model:
+    present: int
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+def missing_attribute(value: first.Model | second.Model) -> int:
+    # error: [unresolved-attribute] "Attribute `present` is not defined on `second.Model` in union `first.Model | second.Model`"
+    return value.present
+```
+
+## Redefined union members
+
+When distinct union members have the same name in the same module, ty identifies the missing member
+using both its source location and its module name.
+
+`test.py`:
+
+```py
+def coinflip() -> bool:
+    return True
+
+if coinflip():
+    class Model:
+        present: int
+
+else:
+    class Model: ...
+
+# error: [unresolved-attribute] "Attribute `present` is not defined on `test.Model @ src/test.py:9:11` in union `test.Model @ src/test.py:5:11 | test.Model @ src/test.py:9:11`"
+Model().present
+```
+
+## Attribute assignments
+
+For ordinary and union attribute assignments, ty distinguishes the assigned class from a same-named
+class appearing elsewhere in the diagnostic.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+class Owner:
+    item: first.Model
+
+class Other:
+    item: int
+
+def assign_attribute(owner: Owner, value: second.Model) -> None:
+    # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` of type `first.Model`"
+    owner.item = value
+
+def assign_union_attribute(owner: first.Model | Other, value: second.Model) -> None:
+    # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` on type `first.Model | Other`"
+    owner.item = value
+```
+
+## Subscript assignments
+
+ty distinguishes an incompatible assigned value from a same-named class nested in the subscripted
+object's type.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+def assign_value(values: list[first.Model], value: second.Model) -> None:
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `second.Model` on object of type `list[first.Model]`"
+    values[0] = value
+```
+
+## Type assertions
+
+ty distinguishes an asserted class from a same-named inferred class.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+from typing import assert_type
+
+import first
+import second
+
+def invalid_assertion(value: second.Model) -> None:
+    # error: [type-assertion-failure] "Type `second.Model` does not match asserted type `first.Model`"
+    assert_type(value, first.Model)
+```
+
+## Incompatible inherited methods
+
+ty distinguishes a derived class from its same-named base when their inherited methods are
+incompatible.
+
+`first.py`:
+
+```py
+class Model:
+    def method(self, value: int) -> int:
+        return value
+```
+
+`second.py`:
+
+```py
+class Different:
+    def method(self, value: str) -> str:
+        return value
+```
+
+```py
+import first
+import second
+
+# error: [invalid-method-override] "Base classes for class `mdtest_snippet.Model` define method `method` incompatibly: `first.Model.method` is incompatible with `Different.method`"
+class Model(first.Model, second.Different): ...
+```
+
+## Conflicting metaclasses
+
+ty distinguishes a derived class from its same-named base throughout a metaclass-conflict
+diagnostic.
+
+`first.py`:
+
+```py
+class Meta(type): ...
+class Model(metaclass=Meta): ...
+```
+
+```py
+import first
+
+class OtherMeta(type): ...
+
+# error: [conflicting-metaclass] "derived class (`mdtest_snippet.Model`) must be a subclass of the metaclasses of all its bases, but `OtherMeta` (metaclass of `mdtest_snippet.Model`) and `Meta` (metaclass of base class `first.Model`) have no subclass relationship"
+class Model(first.Model, metaclass=OtherMeta): ...
+```

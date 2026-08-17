@@ -824,7 +824,11 @@ pub(super) fn qualified_name_components_from_scope(
 }
 
 impl<'db> ClassLiteral<'db> {
-    fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> ClassDisplay<'db> {
+    pub(crate) fn display_with(
+        self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> ClassDisplay<'db> {
         ClassDisplay {
             db,
             class: self,
@@ -833,7 +837,7 @@ impl<'db> ClassLiteral<'db> {
     }
 }
 
-struct ClassDisplay<'db> {
+pub(crate) struct ClassDisplay<'db> {
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
     settings: DisplaySettings<'db>,
@@ -2244,14 +2248,6 @@ impl TupleSpecialization {
 }
 
 impl<'db> CallableType<'db> {
-    fn display<'a>(
-        &'a self,
-        db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
-    ) -> DisplayCallableType<'a, 'db> {
-        Self::display_with(self, db, env, DisplaySettings::default())
-    }
-
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
@@ -3768,7 +3764,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
                     .write_str("Callable")?;
                 f.write_str(" special-form '")?;
-                callable.display(db, self.env).fmt_detailed(f)?;
+                callable
+                    .display_with(db, self.env, self.settings.clone())
+                    .fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeGenericAlias(inner) => {
