@@ -2064,8 +2064,7 @@ class Color(Enum):
 for color in Color:
     reveal_type(color)  # revealed: Color
 
-# TODO: Should be `list[Color]`
-reveal_type(list(Color))  # revealed: list[Unknown]
+reveal_type(list(Color))  # revealed: list[Color]
 ```
 
 ## Methods / non-member attributes

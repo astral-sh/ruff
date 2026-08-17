@@ -4073,7 +4073,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_from_constraint_set(when);
             }
 
-            (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
+            (
+                formal @ Type::ProtocolInstance(_),
+                actual @ (Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::TypedDict(_)),
+            ) => {
+                // A class object can itself implement a protocol. Compare its members directly;
+                // converting it to its instance type would infer from a different interface.
                 let when = self.constraint_for_relation(formal, actual, relation_polarity);
                 return self.infer_from_constraint_set(when);
             }
