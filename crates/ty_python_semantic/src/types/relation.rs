@@ -2219,7 +2219,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // if `type` is a subtype of that protocol.
             (Type::SubclassOf(source_subclass_ty), Type::ProtocolInstance(_))
                 if (source_subclass_ty.is_dynamic() || source_subclass_ty.is_type_var())
-                    && !self.is_eager_assignability() =>
+                    && !self.relation.is_assignability() =>
             {
                 self.check_type_pair(db, KnownClass::Type.to_instance(db, env), target)
             }
