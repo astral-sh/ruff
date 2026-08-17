@@ -17,7 +17,7 @@ help: Remove default argument
 3 + def test_this_is_a_test(a): ...
 4 | def testThisIsAlsoATest(a=1): ...
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
  --> is_pytest_test.py:4:27
@@ -35,7 +35,7 @@ help: Remove default argument
 4 + def testThisIsAlsoATest(a): ...
 5 |
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
  --> is_pytest_test.py:7:41
@@ -52,7 +52,7 @@ help: Remove default argument
 7 +     def test_this_too_is_a_test(self, a): ...
 8 |     def testAndOfCourseThis(self, a=1): ...
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
  --> is_pytest_test.py:8:37
@@ -68,4 +68,4 @@ help: Remove default argument
 8 +     def testAndOfCourseThis(self, a): ...
 9 |
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically

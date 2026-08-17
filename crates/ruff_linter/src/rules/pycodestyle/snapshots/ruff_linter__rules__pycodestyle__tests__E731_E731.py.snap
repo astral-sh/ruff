@@ -121,7 +121,7 @@ help: Rewrite `x` as a `def`
 74 +             return 1
 75 |     else:
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:75:9
@@ -140,7 +140,7 @@ help: Rewrite `x` as a `def`
 76 +             return 2
 77 |     return x
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:86:5

@@ -270,7 +270,7 @@ help: Rename type parameter to remove leading underscores
 79 +         v3 = cast(T, ...)
 80 |
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 UP049 [*] Generic class uses private type parameters
   --> UP049_1.py:82:9
@@ -288,7 +288,7 @@ help: Rename type parameter to remove leading underscores
 83 +     v = cast(T, ...)
 84 |
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 UP049 Generic function uses private type parameters
   --> UP049_1.py:88:11

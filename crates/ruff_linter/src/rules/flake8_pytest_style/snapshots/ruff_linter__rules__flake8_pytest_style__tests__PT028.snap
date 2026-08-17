@@ -18,7 +18,7 @@ help: Remove default argument
 3 + def test_foo(a): ...
 4 | def test_foo(a = 1): ...
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
  --> PT028.py:4:18
@@ -36,7 +36,7 @@ help: Remove default argument
 4 + def test_foo(a): ...
 5 | def test_foo(a = (1)): ...
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
  --> PT028.py:5:19
@@ -55,7 +55,7 @@ help: Remove default argument
 5 + def test_foo(a): ...
 6 | def test_foo(a: int=1): ...
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
  --> PT028.py:6:21
@@ -74,7 +74,7 @@ help: Remove default argument
 6 + def test_foo(a: int): ...
 7 | def test_foo(a: int = 1): ...
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
  --> PT028.py:7:23
@@ -93,7 +93,7 @@ help: Remove default argument
 7 + def test_foo(a: int): ...
 8 | def test_foo(a: (int) = 1): ...
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
   --> PT028.py:8:25
@@ -112,7 +112,7 @@ help: Remove default argument
 8 + def test_foo(a: (int)): ...
 9 | def test_foo(a: int = (1)): ...
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
   --> PT028.py:9:24
@@ -131,7 +131,7 @@ help: Remove default argument
 9  + def test_foo(a: int): ...
 10 | def test_foo(a: (int) = (1)): ...
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
   --> PT028.py:10:26
@@ -149,7 +149,7 @@ help: Remove default argument
 10 + def test_foo(a: (int)): ...
 11 | def test_foo(a=1, /, b=2, *, c=3): ...
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `a` has default argument
   --> PT028.py:11:16
@@ -165,7 +165,7 @@ help: Remove default argument
 11 + def test_foo(a, /, b=2, *, c=3): ...
 12 |
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `b` has default argument
   --> PT028.py:11:24
@@ -181,7 +181,7 @@ help: Remove default argument
 11 + def test_foo(a=1, /, b, *, c=3): ...
 12 |
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PT028 [*] Test function parameter `c` has default argument
   --> PT028.py:11:32
@@ -197,4 +197,4 @@ help: Remove default argument
 11 + def test_foo(a=1, /, b=2, *, c): ...
 12 |
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
