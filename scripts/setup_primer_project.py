@@ -14,7 +14,7 @@
 # [tool.uv.sources]
 # # Keep this revision and the script's lockfile in sync with ecosystem-analyzer's
 # # mypy-primer pin so memory reports and ecosystem jobs use the same project definitions.
-# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer", rev = "6d6eebd8d37c9b8931381e79aa99808d9378c988" }
+# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer", rev = "db37f8a384c45c02fc52544fd819f979d66e174a" }
 # ///
 
 """Clone a mypy-primer project and set up a virtualenv with its dependencies installed.

@@ -44,7 +44,7 @@ env:
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
   # TODO: Update the mypy-primer revision in scripts/setup_primer_project.py
   # and regenerate its lockfile when updating ecosystem-analyzer.
-  ECOSYSTEM_ANALYZER_COMMIT: 2b409ad30445f16b863919e0799b438c6b04c645
+  ECOSYSTEM_ANALYZER_COMMIT: a602846d9c13d7c6d7268dff728442f68c47d923
 
 jobs:
   build-ty:
