@@ -2508,7 +2508,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Specialization<'db> {
         let db = self.db;
         let types = self
-            .solve_pending_with(generic_context, &mut choose)
+            .solve_pending_with(generic_context, &mut choose, |_, _| true)
             .unwrap_or_else(|()| self.solve_hash_map_with(generic_context, &mut choose));
         let specialization =
             generic_context
@@ -2532,7 +2532,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Result<TypeVarInference<'db>, ()> {
-        let types = self.solve_pending_with(generic_context, &mut choose)?;
+        let db = self.db;
+        let env = self.env;
+        let constraints = self.constraints;
+        let types = self.solve_pending_with(generic_context, &mut choose, |bounds, chosen| {
+            bounds
+                .validate_solution(db, env, constraints, chosen)
+                .is_ok()
+        })?;
         Ok(self.typevar_inference(generic_context, &types))
     }
 
@@ -2541,21 +2548,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Each argument relation is solved independently, then its solutions are merged into the
     /// legacy type map. This preserves enough information to report the conflicting arguments
     /// even when a migrated inference path only populated `pending`.
-    pub(crate) fn build_diagnostic_inference_with(
+    ///
+    /// Declaration conflicts are returned with the argument that produced them.
+    pub(crate) fn build_diagnostic_inference_with<A>(
         &mut self,
         generic_context: GenericContext<'db>,
-        argument_relations: impl IntoIterator<Item = (Type<'db>, Type<'db>)>,
+        argument_relations: impl IntoIterator<Item = (Type<'db>, Type<'db>, A)>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
-    ) -> TypeVarInference<'db> {
+    ) -> (TypeVarInference<'db>, Vec<(A, SpecializationError<'db>)>) {
         let db = self.db;
-        for (formal, actual) in argument_relations {
+        let mut errors = Vec::new();
+        for (formal, actual, argument) in argument_relations {
             let when =
                 actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
-            let _ = self.add_type_mappings_from_constraint_set(when);
+            if let Ok(Some(error)) = self.add_type_mappings_from_constraint_set(when) {
+                errors.push((argument, error));
+            }
         }
 
         let types = self.solve_hash_map_with(generic_context, &mut choose);
-        self.typevar_inference(generic_context, &types)
+        (self.typevar_inference(generic_context, &types), errors)
     }
 
     fn typevar_inference(
@@ -2577,6 +2589,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         generic_context: GenericContext<'db>,
         choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
+        validate_choice: impl Fn(&PathBound<'db>, Type<'db>) -> bool,
     ) -> Result<FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>, ()> {
         let db = self.db;
         // TODO: Move `ParamSpec` and `TypeVarTuple` handling to the new constraint solver.
@@ -2606,12 +2619,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.constraints,
             self.inferable,
             |_variance, path_bound| {
-                let typevar = path_bound.bound_typevar;
-                if let Some(ty) = choose(typevar, Some(path_bound)) {
-                    return Ok(Some(ty));
-                }
+                let solution =
+                    PathBounds::default_solve(db, self.env, self.constraints, path_bound)?;
+                let chosen = choose(path_bound.bound_typevar, Some(path_bound))
+                    .filter(|chosen| validate_choice(path_bound, *chosen));
 
-                PathBounds::default_solve(db, self.env, self.constraints, path_bound)
+                Ok(chosen.or(solution))
             },
         ) {
             Solutions::Unsatisfiable => return Err(()),
@@ -2953,12 +2966,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// build the specialization directly from that constraint set. This method lets us migrate to
     /// that brave new world incrementally, by using the new constraint set mechanism piecemeal for
     /// certain type comparisons.
+    ///
+    /// Returns a declaration conflict hidden by a `Never` solution for later diagnostic recovery.
     fn add_type_mappings_from_constraint_set(
         &mut self,
         set: ConstraintSet<'db, 'c>,
-    ) -> Result<(), ConstraintSetInferenceError<'db>> {
+    ) -> Result<Option<SpecializationError<'db>>, ConstraintSetInferenceError<'db>> {
         let db = self.db;
         let mut first_error = None;
+        let mut diagnostic_error = None;
         let solutions = match set.solutions_with(
             db,
             self.env,
@@ -2967,9 +2983,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             |_variance, path_bound| {
                 let solution =
                     PathBounds::preliminary_solve(db, self.env, self.constraints, path_bound);
-                if solution.is_err() && first_error.is_none() {
-                    first_error = self.specialization_error_from_failed_bounds(path_bound);
+                match solution {
+                    Err(()) if first_error.is_none() => {
+                        first_error = self.specialization_error_from_bounds(path_bound);
+                    }
+                    Ok(Some(ty)) if ty.is_never() && diagnostic_error.is_none() => {
+                        diagnostic_error = self.specialization_error_from_bounds(path_bound);
+                    }
+                    _ => {}
                 }
+
                 solution
             },
         ) {
@@ -2979,7 +3002,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     ConstraintSetInferenceError::InvalidTypeVar,
                 ));
             }
-            Solutions::Unconstrained => return Ok(()),
+            Solutions::Unconstrained => return Ok(None),
             Solutions::Constrained(solutions) => solutions,
         };
         for solution in solutions {
@@ -2991,20 +3014,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.insert_hash_map_type_mapping(binding.bound_typevar, solution);
             }
         }
-        Ok(())
+
+        Ok(diagnostic_error)
     }
 
-    /// Returns an actionable type-variable error for a failed projected path.
+    /// Returns a declaration error implied by this path's lower or upper bound.
     ///
-    /// Conflicting inferred lower and upper bounds are not necessarily violations of the type
-    /// variable's declaration, so they remain generic unsatisfiable constraints.
-    fn specialization_error_from_failed_bounds(
+    /// Conflicting inferred bounds alone do not violate the type variable's declaration.
+    fn specialization_error_from_bounds(
         &self,
         path_bound: &PathBound<'db>,
     ) -> Option<SpecializationError<'db>> {
         let db = self.db;
         let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.lower?;
+        let argument = path_bound
+            .lower
+            .or_else(|| path_bound.upper.as_single_bound(db, self.env))?;
         match bound_typevar
             .typevar(db)
             .bound_or_constraints(db, self.env)?
@@ -3037,7 +3062,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let result = self.add_type_mappings_from_constraint_set(when);
         self.pending.intersect(db, self.constraints, when);
         match result {
-            Ok(()) | Err(ConstraintSetInferenceError::Unsatisfiable) => Ok(()),
+            Ok(_) | Err(ConstraintSetInferenceError::Unsatisfiable) => Ok(()),
             Err(ConstraintSetInferenceError::InvalidTypeVar(error)) => Err(error),
         }
     }
@@ -3311,7 +3336,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             constraints,
                         );
                         match self.add_type_mappings_from_constraint_set(when) {
-                            Ok(()) => Some(when),
+                            Ok(_) => Some(when),
                             Err(error) => {
                                 first_error.get_or_insert(error);
                                 None

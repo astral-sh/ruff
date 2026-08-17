@@ -1499,6 +1499,7 @@ def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int | bytes], Non
     reveal_type(bounded_range(unknown_value, upper))  # revealed: int & Unknown
 
 def _(any_value: Any, upper: Callable[[bytes], None]):
+    # error: [invalid-argument-type]
     reveal_type(bounded_range(any_value, upper))  # revealed: Any
 ```
 

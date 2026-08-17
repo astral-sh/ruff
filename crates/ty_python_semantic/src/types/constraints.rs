@@ -3632,6 +3632,64 @@ impl<'db> PathBound<'db> {
         // Keep the original gradual type if the intersection exceeds the DNF expansion limit.
         restricted.unwrap_or(solution)
     }
+
+    /// Validates a solution against the inferred bounds and the type variable's declaration.
+    pub(crate) fn validate_solution(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        solution: Type<'db>,
+    ) -> Result<(), ()> {
+        let is_possibly_assignable = |source, target| {
+            is_possibly_constraint_set_assignable(
+                db,
+                TypePair::new(db, env.program(db), source, target),
+            )
+        };
+
+        if let Some(lower) = self.lower
+            && lower != solution
+            && !is_possibly_assignable(lower, solution)
+        {
+            return Err(());
+        }
+
+        if !self.upper.is_satisfied_by(db, env, solution) {
+            let mut storage = builder.storage.borrow_mut();
+            let (when_upper, source_order) =
+                self.upper
+                    .when_satisfied_by(db, env, &mut storage, solution);
+            if when_upper.is_never_satisfied(db, env, &mut storage, source_order) {
+                return Err(());
+            }
+        }
+
+        let declared_upper = match self
+            .bound_typevar
+            .typevar(db)
+            .require_bound_or_constraints(db, env)
+        {
+            TypeVarBoundOrConstraints::UpperBound(bound) => bound.top_materialization(db, env),
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                return constraints
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .any(|constraint| {
+                        is_possibly_assignable(solution, constraint.top_materialization(db, env))
+                    })
+                    .then_some(())
+                    .ok_or(());
+            }
+        };
+
+        if !is_possibly_assignable(solution, declared_upper) {
+            return Err(());
+        }
+
+        Ok(())
+    }
 }
 
 impl<'db> Type<'db> {
@@ -4037,28 +4095,7 @@ impl<'db> PathBounds<'db> {
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
                 if let Some(lower) = path_bound.lower {
-                    if !path_bound.upper.is_satisfied_by(db, env, lower) {
-                        let mut storage = builder.storage.borrow_mut();
-                        let (when_upper, source_order) =
-                            path_bound
-                                .upper
-                                .when_satisfied_by(db, env, &mut storage, lower);
-                        if when_upper.is_never_satisfied(db, env, &mut storage, source_order) {
-                            // This path does not satisfy the accumulated upper bound, and is
-                            // therefore not a valid specialization.
-                            return Err(());
-                        }
-                    }
-
-                    if !is_possibly_constraint_set_assignable(
-                        db,
-                        TypePair::new(db, env.program(db), lower, declared_upper),
-                    ) {
-                        // This path does not satisfy the typevar's declared upper bound, and is
-                        // therefore not a valid specialization.
-                        return Err(());
-                    }
-
+                    path_bound.validate_solution(db, env, builder, lower)?;
                     return Ok(Some(lower));
                 }
 
