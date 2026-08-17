@@ -11,9 +11,12 @@ use crate::FxIndexMap;
 use crate::docstring::Docstring;
 use crate::goto::docstring_for_call_definition;
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticModel;
@@ -82,7 +85,7 @@ pub fn signature_help<'db>(
     let parsed = parsed_module(db, file.python_file(db)).load(db);
 
     // Get the call expression at the given position.
-    let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
+    let (call_expr, current_arg_index) = get_call_expr(db, &parsed, offset)?;
 
     let model = SemanticModel::new(db, file);
 
@@ -113,16 +116,22 @@ pub fn signature_help<'db>(
 
 /// Returns the innermost call expression that contains the specified offset
 /// and the index of the argument that the offset maps to.
-fn get_call_expr(
-    parsed: &ruff_db::parsed::ParsedModuleRef,
+fn get_call_expr<'ast>(
+    db: &dyn Db,
+    parsed: &'ast ruff_db::parsed::ParsedModuleRef,
     offset: TextSize,
-) -> Option<(&ast::ExprCall, usize)> {
+) -> Option<(&'ast ast::ExprCall, usize)> {
     let root_node: AnyNodeRef = parsed.syntax().into();
+    let source = source_text(db, parsed.module().file());
+    let line_range = source.line_range(offset);
+    let line = &source[line_range];
+    let line_end = line_range.start() + TextSize::of(line.trim_whitespace_end());
+    let token_offset = offset.min(line_end);
 
     // Find the token under the cursor and use its offset to find the node
     let token = parsed
         .tokens()
-        .at_offset(offset)
+        .at_offset(token_offset)
         .max_by_key(|token| match token.kind() {
             TokenKind::Name
             | TokenKind::String
@@ -147,7 +156,9 @@ fn get_call_expr(
             }
 
             // Close the signature help if the cursor is at the closing parenthesis
-            if token.kind() == TokenKind::Rpar && node.end() == token.end() && offset == token.end()
+            if token.kind() == TokenKind::Rpar
+                && node.end() == token.end()
+                && token_offset == token.end()
             {
                 return false;
             }
@@ -1278,6 +1289,29 @@ def ab(a: int, *, c: int):
             def func(first: int, second: str) -> None: ...
 
             func(1,<CURSOR>"#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        assert_eq!(result.signatures[0].active_parameter, Some(1));
+    }
+
+    #[test]
+    fn signature_help_in_trailing_whitespace() {
+        for whitespace in [" ", "\t", "\u{000c}"] {
+            let source = format!(
+                "def func(first: int, second: str) -> None: ...\n\nfunc(1,{whitespace}<CURSOR>"
+            );
+            let test = cursor_test(&source);
+
+            let result = test.signature_help().expect("Should have signature help");
+            assert_eq!(result.signatures[0].active_parameter, Some(1));
+        }
+    }
+
+    #[test]
+    fn signature_help_in_trailing_whitespace_before_newline() {
+        let test = cursor_test(
+            "def func(first: int, second: str) -> None: ...\n\nfunc(1,  <CURSOR>  \n    \"value\")",
         );
 
         let result = test.signature_help().expect("Should have signature help");
