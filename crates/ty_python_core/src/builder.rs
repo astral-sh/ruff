@@ -2311,23 +2311,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scopes[scope_id].is_eager()
     }
 
-    /// Index a variable annotation without inventing exception paths when it is not evaluated.
-    /// Function-local annotations never execute; module and class annotations can also be deferred.
-    fn visit_variable_annotation(&mut self, annotation: &'ast ast::Expr) {
-        let is_eager = matches!(
-            self.scopes[self.current_scope()].kind(),
-            ScopeKind::Module | ScopeKind::Class
-        ) && !self.has_future_annotations
-            && !self.source_type.is_stub()
-            && !self.python_version.defers_annotations();
-        let was_suppressed = self
-            .exception_context_stack_manager
-            .suppress_exception_checkpoints_if(!is_eager);
-        self.visit_annotation(annotation);
-        self.exception_context_stack_manager
-            .restore_exception_checkpoint_suppression(was_suppressed);
-    }
-
     /// Records the current flow state immediately before an operation that may raise an exception.
     ///
     /// This models exceptions from ordinary operations, not every possible interruption. In
@@ -3950,7 +3933,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // not discard the declared type. The value is still bound only after the RHS
                 // completes, so a handler can observe an earlier binding (or an unbound name).
                 let pending = self.begin_annotated_assignment(node);
-                self.visit_variable_annotation(&node.annotation);
+                self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                     if self.is_method_or_eagerly_executed_in_method().is_some() {
