@@ -66,9 +66,7 @@ impl<'a> FullRenderer<'a> {
                 writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
             }
 
-            if diag.has_applicable_fix(self.config.fix_applicability())
-                && let Some(diff) =
-                    Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
+            if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
                 write!(f, "{diff}")?;
                 if let Some(applicability) = to_applicability_annotate(diff.fix) {
@@ -369,17 +367,14 @@ fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
     let (level, message) = match fix.applicability() {
         Applicability::Safe => return None,
         Applicability::Unsafe => (
-            AnnotateLevel::WARNING,
+            AnnotateLevel::WARNING.with_name("note"),
             "This is an unsafe fix and may change runtime behavior",
         ),
         Applicability::DisplayOnly => (
-            // Note that this is still only used in tests. There's no `--display-only-fixes`
-            // analog to `--unsafe-fixes` for users to activate this or see the styling.
-            AnnotateLevel::ERROR,
-            "This is a display-only fix and is likely to be incorrect",
+            AnnotateLevel::ERROR.with_name("warning"),
+            "This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically",
         ),
     };
-    let level = level.with_name("note");
 
     Some(AnnotateGroup::with_title(level.primary_title(message)))
 }
@@ -400,13 +395,18 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
         error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
         1 | import os
           |        ^^
         help: Remove unused import: `os`
+          |
+          - import os
+        1 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         error[F841]: Local variable `x` is assigned to but never used
          --> fib.py:6:5
@@ -419,6 +419,13 @@ mod tests {
         8 |         return 0
           |
         help: Remove assignment to unused variable `x`
+          |
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          -     x = 1
+        6 +     
+        7 |     if n == 0:
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         error[F821]: Undefined name `a`
          --> undef.py:1:4
@@ -443,7 +450,7 @@ mod tests {
         6 |     x = 1
         7 |     if n == 0:
           |
-        "###);
+        "#);
     }
 
     #[test]
@@ -760,6 +767,13 @@ print()
         4 |     x = 1
           |     ^
         help: Remove assignment to unused variable `x`
+         ::: cell 3
+          |
+        3 |     print()
+          -     x = 1
+        4 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 

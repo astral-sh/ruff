@@ -3913,7 +3913,7 @@ class A(Generic[T]):
     ----- stdout -----
     test.py:6:9: non-pep695-generic-class: Generic class `A` uses `Generic` subclass instead of type parameters
     Found 1 error.
-    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    No fixes available (1 unsafe fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "
@@ -4461,7 +4461,7 @@ fn statistics_hyperlinks() -> Result<()> {
     1	<link https://docs.astral.sh/ruff/rules/unused-import>F401</link>   	[*] unused-import
     1	<link https://docs.astral.sh/ruff/rules/useless-import-alias>PLC0414</link>	[ ] useless-import-alias
     Found 2 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    [*] 1 fixable with the `--fix` option (1 unsafe fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     ",
@@ -4583,7 +4583,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     normal.py:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    [*] 1 fixable with the `--fix` option (1 unsafe fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     error: Panic during linting indicates a bug in Ruff. If you could open an issue at:
@@ -4622,9 +4622,19 @@ fn rule_panic_mixed_results_full() -> Result<()> {
 
     stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     --> normal.py:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+    2 | import os
+      |
+    note: This is an unsafe fix and may change runtime behavior
 
     stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     --> normal.py:1:1
+      |
+    1 + # fix from stable-test-rule-display-only-fix
+    2 | import os
+      |
+    warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     preview-test-rule: Hey this is a preview test rule.
     --> normal.py:1:1
@@ -4639,7 +4649,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
 
     Found 7 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    [*] 1 fixable with the `--fix` option (1 unsafe fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     error: Panic during linting indicates a bug in Ruff. If you could open an issue at:

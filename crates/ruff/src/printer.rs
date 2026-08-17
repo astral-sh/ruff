@@ -125,7 +125,7 @@ impl Printer {
                             };
                             writeln!(
                                 writer,
-                                "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
+                                "{fix_prefix} {} fixable with the `--fix` option ({} unsafe fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.applicable, fixables.inapplicable_unsafe
                             )?;
                         } else if fixables.applicable > 0 {
@@ -144,7 +144,7 @@ impl Printer {
                             };
                             writeln!(
                                 writer,
-                                "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
+                                "No fixes available ({} unsafe fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.inapplicable_unsafe
                             )?;
                         }
