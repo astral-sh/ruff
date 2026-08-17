@@ -1164,6 +1164,25 @@ def mean(data: DataFrame) -> float:
 x23: Mapping[Hashable, AggregateSpec] = {"col1": ["sum", mean], "col2": mean}
 ```
 
+## Recursive aliases remain stable in invariant collection contexts
+
+An invariant collection context can infer the same recursive type as both bounds. Because recursive
+inference introduces `Divergent`, intersecting those bounds should not discard any element of the
+union.
+
+```py
+from collections.abc import MutableMapping, MutableSequence
+from typing import TypeAlias, TypedDict
+
+class Leaf(TypedDict, total=False):
+    path: str
+
+RecursiveValue: TypeAlias = int | Leaf | MutableSequence["RecursiveValue | None"] | MutableMapping[str, "RecursiveValue | None"]
+RecursiveMapping: TypeAlias = MutableMapping[str, RecursiveValue | None]
+
+recursive: RecursiveMapping = {}
+```
+
 ## Implicit generic class specialization
 
 Callable type context is also used to inform the implicit specialization of a generic class:
@@ -2097,6 +2116,23 @@ def _(callback: TakesInt) -> None:
         # TODO: Perform fixpoint iteration when evaluating callable intersections.
         x2 = callback("str", lambda value: reveal_type(value) + "!")  # revealed: Unknown
         reveal_type(x2)  # revealed: str
+```
+
+A structural type context can infer a gradual lower bound and a static upper bound before dictionary
+values contribute their constraints. The preliminary solution should retain the gradual lower bound.
+
+```py
+T_co = TypeVar("T_co", covariant=True)
+
+class DictLike(Protocol[T_co]):
+    def __getitem__(self, key: str, /) -> T_co: ...
+    def __setitem__(self, key: str, value: Any, /) -> None: ...
+
+class Command: ...
+
+def _(command: Any):
+    # revealed: dict[str, Any]
+    mapping: DictLike[type[Command]] = reveal_type({"command": command})
 ```
 
 Note that long chains of callables with constraint dependencies in reverse source-order may require

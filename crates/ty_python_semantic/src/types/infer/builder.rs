@@ -7352,7 +7352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::default_solve(db, env, &constraints, path_bound)
+                    PathBounds::preliminary_solve(db, env, &constraints, path_bound)
                 });
 
                 match solutions {

@@ -1346,6 +1346,198 @@ def g[T: A](b: B[T]):
     return f(b.x)  # Fine
 ```
 
+## Inferred upper bounds restrict the range of gradual solutions
+
+Gradual lower bounds are intersected with their inferred upper bounds.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Callable, TypeAlias
+from ty_extensions._internal import Unknown
+
+def infer[T](lower: T, upper: Callable[[T], None]) -> T:
+    return lower
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int], None]):
+    reveal_type(infer(any_value, upper))  # revealed: int & Any
+    reveal_type(infer(unknown_value, upper))  # revealed: int & Unknown
+```
+
+All inferred upper bounds contribute to the intersection, whether they are static or gradual:
+
+```py
+def infer_multiple[T](
+    value: T,
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+) -> T:
+    return value
+
+def _(
+    any_value: Any,
+    unknown_value: Unknown,
+    static: Callable[[int], None],
+    first: Callable[[int | list[Any]], None],
+    second: Callable[[int | dict[str, Any]], None],
+):
+    reveal_type(infer_multiple(any_value, static, first))  # revealed: int & Any
+    reveal_type(infer_multiple(any_value, first, second))  # revealed: int & Any
+    reveal_type(infer_multiple(unknown_value, first, second))  # revealed: int & Unknown
+```
+
+An unsatisfiable gradual range falls back to unioning the inferred bounds for diagnostic recovery:
+
+```py
+def _(
+    unknown_value: Unknown,
+    static: Callable[[int], None],
+    incompatible: Callable[[list[Any]], None],
+):
+    result = infer_multiple(
+        unknown_value,
+        static,  # error: [invalid-argument-type]
+        incompatible,  # error: [invalid-argument-type]
+    )
+    reveal_type(result)  # revealed: Unknown | int | list[Any]
+```
+
+A gradual upper bound contributes its top materialization without replacing the gradual lower bound:
+
+```py
+def _(
+    any_value: Any,
+    unknown_value: Unknown,
+    list_upper: Callable[[list[Any]], None],
+    tuple_upper: Callable[[tuple[Any, ...]], None],
+    callable_upper: Callable[[Callable[[Any], int]], None],
+):
+    reveal_type(infer(any_value, list_upper))  # revealed: Top[list[Any]] & Any
+    reveal_type(infer(unknown_value, list_upper))  # revealed: Top[list[Any]] & Unknown
+    reveal_type(infer(any_value, tuple_upper))  # revealed: tuple[object, ...] & Any
+    reveal_type(infer(any_value, callable_upper))  # revealed: ((Never, /) -> int) & Any
+```
+
+The inferred upper bound is also retained when an invariant return type triggers promotion:
+
+```py
+def infer_list[T](lower: T, upper: Callable[[T], None]) -> list[T]:
+    return [lower]
+
+def _(any_value: Any, upper: Callable[[int], None]):
+    reveal_type(infer_list(any_value, upper))  # revealed: list[int & Any]
+```
+
+Promotion must also preserve the upper bound when a gradual solution contains promotable literals:
+
+```py
+def infer_promoted[T](static: T, gradual: T, upper: Callable[[T], None]) -> list[T]:
+    return [static, gradual]
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int | str], None]):
+    reveal_type(infer_promoted(1, any_value, upper))  # revealed: list[int | (str & Any)]
+    reveal_type(infer_promoted(1, unknown_value, upper))  # revealed: list[int | (str & Unknown)]
+```
+
+The same restriction applies when a type variable occurs in a callable's parameter and return types:
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+def predicate(value: Derived) -> bool:
+    return True
+
+def gradual_rule(value: Derived) -> Unknown:
+    raise NotImplementedError
+
+def condition[T](predicate: Callable[[T], bool], rule: Callable[[T], T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+reveal_type(condition(predicate, gradual_rule))  # revealed: (Derived & Unknown, /) -> Derived & Unknown
+```
+
+If the upper bound is a union, it is distributed across the gradual lower bound:
+
+```py
+class A: ...
+class B: ...
+class Result(A): ...
+
+def reduce[T](function: Callable[[T, T], T], values: Iterable[T]) -> T:
+    raise NotImplementedError
+
+def combine(left: A | B, right: A | B) -> Result:
+    raise NotImplementedError
+
+def _(values: Iterable[Any]):
+    # revealed: Result | (A & Any) | (B & Any)
+    reveal_type(reduce(combine, values))
+```
+
+Declared upper bounds validate a gradual solution but do not restrict its range on their own:
+
+```py
+def bounded[T: A | B](value: T) -> T:
+    return value
+
+def bounded_with_upper[T: A | B](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, upper: Callable[[object], None]):
+    reveal_type(bounded(any_value))  # revealed: Any
+    reveal_type(bounded_with_upper(any_value, upper))  # revealed: Any
+```
+
+An inferred upper bound cannot introduce materializations outside the declared upper bound:
+
+```py
+def bounded_range[T: int | str](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int | bytes], None]):
+    reveal_type(bounded_range(any_value, upper))  # revealed: int & Any
+    reveal_type(bounded_range(unknown_value, upper))  # revealed: int & Unknown
+
+def _(any_value: Any, upper: Callable[[bytes], None]):
+    reveal_type(bounded_range(any_value, upper))  # revealed: Any
+```
+
+Declared gradual bounds preserve the gradual type inferred from the lower bound:
+
+```py
+def bounded_any[T: Any](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def bounded_gradual[T: list[Any]](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(
+    unknown_value: Unknown,
+    int_upper: Callable[[int], None],
+    list_upper: Callable[[list[int]], None],
+):
+    reveal_type(bounded_any(unknown_value, int_upper))  # revealed: int & Unknown
+    reveal_type(bounded_gradual(unknown_value, list_upper))  # revealed: list[int] & Unknown
+```
+
+Recursive declared bounds do not introduce `Divergent` into a concrete solution:
+
+```py
+Recursive: TypeAlias = int | list["Recursive"]
+
+def bounded_recursive[T: Recursive](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]):
+    any_result = bounded_recursive(any_value, upper)
+    unknown_result = bounded_recursive(unknown_value, upper)
+
+    reveal_type(any_result)  # revealed: list[int] & Any
+    reveal_type(any_result[0])  # revealed: int & Any
+    reveal_type(unknown_result)  # revealed: list[int] & Unknown
+    reveal_type(unknown_result[0])  # revealed: int & Unknown
+```
+
 ## Typevars in a union
 
 ```py
