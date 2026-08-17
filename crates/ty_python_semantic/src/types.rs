@@ -492,7 +492,14 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             .visit_type(db, Type::TypeAlias(alias), expand)
     }
 
-    fn for_new_materialization_root(&self) -> Self {
+    /// Starts an independent type mapping without losing the surrounding recursion guards.
+    ///
+    /// Transformation caches are keyed by the input type, not the mapping being applied. Different
+    /// alias specializations or materialization roots therefore need separate caches: otherwise,
+    /// specializing the same `Callable[[], T]` body first with `int` and then with `str` would
+    /// incorrectly reuse the `Callable[[], int]` result for both. Alias-expansion and equivalence
+    /// guards must remain shared so recursive aliases still terminate.
+    fn for_new_mapping_root(&self) -> Self {
         let materialization_equivalence = OnceCell::new();
         let was_empty =
             materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));

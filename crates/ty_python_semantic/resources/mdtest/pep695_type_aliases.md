@@ -1247,6 +1247,36 @@ def finite_alias_union(x: NonRecursiveId[NestedNoneAlias], condition: bool):
     reveal_type(x if condition else 1)  # revealed: None | Literal[1]
 ```
 
+### Non-recursive callable aliases with distinct specializations
+
+Expanding two specializations of the same callable alias must apply each specialization separately.
+Reusing the first expansion would incorrectly make callbacks with different return types or
+parameter types equivalent.
+
+```py
+from collections.abc import Callable
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+
+type Producer[T] = Callable[[], T]
+type Consumer[T] = Callable[[T], None]
+
+static_assert(not is_assignable_to(Producer[int], Producer[str]))
+static_assert(not is_subtype_of(Producer[int], Producer[str]))
+static_assert(not is_equivalent_to(Producer[int], Producer[str]))
+
+static_assert(is_subtype_of(Producer[bool], Producer[int]))
+static_assert(not is_subtype_of(Producer[int], Producer[bool]))
+
+static_assert(not is_equivalent_to(Consumer[int], Consumer[str]))
+static_assert(is_subtype_of(Consumer[int], Consumer[bool]))
+static_assert(not is_subtype_of(Consumer[bool], Consumer[int]))
+
+def incompatible_producer(value: Producer[int]) -> Producer[str]:
+    return value  # error: [invalid-return-type]
+```
+
 ### Non-recursive generic union aliases
 
 Avoiding relation checks while a potentially recursive alias body is rebuilt must not prevent

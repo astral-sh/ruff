@@ -1099,3 +1099,29 @@ def returns_recursive_alias(value: Any) -> GrowingAlias[int]:
 def returns_recursive_alias_with_any(value: Any) -> GrowingAliasWithAny[int]:
     return value
 ```
+
+## Regression test: `unsound-return-statement` + callable type aliases
+
+A generic decorator factory cannot return a callback transformer that only supports one concrete
+return type. Comparing two specializations of the same callable alias must not reuse one
+specialization's cached expansion for the other.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from collections.abc import Callable
+
+type Callback[T] = Callable[[], T]
+
+def decorator_factory[T]() -> Callable[[Callback[T]], Callback[T]]:
+    def wrapper(callback: Callback[int]) -> Callback[int]:
+        return lambda: 1
+
+    return wrapper  # error: [unsound-return-statement]
+```

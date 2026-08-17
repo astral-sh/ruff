@@ -2840,12 +2840,12 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         // pass needs fresh materialization caches. Nested equivalence checks still share the
         // materialization-equivalence recursion guard to avoid re-entering the same comparison.
         let left_to_right_materialization_visitor =
-            self.materialization_visitor.for_new_materialization_root();
+            self.materialization_visitor.for_new_mapping_root();
         self.as_relation_checker(&left_to_right_materialization_visitor)
             .check_type_pair(db, left, right)
             .and(db, self.constraints, || {
                 let right_to_left_materialization_visitor =
-                    self.materialization_visitor.for_new_materialization_root();
+                    self.materialization_visitor.for_new_mapping_root();
                 self.as_relation_checker(&right_to_left_materialization_visitor)
                     .check_type_pair(db, right, left)
             })

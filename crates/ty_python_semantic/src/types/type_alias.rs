@@ -416,6 +416,7 @@ impl<'db> TypeAliasType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         visitor.expand_alias(db, self, || {
+            let specialization_visitor = visitor.for_new_mapping_root();
             let value = self.raw_value_type(db);
             let specialized = self
                 .generic_context(db)
@@ -425,13 +426,13 @@ impl<'db> TypeAliasType<'db> {
                         value,
                         generic_context,
                         self.specialization(db),
-                        visitor,
+                        &specialization_visitor,
                     )
                 })
                 .unwrap_or(value);
 
             self.materialization_kind(db)
-                .map(|kind| specialized.materialize(db, kind, visitor))
+                .map(|kind| specialized.materialize(db, kind, &specialization_visitor))
                 .unwrap_or(specialized)
         })
     }
