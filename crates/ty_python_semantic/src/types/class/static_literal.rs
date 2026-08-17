@@ -25,7 +25,7 @@ use crate::{
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictModule,
+        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
         UnionBuilder, UnionType,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
@@ -961,7 +961,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Return the module defining the `TypedDict` base of this class.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
+    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypingModule> {
         self.iter_mro(db, None)
             .find_map(ClassBase::typed_dict_module)
     }

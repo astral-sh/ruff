@@ -113,7 +113,6 @@ pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
 pub use special_form::SpecialFormType;
-pub(crate) use special_form::TypedDictModule;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
@@ -493,6 +492,61 @@ pub(crate) struct FindLegacyTypeVars;
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
 type SpecializationVisitor<'db> = CycleDetector<'db, VisitSpecialization, Type<'db>, (), 3>;
 struct VisitSpecialization;
+
+/// The standard-library `typing` module or its `typing_extensions` backport.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub enum TypingModule {
+    /// The standard-library `typing` module.
+    Typing,
+    /// The `typing_extensions` backport.
+    TypingExtensions,
+}
+
+impl TypingModule {
+    /// Return the module for a `TypedDict` special form, including a union of the special forms
+    /// exported by `typing` and `typing_extensions`.
+    fn from_typed_dict_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        match ty {
+            Type::SpecialForm(SpecialFormType::TypedDict(module)) => Some(module),
+            Type::Union(union) => {
+                let mut elements = union.elements(db).iter();
+                let Type::SpecialForm(SpecialFormType::TypedDict(module)) = elements.next()? else {
+                    return None;
+                };
+                elements.try_fold(*module, |module, element| {
+                    let Type::SpecialForm(SpecialFormType::TypedDict(element_module)) = element
+                    else {
+                        return None;
+                    };
+                    // `typing_extensions.TypedDict` always offers strictly more functionality than `typing.TypedDict`.
+                    // If any element is from `typing`, we therefore infer that the type is a `typing.TypedDict`,
+                    // since an operation on a union is only valid if the operation is valid on all elements in the
+                    // union.
+                    Some(match (module, element_module) {
+                        (Self::TypingExtensions, Self::TypingExtensions) => Self::TypingExtensions,
+                        _ => Self::Typing,
+                    })
+                })
+            }
+            _ => None,
+        }
+    }
+
+    const fn from_type_alias_class(class: KnownClass) -> Option<Self> {
+        match class {
+            KnownClass::TypeAliasType => Some(Self::Typing),
+            KnownClass::ExtensionsTypeAliasType => Some(Self::TypingExtensions),
+            _ => None,
+        }
+    }
+
+    const fn type_alias_class(self) -> KnownClass {
+        match self {
+            Self::Typing => KnownClass::TypeAliasType,
+            Self::TypingExtensions => KnownClass::ExtensionsTypeAliasType,
+        }
+    }
+}
 
 /// Whether a type represents the upper or lower bound of a gradual type.
 ///
@@ -6017,7 +6071,7 @@ impl<'db> Type<'db> {
                 )
             }
 
-            KnownClass::TypeAliasType => {
+            KnownClass::TypeAliasType | KnownClass::ExtensionsTypeAliasType => {
                 // ```py
                 // def __new__(
                 //     cls,
@@ -6313,6 +6367,7 @@ impl<'db> Type<'db> {
                     | KnownClass::Property
                     | KnownClass::Super
                     | KnownClass::TypeAliasType
+                    | KnownClass::ExtensionsTypeAliasType
                     | KnownClass::Deprecated
             )
         ) {

@@ -35,7 +35,7 @@ use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType,
     Protocol, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, UnionType, WrapperDescriptorKind,
+    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
     visitor,
 };
 use ty_python_core::ProgramFile;
@@ -1540,7 +1540,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
                 f.with_type(Type::SpecialForm(SpecialFormType::TypedDict(
-                    TypedDictModule::Typing,
+                    TypingModule::Typing,
                 )))
                 .write_str("TypedDict")?;
                 f.write_str(" with items ")?;

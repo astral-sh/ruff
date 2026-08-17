@@ -22,8 +22,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictModule,
-    TypedDictType, UnionType, determine_upper_bound,
+    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
+    TypingModule, UnionType, determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -900,7 +900,7 @@ pub struct DynamicTypedDictLiteral<'db> {
     pub(crate) anchor: DynamicTypedDictAnchor<'db>,
 
     #[returns(copy)]
-    pub(crate) typed_dict_module: TypedDictModule,
+    pub(crate) typed_dict_module: TypingModule,
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
@@ -1060,7 +1060,7 @@ pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
         db,
         env,
         typed_dict,
-        TypedDictModule::Typing,
+        TypingModule::Typing,
         lookup_policy,
         name,
         || Type::TypedDict(typed_dict),
@@ -1070,13 +1070,13 @@ pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
 pub(super) fn typed_dict_fallback_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    module: TypedDictModule,
+    module: TypingModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     let fallback = match module {
-        TypedDictModule::Typing => KnownClass::TypedDictFallback,
-        TypedDictModule::TypingExtensions => KnownClass::ExtensionTypedDictFallback,
+        TypingModule::Typing => KnownClass::TypedDictFallback,
+        TypingModule::TypingExtensions => KnownClass::ExtensionTypedDictFallback,
     };
 
     fallback
@@ -1089,7 +1089,7 @@ pub(super) fn typed_dict_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class: ClassType<'db>,
-    module: TypedDictModule,
+    module: TypingModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
@@ -1110,7 +1110,7 @@ fn typed_dict_inherited_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     typed_dict: TypedDictType<'db>,
-    module: TypedDictModule,
+    module: TypingModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
     new_upper_bound: impl FnOnce() -> Type<'db>,

@@ -16,7 +16,7 @@ use crate::{
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, KnownClass,
         KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
-        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule, binding_type,
+        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypingModule, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind,
@@ -670,7 +670,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     if let Some(args) = class_node.arguments.as_deref() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
             let supports_pep_728 = context.in_stub()
-                || class.typed_dict_module(db) == Some(TypedDictModule::TypingExtensions)
+                || class.typed_dict_module(db) == Some(TypingModule::TypingExtensions)
                 || env.python_version(db) >= PythonVersion::PY315;
 
             for keyword in &args.keywords {
