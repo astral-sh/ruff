@@ -1166,6 +1166,45 @@ reveal_type(generic_context(c.method))
 reveal_type(generic_context(c.generic_method))
 ```
 
+## Members of constrained type variables
+
+Member lookup distributes over the constraints of a non-inferable type variable. Each member is
+bound to its matching receiver alternative, while `Self` continues to refer to the original type
+variable.
+
+```py
+from typing_extensions import Self, TypeVar
+
+class TextStream:
+    @property
+    def closed(self) -> bool:
+        return False
+
+    def close(self) -> None: ...
+    def clone(self) -> Self:
+        raise NotImplementedError
+
+class BinaryStream:
+    @property
+    def closed(self) -> bool:
+        return False
+
+    def close(self) -> None: ...
+    def clone(self) -> Self:
+        raise NotImplementedError
+
+Stream = TypeVar("Stream", TextStream, BinaryStream)
+
+def use_stream(stream: Stream) -> Stream:
+    # revealed: bool
+    reveal_type(stream.closed)
+    # revealed: (bound method Stream@use_stream when TextStream.close() -> None) | (bound method Stream@use_stream when BinaryStream.close() -> None)
+    reveal_type(stream.close)
+    if not stream.closed:
+        stream.close()
+    return stream.clone()
+```
+
 ## Specializations propagate
 
 In a specialized generic alias, the specialization is applied to the attributes and methods of the

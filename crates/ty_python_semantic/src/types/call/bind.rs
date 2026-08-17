@@ -1586,7 +1586,7 @@ impl<'db> Bindings<'db> {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
-                                        BoundMethodType::new(db, function, *owner),
+                                        BoundMethodType::new(db, function, *owner, *owner),
                                     ));
                                 }
                                 [Some(instance), None] => {
@@ -1594,6 +1594,7 @@ impl<'db> Bindings<'db> {
                                         BoundMethodType::new(
                                             db,
                                             function,
+                                            instance.to_meta_type(db, env),
                                             instance.to_meta_type(db, env),
                                         ),
                                     ));
@@ -1607,7 +1608,7 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(Type::FunctionLiteral(function));
                             } else {
                                 overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
-                                    db, function, *first,
+                                    db, function, *first, *first,
                                 )));
                             }
                         }
@@ -1621,7 +1622,7 @@ impl<'db> Bindings<'db> {
                                 match overload.parameter_types() {
                                     [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, *function, *owner),
+                                            BoundMethodType::new(db, *function, *owner, *owner),
                                         ));
                                     }
 
@@ -1630,6 +1631,7 @@ impl<'db> Bindings<'db> {
                                             BoundMethodType::new(
                                                 db,
                                                 *function,
+                                                instance.to_meta_type(db, env),
                                                 instance.to_meta_type(db, env),
                                             ),
                                         ));
@@ -1646,7 +1648,9 @@ impl<'db> Bindings<'db> {
                                     }
                                     [_, Some(instance), _] => {
                                         overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, *function, *instance),
+                                            BoundMethodType::new(
+                                                db, *function, *instance, *instance,
+                                            ),
                                         ));
                                     }
 
