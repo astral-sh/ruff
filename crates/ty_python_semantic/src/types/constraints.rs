@@ -107,7 +107,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
@@ -1107,10 +1107,10 @@ impl<'db> ConstraintSetBuilder<'db> {
             .expect("non-terminal BDD should have source_order");
 
         // Combining constraint sets can allocate a new source-order tree even when the BDD is
-        // unchanged. Preserve each constraint's first source position, but rebuild the persisted
-        // sidecar densely so redundant combinations cannot affect its IDs or owned-set equality.
-        // Unlike node and constraint IDs, source-order IDs are not embedded in the BDD, so the
-        // sidecar can be rebuilt without remapping the BDD.
+        // unchanged. Preserve each relevant constraint's first source position, but rebuild the
+        // persisted sidecar densely so redundant combinations cannot affect its IDs or owned-set
+        // equality. Unlike node and constraint IDs, source-order IDs are not embedded in the BDD,
+        // so the sidecar can be rebuilt without remapping the BDD.
         let mut storage = self.storage.into_inner();
         let source_constraints = storage.calculate_source_orders(Some(source_order));
 
@@ -1139,9 +1139,23 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         let mut source_orders: IndexVec<SourceOrderId, SourceOrder> =
             IndexVec::with_capacity(source_constraints.len().saturating_mul(2).saturating_sub(1));
+        let live_support = storage.node_support(node);
         let source_order = source_constraints
             .into_iter()
             .fold(None, |left, source_constraint| {
+                // Quantified-away constraints can still determine the order of related live
+                // solutions. An unrelated constraint cannot, and keeping its fresh type variables
+                // in a cached value can prevent recursive Salsa queries from reaching a fixed
+                // point. Incomplete supports may hide a relationship, so preserve those entries.
+                let constraint_support = storage.constraint_support(source_constraint);
+                if !used_constraints[source_constraint.index()]
+                    && let Some(live_support) = live_support
+                    && live_support.is_complete()
+                    && constraint_support.is_complete()
+                    && !constraint_support.overlaps_with(live_support)
+                {
+                    return left;
+                }
                 used_constraints.set(source_constraint.index(), true);
                 let right = source_orders.push(SourceOrder::Constraint(source_constraint));
 
@@ -1274,6 +1288,11 @@ impl<'db> ConstraintSetStorage<'db> {
 
             fn notify_skipped_lazy_type_attributes(&self) {
                 self.support.borrow_mut().mark_incomplete();
+            }
+
+            fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
+                // Declaration bounds, constraints, and defaults are not occurrences in the
+                // constraint itself and must not contribute to its support.
             }
 
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
@@ -6992,6 +7011,7 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::types::generics::ApplySpecialization;
+    use crate::types::typevar::{TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation};
     use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
@@ -7047,6 +7067,94 @@ mod tests {
                 .iff(db, &builder, expected)
                 .is_always_satisfied(db, &env)
         );
+    }
+
+    #[test]
+    fn constraint_support_ignores_typevar_declaration_defaults() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let metadata = create_typevar(db, "Metadata");
+        let u = create_typevar(db, "U");
+        let declaration = TypeVarInstance::new(
+            db,
+            u.typevar(db).identity(db),
+            None,
+            Some(TypeVarVariance::Invariant),
+            Some(TypeVarDefaultEvaluation::Eager(Type::TypeVar(metadata))),
+        );
+        let u = BoundTypeVarInstance::new(
+            db,
+            declaration,
+            u.binding_context(db),
+            u.paramspec_attr(db),
+            u.freshness(db),
+        );
+        let actual_bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
+        let mut storage = ConstraintSetStorage::default();
+        let support = storage.intern_constraint_typevars(
+            db,
+            &env,
+            t,
+            ConstraintBounds::new(None, Some(actual_bound)),
+        );
+        let mentioned = support
+            .iter()
+            .map(|typevar| storage.typevar_data(typevar))
+            .collect::<Vec<_>>();
+
+        assert_eq!(mentioned, vec![t.identity(db), u.identity(db)]);
+        assert!(support.is_complete());
+    }
+
+    #[test]
+    fn constraint_support_is_complete_for_lazy_typevar_declaration_metadata() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        for (bound_or_constraints, default) in [
+            (
+                Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
+                None,
+            ),
+            (
+                Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),
+                None,
+            ),
+            (None, Some(TypeVarDefaultEvaluation::Lazy)),
+        ] {
+            let declaration = TypeVarInstance::new(
+                db,
+                u.typevar(db).identity(db),
+                bound_or_constraints,
+                Some(TypeVarVariance::Invariant),
+                default,
+            );
+            let u = BoundTypeVarInstance::new(
+                db,
+                declaration,
+                u.binding_context(db),
+                u.paramspec_attr(db),
+                u.freshness(db),
+            );
+            let mut storage = ConstraintSetStorage::default();
+            let support = storage.intern_constraint_typevars(
+                db,
+                &env,
+                t,
+                ConstraintBounds::new(None, Some(Type::TypeVar(u))),
+            );
+            let mentioned = support
+                .iter()
+                .map(|typevar| storage.typevar_data(typevar))
+                .collect::<Vec<_>>();
+
+            assert_eq!(mentioned, vec![t.identity(db), u.identity(db)]);
+            assert!(support.is_complete());
+        }
     }
 
     #[test]
@@ -8666,7 +8774,7 @@ mod tests {
     }
 
     #[test]
-    fn owned_constraint_set_type_walk_excludes_quantified_constraints() {
+    fn owned_constraint_set_discards_unrelated_quantified_constraints() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -8693,7 +8801,48 @@ mod tests {
         );
         assert_eq!(
             owned.inner.as_ref().map(|inner| inner.source_orders.len()),
-            Some(3),
+            Some(1),
+        );
+    }
+
+    #[test]
+    fn owned_constraint_set_preserves_related_quantified_constraint_order() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let v = create_typevar(db, "V");
+
+        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+            let u_t = ConstraintSet::constrain_typevar_with_bounds(
+                db,
+                &env,
+                builder,
+                u,
+                None,
+                Some(Type::TypeVar(t)),
+            );
+            let t_v = ConstraintSet::constrain_typevar(
+                db,
+                &env,
+                builder,
+                t,
+                Type::TypeVar(v),
+                Type::TypeVar(v),
+            );
+
+            u_t.and(db, builder, || t_v).reduce_inferable(
+                db,
+                &env,
+                builder,
+                TypeVarSet::from_typevars(db, [t]),
+            )
+        });
+
+        assert_eq!(
+            owned.inner.as_ref().map(|inner| inner.source_orders.len()),
+            Some(5),
         );
     }
 

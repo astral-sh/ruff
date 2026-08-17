@@ -4044,6 +4044,88 @@ class Incompatible(SupportsMethod[T_co]):
         raise NotImplementedError
 ```
 
+## Recursive protocol receiver binding with an overloaded class method
+
+Accessing an overloaded class method on a generic protocol can recursively bind the protocol's
+receiver. The receiver-binding query must converge and preserve both overload signatures.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, overload
+
+class Container[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    @classmethod
+    def from_value[Self, S](cls: type[Self], value: S) -> object: ...
+    @overload
+    @classmethod
+    def from_value[Self, S](cls: type[Self], value: S, flag: bool) -> object: ...
+
+reveal_type(Container.from_value)  # revealed: Overload[[S](value: S) -> object, [S](value: S, flag: bool) -> object]
+```
+
+## Recursive protocol receiver binding with a bounded type variable
+
+A class method can recursively bind a protocol receiver through a type variable with a declared
+upper bound. Its declared bound is metadata, not another part of the receiver constraint.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=object)
+
+class Box(Protocol[T]):
+    value: T
+
+    @classmethod
+    def first(cls: type[S]) -> S:
+        return cls()
+
+    def second(self) -> S: ...
+    @classmethod
+    def last(cls: type[S]) -> object: ...
+
+reveal_type(Box.first())  # revealed: Box[Unknown]
+```
+
+## Recursive protocol receiver binding with a defaulted type variable
+
+A method type variable with a declared default can also appear while recursively binding a protocol
+receiver. Its default is declaration metadata, not a type-variable occurrence in the constraint.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class Box[T](Protocol):
+    value: T
+
+    @classmethod
+    def first[S = int](cls: type[S]) -> S:
+        return cls()
+
+    def second[S = int](self) -> S: ...
+    @classmethod
+    def last[S = int](cls: type[S]) -> object: ...
+
+reveal_type(Box.first())  # revealed: Box[Unknown]
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
