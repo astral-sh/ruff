@@ -14,9 +14,10 @@ mod enum_property;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
-use std::fmt;
+use std::fmt::{self, Display};
 
 use itertools::Itertools;
+use ruff_db::diagnostic::DiagnosticMessage;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
@@ -25,6 +26,7 @@ use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use self::constructor::{ConstructorBinding, ConstructorContext};
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
+use crate::FxOrderSet;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::lint::LintMetadata;
@@ -74,7 +76,6 @@ use crate::types::{
     TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
     UnionType, WrapperDescriptorKind, enums, list_members,
 };
-use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_python_core::{ProgramFile, semantic_index};
@@ -89,8 +90,8 @@ pub(crate) use self::constructor::ConstructorCallableKind;
 /// ranges.
 pub(crate) struct CallDiagnosticOverride<'a> {
     pub(crate) lint: &'static LintMetadata,
-    pub(crate) message: String,
-    pub(crate) info: &'a str,
+    pub(crate) message: DiagnosticMessage,
+    pub(crate) info: DiagnosticMessage,
     pub(crate) argument_ranges: &'a [TextRange],
 }
 
@@ -109,7 +110,7 @@ impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
         let lint = self.overrides.map_or(lint, |overrides| overrides.lint);
         self.context.report_lint(lint, ranged).map(|builder| {
             if let Some(overrides) = self.overrides {
-                builder.with_message_override(overrides.message.clone(), overrides.info)
+                builder.with_message_override(overrides.message.clone(), overrides.info.clone())
             } else {
                 builder
             }
@@ -4554,9 +4555,7 @@ impl<'db> CallableBinding<'db> {
                 let callable_description = CallableDescription::new(db, self.callable_type);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
-                    callable_description
-                        .map(|description| format!(" of {description}"))
-                        .unwrap_or_default()
+                    display_callable_description(db, callable_description.as_ref(), "of")
                 ));
 
                 if let Some(index) =
@@ -8290,57 +8289,27 @@ impl CallableBindingSnapshotter {
 pub(crate) struct CallableDescription<'a> {
     name: Cow<'a, str>,
     kind: Option<&'static str>,
+    owner: Option<ClassLiteral<'a>>,
 }
 
 impl<'db> CallableDescription<'db> {
-    fn defining_class(db: &'db dyn Db, callable_type: Type<'db>) -> Option<ClassLiteral<'db>> {
-        let function = match callable_type {
-            Type::FunctionLiteral(function) => function,
-            Type::BoundMethod(method) => method.function(db),
-            Type::ClassLiteral(class) => return Some(class),
-            _ => return None,
-        };
-
-        let semantic_index = semantic_index(db, function.program_file(db));
-        let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
-        let class_node = enclosing_scope.node().as_class()?;
-
-        original_class_type(db, semantic_index.expect_single_definition(class_node))
-    }
-
     pub(crate) fn new(
         db: &'db dyn Db,
         callable_type: Type<'db>,
     ) -> Option<CallableDescription<'db>> {
-        Self::new_with_settings(db, callable_type, None)
-    }
-
-    fn new_with_settings(
-        db: &'db dyn Db,
-        callable_type: Type<'db>,
-        settings: Option<&DisplaySettings<'db>>,
-    ) -> Option<CallableDescription<'db>> {
-        fn qualified_function_name<'db>(
+        fn function_owner<'db>(
             db: &'db dyn Db,
             function: FunctionType<'db>,
-            settings: Option<&DisplaySettings<'db>>,
-        ) -> Cow<'db, str> {
-            if let Some(class) =
-                CallableDescription::defining_class(db, Type::FunctionLiteral(function))
+        ) -> Option<ClassLiteral<'db>> {
+            let semantic_index = semantic_index(db, function.program_file(db));
+            let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
+            if let Some(class_node) = enclosing_scope.node().as_class()
+                && let Some(class) =
+                    original_class_type(db, semantic_index.expect_single_definition(class_node))
             {
-                settings
-                    .map(|settings| {
-                        Cow::Owned(format!(
-                            "{}.{}",
-                            class.display_with(db, settings.clone()),
-                            function.name(db)
-                        ))
-                    })
-                    .unwrap_or_else(|| {
-                        Cow::Owned(format!("{}.{}", class.name(db), function.name(db)))
-                    })
+                Some(class)
             } else {
-                Cow::Borrowed(function.name(db))
+                None
             }
         }
 
@@ -8351,20 +8320,19 @@ impl<'db> CallableDescription<'db> {
                 } else {
                     "function"
                 }),
-                name: qualified_function_name(db, function, settings),
+                name: Cow::Borrowed(function.name(db)),
+                owner: function_owner(db, function),
             }),
             Type::ClassLiteral(class_type) => Some(CallableDescription {
                 kind: Some("class"),
-                name: settings
-                    .map(|settings| {
-                        Cow::Owned(class_type.display_with(db, settings.clone()).to_string())
-                    })
-                    .unwrap_or_else(|| Cow::Borrowed(class_type.name(db).as_str())),
+                name: Cow::Borrowed(""),
+                owner: Some(class_type),
             }),
             Type::SubclassOf(subclass) if let Some(typevar) = subclass.into_type_var() => {
                 Some(CallableDescription {
                     kind: None,
                     name: Cow::Owned(format!("type[{}]", typevar.name(db))),
+                    owner: None,
                 })
             }
             Type::BoundMethod(bound_method) => Some({
@@ -8376,25 +8344,29 @@ impl<'db> CallableDescription<'db> {
                 };
                 CallableDescription {
                     kind,
-                    name: qualified_function_name(db, function, settings),
+                    name: Cow::Borrowed(function.name(db)),
+                    owner: function_owner(db, function),
                 }
             }),
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
                     kind: Some("method wrapper `__get__` of function"),
                     name: Cow::Borrowed(function.name(db)),
+                    owner: None,
                 })
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 Some(CallableDescription {
                     kind: Some("method wrapper"),
                     name: Cow::Borrowed("`__get__` of property"),
+                    owner: None,
                 })
             }
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(_)) => {
                 Some(CallableDescription {
                     kind: Some("method wrapper"),
                     name: Cow::Borrowed("`__delete__` of property"),
+                    owner: None,
                 })
             }
             Type::WrapperDescriptor(kind) => Some(CallableDescription {
@@ -8405,20 +8377,45 @@ impl<'db> CallableDescription<'db> {
                     WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
                     WrapperDescriptorKind::PropertyDunderDelete => "property.__delete__",
                 }),
+                owner: None,
             }),
             _ => None,
         }
     }
+
+    fn display<'a>(&'a self, db: &'db dyn Db) -> impl Display + 'a {
+        fmt::from_fn(move |f| {
+            if let Some(kind) = self.kind {
+                write!(f, "{kind} `")?;
+            } else {
+                f.write_str("`")?;
+            }
+
+            if let Some(owner) = self.owner {
+                owner.display(db).fmt(f)?;
+                if !self.name.is_empty() {
+                    f.write_str(".")?;
+                }
+            }
+
+            write!(f, "{}`", self.name)
+        })
+    }
 }
 
-impl std::fmt::Display for CallableDescription<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(kind) = self.kind {
-            write!(f, "{kind} `{}`", self.name)
+/// Formats an optional callable without flattening semantic owner names into a `String`.
+pub(crate) fn display_callable_description<'a, 'db>(
+    db: &'db dyn Db,
+    description: Option<&'a CallableDescription<'db>>,
+    preposition: &'static str,
+) -> impl Display + 'a {
+    fmt::from_fn(move |f| {
+        if let Some(description) = description {
+            write!(f, " {preposition} {}", description.display(db))
         } else {
-            write!(f, "`{}`", self.name)
+            Ok(())
         }
-    }
+    })
 }
 
 /// Information needed to emit a diagnostic regarding a parameter.
@@ -8881,29 +8878,12 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let defining_class =
-                    CallableDescription::defining_class(db, callable_ty).map(Type::ClassLiteral);
-                let types = [*provided_ty, *expected_ty]
-                    .into_iter()
-                    .chain(defining_class);
-                let display_settings =
-                    DisplaySettings::from_possibly_ambiguous_types(db, env, types);
-                let qualified_callable_description = CallableDescription::new_with_settings(
-                    db,
-                    callable_ty,
-                    Some(&display_settings),
-                );
-                let provided_ty_display =
-                    provided_ty.display_with(db, env, display_settings.clone());
-                let expected_ty_display = expected_ty.display_with(db, env, display_settings);
+                let provided_ty_display = provided_ty.display(db, env);
+                let expected_ty_display = expected_ty.display(db, env);
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    qualified_callable_description
-                        .as_ref()
-                        .or(callable_description)
-                        .map(|description| format!(" to {description}"))
-                        .unwrap_or_default()
+                    display_callable_description(db, callable_description, "to")
                 ));
                 if matches!(
                     provenance,
@@ -9053,9 +9033,10 @@ impl<'db> BindingError<'db> {
                     return;
                 };
                 let provided_ty_display = provided_ty.display(db, env);
-                let mut diag = builder.into_diagnostic(
-                    "Argument expression after ** must be a mapping with `str` key type",
-                );
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Argument expression after ** must be a mapping with `{}` key type",
+                    KnownClass::Str.to_instance(db, env).display(db, env)
+                ));
                 diag.set_primary_annotation_message(format_args!("Found `{provided_ty_display}`"));
 
                 if let Some(compound_diag) = compound_diag {
@@ -9073,9 +9054,7 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
-                        callable_description
-                            .map(|description| format!(" to {description}"))
-                            .unwrap_or_default()
+                        display_callable_description(db, callable_description, "to")
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -9099,9 +9078,7 @@ impl<'db> BindingError<'db> {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
-                        callable_description
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                        display_callable_description(db, callable_description, "of")
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -9143,9 +9120,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
-                        callable_description
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                        display_callable_description(db, callable_description, "of")
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -9165,9 +9140,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Unpacked argument may contain keyword arguments that do not match any known parameter{}",
-                        callable_description
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                        display_callable_description(db, callable_description, "of")
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -9192,9 +9165,7 @@ impl<'db> BindingError<'db> {
                 {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Positional-only parameter {parameter} passed as keyword argument{}",
-                        callable_description
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                        display_callable_description(db, callable_description, "of")
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -9217,9 +9188,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&PARAMETER_ALREADY_ASSIGNED, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Multiple values provided for parameter {parameter}{}",
-                        callable_description
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                        display_callable_description(db, callable_description, "of")
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -9240,9 +9209,7 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    callable_description
-                        .map(|description| format!(" to {description}"))
-                        .unwrap_or_default()
+                    display_callable_description(db, callable_description, "to")
                 ));
 
                 match error {
@@ -9352,9 +9319,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Call{} failed: {reason}",
-                        callable_description
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                        display_callable_description(db, callable_description, "of")
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);

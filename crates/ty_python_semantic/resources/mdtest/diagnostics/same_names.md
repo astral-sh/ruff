@@ -677,3 +677,471 @@ class Meta(type): ...
 # error: [conflicting-metaclass] "derived class (`Other`) must be a subclass of the metaclasses of all its bases, but `mdtest_snippet.Meta` (metaclass of `Other`) and `first.Meta` (metaclass of base class `Model`) have no subclass relationship"
 class Other(first.Model, metaclass=Meta): ...
 ```
+
+## Parameter defaults
+
+A diagnostic that formats two types independently still disambiguates classes sharing the same name.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+`main.py`:
+
+```py
+import first
+import second
+
+# error: [invalid-parameter-default] "Default value of type `second.Model` is not assignable to annotated parameter type `first.Model`"
+def accepts_model(value: first.Model = second.Model()) -> None: ...
+```
+
+## TypedDict field explanations
+
+An explanation disambiguates both the enclosing TypedDict classes and their nested field types
+across the complete diagnostic.
+
+`first.py`:
+
+```py
+from typing import TypedDict
+
+class Model: ...
+
+class Record(TypedDict):
+    value: Model
+```
+
+`second.py`:
+
+```py
+from typing import TypedDict
+
+class Model: ...
+
+class Record(TypedDict):
+    value: Model
+```
+
+`main.py`:
+
+```py
+import first
+import second
+
+def update(value: first.Record, replacement: second.Record) -> None:
+    value = replacement  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `second.Record` is not assignable to `first.Record`
+ --> src/main.py:5:13
+  |
+5 |     value = replacement  # snapshot: invalid-assignment
+  |     -----   ^^^^^^^^^^^ Incompatible value of type `second.Record`
+  |     |
+  |     Declared type `first.Record`
+info: field "value" on TypedDict `second.Record` has type `second.Model` which is not assignable to type `first.Model` expected by TypedDict `first.Record`
+```
+
+## Overload signatures
+
+Types inside different callable signatures share the diagnostic's name resolver and remain
+distinguishable in explanatory notes.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+`main.py`:
+
+```py
+from typing import overload
+import first
+import second
+
+@overload
+def convert(value: first.Model) -> None: ...  # snapshot: invalid-overload
+@overload
+def convert(value: int) -> None: ...
+def convert(value: second.Model | int) -> None: ...
+```
+
+```snapshot
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+ --> src/main.py:6:5
+  |
+6 | def convert(value: first.Model) -> None: ...  # snapshot: invalid-overload
+  |     ^^^^^^^
+7 | @overload
+8 | def convert(value: int) -> None: ...
+9 | def convert(value: second.Model | int) -> None: ...
+  |     ------- Implementation defined here
+info: Implementation signature `(value: second.Model | int) -> None` is not assignable to overload signature `(value: first.Model) -> None`
+info: parameter `value` has an incompatible type: `first.Model` is not assignable to `second.Model | int`
+```
+
+## Specialized runtime classes
+
+Specialized runtime values retain the identity of their actual class even when their formatter
+normally uses a short, hand-written name.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`custom.py`:
+
+```py
+class property: ...
+class range: ...
+class TypeAliasType: ...
+class TypeVar: ...
+class ParamSpec: ...
+class TypeVarTuple: ...
+class UnionType: ...
+class module: ...
+```
+
+`main.py`:
+
+```py
+from typing import ParamSpec, TypeVar, TypeVarTuple
+import os
+import custom
+
+class Owner:
+    @property
+    def value(self) -> int:
+        return 1
+
+type Alias = int
+T = TypeVar("T")
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+# error: [invalid-assignment] "Object of type `builtins.property` is not assignable to `custom.property`"
+wrong_property: custom.property = Owner.value
+
+# error: [invalid-assignment] "Object of type `builtins.range` is not assignable to `custom.range`"
+wrong_range: custom.range = range(3)
+
+# error: [invalid-assignment] "Object of type `typing.TypeAliasType` is not assignable to `custom.TypeAliasType`"
+wrong_alias: custom.TypeAliasType = Alias
+
+# error: [invalid-assignment] "Object of type `typing.TypeVar` is not assignable to `custom.TypeVar`"
+wrong_typevar: custom.TypeVar = T
+
+# error: [invalid-assignment] "Object of type `typing.ParamSpec` is not assignable to `custom.ParamSpec`"
+wrong_paramspec: custom.ParamSpec = P
+
+# error: [invalid-assignment] "Object of type `typing.TypeVarTuple` is not assignable to `custom.TypeVarTuple`"
+wrong_typevartuple: custom.TypeVarTuple = Ts
+
+# error: [invalid-assignment] "Object of type `<types.UnionType special-form 'int | str'>` is not assignable to `custom.UnionType`"
+wrong_union: custom.UnionType = int | str
+
+# error: [invalid-assignment] "Object of type `<module 'os'>` is not assignable to `custom.module`"
+wrong_module: custom.module = os
+```
+
+## Specialized alias values
+
+A specialized PEP 695 alias retains the identity of the alias itself, not just the identities of its
+type arguments.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`first.py`:
+
+```py
+class Alias: ...
+```
+
+`main.py`:
+
+```py
+import first
+
+type Alias[T] = list[T]
+
+# error: [invalid-assignment] "Object of type `<type alias 'main.Alias[int]'>` is not assignable to `first.Alias`"
+wrong_alias: first.Alias = Alias[int]
+```
+
+## Partial instances
+
+The specialized formatter for `functools.partial` preserves the identity of its runtime class.
+
+`custom.py`:
+
+```py
+class partial: ...
+```
+
+`main.py`:
+
+```py
+from functools import partial
+import custom
+
+def identity(value: int) -> int:
+    return value
+
+# error: [invalid-assignment] "Object of type `functools.partial[(value: int) -> int]` is not assignable to `custom.partial`"
+wrong: custom.partial = partial(identity)
+```
+
+## Generator return classes
+
+Generator diagnostics retain the existing fully qualified runtime class spelling without introducing
+spurious unknown type arguments.
+
+`custom.py`:
+
+```py
+class GeneratorType: ...
+class AsyncGeneratorType: ...
+```
+
+`main.py`:
+
+```py
+import custom
+
+# error: [invalid-return-type] "Return type does not match returned value: expected `custom.GeneratorType`, found `types.GeneratorType`"
+def synchronous() -> custom.GeneratorType:
+    yield 1
+
+# error: [invalid-return-type] "Return type does not match returned value: expected `custom.AsyncGeneratorType`, found `types.AsyncGeneratorType`"
+async def asynchronous() -> custom.AsyncGeneratorType:
+    yield 1
+```
+
+## Generator yield and send types
+
+Yielded values and delegated send types retain their class identities in concise messages and
+annotations until the complete diagnostic is finalized.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+`main.py`:
+
+```py
+from collections.abc import Generator
+import first
+import second
+
+def yielded() -> Generator[first.Model, None, None]:
+    # error: [invalid-yield] "Yield type `second.Model` does not match annotated yield type `first.Model`"
+    yield second.Model()
+
+def accepts_second() -> Generator[int, second.Model, None]:
+    yield 1
+
+def delegates() -> Generator[int, first.Model, None]:
+    # error: [invalid-yield] "Send type `second.Model` does not match annotated send type `first.Model`"
+    yield from accepts_second()
+```
+
+## Runtime wrapper owners
+
+A method wrapper's owning runtime class participates in name resolution alongside a separately
+displayed expected class.
+
+`custom.py`:
+
+```py
+class property: ...
+```
+
+`main.py`:
+
+```py
+import custom
+
+class Owner:
+    @property
+    def value(self) -> int:
+        return 1
+
+# error: [invalid-assignment] "Object of type `<method-wrapper '__get__' of builtins.property 'value'>` is not assignable to `custom.property`"
+wrong_wrapper: custom.property = Owner.value.__get__
+
+# error: [invalid-assignment] "Object of type `<wrapper-descriptor '__get__' of 'builtins.property' objects>` is not assignable to `custom.property`"
+wrong_descriptor: custom.property = property.__get__
+```
+
+## Conflicting declaration enumerations
+
+A human-readable enumeration formats each declared type directly into the diagnostic instead of
+flattening the list into a string before name resolution.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+`main.py`:
+
+```py
+import first
+import second
+
+def conflicting(flag: bool) -> None:
+    if flag:
+        value: first.Model
+    else:
+        value: second.Model
+
+    # error: [conflicting-declarations] "Conflicting declared types for `value`: `first.Model` and `second.Model`"
+    value = first.Model()
+```
+
+## Class inheritance
+
+A derived class and its same-named base remain distinguishable in class-validation diagnostics,
+including protocol and TypedDict inheritance.
+
+`first.py`:
+
+```py
+from typing import final
+
+@final
+class Model: ...
+
+class Interface: ...
+class Record: ...
+```
+
+`main.py`:
+
+```py
+from typing import Protocol, TypedDict
+import first
+
+# error: [subclass-of-final-class] "Class `main.Model` cannot inherit from final class `first.Model`"
+class Model(first.Model): ...
+
+# error: [invalid-protocol] "Protocol class `main.Interface` cannot inherit from non-protocol class `first.Interface`"
+class Interface(first.Interface, Protocol): ...
+
+# error: [invalid-typed-dict-header] "TypedDict class `main.Record` can only inherit from TypedDict classes: `first.Record` is not a `TypedDict` class"
+class Record(first.Record, TypedDict): ...
+```
+
+## Dynamic class inheritance
+
+Dynamic classes retain their own class identity while their base classes are validated.
+
+`first.py`:
+
+```py
+from typing import final
+
+@final
+class Model: ...
+```
+
+`main.py`:
+
+```py
+import first
+
+# error: [subclass-of-final-class] "Class `main.Model` cannot inherit from final class `first.Model`"
+Model = type("Model", (first.Model,), {})
+```
+
+## Dynamic metaclass conflicts
+
+Conflicting metaclasses and their originating classes remain distinguishable while their existing
+dynamic class representations are preserved.
+
+`first.py`:
+
+```py
+class Meta(type): ...
+class Model(metaclass=Meta): ...
+```
+
+`second.py`:
+
+```py
+class Meta(type): ...
+class Model(metaclass=Meta): ...
+```
+
+`main.py`:
+
+```py
+import first
+import second
+
+# error: [conflicting-metaclass] "`first.Meta` (metaclass of base class `<class 'first.Model'>`) and `second.Meta` (metaclass of base class `<class 'second.Model'>`)"
+Dynamic = type("Dynamic", (first.Model, second.Model), {})
+```
+
+## TypedDict openness
+
+Diagnostics that compare a closed TypedDict subclass with a same-named base preserve both class
+identities.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+`first.py`:
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict, closed=True): ...
+```
+
+`main.py`:
+
+```py
+import first
+
+# error: [invalid-typed-dict-header] "TypedDict `main.Record` must remain closed because base `first.Record` is closed"
+class Record(first.Record, closed=False): ...
+```

@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-use crate::types::class::DynamicClassLiteral;
+use crate::types::class::{ClassLiteral, DynamicClassLiteral};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE,
@@ -86,10 +86,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         bases_node: &ast::Expr,
         bases: &[Type<'db>],
-        name: &Name,
+        class: DynamicClassLiteral<'db>,
         kind: DynamicClassKind,
     ) -> IncompatibleBases<'db> {
         let db = self.db();
+        let name = class.name(db);
 
         let bases_tuple_elts = bases_node
             .as_tuple_expr()
@@ -166,8 +167,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .report_lint(&SUBCLASS_OF_FINAL_CLASS, diagnostic_node)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Class `{name}` cannot inherit from final class `{}`",
-                                class_type.name(db)
+                                "Class `{}` cannot inherit from final class `{}`",
+                                ClassLiteral::Dynamic(class).display(db),
+                                class_type.class_literal(db).display(db)
                             ));
                         }
                         if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
@@ -222,22 +224,16 @@ pub(super) fn report_dynamic_mro_errors<'db>(
     bases: &ast::Expr,
 ) -> bool {
     let db = context.db();
-    let env = context.program_environment();
     let Err(error) = dynamic_class.try_mro(db) else {
         return true;
     };
-    let bases_display = dynamic_class
-        .explicit_bases(db)
-        .iter()
-        .map(|base| base.display(db, env))
-        .join(", ");
     report_mro_error_kind(
         context,
         error,
-        dynamic_class.name(db),
+        ClassLiteral::Dynamic(dynamic_class),
         call_expr,
         Some(bases),
-        Some(&bases_display),
+        Some(dynamic_class.explicit_bases(db)),
     );
 
     false
@@ -277,18 +273,18 @@ pub(super) fn report_inconsistent_dynamic_generic_bases<'db>(
 /// at specific elements in the tuple. When `None` (enums), `InvalidBases`
 /// is skipped since enum bases are always valid.
 ///
-/// `bases_display` is an optional pre-formatted string of the bases list
-/// (e.g. `"<class 'X'>, <class 'Y'>"`). When provided, the `UnresolvableMro`
-/// message includes `with bases [...]`.
+/// `displayed_bases` contains the bases to include in an `UnresolvableMro` message. They remain
+/// unformatted until the diagnostic is constructed so their class identities are preserved.
 pub(super) fn report_mro_error_kind<'db>(
     context: &InferContext<'db, '_>,
     error: &DynamicMroError<'db>,
-    class_name: &Name,
+    class: ClassLiteral<'db>,
     call_expr: &ast::ExprCall,
     bases_expr: Option<&ast::Expr>,
-    bases_display: Option<&str>,
+    displayed_bases: Option<&[Type<'db>]>,
 ) {
     let db = context.db();
+    let class_name = class.display(db);
     match error.reason() {
         DynamicMroErrorKind::InvalidBases(invalid_bases) => {
             let Some(bases) = bases_expr else {
@@ -342,17 +338,22 @@ pub(super) fn report_mro_error_kind<'db>(
                     maybe_s = if duplicates.len() == 1 { "" } else { "es" },
                     dupes = duplicates
                         .iter()
-                        .map(|base: &ClassBase<'_>| base.display(db, env))
-                        .join(", "),
+                        .format_with(", ", |base: &ClassBase<'_>, formatter| {
+                            formatter(&base.display(db, env))
+                        }),
                 ));
             }
         }
         DynamicMroErrorKind::UnresolvableMro => {
             if let Some(builder) = context.report_lint(&INCONSISTENT_MRO, call_expr) {
-                if let Some(bases) = bases_display {
+                if let Some(bases) = displayed_bases {
+                    let env = context.program_environment();
                     builder.into_diagnostic(format_args!(
                         "Cannot create a consistent method resolution order (MRO) \
-                            for class `{class_name}` with bases `[{bases}]`",
+                            for class `{class_name}` with bases `[{}]`",
+                        bases
+                            .iter()
+                            .format_with(", ", |base, formatter| formatter(&base.display(db, env)))
                     ));
                 } else {
                     builder.into_diagnostic(format_args!(

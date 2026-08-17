@@ -882,13 +882,13 @@ for x in Iterable():
 ```
 
 ```snapshot
-error[not-iterable]: Object of type `Iterable` is not iterable
+error[not-iterable]: Object of type `mdtest_snippet.Iterable` is not iterable
   --> src/mdtest_snippet.py:10:10
    |
 10 | for x in Iterable():
    |          ^^^^^^^^^^
 info: Its `__iter__` method has an invalid signature
-info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
+info: type `mdtest_snippet.Iterable` is not assignable to protocol `ty_extensions._internal.Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `extra_arg`
 help: Parameter `extra_arg` must have a default value
@@ -929,7 +929,7 @@ def _(flag: bool):
         def __iter__(self) -> Iterator:
             return Iterator()
 
-    # error: [not-iterable] "Object of type `Iterable` may not be iterable"
+    # error: [not-iterable] "Object of type `mdtest_snippet.<locals of function '_'>.Iterable` may not be iterable"
     for x in Iterable():
         reveal_type(x)  # revealed: int
 ```

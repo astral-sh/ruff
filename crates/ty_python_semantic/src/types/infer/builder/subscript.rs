@@ -8,7 +8,7 @@ use ty_module_resolver::file_to_module;
 use super::TypeInferenceBuilder;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::types::call::CallErrorKind;
-use crate::types::call::bind::CallableDescription;
+use crate::types::call::bind::{CallableDescription, display_callable_description};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
@@ -29,7 +29,7 @@ use crate::types::typed_dict::{
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
-    DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
     UnionTypeInstance, any_over_type, todo_type,
@@ -1116,9 +1116,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter()
                         .map(|tv| tv.typevar(db).name(db))
                         .format("`, `"),
-                    description
-                        .map(|description| format!(" of {description}"))
-                        .unwrap_or_default()
+                    display_callable_description(db, description.as_ref(), "of")
                 ));
             }
             error = Some(ExplicitSpecializationError::MissingTypeVars);
@@ -1154,9 +1152,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let description = CallableDescription::new(db, value_ty);
                     builder.into_diagnostic(format_args!(
                         "Too many type arguments{}: expected {}, got {}",
-                        description
-                            .map(|description| format!(" to {description}"))
-                            .unwrap_or_default(),
+                        display_callable_description(db, description.as_ref(), "to"),
                         if typevar_with_defaults == 0 {
                             format!("{typevars_len}")
                         } else {
@@ -1999,22 +1995,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             target.range.cover(rhs_value_node.range()),
                                         )
                                     {
-                                        let settings =
-                                            DisplaySettings::from_possibly_ambiguous_types(
-                                                db,
-                                                env,
-                                                [rhs_value_ty, object_ty, slice_ty],
-                                            );
-                                        let assigned_d =
-                                            rhs_value_ty.display_with(db, env, settings.clone());
-                                        let object_d =
-                                            object_ty.display_with(db, env, settings.clone());
+                                        let assigned_d = rhs_value_ty.display(db, env);
+                                        let object_d = object_ty.display(db, env);
 
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
                                             "Invalid subscript assignment with key of type `{}` \
                                             and value of type `{assigned_d}` \
                                             on object of type `{object_d}`",
-                                            slice_ty.display_with(db, env, settings),
+                                            slice_ty.display(db, env),
                                         ));
 
                                         // Special diagnostic for dictionaries

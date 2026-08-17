@@ -1,6 +1,7 @@
 use crate::{
-    Db, PythonVersionSource, PythonVersionWithSource, lint::lint_documentation_url,
-    types::TypeCheckDiagnostics,
+    Db, PythonVersionSource, PythonVersionWithSource,
+    lint::lint_documentation_url,
+    types::{TypeCheckDiagnostics, diagnostic_file_location},
 };
 use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
 use ruff_db::{
@@ -8,7 +9,6 @@ use ruff_db::{
     files::File,
 };
 use std::cell::RefCell;
-use std::fmt::Write;
 
 mod levenshtein;
 
@@ -153,25 +153,25 @@ pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
 /// Format a list of elements as a human-readable enumeration.
 ///
 /// Encloses every element in backticks (`1`, `2` and `3`).
-pub(crate) fn format_enumeration<I, IT, D>(elements: I) -> String
-where
-    I: IntoIterator<IntoIter = IT>,
-    IT: ExactSizeIterator<Item = D> + DoubleEndedIterator,
-    D: std::fmt::Display,
-{
-    let mut elements = elements.into_iter();
+pub(crate) fn format_enumeration<D: std::fmt::Display>(
+    elements: impl IntoIterator<Item = D>,
+) -> impl std::fmt::Display {
+    let elements: Vec<_> = elements.into_iter().collect();
     debug_assert!(elements.len() >= 2);
 
-    let final_element = elements.next_back().unwrap();
-    let penultimate_element = elements.next_back().unwrap();
+    std::fmt::from_fn(move |f| {
+        let Some((final_element, preceding)) = elements.split_last() else {
+            return Ok(());
+        };
+        let Some((penultimate_element, preceding)) = preceding.split_last() else {
+            return write!(f, "`{final_element}`");
+        };
 
-    let mut buffer = String::new();
-    for element in elements {
-        write!(&mut buffer, "`{element}`, ").ok();
-    }
-    write!(&mut buffer, "`{penultimate_element}` and `{final_element}`").ok();
-
-    buffer
+        for element in preceding {
+            write!(f, "`{element}`, ")?;
+        }
+        write!(f, "`{penultimate_element}` and `{final_element}`")
+    })
 }
 
 /// An abstraction for mutating a diagnostic.
@@ -187,6 +187,8 @@ where
 /// if either is violated, then the `Drop` impl on `DiagnosticGuard` will
 /// panic.
 pub(super) struct DiagnosticGuard<'sink> {
+    db: &'sink dyn Db,
+
     /// The file of the primary span (to which file does this diagnostic belong).
     file: File,
 
@@ -214,11 +216,13 @@ pub(super) struct DiagnosticGuard<'sink> {
 
 impl<'sink> DiagnosticGuard<'sink> {
     pub(crate) fn new(
+        db: &'sink dyn Db,
         file: File,
         sink: &'sink std::cell::RefCell<TypeCheckDiagnostics>,
         diag: Diagnostic,
     ) -> Self {
         Self {
+            db,
             file,
             sink,
             diag: Some(diag),
@@ -296,6 +300,7 @@ impl Drop for DiagnosticGuard<'_> {
             diag.set_documentation_url(Some(lint_documentation_url(lint_name)));
         }
 
+        diag.disambiguate_names(|file, offset| diagnostic_file_location(self.db, file, offset));
         self.sink.borrow_mut().push(diag);
     }
 }

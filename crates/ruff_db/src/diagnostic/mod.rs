@@ -6,9 +6,14 @@ use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+pub use self::message::{
+    DiagnosticMessage, DiagnosticName, DiagnosticNameKind, DiagnosticNameRecord,
+    IntoDiagnosticMessage,
+};
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
 };
@@ -16,6 +21,7 @@ pub use self::stylesheet::{DiagnosticStylesheet, fmt_with_hyperlink};
 use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
 
+mod message;
 mod render;
 mod stylesheet;
 
@@ -218,9 +224,116 @@ impl Diagnostic {
         self.inner.message.as_str()
     }
 
+    /// Clones the headline while preserving any semantic names awaiting diagnostic finalization.
+    pub fn clone_headline_message(&self) -> DiagnosticMessage {
+        self.inner.message.clone()
+    }
+
     /// Sets the headline message for this diagnostic.
     pub fn set_headline_message(&mut self, message: impl IntoDiagnosticMessage) {
         Arc::make_mut(&mut self.inner).message = message.into_diagnostic_message();
+    }
+
+    /// Resolves semantic names against every message belonging to this diagnostic.
+    ///
+    /// The location formatter is evaluated only when two distinct definitions also share the same
+    /// fully qualified name. All temporary name metadata is discarded before this method returns.
+    pub fn disambiguate_names(&mut self, format_location: impl Fn(File, TextSize) -> String) {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        enum Qualification {
+            Qualified,
+            Located,
+        }
+
+        let mut observed: FxHashMap<Box<str>, Vec<DiagnosticName>> = FxHashMap::default();
+        self.for_each_message(|message| {
+            for occurrence in message.names() {
+                let name = occurrence.name();
+                let identities = observed.entry(name.spelling().into()).or_default();
+                if !identities
+                    .iter()
+                    .any(|existing| existing.has_same_identity(name))
+                {
+                    identities.push(name.clone());
+                }
+            }
+        });
+
+        let qualification: FxHashMap<Box<str>, Qualification> = observed
+            .into_iter()
+            .filter_map(|(spelling, identities)| {
+                if identities.len() < 2 {
+                    return None;
+                }
+
+                let located = identities.iter().enumerate().any(|(index, identity)| {
+                    identities[..index]
+                        .iter()
+                        .any(|other| identity.qualified() == other.qualified())
+                });
+                Some((
+                    spelling,
+                    if located {
+                        Qualification::Located
+                    } else {
+                        Qualification::Qualified
+                    },
+                ))
+            })
+            .collect();
+
+        self.for_each_message_mut(|message| {
+            message.resolve_names(|name| match qualification.get(name.spelling()) {
+                None => None,
+                Some(Qualification::Qualified) => Some(name.qualified().to_string()),
+                Some(Qualification::Located) => Some(format!(
+                    "{}{}",
+                    name.qualified(),
+                    format_location(name.file(), name.offset())
+                )),
+            });
+        });
+    }
+
+    fn for_each_message(&self, mut visit: impl FnMut(&DiagnosticMessage)) {
+        visit(&self.inner.message);
+        if let Some(message) = &self.inner.custom_concise_message {
+            visit(message);
+        }
+        for annotation in &self.inner.annotations {
+            if let Some(message) = &annotation.message {
+                visit(message);
+            }
+        }
+        for diagnostic in &self.inner.subs {
+            visit(&diagnostic.inner.message);
+            for annotation in &diagnostic.inner.annotations {
+                if let Some(message) = &annotation.message {
+                    visit(message);
+                }
+            }
+        }
+    }
+
+    fn for_each_message_mut(&mut self, mut visit: impl FnMut(&mut DiagnosticMessage)) {
+        let inner = Arc::make_mut(&mut self.inner);
+        visit(&mut inner.message);
+        if let Some(message) = &mut inner.custom_concise_message {
+            visit(message);
+        }
+        for annotation in &mut inner.annotations {
+            if let Some(message) = &mut annotation.message {
+                visit(message);
+            }
+        }
+        for diagnostic in &mut inner.subs {
+            visit(&mut diagnostic.inner.message);
+            for annotation in &mut diagnostic.inner.annotations {
+                if let Some(message) = &mut annotation.message {
+                    visit(message);
+                }
+            }
+        }
     }
 
     /// Introspects this diagnostic and returns its message for concise formatting.
@@ -1692,77 +1805,6 @@ impl serde::Serialize for ConciseMessage<'_> {
         S: serde::Serializer,
     {
         serializer.collect_str(self)
-    }
-}
-
-/// A diagnostic message string.
-///
-/// This is, for all intents and purposes, equivalent to a `Box<str>`.
-/// But it does not implement `std::fmt::Display`. Indeed, that it its
-/// entire reason for existence. It provides a way to pass a string
-/// directly into diagnostic methods that accept messages without copying
-/// that string. This works via the `IntoDiagnosticMessage` trait.
-///
-/// In most cases, callers shouldn't need to use this. Instead, there is
-/// a blanket trait implementation for `IntoDiagnosticMessage` for
-/// anything that implements `std::fmt::Display`.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
-pub struct DiagnosticMessage(Box<str>);
-
-impl DiagnosticMessage {
-    /// Returns this message as a borrowed string.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl From<&str> for DiagnosticMessage {
-    fn from(s: &str) -> DiagnosticMessage {
-        DiagnosticMessage(s.into())
-    }
-}
-
-impl From<String> for DiagnosticMessage {
-    fn from(s: String) -> DiagnosticMessage {
-        DiagnosticMessage(s.into())
-    }
-}
-
-impl From<Box<str>> for DiagnosticMessage {
-    fn from(s: Box<str>) -> DiagnosticMessage {
-        DiagnosticMessage(s)
-    }
-}
-
-impl IntoDiagnosticMessage for DiagnosticMessage {
-    fn into_diagnostic_message(self) -> DiagnosticMessage {
-        self
-    }
-}
-
-/// A trait for values that can be converted into a diagnostic message.
-///
-/// Users of the diagnostic API can largely think of this trait as effectively
-/// equivalent to `std::fmt::Display`. Indeed, everything that implements
-/// `Display` also implements this trait. That means wherever this trait is
-/// accepted, you can use things like `format_args!`.
-///
-/// The purpose of this trait is to provide a means to give arguments _other_
-/// than `std::fmt::Display` trait implementations. Or rather, to permit
-/// the diagnostic API to treat them differently. For example, this lets
-/// callers wrap a string in a `DiagnosticMessage` and provide it directly
-/// to any of the diagnostic APIs that accept a message. This will move the
-/// string and avoid any unnecessary copies. (If we instead required only
-/// `std::fmt::Display`, then this would potentially result in a copy via the
-/// `ToString` trait implementation.)
-pub trait IntoDiagnosticMessage {
-    fn into_diagnostic_message(self) -> DiagnosticMessage;
-}
-
-/// Every `IntoDiagnosticMessage` is accepted, so to is `std::fmt::Display`.
-impl<T: std::fmt::Display> IntoDiagnosticMessage for T {
-    fn into_diagnostic_message(self) -> DiagnosticMessage {
-        DiagnosticMessage::from(self.to_string())
     }
 }
 

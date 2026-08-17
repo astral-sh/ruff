@@ -152,13 +152,13 @@ async def foo(flag: bool):
 ```
 
 ```snapshot
-error[not-iterable]: Object of type `AsyncIterable` may not be async-iterable
+error[not-iterable]: Object of type `mdtest_snippet.<locals of function 'foo'>.AsyncIterable` may not be async-iterable
   --> src/mdtest_snippet.py:12:20
    |
 12 |     async for x in AsyncIterable():
    |                    ^^^^^^^^^^^^^^^
 info: Its `__aiter__` method returns an object of type `PossiblyUnboundAnext`, which may not have a `__anext__` method
-info: type `AsyncIterable` is not assignable to protocol `AsyncIterable[Unknown]`
+info: type `mdtest_snippet.<locals of function 'foo'>.AsyncIterable` is not assignable to protocol `ty_extensions._internal.AsyncIterable[Unknown]`
 info: └── protocol member `__aiter__` is incompatible
 info:     └── incompatible return types: `PossiblyUnboundAnext` is not assignable to `AsyncIterator[Unknown]`
 info:         └── type `PossiblyUnboundAnext` is not assignable to protocol `AsyncIterator[Unknown]`
@@ -210,13 +210,13 @@ async def foo():
 ```
 
 ```snapshot
-error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
+error[not-iterable]: Object of type `mdtest_snippet.AsyncIterable` is not async-iterable
   --> src/mdtest_snippet.py:11:20
    |
 11 |     async for x in AsyncIterable():
    |                    ^^^^^^^^^^^^^^^
 info: Its `__aiter__` method has an invalid signature
-info: type `AsyncIterable` is not assignable to protocol `AsyncIterable[Unknown]`
+info: type `mdtest_snippet.AsyncIterable` is not assignable to protocol `ty_extensions._internal.AsyncIterable[Unknown]`
 info: └── protocol member `__aiter__` is incompatible
 info:     └── unexpected extra parameter `arg`
 help: Parameter `arg` must have a default value
@@ -241,16 +241,16 @@ async def foo():
 ```
 
 ```snapshot
-error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
+error[not-iterable]: Object of type `mdtest_snippet.AsyncIterable` is not async-iterable
   --> src/mdtest_snippet.py:11:20
    |
 11 |     async for x in AsyncIterable():
    |                    ^^^^^^^^^^^^^^^
-info: Its `__aiter__` method returns an object of type `AsyncIterator`, which has an invalid `__anext__` method
-info: type `AsyncIterable` is not assignable to protocol `AsyncIterable[Unknown]`
+info: Its `__aiter__` method returns an object of type `mdtest_snippet.AsyncIterator`, which has an invalid `__anext__` method
+info: type `mdtest_snippet.AsyncIterable` is not assignable to protocol `ty_extensions._internal.AsyncIterable[Unknown]`
 info: └── protocol member `__aiter__` is incompatible
-info:     └── incompatible return types: `AsyncIterator` is not assignable to `AsyncIterator[Unknown]`
-info:         └── type `AsyncIterator` is not assignable to protocol `AsyncIterator[Unknown]`
+info:     └── incompatible return types: `mdtest_snippet.AsyncIterator` is not assignable to `ty_extensions._internal.AsyncIterator[Unknown]`
+info:         └── type `mdtest_snippet.AsyncIterator` is not assignable to protocol `ty_extensions._internal.AsyncIterator[Unknown]`
 info:             └── protocol member `__anext__` is incompatible
 info:                 └── unexpected extra parameter `arg`
 help: Parameter `arg` must have a default value

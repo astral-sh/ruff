@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use itertools::Either;
+
 use crate::ProgramEnvironment;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
@@ -79,6 +81,15 @@ impl<'db> ClassBase<'db> {
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
             ClassBase::TypedDict(_) => "TypedDict",
+        }
+    }
+
+    /// Displays this base's source-style name without losing a class's semantic identity.
+    pub(super) fn display_name(self, db: &'db dyn Db) -> impl Display {
+        if let ClassBase::Class(class) = self {
+            Either::Left(class.class_literal(db).display(db))
+        } else {
+            Either::Right(self.name(db))
         }
     }
 

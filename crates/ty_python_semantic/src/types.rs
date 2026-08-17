@@ -71,6 +71,7 @@ use crate::types::diagnostic::{
     AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
     report_bad_dunder_get_call, report_bad_import_call,
 };
+pub(crate) use crate::types::display::diagnostic_file_location;
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 pub(crate) use crate::types::equality::{ComparisonSoundnessPolicy, equality_truthiness};

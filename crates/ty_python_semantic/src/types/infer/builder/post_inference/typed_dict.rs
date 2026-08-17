@@ -183,8 +183,8 @@ fn validate_typed_dict_openness<'db>(
                         class,
                         format_args!(
                             "TypedDict `{}` must remain closed because base `{}` is closed",
-                            class.name(db),
-                            base.name(db),
+                            class.display(db),
+                            base.class_literal(db).display(db),
                         ),
                     );
                     continue;
@@ -199,7 +199,7 @@ fn validate_typed_dict_openness<'db>(
                         class,
                         format_args!(
                             "Cannot add item `{field_name}` to closed TypedDict base `{}`",
-                            base.name(db),
+                            base.class_literal(db).display(db),
                         ),
                     );
                 }
@@ -212,8 +212,8 @@ fn validate_typed_dict_openness<'db>(
                             class,
                             format_args!(
                                 "TypedDict `{}` cannot be open because base `{}` has extra items",
-                                class.name(db),
-                                base.name(db),
+                                class.display(db),
+                                base.class_literal(db).display(db),
                             ),
                         );
                         continue;
@@ -232,7 +232,7 @@ fn validate_typed_dict_openness<'db>(
                                     "Extra items type `{}` is not assignable to `{}` from base `{}`",
                                     child_extra_items.declared_ty.display(db, env),
                                     base_extra_items.declared_ty.display(db, env),
-                                    base.name(db),
+                                    base.class_literal(db).display(db),
                                 ),
                             );
                             continue;
@@ -255,7 +255,7 @@ fn validate_typed_dict_openness<'db>(
                             "Item `{field_name}` of type `{}` is not assignable to extra items type `{}` from base `{}`",
                             field.declared_ty.display(db, env),
                             base_extra_items.declared_ty.display(db, env),
-                            base.name(db),
+                            base.class_literal(db).display(db),
                         ),
                     );
                 }
@@ -267,8 +267,8 @@ fn validate_typed_dict_openness<'db>(
                         class,
                         format_args!(
                             "TypedDict `{}` must preserve mutable extra items from base `{}`",
-                            class.name(db),
-                            base.name(db),
+                            class.display(db),
+                            base.class_literal(db).display(db),
                         ),
                     );
                     continue;
@@ -291,9 +291,9 @@ fn validate_typed_dict_openness<'db>(
                         class,
                         format_args!(
                             "TypedDict `{}` must preserve mutable extra items type `{}` from base `{}`",
-                            class.name(db),
+                            class.display(db),
                             base_extra_items.declared_ty.display(db, env),
-                            base.name(db),
+                            base.class_literal(db).display(db),
                         ),
                     );
                     continue;
@@ -320,7 +320,7 @@ fn validate_typed_dict_openness<'db>(
                         format_args!(
                             "Item `{field_name}` must be mutable, not required, and consistent with extra items type `{}` from base `{}`",
                             base_extra_items.declared_ty.display(db, env),
-                            base.name(db),
+                            base.class_literal(db).display(db),
                         ),
                     );
                 }
