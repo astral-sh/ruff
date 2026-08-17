@@ -400,6 +400,7 @@ impl<'db> CallableItem<'db> {
                 env,
                 binding.partial_signature_applications(
                     db,
+                    env,
                     partial_overload,
                     bound_call_arguments,
                 )?,
@@ -1777,11 +1778,13 @@ impl<'db> Bindings<'db> {
                                 {
                                     // `property.__delete__` returns `None` for ordinary deleters,
                                     // but preserving `Never` keeps non-returning deleters divergent.
-                                    overload.set_return_type(if return_ty.is_never() {
-                                        return_ty
-                                    } else {
-                                        Type::none(db, env)
-                                    });
+                                    overload.set_return_type(
+                                        if return_ty.is_uninhabited(db, env) {
+                                            return_ty
+                                        } else {
+                                            Type::none(db, env)
+                                        },
+                                    );
                                 } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
@@ -1820,11 +1823,13 @@ impl<'db> Bindings<'db> {
                                 {
                                     // `property.__delete__` returns `None` for ordinary deleters,
                                     // but preserving `Never` keeps non-returning deleters divergent.
-                                    overload.set_return_type(if return_ty.is_never() {
-                                        return_ty
-                                    } else {
-                                        Type::none(db, env)
-                                    });
+                                    overload.set_return_type(
+                                        if return_ty.is_uninhabited(db, env) {
+                                            return_ty
+                                        } else {
+                                            Type::none(db, env)
+                                        },
+                                    );
                                 } else {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the deleter failed",
@@ -3534,6 +3539,7 @@ impl<'db> CallableBinding<'db> {
     fn partial_signature_applications<'a>(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
     ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
@@ -3573,7 +3579,7 @@ impl<'db> CallableBinding<'db> {
             .into_iter()
             .filter_map(|index| {
                 self.overloads().get(index).map(|overload| {
-                    overload.partial_signature_application(db, signature_arguments.as_ref())
+                    overload.partial_signature_application(db, env, signature_arguments.as_ref())
                 })
             })
             .collect();
@@ -5899,7 +5905,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // useful concrete information and would cause over-expansion.
                         let concrete_content = inferred_ty
                             .filter_union(db, self.env, |ty| !ty.has_typevar(db, self.env));
-                        if concrete_content.is_never() && inferred_ty.has_typevar(db, self.env) {
+                        if concrete_content.is_uninhabited(db, self.env)
+                            && inferred_ty.has_typevar(db, self.env)
+                        {
                             continue;
                         }
 
@@ -6263,7 +6271,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && provided
                 .variable()
                 .homogeneous_type()
-                .is_some_and(|element| !element.resolve_type_alias(db).is_never())
+                .is_some_and(|element| !element.is_uninhabited(db, self.env))
         {
             // Expose required boundaries without discarding fixed values the splat already has.
             let target_length = TupleLength::Variable(
@@ -6284,7 +6292,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         Some((
-            Type::tuple(TupleType::new(db, self.env, &actual)),
+            Type::tuple(TupleType::new(db, self.env, &actual)).into_typevartuple_pack(db),
             argument_indices,
         ))
     }
@@ -7264,7 +7272,7 @@ impl<'db> Binding<'db> {
                 let return_ty = bindings.return_type(db, env);
                 // `property.__set__` returns `None` for ordinary setters, but preserving `Never`
                 // keeps non-returning setters divergent.
-                self.set_return_type(if return_ty.is_never() {
+                self.set_return_type(if return_ty.is_uninhabited(db, env) {
                     return_ty
                 } else {
                     Type::none(db, env)
@@ -7945,7 +7953,7 @@ impl<'db> Binding<'db> {
 
         Some(if !can_synthesize_signature {
             imprecise_return_type
-        } else if new_return_type.is_never() {
+        } else if new_return_type == Type::Never {
             failed_synthesis_return_type
         } else {
             new_return_type
@@ -7976,7 +7984,12 @@ impl<'db> Binding<'db> {
     }
 
     /// Collects the parameter-level effects of a `functools.partial(...)` application.
-    fn partial_application(&self, arguments: &CallArguments<'_, 'db>) -> PartialApplication<'db> {
+    fn partial_application(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> PartialApplication<'db> {
         let parameters = self.signature.parameters().as_slice();
         let mut partial_application = PartialApplication::new(parameters.len());
 
@@ -7989,7 +8002,7 @@ impl<'db> Binding<'db> {
                         let parameter_index = matched_parameter.index;
                         let parameter = &parameters[parameter_index];
                         if parameter.is_positional()
-                            && parameter.annotated_type() != Type::Never
+                            && !parameter.annotated_type().is_uninhabited(db, env)
                             && !parameter.is_variadic()
                             && !parameter.is_keyword_variadic()
                         {
@@ -8014,7 +8027,7 @@ impl<'db> Binding<'db> {
 
                         partial_application.bind_by_keyword(
                             parameter_index,
-                            (parameter.annotated_type() != Type::Never).then(|| {
+                            (!parameter.annotated_type().is_uninhabited(db, env)).then(|| {
                                 matched_parameter.argument_type.unwrap_or_else(|| {
                                     argument_ty.get_default().unwrap_or_else(Type::unknown)
                                 })
@@ -8032,11 +8045,12 @@ impl<'db> Binding<'db> {
     fn partial_signature_application(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> PartialSignatureApplication<'db> {
         PartialSignatureApplication::new(
             self.signature.clone(),
-            self.partial_application(arguments),
+            self.partial_application(db, env, arguments),
             self.inference,
             self.unspecialized_return_type(db),
         )

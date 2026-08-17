@@ -103,6 +103,16 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
+    /// Marks a tuple-shaped type as a generic argument sequence instead of a runtime value.
+    pub(crate) fn into_typevartuple_pack(self, db: &'db dyn Db) -> Self {
+        match self {
+            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple))) => {
+                Type::tuple(tuple.into_typevartuple_pack(db))
+            }
+            _ => self,
+        }
+    }
+
     pub fn homogeneous_tuple(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -307,6 +317,18 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Cow<'db, TupleSpec<'db>>> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial = |_, _, _| false,
+            heap_size = ruff_memory_usage::heap_size
+        )]
+        fn is_tuple_subclass<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+            class
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|base| base.known(db) == Some(KnownClass::Tuple))
+        }
+
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::SysVersionInfo => {
@@ -315,10 +337,16 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::Object => None,
             NominalInstanceInner::NonTuple(class) => {
                 let class = class.class(db);
-                // Avoid an expensive MRO traversal for common stdlib classes.
-                if class
-                    .known(db)
-                    .is_some_and(|known_class| !known_class.is_tuple_subclass())
+                let class_literal = class.class_literal(db);
+                let known_class = class_literal.known(db);
+                // Known non-tuple classes and user-defined classes without explicit bases cannot
+                // have a tuple ancestor. Cache the answer by class origin for all other classes.
+                if known_class.is_some_and(|known_class| !known_class.is_tuple_subclass())
+                    || known_class.is_none()
+                        && class_literal
+                            .as_static()
+                            .is_some_and(|class| !class.has_explicit_bases(db))
+                    || !is_tuple_subclass(db, class_literal)
                 {
                     return None;
                 }
@@ -353,6 +381,14 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => false,
             NominalInstanceInner::NonTuple(class) => class.class(db).is_generic(),
         }
+    }
+
+    /// Returns whether this instance represents an internal `TypeVarTuple` argument pack.
+    pub(super) fn is_typevartuple_pack(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.0,
+            NominalInstanceInner::ExactTuple(tuple) if tuple.is_typevartuple_pack(db)
+        )
     }
 
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the

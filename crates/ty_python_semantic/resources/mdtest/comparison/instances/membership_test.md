@@ -151,17 +151,29 @@ from typing_extensions import Never, NotRequired, TypedDict
 class Closed(TypedDict, closed=True):
     present: int
     impossible: NotRequired[Never]
+    impossible_tuple: NotRequired[tuple[Never]]
 
 class ClosedByExtraItems(TypedDict, extra_items=Never):
     present: int
 
-def closed_membership(closed: Closed, closed_by_extra_items: ClosedByExtraItems) -> None:
+class ClosedByUninhabitedTuple(TypedDict, extra_items=tuple[Never]):
+    present: int
+
+def closed_membership(
+    closed: Closed,
+    closed_by_extra_items: ClosedByExtraItems,
+    closed_by_uninhabited_tuple: ClosedByUninhabitedTuple,
+) -> None:
     reveal_type("missing" in closed)  # revealed: Literal[False]
     reveal_type("missing" not in closed)  # revealed: Literal[True]
     reveal_type("impossible" in closed)  # revealed: Literal[False]
     reveal_type("impossible" not in closed)  # revealed: Literal[True]
+    reveal_type("impossible_tuple" in closed)  # revealed: Literal[False]
+    reveal_type("impossible_tuple" not in closed)  # revealed: Literal[True]
     reveal_type("missing" in closed_by_extra_items)  # revealed: Literal[False]
     reveal_type("missing" not in closed_by_extra_items)  # revealed: Literal[True]
+    reveal_type("missing" in closed_by_uninhabited_tuple)  # revealed: Literal[False]
+    reveal_type("missing" not in closed_by_uninhabited_tuple)  # revealed: Literal[True]
 ```
 
 ## Undeclared keys in open `TypedDict`s

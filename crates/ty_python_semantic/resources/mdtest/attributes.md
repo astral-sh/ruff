@@ -3841,6 +3841,19 @@ instance.non_existing = 2  # error: [invalid-assignment] "Cannot assign to unres
 instance.existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
 ```
 
+An uninhabited tuple return type also means the assignment cannot complete.
+
+```py
+class FrozenByUninhabitedTuple:
+    existing: int = 1
+
+    def __setattr__(self, name: str, value: object) -> tuple[Never]:
+        raise AttributeError("Attributes cannot be modified")
+
+# error: [invalid-assignment]
+FrozenByUninhabitedTuple().existing = 2
+```
+
 ### `__setattr__` on `object`
 
 `object` has a custom `__setattr__` implementation, but we still emit an error if a non-existing

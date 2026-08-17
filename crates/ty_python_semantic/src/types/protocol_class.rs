@@ -2612,8 +2612,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
         );
         if match &setattr_result {
-            Ok(bindings) => bindings.return_type(db, env).is_never(),
-            Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
+            Ok(bindings) => bindings.return_type(db, env).is_uninhabited(db, env),
+            Err(error) => error
+                .return_type(db, env)
+                .is_some_and(|ty| ty.is_uninhabited(db, env)),
         } {
             return self.never();
         }
@@ -3413,7 +3415,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             else {
                 return self.never();
             };
-            if !callable_has_only_non_never_returns(db, method) {
+            if !callable_has_only_non_never_returns(db, env, method) {
                 return self.never();
             }
 
@@ -3424,7 +3426,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             };
 
             callables.iter().when_all(db, self.constraints, |callable| {
-                if !callable_has_only_non_never_returns(db, *callable) {
+                if !callable_has_only_non_never_returns(db, env, *callable) {
                     return self.never();
                 }
 
@@ -3719,15 +3721,19 @@ fn protocol_apply_self_with_receiver<'db>(
 ///
 /// Return-type disjointness is a pragmatic approximation for method members: a callable returning
 /// `Never` could satisfy otherwise-incompatible signatures, so it must not establish disjointness.
-fn callable_has_only_non_never_returns<'db>(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
+fn callable_has_only_non_never_returns<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    callable: CallableType<'db>,
+) -> bool {
     let mut signatures = callable.signatures(db).iter();
     let Some(first) = signatures.next() else {
         // An empty signature previously produced `Unknown`, which cannot establish disjointness.
         return false;
     };
 
-    !first.return_ty.resolve_type_alias(db).is_never()
-        && signatures.all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
+    !first.return_ty.is_uninhabited(db, env)
+        && signatures.all(|signature| !signature.return_ty.is_uninhabited(db, env))
 }
 
 /// Protocol compatibility can only succeed if every required member is present.

@@ -405,8 +405,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             frozen_dataclass_dispatch,
             Some(FrozenDataclassDispatch::FrozenField)
         ) || match &setattr_result {
-            Ok(bindings) => bindings.return_type(db, env).is_never(),
-            Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
+            Ok(bindings) => bindings.return_type(db, env).is_uninhabited(db, env),
+            Err(error) => error
+                .return_type(db, env)
+                .is_some_and(|ty| ty.is_uninhabited(db, env)),
         };
 
         // We could also model this more precisely by synthesizing a `__setattr__`overload set
@@ -557,8 +559,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 let (setattr_result, value_ty) =
                     self.infer_and_try_call_setattr(object_ty, emit_diagnostics);
                 let setattr_returns_never = match &setattr_result {
-                    Ok(bindings) => bindings.return_type(db, env).is_never(),
-                    Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
+                    Ok(bindings) => bindings.return_type(db, env).is_uninhabited(db, env),
+                    Err(error) => error
+                        .return_type(db, env)
+                        .is_some_and(|ty| ty.is_uninhabited(db, env)),
                 };
                 if setattr_returns_never {
                     if emit_diagnostics {
@@ -706,10 +710,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         );
         // `Never` supports arbitrary operations only because there can be no runtime value to
         // mutate; it is not a concrete descriptor with a terminal setter.
-        let setter_returns_never = !descriptor_ty.is_never()
+        let setter_returns_never = !descriptor_ty.is_uninhabited(db, env)
             && match &setter_result {
-                Ok(bindings) => bindings.return_type(db, env).is_never(),
-                Err(error) => error.return_type(db, env).is_never(),
+                Ok(bindings) => bindings.return_type(db, env).is_uninhabited(db, env),
+                Err(error) => error.return_type(db, env).is_uninhabited(db, env),
             };
         if setter_returns_never
             || property_setter_returns_never(db, env, descriptor_ty, object_ty, value_ty)

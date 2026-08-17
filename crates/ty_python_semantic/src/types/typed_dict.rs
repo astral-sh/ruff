@@ -77,8 +77,13 @@ impl<'db> TypedDictOpenness<'db> {
     /// class ByExtraItems(TypedDict, extra_items=Never): ...
     /// class ByClosed(TypedDict, closed=True): ...
     /// ```
-    pub(crate) fn extra(db: &'db dyn Db, declared_ty: Type<'db>, is_read_only: bool) -> Self {
-        if declared_ty.resolve_type_alias(db).is_never() {
+    pub(crate) fn extra(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        declared_ty: Type<'db>,
+        is_read_only: bool,
+    ) -> Self {
+        if declared_ty.is_uninhabited(db, env) {
             Self::Closed
         } else {
             Self::Extra(TypedDictExtraItems {
@@ -134,6 +139,7 @@ impl<'db> TypedDictOpenness<'db> {
             Self::ImplicitlyOpen | Self::Closed => self,
             Self::Extra(extra_items) => Self::extra(
                 db,
+                visitor.env,
                 extra_items
                     .declared_ty
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -160,7 +166,7 @@ impl<'db> TypedDictOpenness<'db> {
                 } else {
                     declared_ty.unwrap_or(div)
                 };
-                Some(Self::extra(db, declared_ty, extra_items.is_read_only))
+                Some(Self::extra(db, env, declared_ty, extra_items.is_read_only))
             }
         }
     }
@@ -278,6 +284,7 @@ impl<'db> TypedDictType<'db> {
                             .map_type(|ty| ty.apply_optional_specialization(db, specialization));
                     return TypedDictOpenness::extra(
                         db,
+                        &env,
                         annotation.inner_type(),
                         annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
                     );
@@ -354,7 +361,7 @@ impl<'db> TypedDictType<'db> {
 
         self.items(db)
             .iter()
-            .filter(|(_, field)| field.may_be_present(db))
+            .filter(|(_, field)| field.may_be_present(db, env))
             .fold(UnionBuilder::new(db, env), |builder, (name, _)| {
                 builder.add(Type::string_literal(db, name))
             })
@@ -365,10 +372,15 @@ impl<'db> TypedDictType<'db> {
     ///
     /// An undeclared key can still exist in an implicitly open `TypedDict` or one with explicit
     /// extra items. An optional field with an uninhabited value type can never be present.
-    pub(crate) fn key_membership_truthiness(self, db: &'db dyn Db, key: &str) -> Truthiness {
+    pub(crate) fn key_membership_truthiness(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        key: &str,
+    ) -> Truthiness {
         match self.items(db).get(key) {
             Some(field) if field.is_required() => Truthiness::AlwaysTrue,
-            Some(field) if field.may_be_present(db) => Truthiness::Ambiguous,
+            Some(field) if field.may_be_present(db, env) => Truthiness::Ambiguous,
             Some(_) => Truthiness::AlwaysFalse,
             None if self.openness(db).is_closed() => Truthiness::AlwaysFalse,
             None => Truthiness::Ambiguous,
@@ -1396,6 +1408,7 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
         let deferred_inference = infer_deferred_types(db, definition);
         return TypedDictOpenness::extra(
             db,
+            &env,
             deferred_inference.expression_type(&extra_items.value),
             deferred_inference
                 .qualifiers(&extra_items.value)
@@ -1711,6 +1724,7 @@ fn intersect_unpacked_typed_dict_openness<'db>(
     } else {
         TypedDictOpenness::extra(
             db,
+            env,
             IntersectionType::from_elements(db, env, explicit_value_types),
             true,
         )
@@ -1749,11 +1763,11 @@ fn union_unpacked_typed_dict_openness<'db>(
     }
 
     if has_implicitly_open && has_explicit_extra_items {
-        TypedDictOpenness::extra(db, Type::object(), true)
+        TypedDictOpenness::extra(db, env, Type::object(), true)
     } else if has_implicitly_open {
         TypedDictOpenness::ImplicitlyOpen
     } else if has_explicit_extra_items {
-        TypedDictOpenness::extra(db, value_types.build(), true)
+        TypedDictOpenness::extra(db, env, value_types.build(), true)
     } else {
         TypedDictOpenness::Closed
     }
@@ -2027,9 +2041,13 @@ pub(super) fn infer_unpacked_keyword_types<'db>(
         .collect()
 }
 
-fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+fn unpacked_keyword_is_gradual<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
     match ty.resolve_type_alias(db) {
-        ty if ty.is_never() || ty.is_dynamic() => true,
+        ty if ty.is_uninhabited(db, env) || ty.is_dynamic() => true,
         Type::Union(union) => union
             .elements(db)
             .iter()
@@ -2123,7 +2141,7 @@ fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
         return;
     }
 
-    if unpacked_keyword_is_gradual(db, unpacked_type) {
+    if unpacked_keyword_is_gradual(db, env, unpacked_type) {
         provided_keys.extend(typed_dict.items(db).keys().cloned());
     } else if let Some(unpacked_keys) =
         extract_unpacked_typed_dict_keys_from_value_type(db, env, unpacked_type)
@@ -2855,7 +2873,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
 
     // Never and Dynamic types are special: they can have any keys, so we skip validation and mark
     // all target keys as provided.
-    if unpacked_keyword_is_gradual(db, unpacked_type) {
+    if unpacked_keyword_is_gradual(db, env, unpacked_type) {
         shadowed_keys.extend(items.keys().cloned());
         for key_name in items.keys() {
             guaranteed_keys.entry(key_name.clone()).or_insert(None);
@@ -2915,7 +2933,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
                 context,
                 typed_dict,
                 &BTreeMap::new(),
-                TypedDictOpenness::extra(db, value_ty, true),
+                TypedDictOpenness::extra(db, env, value_ty, true),
                 nodes,
                 shadowed_keys,
             );
@@ -3103,8 +3121,8 @@ impl<'db> TypedDictField<'db> {
     }
 
     /// Returns `false` for optional fields whose declared type is uninhabited.
-    pub(crate) fn may_be_present(&self, db: &'db dyn Db) -> bool {
-        self.is_required() || !self.declared_ty.resolve_type_alias(db).is_never()
+    pub(crate) fn may_be_present(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        self.is_required() || !self.declared_ty.is_uninhabited(db, env)
     }
 
     pub(crate) const fn first_declaration(&self) -> Option<Definition<'db>> {

@@ -229,6 +229,14 @@ def accept_gradual_and_bottom(dynamic: Any, bottom: Never) -> None:
     bottom_form: TypeForm[str] = bottom
 ```
 
+Other uninhabited types are also assignable to a `TypeForm` without reinterpreting the expression as
+a type.
+
+```py
+def accept_uninhabited_tuple(value: tuple[Never]) -> None:
+    form: TypeForm[str] = value
+```
+
 ## Union contexts
 
 If a union contains both `TypeForm` and non-`TypeForm` arms, ordinary expression inference should

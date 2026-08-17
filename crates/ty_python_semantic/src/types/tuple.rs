@@ -10,8 +10,7 @@
 //!
 //! The description of which elements can appear in a `tuple` is called a [`TupleSpec`]. Other
 //! things besides `tuple` instances can be described by a tuple spec — for instance, the targets
-//! of an unpacking assignment. A `tuple` specialization can include `Never` as a fixed-length
-//! element because a user-defined tuple subclass can inhabit that type.
+//! of an unpacking assignment or the arguments of a `TypeVarTuple`.
 
 use crate::{Program, ProgramEnvironment};
 use std::cmp::Ordering;
@@ -125,6 +124,13 @@ impl TupleLength {
     }
 }
 
+/// Whether a tuple specification describes runtime values or variadic type arguments.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub enum TupleRole {
+    RuntimeValue,
+    TypeVarTuplePack,
+}
+
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct TupleType<'db> {
     #[returns(copy)]
@@ -132,6 +138,11 @@ pub struct TupleType<'db> {
 
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
+
+    /// Argument packs describe type sequences, not runtime tuples, so `Never` does not make them
+    /// uninhabited. Intern the role to keep packs distinct from otherwise identical runtime tuples.
+    #[returns(copy)]
+    pub(crate) role: TupleRole,
 }
 
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -174,20 +185,30 @@ impl<'db> TupleType<'db> {
         env: &ProgramEnvironment<'db>,
         spec: &TupleSpec<'db>,
     ) -> Self {
-        // If the variable-length portion is Never, it can only be instantiated with zero elements.
-        // That means this isn't a variable-length tuple after all!
+        Self::new_with_visitor(db, spec, &ApplyTypeMappingVisitor::new(env))
+    }
+
+    fn new_with_visitor(
+        db: &'db dyn Db,
+        spec: &TupleSpec<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let env = visitor.env;
+        // If the variable-length portion is uninhabited, it can only be instantiated with zero
+        // elements. That means this isn't a variable-length tuple after all!
         if let TupleSpec::Variable(tuple) = spec
-            && matches!(tuple.variable(), VariableSegment::Homogeneous(Type::Never))
+            && let VariableSegment::Homogeneous(element) = tuple.variable()
+            && visitor.is_uninhabited(db, element)
         {
             let tuple = TupleSpec::Fixed(FixedLengthTuple::from_elements(
                 tuple
                     .iter_prefix_elements()
                     .chain(tuple.iter_suffix_elements()),
             ));
-            return TupleType::new_internal(db, env.program(db), tuple);
+            return TupleType::new_internal(db, env.program(db), tuple, TupleRole::RuntimeValue);
         }
 
-        TupleType::new_internal(db, env.program(db), spec)
+        TupleType::new_internal(db, env.program(db), spec, TupleRole::RuntimeValue)
     }
 
     pub(crate) fn empty(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
@@ -195,6 +216,7 @@ impl<'db> TupleType<'db> {
             db,
             env.program(db),
             TupleSpec::from(FixedLengthTuple::empty()),
+            TupleRole::RuntimeValue,
         )
     }
 
@@ -241,13 +263,10 @@ impl<'db> TupleType<'db> {
         env: &ProgramEnvironment<'db>,
         element: Type<'db>,
     ) -> Self {
-        match element {
-            Type::Never => TupleType::empty(db, env),
-            _ => TupleType::new_internal(db, env.program(db), TupleSpec::homogeneous(element)),
-        }
+        Self::new(db, env, &TupleSpec::homogeneous(element))
     }
 
-    /// Packs a `TypeVarTuple` into the tuple value used for generic specialization relations.
+    /// Represents a symbolic `TypeVarTuple` as an argument pack rather than a runtime tuple.
     pub(crate) fn unpacked_typevartuple(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -258,7 +277,26 @@ impl<'db> TupleType<'db> {
             db,
             env.program(db),
             VariableLengthTuple::mixed([], VariableSegment::TypeVarTuple(typevar), []),
+            TupleRole::TypeVarTuplePack,
         )
+    }
+
+    pub(crate) fn is_typevartuple_pack(self, db: &'db dyn Db) -> bool {
+        self.role(db) == TupleRole::TypeVarTuplePack
+    }
+
+    /// Gives this tuple specification the distinct identity of a generic argument pack.
+    pub(crate) fn into_typevartuple_pack(self, db: &'db dyn Db) -> Self {
+        if self.is_typevartuple_pack(db) {
+            self
+        } else {
+            Self::new_internal(
+                db,
+                self.program(db),
+                self.tuple(db),
+                TupleRole::TypeVarTuplePack,
+            )
+        }
     }
 
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
@@ -293,6 +331,7 @@ impl<'db> TupleType<'db> {
             env.program(db),
             self.tuple(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
+            self.role(db),
         ))
     }
 
@@ -303,13 +342,18 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        TupleType::new(
+        let mapped = TupleType::new_with_visitor(
             db,
-            visitor.env,
             &self
                 .tuple(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        )
+            visitor,
+        );
+        if self.is_typevartuple_pack(db) {
+            mapped.into_typevartuple_pack(db)
+        } else {
+            mapped
+        }
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -326,6 +370,34 @@ impl<'db> TupleType<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// A runtime tuple or tuple subclass is uninhabited if any required element is uninhabited.
+    ///
+    /// Reuse this relation checker's visitors for the element comparisons: a recursive alias
+    /// such as `type Empty[T] = tuple[Empty[list[T]], Never]` must encounter the existing
+    /// recursion guard instead of starting an independent equivalence check for each element.
+    pub(super) fn check_tuple_spec_is_uninhabited(
+        &self,
+        db: &'db dyn Db,
+        tuple: &TupleSpec<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let check_element = |element| {
+            self.as_equivalence_checker()
+                .check_type_pair(db, element, Type::Never)
+        };
+
+        match tuple {
+            Tuple::Fixed(tuple) => {
+                tuple
+                    .iter_all_elements()
+                    .when_any(db, self.constraints, check_element)
+            }
+            Tuple::Variable(tuple) => tuple
+                .iter_prefix_elements()
+                .chain(tuple.iter_suffix_elements())
+                .when_any(db, self.constraints, check_element),
+        }
+    }
+
     pub(super) fn check_tuple_type_pair(
         &self,
         db: &'db dyn Db,
@@ -429,7 +501,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 match target.variable() {
                     VariableSegment::TypeVarTuple(typevartuple) => {
-                        let packed = Type::heterogeneous_tuple(db, self.env, source_iter.copied());
+                        let packed = Type::heterogeneous_tuple(db, self.env, source_iter.copied())
+                            .into_typevartuple_pack(db);
                         result.and(db, self.constraints, || {
                             self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
                         })
@@ -577,7 +650,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             source.variable(),
                             source_suffix[..source_suffix_start].iter().copied(),
                         ),
-                    ));
+                    ))
+                    .into_typevartuple_pack(db);
                     return boundary_constraints.and(db, self.constraints, || {
                         self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
                     });

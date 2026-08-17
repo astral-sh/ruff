@@ -283,6 +283,22 @@ fn apply_type_alias_specialization<'db>(
     };
 
     let env = ProgramEnvironment::from_program(generic_context.program(db));
+    apply_type_alias_specialization_with_visitor(
+        db,
+        ty,
+        generic_context,
+        specialization,
+        &ApplyTypeMappingVisitor::new(&env),
+    )
+}
+
+fn apply_type_alias_specialization_with_visitor<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    generic_context: GenericContext<'db>,
+    specialization: Option<Specialization<'db>>,
+    visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+) -> Type<'db> {
     let specialization =
         specialization.unwrap_or_else(|| generic_context.default_specialization(db, None));
     let type_mapping = match specialization.materialization_kind(db) {
@@ -293,12 +309,7 @@ fn apply_type_alias_specialization<'db>(
         },
     };
 
-    ty.apply_type_mapping_impl(
-        db,
-        &type_mapping,
-        TypeContext::default(),
-        &ApplyTypeMappingVisitor::new(&env),
-    )
+    ty.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), visitor)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -393,6 +404,36 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.raw_value_type(db),
         }
+    }
+
+    /// Expand this alias while retaining the caller's active transformation and recursion state.
+    ///
+    /// Tuple normalization can ask whether a recursive alias is inhabited during specialization;
+    /// creating a fresh visitor at that boundary would hide the active recursive definition.
+    pub(super) fn value_type_with_visitor(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        visitor.expand_alias(db, self, || {
+            let value = self.raw_value_type(db);
+            let specialized = self
+                .generic_context(db)
+                .map(|generic_context| {
+                    apply_type_alias_specialization_with_visitor(
+                        db,
+                        value,
+                        generic_context,
+                        self.specialization(db),
+                        visitor,
+                    )
+                })
+                .unwrap_or(value);
+
+            self.materialization_kind(db)
+                .map(|kind| specialized.materialize(db, kind, visitor))
+                .unwrap_or(specialized)
+        })
     }
 
     /// Returns the alias without an applied specialization or pending materialization.

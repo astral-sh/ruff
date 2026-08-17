@@ -1001,20 +1001,211 @@ type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
 static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
 ```
 
+### Inhabited recursive generic aliases with tuple alternatives
+
+A recursive tuple alternative does not make an alias uninhabited when another union alternative
+contains values.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Recursive[T] = tuple[Recursive[T]] | int
+
+def accepts_recursive(value: Recursive[int]) -> None:
+    reveal_type(value)  # revealed: tuple[Recursive[int]] | int
+
+static_assert(not is_equivalent_to(Recursive[int], Never))
+```
+
+### Inhabited recursive generic aliases with growing specializations
+
+The alias definition must also be recognized when its specialization grows on each recursive
+reference.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Growing[T] = tuple[Growing[list[T]]] | int
+
+def accepts_growing(value: Growing[int]) -> None:
+    reveal_type(value)  # revealed: tuple[Growing[list[int]]] | int
+
+static_assert(not is_equivalent_to(Growing[int], Never))
+```
+
+The recursive reference must not hide an element whose specialization determines whether the alias
+has any inhabitants.
+
+```py
+type ParameterDependent[T] = tuple[ParameterDependent[list[T]], T] | T
+
+static_assert(is_equivalent_to(ParameterDependent[Never], Never))
+static_assert(not is_equivalent_to(ParameterDependent[int], Never))
+```
+
+That specialization-dependent inhabitance must also determine whether a homogeneous tuple has only
+its empty value.
+
+```py
+type ParameterSequence[T] = tuple[ParameterDependent[T], ...]
+
+static_assert(is_equivalent_to(ParameterSequence[Never], tuple[()]))
+static_assert(not is_equivalent_to(ParameterSequence[int], tuple[()]))
+```
+
+### Mutually recursive generic aliases with tuple alternatives
+
+The same reasoning applies when two aliases refer to one another.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Left[T] = tuple[Right[T]] | int
+type Right[T] = tuple[Left[T]] | str
+
+def accepts_mutually_recursive(value: Left[int]) -> None:
+    reveal_type(value)  # revealed: tuple[Right[int]] | int
+
+static_assert(not is_equivalent_to(Left[int], Never))
+```
+
+### Homogeneous recursive generic tuple aliases
+
+A homogeneous tuple can always be empty, even when its element type refers back to the same alias.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Recursive[T] = tuple[Recursive[T], ...]
+
+def accepts_recursive(value: Recursive[int]) -> None:
+    reveal_type(value)  # revealed: tuple[Recursive[int], ...]
+
+static_assert(not is_equivalent_to(Recursive[int], Never))
+```
+
+An actually uninhabited recursive element must still normalize a homogeneous tuple to its empty
+tuple value.
+
+```py
+type Empty[T] = tuple[Empty[list[T]], Never]
+type EmptySequence[T] = tuple[Empty[T], ...]
+
+static_assert(is_equivalent_to(EmptySequence[int], tuple[()]))
+```
+
+The same recursion is safe when each reference introduces a more deeply nested specialization.
+
+```py
+type Growing[T] = tuple[Growing[list[T]], ...]
+
+static_assert(not is_equivalent_to(Growing[int], Never))
+```
+
+### Homogeneous recursive generic aliases nested inside tuples
+
+An extra tuple between a homogeneous element and its recursive alias must not hide the recursive
+definition when each specialization grows.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Recursive[T] = tuple[tuple[Recursive[list[T]]], ...]
+
+def accepts_recursive(value: Recursive[int]) -> None: ...
+
+static_assert(not is_equivalent_to(Recursive[int], Never))
+```
+
+The same recursive definition can also be hidden behind a non-recursive generic alias.
+
+```py
+type Box[T] = tuple[T]
+type Wrapped[T] = tuple[Box[Wrapped[list[T]]], ...] | T
+
+static_assert(not is_equivalent_to(Wrapped[Never], Never))
+```
+
+### Homogeneous recursive generic aliases nested inside unions
+
+A union inside the homogeneous element must preserve the same recursive definition identity, even
+when another alternative specializes to `Never`.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Recursive[T] = tuple[Recursive[list[T]] | T, ...]
+
+def accepts_recursive(value: Recursive[int]) -> None: ...
+
+static_assert(not is_equivalent_to(Recursive[int], Never))
+static_assert(not is_equivalent_to(Recursive[Never], Never))
+```
+
+### Recursive variadic generic aliases
+
+Recursive aliases can preserve a variable number of type arguments while retaining an inhabited
+union alternative.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Recursive[*Ts] = tuple[Recursive[*Ts]] | int
+
+def accepts_recursive(value: Recursive[int, str]) -> None:
+    reveal_type(value)  # revealed: tuple[Recursive[int, str]] | int
+
+static_assert(not is_equivalent_to(Recursive[int, str], Never))
+```
+
+### Growing recursive aliases with uninhabited elements
+
+A recursively growing specialization does not prevent another required tuple element from proving
+that the alias is uninhabited.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Empty[T] = tuple[Empty[list[T]], Never]
+
+static_assert(is_equivalent_to(Empty[int], Never))
+```
+
 ### Non-recursive nested generic aliases
 
 A repeated use of the same generic alias can be a finite alias application instead of recursion.
 
 ```py
-from typing import Literal
+from typing import Literal, Never
 
 from ty_extensions import static_assert
-from ty_extensions._internal import is_subtype_of
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 
 type NonRecursiveId[T] = T
 
 static_assert(is_subtype_of(NonRecursiveId[NonRecursiveId[int]], int))
 static_assert(not is_subtype_of(NonRecursiveId[NonRecursiveId[int]], str))
+
+type NonRecursiveTuple[T] = tuple[T]
+
+static_assert(is_equivalent_to(NonRecursiveTuple[NonRecursiveTuple[Never]], Never))
+static_assert(is_equivalent_to(NonRecursiveTuple[NonRecursiveTuple[NonRecursiveTuple[Never]]], Never))
 
 truth: NonRecursiveId[NonRecursiveId[Literal[True]]] = True
 static_assert(truth)
@@ -1054,6 +1245,21 @@ type NestedNoneAlias = NonRecursiveId[NoneAlias]
 
 def finite_alias_union(x: NonRecursiveId[NestedNoneAlias], condition: bool):
     reveal_type(x if condition else 1)  # revealed: None | Literal[1]
+```
+
+### Non-recursive generic union aliases
+
+Avoiding relation checks while a potentially recursive alias body is rebuilt must not prevent
+ordinary, non-recursive generic aliases from exposing their simplified values.
+
+```py
+class Parent: ...
+class Child(Parent): ...
+
+type Alias[T] = T | Parent
+
+def reveal_alias(value: Alias[Child]) -> None:
+    reveal_type(value)  # revealed: Parent
 ```
 
 ### Generic self-recursive aliases with deeper specializations
@@ -1106,6 +1312,22 @@ def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     x = y
     # error: [invalid-assignment] "Object of type `StableWrapped[int]` is not assignable to `StableWrapped[str]`"
     y = x
+```
+
+### Materializations of recursive homogeneous tuple aliases
+
+Top and bottom materializations must preserve the empty tuple that inhabits a recursively defined
+homogeneous tuple, even when its specialization grows at each recursive reference.
+
+```py
+from typing import Any, Never
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Recursive[T] = tuple[Recursive[list[T]], ...] | T
+
+static_assert(not is_equivalent_to(Top[Recursive[Any]], Never))
+static_assert(not is_equivalent_to(Bottom[Recursive[Any]], Never))
 ```
 
 ### Subtyping of materializations of cyclic aliases

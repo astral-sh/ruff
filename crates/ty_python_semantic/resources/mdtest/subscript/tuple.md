@@ -171,6 +171,29 @@ class TupleSubclass(tuple[int, str]): ...
 static_assert(is_subtype_of(TupleSubclass, IntFromZeroSubscript))
 ```
 
+## Indexing a tuple with an uninhabited homogeneous portion
+
+If a variable-length portion has an uninhabited element type, it contributes no elements. Indexing
+therefore sees only the fixed prefix and suffix.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Never
+
+def read(empty: tuple[tuple[Never], ...], fixed: tuple[int, *tuple[tuple[Never], ...], str]) -> None:
+    reveal_type(empty)  # revealed: tuple[()]
+    empty[0]  # error: [index-out-of-bounds]
+
+    reveal_type(fixed)  # revealed: tuple[int, str]
+    reveal_type(fixed[0])  # revealed: int
+    reveal_type(fixed[1])  # revealed: str
+    fixed[2]  # error: [index-out-of-bounds]
+```
+
 ## Slices
 
 ```py

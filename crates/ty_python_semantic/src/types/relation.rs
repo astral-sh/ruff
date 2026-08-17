@@ -19,8 +19,8 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -1220,6 +1220,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .try_visit(
                 db,
                 (source, target, self.relation, self.typevar_evaluation),
+                (target == Type::Never).then(|| self.never()),
                 work,
             )
             .unwrap_or_else(|item| self.recursive_type_pair_fallback(item.0, item.1))
@@ -1238,6 +1239,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // The correct choice here is a logical value that is "neither true nor false", and expressing this requires the introduction of 3-valued logic.
         // Discussion: https://github.com/astral-sh/ty/issues/4050
         self.never()
+    }
+
+    /// A nominal tuple instance is uninhabited when its tuple specification has an empty element.
+    ///
+    /// Keep this check inside nominal-instance match arms: discovering a tuple subclass can
+    /// require walking its MRO, and most type pairs never need that work. Argument packs share
+    /// the tuple representation but describe type sequences, so their elements do not determine
+    /// runtime inhabitance.
+    fn is_uninhabited_nominal_instance(
+        &self,
+        db: &'db dyn Db,
+        instance: NominalInstanceType<'db>,
+    ) -> bool {
+        !instance.is_typevartuple_pack(db)
+            && instance.tuple_spec(db, self.env).is_some_and(|tuple| {
+                self.with_recursion_guard(db, Type::NominalInstance(instance), Type::Never, || {
+                    self.check_tuple_spec_is_uninhabited(db, tuple.as_ref())
+                })
+                .is_always_satisfied(db, self.env)
+            })
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
@@ -1428,6 +1449,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => self.always(),
 
+            // Tuple instances and tuple subclasses with an uninhabited required element behave
+            // as `Never`. Internal TypeVarTuple argument packs instead remain structural.
+            (Type::NominalInstance(instance), other)
+                if !other
+                    .as_nominal_instance()
+                    .is_some_and(|other| other.is_typevartuple_pack(db))
+                    && self.is_uninhabited_nominal_instance(db, instance) =>
+            {
+                self.always()
+            }
+            (other, Type::NominalInstance(instance))
+                if !other
+                    .as_nominal_instance()
+                    .is_some_and(|other| other.is_typevartuple_pack(db))
+                    && self.is_uninhabited_nominal_instance(db, instance) =>
+            {
+                self.check_type_pair(db, other, Type::Never)
+            }
+
             (Type::TypeVar(source_typevar), Type::TypeVar(target_typevar))
                 if source_typevar.is_same_typevar_as(db, target_typevar) =>
             {
@@ -1451,13 +1491,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::TypeAlias(source_alias), _) => {
                 self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source_alias.value_type(db), target)
+                    self.check_type_pair(
+                        db,
+                        source_alias.value_type_with_visitor(db, self.materialization_visitor),
+                        target,
+                    )
                 })
             }
 
             (_, Type::TypeAlias(target_alias)) => {
                 self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, target_alias.value_type(db))
+                    self.check_type_pair(
+                        db,
+                        source,
+                        target_alias.value_type_with_visitor(db, self.materialization_visitor),
+                    )
                 })
             }
 
@@ -2678,7 +2726,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         })
     }
 
-    fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
+    pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             env: self.env,
             constraints: self.constraints,
@@ -2998,18 +3046,42 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         match (left, right) {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
+            // An uninhabited runtime tuple or tuple subclass has no common values with another
+            // runtime type. TypeVarTuple argument packs are type sequences, not runtime values.
+            (Type::NominalInstance(instance), other)
+                if !other
+                    .as_nominal_instance()
+                    .is_some_and(|other| other.is_typevartuple_pack(db))
+                    && self
+                        .as_relation_checker(TypeRelation::Redundancy { pure: true })
+                        .is_uninhabited_nominal_instance(db, instance) =>
+            {
+                self.always()
+            }
+            (other, Type::NominalInstance(instance))
+                if !other
+                    .as_nominal_instance()
+                    .is_some_and(|other| other.is_typevartuple_pack(db))
+                    && self
+                        .as_relation_checker(TypeRelation::Redundancy { pure: true })
+                        .is_uninhabited_nominal_instance(db, instance) =>
+            {
+                self.always()
+            }
+
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
             (Type::TypeAlias(alias), _) => nontrivial_check(self, || {
-                let left_alias_ty = alias.value_type(db);
+                let left_alias_ty = alias.value_type_with_visitor(db, self.materialization_visitor);
                 self.with_recursion_guard(db, left, right, || {
                     self.check_type_pair(db, left_alias_ty, right)
                 })
             }),
 
             (_, Type::TypeAlias(alias)) => nontrivial_check(self, || {
-                let right_alias_ty = alias.value_type(db);
+                let right_alias_ty =
+                    alias.value_type_with_visitor(db, self.materialization_visitor);
                 self.with_recursion_guard(db, left, right, || {
                     self.check_type_pair(db, left, right_alias_ty)
                 })

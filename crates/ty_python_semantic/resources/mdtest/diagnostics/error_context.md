@@ -1900,6 +1900,36 @@ def _(source: tuple[bool, bool]):
     target: tuple[int, int] = source
 ```
 
+## Invariant variadic generic classes
+
+The invariance hint also explains incompatible specializations of a class parameterized by a type
+variable tuple.
+
+```py
+class Box[*Ts]:
+    values: tuple[*Ts]
+
+def accepts(value: Box[int]) -> None: ...
+def check(value: Box[bool]) -> None:
+    accepts(value)  # snapshot
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `accepts` is incorrect
+ --> src/mdtest_snippet.py:6:13
+  |
+6 |     accepts(value)  # snapshot
+  |             ^^^^^ Expected `Box[int]`, found `Box[bool]`
+info: the first tuple element is not compatible: `int` is not assignable to `bool`
+info: Function defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | def accepts(value: Box[int]) -> None: ...
+  |     ^^^^^^^ --------------- Parameter declared here
+info: `Box` is invariant in its type parameter
+info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
+```
+
 ## Error context in other scenarios
 
 ### In `invalid-return-type` diagnostics

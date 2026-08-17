@@ -2846,8 +2846,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         property_ty.as_property_instance().is_some_and(|property| {
             property.deleter(db).is_some_and(|deleter| {
                 match deleter.try_call(db, env, &CallArguments::positional([object_ty])) {
-                    Ok(result) => result.return_type(db, env).is_never(),
-                    Err(err) => err.return_type(db, env).is_never(),
+                    Ok(result) => result.return_type(db, env).is_uninhabited(db, env),
+                    Err(err) => err.return_type(db, env).is_uninhabited(db, env),
                 }
             })
         })
@@ -2995,8 +2995,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     frozen_dataclass_dispatch,
                     Some(FrozenDataclassDispatch::FrozenField)
                 ) || match &delattr_dunder_call_result {
-                    Ok(result) => result.return_type(db, env).is_never(),
-                    Err(err) => err.return_type(db, env).is_some_and(|ty| ty.is_never()),
+                    Ok(result) => result.return_type(db, env).is_uninhabited(db, env),
+                    Err(err) => err
+                        .return_type(db, env)
+                        .is_some_and(|ty| ty.is_uninhabited(db, env)),
                 };
                 if returns_never {
                     if emit_diagnostics
@@ -3075,12 +3077,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // `Never` supports arbitrary operations only because there can be no runtime
                     // value to mutate; it is not a concrete descriptor with a terminal deleter.
-                    let deleter_returns_never = !attr_ty.is_never()
+                    let deleter_returns_never = !attr_ty.is_uninhabited(db, env)
                         && match &delete_dunder_call_result {
-                            Ok(bindings) => bindings.return_type(db, env).is_never(),
-                            Err(error) => {
-                                error.return_type(db, env).is_some_and(|ty| ty.is_never())
-                            }
+                            Ok(bindings) => bindings.return_type(db, env).is_uninhabited(db, env),
+                            Err(error) => error
+                                .return_type(db, env)
+                                .is_some_and(|ty| ty.is_uninhabited(db, env)),
                         };
                     if deleter_returns_never
                         || self.property_deleter_returns_never(attr_ty, object_ty)

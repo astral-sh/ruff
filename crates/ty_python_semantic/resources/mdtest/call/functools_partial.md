@@ -29,6 +29,35 @@ p = partial(f, b="hello")
 reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello") -> bool]
 ```
 
+### Uninhabited parameter bound positionally
+
+An uninhabited positional parameter remains present in the reduced signature, even when its type is
+not represented directly as `Never`.
+
+```py
+from functools import partial
+from typing import Any
+from typing_extensions import Never
+
+def f(first: tuple[Never], second: int) -> None: ...
+def bind(value: Any) -> None:
+    reveal_type(partial(f, value))  # revealed: partial[(first: tuple[Never], second: int) -> None]
+```
+
+### Uninhabited parameter bound by keyword
+
+An uninhabited keyword-bound parameter becomes keyword-only but does not acquire a default.
+
+```py
+from functools import partial
+from typing import Any
+from typing_extensions import Never
+
+def f(first: tuple[Never], second: int) -> None: ...
+def bind(value: Any) -> None:
+    reveal_type(partial(f, first=value))  # revealed: partial[(*, first: tuple[Never], second: int) -> None]
+```
+
 ### Leading parameter bound by keyword
 
 Binding a positional-or-keyword parameter by keyword makes it defaulted and keyword-only in the

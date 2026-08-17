@@ -389,9 +389,11 @@ fn definition_expression_annotation<'db>(
 
 struct ApplyTypeMappingTag;
 struct ApplyMaterializationEquivalence;
+struct ExpandTypeAlias;
 
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
+type TypeAliasExpansionVisitor<'db> = Rc<TypeTransformer<'db, ExpandTypeAlias>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -408,6 +410,7 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    alias_expansion: OnceCell<TypeAliasExpansionVisitor<'db>>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -422,6 +425,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
+            alias_expansion: OnceCell::default(),
         }
     }
 
@@ -469,14 +473,40 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             })
     }
 
+    fn is_uninhabited(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        ty == Type::Never || ty.is_equivalent_to_with_materialization_visitor(db, Type::Never, self)
+    }
+
+    /// Keep alias recursion visible through wrappers such as tuples, unions, and materialization.
+    ///
+    /// The transformer identifies recursive aliases by their definition, so growing
+    /// specializations encounter the same active visit even when their concrete types differ.
+    fn expand_alias(
+        &self,
+        db: &'db dyn Db,
+        alias: TypeAliasType<'db>,
+        expand: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        self.alias_expansion
+            .get_or_init(|| Rc::new(TypeTransformer::default()))
+            .visit_type(db, Type::TypeAlias(alias), expand)
+    }
+
     fn for_new_materialization_root(&self) -> Self {
         let materialization_equivalence = OnceCell::new();
         let was_empty =
             materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
         debug_assert!(was_empty.is_ok());
 
+        let alias_expansion = OnceCell::new();
+        if let Some(visitor) = self.alias_expansion.get() {
+            let was_empty = alias_expansion.set(Rc::clone(visitor));
+            debug_assert!(was_empty.is_ok());
+        }
+
         Self {
             materialization_equivalence,
+            alias_expansion,
             ..Self::new(self.env)
         }
     }
@@ -1713,15 +1743,13 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) const fn is_never(&self) -> bool {
-        matches!(
-            self,
-            Type::Never
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Bottom),
-                    ..
-                })
-        )
+    /// Returns whether this type has no inhabitants.
+    ///
+    /// A runtime tuple with a required uninhabited element is equivalent to `Never` even though
+    /// its tuple shape is preserved for display. Type aliases do not change inhabitance. Variadic
+    /// type argument packs are not runtime tuples, so their `Never` elements remain meaningful.
+    pub(crate) fn is_uninhabited(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        *self == Type::Never || self.is_equivalent_to(db, env, Type::Never)
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -2505,7 +2533,6 @@ impl<'db> Type<'db> {
             | Type::TypeVar(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_)
-            | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
@@ -2524,11 +2551,12 @@ impl<'db> Type<'db> {
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_) => {
-                IntersectionBuilder::new(db, env)
-                    .add_negative(*self)
-                    .build()
-            }
+            Type::NominalInstance(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::EnumComplement(_) => IntersectionBuilder::new(db, env)
+                .add_negative(*self)
+                .build(),
         }
     }
 
@@ -7873,9 +7901,23 @@ impl<'db> Type<'db> {
                 property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
 
-            Type::Union(union) => union.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            }),
+            Type::Union(union) => {
+                let transform = |element: &Type<'db>| {
+                    element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                };
+                if matches!(
+                    type_mapping,
+                    TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(_))
+                        | TypeMapping::ApplySpecializationWithMaterialization {
+                            specialization: ApplySpecialization::TypeAlias(_),
+                            ..
+                        }
+                ) {
+                    union.map_leave_aliases_during_cycle_recovery(db, visitor.env, transform)
+                } else {
+                    union.map_leave_aliases(db, visitor.env, transform)
+                }
+            }
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db, visitor.env);
                 for positive in intersection.positive(db) {

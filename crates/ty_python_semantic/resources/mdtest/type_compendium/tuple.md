@@ -227,18 +227,17 @@ static_assert(not is_singleton(tuple[None]))
 python-version = "3.11"
 ```
 
-The `Never` type contains no inhabitants, but a tuple annotation can also describe user-defined
-subclasses. A tuple type containing `Never` as a mandatory element therefore retains its shape
-instead of simplifying to `Never`.
+The `Never` type contains no inhabitants, so a tuple type that contains `Never` as a mandatory
+element also contains no inhabitants.
 
 ```py
 from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to
 
-static_assert(not is_equivalent_to(tuple[Never], Never))
-static_assert(not is_equivalent_to(tuple[int, Never], Never))
-static_assert(not is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
+static_assert(is_equivalent_to(tuple[Never], Never))
+static_assert(is_equivalent_to(tuple[int, Never], Never))
+static_assert(is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
 ```
 
 Tuple expressions also preserve their element types when an element has type `Never`.
@@ -261,6 +260,16 @@ static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
 static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...]], tuple[int]))
 static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...], int], tuple[int, int]))
 static_assert(is_equivalent_to(tuple[*tuple[Never, ...], int], tuple[int]))
+```
+
+An element type that is only equivalent to `Never`, such as an uninhabited tuple, also forces the
+variable-length portion to be empty.
+
+```py
+static_assert(is_equivalent_to(tuple[tuple[Never], ...], tuple[()]))
+static_assert(is_equivalent_to(tuple[int, *tuple[tuple[Never], ...]], tuple[int]))
+static_assert(is_equivalent_to(tuple[int, *tuple[tuple[Never], ...], str], tuple[int, str]))
+static_assert(is_equivalent_to(tuple[*tuple[tuple[Never], ...], int], tuple[int]))
 ```
 
 ## Homogeneous non-empty tuples

@@ -117,10 +117,10 @@ mod stable {
         }
     );
 
-    // `T` is not disjoint from itself, unless `T` is `Never`.
+    // `T` is not disjoint from itself, unless `T` is uninhabited.
     type_property_test!(
         disjoint_from_is_irreflexive, db, env,
-        forall types t. t.is_disjoint_from(db, env, t) => t.is_never()
+        forall types t. t.is_disjoint_from(db, env, t) => t.is_uninhabited(db, env)
     );
 
     // `S` is disjoint from `T` implies that `T` is disjoint from `S`.
@@ -129,10 +129,10 @@ mod stable {
         forall types s, t. s.is_disjoint_from(db, env, t) == t.is_disjoint_from(db, env, s)
     );
 
-    // `S <: T` implies that `S` is not disjoint from `T`, unless `S` is `Never`.
+    // `S <: T` implies that `S` is not disjoint from `T`, unless `S` is uninhabited.
     type_property_test!(
         subtype_of_implies_not_disjoint_from, db, env,
-        forall types s, t. s.is_subtype_of(db, env, t) => !s.is_disjoint_from(db, env, t) || s.is_never()
+        forall types s, t. s.is_subtype_of(db, env, t) => !s.is_disjoint_from(db, env, t) || s.is_uninhabited(db, env)
     );
 
     // `S <: T` implies that `S` can be assigned to `T`.

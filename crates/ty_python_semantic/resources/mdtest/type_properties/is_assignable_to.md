@@ -839,9 +839,9 @@ from typing_extensions import Any, Never, Sequence
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to
 
-# The bottom materialization of `tuple[Any]` is `tuple[Never]`. Both
-# `tuple[int]` and `tuple[()]` are disjoint from `tuple[Never]`, so they are
-# assignable to `~tuple[Any]`.
+# The bottom materialization of `tuple[Any]` is `tuple[Never]`,
+# which simplifies to `Never`, so `tuple[int]` and `tuple[()]` are
+# both assignable to `~tuple[Any]`
 static_assert(is_assignable_to(tuple[int], ~tuple[Any]))
 static_assert(is_assignable_to(tuple[()], ~tuple[Any]))
 
@@ -990,6 +990,31 @@ static_assert(is_assignable_to(Any & int, Never))
 static_assert(is_assignable_to(Unknown & int, Never))
 static_assert(not is_assignable_to(Any | int, Never))
 static_assert(not is_assignable_to(Unknown | int, Never))
+```
+
+### Assignability to uninhabited tuples
+
+A tuple with a required `Never` element is equivalent to `Never`. Gradual types, bottom aliases, and
+classes that inherit from `Any` therefore retain their normal assignability to the bottom type.
+
+```py
+from typing import Any, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to
+
+type Bottom = Never
+
+class DynamicBase(Any): ...
+
+static_assert(is_assignable_to(Any, tuple[Never]))
+static_assert(is_assignable_to(Unknown, tuple[Never]))
+static_assert(is_assignable_to(Bottom, tuple[Never]))
+static_assert(is_assignable_to(DynamicBase, tuple[Never]))
+static_assert(not is_assignable_to(int, tuple[Never]))
+static_assert(not is_assignable_to(Any | int, tuple[Never]))
+
+def bounded[T: Never](value: T) -> tuple[Never]:
+    return value
 ```
 
 ## Callable

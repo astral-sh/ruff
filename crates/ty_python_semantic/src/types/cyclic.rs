@@ -386,15 +386,17 @@ where
     /// Visits `item`, returning it in `Err` if another active item has the same identity.
     ///
     /// The caller must convert `Err(item)` into an operation-specific conservative result. An
-    /// exact recursive reentry uses the detector's configured fallback and is returned as `Ok`.
+    /// exact recursive reentry uses `cycle_fallback`, when provided, or the detector's configured
+    /// fallback otherwise, and is returned as `Ok`.
     #[inline]
     pub(super) fn try_visit(
         &self,
         db: &'db dyn Db,
         item: T,
+        cycle_fallback: Option<R>,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
-        match self.begin_visit(db, item) {
+        match self.begin_visit_with_cycle_fallback(db, item, cycle_fallback) {
             CycleDetectorVisit::Ready(result) => Ok(result),
             CycleDetectorVisit::Cycle(item) => Err(item),
             CycleDetectorVisit::Pending(item) => {
@@ -405,13 +407,24 @@ where
     }
 
     fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
+        self.begin_visit_with_cycle_fallback(db, item, None)
+    }
+
+    fn begin_visit_with_cycle_fallback(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        cycle_fallback: Option<R>,
+    ) -> CycleDetectorVisit<T, R> {
         if let Some(result) = self.cache.borrow().get(&item) {
             return CycleDetectorVisit::Ready(result.clone());
         }
 
         let seen = self.seen.borrow();
         if seen.iter().any(|active| active.item == item) {
-            return CycleDetectorVisit::Ready(self.fallback.clone());
+            return CycleDetectorVisit::Ready(
+                cycle_fallback.unwrap_or_else(|| self.fallback.clone()),
+            );
         }
 
         let mut candidates = seen
@@ -842,6 +855,21 @@ class RecursivePropertySetter[T](Protocol):
         assert_eq!(
             detector.visit(db, 1, || detector.visit(db, 1, || 20) + 10),
             10
+        );
+    }
+
+    #[test]
+    fn exact_cycle_can_override_the_default_fallback() {
+        let db = setup_db();
+        let db = &db;
+        let detector = Detector::new(1);
+
+        assert_eq!(
+            detector.try_visit(db, 1, None, || {
+                assert_eq!(detector.try_visit(db, 1, Some(0), || 2), Ok(0));
+                3
+            }),
+            Ok(3)
         );
     }
 
