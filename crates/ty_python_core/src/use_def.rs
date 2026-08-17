@@ -272,8 +272,11 @@ use crate::{
     BoundnessAnalysis, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces, SemanticIndex,
 };
 
+mod exception_checkpoint;
 mod place_state;
 
+pub(super) use exception_checkpoint::ExceptionCheckpointKey;
+use exception_checkpoint::{ExceptionCheckpointSnapshot, ExceptionCheckpointState};
 pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
@@ -1373,6 +1376,8 @@ pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, PendingPlaceState>,
     member_states: IndexVec<ScopedMemberId, PendingPlaceState>,
     reachability: ScopedReachabilityConstraintId,
+    checkpoint_flow: ScopedReachabilityConstraintId,
+    checkpoint_state: ExceptionCheckpointSnapshot,
     pending_reachability: PendingReachabilityId,
 }
 
@@ -1757,16 +1762,6 @@ pub(super) struct SingleSymbolSnapshot {
     associated_member_states: FxHashMap<ScopedMemberId, PlaceState>,
 }
 
-/// Identifies a control-flow path within a single scope.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(super) struct ControlFlowRevision(u64);
-
-impl ControlFlowRevision {
-    fn advance(&mut self) {
-        self.0 += 1;
-    }
-}
-
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`DefinitionState`].
@@ -1804,11 +1799,14 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// keyed by their text range.
     range_reachability: Vec<(TextRange, RangeInfo)>,
 
-    /// Distinguishes control-flow paths that can have the same set of recorded definitions.
+    /// Identifies the current control-flow path for exception checkpoints.
     ///
-    /// This only moves forward when restoring switches paths or merging widens the current path.
-    /// Revisions are not restored from snapshots, so separate branches cannot appear equivalent.
-    control_flow_revision: ControlFlowRevision,
+    /// Unlike `reachability`, this excludes per-call gates so repeated calls with unchanged
+    /// bindings share a checkpoint.
+    checkpoint_flow: ScopedReachabilityConstraintId,
+
+    /// Restorable identity of the bindings visible to exception handlers.
+    checkpoint_state: ExceptionCheckpointState,
 
     /// Live bindings for each so-far-recorded definition and, for binding-only definitions, the
     /// live declarations.
@@ -1852,7 +1850,8 @@ impl<'db> UseDefMapBuilder<'db> {
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
-            control_flow_revision: ControlFlowRevision::default(),
+            checkpoint_flow: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            checkpoint_state: ExceptionCheckpointState::default(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
@@ -1874,6 +1873,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     fn push_definition(&mut self, state: DefinitionState<'db>) -> ScopedDefinitionId {
+        self.checkpoint_state.record_binding_change();
         let def_id = self.all_definitions.push(state);
         let used_id = self.used_bindings.push(false);
         debug_assert_eq!(def_id, used_id);
@@ -1889,6 +1889,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
+        self.checkpoint_state.record_binding_change();
         match place {
             ScopedPlaceId::Symbol(symbol) => {
                 let new_place = self.symbol_states.push(PendingPlaceState::new(
@@ -1925,9 +1926,16 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions.next_index()
     }
 
-    /// Identifies the latest definitions and control-flow path observed by an exception handler.
-    pub(super) fn exception_checkpoint_key(&self) -> (ScopedDefinitionId, ControlFlowRevision) {
-        (self.next_definition_id(), self.control_flow_revision)
+    /// Identifies the visible bindings and control-flow path observed by an exception handler.
+    pub(super) fn exception_checkpoint_key(&self) -> ExceptionCheckpointKey {
+        self.checkpoint_state
+            .key((!self.reachability_constraints.is_saturated()).then_some(self.checkpoint_flow))
+    }
+
+    /// Invalidates checkpoint reuse for narrowing that has no corresponding reachability predicate.
+    /// Match guards use this because their success and failure are not modeled in reachability.
+    pub(super) fn record_exception_checkpoint_binding_change(&mut self) {
+        self.checkpoint_state.record_binding_change();
     }
 
     pub(super) fn record_binding(
@@ -2214,6 +2222,7 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedSymbolId,
         pre_definition: SingleSymbolSnapshot,
     ) {
+        self.checkpoint_state.record_binding_change();
         let negated_reachability_id = self
             .reachability_constraints
             .add_not_constraint(reachability_id);
@@ -2284,6 +2293,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         constraint: ScopedNarrowingConstraint,
     ) {
+        self.checkpoint_state.record_call_gate();
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -2304,6 +2314,9 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         constraint: ScopedReachabilityConstraintId,
     ) {
+        self.checkpoint_flow = self
+            .reachability_constraints
+            .add_and_constraint(self.checkpoint_flow, constraint);
         self.record_reachability_constraint_impl(
             constraint,
             ScopedNarrowingConstraint::ALWAYS_TRUE,
@@ -2319,6 +2332,7 @@ impl<'db> UseDefMapBuilder<'db> {
         reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
     ) {
+        self.checkpoint_state.record_call_gate();
         self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
     }
 
@@ -2675,6 +2689,8 @@ impl<'db> UseDefMapBuilder<'db> {
             symbol_states: self.symbol_states.clone(),
             member_states: self.member_states.clone(),
             reachability: self.reachability,
+            checkpoint_flow: self.checkpoint_flow,
+            checkpoint_state: self.checkpoint_state.snapshot(),
             pending_reachability: self.pending_reachability.current,
         }
     }
@@ -2702,7 +2718,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     /// Restore the current builder places state to the given snapshot.
     pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
-        self.control_flow_revision.advance();
+        self.checkpoint_state.restore(snapshot.checkpoint_state);
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.
@@ -2714,6 +2730,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.symbol_states = snapshot.symbol_states;
         self.member_states = snapshot.member_states;
         self.reachability = snapshot.reachability;
+        self.checkpoint_flow = snapshot.checkpoint_flow;
         self.pending_reachability.current = snapshot.pending_reachability;
 
         // If the snapshot we are restoring is missing some places we've recorded since, we need
@@ -2746,7 +2763,8 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        self.control_flow_revision.advance();
+        self.checkpoint_state.merge(snapshot.checkpoint_state);
+
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.
@@ -2774,6 +2792,9 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachability = self
             .reachability_constraints
             .add_or_constraint(self.reachability, snapshot.reachability);
+        self.checkpoint_flow = self
+            .reachability_constraints
+            .add_or_constraint(self.checkpoint_flow, snapshot.checkpoint_flow);
     }
 
     pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {

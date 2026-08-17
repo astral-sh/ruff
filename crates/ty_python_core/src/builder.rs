@@ -3180,6 +3180,146 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .get_or_init(|| source_text(self.db, self.file.file(self.db)))
     }
 
+    /// Visits a conditional expression without reserving its flow snapshots in every recursive
+    /// expression-visitor frame. This matters for deeply nested expressions in unoptimized builds.
+    fn visit_if_expression(&mut self, node: &'ast ast::ExprIf) {
+        let ast::ExprIf {
+            body, test, orelse, ..
+        } = node;
+        self.visit_expr(test);
+        let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
+        let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
+            self.flow_restore(snapshots.truthy);
+            snapshots.falsy
+        } else {
+            self.flow_snapshot()
+        };
+        let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
+        let reachability_constraint = self.record_reachability_constraint(predicate);
+        let in_type_checking_block = self.in_type_checking_block;
+        self.current_use_def_map_mut()
+            .record_range_reachability(body.range(), in_type_checking_block);
+        self.visit_expr(body);
+        let post_body = self.flow_snapshot();
+        self.flow_restore(falsy);
+
+        self.record_negated_narrowing_constraint(predicate, predicate_id);
+        self.record_negated_reachability_constraint(reachability_constraint);
+        let in_type_checking_block = self.in_type_checking_block;
+        self.current_use_def_map_mut()
+            .record_range_reachability(orelse.range(), in_type_checking_block);
+        self.visit_expr(orelse);
+        self.flow_merge(post_body);
+    }
+
+    /// Keeps short-circuit flow snapshots out of the common recursive expression-visitor frame.
+    fn visit_bool_expression(&mut self, node: &'ast ast::ExprBoolOp) {
+        let ast::ExprBoolOp { values, op, .. } = node;
+        let mut snapshots = vec![];
+        let mut reachability_constraints = vec![];
+        let mut last_condition_flow_snapshots = None;
+
+        for (index, value) in values.iter().enumerate() {
+            for id in &reachability_constraints {
+                self.current_use_def_map_mut()
+                    .record_reachability_constraint(*id); // TODO: nicer API
+            }
+
+            let in_type_checking_block = self.in_type_checking_block;
+            self.current_use_def_map_mut()
+                .record_range_reachability(value.range(), in_type_checking_block);
+            self.visit_expr(value);
+
+            // Only non-final values can short-circuit this boolean operation. The final
+            // value can still have its own outcome-specific flow if it is nested.
+            if index < values.len() - 1 {
+                self.record_exception_checkpoint_if(!Self::condition_evaluation_is_known_safe(
+                    value,
+                ));
+                let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
+                let predicate = self.build_predicate(value);
+                let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+                let predicate_id = match op {
+                    ast::BoolOp::And => self.add_predicate(predicate),
+                    ast::BoolOp::Or => self.add_negated_predicate(predicate),
+                };
+                let reachability_constraint = self
+                    .current_reachability_constraints_mut()
+                    .add_atom(predicate_id);
+
+                let continuation = if let Some(condition_flow_snapshots) = condition_flow_snapshots
+                {
+                    let (short_circuit, continuation) =
+                        condition_flow_snapshots.into_short_circuit_and_continuation(*op);
+                    self.flow_restore(short_circuit);
+                    continuation
+                } else {
+                    self.flow_snapshot()
+                };
+
+                // We first model the short-circuiting behavior. We take the short-circuit
+                // path here if all of the previous short-circuit paths were not taken, so
+                // we record all previously existing reachability constraints, and negate the
+                // one for the current expression.
+
+                self.record_negated_reachability_constraint(reachability_constraint);
+                snapshots.push(self.flow_snapshot());
+
+                // Then we model the non-short-circuiting behavior. Here, we need to delay
+                // the application of the reachability constraint until after the expression
+                // has been evaluated, so we only push it onto the stack here.
+                self.flow_restore(continuation);
+                self.record_narrowing_constraint_id_for_places(predicate_id, &possibly_narrowed);
+                reachability_constraints.push(reachability_constraint);
+            } else {
+                last_condition_flow_snapshots = self.take_condition_flow_snapshots(value);
+            }
+        }
+
+        let has_specialized_last = last_condition_flow_snapshots.is_some();
+        let (last_short_circuit, no_short_circuit) =
+            if let Some(condition_flow_snapshots) = last_condition_flow_snapshots {
+                let (short_circuit, no_short_circuit) =
+                    condition_flow_snapshots.into_short_circuit_and_continuation(*op);
+                (Some(short_circuit), Some(no_short_circuit))
+            } else {
+                (
+                    None,
+                    values
+                        .iter()
+                        .any(|value| any_over_expr(value, &ast::Expr::is_named_expr))
+                        .then(|| self.flow_snapshot()),
+                )
+            };
+
+        if let Some(last_short_circuit) = last_short_circuit {
+            self.flow_restore(last_short_circuit);
+        }
+
+        for snapshot in snapshots {
+            self.flow_merge(snapshot);
+        }
+
+        if let Some(no_short_circuit) = no_short_circuit {
+            let bool_op_key = ExpressionNodeKey::from(ast::ExprRef::BoolOp(node));
+            let maybe_short_circuit = self.flow_snapshot();
+
+            if has_specialized_last {
+                // Restore the merged post-expression flow after constructing the two
+                // outcome-specific snapshots.
+                self.flow_merge(no_short_circuit.clone());
+            }
+
+            let (truthy, falsy) = match op {
+                ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
+                ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
+            };
+
+            self.condition_flow_snapshots_by_node
+                .insert(bool_op_key, ConditionFlowSnapshots { truthy, falsy });
+        }
+    }
+
     fn visit_stmt_impl(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
@@ -4348,6 +4488,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 guard_predicate_id,
                                 &possibly_narrowed,
                             );
+                        self.current_use_def_map_mut()
+                            .record_exception_checkpoint_binding_change();
                         let match_success_guard_failure = self.flow_snapshot();
                         self.flow_restore(truthy);
                         self.current_use_def_map_mut()
@@ -4355,6 +4497,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 guard_predicate_id,
                                 &possibly_narrowed,
                             );
+                        self.current_use_def_map_mut()
+                            .record_exception_checkpoint_binding_change();
                         match_success_guard_failure
                     });
 
@@ -5185,34 +5329,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(lambda.body.as_ref());
                 self.pop_scope();
             }
-            ast::Expr::If(ast::ExprIf {
-                body, test, orelse, ..
-            }) => {
-                self.visit_expr(test);
-                let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
-                let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
-                    self.flow_restore(snapshots.truthy);
-                    snapshots.falsy
-                } else {
-                    self.flow_snapshot()
-                };
-                let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
-                let reachability_constraint = self.record_reachability_constraint(predicate);
-                let in_type_checking_block = self.in_type_checking_block;
-                self.current_use_def_map_mut()
-                    .record_range_reachability(body.range(), in_type_checking_block);
-                self.visit_expr(body);
-                let post_body = self.flow_snapshot();
-                self.flow_restore(falsy);
-
-                self.record_negated_narrowing_constraint(predicate, predicate_id);
-                self.record_negated_reachability_constraint(reachability_constraint);
-                let in_type_checking_block = self.in_type_checking_block;
-                self.current_use_def_map_mut()
-                    .record_range_reachability(orelse.range(), in_type_checking_block);
-                self.visit_expr(orelse);
-                self.flow_merge(post_body);
-            }
+            ast::Expr::If(node) => self.visit_if_expression(node),
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
                     elt, generators, ..
@@ -5300,117 +5417,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     ));
                 }
             }
-            ast::Expr::BoolOp(ast::ExprBoolOp {
-                values,
-                range: _,
-                node_index: _,
-                op,
-            }) => {
-                let mut snapshots = vec![];
-                let mut reachability_constraints = vec![];
-                let mut last_condition_flow_snapshots = None;
-
-                for (index, value) in values.iter().enumerate() {
-                    for id in &reachability_constraints {
-                        self.current_use_def_map_mut()
-                            .record_reachability_constraint(*id); // TODO: nicer API
-                    }
-
-                    let in_type_checking_block = self.in_type_checking_block;
-                    self.current_use_def_map_mut()
-                        .record_range_reachability(value.range(), in_type_checking_block);
-                    self.visit_expr(value);
-
-                    // Only non-final values can short-circuit this boolean operation. The final
-                    // value can still have its own outcome-specific flow if it is nested.
-                    if index < values.len() - 1 {
-                        self.record_exception_checkpoint_if(
-                            !Self::condition_evaluation_is_known_safe(value),
-                        );
-                        let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
-                        let predicate = self.build_predicate(value);
-                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
-                        let predicate_id = match op {
-                            ast::BoolOp::And => self.add_predicate(predicate),
-                            ast::BoolOp::Or => self.add_negated_predicate(predicate),
-                        };
-                        let reachability_constraint = self
-                            .current_reachability_constraints_mut()
-                            .add_atom(predicate_id);
-
-                        let continuation =
-                            if let Some(condition_flow_snapshots) = condition_flow_snapshots {
-                                let (short_circuit, continuation) = condition_flow_snapshots
-                                    .into_short_circuit_and_continuation(*op);
-                                self.flow_restore(short_circuit);
-                                continuation
-                            } else {
-                                self.flow_snapshot()
-                            };
-
-                        // We first model the short-circuiting behavior. We take the short-circuit
-                        // path here if all of the previous short-circuit paths were not taken, so
-                        // we record all previously existing reachability constraints, and negate the
-                        // one for the current expression.
-
-                        self.record_negated_reachability_constraint(reachability_constraint);
-                        snapshots.push(self.flow_snapshot());
-
-                        // Then we model the non-short-circuiting behavior. Here, we need to delay
-                        // the application of the reachability constraint until after the expression
-                        // has been evaluated, so we only push it onto the stack here.
-                        self.flow_restore(continuation);
-                        self.record_narrowing_constraint_id_for_places(
-                            predicate_id,
-                            &possibly_narrowed,
-                        );
-                        reachability_constraints.push(reachability_constraint);
-                    } else {
-                        last_condition_flow_snapshots = self.take_condition_flow_snapshots(value);
-                    }
-                }
-
-                let has_specialized_last = last_condition_flow_snapshots.is_some();
-                let (last_short_circuit, no_short_circuit) =
-                    if let Some(condition_flow_snapshots) = last_condition_flow_snapshots {
-                        let (short_circuit, no_short_circuit) =
-                            condition_flow_snapshots.into_short_circuit_and_continuation(*op);
-                        (Some(short_circuit), Some(no_short_circuit))
-                    } else {
-                        (
-                            None,
-                            any_over_expr(expr, &ast::Expr::is_named_expr)
-                                .then(|| self.flow_snapshot()),
-                        )
-                    };
-
-                if let Some(last_short_circuit) = last_short_circuit {
-                    self.flow_restore(last_short_circuit);
-                }
-
-                for snapshot in snapshots {
-                    self.flow_merge(snapshot);
-                }
-
-                if let Some(no_short_circuit) = no_short_circuit {
-                    let bool_op_key = ExpressionNodeKey::from(expr);
-                    let maybe_short_circuit = self.flow_snapshot();
-
-                    if has_specialized_last {
-                        // Restore the merged post-expression flow after constructing the two
-                        // outcome-specific snapshots.
-                        self.flow_merge(no_short_circuit.clone());
-                    }
-
-                    let (truthy, falsy) = match op {
-                        ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
-                        ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
-                    };
-
-                    self.condition_flow_snapshots_by_node
-                        .insert(bool_op_key, ConditionFlowSnapshots { truthy, falsy });
-                }
-            }
+            ast::Expr::BoolOp(node) => self.visit_bool_expression(node),
             ast::Expr::StringLiteral(_) => {
                 walk_expr(self, expr);
             }

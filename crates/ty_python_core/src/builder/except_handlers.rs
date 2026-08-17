@@ -1,5 +1,5 @@
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
-use crate::use_def::{ControlFlowRevision, FlowSnapshot, ScopedDefinitionId, UseDefMapBuilder};
+use crate::use_def::{ExceptionCheckpointKey, FlowSnapshot, UseDefMapBuilder};
 
 use super::SemanticIndexBuilder;
 
@@ -347,7 +347,7 @@ enum ExceptionContextKind {
 pub(super) struct ExceptionContext {
     exception_handlers: ExceptionHandlers,
     kind: ExceptionContextKind,
-    last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
+    last_checkpoint_key: Option<ExceptionCheckpointKey>,
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,
     /// Whether apparently terminal control flow in a nested context-manager body, such as a

@@ -194,6 +194,11 @@ pub struct ReachabilityConstraintsBuilder {
 }
 
 impl ReachabilityConstraintsBuilder {
+    /// Returns whether new constraint combinations may lose precision at the arena limit.
+    pub(crate) fn is_saturated(&self) -> bool {
+        self.interiors.len() >= MAX_INTERIOR_NODES
+    }
+
     pub(crate) fn build(self) -> ReachabilityConstraints {
         if self.interior_used.first_zero().is_none() {
             ReachabilityConstraints {
@@ -355,7 +360,7 @@ impl ReachabilityConstraintsBuilder {
         match (a, b) {
             (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
             (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
-            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+            _ if a == b => return a,
             _ => {}
         }
 
@@ -425,7 +430,7 @@ impl ReachabilityConstraintsBuilder {
         match (a, b) {
             (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
             (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
-            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+            _ if a == b => return a,
             _ => {}
         }
 

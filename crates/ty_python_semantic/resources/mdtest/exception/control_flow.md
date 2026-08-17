@@ -246,6 +246,20 @@ def repeated_calls() -> None:
         reveal_type(state)  # revealed: Literal[0, "changed"]
 ```
 
+A branch that does not change any bindings preserves the state visible to the handler:
+
+```py
+def unchanged_branch(flag: bool) -> None:
+    state = 0
+    try:
+        may_raise()
+        if flag is True:
+            pass
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
 Branch narrowing changes the state visible to the handler even when neither branch introduces a new
 binding:
 
@@ -268,6 +282,20 @@ def restored_branches(value: int | None) -> None:
             may_raise()
         else:
             may_raise()
+    except:
+        reveal_type(value)  # revealed: int | None
+```
+
+Match guards also distinguish successful and failed branches without introducing a new binding:
+
+```py
+def guarded_match_branches(value: int | None) -> None:
+    try:
+        match value:
+            case _ if value is not None:
+                may_raise()
+            case _:
+                may_raise()
     except:
         reveal_type(value)  # revealed: int | None
 ```
@@ -299,6 +327,54 @@ def call_never_returns() -> None:
     try:
         stop()
         state = "unreachable"
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
+## Nested handlers with merged bindings
+
+An inner handler can preserve the original binding while its `else` suite sees a later assignment.
+After those paths merge, an exception must expose both bindings to the outer handler:
+
+```py
+def may_raise() -> None: ...
+def nested_try() -> None:
+    state = 0
+    try:
+        try:
+            may_raise()
+            state = "changed"
+        except:
+            pass
+        else:
+            may_raise()
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0, "changed"]
+```
+
+## Caught calls that never return
+
+Catching an exception from a `NoReturn` call makes the following code reachable again, even if no
+bindings changed. The unreachable inner `else` suite must not hide the later exception:
+
+```py
+from typing import NoReturn
+
+def may_raise() -> None: ...
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def nested_terminal() -> None:
+    state = 0
+    try:
+        try:
+            stop()
+        except:
+            pass
+        else:
+            may_raise()
         may_raise()
     except:
         reveal_type(state)  # revealed: Literal[0]
