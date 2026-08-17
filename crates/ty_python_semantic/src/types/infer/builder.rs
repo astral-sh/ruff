@@ -6,10 +6,11 @@ use compact_str::CompactString;
 use itertools::Itertools;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_string_annotation};
 use ruff_db::source::source_text;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
     PythonVersion,
@@ -54,7 +55,8 @@ use crate::types::call::bind::{
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
+    ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, FunctionalTypeVarCandidate,
+    MethodDecorator,
 };
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
@@ -202,6 +204,24 @@ fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
 /// performance problem. For now, we optimize for memory usage.
 const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
+
+struct FunctionalTypeVarCandidateCollector<'ast> {
+    candidates: Vec<&'ast ast::Expr>,
+    strings: Vec<&'ast ast::ExprStringLiteral>,
+}
+
+impl<'ast> Visitor<'ast> for FunctionalTypeVarCandidateCollector<'ast> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        match expr {
+            ast::Expr::Name(_) => self.candidates.push(expr),
+            ast::Expr::Attribute(attribute) if is_dotted_name(&attribute.value) => {
+                self.candidates.push(expr);
+            }
+            ast::Expr::StringLiteral(string) => self.strings.push(string),
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
+}
 
 /// Builder to infer all types in a region.
 ///
@@ -455,6 +475,113 @@ fn transparent_callable_decorator_result<'db>(
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
+    fn functional_typevar_candidate(
+        &self,
+        candidate: &ast::Expr,
+        from_string: bool,
+    ) -> Option<FunctionalTypeVarCandidate<'db>> {
+        let mut attributes = Vec::new();
+        let mut root = candidate;
+        while let ast::Expr::Attribute(attribute) = root {
+            attributes.push(Name::new(attribute.attr.id.as_str()));
+            root = &attribute.value;
+        }
+        let ast::Expr::Name(root) = root else {
+            return None;
+        };
+        attributes.reverse();
+
+        let db = self.db();
+        let scope = self.scope.file_scope_id(db);
+        let use_def = self.index.use_def_map(scope);
+        let possible_binding = |definition: Definition<'db>| {
+            !matches!(
+                definition.kind(db),
+                DefinitionKind::Function(_)
+                    | DefinitionKind::Class(_)
+                    | DefinitionKind::TypeAlias(_)
+                    | DefinitionKind::TypeVar(_)
+                    | DefinitionKind::ParamSpec(_)
+                    | DefinitionKind::TypeVarTuple(_)
+            )
+        };
+        let root_bindings = if from_string {
+            // Names parsed from string annotations have no use IDs in the semantic index.
+            let symbol = self.index.place_table(scope).symbol_id(root.id.as_str())?;
+            use_def
+                .reachable_bindings(symbol.into())
+                .filter_map(|binding| binding.binding.definition())
+                .filter(|definition| possible_binding(*definition))
+                .collect::<Box<[_]>>()
+        } else {
+            let root_use = root.scoped_use_id(db, self.program_file());
+            use_def
+                .bindings_at_use(root_use)
+                .filter_map(|binding| binding.binding.definition())
+                .filter(|definition| possible_binding(*definition))
+                .collect::<Box<[_]>>()
+        };
+
+        (!root_bindings.is_empty()).then_some(FunctionalTypeVarCandidate {
+            root_bindings,
+            attributes: attributes.into_boxed_slice(),
+        })
+    }
+
+    fn collect_functional_string_typevar_candidates(
+        &self,
+        string: &ast::ExprStringLiteral,
+        candidates: &mut FxIndexSet<FunctionalTypeVarCandidate<'db>>,
+    ) {
+        let Some(literal) = string.as_single_part_string() else {
+            return;
+        };
+        let source = source_text(self.db(), self.file());
+        if &source[literal.content_range()] != literal.as_str() {
+            return;
+        }
+        let Ok(parsed) = parsed_string_annotation(source.as_str(), literal) else {
+            return;
+        };
+        let mut collector = FunctionalTypeVarCandidateCollector {
+            candidates: Vec::new(),
+            strings: Vec::new(),
+        };
+        collector.visit_expr(parsed.expr());
+        candidates.extend(
+            collector
+                .candidates
+                .into_iter()
+                .filter_map(|candidate| self.functional_typevar_candidate(candidate, true)),
+        );
+        for nested in collector.strings {
+            self.collect_functional_string_typevar_candidates(nested, candidates);
+        }
+    }
+
+    pub(super) fn functional_typevar_candidates(
+        &self,
+        annotations: &[&ast::Expr],
+    ) -> Box<[FunctionalTypeVarCandidate<'db>]> {
+        let mut collector = FunctionalTypeVarCandidateCollector {
+            candidates: Vec::new(),
+            strings: Vec::new(),
+        };
+        for annotation in annotations {
+            collector.visit_expr(annotation);
+        }
+
+        let mut candidates = collector
+            .candidates
+            .into_iter()
+            .filter_map(|candidate| self.functional_typevar_candidate(candidate, false))
+            .collect::<FxIndexSet<_>>();
+        for string in collector.strings {
+            self.collect_functional_string_typevar_candidates(string, &mut candidates);
+        }
+        candidates.into_iter().collect()
+    }
+
     /// How big a string do we build before bailing?
     ///
     /// This is a fairly arbitrary number. It should be *far* more than enough

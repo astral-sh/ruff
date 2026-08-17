@@ -323,6 +323,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.validate_fields_arg(fields_arg);
 
+        let typevar_candidates = definition.map_or_else(Box::default, |_| {
+            let mut annotations = match fields_arg {
+                ast::Expr::Dict(fields) => fields
+                    .iter()
+                    .filter_map(|item| item.key.as_ref().map(|_| &item.value))
+                    .collect::<Vec<_>>(),
+                _ => Vec::new(),
+            };
+            if let Some(extra_items) = call_expr.arguments.find_keyword("extra_items") {
+                annotations.push(&extra_items.value);
+            }
+            self.functional_typevar_candidates(&annotations)
+        });
+
         if let Some(definition) = definition {
             self.deferred.insert(definition);
         }
@@ -354,7 +368,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        let typeddict = DynamicTypedDictLiteral::new(db, name, anchor, typed_dict_module);
+        let typeddict =
+            DynamicTypedDictLiteral::new(db, name, anchor, typed_dict_module, typevar_candidates);
         Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
     }
 

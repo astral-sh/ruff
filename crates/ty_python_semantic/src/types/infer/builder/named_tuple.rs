@@ -360,6 +360,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name = name.unwrap_or("<unknown>");
 
+        let typevar_candidates = match (definition, kind) {
+            (Some(_), NamedTupleKind::Typing) => {
+                let fields = match fields_arg {
+                    ast::Expr::List(fields) => &*fields.elts,
+                    ast::Expr::Tuple(fields) => &*fields.elts,
+                    _ => &[],
+                };
+                let annotations = fields
+                    .iter()
+                    .filter_map(|field| match field {
+                        ast::Expr::Tuple(field) => field.elts.get(1),
+                        ast::Expr::List(field) => field.elts.get(1),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+                self.functional_typevar_candidates(&annotations)
+            }
+            _ => Box::default(),
+        };
+
         // Handle fields based on which namedtuple variant.
         let anchor = match definition {
             Some(definition) => match kind {
@@ -410,7 +430,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        let namedtuple = DynamicNamedTupleLiteral::new(db, name, anchor);
+        let namedtuple = DynamicNamedTupleLiteral::new(db, name, anchor, typevar_candidates);
 
         Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple))
     }

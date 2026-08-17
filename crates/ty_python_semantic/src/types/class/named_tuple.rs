@@ -11,7 +11,7 @@ use crate::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
         PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
-        class::{DynamicClassHeaderAnchor, dynamic_class_header_range},
+        class::{DynamicClassHeaderAnchor, FunctionalTypeVarCandidate, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
         mro::Mro,
@@ -166,6 +166,9 @@ pub struct DynamicNamedTupleLiteral<'db> {
     ///   is relative to the enclosing scope's anchor node index.
     #[returns(ref)]
     pub anchor: DynamicNamedTupleAnchor<'db>,
+
+    #[returns(deref)]
+    pub(super) typevar_candidates: Box<[FunctionalTypeVarCandidate<'db>]>,
 }
 
 impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
@@ -183,6 +186,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             self.name(db),
             self.anchor(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
+            self.typevar_candidates(db),
         ))
     }
 }

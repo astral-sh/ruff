@@ -370,6 +370,16 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 }
 
+/// A possibly qualified name from a functional field annotation that may resolve to a legacy
+/// `TypeVar`.
+///
+/// Definitions and attribute names remain stable across unrelated edits, unlike AST references.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct FunctionalTypeVarCandidate<'db> {
+    pub(super) root_bindings: Box<[Definition<'db>]>,
+    pub(super) attributes: Box<[Name]>,
+}
+
 /// A class that can be the origin of a [`GenericAlias`].
 ///
 /// This is intentionally narrower than [`ClassLiteral`]. Each variant must explicitly implement

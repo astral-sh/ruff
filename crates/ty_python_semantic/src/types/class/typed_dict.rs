@@ -11,7 +11,9 @@ use ty_module_resolver::KnownModule;
 use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::class::{DynamicClassHeaderAnchor, dynamic_class_header_range};
+use crate::types::class::{
+    DynamicClassHeaderAnchor, FunctionalTypeVarCandidate, dynamic_class_header_range,
+};
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
 use crate::types::mro::Mro;
@@ -902,6 +904,9 @@ pub struct DynamicTypedDictLiteral<'db> {
 
     #[returns(copy)]
     pub(crate) typed_dict_module: TypingModule,
+
+    #[returns(deref)]
+    pub(super) typevar_candidates: Box<[FunctionalTypeVarCandidate<'db>]>,
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
@@ -937,6 +942,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             self.anchor(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
             self.typed_dict_module(db),
+            self.typevar_candidates(db),
         ))
     }
 }
