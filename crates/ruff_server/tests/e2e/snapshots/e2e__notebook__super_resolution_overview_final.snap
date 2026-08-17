@@ -247,7 +247,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         },
-        "title": "stable-test-rule-display-only-fix"
+        "title": "stable-test-rule-display-only-fix (review required)"
       }
     },
     {

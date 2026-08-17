@@ -15,7 +15,7 @@ use crate::{
     session::DocumentQuery,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     Locator, SuppressionKind,
     directives::{Flags, extract_directives},
@@ -397,6 +397,10 @@ fn to_lsp_diagnostic(
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
+            let mut title = suggestion.unwrap_or(name).to_string();
+            if fix.is_some_and(|fix| fix.applicability() == Applicability::DisplayOnly) {
+                title.push_str(" (review required)");
+            }
             let edits = fix
                 .into_iter()
                 .flat_map(Fix::edits)
@@ -410,7 +414,7 @@ fn to_lsp_diagnostic(
                 new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
-                title: suggestion.unwrap_or(name).to_string(),
+                title,
                 noqa_edit,
                 edits,
                 code: code.clone(),
