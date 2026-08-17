@@ -219,7 +219,21 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
       "tags": [],
       "data": {
         "code": "RUF903",
-        "edits": [],
+        "edits": [
+          {
+            "newText": "# fix from stable-test-rule-display-only-fix\n",
+            "range": {
+              "end": {
+                "character": 0,
+                "line": 0
+              },
+              "start": {
+                "character": 0,
+                "line": 0
+              }
+            }
+          }
+        ],
         "noqa_edit": {
           "newText": "  # noqa: RUF903\n",
           "range": {

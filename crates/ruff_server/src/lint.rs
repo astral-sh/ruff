@@ -15,7 +15,7 @@ use crate::{
     session::DocumentQuery,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
-use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_linter::{
     Locator, SuppressionKind,
     directives::{Flags, extract_directives},
@@ -372,7 +372,6 @@ fn to_lsp_diagnostic(
     let name = diagnostic.name();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.first_help_text();
-    let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 
     let (severity, code) = if let Some(code) = diagnostic.secondary_code() {
         let severity = severity(code);
