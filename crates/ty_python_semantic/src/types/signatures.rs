@@ -1270,13 +1270,13 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
-    /// compatible with the bound receiver.
+    /// Specializes this signature using the type variables determined by its bound receiver.
     ///
     /// Matching the receiver can constrain type variables that occur elsewhere in the signature.
-    /// Exact bounds determine an unambiguous specialization; one-sided constraints remain attached
-    /// to the bound signature for later relation checks.
-    pub(crate) fn bind_self_if_compatible(
+    /// Exact bounds determine an unambiguous specialization; one-sided constraints remain
+    /// available to normal call inference. The receiver remains in the returned signature so
+    /// bound-method calls can still check it and report receiver-related diagnostics.
+    pub(crate) fn specialize_for_bound_receiver(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1290,7 +1290,7 @@ impl<'db> Signature<'db> {
         let bound_signature =
             self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
-            return Some(bound_signature);
+            return Some(self.clone());
         };
 
         let constraints = ConstraintSetBuilder::new();
@@ -1299,17 +1299,17 @@ impl<'db> Signature<'db> {
 
         match when.solutions(db, env, &constraints, inferable) {
             Solutions::Unsatisfiable => return None,
-            Solutions::Unconstrained => return Some(bound_signature),
+            Solutions::Unconstrained => return Some(self.clone()),
             // Each receiver path can leave a different type variable unconstrained. Preserve the
             // original relation instead of combining those independent solutions.
             Solutions::Constrained(solutions) if solutions.len() > 1 => {
-                return Some(bound_signature);
+                return Some(self.clone());
             }
             Solutions::Constrained(_) => {}
         }
 
         let Some(generic_context) = self.generic_context else {
-            return Some(bound_signature);
+            return Some(self.clone());
         };
 
         let mut builder = SpecializationBuilder::new(db, env, &constraints, inferable);
@@ -1340,10 +1340,27 @@ impl<'db> Signature<'db> {
             Some(Type::TypeVar(typevar))
         });
 
-        Some(
-            self.apply_specialization(db, specialization)
-                .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type)),
-        )
+        Some(self.apply_specialization(db, specialization))
+    }
+
+    /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
+    /// compatible with the bound receiver.
+    pub(crate) fn bind_self_if_compatible(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> Option<Self> {
+        self.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+            .map(|signature| {
+                signature.bind_self_with_receiver(
+                    db,
+                    env,
+                    Some(receiver_type),
+                    Some(typing_self_type),
+                )
+            })
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
@@ -1423,6 +1440,56 @@ impl<'db> Signature<'db> {
         self.parameters
             .get(0)
             .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+    }
+
+    /// Returns whether the receiver can determine a method type variable used elsewhere.
+    ///
+    /// Receiver-only variables cannot affect the rest of the signature, class type variables are
+    /// handled by class or constructor inference, and `typing.Self` is handled by receiver binding.
+    pub(crate) fn has_receiver_determined_method_typevar(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        let Some(receiver) = self
+            .parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+        else {
+            return false;
+        };
+        let Some(generic_context) = self.generic_context else {
+            return false;
+        };
+        let Some(definition) = self.definition else {
+            return false;
+        };
+        let annotation = receiver.annotated_type();
+
+        let mut typevars = match annotation {
+            Type::TypeVar(typevar) => Either::Left(std::iter::once(typevar)),
+            Type::SubclassOf(subclass) if let Some(typevar) = subclass.into_type_var() => {
+                Either::Left(std::iter::once(typevar))
+            }
+            _ => Either::Right(generic_context.variables(db)),
+        };
+
+        typevars.any(|typevar| {
+            let variable = typevar.typevar(db);
+            let identity = variable.identity(db);
+
+            typevar.binding_context(db).definition() == Some(definition)
+                && !variable.is_self(db)
+                && annotation.references_typevar_through_aliases(db, env, identity)
+                && (self
+                    .return_ty
+                    .references_typevar_through_aliases(db, env, identity)
+                    || self.parameters.iter().skip(1).any(|parameter| {
+                        parameter
+                            .annotated_type()
+                            .references_typevar_through_aliases(db, env, identity)
+                    }))
+        })
     }
 
     pub(crate) fn has_implicit_positional_receiver_annotation(&self) -> bool {

@@ -153,12 +153,18 @@ impl<'db> BoundMethodType<'db> {
             );
         };
 
-        CallableSignature::single(signature.bind_self_with_receiver(
-            db,
-            env,
-            Some(receiver_type),
-            Some(typing_self_type),
-        ))
+        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
+            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+        } else {
+            None
+        };
+
+        CallableSignature::single(
+            specialized
+                .as_ref()
+                .unwrap_or(signature)
+                .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type)),
+        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
