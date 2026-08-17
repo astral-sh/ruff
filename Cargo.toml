@@ -136,8 +136,7 @@ matchit = { version = "0.9.0" }
 memchr = { version = "2.7.1" }
 # mimalloc v3.3.2 crashes on Windows CPUs that do not support POPCNT.
 # Fixed in mimalloc v3.4.0: https://github.com/microsoft/mimalloc/issues/1291
-# Keep v2 until the Rust crate includes the fix:
-# https://github.com/purpleprotocol/mimalloc_rust/pull/169
+# Keep v2 until an updated Rust crate includes the fix.
 mimalloc = { version = "0.1.52", features = ["v2"] }
 natord = { version = "1.0.9" }
 notify = { version = "8.0.0" }
