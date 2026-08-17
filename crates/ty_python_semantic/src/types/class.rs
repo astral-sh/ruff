@@ -370,11 +370,132 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 }
 
+/// A class that can be the origin of a [`GenericAlias`].
+///
+/// This is intentionally narrower than [`ClassLiteral`]. Each variant must explicitly implement
+/// how its type parameters and members are specialized.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum GenericClassLiteral<'db> {
+    Static(StaticClassLiteral<'db>),
+    DynamicNamedTuple(DynamicNamedTupleLiteral<'db>),
+    DynamicTypedDict(DynamicTypedDictLiteral<'db>),
+}
+
+impl<'db> GenericClassLiteral<'db> {
+    pub(crate) const fn class_literal(self) -> ClassLiteral<'db> {
+        match self {
+            Self::Static(class) => ClassLiteral::Static(class),
+            Self::DynamicNamedTuple(class) => ClassLiteral::DynamicNamedTuple(class),
+            Self::DynamicTypedDict(class) => ClassLiteral::DynamicTypedDict(class),
+        }
+    }
+
+    pub(crate) const fn as_static(self) -> Option<StaticClassLiteral<'db>> {
+        match self {
+            Self::Static(class) => Some(class),
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => None,
+        }
+    }
+
+    pub(crate) fn type_definition(self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
+        self.class_literal().type_definition(db)
+    }
+
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
+        self.class_literal().name(db)
+    }
+
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.class_literal().program_file(db)
+    }
+
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        self.class_literal().generic_context(db)
+    }
+
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> ClassType<'db> {
+        self.generic_context(db).map_or_else(
+            || ClassType::NonGeneric(self.class_literal()),
+            |generic_context| ClassType::Generic(GenericAlias::new(db, self, f(generic_context))),
+        )
+    }
+
+    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.apply_specialization(db, |generic_context| {
+            generic_context.identity_specialization(db)
+        })
+    }
+
+    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.class_literal().is_typed_dict(db)
+    }
+
+    pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
+        self.class_literal().is_tuple(db)
+    }
+
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        self.class_literal().metaclass(db)
+    }
+
+    pub(crate) fn typed_dict_member(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::Static(class) => class.typed_dict_member(db, env, specialization, name, policy),
+            Self::DynamicTypedDict(class) => class
+                .class_member(db, env, specialization, name, policy)
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+            Self::DynamicNamedTuple(_) => Place::Undefined.into(),
+        }
+    }
+
+    pub(crate) fn with_dataclass_params(
+        self,
+        db: &'db dyn Db,
+        dataclass_params: Option<DataclassParams<'db>>,
+    ) -> Self {
+        match self {
+            Self::Static(class) => Self::Static(class.with_dataclass_params(db, dataclass_params)),
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => self,
+        }
+    }
+}
+
+impl<'db> From<StaticClassLiteral<'db>> for GenericClassLiteral<'db> {
+    fn from(class: StaticClassLiteral<'db>) -> Self {
+        Self::Static(class)
+    }
+}
+
+impl<'db> VarianceInferable<'db> for GenericClassLiteral<'db> {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
+        match self {
+            Self::Static(class) => class.variance_of(db, env, typevar),
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => TypeVarVariance::Invariant,
+        }
+    }
+}
+
 /// A specialization of a generic class with a particular assignment of types to typevars.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericAlias<'db> {
     #[returns(copy)]
-    pub(crate) origin: StaticClassLiteral<'db>,
+    pub(crate) origin: GenericClassLiteral<'db>,
     #[returns(copy)]
     pub(crate) specialization: Specialization<'db>,
 }
@@ -424,10 +545,6 @@ impl<'db> GenericAlias<'db> {
         ))
     }
 
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        self.origin(db).definition(db)
-    }
-
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -437,7 +554,7 @@ impl<'db> GenericAlias<'db> {
     ) -> Self {
         let tcx = tcx
             .annotation
-            .and_then(|ty| ty.specialization_of(db, visitor.env, self.origin(db)))
+            .and_then(|ty| ty.specialization_of(db, visitor.env, self.origin(db).class_literal()))
             .map(|specialization| specialization.types(db))
             .unwrap_or(&[]);
 
@@ -673,8 +790,12 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.class_member(db, env, name, policy),
             Self::Dynamic(class) => class.class_member(db, env, name, policy),
-            Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, env, name, policy),
-            Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, env, name, policy),
+            Self::DynamicNamedTuple(namedtuple) => {
+                namedtuple.class_member(db, env, None, name, policy)
+            }
+            Self::DynamicTypedDict(typeddict) => {
+                typeddict.class_member(db, env, None, name, policy)
+            }
             Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name),
         }
     }
@@ -1027,7 +1148,9 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::Static(class) => class.typed_dict_member(db, env, specialization, name, policy),
-            Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, env, name, policy),
+            Self::DynamicTypedDict(typeddict) => {
+                typeddict.class_member(db, env, specialization, name, policy)
+            }
             Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicEnum(_) => {
                 Place::Undefined.into()
             }
@@ -1161,7 +1284,7 @@ impl<'db> ClassType<'db> {
     pub(crate) fn class_literal(self, db: &'db dyn Db) -> ClassLiteral<'db> {
         match self {
             Self::NonGeneric(literal) => literal,
-            Self::Generic(generic) => ClassLiteral::Static(generic.origin(db)),
+            Self::Generic(generic) => generic.origin(db).class_literal(),
         }
     }
 
@@ -1176,7 +1299,7 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(literal) => (literal, None),
             Self::Generic(generic) => (
-                ClassLiteral::Static(generic.origin(db)),
+                generic.origin(db).class_literal(),
                 Some(generic.specialization(db)),
             ),
         }
@@ -1196,7 +1319,10 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
-            Self::Generic(generic) => Some((generic.origin(db), Some(generic.specialization(db)))),
+            Self::Generic(generic) => generic
+                .origin(db)
+                .as_static()
+                .map(|origin| (origin, Some(generic.specialization(db)))),
         }
     }
 
@@ -1216,7 +1342,7 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
             Self::Generic(generic) => {
-                let origin = generic.origin(db);
+                let origin = generic.origin(db).as_static()?;
                 Some((
                     origin,
                     Some(
@@ -1326,7 +1452,7 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(class) => class.iter_mro(db),
             Self::Generic(generic) => MroIterator::new(
                 db,
-                ClassLiteral::Static(generic.origin(db)),
+                generic.origin(db).class_literal(),
                 Some(generic.specialization(db)),
             ),
         }
@@ -1345,7 +1471,7 @@ impl<'db> ClassType<'db> {
                 let origin = generic.origin(db);
                 MroIterator::new(
                     db,
-                    ClassLiteral::Static(origin),
+                    origin.class_literal(),
                     Some(
                         generic
                             .specialization(db)
@@ -1765,13 +1891,20 @@ impl<'db> ClassType<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::NonGeneric(class) => class.class_member(db, env, name, policy),
-            Self::Generic(generic) => generic.origin(db).class_member_inner(
-                db,
-                env,
-                Some(generic.specialization(db)),
-                name,
-                policy,
-            ),
+            Self::Generic(generic) => {
+                let specialization = Some(generic.specialization(db));
+                match generic.origin(db) {
+                    GenericClassLiteral::Static(class) => {
+                        class.class_member_inner(db, env, specialization, name, policy)
+                    }
+                    GenericClassLiteral::DynamicNamedTuple(class) => class
+                        .class_member(db, env, specialization, name, policy)
+                        .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                    GenericClassLiteral::DynamicTypedDict(class) => class
+                        .class_member(db, env, specialization, name, policy)
+                        .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                }
+            }
         }
     }
 
@@ -1809,16 +1942,32 @@ impl<'db> ClassType<'db> {
                 return dynamic.own_class_member(db, name);
             }
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
-                return namedtuple.own_class_member(db, name);
+                return namedtuple.own_class_member(db, None, name);
             }
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(typeddict)) => {
-                return typeddict.own_class_member(db, name);
+                return typeddict.own_class_member(db, None, name);
             }
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
                 return enum_lit.own_class_member(db, name);
             }
             Self::NonGeneric(ClassLiteral::Static(class)) => (class, None),
-            Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
+            Self::Generic(generic) => match generic.origin(db) {
+                GenericClassLiteral::Static(class) => (class, Some(generic.specialization(db))),
+                GenericClassLiteral::DynamicNamedTuple(class) => {
+                    return class
+                        .own_class_member(db, Some(generic.specialization(db)), name)
+                        .map_type(|ty| {
+                            ty.apply_optional_specialization(db, Some(generic.specialization(db)))
+                        });
+                }
+                GenericClassLiteral::DynamicTypedDict(class) => {
+                    return class
+                        .own_class_member(db, Some(generic.specialization(db)), name)
+                        .map_type(|ty| {
+                            ty.apply_optional_specialization(db, Some(generic.specialization(db)))
+                        });
+                }
+            },
         };
 
         let fallback_member_lookup = || {
@@ -2133,10 +2282,11 @@ impl<'db> ClassType<'db> {
                 class.instance_member(db, env, None, name)
             }
             Self::Generic(generic) => {
-                let class_literal = generic.origin(db);
+                let origin = generic.origin(db);
+                let class_literal = origin.class_literal();
                 let specialization = Some(generic.specialization(db));
 
-                if class_literal.is_typed_dict(db) {
+                if origin.is_typed_dict(db) {
                     return Place::Undefined.into();
                 }
 
@@ -2159,6 +2309,7 @@ impl<'db> ClassType<'db> {
             }
             Self::Generic(generic) => generic
                 .origin(db)
+                .as_static()?
                 .converter_input_type_for_field(db, name)
                 .map(|ty| ty.apply_optional_specialization(db, Some(generic.specialization(db)))),
             Self::NonGeneric(
@@ -2194,10 +2345,14 @@ impl<'db> ClassType<'db> {
             }
             Self::Generic(generic) => {
                 let specialization = generic.specialization(db);
-                generic
-                    .origin(db)
-                    .own_instance_member(db, env, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+                let member = match generic.origin(db) {
+                    GenericClassLiteral::Static(class) => class.own_instance_member(db, env, name),
+                    GenericClassLiteral::DynamicNamedTuple(class) => {
+                        class.own_instance_member(db, name)
+                    }
+                    GenericClassLiteral::DynamicTypedDict(_) => Member::default(),
+                };
+                member.map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
         }
     }

@@ -1072,7 +1072,7 @@ fn lax_input_type_impl<'db>(
     }
 
     let alias = if (module, symbol) == (KnownModule::Re, "Pattern") {
-        let Some(specialization) = field_type.specialization_of(db, env, class) else {
+        let Some(specialization) = field_type.specialization_of(db, env, class.into()) else {
             return Type::any();
         };
         let [pattern_type] = specialization.types(db) else {

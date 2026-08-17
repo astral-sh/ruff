@@ -553,7 +553,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .is_some_and(|(class_literal, annotation)| {
                 any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
                     ty.resolve_type_alias(db)
-                        .specialization_of(db, env, class_literal)
+                        .specialization_of(db, env, class_literal.into())
                         .is_some_and(|specialization| {
                             specialization
                                 .types(db)

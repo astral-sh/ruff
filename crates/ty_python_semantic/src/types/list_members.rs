@@ -266,15 +266,11 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::GenericAlias(generic_alias) => {
-                let class_literal = generic_alias.origin(db);
-                self.extend_with_class_members(db, env, ty, ClassLiteral::Static(class_literal));
-                self.extend_with_synthetic_members(
-                    db,
-                    env,
-                    ty,
-                    ClassLiteral::Static(class_literal),
-                );
-                self.extend_with_metaclass_members(db, env, ty, class_literal.metaclass(db));
+                let origin = generic_alias.origin(db);
+                let class_literal = origin.class_literal();
+                self.extend_with_class_members(db, env, ty, class_literal);
+                self.extend_with_synthetic_members(db, env, ty, class_literal);
+                self.extend_with_metaclass_members(db, env, ty, origin.metaclass(db));
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
@@ -387,12 +383,11 @@ impl<'db> AllMembers<'db> {
                     }
                 }
                 Type::GenericAlias(generic_alias) => {
-                    let class_literal = generic_alias.origin(db);
                     self.extend_with_class_members(
                         db,
                         env,
                         ty,
-                        ClassLiteral::Static(class_literal),
+                        generic_alias.origin(db).class_literal(),
                     );
                 }
                 _ => {}

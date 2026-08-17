@@ -546,7 +546,11 @@ impl<'db> StaticClassLiteral<'db> {
             Some(generic_context) => {
                 let specialization = f(generic_context);
 
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
+                ClassType::Generic(GenericAlias::new(
+                    db,
+                    super::GenericClassLiteral::Static(self),
+                    specialization,
+                ))
             }
         }
     }
@@ -2297,9 +2301,11 @@ impl<'db> StaticClassLiteral<'db> {
             Place::bound(member).into()
         } else {
             let class = match specialization {
-                Some(specialization) => {
-                    ClassType::Generic(GenericAlias::new(db, self, specialization))
-                }
+                Some(specialization) => ClassType::Generic(GenericAlias::new(
+                    db,
+                    super::GenericClassLiteral::Static(self),
+                    specialization,
+                )),
                 None => self.identity_specialization(db),
             };
             let Some(module) = self.typed_dict_module(db) else {
@@ -3121,7 +3127,7 @@ impl<'db> StaticClassLiteral<'db> {
                 for explicit_base in class.explicit_bases(db) {
                     let explicit_base_class_literal = match explicit_base {
                         Type::ClassLiteral(class_literal) => class_literal.as_static(),
-                        Type::GenericAlias(generic_alias) => Some(generic_alias.origin(db)),
+                        Type::GenericAlias(generic_alias) => generic_alias.origin(db).as_static(),
                         _ => continue,
                     };
                     let Some(explicit_base_class_literal) = explicit_base_class_literal else {

@@ -105,7 +105,9 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{any_over_type, dynamic_content};
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
+pub(crate) use class::{
+    ClassLiteral, ClassType, GenericAlias, GenericClassLiteral, StaticClassLiteral,
+};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
@@ -1979,7 +1981,7 @@ impl<'db> Type<'db> {
         known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
         let class_literal = known_class.try_to_class_literal(db, env)?;
-        self.specialization_of(db, env, class_literal)
+        self.specialization_of(db, env, class_literal.into())
     }
 
     /// If the type is a specialized instance of the given class, returns the specialization.
@@ -1987,7 +1989,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        expected_class: StaticClassLiteral<'_>,
+        expected_class: ClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
         self.class_specialization(db, env)
             .filter(|(class_literal, _)| *class_literal == expected_class)
@@ -1999,15 +2001,14 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
+    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
         let class = match self {
             Type::TypedDict(typed_dict) => typed_dict.defining_class()?,
             _ => self.nominal_class(db, env)?,
         };
 
-        class
-            .static_class_literal(db)
-            .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
+        let (class_literal, specialization) = class.class_literal_and_specialization(db);
+        Some((class_literal, specialization?))
     }
 
     /// If this type is a class instance, returns its class.
@@ -8556,7 +8557,7 @@ impl<'db> Type<'db> {
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
             Self::ClassLiteral(class_literal) => class_literal.type_definition(db),
-            Self::GenericAlias(alias) => Some(TypeDefinition::StaticClass(alias.definition(db))),
+            Self::GenericAlias(alias) => alias.origin(db).type_definition(db),
             Self::NominalInstance(instance) => instance.class(db, env).type_definition(db),
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
@@ -8739,11 +8740,11 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<StaticClassLiteral<'db>> {
         match self {
-            Type::GenericAlias(generic) => Some(generic.origin(db)),
+            Type::GenericAlias(generic) => generic.origin(db).as_static(),
             Type::NominalInstance(instance)
                 if let ClassType::Generic(generic) = instance.class(db, env) =>
             {
-                Some(generic.origin(db))
+                generic.origin(db).as_static()
             }
             _ => None,
         }

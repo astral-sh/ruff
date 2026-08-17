@@ -25,6 +25,7 @@ use crate::types::{
     MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
     TypingModule, UnionType, determine_upper_bound,
 };
+use crate::types::{GenericAlias, GenericClassLiteral, Specialization};
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -906,6 +907,23 @@ pub struct DynamicTypedDictLiteral<'db> {
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
 
 impl<'db> DynamicTypedDictLiteral<'db> {
+    fn class_type(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> ClassType<'db> {
+        specialization.map_or_else(
+            || ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)),
+            |specialization| {
+                ClassType::Generic(GenericAlias::new(
+                    db,
+                    GenericClassLiteral::DynamicTypedDict(self),
+                    specialization,
+                ))
+            },
+        )
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -1002,12 +1020,16 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> Member<'db> {
         let env = ProgramEnvironment::from_scope(self.scope(db));
-        let typed_dict =
-            TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)));
+        let typed_dict = TypedDictType::new(self.class_type(db, specialization));
         synthesize_typed_dict_method(db, &env, typed_dict, name, || {
-            TypedDictFields::Dynamic(self.items(db))
+            TypedDictFields::Dynamic(typed_dict.items(db))
         })
         .map(Member::definitely_declared)
         .unwrap_or_default()
@@ -1018,11 +1040,12 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // First check synthesized members (like __getitem__, __init__, get, etc.).
-        let member = self.own_class_member(db, name);
+        let member = self.own_class_member(db, specialization, name);
         if !member.is_undefined() {
             return member.inner;
         }
@@ -1032,7 +1055,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         typed_dict_class_member(
             db,
             env,
-            ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)),
+            self.class_type(db, specialization),
             self.typed_dict_module(db),
             policy,
             name,

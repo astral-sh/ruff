@@ -614,7 +614,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 }
             }
             Type::GenericAlias(alias) => {
-                self.record_class(db, ClassLiteral::Static(alias.origin(db)));
+                self.record_class(db, alias.origin(db).class_literal());
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
             // Visit the class (as if it were a nominal-instance type)
@@ -1885,7 +1885,7 @@ impl<'db> GenericAlias<'db> {
         settings: DisplaySettings<'db>,
     ) -> DisplayGenericAlias<'env, 'db> {
         DisplayGenericAlias {
-            origin: ClassLiteral::Static(self.origin(db)),
+            origin: self.origin(db).class_literal(),
             specialization: self.specialization(db),
             db,
             env,
