@@ -578,6 +578,399 @@ def finally_assignment_runs_before_break():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Returning from a context manager inside `try`
+
+A context manager cannot prevent a `return` from reaching the enclosing `finally` block. The block
+still sees assignments made before the return.
+
+```py
+from contextlib import suppress
+
+def returns_through_finally() -> None:
+    value = "before"
+    try:
+        with suppress(ValueError):
+            value = "returned"
+            return
+    finally:
+        reveal_type(value)  # revealed: Literal["returned"]
+```
+
+## Continuing after a suppressing context manager inside `try`
+
+When a context manager suppresses an exception, a later assignment determines the value observed by
+the `finally` block:
+
+```py
+from contextlib import suppress
+
+value = "before"
+try:
+    with suppress(ValueError):
+        raise ValueError
+    value = "continuing"
+finally:
+    reveal_type(value)  # revealed: Literal["continuing"]
+```
+
+## Continuing after a suppressing context manager and `finally`
+
+After an exception is suppressed, assignments in the `finally` block remain visible on the
+continuing path:
+
+```py
+from contextlib import suppress
+
+def continues_after_finally() -> str:
+    try:
+        with suppress(ValueError):
+            raise ValueError
+    finally:
+        value = "cleanup"
+    reveal_type(value)  # revealed: Literal["cleanup"]
+    return value
+```
+
+## Raising from a context manager inside `try`
+
+A `finally` block remains reachable when a context manager propagates an exception:
+
+```py
+from contextlib import nullcontext
+
+try:
+    with nullcontext():
+        raise ValueError
+finally:
+    # The diagnostic confirms that `finally` is reachable.
+    missing_name  # error: [unresolved-reference]
+```
+
+## Unreachable bindings after a context manager inside `try`
+
+Assignments and imports after the propagating context manager cannot make the `finally` block
+unreachable:
+
+```py
+from contextlib import nullcontext
+
+try:
+    with nullcontext():
+        raise ValueError
+    unreachable = 1
+    import sys
+finally:
+    # The diagnostic confirms that `finally` is reachable.
+    missing_after_unreachable_bindings  # error: [unresolved-reference]
+```
+
+## Code after a terminal context manager and `finally`
+
+A non-suppressing manager does not allow a raised exception to continue past `finally` or implicitly
+return from an annotated function:
+
+```py
+from contextlib import nullcontext
+
+def does_not_continue() -> int:
+    try:
+        with nullcontext():
+            raise ValueError
+    finally:
+        pass
+    # The absence of a diagnostic confirms that this code is unreachable.
+    missing_after_finally
+```
+
+## Narrowing after a terminal context manager and `finally`
+
+A branch that raises through a non-suppressing manager remains terminal after its cleanup:
+
+```py
+from contextlib import nullcontext
+
+def narrows_after_finally(value: str | None) -> None:
+    if value is None:
+        try:
+            with nullcontext():
+                raise ValueError
+        finally:
+            pass
+    reveal_type(value)  # revealed: str
+```
+
+## Loop control after a terminal context manager and `finally`
+
+A `break` through a non-suppressing manager and its enclosing cleanup cannot reach a later
+assignment in the loop:
+
+```py
+from contextlib import nullcontext
+
+for _ in [1]:
+    try:
+        with nullcontext():
+            break
+    finally:
+        pass
+    after_break = 1
+
+after_break  # error: [unresolved-reference]
+```
+
+The same applies to `continue`:
+
+```py
+for _ in [1]:
+    try:
+        with nullcontext():
+            continue
+    finally:
+        pass
+    after_continue = 1
+
+after_continue  # error: [unresolved-reference]
+```
+
+## Nested `finally` suites after a terminal context manager
+
+The outer cleanup observes assignments made in the inner cleanup, but execution does not continue
+after either suite:
+
+```py
+from contextlib import nullcontext
+
+def nested_cleanup() -> None:
+    try:
+        try:
+            with nullcontext():
+                raise ValueError
+        finally:
+            value = "cleanup"
+    finally:
+        reveal_type(value)  # revealed: Literal["cleanup"]
+    # The absence of a diagnostic confirms that this code is unreachable.
+    missing_after_nested_finally
+```
+
+## Terminal `except` branches after a context manager
+
+An `except` branch that assigns a value before returning still contributes that value to the
+`finally` block:
+
+```py
+from contextlib import nullcontext
+
+def unknown_exception() -> Exception:
+    return ValueError()
+
+def handler_returns() -> None:
+    value = "before"
+    try:
+        with nullcontext():
+            raise unknown_exception()
+    except ValueError:
+        value = "returned"
+        return
+    finally:
+        reveal_type(value)  # revealed: Literal["before", "returned"]
+```
+
+## Named `except` branches after a context manager
+
+Binding an exception does not make a terminal `except` branch a continuing entry into `finally`:
+
+```py
+from contextlib import nullcontext
+
+def unknown_exception() -> Exception:
+    return ValueError()
+
+def named_handler() -> None:
+    value = "before"
+    try:
+        with nullcontext():
+            raise unknown_exception()
+    except ValueError as error:
+        value = error
+        return
+    finally:
+        reveal_type(value)  # revealed: Literal["before"] | ValueError
+```
+
+## Multiple terminal `except` branches after a context manager
+
+Every terminal `except` branch contributes its assignment to the `finally` block:
+
+```py
+from contextlib import nullcontext
+
+def unknown_exception() -> Exception:
+    return ValueError()
+
+def multiple_handlers() -> None:
+    value = "before"
+    try:
+        with nullcontext():
+            raise unknown_exception()
+    except ValueError:
+        value = "value-error"
+        return
+    except TypeError:
+        value = "type-error"
+        raise RuntimeError
+    finally:
+        reveal_type(value)  # revealed: Literal["before", "value-error", "type-error"]
+```
+
+## `except` branches without terminal statements after a context manager
+
+An `except` branch with no terminal statements determines the value observed by `finally`:
+
+```py
+from contextlib import nullcontext
+
+value = "before"
+try:
+    with nullcontext():
+        raise ValueError
+except ValueError:
+    value = "continuing"
+finally:
+    reveal_type(value)  # revealed: Literal["continuing"]
+```
+
+## Unreachable assignments after a context manager inside `except`
+
+A context manager propagates an exception from an `except` branch even when an unreachable
+assignment follows:
+
+```py
+from contextlib import nullcontext
+
+try:
+    raise ValueError
+except ValueError:
+    with nullcontext():
+        raise RuntimeError
+    unreachable = 1
+finally:
+    # The diagnostic confirms that `finally` is reachable.
+    missing_after_unreachable_handler_assignment  # error: [unresolved-reference]
+```
+
+## Raising from a context manager inside a named `except` branch
+
+Clearing a named exception does not hide the terminal path from `finally`:
+
+```py
+from contextlib import nullcontext
+
+try:
+    raise ValueError
+except ValueError as error:
+    with nullcontext():
+        raise RuntimeError
+finally:
+    # The diagnostic confirms that `finally` is reachable.
+    missing_name  # error: [unresolved-reference]
+```
+
+## Terminal nested `except` branches without their own `finally`
+
+An unreachable assignment and a binding in the terminal inner `except` branch do not prevent the
+path from reaching the outer `finally` block:
+
+```py
+from contextlib import nullcontext
+
+def nested_unreachable_assignment() -> None:
+    try:
+        try:
+            with nullcontext():
+                raise ValueError
+            unreachable = 1
+        except ValueError:
+            local = 1
+            return
+    finally:
+        # The diagnostic confirms that `finally` is reachable.
+        missing_after_nested_unreachable_assignment  # error: [unresolved-reference]
+```
+
+A `break` through an inner `except` branch also reaches the outer `finally` block:
+
+```py
+for _ in [1]:
+    try:
+        try:
+            with nullcontext():
+                raise ValueError
+        except ValueError:
+            break
+    finally:
+        # The diagnostic confirms that `finally` is reachable.
+        missing_name  # error: [unresolved-reference]
+```
+
+## Unreachable assignments after a context manager inside `else`
+
+A context manager propagates an exception from `else` even when an unreachable assignment follows:
+
+```py
+from contextlib import nullcontext
+
+try:
+    pass
+except ValueError:
+    pass
+else:
+    with nullcontext():
+        raise RuntimeError
+    unreachable = 1
+finally:
+    # The diagnostic confirms that `finally` is reachable.
+    missing_after_unreachable_else_assignment  # error: [unresolved-reference]
+```
+
+## Possibly unbound names in `finally` after a context manager
+
+When an assignment raises before binding a name, a `finally` block can observe that the name is
+undefined:
+
+```py
+from contextlib import nullcontext
+
+def may_raise() -> str:
+    raise RuntimeError
+
+def without_context_manager() -> str | None:
+    try:
+        value = may_raise()
+        return may_raise()
+    except ValueError:
+        return None
+    finally:
+        # error: [possibly-unresolved-reference]
+        reveal_type(value)  # revealed: str
+```
+
+A non-suppressing context manager does not prevent the `finally` block from observing that the name
+may remain undefined.
+
+```py
+def with_context_manager() -> str | None:
+    try:
+        value = may_raise()
+        with nullcontext():
+            return may_raise()
+    except ValueError:
+        return None
+    finally:
+        # error: [possibly-unresolved-reference]
+        reveal_type(value)  # revealed: str
+```
+
 ## Calls to functions returning `Never` / `NoReturn`
 
 These calls should be treated as terminal statements.

@@ -393,6 +393,90 @@ reveal_type(p(2))  # revealed: tuple[int, int]
 reveal_type(p(2)[1])  # revealed: int
 ```
 
+### Variadic generic functions with no bound arguments
+
+A partial with no bound arguments preserves its variadic type parameter until the resulting callable
+is invoked.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+
+def collect[*Ts](*values: *Ts) -> tuple[*Ts]:
+    return values
+
+bound = partial(collect)
+reveal_type(bound)  # revealed: partial[[*Ts](*values: Ts) -> tuple[*Ts]]
+reveal_type(bound())  # revealed: tuple[()]
+reveal_type(bound("x", 1))  # revealed: tuple[Literal["x"], Literal[1]]
+```
+
+### Variadic generic functions with a bound leading parameter
+
+Binding a fixed leading parameter leaves the variadic type parameter available for later arguments.
+A completed call with no variadic arguments still infers an empty tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+
+def collect[*Ts](prefix: int, *values: *Ts) -> tuple[*Ts]:
+    return values
+
+bound = partial(collect, 1)
+reveal_type(bound)  # revealed: partial[[*Ts](*values: Ts) -> tuple[*Ts]]
+reveal_type(bound())  # revealed: tuple[()]
+reveal_type(bound("x", 2))  # revealed: tuple[Literal["x"], Literal[2]]
+reveal_type(collect(1))  # revealed: tuple[()]
+```
+
+### Variadic generic functions with a bound generic leading parameter
+
+A bound ordinary type parameter is specialized while an untouched variadic type parameter remains
+generic.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+
+def collect[T, *Ts](prefix: T, *values: *Ts) -> tuple[T, *Ts]:
+    return (prefix, *values)
+
+bound = partial(collect, 1)
+reveal_type(bound)  # revealed: partial[[*Ts](*values: Ts) -> tuple[Literal[1], *Ts]]
+reveal_type(bound())  # revealed: tuple[Literal[1]]
+reveal_type(bound("x", True))  # revealed: tuple[Literal[1], Literal["x"], Literal[True]]
+```
+
+### Partially bound asyncio executor callback
+
+Binding the executor must not consume the callback's variadic arguments before it is called.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+import asyncio
+from functools import partial
+
+callback = partial(asyncio.get_running_loop().run_in_executor, None)
+asyncio.run(callback(print, ""))
+```
+
 ### Generic functions preserve defaults for no-longer-inferable type params
 
 ```py

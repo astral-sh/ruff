@@ -881,12 +881,12 @@ help: A subclass of `Empty` could validly add a new field of an arbitrary type, 
 
 ## Generic `TypedDict` field conflicts in overload diagnostics
 
-A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. The
-resulting overload diagnostic should still explain which field introduced the conflicting
-constraints.
+A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. Capturing
+its type variable from an enclosing function keeps the overload non-generic while retaining the
+conflicting constraints. The resulting diagnostic should explain which field introduced them.
 
 ```py
-from typing import Generic, Self, TypeVar, TypedDict, overload
+from typing import Generic, TypeVar, TypedDict, overload
 
 T = TypeVar("T")
 
@@ -898,38 +898,39 @@ class Fixed(TypedDict):
     first: int
     second: str
 
-class OverloadedSelf:
+def outer(value: T) -> None:
     @overload
-    def method(self, value: Fixed) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
     @overload
-    def method(self, value: str) -> None: ...
-    def method(self, value: Pair[Self] | str) -> None: ...
+    def inner(value: str) -> None: ...
+    def inner(value: Pair[T] | str) -> None: ...
 ```
 
 ```snapshot
 error[invalid-overload]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def method(self, value: Fixed) -> None: ...  # snapshot: invalid-overload
-   |         ^^^^^^
+15 |     def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+   |         ^^^^^
 16 |     @overload
-17 |     def method(self, value: str) -> None: ...
-18 |     def method(self, value: Pair[Self] | str) -> None: ...
-   |         ------ Implementation defined here
-info: Implementation signature `(self, value: Pair[Self@method] | str) -> None` is not assignable to overload signature `(self, value: Fixed) -> None`
-info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[Self@method] | str`
-info: └── type `Fixed` is not assignable to any element of the union `Pair[Self@method] | str`
-info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `Self@method` expected by TypedDict `Pair`
+17 |     def inner(value: str) -> None: ...
+18 |     def inner(value: Pair[T] | str) -> None: ...
+   |         ----- Implementation defined here
+info: Implementation signature `(value: Pair[T@outer] | str) -> None` is not assignable to overload signature `(value: Fixed) -> None`
+info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[T@outer] | str`
+info: └── type `Fixed` is not assignable to any element of the union `Pair[T@outer] | str`
+info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `T@outer` expected by TypedDict `Pair`
 info:     └── ... omitted 1 union element without additional context
 ```
 
 ## Stop checking callable parameters after incompatible generic constraints
 
 Once earlier parameters produce an unsatisfiable nonterminal constraint set, continuing to a later
-parameter must not replace the diagnostic context that explains the original incompatibility.
+parameter must not replace the diagnostic context that explains the original incompatibility. The
+type variable belongs to the enclosing function, so the overload itself remains non-generic.
 
 ```py
-from typing import Generic, Self, TypeVar, TypedDict, overload
+from typing import Generic, TypeVar, TypedDict, overload
 
 T = TypeVar("T")
 
@@ -941,28 +942,28 @@ class Fixed(TypedDict):
     first: int
     second: str
 
-class OverloadedSelf:
+def outer(value: T) -> None:
     @overload
-    def method(self, value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
     @overload
-    def method(self, value: str, later: str) -> None: ...
-    def method(self, value: Pair[Self] | str, later: str) -> None: ...
+    def inner(value: str, later: str) -> None: ...
+    def inner(value: Pair[T] | str, later: str) -> None: ...
 ```
 
 ```snapshot
 error[invalid-overload]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def method(self, value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
-   |         ^^^^^^
+15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+   |         ^^^^^
 16 |     @overload
-17 |     def method(self, value: str, later: str) -> None: ...
-18 |     def method(self, value: Pair[Self] | str, later: str) -> None: ...
-   |         ------ Implementation defined here
-info: Implementation signature `(self, value: Pair[Self@method] | str, later: str) -> None` is not assignable to overload signature `(self, value: Fixed, later: int) -> None`
-info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[Self@method] | str`
-info: └── type `Fixed` is not assignable to any element of the union `Pair[Self@method] | str`
-info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `Self@method` expected by TypedDict `Pair`
+17 |     def inner(value: str, later: str) -> None: ...
+18 |     def inner(value: Pair[T] | str, later: str) -> None: ...
+   |         ----- Implementation defined here
+info: Implementation signature `(value: Pair[T@outer] | str, later: str) -> None` is not assignable to overload signature `(value: Fixed, later: int) -> None`
+info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[T@outer] | str`
+info: └── type `Fixed` is not assignable to any element of the union `Pair[T@outer] | str`
+info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `T@outer` expected by TypedDict `Pair`
 info:     └── ... omitted 1 union element without additional context
 ```
 

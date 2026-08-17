@@ -385,6 +385,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // First try loading the requested attribute from the module.
         if !skip_self_referential_member_lookup {
+            let result = module_literal.static_member(db, self.program_environment(), name);
+            let error = result.err();
             if let PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
@@ -394,7 +396,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
-            } = module_literal.static_member(db, self.program_environment(), name)
+            } = result.unwrap_or_else(|error| error.fallback_member(db))
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
@@ -409,7 +411,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
-                    from_module_getattr = Some((ty, qualifiers, source_provenance));
+                    from_module_getattr = Some((ty, qualifiers, source_provenance, error));
                 } else {
                     self.add_declaration_with_binding(
                         alias.into(),
@@ -467,7 +469,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // We've checked for a submodule, so now we can go ahead and use a type from module
         // `__getattr__`.
-        if let Some((ty, qualifiers, source_provenance)) = from_module_getattr {
+        if let Some((ty, qualifiers, source_provenance, error)) = from_module_getattr {
+            if let Some(error) = error {
+                error.report_module_getattr_import_diagnostic(
+                    &self.context,
+                    module_literal,
+                    alias,
+                    name,
+                );
+            }
             self.add_declaration_with_binding(
                 alias.into(),
                 definition,

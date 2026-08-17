@@ -412,7 +412,7 @@ impl<'db> ConstructorBinding<'db> {
                         .copied()
                         .map(|mapped_ty| {
                             let without_unknown =
-                                mapped_ty.filter_union(db, |element| !element.is_unknown());
+                                mapped_ty.filter_union(db, env, |element| !element.is_unknown());
                             let mapped_ty = if without_unknown.is_never() {
                                 mapped_ty
                             } else {

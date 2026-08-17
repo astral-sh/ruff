@@ -1080,6 +1080,239 @@ def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
 takes_td_or_iterable({42: 42})
 ```
 
+## Union of `TypedDict` behind a type alias
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A `TypedDict` is still found when the annotation reaches it through a type alias, including when the
+alias resolves to a union and is itself one element of a larger union:
+
+```py
+from typing import TypedDict
+from typing_extensions import TypeAliasType
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+type PersonAlias = Person
+type PersonOrId = Person | int
+PersonOrIdAliasType = TypeAliasType("PersonOrIdAliasType", Person | int)
+
+aliased: PersonAlias = {"name": "Alice", "age": 30}
+reveal_type(aliased)  # revealed: Person
+
+aliased_in_union: PersonAlias | str = {"name": "Alice", "age": 30}
+reveal_type(aliased_in_union)  # revealed: Person
+
+union_alias: PersonOrId = {"name": "Alice", "age": 30}
+reveal_type(union_alias)  # revealed: Person
+
+union_alias_in_union: PersonOrId | str = {"name": "Alice", "age": 30}
+reveal_type(union_alias_in_union)  # revealed: Person
+
+alias_type_in_union: PersonOrIdAliasType | str = {"name": "Alice", "age": 30}
+reveal_type(alias_type_in_union)  # revealed: Person
+```
+
+A dictionary constructed with keyword arguments uses the same aliased `TypedDict` context:
+
+```py
+constructed: PersonOrId | str = dict(name="Alice", age=30)
+reveal_type(constructed)  # revealed: Person
+```
+
+Keys are still validated against the aliased `TypedDict`:
+
+```py
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
+```
+
+Expanding can leave a single `TypedDict` rather than a union, when every arm aliases the same one.
+Such an annotation is still validated field by field:
+
+```py
+type FirstPerson = Person
+type SecondPerson = Person
+
+collapsed: FirstPerson | SecondPerson = {"name": "Alice", "age": 30}
+reveal_type(collapsed)  # revealed: Person
+
+collapsed_constructor: FirstPerson | SecondPerson = dict(name="Alice", age=30)
+reveal_type(collapsed_constructor)  # revealed: Person
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+collapsed_unknown_key: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nickname": "Ali"}
+
+collapsed_constructor_unknown_key: FirstPerson | SecondPerson = dict(
+    name="Alice",
+    age=30,
+    # error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+    nickname="Ali",
+)
+```
+
+The same holds where the annotation is a parameter default or a nested field:
+
+```py
+class Team(TypedDict):
+    lead: FirstPerson | SecondPerson
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+def hire(person: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nickname": "Ali"}): ...
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+team: Team = {"lead": {"name": "Alice", "age": 30, "nickname": "Ali"}}
+```
+
+Constructor inference currently ignores compatible non-`TypedDict` union members. This also occurs
+without aliases; expansion only exposes the existing limitation:
+
+```py
+# TODO: The `dict[str, str]` fallback should accept this constructor without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+accepted_by_fallback: PersonOrId | dict[str, str] = dict(other="x")
+
+# TODO: This should reveal `dict[str, str]`, not `Person`.
+reveal_type(accepted_by_fallback)  # revealed: Person
+```
+
+The same limitation applies to arguments, return values, and nested `TypedDict` fields:
+
+```py
+class Roster(TypedDict):
+    lead: PersonOrId | dict[str, str]
+
+def takes_fallback(value: PersonOrId | dict[str, str]) -> None: ...
+
+# TODO: The `dict[str, str]` fallback should accept this argument without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+takes_fallback(dict(other="x"))
+
+def returns_fallback() -> PersonOrId | dict[str, str]:
+    # TODO: The `dict[str, str]` fallback should accept this return without errors.
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+    # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+    # error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+    return dict(other="x")
+
+# TODO: The `dict[str, str]` fallback should accept this nested value without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+nested_fallback: Roster = {"lead": dict(other="x")}
+```
+
+Broader fallback types are also ignored:
+
+```py
+from typing import Any, Mapping
+
+# TODO: The `Any` fallback should accept this constructor without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+any_fallback: PersonOrId | Any = dict(other="x")
+
+# TODO: The `Mapping[str, str]` fallback should accept this constructor without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+mapping_fallback: PersonOrId | Mapping[str, str] = dict(other="x")
+```
+
+A constructor with an invalid key is correctly validated when no union member provides a compatible
+dictionary fallback, whether the alias appears directly or in a larger union:
+
+```py
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+no_fallback: PersonOrId = dict(other="x")
+
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+invalid_constructor: PersonOrId | str = dict(other="x")
+```
+
+## Overload selection with an aliased `TypedDict`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A dictionary literal selects the matching overload when its `TypedDict` type is nested inside a
+union-valued alias:
+
+```py
+from typing import TypedDict, assert_type, overload
+
+class Payload(TypedDict):
+    required: int
+
+type PayloadOrInt = Payload | int
+
+@overload
+def select(value: PayloadOrInt | str) -> str: ...
+@overload
+def select(value: float) -> bytes: ...
+def select(value: object) -> object:
+    return str(value)
+
+assert_type(select({"required": 1}), str)
+```
+
+## `TypedDict` behind a `TypeAliasType` alias on Python 3.11
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+Expansion is not tied to the `type` statement. `TypeAliasType` is expanded the same way on versions
+that predate it, and the `TypedDict` behind one is still found and validated:
+
+```py
+from typing import TypedDict
+from typing_extensions import TypeAliasType
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+PersonOrId = TypeAliasType("PersonOrId", Person | int)
+
+union_alias_in_union: PersonOrId | str = {"name": "Alice", "age": 30}
+reveal_type(union_alias_in_union)  # revealed: Person
+```
+
+Dictionary constructors use the same aliased `TypedDict` context:
+
+```py
+constructed: PersonOrId | str = dict(name="Alice", age=30)
+reveal_type(constructed)  # revealed: Person
+```
+
+Both dictionary literals and constructors reject unknown keys:
+
+```py
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+invalid_constructor: PersonOrId | str = dict(name="Alice", age=30, nickname="Ali")
+```
+
 ## Type ignore compatibility issues
 
 Users should be able to ignore TypedDict validation errors with `# type: ignore`

@@ -440,7 +440,7 @@ class cached_property(Generic[_T_co]):
 
     def __set_name__(self, owner: type[Any], name: str) -> None: ...
     # __set__ is not defined at runtime, but @cached_property is designed to be settable
-    def __set__(self, instance: object, value: _T_co) -> None: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
+    def __set__(self, instance: object, value: _T_co) -> None: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # pyrefly: ignore [invalid-variance]
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 

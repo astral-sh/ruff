@@ -1,7 +1,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
-use except_handlers::{ExceptionHandlers, TryNodeContextStackManager};
+use except_handlers::{ExceptionContextStackManager, ExceptionHandlers};
 use itertools::Itertools;
 use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -244,8 +244,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'ast str>,
 
-    /// Per-scope contexts regarding nested `try`/`except` statements
-    try_node_context_stack_manager: TryNodeContextStackManager,
+    /// Per-scope exception contexts for nested `try` and `with` statements.
+    exception_context_stack_manager: ExceptionContextStackManager,
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
@@ -257,7 +257,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
-    in_try: bool,
+    /// Whether the current statement is inside a `try` statement, including its `except`, `else`,
+    /// and `finally` suites. Used for semantic syntax checks independently of handler activity.
+    in_try_statement: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -316,7 +318,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_statements: Vec::new(),
             current_match_case: None,
             current_first_parameter_name: None,
-            try_node_context_stack_manager: TryNodeContextStackManager::default(),
+            exception_context_stack_manager: ExceptionContextStackManager::default(),
 
             has_future_annotations: false,
             in_type_checking_block: false,
@@ -349,7 +351,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             python_version: file.python_version(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
-            in_try: false,
+            in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: FxHashMap::default(),
             alias_predicates: FxHashMap::default(),
@@ -509,7 +511,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let scope = Scope::new(parent, node_with_kind, children_start..children_start);
         let is_class_scope = scope.kind().is_class();
-        self.try_node_context_stack_manager.enter_nested_scope();
+        self.exception_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
         self.place_tables.push(PlaceTableBuilder::default());
@@ -898,7 +900,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// scope, including those contributed by `global` and `nonlocal` keywords in the popped scope,
     /// but excluding nested `nonlocal`s that resolved to the popped scope.
     fn pop_scope(&mut self) -> NestedGlobalOrNonlocalDeclarations {
-        self.try_node_context_stack_manager.exit_scope();
+        self.exception_context_stack_manager.exit_scope();
 
         let ScopeInfo {
             file_scope_id: popped_scope_id,
@@ -2172,6 +2174,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::ContextManagerSuppresses { .. }
+                    | PredicateNode::FinallyNormalPathImpossible { .. }
                     | PredicateNode::IsNonEmptyIterable(_)
                     | PredicateNode::OrPatternAlternative(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
@@ -2207,9 +2211,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Records that the current state can enter any active `finally` suites before the current
     /// terminal control-flow transfer reaches its destination.
     fn record_terminal_finally_entry(&mut self) {
-        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
-        try_node_stack_manager.record_terminal_finally_entry(self);
-        self.try_node_context_stack_manager = try_node_stack_manager;
+        let mut exception_context_stack_manager =
+            std::mem::take(&mut self.exception_context_stack_manager);
+        exception_context_stack_manager.record_terminal_finally_entry(self);
+        self.exception_context_stack_manager = exception_context_stack_manager;
     }
 
     /// Returns whether an exception raised while evaluating `scope` can propagate directly to its
@@ -2242,19 +2247,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///     reveal_type(state)  # Literal[1]
     /// ```
     ///
-    /// Skips snapshot construction entirely when no enclosing `try` suite has active handlers.
+    /// Skips snapshot construction when no enclosing `try` or `with` context can handle exceptions.
     fn record_exception_checkpoint(&mut self) {
-        if !self.in_try
-            || !self
-                .try_node_context_stack_manager
-                .has_active_exception_handler(self)
+        if !self
+            .exception_context_stack_manager
+            .has_active_exception_handler(self)
         {
             return;
         }
 
-        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
-        try_node_stack_manager.record_exception_checkpoint(self);
-        self.try_node_context_stack_manager = try_node_stack_manager;
+        let mut exception_context_stack_manager =
+            std::mem::take(&mut self.exception_context_stack_manager);
+        exception_context_stack_manager.record_exception_checkpoint(self);
+        self.exception_context_stack_manager = exception_context_stack_manager;
     }
 
     fn record_exception_checkpoint_if(&mut self, can_raise: bool) {
@@ -2273,9 +2278,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         is_use
-            && self.in_try
             && self
-                .try_node_context_stack_manager
+                .exception_context_stack_manager
                 .has_active_exception_handler(self)
             && self
                 .current_place_table()
@@ -3647,7 +3651,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 if msg.is_some()
                     || self
-                        .try_node_context_stack_manager
+                        .exception_context_stack_manager
                         .has_active_exception_handler(self)
                 {
                     let truthy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
@@ -4021,6 +4025,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_expr(context_expr);
                     self.record_exception_checkpoint();
 
+                    self.exception_context_stack_manager
+                        .push_context_manager_context();
+
                     if let Some(optional_vars) = optional_vars.as_deref() {
                         let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
@@ -4033,8 +4040,62 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         );
                     }
                 }
+
                 self.visit_body(body);
-                self.record_exception_checkpoint();
+
+                for item in items.iter().rev() {
+                    let mut exceptional_entries = self
+                        .exception_context_stack_manager
+                        .finish_context_manager_context()
+                        .into_iter();
+
+                    if let Some(exceptional_entry) = exceptional_entries.next() {
+                        let normal_exit = self.flow_snapshot();
+                        if normal_exit.is_always_unreachable() {
+                            self.exception_context_stack_manager
+                                .record_deferred_terminal_context_manager_exit();
+                        }
+                        let context_expr = &item.context_expr;
+                        let expression = self
+                            .expressions_by_node
+                            .get(&ExpressionNodeKey::from(context_expr))
+                            .copied()
+                            .unwrap_or_else(|| self.add_standalone_expression(context_expr));
+                        let predicate = PredicateOrLiteral::Predicate(Predicate {
+                            node: PredicateNode::ContextManagerSuppresses {
+                                expression,
+                                is_async: *is_async,
+                            },
+                            is_positive: true,
+                        });
+                        let predicate_id = self.add_predicate(predicate);
+
+                        self.flow_restore(exceptional_entry);
+                        for exceptional_entry in exceptional_entries {
+                            self.flow_merge(exceptional_entry);
+                        }
+
+                        self.record_ambiguous_reachability();
+                        let reachability_constraint = self
+                            .current_reachability_constraints_mut()
+                            .add_atom(predicate_id);
+                        let narrowing_constraint = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_atom(predicate_id);
+                        self.current_use_def_map_mut()
+                            .record_non_terminal_call_constraints(
+                                reachability_constraint,
+                                narrowing_constraint,
+                            );
+
+                        self.flow_merge(normal_exit);
+                    }
+
+                    // A manager cannot suppress an exception raised by its own exit method, but
+                    // an earlier manager or enclosing `try` statement can still receive it.
+                    self.record_exception_checkpoint();
+                }
             }
 
             ast::Stmt::For(
@@ -4337,7 +4398,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 range: _,
                 node_index: _,
             }) => {
-                let was_in_try = std::mem::replace(&mut self.in_try, true);
+                let was_in_try_statement = std::mem::replace(&mut self.in_try_statement, true);
                 self.record_ambiguous_reachability();
 
                 let exception_handlers = if handlers.is_empty() {
@@ -4350,8 +4411,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     ExceptionHandlers::propagating()
                 };
-                self.try_node_context_stack_manager
-                    .push_context(exception_handlers);
+                self.exception_context_stack_manager
+                    .push_try_context(exception_handlers, !finalbody.is_empty());
 
                 // Visit the `try` block!
                 self.visit_body(body);
@@ -4362,7 +4423,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // that may raise. Keep the context itself on the stack so that terminal statements
                 // in `except` and `else` suites can still be recorded as entries to the associated
                 // `finally` suite.
-                let try_block_snapshots = self.try_node_context_stack_manager.end_try_suite();
+                let try_block_snapshots = self.exception_context_stack_manager.end_try_suite();
 
                 if !handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block
@@ -4449,9 +4510,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 let normal_pre_finally_state = self.flow_snapshot();
-                let (terminal_finally_entry_snapshots, has_escaping_exception) = self
-                    .try_node_context_stack_manager
-                    .pop_context()
+                let (
+                    terminal_finally_entry_snapshots,
+                    has_escaping_exception,
+                    has_deferred_terminal_context_manager_exit,
+                ) = self
+                    .exception_context_stack_manager
+                    .pop_try_context()
                     .into_finally_entry_state();
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit
@@ -4481,6 +4546,53 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.mark_unreachable();
                 } else {
+                    let mut post_finally_terminal_predicate = None;
+                    let mut terminal_snapshots = terminal_finally_entry_snapshots.into_iter();
+                    if has_deferred_terminal_context_manager_exit
+                        && let Some(snapshot) = terminal_snapshots.next()
+                    {
+                        let continuation = self.current_use_def_map().reachability;
+                        self.current_reachability_constraints_mut()
+                            .mark_used(continuation);
+                        let predicate_id =
+                            self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+                                node: PredicateNode::FinallyNormalPathImpossible {
+                                    scope: self.current_scope_id(),
+                                    continuation,
+                                },
+                                is_positive: true,
+                            }));
+
+                        self.flow_restore(snapshot);
+                        for snapshot in terminal_snapshots {
+                            self.flow_merge(snapshot);
+                        }
+
+                        let reachability_constraint = self
+                            .current_reachability_constraints_mut()
+                            .add_atom(predicate_id);
+                        let narrowing_constraint = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_atom(predicate_id);
+                        self.current_use_def_map_mut()
+                            .record_non_terminal_call_constraints(
+                                reachability_constraint,
+                                narrowing_constraint,
+                            );
+
+                        if finalbody.is_empty() {
+                            let terminal_snapshot = self.flow_snapshot();
+                            self.flow_restore(normal_pre_finally_state);
+                            self.exception_context_stack_manager
+                                .propagate_deferred_terminal_context_manager_exit(
+                                    terminal_snapshot,
+                                );
+                        } else {
+                            self.flow_merge(normal_pre_finally_state);
+                            post_finally_terminal_predicate = Some(predicate_id);
+                        }
+                    }
                     // Mixed normal and terminal entry states are still handled by the normal path
                     // only. See the corresponding TODO tests in `terminal_statements.md`.
                     self.visit_body(finalbody);
@@ -4491,8 +4603,44 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     {
                         self.record_exception_checkpoint();
                     }
+
+                    if let Some(predicate_id) = post_finally_terminal_predicate
+                        && self.current_use_def_map().reachability
+                            != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                    {
+                        let post_finally_state = self.flow_snapshot();
+                        let terminal_reachability = self
+                            .current_reachability_constraints_mut()
+                            .add_atom(predicate_id);
+                        let terminal_narrowing = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_atom(predicate_id);
+                        self.current_use_def_map_mut()
+                            .record_non_terminal_call_constraints(
+                                terminal_reachability,
+                                terminal_narrowing,
+                            );
+                        let terminal_snapshot = self.flow_snapshot();
+                        self.flow_restore(post_finally_state);
+                        self.exception_context_stack_manager
+                            .propagate_deferred_terminal_context_manager_exit(terminal_snapshot);
+
+                        let normal_reachability = self
+                            .current_reachability_constraints_mut()
+                            .add_not_constraint(terminal_reachability);
+                        let normal_narrowing = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_negated_atom(predicate_id);
+                        self.current_use_def_map_mut()
+                            .record_non_terminal_call_constraints(
+                                normal_reachability,
+                                normal_narrowing,
+                            );
+                    }
                 }
-                self.in_try = was_in_try;
+                self.in_try_statement = was_in_try_statement;
             }
 
             ast::Stmt::Raise(_) => {
@@ -4511,6 +4659,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
 
             ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {
+                if self
+                    .exception_context_stack_manager
+                    .has_context_manager_exception_checkpoint()
+                {
+                    self.record_ambiguous_reachability();
+                }
                 let snapshot = self.flow_snapshot();
                 if let Some(current_loop) = self.current_loop_mut() {
                     if stmt.is_continue_stmt() {
@@ -5382,7 +5536,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             | ScopeKind::TypeParams => {}
         }
 
-        if self.in_try {
+        if self.in_try_statement {
             return Some(LazyImportContext::TryExceptBlocks);
         }
 

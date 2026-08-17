@@ -43,6 +43,8 @@ def open_new_tab(url: str) -> bool:
     If not possible, then the behavior becomes equivalent to open_new().
     """
 
+def register_standard_browsers() -> None: ...
+
 class BaseBrowser:
     """Parent class for all browsers. Do not use directly."""
 

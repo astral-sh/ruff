@@ -1,17 +1,8 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  dependencyDashboard: true,
-  suppressNotifications: ["prEditedNotification"],
   extends: ["github>astral-sh/renovate-config"],
-  labels: ["internal"],
   schedule: ["before 4am on Wednesday"],
-  semanticCommits: "disabled",
-  separateMajorMinor: false,
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm", "custom.regex"],
-  cargo: {
-    // See https://docs.renovatebot.com/configuration-options/#rangestrategy
-    rangeStrategy: "update-lockfile",
-  },
   pep621: {
     // The default for this package manager is to only search for `pyproject.toml` files
     // found at the repository root: https://docs.renovatebot.com/modules/manager/pep621/#file-matching
@@ -35,29 +26,7 @@
     // found at the repository root: https://docs.renovatebot.com/modules/manager/npm/#file-matching
     managerFilePatterns: ["^playground/.*package\\.json$"],
   },
-  "pre-commit": {
-    enabled: true,
-  },
   packageRules: [
-    // Pin GitHub Actions to immutable SHAs.
-    {
-      matchDepTypes: ["action"],
-      pinDigests: true,
-    },
-    // Annotate GitHub Actions SHAs with a SemVer version.
-    {
-      extends: ["helpers:pinGitHubActionDigests"],
-      extractVersion: "^(?<version>v?\\d+\\.\\d+\\.\\d+)$",
-      versioning: "regex:^v?(?<major>\\d+)(\\.(?<minor>\\d+)\\.(?<patch>\\d+))?$",
-    },
-    {
-      // Group upload/download artifact updates, the versions are dependent
-      groupName: "Artifact GitHub Actions dependencies",
-      matchManagers: ["github-actions"],
-      matchDatasources: ["gitea-tags", "github-tags"],
-      matchPackageNames: ["actions/upload-artifact", "actions/download-artifact"],
-      description: "Weekly update of artifact-related GitHub Actions dependencies",
-    },
     {
       // This package rule disables updates for GitHub runners:
       // we'd only pin them to a specific version
@@ -104,7 +73,6 @@
       // We have a rolling support policy for the MSRV
       // 2 releases back * 6 weeks per release * 7 days per week + 1
       minimumReleaseAge: "85 days",
-      internalChecksFilter: "strict",
       groupName: "MSRV",
     },
     {
@@ -153,8 +121,4 @@
       datasourceTemplate: "github-releases",
     },
   ],
-  vulnerabilityAlerts: {
-    commitMessageSuffix: "",
-    labels: ["internal", "security"],
-  },
 }

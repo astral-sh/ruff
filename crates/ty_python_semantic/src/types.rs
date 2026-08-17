@@ -69,7 +69,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{
     AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
-    report_bad_dunder_get_call,
+    report_bad_dunder_get_call, report_bad_import_call,
 };
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
@@ -625,6 +625,12 @@ enum MemberLookupErrorKind<'db> {
         name: Type<'db>,
     },
 
+    /// An invalid module-level `__getattr__` call, stored without its call bindings.
+    ModuleGetAttr {
+        callable: Type<'db>,
+        name: Type<'db>,
+    },
+
     /// An invalid attribute-interception call, represented by its receiver and attribute name.
     GetAttribute {
         receiver: Type<'db>,
@@ -704,8 +710,57 @@ impl<'db> MemberLookupError<'db> {
                     );
                 }
             }
-            MemberLookupErrorKind::DescriptorGet(_) => {}
+            MemberLookupErrorKind::ModuleGetAttr { .. }
+                if assigned_type.is_none()
+                    && let Some(failure) = self.module_getattr_call_failure(db, env) =>
+            {
+                report_bad_attribute_access_call(
+                    context,
+                    &failure,
+                    object_type,
+                    target,
+                    AttributeAccessMethod::GetAttr,
+                );
+            }
+            MemberLookupErrorKind::DescriptorGet(_)
+            | MemberLookupErrorKind::ModuleGetAttr { .. } => {}
         }
+    }
+
+    /// Reports a failed module `__getattr__` call on a `from` import.
+    ///
+    /// Imports defer this diagnostic until they have ruled out a real submodule:
+    ///
+    /// ```python
+    /// from package import missing  # Calls package.__getattr__("missing").
+    /// ```
+    fn report_module_getattr_import_diagnostic(
+        self,
+        context: &InferContext<'db, '_>,
+        module: ModuleLiteralType<'db>,
+        target: &ast::Alias,
+        name: &str,
+    ) {
+        if let Some(failure) =
+            self.module_getattr_call_failure(context.db(), context.program_environment())
+        {
+            report_bad_import_call(context, &failure, module, target, name);
+        }
+    }
+
+    /// Recreates a failed module `__getattr__` call without caching its call bindings.
+    fn module_getattr_call_failure(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<CallError<'db>> {
+        let MemberLookupErrorKind::ModuleGetAttr { callable, name } = self.kind(db) else {
+            return None;
+        };
+
+        callable
+            .try_call(db, env, &CallArguments::positional([name]))
+            .err()
     }
 }
 
@@ -2542,13 +2597,31 @@ impl<'db> Type<'db> {
     /// If the type is a union (or a type alias that resolves to a union), filters union elements
     /// based on the provided predicate.
     ///
+    /// Aliases among the elements are expanded first. An element may itself be an alias for a
+    /// union, which is otherwise left unexpanded so diagnostics can name it, but filtering is a
+    /// set operation and has to see the members rather than the name.
+    ///
     /// Otherwise, returns the type unchanged.
-    fn filter_union(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
-        if let Type::Union(union) = self.resolve_type_alias(db) {
-            union.filter(db, f)
+    fn filter_union(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut f: impl FnMut(&Type<'db>) -> bool,
+    ) -> Type<'db> {
+        let Type::Union(union) = self.resolve_type_alias(db) else {
+            return self;
+        };
+        let union = if union.has_aliases(db) {
+            match union.expand_aliases(db, env) {
+                Type::Union(expanded) => expanded,
+                // Expanding collapsed the union to a single type, leaving nothing to filter
+                // between, so apply the predicate to it directly.
+                expanded => return if f(&expanded) { expanded } else { Type::Never },
+            }
         } else {
-            self
-        }
+            union
+        };
+        union.filter(db, f)
     }
 
     /// If the type is a union, removes union elements that are disjoint from `target`.
@@ -2562,7 +2635,7 @@ impl<'db> Type<'db> {
         inferable: TypeVarSet<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
-        self.filter_union(db, |elem| {
+        self.filter_union(db, env, |elem| {
             !elem
                 .when_disjoint_from(db, env, target, &constraints, inferable)
                 .is_always_satisfied(db, env)
@@ -3550,20 +3623,14 @@ impl<'db> Type<'db> {
         else {
             return dynamic_instance_fallback;
         };
-        let all_arms_are_possible_data_descriptors = declaration
-            .ty
-            .resolve_type_alias(db)
-            .as_union()
-            .is_none_or(|union| {
-                union
-                    .elements(db)
-                    .iter()
-                    .all(|ty| ty.may_be_data_descriptor(db, env))
-            });
+        let mut all_arms_are_possible_data_descriptors = true;
+        let descriptor_ty = declaration.ty.filter_union(db, env, |ty| {
+            let is_possible_data_descriptor = ty.may_be_data_descriptor(db, env);
+            all_arms_are_possible_data_descriptors &= is_possible_data_descriptor;
+            is_possible_data_descriptor
+        });
         Place::Defined(DefinedPlace {
-            ty: declaration
-                .ty
-                .filter_union(db, |ty| ty.may_be_data_descriptor(db, env)),
+            ty: descriptor_ty,
             definedness: if all_arms_are_possible_data_descriptors {
                 declaration.definedness
             } else {
@@ -3717,7 +3784,9 @@ impl<'db> Type<'db> {
         name: &str,
     ) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
-            module.static_member(db, env, name).place
+            module
+                .static_member(db, env, name)
+                .map_or(Place::Undefined, |member| member.place)
         } else if let place @ Place::Defined(_) = self.class_member(db, env, name).place {
             place
         } else if let Some(place @ Place::Defined(_)) = self
@@ -4926,7 +4995,7 @@ impl<'db> Type<'db> {
                     Place::bound(Type::int_literal(i64::from(bool_value))).into()
                 }
 
-                Type::ModuleLiteral(module) => module.static_member(db, env, name_str).into(),
+                Type::ModuleLiteral(module) => module.static_member(db, env, name_str),
 
                 // If a protocol does not include a member and the policy disables falling back to
                 // `object`, we return `Place::Undefined` here. This short-circuits attribute lookup
@@ -8102,6 +8171,14 @@ impl<'db> Type<'db> {
                 instance.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
 
+            Type::TypedDict(TypedDictType::Class(class)) => {
+                class.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+            }
+
+            // Synthesized schemas can contain type variables, but their internal narrowing and
+            // update constraints inherit those variables from an existing generic context.
+            Type::TypedDict(TypedDictType::Synthesized(_)) => {}
+
             Type::NewTypeInstance(_) => {
                 // A newtype can never be constructed from an unspecialized generic class, so it is
                 // impossible that we could ever find any legacy typevars in a newtype instance or
@@ -8250,8 +8327,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::LiteralValue(_)
             | Type::BoundSuper(_)
-            | Type::SpecialForm(_)
-            | Type::TypedDict(_) => {}
+            | Type::SpecialForm(_) => {}
         }
     }
 
@@ -9963,48 +10039,75 @@ impl<'db> ModuleLiteralType<'db> {
         Some(Type::module_literal(db, importing_file, submodule))
     }
 
+    /// Resolves a missing member through the module's `__getattr__` function.
+    ///
+    /// Invalid calls retain their declared return type for recovery while deferring the diagnostic
+    /// until the caller determines whether the fallback actually takes precedence.
+    ///
+    /// ```python
+    /// # example.py
+    /// def __getattr__() -> str: ...
+    ///
+    /// # Another module:
+    /// import example
+    /// example.missing  # Invalid call; the recovery type is str.
+    /// ```
     fn try_module_getattr(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
-        // For module literals, we want to try calling the module's own `__getattr__` function
-        // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
-        let module = self.module(db);
-        if let Some(file) = module
+    ) -> MemberLookupResult<'db> {
+        if let Some(file) = self
+            .module(db)
             .file(db)
             .map(|file| ProgramFile::new(db, file, env.program(db)))
+            && let Place::Defined(place) =
+                imported_symbol(db, env, Some(file), "__getattr__", None).place
         {
-            let getattr_symbol = imported_symbol(db, env, Some(file), "__getattr__", None);
-            // If we found a __getattr__ function, try to call it with the name argument
-            if let Place::Defined(place) = getattr_symbol.place
-                && let Ok(outcome) = place.ty.try_call(
-                    db,
-                    env,
-                    &CallArguments::positional([Type::string_literal(db, name)]),
-                )
-            {
-                return PlaceAndQualifiers {
+            let name_type = Type::string_literal(db, name);
+            let (return_type, error) =
+                match place
+                    .ty
+                    .try_call(db, env, &CallArguments::positional([name_type]))
+                {
+                    Ok(outcome) => (outcome.return_type(db, env), None),
+                    Err(CallError(_, bindings)) => (
+                        bindings.return_type(db, env),
+                        Some(MemberLookupErrorKind::ModuleGetAttr {
+                            callable: place.ty,
+                            name: name_type,
+                        }),
+                    ),
+                };
+
+            return member_lookup_result(
+                db,
+                PlaceAndQualifiers {
                     place: Place::Defined(DefinedPlace {
-                        ty: outcome.return_type(db, env),
+                        ty: return_type,
                         provenance: Provenance::Unknown,
                         ..place
                     }),
                     qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
-                };
-            }
+                },
+                error,
+            );
         }
 
         Place::Undefined.into()
     }
 
+    /// Looks up a module member while preserving failed module-level `__getattr__` calls.
+    ///
+    /// The failed call and its recovery type are retained so direct attribute access and `from`
+    /// imports can report the error after resolving lookup precedence.
     fn static_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> MemberLookupResult<'db> {
         let module = self.module(db);
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
@@ -10012,7 +10115,8 @@ impl<'db> ModuleLiteralType<'db> {
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db, env)
-                .member(db, env, "__dict__");
+                .member(db, env, "__dict__")
+                .into();
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -10056,11 +10160,12 @@ impl<'db> ModuleLiteralType<'db> {
                         ..defined
                     }),
                     qualifiers: place_and_qualifiers.qualifiers,
-                };
+                }
+                .into();
             }
         }
 
-        place_and_qualifiers
+        place_and_qualifiers.into()
     }
 }
 

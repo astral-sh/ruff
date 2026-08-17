@@ -62,7 +62,7 @@ PublishDiagnosticsParams {
                 "ty",
             ),
             message: String(
-                "Name `PythonFinalizationError` used when not defined\n\ninfo: `PythonFinalizationError` was added as a builtin in Python 3.13\ninfo: Python 3.12 was assumed when resolving types because it was specified in script metadata",
+                "Name `PythonFinalizationError` used when not defined\n\ninfo: `PythonFinalizationError` was added as a builtin in Python 3.13",
             ),
             tags: None,
             related_information: None,

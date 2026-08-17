@@ -1386,6 +1386,38 @@ def _(x: list[int], y: dict[int, int]):
     reveal_type(h(y))  # revealed: int | None
 ```
 
+A bounded type variable should still be enforced when it appears in multiple union members and the
+argument is itself a union. This currently exposes <https://github.com/astral-sh/ty/issues/4277>:
+
+```py
+class Box[T]: ...
+
+def unbox[T: bytes](value: Box[T] | T) -> T:
+    raise NotImplementedError
+
+def invalid_union(value: int | str) -> None:
+    # TODO: This should report [invalid-argument-type]: neither `int` nor `str` satisfies `T: bytes`.
+    reveal_type(unbox(value))  # revealed: Unknown
+```
+
+The same missing constraint lets an incompatible generic overload win over a matching overload:
+
+```py
+from typing import assert_type, overload
+
+@overload
+def select[T: bytes](value: Box[T] | T) -> T: ...
+@overload
+def select(value: int | str) -> bool: ...
+def select(value: object) -> object:
+    raise NotImplementedError
+
+def selects_invalid_overload(value: int | str) -> None:
+    # TODO: This should select the second overload and infer `bool`.
+    # error: [type-assertion-failure] "Type `Unknown` does not match asserted type `bool`"
+    assert_type(select(value), bool)
+```
+
 ## Bounded typevar call context through a union
 
 Regression test for an `invalid-assignment` false positive: `list(items)` should be assignable to

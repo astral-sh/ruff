@@ -63,6 +63,9 @@ release = [
     "rooster==0.1.1",
 ]
 
+[tool.uv]
+exclude-newer = "P7D"
+
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
 release = { requires-python = ">=3.12" }
@@ -133,6 +136,7 @@ version_files = [
     "pyproject.toml",
     # Might become unneeded once Markdown formatting is stabilized.
     "docs/formatter.md",
+    "docs/installation.md",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
