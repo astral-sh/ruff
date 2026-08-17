@@ -1,5 +1,124 @@
 # Structures
 
+## Imported modules can be reassigned
+
+Importing a module binds its current module-literal type, but does not declare that later
+assignments must preserve that exact type.
+
+```py
+import os
+from types import ModuleType
+
+def normalize(module: ModuleType) -> ModuleType:
+    return module
+
+os = normalize(os)
+reveal_type(os)  # revealed: ModuleType
+```
+
+## Imported names can be rebound by match patterns in loops
+
+Checking whether an imported name is `Final` must not recursively infer synthetic loop or
+comprehension bindings when a match pattern rebinds that name.
+
+```py
+import os as x
+
+class C:
+    x = object()
+
+items = [object()]
+
+for _ in items:
+    match (x for _ in items):
+        case C.x as x:
+            pass
+        case C():
+            x = 0
+```
+
+## Imported names can be rebound by context managers
+
+An imported name is an ordinary binding, so a context-manager target may replace it with a value of
+another type.
+
+`values.py`:
+
+```py
+value: str = "before"
+```
+
+```py
+from values import value
+
+class Manager:
+    def __enter__(self) -> int:
+        return 1
+
+    def __exit__(self, exc_type, exc_value, traceback): ...
+
+with Manager() as value:
+    reveal_type(value)  # revealed: int
+```
+
+## Existing annotations constrain imported bindings
+
+An import must respect an existing declaration without creating a conflicting declaration of its
+own.
+
+`values.py`:
+
+```py
+value: str = "available"
+```
+
+```py
+value: str | None
+
+try:
+    from values import value
+except ImportError:
+    value = None
+
+reveal_type(value)  # revealed: str | None
+```
+
+## Imported values must satisfy existing annotations
+
+Although an import does not declare a type, its value must still be assignable to an existing local
+declaration.
+
+`values.py`:
+
+```py
+value: str = "incompatible"
+```
+
+```py
+value: int
+
+from values import value  # error: [invalid-assignment]
+
+reveal_type(value)  # revealed: int
+```
+
+## Star-imported names can be reassigned
+
+Wildcard imports bind the names they introduce without declaring their imported types.
+
+`values.py`:
+
+```py
+value: str = "before"
+```
+
+```py
+from values import *
+
+value = 1
+reveal_type(value)  # revealed: Literal[1]
+```
+
 ## Class import following
 
 ```py

@@ -7,7 +7,8 @@ use ty_module_resolver::{
 
 use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
+    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin},
+    reachability::evaluate_reachability_with_cache,
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
         diagnostic::{
@@ -15,13 +16,46 @@ use crate::{
             hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
-        infer::{TypeInferenceBuilder, builder::DeclaredAndInferredType},
+        infer::TypeInferenceBuilder,
         infer_definition_types,
     },
 };
 use ty_python_core::definition::Definition;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
+    /// Binds an imported value without declaring its type, except for inherited `Final` metadata.
+    ///
+    /// An import does not itself constrain later assignments. Imported `Final` values still need a
+    /// declaration so their qualifier survives re-exports and prevents later reassignment:
+    ///
+    /// ```python
+    /// # values.py
+    /// from typing import Final
+    /// VALUE: Final[int] = 1
+    ///
+    /// # consumer.py
+    /// from values import VALUE
+    /// VALUE = 2  # invalid-assignment
+    /// ```
+    fn add_imported_binding(
+        &mut self,
+        alias: &'ast ast::Alias,
+        definition: Definition<'db>,
+        ty: Type<'db>,
+        qualifiers: TypeQualifiers,
+        provenance: Provenance<'db>,
+    ) {
+        self.add_binding(alias.into(), definition).insert(self, ty);
+
+        if qualifiers.contains(TypeQualifiers::FINAL) {
+            self.declarations.insert(
+                definition,
+                TypeAndQualifiers::new(ty, TypeOrigin::Declared, qualifiers)
+                    .with_provenance(provenance),
+            );
+        }
+    }
+
     pub(super) fn infer_import_statement(&mut self, import: &ast::StmtImport) {
         let ast::StmtImport {
             names,
@@ -163,7 +197,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn infer_import_definition(
         &mut self,
-        alias: &ast::Alias,
+        alias: &'ast ast::Alias,
         definition: Definition<'db>,
     ) {
         let ast::Alias {
@@ -176,7 +210,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // The name of the module being imported
         let Some(full_module_name) = ModuleName::new(name) else {
             tracing::debug!("Failed to resolve import due to invalid syntax");
-            self.add_unknown_declaration_with_binding(alias.into(), definition);
+            self.add_binding(alias.into(), definition)
+                .insert(self, Type::unknown());
             return;
         };
 
@@ -186,18 +221,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .matches(&full_module_name)
             .is_include()
         {
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                &DeclaredAndInferredType::are_the_same_type(Type::any()),
-            );
+            self.add_binding(alias.into(), definition)
+                .insert(self, Type::any());
             return;
         }
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
             self.report_unresolved_import(alias.range(), 0, Some(name), Some(&full_module_name));
-            self.add_unknown_declaration_with_binding(alias.into(), definition);
+            self.add_binding(alias.into(), definition)
+                .insert(self, Type::unknown());
             return;
         };
 
@@ -212,7 +245,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let topmost_parent_name =
                 ModuleName::new(full_module_name.components().next().unwrap()).unwrap();
             let Some(topmost_parent_ty) = self.module_type_from_name(&topmost_parent_name) else {
-                self.add_unknown_declaration_with_binding(alias.into(), definition);
+                self.add_binding(alias.into(), definition)
+                    .insert(self, Type::unknown());
                 return;
             };
             topmost_parent_ty
@@ -222,11 +256,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             full_module_ty
         };
 
-        self.add_declaration_with_binding(
-            alias.into(),
-            definition,
-            &DeclaredAndInferredType::are_the_same_type(binding_ty),
-        );
+        self.add_binding(alias.into(), definition)
+            .insert(self, binding_ty);
     }
 
     pub(super) fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
@@ -245,12 +276,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for alias in names {
             for definition in self.index.definitions(alias) {
+                if let Some(star_import) = definition.kind(db).as_star_import() {
+                    let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+                    if let Some(binding) = use_def
+                        .reachable_symbol_bindings(star_import.symbol_id())
+                        .find(|binding| {
+                            binding
+                                .binding
+                                .is_defined_and(|candidate| candidate == *definition)
+                        })
+                        && evaluate_reachability_with_cache(
+                            db,
+                            Some(self.reachability_cache()),
+                            use_def.reachability_constraints(),
+                            use_def.predicates(),
+                            binding.reachability_constraint,
+                        )
+                        .is_always_false()
+                    {
+                        continue;
+                    }
+                }
+
                 let inferred = infer_definition_types(self.db(), *definition);
                 // Check non-star imports for deprecations
                 if definition.kind(db).as_star_import().is_none() {
-                    // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.
-                    for ty in inferred.declaration_types() {
-                        self.check_deprecated(alias, ty.inner);
+                    // In the initial cycle, `bindings()` is empty, so no deprecation check is performed.
+                    for (_, ty) in inferred.bindings(*definition) {
+                        self.check_deprecated(alias, ty);
                     }
                 }
                 self.extend_definition(*definition, inferred);
@@ -319,7 +372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_import_from_definition(
         &mut self,
         import_from: &ast::StmtImportFrom,
-        alias: &ast::Alias,
+        alias: &'ast ast::Alias,
         definition: Definition<'db>,
     ) {
         let db = self.db();
@@ -330,7 +383,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         let Ok(module_name) = ModuleName::from_import_statement(db, importing_file, import_from)
         else {
-            self.add_unknown_declaration_with_binding(alias.into(), definition);
+            self.add_binding(alias.into(), definition)
+                .insert(self, Type::unknown());
             return;
         };
 
@@ -340,16 +394,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .matches(&module_name)
             .is_include()
         {
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                &DeclaredAndInferredType::are_the_same_type(Type::any()),
-            );
+            self.add_binding(alias.into(), definition)
+                .insert(self, Type::any());
             return;
         }
 
         let Some(module) = resolve_module(db, importing_file, &module_name) else {
-            self.add_unknown_declaration_with_binding(alias.into(), definition);
+            self.add_binding(alias.into(), definition)
+                .insert(self, Type::unknown());
             return;
         };
 
@@ -413,19 +465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
                     from_module_getattr = Some((ty, qualifiers, source_provenance, error));
                 } else {
-                    self.add_declaration_with_binding(
-                        alias.into(),
-                        definition,
-                        &DeclaredAndInferredType::MightBeDifferent {
-                            declared_ty: TypeAndQualifiers {
-                                inner: ty,
-                                origin: TypeOrigin::Declared,
-                                qualifiers,
-                                provenance: source_provenance,
-                            },
-                            inferred_ty: ty,
-                        },
-                    );
+                    self.add_imported_binding(alias, definition, ty, qualifiers, source_provenance);
                     return;
                 }
             }
@@ -459,11 +499,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_ref()
             .and_then(|submodule_name| self.module_type_from_name(submodule_name))
         {
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                &DeclaredAndInferredType::are_the_same_type(submodule_type),
-            );
+            self.add_binding(alias.into(), definition)
+                .insert(self, submodule_type);
             return;
         }
 
@@ -478,23 +515,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     name,
                 );
             }
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                &DeclaredAndInferredType::MightBeDifferent {
-                    declared_ty: TypeAndQualifiers {
-                        inner: ty,
-                        origin: TypeOrigin::Declared,
-                        qualifiers,
-                        provenance: source_provenance,
-                    },
-                    inferred_ty: ty,
-                },
-            );
+            self.add_imported_binding(alias, definition, ty, qualifiers, source_provenance);
             return;
         }
 
-        self.add_unknown_declaration_with_binding(alias.into(), definition);
+        self.add_binding(alias.into(), definition)
+            .insert(self, Type::unknown());
 
         if &alias.name == "*" {
             return;
