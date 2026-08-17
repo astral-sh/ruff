@@ -8,7 +8,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
     KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, TypedDictModule, todo_type,
+    TypeMapping, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -37,7 +37,7 @@ pub enum ClassBase<'db> {
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
     Generic,
-    TypedDict(TypedDictModule),
+    TypedDict(TypingModule),
 }
 
 impl<'db> ClassBase<'db> {
@@ -91,7 +91,7 @@ impl<'db> ClassBase<'db> {
         self.typed_dict_module().is_some()
     }
 
-    pub(super) const fn typed_dict_module(self) -> Option<TypedDictModule> {
+    pub(super) const fn typed_dict_module(self) -> Option<TypingModule> {
         match self {
             ClassBase::TypedDict(module) => Some(module),
             _ => None,
@@ -104,7 +104,7 @@ impl<'db> ClassBase<'db> {
     /// pseudo-base when detecting duplicate or conflicting bases.
     pub(super) const fn mro_identity(self) -> Self {
         match self {
-            Self::TypedDict(_) => Self::TypedDict(TypedDictModule::Typing),
+            Self::TypedDict(_) => Self::TypedDict(TypingModule::Typing),
             _ => self,
         }
     }
@@ -164,7 +164,7 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::Union(union) => {
-                if let Some(module) = TypedDictModule::from_type(db, ty) {
+                if let Some(module) = TypingModule::from_typed_dict_type(db, ty) {
                     return Some(ClassBase::TypedDict(module));
                 }
 

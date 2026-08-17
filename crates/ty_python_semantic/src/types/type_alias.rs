@@ -4,9 +4,9 @@ use std::fmt::Write;
 use crate::{
     Db, FxOrderSet,
     types::{
-        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext, KnownClass,
         KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
-        definition_expression_type,
+        TypingModule, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::VarianceInferable,
@@ -148,6 +148,9 @@ pub struct ManualPEP695TypeAliasType<'db> {
     pub definition: Definition<'db>,
 
     #[returns(copy)]
+    pub(super) typing_module: TypingModule,
+
+    #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
 
     /// Keeps recursive references stable while their alias body is materialized lazily.
@@ -223,6 +226,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             db,
             self.name(db),
             self.definition(db),
+            self.typing_module(db),
             Some(f(generic_context)),
             self.materialization_kind(db),
         )
@@ -326,6 +330,15 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
+    pub(super) fn known_class(self, db: &'db dyn Db) -> KnownClass {
+        match self {
+            TypeAliasType::PEP695(_) => KnownClass::TypeAliasType,
+            TypeAliasType::ManualPEP695(type_alias) => {
+                type_alias.typing_module(db).type_alias_class()
+            }
+        }
+    }
+
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
@@ -397,6 +410,7 @@ impl<'db> TypeAliasType<'db> {
                     db,
                     alias.name(db),
                     alias.definition(db),
+                    alias.typing_module(db),
                     None,
                     None,
                 ))
@@ -433,6 +447,7 @@ impl<'db> TypeAliasType<'db> {
                     db,
                     alias.name(db),
                     alias.definition(db),
+                    alias.typing_module(db),
                     alias.specialization(db),
                     materialization_kind,
                 ))

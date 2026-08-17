@@ -45,7 +45,7 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypingModule,
     UnionBuilder, VarianceInferable,
 };
 use crate::{
@@ -3130,7 +3130,7 @@ pub(super) enum ClassMemberResult<'db> {
     /// Found the member or exhausted the MRO.
     Done(CompletedMemberLookup<'db>),
     /// Encountered a `TypedDict` base.
-    TypedDict(TypedDictModule),
+    TypedDict(TypingModule),
 }
 
 pub(super) struct CompletedMemberLookup<'db> {

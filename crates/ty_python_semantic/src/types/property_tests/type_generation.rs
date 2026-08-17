@@ -486,7 +486,7 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
             Ty::KnownClassInstance(KnownClass::FunctionType),
             Ty::KnownClassInstance(KnownClass::SpecialForm),
             Ty::KnownClassInstance(KnownClass::TypeVar),
-            Ty::KnownClassInstance(KnownClass::TypeAliasType),
+            Ty::KnownClassInstance(KnownClass::ExtensionsTypeAliasType),
             Ty::KnownClassInstance(KnownClass::NoDefaultType),
             Ty::TypingLiteral,
             Ty::UnittestMockLiteral,

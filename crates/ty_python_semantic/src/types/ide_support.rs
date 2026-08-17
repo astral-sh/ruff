@@ -1643,7 +1643,14 @@ fn known_type_form_parameter_index(db: &dyn Db, callable_type: Type<'_>) -> Opti
             Some(KnownFunction::AssertType) => Some(1),
             _ => None,
         },
-        Type::ClassLiteral(class) if class.is_known(db, KnownClass::TypeAliasType) => Some(1),
+        Type::ClassLiteral(class)
+            if matches!(
+                class.known(db),
+                Some(KnownClass::TypeAliasType | KnownClass::ExtensionsTypeAliasType)
+            ) =>
+        {
+            Some(1)
+        }
         _ => None,
     }
 }

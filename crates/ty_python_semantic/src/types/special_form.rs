@@ -1,7 +1,7 @@
 //! An enumeration of special forms in the Python type system.
 //! Each of these is considered to inhabit a unique type in our model of the type system.
 
-use super::{ClassType, Type, TypeFormType, class::KnownClass};
+use super::{ClassType, Type, TypeFormType, TypingModule, class::KnownClass};
 use crate::ProgramEnvironment;
 use crate::db::Db;
 use crate::types::IntersectionType;
@@ -110,7 +110,7 @@ pub enum SpecialFormType {
     /// The symbol `typing.TypeGuard` (which can also be found as `typing_extensions.TypeGuard`)
     TypeGuard,
     /// The symbol `typing.TypedDict` or `typing_extensions.TypedDict`.
-    TypedDict(TypedDictModule),
+    TypedDict(TypingModule),
     /// The symbol `typing.TypeIs` (which can also be found as `typing_extensions.TypeIs`)
     TypeIs,
 
@@ -130,48 +130,6 @@ pub enum SpecialFormType {
     /// Typeshed defines this symbol as a class, but this isn't accurate: it's actually a factory function
     /// at runtime. We therefore represent it as a special form internally.
     NamedTuple,
-}
-
-/// The module or modules from which `TypedDict` may have been imported.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub enum TypedDictModule {
-    /// `typing.TypedDict`.
-    Typing,
-    /// `typing_extensions.TypedDict`.
-    TypingExtensions,
-}
-
-impl TypedDictModule {
-    /// Return the module for a `TypedDict` special form, including a union of the special forms
-    /// exported by `typing` and `typing_extensions`.
-    pub(super) fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        match ty {
-            Type::SpecialForm(SpecialFormType::TypedDict(module)) => Some(module),
-            Type::Union(union) => {
-                let mut elements = union.elements(db).iter();
-                let Type::SpecialForm(SpecialFormType::TypedDict(module)) = elements.next()? else {
-                    return None;
-                };
-                elements.try_fold(*module, |module, element| {
-                    let Type::SpecialForm(SpecialFormType::TypedDict(element_module)) = element
-                    else {
-                        return None;
-                    };
-                    // `typing_extensions.TypedDict` always offers strictly more functionality than `typing.TypedDict`.
-                    // If any element is from `typing`, we therefore infer that the type is a `typing.TypedDict`,
-                    // since an operation on a union is only valid if the operation is valid on all elements in the
-                    // union.
-                    Some(match (module, element_module) {
-                        (TypedDictModule::TypingExtensions, TypedDictModule::TypingExtensions) => {
-                            TypedDictModule::TypingExtensions
-                        }
-                        _ => TypedDictModule::Typing,
-                    })
-                })
-            }
-            _ => None,
-        }
-    }
 }
 
 impl SpecialFormType {
@@ -489,8 +447,8 @@ impl SpecialFormType {
                     SpecialFormTypeBuilder::Unpack => &[Self::Unpack],
                     SpecialFormTypeBuilder::Tuple => &[Self::Tuple],
                     SpecialFormTypeBuilder::TypedDict => &[
-                        Self::TypedDict(TypedDictModule::Typing),
-                        Self::TypedDict(TypedDictModule::TypingExtensions),
+                        Self::TypedDict(TypingModule::Typing),
+                        Self::TypedDict(TypingModule::TypingExtensions),
                     ],
                     SpecialFormTypeBuilder::TypeOf => &[Self::TypeOf],
                     SpecialFormTypeBuilder::List => {
@@ -555,7 +513,7 @@ impl SpecialFormType {
             | Self::Tuple
             | Self::Type
             | Self::Generic
-            | Self::TypedDict(TypedDictModule::Typing)
+            | Self::TypedDict(TypingModule::Typing)
             | Self::TypingCallable => module.is_typing(),
 
             Self::Annotated
@@ -594,7 +552,7 @@ impl SpecialFormType {
                 KnownModule::CollectionsAbc | KnownModule::CollectionsAbcInternal
             ),
 
-            Self::TypedDict(TypedDictModule::TypingExtensions) => module.is_typing_extensions(),
+            Self::TypedDict(TypingModule::TypingExtensions) => module.is_typing_extensions(),
         }
     }
 
@@ -799,8 +757,8 @@ impl SpecialFormType {
                 &[KnownModule::Typing, KnownModule::TypingExtensions]
             }
 
-            SpecialFormType::TypedDict(TypedDictModule::Typing) => &[KnownModule::Typing],
-            SpecialFormType::TypedDict(TypedDictModule::TypingExtensions) => {
+            SpecialFormType::TypedDict(TypingModule::Typing) => &[KnownModule::Typing],
+            SpecialFormType::TypedDict(TypingModule::TypingExtensions) => {
                 &[KnownModule::TypingExtensions]
             }
 

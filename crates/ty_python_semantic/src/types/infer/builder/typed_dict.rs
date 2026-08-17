@@ -19,8 +19,8 @@ use crate::types::typed_dict::{
     validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
-    TypedDictType, any_over_type,
+    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
+    TypingModule, any_over_type,
 };
 use crate::{Db, ProgramEnvironment, TypeQualifiers};
 use ty_python_core::definition::Definition;
@@ -99,7 +99,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
-        typed_dict_module: TypedDictModule,
+        typed_dict_module: TypingModule,
     ) -> Type<'db> {
         let env = self.program_environment();
         let db = self.db();
@@ -173,7 +173,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut closed = false;
         let mut extra_items = None;
         let supports_pep_728 = self.in_stub()
-            || typed_dict_module == TypedDictModule::TypingExtensions
+            || typed_dict_module == TypingModule::TypingExtensions
             || self.program_environment().python_version(db) >= PythonVersion::PY315;
 
         for kw in keywords {

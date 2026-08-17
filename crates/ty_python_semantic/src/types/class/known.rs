@@ -112,6 +112,7 @@ pub enum KnownClass {
     TypeVarTuple,
     ExtensionsTypeVarTuple, // must be distinct from typing.TypeVarTuple, backports new features
     TypeAliasType,
+    ExtensionsTypeAliasType, // may be distinct from typing.TypeAliasType
     NoDefaultType,
     NewType,
     Hashable,
@@ -193,6 +194,7 @@ impl KnownClass {
             | Self::FunctionType
             | Self::VersionInfo
             | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
@@ -373,6 +375,7 @@ impl KnownClass {
             | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
             | KnownClass::Hashable
@@ -487,6 +490,7 @@ impl KnownClass {
             | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
             | KnownClass::Hashable
@@ -602,6 +606,7 @@ impl KnownClass {
             | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
             | KnownClass::Hashable
@@ -724,6 +729,7 @@ impl KnownClass {
             | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
             | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
             | Self::NoDefaultType
             | Self::NewType
             | Self::ChainMap
@@ -849,6 +855,7 @@ impl KnownClass {
             | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
             | KnownClass::Hashable
@@ -946,7 +953,7 @@ impl KnownClass {
             Self::TypeVarTuple => "TypeVarTuple",
             Self::ExtensionsTypeVarTuple => "TypeVarTuple",
             Self::Sentinel => "sentinel",
-            Self::TypeAliasType => "TypeAliasType",
+            Self::TypeAliasType | Self::ExtensionsTypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
             Self::Hashable => "Hashable",
@@ -1374,7 +1381,7 @@ impl KnownClass {
             | Self::ParamSpec
             | Self::Hashable
             | Self::SupportsIndex => KnownModule::Typing,
-            Self::TypeAliasType
+            Self::ExtensionsTypeAliasType
             | Self::ExtensionsTypeVar
             | Self::ExtensionsTypeVarTuple
             | Self::ExtensionsParamSpec
@@ -1383,6 +1390,13 @@ impl KnownClass {
             | Self::Deprecated
             | Self::ExtensionTypedDictFallback
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::TypeAliasType => {
+                if python_version >= PythonVersion::PY312 {
+                    KnownModule::Typing
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::TypeVarTuple => {
                 if python_version >= PythonVersion::PY311 {
                     KnownModule::Typing
@@ -1494,6 +1508,7 @@ impl KnownClass {
             | Self::AsyncGenerator
             | Self::Deprecated
             | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
@@ -1603,7 +1618,7 @@ impl KnownClass {
             "WrapperDescriptorType" => &[Self::WrapperDescriptorType],
             "BuiltinFunctionType" => &[Self::BuiltinFunctionType],
             "NewType" => &[Self::NewType],
-            "TypeAliasType" => &[Self::TypeAliasType],
+            "TypeAliasType" => &[Self::TypeAliasType, Self::ExtensionsTypeAliasType],
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
             "Iterable" => &[Self::Iterable, Self::TyExtensionsIterable],
             "Iterator" => &[Self::Iterator, Self::TyExtensionsIterator],
@@ -1746,6 +1761,8 @@ impl KnownClass {
             | Self::ExtensionsParamSpec
             | Self::TypeVarTuple
             | Self::ExtensionsTypeVarTuple
+            | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
             | Self::Sentinel
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -1774,7 +1791,6 @@ impl KnownClass {
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
 
             Self::SpecialForm
-            | Self::TypeAliasType
             | Self::NoDefaultType
             | Self::Hashable
             | Self::SupportsIndex
