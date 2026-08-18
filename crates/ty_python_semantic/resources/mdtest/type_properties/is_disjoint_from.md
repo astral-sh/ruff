@@ -1113,6 +1113,45 @@ static_assert(not is_disjoint_from(Covariant[A], CoSubB))
 static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
 ```
 
+### Variadic generic specializations containing `Never`
+
+A variadic generic remains inhabited when one of its type arguments is `Never`. A writable
+`tuple[*Ts]` attribute makes the class invariant even though `tuple` itself is covariant, so
+specializations with incompatible type arguments are disjoint.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+class Container[*Ts]:
+    values: tuple[*Ts]
+
+static_assert(not is_disjoint_from(Container[int, Never], Container[int, Never]))
+static_assert(not is_subtype_of(Container[Never, Never], Container[int, Never]))
+static_assert(is_disjoint_from(Container[int, Never], Container[str, Never]))
+static_assert(is_disjoint_from(Container[int, Never], Container[int, Never, Never]))
+static_assert(is_disjoint_from(Container[int, Never], Container[Never, int]))
+```
+
+If `tuple[*Ts]` appears only as a return type, the class is covariant. A specialization using
+`Never` is then a common subtype, so differently specialized classes overlap.
+
+```py
+class CovariantContainer[*Ts]:
+    def values(self) -> tuple[*Ts]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(CovariantContainer[Never, Never], CovariantContainer[int, Never]))
+static_assert(is_subtype_of(CovariantContainer[Never, Never], CovariantContainer[str, Never]))
+static_assert(not is_disjoint_from(CovariantContainer[int, Never], CovariantContainer[str, Never]))
+```
+
 ### Specialized `@final` types
 
 Final generic specializations can overlap through a shared subtype such as `Foo[Never]`.
