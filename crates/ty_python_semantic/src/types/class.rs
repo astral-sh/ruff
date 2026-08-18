@@ -2226,9 +2226,9 @@ impl<'db> ClassType<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        let implicit = self.static_class_literal(db).map(|(class, _)| {
-            class.implicit_attribute_bindings(db, name, target_method_decorator)
-        });
+        let implicit = self
+            .static_class_literal(db)
+            .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator));
         let established_in_constructor = implicit
             .as_ref()
             .is_some_and(|implicit| implicit.established_in_constructor);
