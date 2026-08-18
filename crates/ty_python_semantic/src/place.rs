@@ -1,3 +1,5 @@
+pub(crate) mod definitions;
+
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_index::IndexSlice;
