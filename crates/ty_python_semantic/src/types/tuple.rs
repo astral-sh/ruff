@@ -185,7 +185,16 @@ impl<'db> TupleType<'db> {
         env: &ProgramEnvironment<'db>,
         spec: &TupleSpec<'db>,
     ) -> Self {
-        Self::new_with_visitor(db, spec, &ApplyTypeMappingVisitor::new(env))
+        // Fixed tuples and definitely inhabited variable segments cannot normalize to a shorter
+        // tuple, so they do not need to construct a transformation visitor.
+        if let TupleSpec::Variable(tuple) = spec
+            && let VariableSegment::Homogeneous(element) = tuple.variable()
+            && element.may_be_uninhabited()
+        {
+            Self::new_with_visitor(db, spec, &ApplyTypeMappingVisitor::new(env))
+        } else {
+            Self::new_internal(db, env.program(db), spec, TupleRole::RuntimeValue)
+        }
     }
 
     fn new_with_visitor(

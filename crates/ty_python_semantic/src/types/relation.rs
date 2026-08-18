@@ -1454,23 +1454,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => self.always(),
 
+            // Dynamic types are assignable to and from every type, including empty tuples.
+            // A later match arm also handles this case, but handling assignability here first
+            // is an important optimisation, as it avoids inspecting the other type's class
+            // hierarchy in simple/common cases.
+            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) if self.relation.is_assignability() => {
+                self.always()
+            }
+
             // Tuple instances and tuple subclasses with an uninhabited required element behave
             // as `Never`. Internal TypeVarTuple argument packs instead remain structural.
-            (Type::NominalInstance(instance), other)
-                if !other
+            (Type::NominalInstance(source), target)
+                if !target
                     .as_nominal_instance()
-                    .is_some_and(|other| other.is_typevartuple_pack(db))
-                    && self.is_uninhabited_nominal_instance(db, instance) =>
+                    .is_some_and(|target| target.is_typevartuple_pack(db))
+                    && self.is_uninhabited_nominal_instance(db, source) =>
             {
                 self.always()
             }
-            (other, Type::NominalInstance(instance))
-                if !other
-                    .as_nominal_instance()
-                    .is_some_and(|other| other.is_typevartuple_pack(db))
-                    && self.is_uninhabited_nominal_instance(db, instance) =>
+
+            // A definitely inhabited non-dynamic source cannot be a subtype of an empty
+            // target. Uninhabited nominal sources were already checked in the branch immediately
+            // above; ordinary class relations and explicit-`Any` handling settle the remaining
+            // nominal cases.
+            (source, Type::NominalInstance(target))
+                if source.may_be_uninhabited()
+                    && !source.is_nominal_instance()
+                    && self.is_uninhabited_nominal_instance(db, target) =>
             {
-                self.check_type_pair(db, other, Type::Never)
+                self.check_type_pair(db, source, Type::Never)
             }
 
             (Type::TypeVar(source_typevar), Type::TypeVar(target_typevar))

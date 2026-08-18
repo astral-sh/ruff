@@ -4005,7 +4005,7 @@ impl<'db> PathBounds<'db> {
         let restricted = path_bound.restrict_gradual_solution(db, env, solution);
 
         // An empty gradual range makes the constraint path unsatisfiable.
-        if restricted.is_never() && !solution.is_never() {
+        if restricted == Type::Never && solution != Type::Never {
             return Err(());
         }
 

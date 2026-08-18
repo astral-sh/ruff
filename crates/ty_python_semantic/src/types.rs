@@ -2546,7 +2546,11 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
-            Type::NominalInstance(instance) if instance.tuple_spec(db, env).is_some() => {
+            Type::NominalInstance(instance)
+                if instance
+                    .tuple_spec(db, env)
+                    .is_some_and(|tuple| tuple.fixed_elements().any(Type::may_be_uninhabited)) =>
+            {
                 IntersectionBuilder::new(db, env)
                     .add_negative(*self)
                     .build()
