@@ -5,6 +5,7 @@
 # dependencies = ["ruff"]
 #
 # [tool.uv]
+# no-build = true
 # exclude-newer = "P7D"
 # ///
 
