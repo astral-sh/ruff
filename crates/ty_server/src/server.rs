@@ -5,7 +5,7 @@ use crate::PositionEncoding;
 use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
 use crate::session::{ClientName, InitializationOptions, Session, warn_about_unknown_options};
 use anyhow::Context;
-use lsp_server::Connection;
+use lsp_server::{Connection, ErrorCode, Message, Response};
 use lsp_types::{
     ClientCapabilities, InitializeParams, MessageType, Uri, WorkspaceFolders,
     WorkspaceFoldersInitializeParams,
@@ -56,7 +56,17 @@ impl Server {
             .context("Failed to deserialize initialization parameters")?;
 
         let (initialization_options, deserialization_error) =
-            InitializationOptions::from_value(initialization_options);
+            match InitializationOptions::from_value(initialization_options) {
+                Ok(options) => options,
+                Err(error) => {
+                    connection.sender.send(Message::Response(Response::new_err(
+                        id,
+                        ErrorCode::InvalidParams as i32,
+                        format!("Invalid initialization options: {error:#}"),
+                    )))?;
+                    return Err(error).context("Failed to deserialize initialization options");
+                }
+            };
 
         if !in_test {
             crate::logging::init_logging(
@@ -240,5 +250,86 @@ impl Drop for ServerPanicHookHandler {
         if let Some(hook) = self.hook.take() {
             std::panic::set_hook(hook);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+    use std::sync::Arc;
+
+    use lsp_server::{Connection, ErrorCode, Message, Notification, Request};
+    use ruff_db::system::OsSystem;
+    use serde_json::{Value, json};
+
+    use super::Server;
+    use crate::system::WorkspaceTrust;
+
+    #[test]
+    fn malformed_trust_rejects_initialization() -> anyhow::Result<()> {
+        let (connection, client) = initialize_connection(&json!({
+            "untrustedWorkspace": "true",
+            "logLevel": "invalid"
+        }))?;
+        assert!(
+            Server::new(
+                NonZeroUsize::MIN,
+                connection,
+                Arc::new(OsSystem::default()),
+                true,
+            )
+            .is_err()
+        );
+
+        let Message::Response(response) = client.receiver.try_recv()? else {
+            anyhow::bail!("Expected an initialization error response");
+        };
+        assert_eq!(response.id, 1.into());
+        let error = response.response_result.unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidParams as i32);
+        assert_eq!(
+            error.message,
+            "Invalid initialization options: Invalid `untrustedWorkspace` setting: \
+             invalid type: string \"true\", expected a boolean",
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_initialization_options_preserve_workspace_trust() -> anyhow::Result<()> {
+        let (connection, _client_connection) = initialize_connection(&json!({
+            "untrustedWorkspace": true,
+            "diagnosticMode": "invalid"
+        }))?;
+        let server = Server::new(
+            NonZeroUsize::MIN,
+            connection,
+            Arc::new(OsSystem::default()),
+            true,
+        )?;
+        assert_eq!(
+            server.session.initialization_options().workspace_trust,
+            WorkspaceTrust::Untrusted,
+        );
+        Ok(())
+    }
+
+    fn initialize_connection(
+        initialization_options: &Value,
+    ) -> anyhow::Result<(Connection, Connection)> {
+        let (server, client) = Connection::memory();
+        client.sender.send(Message::Request(Request::new(
+            1.into(),
+            "initialize".into(),
+            json!({
+                "capabilities": {},
+                "initializationOptions": initialization_options
+            }),
+        )))?;
+        client.sender.send(Message::Notification(Notification::new(
+            "initialized".into(),
+            json!({}),
+        )))?;
+        Ok((server, client))
     }
 }
