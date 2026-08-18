@@ -4430,6 +4430,54 @@ def get_value[T](obj: HasValue[T]) -> T:
 reveal_type(get_value(values))  # revealed: int
 ```
 
+## Generic protocol inference through type aliases
+
+An alias for an instance type must not hide the members that determine a protocol's type arguments.
+Inference should preserve those arguments and check their bounds.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    def get(self) -> T: ...
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+type Alias[T] = Box[T]
+
+def get_value[T](value: HasValue[T]) -> T:
+    return value.get()
+
+def require_str[T: str](value: HasValue[T]) -> T:
+    return value.get()
+
+def check_alias(value: Alias[int]):
+    reveal_type(get_value(value))  # revealed: int
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `str` of type variable `T`"
+    require_str(value)
+```
+
+An equivalent generic alias constructed with `TypeAliasType` preserves the same information.
+
+```py
+from typing import TypeAliasType, TypeVar
+
+U = TypeVar("U")
+ConstructedAlias = TypeAliasType("ConstructedAlias", Box[U], type_params=(U,))
+
+def check_constructed_alias(value: ConstructedAlias[int]):
+    reveal_type(get_value(value))  # revealed: int
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `str` of type variable `T`"
+    require_str(value)
+```
+
 ## Class objects with class-method protocol members
 
 A class object implements a protocol when its directly accessible members have compatible types. The
