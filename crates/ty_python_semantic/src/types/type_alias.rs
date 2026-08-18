@@ -301,7 +301,9 @@ fn apply_type_alias_specialization<'db>(
     )
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue, salsa::Supertype,
+)]
 pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
     PEP695(PEP695TypeAliasType<'db>),

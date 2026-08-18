@@ -6,9 +6,15 @@ use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use self::message::DiagnosticNameQualification;
+pub use self::message::{
+    DiagnosticMessage, DiagnosticName, DiagnosticNameKind, DiagnosticNameRecord,
+    DiagnosticNameResolver, IntoDiagnosticMessage,
+};
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
 };
@@ -16,6 +22,7 @@ pub use self::stylesheet::{DiagnosticStylesheet, fmt_with_hyperlink};
 use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
 
+mod message;
 mod render;
 mod stylesheet;
 
@@ -218,9 +225,169 @@ impl Diagnostic {
         self.inner.message.as_str()
     }
 
+    /// Clones the headline while preserving any semantic names awaiting diagnostic finalization.
+    pub fn clone_headline_message(&self) -> DiagnosticMessage {
+        self.inner.message.clone()
+    }
+
     /// Sets the headline message for this diagnostic.
     pub fn set_headline_message(&mut self, message: impl IntoDiagnosticMessage) {
         Arc::make_mut(&mut self.inner).message = message.into_diagnostic_message();
+    }
+
+    /// Resolves semantic names against the messages visible in each diagnostic format.
+    ///
+    /// Qualified names are resolved only when distinct identities have the same displayed
+    /// spelling. Source locations are resolved only when their qualified names also coincide.
+    /// All temporary name metadata is discarded before this method returns.
+    pub fn disambiguate_names(&mut self, resolver: &impl DiagnosticNameResolver) {
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        enum Qualification {
+            Qualified(String),
+            Located(String),
+        }
+
+        let observe =
+            |message: &DiagnosticMessage,
+             observed: &mut FxHashMap<Box<str>, Vec<DiagnosticName>>| {
+                for occurrence in message.names() {
+                    let name = occurrence.name();
+                    let identities = observed.entry(name.spelling().into()).or_default();
+                    if !identities
+                        .iter()
+                        .any(|existing| existing.has_same_identity(name))
+                    {
+                        identities.push(name.clone());
+                    }
+                }
+            };
+
+        let mut full_names: FxHashMap<Box<str>, Vec<DiagnosticName>> = FxHashMap::default();
+        self.for_each_full_message(|message| observe(message, &mut full_names));
+
+        let mut concise_names: FxHashMap<Box<str>, Vec<DiagnosticName>> = FxHashMap::default();
+        if let Some(message) = &self.inner.custom_concise_message {
+            observe(message, &mut concise_names);
+        } else {
+            observe(&self.inner.message, &mut concise_names);
+            if let Some(message) = self
+                .primary_annotation()
+                .and_then(|annotation| annotation.message.as_ref())
+            {
+                observe(message, &mut concise_names);
+            }
+        }
+
+        let mut qualified_names: FxHashMap<DiagnosticName, String> = FxHashMap::default();
+        let mut qualify = |observed: FxHashMap<Box<str>, Vec<DiagnosticName>>| {
+            let mut qualification: FxHashMap<DiagnosticName, Qualification> = FxHashMap::default();
+            for identities in observed.into_values() {
+                if identities.len() < 2 {
+                    continue;
+                }
+
+                let resolved_names: Vec<_> = identities
+                    .iter()
+                    .map(|identity| {
+                        qualified_names
+                            .entry(identity.clone())
+                            .or_insert_with(|| resolver.qualified_name(identity))
+                            .clone()
+                    })
+                    .collect();
+                let located = resolved_names.iter().enumerate().any(|(index, qualified)| {
+                    resolved_names[..index]
+                        .iter()
+                        .any(|other| qualified == other)
+                });
+
+                qualification.extend(identities.into_iter().zip(resolved_names).map(
+                    |(identity, qualified)| {
+                        (
+                            identity,
+                            if located {
+                                Qualification::Located(qualified)
+                            } else {
+                                Qualification::Qualified(qualified)
+                            },
+                        )
+                    },
+                ));
+            }
+
+            qualification
+        };
+
+        let full_qualification = qualify(full_names);
+        let concise_qualification = qualify(concise_names);
+        let replacement =
+            |name: &DiagnosticName, qualification: &FxHashMap<DiagnosticName, Qualification>| {
+                match qualification.get(name) {
+                    None => None,
+                    Some(Qualification::Qualified(qualified)) => Some(qualified.clone()),
+                    Some(Qualification::Located(qualified)) => {
+                        Some(format!("{qualified}{}", resolver.location(name)))
+                    }
+                }
+            };
+        let full_replacement = |name: &DiagnosticName| replacement(name, &full_qualification);
+        let concise_replacement = |name: &DiagnosticName| replacement(name, &concise_qualification);
+        let concise_replacement: DiagnosticNameQualification<'_> = &concise_replacement;
+
+        let custom_concise = self.inner.custom_concise_message.is_some();
+        let primary_index = self
+            .inner
+            .annotations
+            .iter()
+            .position(|annotation| annotation.is_primary);
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.message.resolve_names(
+            full_replacement,
+            (!custom_concise).then_some(concise_replacement),
+        );
+
+        if let Some(message) = &mut inner.custom_concise_message {
+            message.resolve_names(concise_replacement, None);
+        }
+
+        for (index, annotation) in inner.annotations.iter_mut().enumerate() {
+            if let Some(message) = &mut annotation.message {
+                message.resolve_names(
+                    full_replacement,
+                    (!custom_concise && primary_index == Some(index))
+                        .then_some(concise_replacement),
+                );
+            }
+        }
+
+        for diagnostic in &mut inner.subs {
+            diagnostic
+                .inner
+                .message
+                .resolve_names(full_replacement, None);
+            for annotation in &mut diagnostic.inner.annotations {
+                if let Some(message) = &mut annotation.message {
+                    message.resolve_names(full_replacement, None);
+                }
+            }
+        }
+    }
+
+    fn for_each_full_message(&self, mut visit: impl FnMut(&DiagnosticMessage)) {
+        visit(&self.inner.message);
+        for annotation in &self.inner.annotations {
+            if let Some(message) = &annotation.message {
+                visit(message);
+            }
+        }
+        for diagnostic in &self.inner.subs {
+            visit(&diagnostic.inner.message);
+            for annotation in &diagnostic.inner.annotations {
+                if let Some(message) = &annotation.message {
+                    visit(message);
+                }
+            }
+        }
     }
 
     /// Introspects this diagnostic and returns its message for concise formatting.
@@ -236,13 +403,14 @@ impl Diagnostic {
     /// you want.
     pub fn concise_message(&self) -> ConciseMessage<'_> {
         if let Some(custom_message) = &self.inner.custom_concise_message {
-            return ConciseMessage::Custom(custom_message.as_str());
+            return ConciseMessage::Custom(custom_message.as_concise_str());
         }
 
-        let main = self.inner.message.as_str();
+        let main = self.inner.message.as_concise_str();
         let annotation = self
             .primary_annotation()
-            .and_then(|ann| ann.get_message())
+            .and_then(|annotation| annotation.message.as_ref())
+            .map(DiagnosticMessage::as_concise_str)
             .unwrap_or_default();
         if annotation.is_empty() {
             ConciseMessage::MainDiagnostic(main)
@@ -1692,77 +1860,6 @@ impl serde::Serialize for ConciseMessage<'_> {
         S: serde::Serializer,
     {
         serializer.collect_str(self)
-    }
-}
-
-/// A diagnostic message string.
-///
-/// This is, for all intents and purposes, equivalent to a `Box<str>`.
-/// But it does not implement `std::fmt::Display`. Indeed, that it its
-/// entire reason for existence. It provides a way to pass a string
-/// directly into diagnostic methods that accept messages without copying
-/// that string. This works via the `IntoDiagnosticMessage` trait.
-///
-/// In most cases, callers shouldn't need to use this. Instead, there is
-/// a blanket trait implementation for `IntoDiagnosticMessage` for
-/// anything that implements `std::fmt::Display`.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
-pub struct DiagnosticMessage(Box<str>);
-
-impl DiagnosticMessage {
-    /// Returns this message as a borrowed string.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl From<&str> for DiagnosticMessage {
-    fn from(s: &str) -> DiagnosticMessage {
-        DiagnosticMessage(s.into())
-    }
-}
-
-impl From<String> for DiagnosticMessage {
-    fn from(s: String) -> DiagnosticMessage {
-        DiagnosticMessage(s.into())
-    }
-}
-
-impl From<Box<str>> for DiagnosticMessage {
-    fn from(s: Box<str>) -> DiagnosticMessage {
-        DiagnosticMessage(s)
-    }
-}
-
-impl IntoDiagnosticMessage for DiagnosticMessage {
-    fn into_diagnostic_message(self) -> DiagnosticMessage {
-        self
-    }
-}
-
-/// A trait for values that can be converted into a diagnostic message.
-///
-/// Users of the diagnostic API can largely think of this trait as effectively
-/// equivalent to `std::fmt::Display`. Indeed, everything that implements
-/// `Display` also implements this trait. That means wherever this trait is
-/// accepted, you can use things like `format_args!`.
-///
-/// The purpose of this trait is to provide a means to give arguments _other_
-/// than `std::fmt::Display` trait implementations. Or rather, to permit
-/// the diagnostic API to treat them differently. For example, this lets
-/// callers wrap a string in a `DiagnosticMessage` and provide it directly
-/// to any of the diagnostic APIs that accept a message. This will move the
-/// string and avoid any unnecessary copies. (If we instead required only
-/// `std::fmt::Display`, then this would potentially result in a copy via the
-/// `ToString` trait implementation.)
-pub trait IntoDiagnosticMessage {
-    fn into_diagnostic_message(self) -> DiagnosticMessage;
-}
-
-/// Every `IntoDiagnosticMessage` is accepted, so to is `std::fmt::Display`.
-impl<T: std::fmt::Display> IntoDiagnosticMessage for T {
-    fn into_diagnostic_message(self) -> DiagnosticMessage {
-        DiagnosticMessage::from(self.to_string())
     }
 }
 

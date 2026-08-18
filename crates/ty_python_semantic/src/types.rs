@@ -206,7 +206,8 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(source_file, error, error)),
     );
 
-    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
+    let mut diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
+    display::disambiguate_diagnostic_names(db, &mut diagnostics);
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {

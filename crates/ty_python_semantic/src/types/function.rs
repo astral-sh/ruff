@@ -49,7 +49,7 @@
 //! the public type of `f` is resolved at position 3, correctly giving you all of the overloads
 //! (and the implementation).
 
-use std::{borrow::Cow, str::FromStr};
+use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use bitflags::bitflags;
 use itertools::Either;
@@ -79,7 +79,6 @@ use crate::types::diagnostic::{
     report_runtime_check_against_non_runtime_checkable_protocol,
     report_runtime_check_against_typed_dict,
 };
-use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
 use crate::types::infer::{infer_definition_types, nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
@@ -92,10 +91,10 @@ use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
-    IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
+    CallableType, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
+    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
+    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    binding_type, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1905,15 +1904,16 @@ fn report_invalid_union_type_elements<'db>(
     // When we have a secondary annotation pointing at the UnionType expression,
     // "the union" is unambiguous. Otherwise, spell out the union type in the message.
     let env = context.program_environment();
-    let union_suffix = match (&union_type_expr, union_type) {
-        (None, Type::KnownInstance(KnownInstanceType::UnionType(instance))) => {
-            match instance.union_type(db) {
-                Ok(ty) => format!(" `{}`", ty.display(db, env)),
-                Err(_) => String::new(),
-            }
+    let union_suffix = std::fmt::from_fn(|f| {
+        if let (None, Type::KnownInstance(KnownInstanceType::UnionType(instance))) =
+            (&union_type_expr, union_type)
+            && let Ok(ty) = instance.union_type(db)
+        {
+            write!(f, " `{}`", ty.display(db, env))
+        } else {
+            Ok(())
         }
-        _ => String::new(),
-    };
+    });
 
     match other_invalid_elements {
         [] => diagnostic.info(format_args!(
@@ -2518,14 +2518,9 @@ impl KnownFunction {
                     &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
                 };
                 if let Some(builder) = context.report_lint(diagnostic, call_expression) {
-                    let settings = DisplaySettings::from_possibly_ambiguous_types(
-                        db,
-                        env,
-                        [*actual_ty, asserted_ty],
-                    );
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
-                        asserted_ty.display_with(db, env, settings.clone()),
+                        asserted_ty.display(db, env),
                     ));
 
                     diagnostic.annotate(
@@ -2537,28 +2532,28 @@ impl KnownFunction {
                         )
                         .message(format_args!(
                             "Inferred type is `{}`",
-                            actual_ty.display_with(db, env, settings.clone())
+                            actual_ty.display(db, env)
                         )),
                     );
 
                     if actual_ty.is_subtype_of(db, env, asserted_ty) {
                         diagnostic.info(format_args!(
                             "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
-                            asserted_type = asserted_ty.display_with(db, env, settings.clone()),
-                            inferred_type = actual_ty.display_with(db, env, settings.clone()),
+                            asserted_type = asserted_ty.display(db, env),
+                            inferred_type = actual_ty.display(db, env),
                         ));
                     } else {
                         diagnostic.info(format_args!(
                             "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                            asserted_type = asserted_ty.display_with(db, env, settings.clone()),
-                            inferred_type = actual_ty.display_with(db, env, settings.clone()),
+                            asserted_type = asserted_ty.display(db, env),
+                            inferred_type = actual_ty.display(db, env),
                         ));
                     }
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
-                        actual_ty.display_with(db, env, settings.clone()),
-                        asserted_ty.display_with(db, env, settings),
+                        actual_ty.display(db, env),
+                        asserted_ty.display(db, env),
                     ));
                 }
             }
@@ -2799,43 +2794,28 @@ impl KnownFunction {
                         call_argument_node(call_expression, "cls", 0)
                             .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
                     );
-                    let mut message = String::new();
-                    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
-                        db,
-                        env,
-                        classes
-                            .iter()
-                            .flat_map(|class| class.iter_mro(db))
-                            .filter_map(ClassBase::into_class),
-                    );
-                    for (i, class) in classes.iter().enumerate() {
-                        message.push('(');
-                        for class in class.iter_mro(db) {
-                            message.push_str(
-                                &class
-                                    .display_with(db, env, display_settings.clone())
-                                    .to_string(),
-                            );
-                            // Omit the comma for the last element (which is always `object`)
-                            if class
-                                .into_class()
-                                .is_none_or(|base| !base.is_object(context.db()))
-                            {
-                                message.push_str(", ");
+                    let message = std::fmt::from_fn(|f| {
+                        for (index, class) in classes.iter().enumerate() {
+                            f.write_str("(")?;
+                            for base in class.iter_mro(db) {
+                                base.display(db, env).fmt(f)?;
+                                // Omit the comma for the last element (which is always `object`).
+                                if base.into_class().is_none_or(|base| !base.is_object(db)) {
+                                    f.write_str(", ")?;
+                                }
+                            }
+                            // A length-one tuple needs a trailing comma and only occurs when
+                            // revealing `object` itself.
+                            if class.is_object(db) {
+                                f.write_str(",")?;
+                            }
+                            f.write_str(")")?;
+                            if index < classes.len() - 1 {
+                                f.write_str(" | ")?;
                             }
                         }
-                        // If the last element was also the first element
-                        // (i.e., it's a length-1 tuple -- which can only happen if we're revealing
-                        // the MRO for `object` itself), add a trailing comma so that it's still a
-                        // valid tuple display.
-                        if class.is_object(db) {
-                            message.push(',');
-                        }
-                        message.push(')');
-                        if i < classes.len() - 1 {
-                            message.push_str(" | ");
-                        }
-                    }
+                        Ok(())
+                    });
                     diag.annotate(Annotation::primary(span).message(message));
                 }
             }

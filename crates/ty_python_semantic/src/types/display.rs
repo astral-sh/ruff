@@ -7,7 +7,10 @@ use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
-use ruff_db::files::FilePath;
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticName, DiagnosticNameKind, DiagnosticNameRecord, DiagnosticNameResolver,
+};
+use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::str::{Quote, TripleQuotes};
@@ -15,13 +18,14 @@ use ruff_python_literal::escape::AsciiEscape;
 use ruff_source_file::LineColumn;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::plumbing::{AsId, FromIdWithDb};
 
 use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
-use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -80,6 +84,70 @@ impl<'db> NamedItem<'db> {
                 type_alias.qualified_name(db).components_excluding_self()
             }
         }
+    }
+
+    fn diagnostic_name(self, db: &'db dyn Db, spelling: &str) -> DiagnosticName {
+        match self {
+            NamedItem::Class(class) => {
+                DiagnosticName::new(spelling, class.as_id(), DiagnosticNameKind::Class)
+            }
+            NamedItem::TypeAlias(alias) => DiagnosticName::new(
+                spelling,
+                alias.unspecialized(db).as_id(),
+                DiagnosticNameKind::TypeAlias,
+            ),
+        }
+    }
+
+    fn from_diagnostic_name(db: &'db dyn Db, name: &DiagnosticName) -> Self {
+        match name.kind() {
+            DiagnosticNameKind::Class => {
+                Self::Class(FromIdWithDb::from_id(name.identity(), db.zalsa()))
+            }
+            DiagnosticNameKind::TypeAlias => {
+                Self::TypeAlias(FromIdWithDb::from_id(name.identity(), db.zalsa()))
+            }
+        }
+    }
+}
+
+struct TypeDiagnosticNameResolver<'db> {
+    db: &'db dyn Db,
+}
+
+impl DiagnosticNameResolver for TypeDiagnosticNameResolver<'_> {
+    fn qualified_name(&self, name: &DiagnosticName) -> String {
+        match NamedItem::from_diagnostic_name(self.db, name) {
+            NamedItem::Class(class) => class.qualified_name(self.db).to_string(),
+            NamedItem::TypeAlias(alias) => alias.qualified_name(self.db).to_string(),
+        }
+    }
+
+    fn location(&self, name: &DiagnosticName) -> String {
+        let (file, offset) = match NamedItem::from_diagnostic_name(self.db, name) {
+            NamedItem::Class(class) => (class.file(self.db), class.header_range(self.db).start()),
+            NamedItem::TypeAlias(alias) => {
+                let definition = alias.definition(self.db);
+                let offset = definition
+                    .focus_range(
+                        self.db,
+                        &parsed_module(self.db, definition.python_file(self.db)).load(self.db),
+                    )
+                    .range()
+                    .start();
+                (definition.file(self.db), offset)
+            }
+        };
+
+        diagnostic_file_location(self.db, file, offset)
+    }
+}
+
+/// Finalizes names only after all fine-grained inference queries have completed.
+pub(super) fn disambiguate_diagnostic_names(db: &dyn Db, diagnostics: &mut [Diagnostic]) {
+    let resolver = TypeDiagnosticNameResolver { db };
+    for diagnostic in diagnostics {
+        diagnostic.disambiguate_names(&resolver);
     }
 }
 
@@ -347,6 +415,42 @@ impl<'db> TypeDetailsWriter<'db> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct KnownClassName<'db, 'spelling> {
+    class: KnownClass,
+    rendered_spelling: &'spelling str,
+    collision_spelling: &'spelling str,
+    detailed_type: Option<Type<'db>>,
+    replace_when_ambiguous: bool,
+}
+
+impl<'db, 'spelling> KnownClassName<'db, 'spelling> {
+    fn displayed_as(class: KnownClass, spelling: &'spelling str) -> Self {
+        Self {
+            class,
+            rendered_spelling: spelling,
+            collision_spelling: spelling,
+            detailed_type: None,
+            replace_when_ambiguous: true,
+        }
+    }
+
+    fn with_collision_spelling(mut self, spelling: &'spelling str) -> Self {
+        self.collision_spelling = spelling;
+        self
+    }
+
+    fn with_detailed_type(mut self, ty: Type<'db>) -> Self {
+        self.detailed_type = Some(ty);
+        self
+    }
+
+    fn without_replacement(mut self) -> Self {
+        self.replace_when_ambiguous = false;
+        self
+    }
+}
+
 impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
     /// Indicate the given detail is about to start being written to this Writer
     ///
@@ -367,6 +471,45 @@ impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
     /// Convenience for `with_detail(TypeDetail::Type(ty))`
     fn with_type<'c>(&'c mut self, ty: Type<'db>) -> TypeDetailGuard<'a, 'b, 'c, 'db> {
         self.with_detail(TypeDetail::Type(ty))
+    }
+
+    /// Writes a known class name while preserving its semantic identity in diagnostics.
+    ///
+    /// Several runtime values deliberately use spellings such as `function` instead of their
+    /// defining class's name, `FunctionType`. The displayed spelling is therefore the collision
+    /// key, while the class itself determines the qualified replacement.
+    fn write_known_class(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        display_name: KnownClassName<'db, '_>,
+    ) -> fmt::Result {
+        let KnownClassName {
+            class: known_class,
+            rendered_spelling,
+            collision_spelling,
+            detailed_type,
+            replace_when_ambiguous,
+        } = display_name;
+
+        if let Some(class) = known_class.try_to_class_literal(db, env) {
+            let class = ClassLiteral::Static(class);
+            let detailed_type = detailed_type.unwrap_or(Type::ClassLiteral(class));
+            let record = DiagnosticNameRecord {
+                render: || self.with_type(detailed_type).write_str(rendered_spelling),
+                name: || NamedItem::Class(class).diagnostic_name(db, collision_spelling),
+            };
+            if replace_when_ambiguous {
+                record.render()
+            } else {
+                record.render_fixed()
+            }
+        } else if replace_when_ambiguous {
+            self.with_type(detailed_type.unwrap_or_else(Type::unknown))
+                .write_str(rendered_spelling)
+        } else {
+            self.write_str(rendered_spelling)
+        }
     }
 
     fn set_invalid_type_annotation(&mut self) {
@@ -753,12 +896,7 @@ impl fmt::Debug for DisplayType<'_, '_> {
 }
 
 /// Format a file location suffix for disambiguation (e.g., " @ path:line:column")
-fn fmt_file_location<'db>(
-    db: &'db dyn Db,
-    file: ruff_db::files::File,
-    offset: TextSize,
-    f: &mut TypeWriter<'_, '_, 'db>,
-) -> fmt::Result {
+fn diagnostic_file_location(db: &dyn Db, file: File, offset: TextSize) -> String {
     let path = file.path(db);
     let path = match path {
         FilePath::System(path) => Cow::Owned(FilePath::from(
@@ -770,8 +908,17 @@ fn fmt_file_location<'db>(
     };
     let line_index = line_index(db, file);
     let LineColumn { line, column } = line_index.line_column(offset, &source_text(db, file));
+    format!(" @ {path}:{line}:{column}")
+}
+
+fn fmt_file_location<'db>(
+    db: &'db dyn Db,
+    file: File,
+    offset: TextSize,
+    f: &mut TypeWriter<'_, '_, 'db>,
+) -> fmt::Result {
     f.set_invalid_type_annotation();
-    write!(f, " @ {path}:{line}:{column}")
+    f.write_str(&diagnostic_file_location(db, file, offset))
 }
 
 /// Returns the qualified name components for a scope, excluding the item itself.
@@ -824,7 +971,12 @@ pub(super) fn qualified_name_components_from_scope(
 }
 
 impl<'db> ClassLiteral<'db> {
-    pub(crate) fn display_with(
+    /// Displays this class's name while allowing a diagnostic to resolve name collisions.
+    pub(crate) fn display(self, db: &'db dyn Db) -> ClassDisplay<'db> {
+        self.display_with(db, DisplaySettings::default())
+    }
+
+    pub(super) fn display_with(
         self,
         db: &'db dyn Db,
         settings: DisplaySettings<'db>,
@@ -837,6 +989,26 @@ impl<'db> ClassLiteral<'db> {
     }
 }
 
+impl<'db> StaticClassLiteral<'db> {
+    /// Displays this class's name while preserving its identity for diagnostics.
+    pub(crate) fn display(self, db: &'db dyn Db) -> ClassDisplay<'db> {
+        ClassLiteral::Static(self).display(db)
+    }
+
+    /// Displays this class's qualified name while preserving its diagnostic identity.
+    pub(crate) fn display_qualified(self, db: &'db dyn Db) -> impl Display + 'db {
+        let class = ClassLiteral::Static(self);
+        fmt::from_fn(move |f| {
+            let spelling = class.name(db);
+            DiagnosticNameRecord {
+                render: || class.qualified_name(db).fmt(f),
+                name: || NamedItem::Class(class).diagnostic_name(db, spelling),
+            }
+            .render()
+        })
+    }
+}
+
 pub(crate) struct ClassDisplay<'db> {
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -845,22 +1017,28 @@ pub(crate) struct ClassDisplay<'db> {
 
 impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let qualification_level = self.settings.qualified.get(&**self.class.name(self.db));
+        let spelling = self.class.name(self.db);
+        DiagnosticNameRecord {
+            render: || {
+                let qualification_level = self.settings.qualified.get(&**spelling);
+                let ty = Type::ClassLiteral(self.class);
+                if qualification_level.is_some() {
+                    let qualified_name = self.class.qualified_name(self.db);
+                    write!(f.with_type(ty), "{qualified_name}")?;
+                } else {
+                    write!(f.with_type(ty), "{spelling}")?;
+                }
 
-        let ty = Type::ClassLiteral(self.class);
-        if qualification_level.is_some() {
-            let qualified_name = self.class.qualified_name(self.db);
-            write!(f.with_type(ty), "{qualified_name}")?;
-        } else {
-            write!(f.with_type(ty), "{}", self.class.name(self.db))?;
+                if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
+                    let file = self.class.file(self.db);
+                    let offset = self.class.header_range(self.db).start();
+                    fmt_file_location(self.db, file, offset, f)?;
+                }
+                Ok(())
+            },
+            name: || NamedItem::Class(self.class).diagnostic_name(self.db, spelling),
         }
-
-        if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
-            let file = self.class.file(self.db);
-            let offset = self.class.header_range(self.db).start();
-            fmt_file_location(self.db, file, offset, f)?;
-        }
-        Ok(())
+        .render()
     }
 }
 
@@ -912,32 +1090,35 @@ struct TypeAliasDisplay<'db> {
 
 impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let qualification_level = self
-            .settings
-            .qualified_type_aliases
-            .get(self.type_alias.name(self.db));
+        let spelling = self.type_alias.name(self.db);
+        DiagnosticNameRecord {
+            render: || {
+                let qualification_level = self.settings.qualified_type_aliases.get(spelling);
+                let ty = Type::TypeAlias(self.type_alias);
+                if qualification_level.is_some() {
+                    let qualified_name = self.type_alias.qualified_name(self.db);
+                    write!(f.with_type(ty), "{qualified_name}")?;
+                } else {
+                    write!(f.with_type(ty), "{spelling}")?;
+                }
 
-        let ty = Type::TypeAlias(self.type_alias);
-        if qualification_level.is_some() {
-            let qualified_name = self.type_alias.qualified_name(self.db);
-            write!(f.with_type(ty), "{qualified_name}")?;
-        } else {
-            write!(f.with_type(ty), "{}", self.type_alias.name(self.db))?;
+                if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
+                    let definition = self.type_alias.definition(self.db);
+                    let file = definition.file(self.db);
+                    let offset = definition
+                        .focus_range(
+                            self.db,
+                            &parsed_module(self.db, definition.python_file(self.db)).load(self.db),
+                        )
+                        .range()
+                        .start();
+                    fmt_file_location(self.db, file, offset, f)?;
+                }
+                Ok(())
+            },
+            name: || NamedItem::TypeAlias(self.type_alias).diagnostic_name(self.db, spelling),
         }
-
-        if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
-            let definition = self.type_alias.definition(self.db);
-            let file = definition.file(self.db);
-            let offset = definition
-                .focus_range(
-                    self.db,
-                    &parsed_module(self.db, definition.python_file(self.db)).load(self.db),
-                )
-                .range()
-                .start();
-            fmt_file_location(self.db, file, offset, f)?;
-        }
-        Ok(())
+        .render()
     }
 }
 
@@ -1129,14 +1310,24 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     f.write_char('>')
                 }
             },
-            Type::PropertyInstance(property) => f
-                .with_type(self.ty)
-                .write_str(property_display_name(db, property)),
+            Type::PropertyInstance(property) => f.write_known_class(
+                db,
+                self.env,
+                KnownClassName::displayed_as(
+                    property.instance_class(db),
+                    property_display_name(db, property),
+                )
+                .with_detailed_type(self.ty),
+            ),
             Type::ModuleLiteral(module) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::ModuleType.to_class_literal(db, self.env))
-                    .write_str("module")?;
+                f.write_known_class(
+                    db,
+                    self.env,
+                    KnownClassName::displayed_as(KnownClass::ModuleType, "module")
+                        .without_replacement(),
+                )?;
                 f.write_str(" '")?;
                 f.with_type(self.ty).write_str(module.module(db).name(db))?;
                 f.write_str("'>")
@@ -1161,8 +1352,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
+                    f.write_known_class(
+                        db,
+                        self.env,
+                        KnownClassName::displayed_as(KnownClass::Type, "type"),
+                    )?;
                     f.write_char('[')?;
                     class
                         .display_with(db, self.settings.clone())
@@ -1170,8 +1364,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
+                    f.write_known_class(
+                        db,
+                        self.env,
+                        KnownClassName::displayed_as(KnownClass::Type, "type"),
+                    )?;
                     f.write_char('[')?;
                     alias
                         .display_with(db, self.env, self.settings.clone())
@@ -1179,15 +1376,21 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
+                    f.write_known_class(
+                        db,
+                        self.env,
+                        KnownClassName::displayed_as(KnownClass::Type, "type"),
+                    )?;
                     f.write_char('[')?;
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Protocol(protocol) => {
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
+                    f.write_known_class(
+                        db,
+                        self.env,
+                        KnownClassName::displayed_as(KnownClass::Type, "type"),
+                    )?;
                     f.write_char('[')?;
                     Type::ProtocolInstance(protocol)
                         .display_with(db, self.env, self.settings.clone())
@@ -1196,8 +1399,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     f.set_invalid_type_annotation();
-                    f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                        .write_str("type")?;
+                    f.write_known_class(
+                        db,
+                        self.env,
+                        KnownClassName::displayed_as(KnownClass::Type, "type"),
+                    )?;
                     f.write_char('[')?;
                     write!(
                         f.with_type(Type::TypeVar(bound_typevar)),
@@ -1387,7 +1593,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     f.write_str(member_name)?;
                 }
                 f.write_str("' of ")?;
-                f.with_type(class_ty).write_str(cls_name)?;
+                f.write_known_class(
+                    db,
+                    self.env,
+                    KnownClassName::displayed_as(cls, cls_name).with_detailed_type(class_ty),
+                )?;
                 if let Some(name) = ty_name {
                     f.write_str(" '")?;
                     f.with_type(ty).write_str(name)?;
@@ -1418,8 +1628,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 f.write_str(" '")?;
                 f.write_str(method)?;
                 f.write_str("' of '")?;
-                f.with_type(cls.to_class_literal(db, self.env))
-                    .write_str(object)?;
+                f.write_known_class(db, self.env, KnownClassName::displayed_as(cls, object))?;
                 f.write_str("' objects>")
             }
             Type::DataclassDecorator(_) => {
@@ -1506,7 +1715,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             Type::AlwaysFalsy => f.with_type(self.ty).write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
                 f.set_invalid_type_annotation();
-                f.write_str("<super: ")?;
+                f.write_char('<')?;
+                f.write_known_class(
+                    db,
+                    self.env,
+                    KnownClassName::displayed_as(KnownClass::Super, "super"),
+                )?;
+                f.write_str(": ")?;
                 Type::from(bound_super.pivot_class(db))
                     .display_with(db, self.env, self.settings.singleline())
                     .fmt_detailed(f)?;
@@ -3644,7 +3859,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 if let Some(specialization) = alias.specialization(db) {
                     f.set_invalid_type_annotation();
                     f.write_str("<type alias '")?;
-                    f.with_type(ty).write_str(alias.name(db))?;
+                    alias
+                        .display_with(db, self.settings.clone())
+                        .fmt_detailed(f)?;
                     specialization
                         .display_short(
                             db,
@@ -3655,24 +3872,46 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                         .fmt_detailed(f)?;
                     f.write_str("'>")
                 } else {
-                    f.with_type(ty).write_str("TypeAliasType")
+                    f.write_known_class(
+                        db,
+                        self.env,
+                        KnownClassName::displayed_as(alias.known_class(db), "TypeAliasType")
+                            .with_detailed_type(ty),
+                    )
                 }
             }
             // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
             // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
             // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
             KnownInstanceType::TypeVar(typevar_instance) => {
-                if typevar_instance.kind(db).is_paramspec() {
-                    f.with_type(ty).write_str("ParamSpec")
+                let (known_class, spelling) = if typevar_instance.kind(db).is_paramspec() {
+                    (KnownClass::ParamSpec, "ParamSpec")
                 } else if typevar_instance.kind(db).is_typevartuple() {
-                    f.with_type(ty).write_str("TypeVarTuple")
+                    (KnownClass::TypeVarTuple, "TypeVarTuple")
                 } else {
-                    f.with_type(ty).write_str("TypeVar")
-                }
+                    (KnownClass::TypeVar, "TypeVar")
+                };
+                f.write_known_class(
+                    db,
+                    self.env,
+                    KnownClassName::displayed_as(known_class, spelling).with_detailed_type(ty),
+                )
             }
-            KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
+            KnownInstanceType::Deprecated(_) => f.write_known_class(
+                db,
+                self.env,
+                KnownClassName::displayed_as(KnownClass::Deprecated, "warnings.deprecated")
+                    .with_collision_spelling("deprecated")
+                    .with_detailed_type(ty),
+            ),
             KnownInstanceType::Field(field) => {
-                f.with_type(ty).write_str("dataclasses.Field")?;
+                f.write_known_class(
+                    db,
+                    self.env,
+                    KnownClassName::displayed_as(KnownClass::Field, "dataclasses.Field")
+                        .with_collision_spelling("Field")
+                        .with_detailed_type(ty),
+                )?;
 
                 let field_type = field
                     .converter(db)
@@ -3729,8 +3968,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::UnionType(union) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(KnownClass::UnionType.to_class_literal(db, self.env))
-                    .write_str("types.UnionType")?;
+                f.write_known_class(
+                    db,
+                    self.env,
+                    KnownClassName::displayed_as(KnownClass::UnionType, "types.UnionType")
+                        .with_collision_spelling("UnionType"),
+                )?;
                 f.write_str(" special-form")?;
                 if let Ok(ty) = union.union_type(db) {
                     f.write_str(" '")?;
@@ -3772,8 +4015,11 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::TypeGenericAlias(inner) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<special-form '")?;
-                f.with_type(KnownClass::Type.to_class_literal(db, self.env))
-                    .write_str("type")?;
+                f.write_known_class(
+                    db,
+                    self.env,
+                    KnownClassName::displayed_as(KnownClass::Type, "type"),
+                )?;
                 f.write_char('[')?;
                 inner.inner(db).display(db, self.env).fmt_detailed(f)?;
                 f.write_str("]'>")
@@ -3795,15 +4041,23 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
             KnownInstanceType::FunctoolsPartial(partial) => {
-                f.write_str("partial[")?;
+                f.write_known_class(
+                    db,
+                    self.env,
+                    KnownClassName::displayed_as(KnownClass::FunctoolsPartial, "partial")
+                        .with_detailed_type(ty),
+                )?;
+                f.write_char('[')?;
                 Type::Callable(partial.partial(db))
                     .display_with(db, self.env, DisplaySettings::default().singleline())
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
-            KnownInstanceType::Range { .. } => f
-                .with_type(KnownClass::Range.to_class_literal(db, self.env))
-                .write_str("range"),
+            KnownInstanceType::Range { .. } => f.write_known_class(
+                db,
+                self.env,
+                KnownClassName::displayed_as(KnownClass::Range, "range"),
+            ),
             KnownInstanceType::FunctoolsPartialCall(partial) => Type::Callable(partial.partial(db))
                 .display_with(db, self.env, DisplaySettings::default().singleline())
                 .fmt_detailed(f),

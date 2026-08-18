@@ -269,7 +269,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut disjoint_bases = self.validate_dynamic_type_bases(
                 bases_arg,
                 explicit_bases,
-                dynamic_class.name(db),
+                dynamic_class,
                 DynamicClassKind::TypeCall,
             );
 
@@ -300,7 +300,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 report_conflicting_metaclass_from_bases(
                     &self.context,
                     call_expr.into(),
-                    dynamic_class.name(db),
+                    ClassLiteral::Dynamic(dynamic_class).display(db),
                     metaclass1,
                     base1.display(db, env),
                     metaclass2,
@@ -321,8 +321,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         definition: Definition<'db>,
         call_expr: &ast::Expr,
     ) {
-        let db = self.db();
-
         let ast::Expr::Call(call) = call_expr else {
             return;
         };
@@ -355,7 +353,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         // Validate individual bases for special types that aren't allowed in dynamic classes.
-        let name = dynamic_class.name(db);
-        self.validate_dynamic_type_bases(bases_arg, &bases, name, DynamicClassKind::TypeCall);
+        self.validate_dynamic_type_bases(
+            bases_arg,
+            &bases,
+            dynamic_class,
+            DynamicClassKind::TypeCall,
+        );
     }
 }

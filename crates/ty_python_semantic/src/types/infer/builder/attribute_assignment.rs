@@ -1,3 +1,4 @@
+use ruff_db::diagnostic::DiagnosticMessage;
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -15,9 +16,7 @@ use crate::types::diagnostic::{
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, UNRESOLVED_ATTRIBUTE, report_bad_dunder_set_call,
     report_invalid_attribute_assignment, report_possibly_missing_attribute,
 };
-use crate::types::{
-    CallDunderError, DisplaySettings, MemberLookupPolicy, Type, TypeContext, TypeQualifiers,
-};
+use crate::types::{CallDunderError, MemberLookupPolicy, Type, TypeContext, TypeQualifiers};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Make sure that the attribute assignment `obj.attribute = value` is valid.
@@ -810,16 +809,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     .context
                     .report_lint(&INVALID_ASSIGNMENT, self.target)
                 {
-                    let settings = DisplaySettings::from_possibly_ambiguous_types(
-                        db,
-                        env,
-                        [value_ty, object_ty],
-                    );
                     builder.into_diagnostic(format_args!(
                         "Object of type `{}` is not assignable to attribute `{}` on type `{}`",
-                        value_ty.display_with(db, env, settings.clone()),
+                        value_ty.display(db, env),
                         self.attribute,
-                        object_ty.display_with(db, env, settings),
+                        object_ty.display(db, env),
                     ));
                 }
             }
@@ -859,23 +853,23 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     .report_lint(&INVALID_ASSIGNMENT, self.target)
                 {
                     let message = if !member_exists {
-                        format!(
+                        DiagnosticMessage::from_display(format_args!(
                             "Cannot assign to unresolved attribute `{}` on type `{}`",
                             self.attribute,
                             self.object_ty.display(db, env)
-                        )
+                        ))
                     } else if is_setattr_synthesized {
-                        format!(
+                        DiagnosticMessage::from_display(format_args!(
                             "Property `{}` defined in `{}` is read-only",
                             self.attribute,
                             self.object_ty.display(db, env)
-                        )
+                        ))
                     } else {
-                        format!(
+                        DiagnosticMessage::from_display(format_args!(
                             "Cannot assign to attribute `{}` on type `{}` whose `__setattr__` method returns `Never`/`NoReturn`",
                             self.attribute,
                             self.object_ty.display(db, env)
-                        )
+                        ))
                     };
                     builder.into_diagnostic(message);
                 }
@@ -922,13 +916,15 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.target.into(),
                     &CallDiagnosticOverride {
                         lint: &INVALID_ASSIGNMENT,
-                        message: format!(
+                        message: DiagnosticMessage::from_display(format_args!(
                             "Cannot assign object of type `{}` to attribute `{}` on type `{}`",
                             value_ty.display(db, env),
                             self.attribute,
                             self.object_ty.display(db, env)
+                        )),
+                        info: DiagnosticMessage::from(
+                            "This assignment implicitly calls a custom `__setattr__` method",
                         ),
-                        info: "This assignment implicitly calls a custom `__setattr__` method",
                         argument_ranges: &[self.target.range(), self.value.range()],
                     },
                 );

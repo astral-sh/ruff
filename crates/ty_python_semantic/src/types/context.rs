@@ -5,7 +5,10 @@ use ruff_db::PythonFile;
 use ruff_db::diagnostic::DiagnosticTag;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
+    diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, DiagnosticMessage, IntoDiagnosticMessage, Severity,
+        Span,
+    },
     files::File,
 };
 use ruff_python_ast::PythonVersion;
@@ -408,7 +411,7 @@ pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     diag: Option<Diagnostic>,
 
     source: LintSource,
-    message_override: Option<String>,
+    message_override: Option<DiagnosticMessage>,
 }
 
 impl LintDiagnosticGuard<'_, '_> {
@@ -503,7 +506,7 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                 .primary_annotation()
                 .and_then(Annotation::get_message)
                 .is_some_and(|message| !message.is_empty());
-            let original_message = diag.headline_message().to_string();
+            let original_message = diag.clone_headline_message();
             if primary_annotation_has_message {
                 diag.prepend_info(original_message);
             } else if let Some(annotation) = diag.primary_annotation_mut() {
@@ -575,7 +578,7 @@ pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
     severity: Severity,
     source: LintSource,
     primary_range: TextRange,
-    message_override: Option<(String, String)>,
+    message_override: Option<(DiagnosticMessage, DiagnosticMessage)>,
 }
 
 impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
@@ -673,7 +676,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     /// sub-diagnostic otherwise. Any custom concise message is discarded.
     pub(super) fn into_diagnostic(
         self,
-        message: impl std::fmt::Display,
+        message: impl IntoDiagnosticMessage,
     ) -> LintDiagnosticGuard<'db, 'ctx> {
         // This is why `LintDiagnosticGuard::set_primary_annotation_message` exists.
         // We add the primary annotation here (because it's required). Without a message
@@ -697,8 +700,12 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     /// Replace the headline message when the diagnostic is finalized and add an info
     /// sub-diagnostic. The original message is retained on the primary annotation if it has no
     /// message, or as an info sub-diagnostic otherwise.
-    pub(super) fn with_message_override(mut self, message: String, info: &str) -> Self {
-        self.message_override = Some((message, info.to_string()));
+    pub(super) fn with_message_override(
+        mut self,
+        message: DiagnosticMessage,
+        info: DiagnosticMessage,
+    ) -> Self {
+        self.message_override = Some((message, info));
         self
     }
 }
@@ -740,7 +747,10 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
-    pub(super) fn into_diagnostic(self, message: impl std::fmt::Display) -> DiagnosticGuard<'ctx> {
+    pub(super) fn into_diagnostic(
+        self,
+        message: impl IntoDiagnosticMessage,
+    ) -> DiagnosticGuard<'ctx> {
         let diag = Diagnostic::new(self.id, self.severity, message);
 
         DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)

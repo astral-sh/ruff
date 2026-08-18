@@ -31,11 +31,13 @@ use crate::types::{
     protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
-use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, declare_lint};
-use itertools::Itertools;
+use crate::{Db, FxIndexMap, ProgramEnvironment, declare_lint};
+use itertools::{Either, Itertools};
 use ruff_db::source::source_text;
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    diagnostic::{
+        Annotation, Diagnostic, DiagnosticMessage, Span, SubDiagnostic, SubDiagnosticSeverity,
+    },
     files::File,
     parsed::parsed_module,
 };
@@ -1662,8 +1664,6 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [target_ty, value_ty]);
-
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows
         // invalid-assignment diagnostics to be suppressed on the opening or closing parenthesis:
@@ -1685,8 +1685,8 @@ pub(super) fn report_invalid_assignment<'db>(
         diagnostic_range,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
-            value_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings)
+            value_ty.display(db, env),
+            target_ty.display(db, env)
         ),
     ) else {
         return;
@@ -1740,7 +1740,7 @@ pub(super) fn report_invalid_assignment<'db>(
         error_context.attach_to(db, env, &mut diag);
 
         // Overwrite the concise message to avoid showing the value type twice
-        let message = diag.headline_message().to_string();
+        let message = diag.clone_headline_message();
         diag.set_concise_message(message);
     }
 
@@ -1763,14 +1763,13 @@ pub(super) fn report_invalid_attribute_assignment(
     // diagnostic being emitted here.
 
     let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings),
+            source_ty.display(db, env),
+            target_ty.display(db, env),
         ),
     ) else {
         return;
@@ -1824,14 +1823,14 @@ pub(super) fn report_bad_dunder_get_call<'db>(
             target.into(),
             &CallDiagnosticOverride {
                 lint: &INVALID_ATTRIBUTE_ACCESS,
-                message: format!(
+                message: DiagnosticMessage::from_display(format_args!(
                     "Invalid access to descriptor attribute `{attribute}` on type `{}`",
                     object_type.display(db, env),
-                ),
-                info: &format!(
+                )),
+                info: DiagnosticMessage::from_display(format_args!(
                     "This access implicitly calls `__get__` on a descriptor of type `{}`",
                     descriptor_type.display(db, env),
-                ),
+                )),
                 argument_ranges: &[target.range(), target.value.range(), target.value.range()],
             },
         );
@@ -1880,11 +1879,14 @@ pub(super) fn report_bad_attribute_access_call<'db>(
         target.into(),
         &CallDiagnosticOverride {
             lint: &INVALID_ATTRIBUTE_ACCESS,
-            message: format!(
+            message: DiagnosticMessage::from_display(format_args!(
                 "Invalid access to attribute `{attribute}` on type `{}`",
                 object_type.display(db, env),
-            ),
-            info: &format!("This access implicitly calls `{}`", method.as_str()),
+            )),
+            info: DiagnosticMessage::from_display(format_args!(
+                "This access implicitly calls `{}`",
+                method.as_str()
+            )),
             argument_ranges: &[target.range()],
         },
     );
@@ -1909,11 +1911,13 @@ pub(super) fn report_bad_import_call<'db>(
         target.into(),
         &CallDiagnosticOverride {
             lint: &INVALID_MODULE_GETATTR_CALL,
-            message: format!(
+            message: DiagnosticMessage::from_display(format_args!(
                 "Cannot import `{name}` from module `{}`",
                 module.module(db).name(db),
+            )),
+            info: DiagnosticMessage::from(
+                "This import implicitly calls a module-level `__getattr__` function",
             ),
-            info: "This import implicitly calls a module-level `__getattr__` function",
             argument_ranges: &[target.range()],
         },
     );
@@ -1962,14 +1966,14 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             target.into(),
             &CallDiagnosticOverride {
                 lint: &INVALID_ASSIGNMENT,
-                message: format!(
+                message: DiagnosticMessage::from_display(format_args!(
                     "Invalid assignment to data descriptor attribute `{attribute}` on type `{}`",
                     object_type.display(db, env)
-                ),
-                info: &format!(
+                )),
+                info: DiagnosticMessage::from_display(format_args!(
                     "This assignment implicitly calls `__set__` on a descriptor of type `{}`",
                     descriptor_type.display(db, env)
-                ),
+                )),
                 argument_ranges,
             },
         );
@@ -2061,20 +2065,18 @@ pub(super) fn report_invalid_return_type(
     };
 
     let env = &context.program_environment();
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_annotation_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display_with(db, env, settings.clone()),
-        actual_ty = actual_ty.display_with(db, env, settings.clone()),
+        expected_ty = expected_ty.display(db, env),
+        actual_ty = actual_ty.display(db, env),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display_with(db, env, settings),
+            expected_ty = expected_ty.display(db, env),
         )),
     );
 
@@ -2104,12 +2106,9 @@ pub(super) fn report_unsound_return_statement(
         _ => expected_ty,
     };
 
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
-
     let mut diag = builder.into_diagnostic("Unsound return statement");
-    let actual_ty_display = actual_ty.display_with(db, env, settings.clone());
-    let expected_ty_display = expected_ty.display_with(db, env, settings);
+    let actual_ty_display = actual_ty.display(db, env);
+    let expected_ty_display = expected_ty.display(db, env);
 
     diag.set_concise_message(format_args!(
         "Unsound return statement: `{actual_ty_display}` is not a subtype \
@@ -2142,7 +2141,11 @@ pub(super) fn report_invalid_generator_function_return_type(
 
     let env = &context.program_environment();
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
-    let inferred_ty = inferred_return.display(env.python_version(db));
+    let inferred_ty = if let Some(class) = inferred_return.try_to_class_literal(db, env) {
+        Either::Left(class.display_qualified(db))
+    } else {
+        Either::Right(inferred_return.display(env.python_version(db)))
+    };
     diag.set_primary_annotation_message(format_args!(
         "expected `{expected_ty}`, found `{inferred_ty}`",
         expected_ty = expected_ty.display(db, env),
@@ -2186,46 +2189,39 @@ pub(super) fn report_invalid_generator_yield_type(
     };
 
     let env = &context.program_environment();
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
-    let expected_display = expected_ty.display_with(db, env, settings.clone());
-    let actual_display = actual_ty.display_with(db, env, settings);
+    let expected_display = expected_ty.display(db, env);
+    let actual_display = actual_ty.display(db, env);
 
-    let (kind_name, title, concise) = match kind {
+    let (kind_name, title, capitalized_kind, primary_prefix) = match kind {
         GeneratorMismatchKind::YieldType => (
             "yield",
             "Yield expression type does not match annotation",
-            format!(
-                "Yield type `{actual_display}` does not match annotated yield type \
-                `{expected_display}`"
-            ),
+            "Yield",
+            "expression of type",
         ),
         GeneratorMismatchKind::SendType => (
             "send",
             "Send type does not match annotation",
-            format!(
-                "Send type `{actual_display}` does not match annotated send type \
-                `{expected_display}`"
-            ),
+            "Send",
+            "generator with send type",
         ),
     };
 
     let mut diag = builder.into_diagnostic(title);
-    diag.set_concise_message(concise);
-    let primary = match kind {
-        GeneratorMismatchKind::YieldType => {
-            format!("expression of type `{actual_display}`, expected `{expected_display}`")
-        }
-        GeneratorMismatchKind::SendType => {
-            format!("generator with send type `{actual_display}`, expected `{expected_display}`")
-        }
-    };
-    diag.set_primary_annotation_message(primary);
+    diag.set_concise_message(format_args!(
+        "{capitalized_kind} type `{actual_display}` does not match annotated {kind_name} type \
+        `{expected_display}`"
+    ));
+    diag.set_primary_annotation_message(format_args!(
+        "{primary_prefix} `{actual_display}`, expected `{expected_display}`"
+    ));
 
     if let Some(return_type_span) = return_type_span {
-        diag.annotate(Annotation::secondary(return_type_span).message(format!(
-            "Function annotated with {kind_name} type `{expected_display}` here"
-        )));
+        diag.annotate(
+            Annotation::secondary(return_type_span).message(format_args!(
+                "Function annotated with {kind_name} type `{expected_display}` here"
+            )),
+        );
     }
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
@@ -2246,10 +2242,8 @@ pub(super) fn report_unsound_yield(
     };
 
     let env = context.program_environment();
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
-    let actual_display = actual_ty.display_with(db, env, settings.clone());
-    let expected_display = expected_ty.display_with(db, env, settings);
+    let actual_display = actual_ty.display(db, env);
+    let expected_display = expected_ty.display(db, env);
 
     let mut diagnostic = builder.into_diagnostic(format_args!("Unsound `{kind}`"));
     diagnostic.set_concise_message(format_args!(
@@ -2592,14 +2586,14 @@ pub(crate) fn report_instance_layout_conflict(
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout \
                         because `{base}` defines non-empty `__slots__`",
-                        base = originating_base.name(db)
+                        base = originating_base.display(db)
                     ));
                 }
                 DisjointBaseKind::DisjointBaseDecorator => {
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout \
                         because of the way `{base}` is implemented in a C extension",
-                        base = originating_base.name(db)
+                        base = originating_base.display(db)
                     ));
                 }
             }
@@ -2608,8 +2602,8 @@ pub(crate) fn report_instance_layout_conflict(
             annotation = annotation.message(format_args!(
                 "`{base}` instances have a distinct memory layout \
                 because `{base}` inherits from `{disjoint_base}`",
-                base = originating_base.name(db),
-                disjoint_base = disjoint_base.class.name(db)
+                base = originating_base.display(db),
+                disjoint_base = disjoint_base.class.display(db)
             ));
             subdiagnostic.annotate(annotation);
 
@@ -2619,14 +2613,14 @@ pub(crate) fn report_instance_layout_conflict(
                 DisjointBaseKind::DefinesSlots => additional_annotation.message(format_args!(
                     "`{disjoint_base}` instances have a distinct memory layout \
                     because `{disjoint_base}` defines non-empty `__slots__`",
-                    disjoint_base = disjoint_base.class.name(db),
+                    disjoint_base = disjoint_base.class.display(db),
                 )),
 
                 DisjointBaseKind::DisjointBaseDecorator => {
                     additional_annotation.message(format_args!(
                         "`{disjoint_base}` instances have a distinct memory layout \
                         because of the way `{disjoint_base}` is implemented in a C extension",
-                        disjoint_base = disjoint_base.class.name(db),
+                        disjoint_base = disjoint_base.class.display(db),
                     ))
                 }
             };
@@ -2643,7 +2637,7 @@ pub(crate) fn report_instance_layout_conflict(
 pub(super) fn report_conflicting_metaclass_from_bases(
     context: &InferContext,
     node: AnyNodeRef,
-    class_name: &str,
+    class_name: impl std::fmt::Display,
     metaclass1: ClassType,
     base1: impl std::fmt::Display,
     metaclass2: ClassType,
@@ -2659,8 +2653,8 @@ pub(super) fn report_conflicting_metaclass_from_bases(
             but `{metaclass1}` (metaclass of base class `{base1}`) \
             and `{metaclass2}` (metaclass of base class `{base2}`) \
             have no subclass relationship",
-        metaclass1 = metaclass1.name(db),
-        metaclass2 = metaclass2.name(db),
+        metaclass1 = metaclass1.class_literal(db).display(db),
+        metaclass2 = metaclass2.class_literal(db).display(db),
     ));
 }
 
@@ -2689,8 +2683,14 @@ impl<'db> IncompatibleBases<'db> {
     }
 
     /// List the problematic class bases in a human-readable format.
-    fn describe_problematic_class_bases(&self, db: &dyn Db) -> String {
-        let bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
+    fn describe_problematic_class_bases(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl std::fmt::Display + use<'_, 'db> {
+        let bad_base_names = self
+            .0
+            .values()
+            .map(|info| info.originating_base.display(db));
 
         format_enumeration(bad_base_names)
     }
@@ -3330,14 +3330,14 @@ pub(crate) fn report_duplicate_bases(
         later_indices,
     } = duplicate_base_error;
 
-    let duplicate_name = duplicate_base.name(db);
+    let duplicate_name = duplicate_base.display_name(db);
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`"));
 
     diagnostic.info(format_args!(
         "Definition of class `{}` will raise `TypeError` at runtime",
-        class.name(db)
+        class.display(db)
     ));
 
     let first_base = bases_list[*first_index].source_node();
@@ -4366,18 +4366,9 @@ pub(super) fn report_incompatible_base_method<'db>(
 
     let (selected_owner, selected_definition, selected_decorator) = selected;
     let (contract_owner, contract_definition, contract_decorator) = contract;
-    let types = [
-        Type::from(class),
-        Type::from(selected_owner),
-        Type::from(contract_owner),
-    ];
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, context.program_environment(), types);
-    let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
-    let selected_name = selected_owner
-        .class_literal(db)
-        .display_with(db, settings.clone());
-    let contract_name = contract_owner.class_literal(db).display_with(db, settings);
+    let class_name = class.display(db);
+    let selected_name = selected_owner.class_literal(db).display(db);
+    let contract_name = contract_owner.class_literal(db).display(db);
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Base classes for class `{class_name}` define method `{member}` incompatibly",
     ));
@@ -4661,39 +4652,34 @@ pub(super) fn report_unsupported_comparison<'db>(
     };
 
     let env = &context.program_environment();
-    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
-        db,
-        env,
-        [error.left_ty, error.right_ty, left_ty, right_ty],
-    );
-
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
 
     if left_ty.is_equivalent_to(db, env, right_ty) {
         diagnostic.set_primary_annotation_message(format_args!(
             "Both operands have type `{}`",
-            left_ty.display_with(db, env, display_settings.clone())
+            left_ty.display(db, env)
         ));
         diagnostic.annotate(context.secondary(left));
         diagnostic.annotate(context.secondary(right));
         diagnostic.set_concise_message(format_args!(
             "Operator `{}` is not supported between two objects of type `{}`",
             error.op,
-            left_ty.display_with(db, env, display_settings.clone())
+            left_ty.display(db, env)
         ));
     } else {
         for (ty, expr) in [(left_ty, left), (right_ty, right)] {
-            diagnostic.annotate(context.secondary(expr).message(format_args!(
-                "Has type `{}`",
-                ty.display_with(db, env, display_settings.clone())
-            )));
+            diagnostic.annotate(
+                context
+                    .secondary(expr)
+                    .message(format_args!("Has type `{}`", ty.display(db, env))),
+            );
         }
         diagnostic.set_concise_message(format_args!(
             "Operator `{}` is not supported between objects of type `{}` and `{}`",
             error.op,
-            left_ty.display_with(db, env, display_settings.clone()),
-            right_ty.display_with(db, env, display_settings.clone())
+            left_ty.display(db, env),
+            right_ty.display(db, env)
         ));
     }
 
@@ -4722,7 +4708,7 @@ pub(super) fn report_unsupported_comparison<'db>(
                     the tuple elements at index {} (both of type `{}`)",
                     error.op,
                     position + 1,
-                    error.left_ty.display_with(db, env, display_settings),
+                    error.left_ty.display(db, env),
                 ));
             } else {
                 diagnostic.info(format_args!(
@@ -4730,10 +4716,8 @@ pub(super) fn report_unsupported_comparison<'db>(
                     the tuple elements at index {} (of type `{}` and `{}`)",
                     error.op,
                     position + 1,
-                    error
-                        .left_ty
-                        .display_with(db, env, display_settings.clone()),
-                    error.right_ty.display_with(db, env, display_settings),
+                    error.left_ty.display(db, env),
+                    error.right_ty.display(db, env),
                 ));
             }
         } else {
@@ -4742,17 +4726,15 @@ pub(super) fn report_unsupported_comparison<'db>(
                     "Operation fails because operator `{}` is not supported \
                     between two objects of type `{}`",
                     error.op,
-                    error.left_ty.display_with(db, env, display_settings),
+                    error.left_ty.display(db, env),
                 ));
             } else {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported \
                     between objects of type `{}` and `{}`",
                     error.op,
-                    error
-                        .left_ty
-                        .display_with(db, env, display_settings.clone()),
-                    error.right_ty.display_with(db, env, display_settings)
+                    error.left_ty.display(db, env),
+                    error.right_ty.display(db, env)
                 ));
             }
         }
@@ -4828,34 +4810,32 @@ fn report_unsupported_binary_operation_impl<'a>(
     let db = context.db();
     let diagnostic_builder = context.report_lint(&UNSUPPORTED_OPERATOR, range)?;
     let env = &context.program_environment();
-    let display_settings =
-        DisplaySettings::from_possibly_ambiguous_types(db, env, [left_ty, right_ty]);
-
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));
 
     if left_ty.is_equivalent_to(db, env, right_ty) {
         diagnostic.set_primary_annotation_message(format_args!(
             "Both operands have type `{}`",
-            left_ty.display_with(db, env, display_settings.clone())
+            left_ty.display(db, env)
         ));
         diagnostic.annotate(context.secondary(left));
         diagnostic.annotate(context.secondary(right));
         diagnostic.set_concise_message(format_args!(
             "Operator `{operator}` is not supported between two objects of type `{}`",
-            left_ty.display_with(db, env, display_settings.clone())
+            left_ty.display(db, env)
         ));
     } else {
         for (ty, expr) in [(left_ty, left), (right_ty, right)] {
-            diagnostic.annotate(context.secondary(expr).message(format_args!(
-                "Has type `{}`",
-                ty.display_with(db, env, display_settings.clone())
-            )));
+            diagnostic.annotate(
+                context
+                    .secondary(expr)
+                    .message(format_args!("Has type `{}`", ty.display(db, env))),
+            );
         }
         diagnostic.set_concise_message(format_args!(
             "Operator `{operator}` is not supported between objects of type `{}` and `{}`",
-            left_ty.display_with(db, env, display_settings.clone()),
-            right_ty.display_with(db, env, display_settings.clone())
+            left_ty.display(db, env),
+            right_ty.display(db, env)
         ));
     }
 
@@ -4882,13 +4862,13 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
             builder.into_diagnostic("Non-frozen dataclass cannot inherit from frozen dataclass");
         diagnostic.set_concise_message(format_args!(
             "Non-frozen dataclass `{}` cannot inherit from frozen dataclass `{}`",
-            class.name(db),
-            base_class.name(db)
+            class.display(db),
+            base_class.display(db)
         ));
         diagnostic.set_primary_annotation_message(format_args!(
             "Subclass `{}` is not frozen but base class `{}` is",
-            class.name(db),
-            base_class.name(db)
+            class.display(db),
+            base_class.display(db)
         ));
         diagnostic
     } else {
@@ -4896,13 +4876,13 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
             builder.into_diagnostic("Frozen dataclass cannot inherit from non-frozen dataclass");
         diagnostic.set_concise_message(format_args!(
             "Frozen dataclass `{}` cannot inherit from non-frozen dataclass `{}`",
-            class.name(db),
-            base_class.name(db)
+            class.display(db),
+            base_class.display(db)
         ));
         diagnostic.set_primary_annotation_message(format_args!(
             "Subclass `{}` is frozen but base class `{}` is not",
-            class.name(db),
-            base_class.name(db)
+            class.display(db),
+            base_class.display(db)
         ));
         diagnostic
     };
@@ -4913,7 +4893,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         diagnostic.annotate(
             context
                 .secondary(&class_node.decorator_list[position])
-                .message(format_args!("`{}` dataclass parameters", class.name(db))),
+                .message(format_args!("`{}` dataclass parameters", class.display(db))),
         );
     }
     diagnostic.info("This causes the class creation to fail");
@@ -4925,7 +4905,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         );
         sub.annotate(
             Annotation::primary(base_class.header_span(db))
-                .message(format_args!("`{}` definition", base_class.name(db))),
+                .message(format_args!("`{}` definition", base_class.display(db))),
         );
 
         let base_class_file = base_class.file(db);

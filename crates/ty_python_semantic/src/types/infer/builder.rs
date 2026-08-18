@@ -124,7 +124,7 @@ use crate::types::{
     any_over_type, binding_type, extract_fixed_length_iterable_element_types,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet};
+use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
@@ -3768,7 +3768,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
         {
             let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
-            diag.set_primary_annotation_message(format!("type `{}`", inferred.display(db, env)));
+            diag.set_primary_annotation_message(format_args!(
+                "type `{}`",
+                inferred.display(db, env)
+            ));
             if matches!(inferred, Type::ProtocolInstance(_)) {
                 diag.info("The base of a `NewType` is not allowed to be a protocol class.");
             } else if matches!(inferred, Type::TypedDict(_)) {
@@ -10449,24 +10452,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if let Some(builder) =
                                 self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
                             {
-                                let types = std::iter::once(union_like_type)
-                                    .chain(elements_missing_the_attribute.iter().copied());
-                                let settings =
-                                    DisplaySettings::from_possibly_ambiguous_types(db, env, types);
-                                let missing_types = elements_missing_the_attribute
-                                    .iter()
-                                    .map(|ty| {
-                                        format!("`{}`", ty.display_with(db, env, settings.clone()))
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(", ");
-
                                 builder.into_diagnostic(format_args!(
                                     "Attribute `{attr_name}` is not defined on {} \
                                     in union `{union_like_type}`",
-                                    missing_types,
-                                    union_like_type =
-                                        union_like_type.display_with(db, env, settings),
+                                    elements_missing_the_attribute.iter().format_with(
+                                        ", ",
+                                        |ty, formatter| {
+                                            formatter(&format_args!("`{}`", ty.display(db, env)))
+                                        }
+                                    ),
+                                    union_like_type = union_like_type.display(db, env),
                                 ));
                             }
                             return type_when_bound;

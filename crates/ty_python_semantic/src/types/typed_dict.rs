@@ -2903,8 +2903,9 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         if !key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env)) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
                 builder.into_diagnostic(format_args!(
-                    "Unpacked argument has key type `{}` that is not assignable to `str`",
+                    "Unpacked argument has key type `{}` that is not assignable to `{}`",
                     key_ty.display(db, env),
+                    KnownClass::Str.to_instance(db, env).display(db, env),
                 ));
             }
             return false;

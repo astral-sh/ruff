@@ -458,7 +458,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             report_mro_error_kind(
                 &self.context,
                 error,
-                enum_lit.name(db),
+                ClassLiteral::DynamicEnum(enum_lit),
                 call_expr,
                 None,
                 None,
@@ -548,8 +548,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 builder.into_diagnostic(format_args!(
                     "Class `{}` cannot be used as an enum mixin with `{}`",
-                    mixin_class.name(db),
-                    base_class.name(self.program_environment().python_version(db)),
+                    mixin_class.class_literal(db).display(db),
+                    enum_base.class_literal(db).display(db),
                 ));
                 return (None, false);
             }

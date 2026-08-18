@@ -8,7 +8,6 @@ use ruff_db::{
     files::File,
 };
 use std::cell::RefCell;
-use std::fmt::Write;
 
 mod levenshtein;
 
@@ -153,25 +152,25 @@ pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
 /// Format a list of elements as a human-readable enumeration.
 ///
 /// Encloses every element in backticks (`1`, `2` and `3`).
-pub(crate) fn format_enumeration<I, IT, D>(elements: I) -> String
-where
-    I: IntoIterator<IntoIter = IT>,
-    IT: ExactSizeIterator<Item = D> + DoubleEndedIterator,
-    D: std::fmt::Display,
-{
-    let mut elements = elements.into_iter();
+pub(crate) fn format_enumeration<D: std::fmt::Display>(
+    elements: impl IntoIterator<Item = D>,
+) -> impl std::fmt::Display {
+    let elements: Vec<_> = elements.into_iter().collect();
     debug_assert!(elements.len() >= 2);
 
-    let final_element = elements.next_back().unwrap();
-    let penultimate_element = elements.next_back().unwrap();
+    std::fmt::from_fn(move |f| {
+        let Some((final_element, preceding)) = elements.split_last() else {
+            return Ok(());
+        };
+        let Some((penultimate_element, preceding)) = preceding.split_last() else {
+            return write!(f, "`{final_element}`");
+        };
 
-    let mut buffer = String::new();
-    for element in elements {
-        write!(&mut buffer, "`{element}`, ").ok();
-    }
-    write!(&mut buffer, "`{penultimate_element}` and `{final_element}`").ok();
-
-    buffer
+        for element in preceding {
+            write!(f, "`{element}`, ")?;
+        }
+        write!(f, "`{penultimate_element}` and `{final_element}`")
+    })
 }
 
 /// An abstraction for mutating a diagnostic.
