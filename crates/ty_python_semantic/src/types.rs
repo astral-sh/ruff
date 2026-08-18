@@ -4542,20 +4542,8 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
-        // A TypeVar retains its class identity when lookup is delegated to its bound, including
-        // after narrowing. Narrowing can also add an unrelated class to a mixin's `Self`, in which
-        // case the TypeVar alone is not a valid owner for descriptors from that class.
-        let owner = match receiver {
-            Type::TypeVar(_) => receiver,
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .copied()
-                .find(|element| element.is_type_var() && element.is_subtype_of(db, env, key.ty(db)))
-                .unwrap_or(key.ty(db)),
-            _ => key.ty(db),
-        }
-        .to_meta_type(db, env);
+        // Preserve the receiver's type variables and all its narrowed class constraints.
+        let owner = receiver.to_meta_type(db, env);
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -7642,13 +7630,43 @@ impl<'db> Type<'db> {
                 SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
             }
             Type::Divergent(_) => self,
-            // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
                     alternatives.to_meta_type(db, env)
                 } else {
-                    SubclassOfType::try_from_type(db, env, todo_type!("Intersection meta-type"))
-                        .expect("Type::Todo should be a valid `SubclassOfInner`")
+                    // Negative constraints do not generally constrain classes: `int & ~Literal[0]`
+                    // still has meta-type `type[int]`. Pure negations are bounded by `object`.
+                    let mut builder = IntersectionBuilder::new(db, env);
+                    for positive in intersection.positive_elements_or_object(db) {
+                        builder.add_positive_in_place(positive.to_meta_type(db, env));
+                    }
+
+                    // An exclusion can narrow a type variable's union bound to a definite class:
+                    // `(T: C | None) & ~None` has meta-type `type[T] & type[C]`.
+                    // If the remaining bound is a class object, retain its metaclass instead.
+                    // Structural bounds need separate runtime-class handling (see `dunder_class`).
+                    if !intersection.negative(db).is_empty()
+                        && intersection
+                            .iter_positive(db)
+                            .any(|positive| matches!(positive, Type::TypeVar(_)))
+                        && let Some(narrowed_bound) = match intersection
+                            .with_expanded_typevars_and_newtypes(db, env)
+                        {
+                            bound @ (Type::NominalInstance(_)
+                            | Type::ClassLiteral(_)
+                            | Type::GenericAlias(_)) => Some(bound),
+                            bound @ Type::SubclassOf(subclass_of)
+                                if let SubclassOfInner::Class(_) = subclass_of.subclass_of() =>
+                            {
+                                Some(bound)
+                            }
+                            _ => None,
+                        }
+                    {
+                        builder.add_positive_in_place(narrowed_bound.to_meta_type(db, env));
+                    }
+
+                    builder.build()
                 }
             }
             Type::EnumComplement(complement) => complement
