@@ -935,6 +935,14 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.5"
+      - name: "Check script lockfiles"
+        run: |
+          set -e -o pipefail
+          # Resource fixtures include intentionally invalid PEP 723 metadata.
+          git grep -lz '^# /// script$' -- '*.py' ':(glob,exclude)crates/*/resources/**' |
+          while IFS= read -r -d '' script; do
+            uv lock --script "$script" --check
+          done
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
