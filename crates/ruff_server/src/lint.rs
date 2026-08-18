@@ -399,7 +399,7 @@ fn to_lsp_diagnostic(
         .then(|| {
             let mut title = suggestion.unwrap_or(name).to_string();
             if fix.is_some_and(|fix| fix.applicability() == Applicability::DisplayOnly) {
-                title.push_str(" (review required)");
+                title.push_str(" (suggestion)");
             }
             let edits = fix
                 .into_iter()
