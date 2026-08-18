@@ -1,6 +1,8 @@
 use ruff_python_ast as ast;
 
-use crate::types::{Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_DEFINITION};
+use crate::types::{
+    DisplaySettings, Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_DEFINITION,
+};
 
 /// Check that all type guard function definitions have at least one positional parameter
 /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is
@@ -56,11 +58,13 @@ pub(crate) fn check_type_guard_definition<'db>(
         if !narrowed_ty.is_assignable_to(db, env, param_ty)
             && let Some(builder) = context.report_lint(&INVALID_TYPE_GUARD_DEFINITION, returns_expr)
         {
+            let settings =
+                DisplaySettings::from_possibly_ambiguous_types(context, [narrowed_ty, param_ty]);
             builder.into_diagnostic(format_args!(
                 "Narrowed type `{narrowed}` is not assignable \
                     to the declared parameter type `{param}`",
-                narrowed = narrowed_ty.display(db, env),
-                param = param_ty.display(db, env)
+                narrowed = narrowed_ty.display_with(db, env, settings.clone()),
+                param = param_ty.display_with(db, env, settings)
             ));
         }
     }

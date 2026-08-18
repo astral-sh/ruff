@@ -1,4 +1,3 @@
-use crate::Db;
 use crate::types::relation::TypeRelation;
 /// This module defines a tree structure for collecting contextual information about type relation errors
 /// ("why is this complex type not assignable to that other complex type?").
@@ -8,11 +7,11 @@ use std::rc::Rc;
 use ruff_python_ast::name::Name;
 use ty_python_core::semantic_index;
 
-use crate::types::context::LintDiagnosticGuard;
+use crate::FxOrderSet;
+use crate::types::context::{InferContext, LintDiagnosticGuard};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::tuple::TupleLength;
-use crate::types::{DisplaySettings, Type, TypedDictType};
-use crate::{FxOrderSet, ProgramEnvironment};
+use crate::types::{ClassLiteral, DisplaySettings, StaticClassLiteral, Type, TypedDictType};
 
 /// Identifies a parameter, either by name or by position.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -176,17 +175,23 @@ pub(crate) enum ErrorContext<'db> {
 impl<'db> ErrorContext<'db> {
     fn render(
         &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        context: &InferContext<'db, '_>,
+        settings: &mut DisplaySettings<'db>,
         relation: TypeRelation,
         help_messages: &mut FxOrderSet<HelpMessages<'db>>,
     ) -> Option<String> {
-        let typed_dict_name = |typed_dict: &TypedDictType<'db>| match typed_dict {
-            TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
-            TypedDictType::Synthesized(_) => {
-                Type::TypedDict(*typed_dict).display(db, env).to_string()
-            }
-        };
+        let db = context.db();
+        let env = context.program_environment();
+        let typed_dict_name =
+            |typed_dict: &TypedDictType<'db>, settings: &DisplaySettings<'db>| match typed_dict {
+                TypedDictType::Class(class) => format!(
+                    "TypedDict `{}`",
+                    class.class_literal(db).display_with(db, settings.clone())
+                ),
+                TypedDictType::Synthesized(_) => Type::TypedDict(*typed_dict)
+                    .display_with(db, env, settings.clone())
+                    .to_string(),
+            };
 
         Some(match self {
             Self::Empty => {
@@ -197,22 +202,18 @@ impl<'db> ErrorContext<'db> {
                 union,
                 target,
             } => {
-                let settings = DisplaySettings::from_possibly_ambiguous_types(
-                    db,
-                    env,
-                    [*element, *union, *target],
-                );
+                *settings =
+                    settings.with_possibly_ambiguous_types(context, [element, union, target]);
                 format!(
                     "element `{}` of union `{}` is not {} `{}`",
                     element.display_with(db, env, settings.clone()),
                     union.display_with(db, env, settings.expand_numeric_tower_unions()),
                     relation.description(),
-                    target.display_with(db, env, settings),
+                    target.display_with(db, env, settings.clone()),
                 )
             }
             Self::NotAssignableToAnyUnionElement { source, union } => {
-                let settings =
-                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*source, *union]);
+                *settings = settings.with_possibly_ambiguous_types(context, [source, union]);
                 format!(
                     "type `{}` is not {} any element of the union `{}`",
                     source.display_with(db, env, settings.clone()),
@@ -228,26 +229,33 @@ impl<'db> ErrorContext<'db> {
                 source,
                 element,
                 intersection,
-            } => format!(
-                "type `{}` is not {} element `{}` of intersection `{}`",
-                source.display(db, env),
-                relation.description(),
-                element.display(db, env),
-                intersection.display(db, env),
-            ),
+            } => {
+                let types = [source, element, intersection];
+                *settings = settings.with_possibly_ambiguous_types(context, types);
+                format!(
+                    "type `{}` is not {} element `{}` of intersection `{}`",
+                    source.display_with(db, env, settings.clone()),
+                    relation.description(),
+                    element.display_with(db, env, settings.clone()),
+                    intersection.display_with(db, env, settings.clone()),
+                )
+            }
             Self::NoIntersectionElementAssignableToTarget {
                 intersection,
                 target,
-            } => format!(
-                "no element of intersection `{}` is {} `{}`",
-                intersection.display(db, env),
-                relation.description(),
-                target.display(db, env),
-            ),
+            } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [intersection, target]);
+                format!(
+                    "no element of intersection `{}` is {} `{}`",
+                    intersection.display_with(db, env, settings.clone()),
+                    relation.description(),
+                    target.display_with(db, env, settings.clone()),
+                )
+            }
             Self::TypedDictFieldMissing { field_name, source } => {
                 format!(
                     "required field \"{field_name}\" is not present in source {source}",
-                    source = typed_dict_name(source)
+                    source = typed_dict_name(source, settings)
                 )
             }
             Self::TypedDictFieldNotRequiredInSource {
@@ -255,10 +263,11 @@ impl<'db> ErrorContext<'db> {
                 source,
                 target,
             } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [source, target]);
                 format!(
                     "field \"{field_name}\" is required in {target} but not required in {source}",
-                    source = typed_dict_name(source),
-                    target = typed_dict_name(target)
+                    source = typed_dict_name(source, settings),
+                    target = typed_dict_name(target, settings)
                 )
             }
             Self::TypedDictFieldNotRequiredAndMutableInTarget {
@@ -266,12 +275,13 @@ impl<'db> ErrorContext<'db> {
                 source,
                 target,
             } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [source, target]);
                 help_messages.insert(HelpMessages::RequiredFieldCouldBeRemoved);
                 format!(
                     "field \"{field_name}\" is required in {source} \
                     but not required and mutable in {target}",
-                    source = typed_dict_name(source),
-                    target = typed_dict_name(target)
+                    source = typed_dict_name(source, settings),
+                    target = typed_dict_name(target, settings)
                 )
             }
             Self::TypedDictFieldReadOnlyInSource {
@@ -279,10 +289,11 @@ impl<'db> ErrorContext<'db> {
                 source,
                 target,
             } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [source, target]);
                 format!(
                     "field \"{field_name}\" is read-only in {source} but mutable in {target}",
-                    source = typed_dict_name(source),
-                    target = typed_dict_name(target)
+                    source = typed_dict_name(source, settings),
+                    target = typed_dict_name(target, settings)
                 )
             }
             Self::TypedDictFieldIncompatible {
@@ -291,67 +302,84 @@ impl<'db> ErrorContext<'db> {
                 target,
                 source_field,
                 target_field,
-            } => format!(
-                "field \"{field_name}\" on {source} has type `{source_field}` \
-                which is not {relation} type `{target_field}` expected by {target}",
-                source = typed_dict_name(source),
-                target = typed_dict_name(target),
-                relation = relation.description(),
-                source_field = source_field.display(db, env),
-                target_field = target_field.display(db, env),
-            ),
+            } => {
+                let types = [
+                    Type::TypedDict(*source),
+                    Type::TypedDict(*target),
+                    *source_field,
+                    *target_field,
+                ];
+                *settings = settings.with_possibly_ambiguous_types(context, types);
+                format!(
+                    "field \"{field_name}\" on {source} has type `{source_field}` \
+                    which is not {relation} type `{target_field}` expected by {target}",
+                    source = typed_dict_name(source, settings),
+                    target = typed_dict_name(target, settings),
+                    relation = relation.description(),
+                    source_field = source_field.display_with(db, env, settings.clone()),
+                    target_field = target_field.display_with(db, env, settings.clone()),
+                )
+            }
             Self::TypedDictNotAssignableToDict(typed_dict) => {
                 help_messages.insert(HelpMessages::TypedDictNotAssignableToDict(relation));
                 help_messages.insert(HelpMessages::ConsiderUsingMappingInsteadOfDict);
 
                 format!(
                     "{source} is not {relation} `dict`",
-                    source = typed_dict_name(typed_dict),
+                    source = typed_dict_name(typed_dict, settings),
                     relation = relation.description()
                 )
             }
             Self::OpenTypedDictNotAssignableToMapping { source, target } => {
-                let name = source.defining_class().map(|class| class.name(db));
+                let types = [Type::TypedDict(*source), *target];
+                *settings = settings.with_possibly_ambiguous_types(context, types);
                 help_messages.insert(HelpMessages::OpenTypedDictNotAssignableToMapping {
-                    typed_dict_name: name,
+                    typed_dict: *source,
                     mapping_target: *target,
                 });
                 help_messages.insert(HelpMessages::ExplainOpenTypedDictUnsoundness {
-                    typed_dict_name: name,
+                    typed_dict: *source,
                     mapping_target: *target,
                 });
 
                 format!(
                     "{source} is not {relation} `{target}`",
-                    source = typed_dict_name(source),
+                    source = typed_dict_name(source, settings),
                     relation = relation.description(),
-                    target = target.display(db, env)
+                    target = target.display_with(db, env, settings.clone())
                 )
             }
-            Self::IncompatibleReturnTypes { source, target } => format!(
-                "incompatible return types: `{source}` is not {relation} `{target}`",
-                source = source.display(db, env),
-                relation = relation.description(),
-                target = target.display(db, env),
-            ),
+            Self::IncompatibleReturnTypes { source, target } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [source, target]);
+                format!(
+                    "incompatible return types: `{source}` is not {relation} `{target}`",
+                    source = source.display_with(db, env, settings.clone()),
+                    relation = relation.description(),
+                    target = target.display_with(db, env, settings.clone()),
+                )
+            }
             Self::IncompatibleParameterTypes {
                 source,
                 target,
                 parameter,
             } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [source, target]);
                 // reversed order due to contravariance of parameter types
                 format!(
                     "{parameter} has an incompatible type: `{target}` is not {relation} `{source}`",
-                    source = source.display(db, env),
+                    source = source.display_with(db, env, settings.clone()),
                     relation = relation.description(),
-                    target = target.display(db, env),
+                    target = target.display_with(db, env, settings.clone()),
                 )
             }
-            Self::InferredCallableType { source, callable } => format!(
-                "type `{}` has inferred callable type `{}`",
-                source.display(db, env),
-                callable.display(db, env),
-            ),
+            Self::InferredCallableType { source, callable } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [source, callable]);
+                format!(
+                    "type `{}` has inferred callable type `{}`",
+                    source.display_with(db, env, settings.clone()),
+                    callable.display_with(db, env, settings.clone()),
+                )
+            }
             Self::ExtraRequiredParameter { parameter } => match parameter {
                 ParameterDescription::Named(name) => {
                     help_messages.insert(HelpMessages::ConsiderAddingADefaultValue {
@@ -381,7 +409,7 @@ impl<'db> ErrorContext<'db> {
                 format!(
                     "Object of type `Top[(...) -> {}]` is not safe to call; \
                     its signature is not known",
-                    return_type.display(db, env)
+                    return_type.display_with(db, env, settings.clone())
                 )
             }
             Self::ParameterNameMismatch {
@@ -428,38 +456,40 @@ impl<'db> ErrorContext<'db> {
                     (3, _) => "the third tuple element".to_string(),
                     (n, c) => format!("tuple element {n} of {c}"),
                 };
+                *settings = settings.with_possibly_ambiguous_types(context, [source, target]);
                 format!(
                     "{which} is not compatible: `{source}` is not {relation} `{target}`",
-                    source = source.display(db, env),
+                    source = source.display_with(db, env, settings.clone()),
                     relation = relation.description(),
-                    target = target.display(db, env)
+                    target = target.display_with(db, env, settings.clone())
                 )
             }
             Self::TypeNotCompatibleWithProtocol { ty, protocol } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [ty, protocol]);
                 if let Type::ProtocolInstance(_) = ty {
                     format!(
                         "protocol `{}` is not {} protocol `{}`",
-                        ty.display(db, env),
+                        ty.display_with(db, env, settings.clone()),
                         relation.description(),
-                        protocol.display(db, env),
+                        protocol.display_with(db, env, settings.clone()),
                     )
                 } else {
                     format!(
                         "type `{}` is not {} protocol `{}`",
-                        ty.display(db, env),
+                        ty.display_with(db, env, settings.clone()),
                         relation.description(),
-                        protocol.display(db, env),
+                        protocol.display_with(db, env, settings.clone()),
                     )
                 }
             }
             Self::ProtocolMemberNotDefined { member_name, ty } => format!(
                 "protocol member `{member_name}` is not defined on type `{}`",
-                ty.display(db, env),
+                ty.display_with(db, env, settings.clone()),
             ),
             Self::ProtocolMemberClassVarMismatch { member_name, ty } => format!(
                 "protocol member `{member_name}` is an instance variable on type `{}`, \
                 but a class variable is required",
-                ty.display(db, env),
+                ty.display_with(db, env, settings.clone()),
             ),
             Self::ProtocolSpecialMethodNotDefinedOnMetaType => {
                 "special methods must be defined on the meta-type when matching a protocol"
@@ -468,17 +498,23 @@ impl<'db> ErrorContext<'db> {
             Self::ProtocolMemberIncompatible { member_name } => {
                 format!("protocol member `{member_name}` is incompatible")
             }
-            Self::ProtocolMemberReadTypeIncompatible { source, target } => format!(
-                "read type `{source}` is not {relation} `{target}`",
-                source = source.display(db, env),
-                relation = relation.description(),
-                target = target.display(db, env),
-            ),
+            Self::ProtocolMemberReadTypeIncompatible { source, target } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [source, target]);
+                format!(
+                    "read type `{source}` is not {relation} `{target}`",
+                    source = source.display_with(db, env, settings.clone()),
+                    relation = relation.description(),
+                    target = target.display_with(db, env, settings.clone()),
+                )
+            }
             Self::ProtocolMemberNotWritable => "the member is not writable".to_string(),
-            Self::ProtocolMemberWriteTypeIncompatible { target } => format!(
-                "the member does not accept writes of type `{}`",
-                target.display(db, env),
-            ),
+            Self::ProtocolMemberWriteTypeIncompatible { target } => {
+                *settings = settings.with_possibly_ambiguous_types(context, [target]);
+                format!(
+                    "the member does not accept writes of type `{}`",
+                    target.display_with(db, env, settings.clone()),
+                )
+            }
         })
     }
 }
@@ -493,17 +529,17 @@ enum HelpMessages<'db> {
         parameter_name: Option<Name>,
     },
     OpenTypedDictNotAssignableToMapping {
-        typed_dict_name: Option<&'db Name>,
+        typed_dict: TypedDictType<'db>,
         mapping_target: Type<'db>,
     },
     ExplainOpenTypedDictUnsoundness {
-        typed_dict_name: Option<&'db Name>,
+        typed_dict: TypedDictType<'db>,
         mapping_target: Type<'db>,
     },
     SuggestMakingParameterPositionalOnly {
         ty: Type<'db>,
         protocol: Type<'db>,
-        declaring_protocol_name: &'db Name,
+        declaring_protocol: StaticClassLiteral<'db>,
         method_name: Name,
         parameter_name: Name,
     },
@@ -512,10 +548,13 @@ enum HelpMessages<'db> {
 impl<'db> HelpMessages<'db> {
     fn display(
         &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment,
+        context: &InferContext<'db, '_>,
+        settings: &DisplaySettings<'db>,
         relation: TypeRelation,
     ) -> impl std::fmt::Display {
+        let db = context.db();
+        let env = context.program_environment();
+
         std::fmt::from_fn(move |f| match self {
             HelpMessages::RequiredFieldCouldBeRemoved => f.write_str(
                 "The required field could be removed through a destructive operation \
@@ -533,12 +572,17 @@ impl<'db> HelpMessages<'db> {
                 f.write_str("Consider using `Mapping[..]` instead of `dict[..]`")
             }
             HelpMessages::OpenTypedDictNotAssignableToMapping {
-                typed_dict_name,
+                typed_dict,
                 mapping_target,
             } => {
-                let name = typed_dict_name
-                    .as_ref()
-                    .map(|name| format!("`{name}`"))
+                let name = typed_dict
+                    .defining_class()
+                    .map(|class| {
+                        format!(
+                            "`{}`",
+                            class.class_literal(db).display_with(db, settings.clone())
+                        )
+                    })
                     .unwrap_or_else(|| "this TypedDict".to_string());
                 write!(
                     f,
@@ -546,22 +590,27 @@ impl<'db> HelpMessages<'db> {
                     if it were declared with `closed=True`, \
                     but TypedDicts are open by default",
                     relation = relation.description(),
-                    mapping = mapping_target.display(db, env)
+                    mapping = mapping_target.display_with(db, env, settings.clone())
                 )
             }
             HelpMessages::ExplainOpenTypedDictUnsoundness {
-                typed_dict_name,
+                typed_dict,
                 mapping_target,
             } => {
-                let name = typed_dict_name
-                    .as_ref()
-                    .map(|name| format!("`{name}`"))
+                let name = typed_dict
+                    .defining_class()
+                    .map(|class| {
+                        format!(
+                            "`{}`",
+                            class.class_literal(db).display_with(db, settings.clone())
+                        )
+                    })
                     .unwrap_or_else(|| "this TypedDict".to_string());
                 write!(
                     f,
                     "A subclass of {name} could validly add a new field \
                     of an arbitrary type, violating subtyping with `{mapping_type}`",
-                    mapping_type = mapping_target.display(db, env)
+                    mapping_type = mapping_target.display_with(db, env, settings.clone())
                 )
             }
             HelpMessages::TopCallableExplanation => f.write_str(
@@ -576,24 +625,30 @@ impl<'db> HelpMessages<'db> {
             HelpMessages::SuggestMakingParameterPositionalOnly {
                 ty,
                 protocol,
-                declaring_protocol_name,
+                declaring_protocol,
                 method_name,
                 parameter_name,
             } => {
-                let settings =
-                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*ty, *protocol]);
                 write!(
                     f,
                     "`{source}` might be {relation} `{target}` \
                     if the parameter `{parameter_name}` were made positional-only \
-                    in `{declaring_protocol_name}.{method_name}`",
+                    in `{declaring_protocol}.{method_name}`",
                     source = ty.display_with(db, env, settings.clone()),
                     relation = relation.description(),
-                    target = protocol.display_with(db, env, settings),
+                    target = protocol.display_with(db, env, settings.clone()),
+                    declaring_protocol = ClassLiteral::Static(*declaring_protocol)
+                        .display_with(db, settings.clone()),
                 )
             }
         })
     }
+}
+
+#[derive(Default)]
+struct RenderedErrorContext<'db> {
+    lines: Vec<String>,
+    help_messages: FxOrderSet<HelpMessages<'db>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -617,19 +672,22 @@ impl<'db> ErrorContextNode<'db> {
         matches!(self.context, ErrorContext::Empty) && self.children.is_empty()
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn render_tree(
         &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        context: &InferContext<'db, '_>,
+        settings: &mut DisplaySettings<'db>,
         relation: TypeRelation,
-        output_lines: &mut Vec<String>,
-        help_messages: &mut FxOrderSet<HelpMessages<'db>>,
+        output: &mut RenderedErrorContext<'db>,
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(line) = self.context.render(db, env, relation, help_messages) {
-            output_lines.push(format!("{prefix}{line}"));
+        let db = context.db();
+
+        if let Some(line) =
+            self.context
+                .render(context, settings, relation, &mut output.help_messages)
+        {
+            output.lines.push(format!("{prefix}{line}"));
         }
 
         if let ErrorContext::TypeNotCompatibleWithProtocol { ty, protocol } = &self.context
@@ -649,13 +707,15 @@ impl<'db> ErrorContextNode<'db> {
                 definition.scope(db),
             )
         {
-            help_messages.insert(HelpMessages::SuggestMakingParameterPositionalOnly {
-                ty: *ty,
-                protocol: *protocol,
-                declaring_protocol_name: declaring_protocol.name(db),
-                method_name: member_name.clone(),
-                parameter_name: target_name.clone(),
-            });
+            output
+                .help_messages
+                .insert(HelpMessages::SuggestMakingParameterPositionalOnly {
+                    ty: *ty,
+                    protocol: *protocol,
+                    declaring_protocol,
+                    method_name: member_name.clone(),
+                    parameter_name: target_name.clone(),
+                });
         }
 
         let num_children = self.children.len();
@@ -667,11 +727,10 @@ impl<'db> ErrorContextNode<'db> {
                 (format!("{continuation}├── "), format!("{continuation}│   "))
             };
             child.render_tree(
-                db,
-                env,
+                context,
+                settings,
                 relation,
-                output_lines,
-                help_messages,
+                output,
                 &child_prefix,
                 &child_continuation,
             );
@@ -769,26 +828,22 @@ impl<'db> ErrorContextTree<'db> {
     /// Render the error context tree as info sub-diagnostics on `diag`.
     pub(in crate::types) fn attach_to(
         &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        diag: &mut LintDiagnosticGuard<'_, '_>,
+        context: &InferContext<'db, '_>,
+        settings: &DisplaySettings<'db>,
+        diag: &mut LintDiagnosticGuard<'db, '_>,
     ) {
-        let mut output_lines = Vec::new();
-        let mut help_messages = FxOrderSet::default();
-        self.root.borrow().render_tree(
-            db,
-            env,
-            self.relation,
-            &mut output_lines,
-            &mut help_messages,
-            "",
-            "",
-        );
-        for line in output_lines {
+        // Each node contributes the types it displays while the tree is rendered. Help is emitted
+        // afterward so it also sees types introduced by nested protocol and TypedDict errors.
+        let mut settings = settings.clone();
+        let mut output = RenderedErrorContext::default();
+        self.root
+            .borrow()
+            .render_tree(context, &mut settings, self.relation, &mut output, "", "");
+        for line in output.lines {
             diag.info(line);
         }
-        for help_message in help_messages {
-            diag.help(help_message.display(db, env, self.relation));
+        for help_message in output.help_messages {
+            diag.help(help_message.display(context, &settings, self.relation));
         }
     }
 }

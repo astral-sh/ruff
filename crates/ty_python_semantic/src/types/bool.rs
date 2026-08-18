@@ -4,10 +4,10 @@ use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::{
-    CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
-    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    CallArguments, CallDunderError, ClassType, CycleDetector, DisplaySettings, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, SubclassOfInner, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
+    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -462,15 +462,19 @@ impl<'db> BoolError<'db> {
                 not_boolable_type,
                 return_type,
             } => {
+                let expected_type = KnownClass::Bool.to_instance(db, env);
+                let types = [not_boolable_type, return_type, &expected_type];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{not_boolable}`",
-                    not_boolable = not_boolable_type.display(db, env),
+                    not_boolable = not_boolable_type.display_with(db, env, settings.clone()),
                 ));
                 let mut sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(
-                        "`{return_type}` is not assignable to `bool`",
-                        return_type = return_type.display(db, env),
+                        "`{return_type}` is not assignable to `{expected_type}`",
+                        return_type = return_type.display_with(db, env, settings.clone()),
+                        expected_type = expected_type.display_with(db, env, settings),
                     ),
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
@@ -510,12 +514,16 @@ impl<'db> BoolError<'db> {
                     .iter()
                     .find_map(|element| element.try_bool(db, env).err())
                     .unwrap();
+                let union_ty = Type::Union(*union);
+                let error_ty = first_error.not_boolable_type();
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(context, [union_ty, error_ty]);
 
                 builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for union `{}` \
                      because `{}` doesn't implement `__bool__` correctly",
-                    Type::Union(*union).display(db, env),
-                    first_error.not_boolable_type().display(db, env),
+                    union_ty.display_with(db, env, settings.clone()),
+                    error_ty.display_with(db, env, settings),
                 ));
             }
 

@@ -21,11 +21,11 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
-    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
-    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
-    todo_type,
+    BindingContext, CallableType, DisplaySettings, DynamicType, GenericContext,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    LiteralValueTypeKind, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
+    TypeContext, TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
+    UnionType, any_over_type, todo_type,
 };
 use crate::{FxOrderSet, add_inferred_python_version_hint_to_diagnostic};
 
@@ -302,15 +302,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 let mut diagnostic =
                                     builder.into_diagnostic("Unsupported `|` operation");
 
+                                let types = [left_type_value, right_type_value];
+                                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                                    &self.context,
+                                    types,
+                                );
+
                                 if left_type_value.is_equivalent_to(db, env, right_type_value) {
                                     diagnostic.set_primary_annotation_message(format_args!(
                                         "Both operands have type `{}`",
-                                        left_type_value.display(db, env)
+                                        left_type_value.display_with(db, env, settings.clone())
                                     ));
                                     diagnostic.set_concise_message(format_args!(
                                         "Operator `|` is unsupported between \
                                         two objects of type `{}`",
-                                        left_type_value.display(db, env)
+                                        left_type_value.display_with(db, env, settings)
                                     ));
                                 } else {
                                     for (operand, ty) in [
@@ -320,15 +326,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         diagnostic.annotate(
                                             self.context.secondary(operand).message(format_args!(
                                                 "Has type `{}`",
-                                                ty.display(db, env)
+                                                ty.display_with(db, env, settings.clone())
                                             )),
                                         );
                                     }
                                     diagnostic.set_concise_message(format_args!(
                                         "Operator `|` is unsupported between \
                                         objects of type `{}` and `{}`",
-                                        left_type_value.display(db, env),
-                                        right_type_value.display(db, env)
+                                        left_type_value.display_with(db, env, settings.clone()),
+                                        right_type_value.display_with(db, env, settings)
                                     ));
                                 }
 

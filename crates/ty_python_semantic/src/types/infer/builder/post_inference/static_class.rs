@@ -384,27 +384,37 @@ pub(crate) fn check_static_class_definitions<'db>(
                 && !base_class.is_object(db)
                 && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node)
             {
+                let types = [Type::from(class), Type::from(base_class)];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 builder.into_diagnostic(format_args!(
                     "Protocol class `{}` cannot inherit from non-protocol class `{}`",
-                    class.name(db),
-                    base_class.name(db),
+                    ClassLiteral::Static(class).display_with(db, settings.clone()),
+                    base_class.class_literal(db).display_with(db, settings),
                 ));
             }
         } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
             if !base_class.class_literal(db).is_typed_dict(db)
                 && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, source_node)
             {
+                let types = [Type::from(class), Type::from(base_class)];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "TypedDict class `{}` can only inherit from TypedDict classes",
-                    class.name(db),
+                    ClassLiteral::Static(class).display_with(db, settings.clone()),
                 ));
                 diagnostic.set_primary_annotation_message(format_args!(
                     "`{}` is not a `TypedDict` class",
-                    base_class.name(db)
+                    base_class
+                        .class_literal(db)
+                        .display_with(db, settings.clone())
                 ));
                 diagnostic.annotate(
-                    Annotation::secondary(base_class.class_literal(db).header_span(db))
-                        .message(format_args!("`{}` defined here", base_class.name(db))),
+                    Annotation::secondary(base_class.class_literal(db).header_span(db)).message(
+                        format_args!(
+                            "`{}` defined here",
+                            base_class.class_literal(db).display_with(db, settings)
+                        ),
+                    ),
                 );
             }
             if base_class.class_literal(db).is_typed_dict(db) {
@@ -415,10 +425,12 @@ pub(crate) fn check_static_class_definitions<'db>(
         if base_class.is_final(db)
             && let Some(builder) = context.report_lint(&SUBCLASS_OF_FINAL_CLASS, source_node)
         {
+            let types = [Type::from(class), Type::from(base_class)];
+            let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
             builder.into_diagnostic(format_args!(
                 "Class `{}` cannot inherit from final class `{}`",
-                class.name(db),
-                base_class.name(db),
+                ClassLiteral::Static(class).display_with(db, settings.clone()),
+                base_class.class_literal(db).display_with(db, settings),
             ));
         }
 
@@ -446,10 +458,14 @@ pub(crate) fn check_static_class_definitions<'db>(
                 && let Some(builder) =
                     context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, source_node)
             {
+                let types = [Type::from(class), Type::from(ordered_base_class)];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Class `{}` inherits from dataclass `{}` which has `order=True`",
-                    class.name(db),
-                    ordered_base_class.name(db),
+                    ClassLiteral::Static(class).display_with(db, settings.clone()),
+                    ordered_base_class
+                        .class_literal(db)
+                        .display_with(db, settings),
                 ));
                 diagnostic.info(
                     "Comparison of instances of the child class with instances \
@@ -492,13 +508,16 @@ pub(crate) fn check_static_class_definitions<'db>(
                 if let Some(builder) =
                     context.report_lint(&INCONSISTENT_MRO, class.header_range(db))
                 {
+                    let types =
+                        std::iter::once(Type::from(class)).chain(bases_list.iter().copied());
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Cannot create a consistent method resolution order (MRO) \
                                     for class `{}` with bases list `[{}]`",
-                        class.name(db),
+                        ClassLiteral::Static(class).display_with(db, settings.clone()),
                         bases_list
                             .iter()
-                            .map(|base| base.display(db, env))
+                            .map(|base| base.display_with(db, env, settings.clone()))
                             .join(", ")
                     ));
                     let can_rewrite_bases = bases_list.len() == class_node.bases().len()
@@ -641,11 +660,11 @@ pub(crate) fn check_static_class_definitions<'db>(
                     report_conflicting_metaclass_from_bases(
                         context,
                         class_node.into(),
-                        class.name(db),
+                        ClassLiteral::Static(class),
                         *metaclass1,
-                        class1.name(db),
+                        ClassBase::Class(ClassType::NonGeneric(ClassLiteral::from(*class1))),
                         *metaclass2,
-                        class2.name(db),
+                        ClassBase::Class(ClassType::NonGeneric(ClassLiteral::from(*class2))),
                     );
                 } else if let Some(builder) =
                     context.report_lint(&CONFLICTING_METACLASS, class_node)
@@ -656,7 +675,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                         Type::from(*metaclass2),
                         Type::from(*class2),
                     ];
-                    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                     builder.into_diagnostic(format_args!(
                         "The metaclass of a derived class (`{class}`) \
                             must be a subclass of the metaclasses of all its bases, \
@@ -1359,7 +1379,12 @@ fn check_final_class_abstract_methods<'db>(
         return;
     };
 
-    let class_name = class.name(db);
+    let types = [
+        Type::from(class),
+        Type::from(abstract_method.defining_class),
+    ];
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
+    let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
 
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Final class `{class_name}` has unimplemented abstract methods",
@@ -1427,7 +1452,7 @@ fn check_final_class_abstract_methods<'db>(
         kind,
     } = abstract_method;
 
-    let defining_class_name = defining_class.name(db);
+    let defining_class_name = defining_class.class_literal(db).display_with(db, settings);
 
     if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
         let policy = if kind.is_explicit() {

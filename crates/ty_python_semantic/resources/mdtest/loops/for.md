@@ -888,7 +888,7 @@ error[not-iterable]: Object of type `Iterable` is not iterable
 10 | for x in Iterable():
    |          ^^^^^^^^^^
 info: Its `__iter__` method has an invalid signature
-info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
+info: type `mdtest_snippet.Iterable` is not assignable to protocol `ty_extensions._internal.Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `extra_arg`
 help: Parameter `extra_arg` must have a default value

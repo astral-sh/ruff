@@ -23,8 +23,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
+    ClassLiteral, DisplaySettings, IntersectionBuilder, IntersectionType, KnownInstanceType, Type,
+    TypeAliasType, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -114,11 +114,13 @@ pub(crate) enum SubscriptErrorKind<'db> {
     DunderPossiblyUnbound {
         method: DunderMethod,
         value_ty: Type<'db>,
+        full_object_ty: Option<Type<'db>>,
     },
     /// `__getitem__` or `__class_getitem__` exists but can't be called with the given arguments.
     DunderCallError {
         method: DunderMethod,
         value_ty: Type<'db>,
+        full_object_ty: Option<Type<'db>>,
         slice_ty: Type<'db>,
         kind: CallErrorKind,
         bindings: Box<Bindings<'db>>,
@@ -132,6 +134,7 @@ pub(crate) enum SubscriptErrorKind<'db> {
     /// The type does not support subscripting via the expected dunder.
     NotSubscriptable {
         value_ty: Type<'db>,
+        full_object_ty: Option<Type<'db>>,
         method: DunderMethod,
     },
     /// An invalid argument was provided to `Generic` or `Protocol`.
@@ -191,6 +194,28 @@ impl<'db> SubscriptError<'db> {
 impl<'db> SubscriptErrorKind<'db> {
     fn with_full_object_ty(self, full_object_ty: Type<'db>) -> Self {
         match self {
+            Self::DunderPossiblyUnbound {
+                method, value_ty, ..
+            } => Self::DunderPossiblyUnbound {
+                method,
+                value_ty,
+                full_object_ty: Some(full_object_ty),
+            },
+            Self::DunderCallError {
+                method,
+                value_ty,
+                slice_ty,
+                kind,
+                bindings,
+                ..
+            } => Self::DunderCallError {
+                method,
+                value_ty,
+                full_object_ty: Some(full_object_ty),
+                slice_ty,
+                kind,
+                bindings,
+            },
             Self::InvalidTypedDictKey {
                 typed_dict,
                 slice_ty,
@@ -199,6 +224,13 @@ impl<'db> SubscriptErrorKind<'db> {
                 typed_dict,
                 slice_ty,
                 full_object_ty: Some(full_object_ty),
+            },
+            Self::NotSubscriptable {
+                value_ty, method, ..
+            } => Self::NotSubscriptable {
+                value_ty,
+                full_object_ty: Some(full_object_ty),
+                method,
             },
             other => other,
         }
@@ -257,30 +289,42 @@ impl<'db> SubscriptErrorKind<'db> {
                     ));
                 }
             }
-            Self::DunderPossiblyUnbound { method, value_ty } => {
+            Self::DunderPossiblyUnbound {
+                method,
+                value_ty,
+                full_object_ty,
+            } => {
                 if let Some(builder) =
                     context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
                 {
+                    let types = std::iter::once(*value_ty).chain(*full_object_ty);
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
                     builder.into_diagnostic(format_args!(
                         "Method `{method}` of type `{}` may be missing",
-                        value_ty.display(db, env),
+                        value_ty.display_with(db, env, settings),
                     ));
                 }
             }
             Self::DunderCallError {
                 method,
                 value_ty,
+                full_object_ty,
                 slice_ty,
                 kind,
                 bindings,
             } => match kind {
                 CallErrorKind::NotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                        let callable_ty = bindings.callable_type();
+
+                        let types = [callable_ty, *value_ty].into_iter().chain(*full_object_ty);
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` is not callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(db, env),
-                            value_ty.display(db, env),
+                            callable_ty.display_with(db, env, settings.clone()),
+                            value_ty.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -291,29 +335,45 @@ impl<'db> SubscriptErrorKind<'db> {
                             value_node.into(),
                             slice_node.into(),
                             *value_ty,
-                            None,
+                            *full_object_ty,
                             *slice_ty,
                             typed_dict.items(db),
                         );
                     } else if let Some(builder) =
                         context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                     {
+                        let callable_ty = bindings.callable_type();
+
+                        let types = [callable_ty, *slice_ty, *value_ty]
+                            .into_iter()
+                            .chain(*full_object_ty)
+                            .chain(bindings.invalid_argument_types(context));
+
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` cannot be called \
                             with key of type `{}` on object of type `{}`",
-                            bindings.callable_type().display(db, env),
-                            slice_ty.display(db, env),
-                            value_ty.display(db, env),
+                            callable_ty.display_with(db, env, settings.clone()),
+                            slice_ty.display_with(db, env, settings.clone()),
+                            value_ty.display_with(db, env, settings),
                         ));
                     }
                 }
                 CallErrorKind::PossiblyNotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                        let callable_ty = bindings.callable_type();
+
+                        let types = [callable_ty, *value_ty].into_iter().chain(*full_object_ty);
+                        let settings =
+                            DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` may not be callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(db, env),
-                            value_ty.display(db, env),
+                            callable_ty.display_with(db, env, settings.clone()),
+                            value_ty.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -334,8 +394,18 @@ impl<'db> SubscriptErrorKind<'db> {
                     typed_dict.items(db),
                 );
             }
-            Self::NotSubscriptable { value_ty, method } => {
-                report_not_subscriptable(context, subscript, *value_ty, method.as_str());
+            Self::NotSubscriptable {
+                value_ty,
+                full_object_ty,
+                method,
+            } => {
+                report_not_subscriptable(
+                    context,
+                    subscript,
+                    *value_ty,
+                    *full_object_ty,
+                    method.as_str(),
+                );
             }
             Self::InvalidLegacyGenericArgument {
                 origin,
@@ -932,6 +1002,7 @@ impl<'db> Type<'db> {
                     SubscriptErrorKind::DunderPossiblyUnbound {
                         method: DunderMethod::GetItem,
                         value_ty,
+                        full_object_ty: None,
                     },
                 ));
             }
@@ -941,6 +1012,7 @@ impl<'db> Type<'db> {
                     SubscriptErrorKind::DunderCallError {
                         method: DunderMethod::GetItem,
                         value_ty,
+                        full_object_ty: None,
                         slice_ty,
                         kind: call_error_kind,
                         bindings,
@@ -979,6 +1051,7 @@ impl<'db> Type<'db> {
                         SubscriptErrorKind::DunderPossiblyUnbound {
                             method: DunderMethod::ClassGetItem,
                             value_ty,
+                            full_object_ty: None,
                         },
                     ));
                 }
@@ -988,6 +1061,7 @@ impl<'db> Type<'db> {
                         SubscriptErrorKind::DunderCallError {
                             method: DunderMethod::ClassGetItem,
                             value_ty,
+                            full_object_ty: None,
                             slice_ty,
                             kind: call_error_kind,
                             bindings,
@@ -1027,6 +1101,7 @@ impl<'db> Type<'db> {
                 Type::unknown(),
                 SubscriptErrorKind::NotSubscriptable {
                     value_ty,
+                    full_object_ty: None,
                     method: DunderMethod::ClassGetItem,
                 },
             ));
@@ -1035,6 +1110,7 @@ impl<'db> Type<'db> {
                 Type::unknown(),
                 SubscriptErrorKind::NotSubscriptable {
                     value_ty,
+                    full_object_ty: None,
                     method: DunderMethod::GetItem,
                 },
             ));

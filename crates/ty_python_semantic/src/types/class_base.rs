@@ -479,14 +479,6 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(super) fn display(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> impl std::fmt::Display {
-        self.display_with(db, env, DisplaySettings::default())
-    }
-
     pub(super) fn display_with<'env>(
         self,
         db: &'db dyn Db,

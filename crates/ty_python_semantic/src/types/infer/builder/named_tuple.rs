@@ -1,8 +1,8 @@
 use crate::{
     Db,
     types::{
-        ClassLiteral, IntersectionType, KnownClass, KnownInstanceType, SpecialFormType, Type,
-        TypeContext, UnionType,
+        ClassLiteral, DisplaySettings, IntersectionType, KnownClass, KnownInstanceType,
+        SpecialFormType, Type, TypeContext, UnionType,
         class::{
             DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
         },
@@ -243,12 +243,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
+                        let settings = DisplaySettings::from_possibly_ambiguous_types(
+                            &self.context,
+                            [valid_type, kw_type],
+                        );
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `defaults` of `namedtuple()`"
                         ));
                         diagnostic.set_primary_annotation_message(format_args!(
-                            "Expected `Iterable[Any] | None`, found `{}`",
-                            kw_type.display(db, env)
+                            "Expected `{}`, found `{}`",
+                            valid_type.display_with(db, env, settings.clone()),
+                            kw_type.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -256,16 +261,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     rename_type = Some(kw_type);
 
                     // Emit diagnostic for non-bool types.
-                    if !kw_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
+                    let expected_type = KnownClass::Bool.to_instance(db, env);
+                    if !kw_type.is_assignable_to(db, env, expected_type)
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
+                        let settings = DisplaySettings::from_possibly_ambiguous_types(
+                            &self.context,
+                            [expected_type, kw_type],
+                        );
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `rename` of `namedtuple()`"
                         ));
                         diagnostic.set_primary_annotation_message(format_args!(
-                            "Expected `bool`, found `{}`",
-                            kw_type.display(db, env)
+                            "Expected `{}`, found `{}`",
+                            expected_type.display_with(db, env, settings.clone()),
+                            kw_type.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -281,12 +292,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
+                        let settings = DisplaySettings::from_possibly_ambiguous_types(
+                            &self.context,
+                            [valid_type, kw_type],
+                        );
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `module` of `namedtuple()`"
                         ));
                         diagnostic.set_primary_annotation_message(format_args!(
-                            "Expected `str | None`, found `{}`",
-                            kw_type.display(db, env)
+                            "Expected `{}`, found `{}`",
+                            valid_type.display_with(db, env, settings.clone()),
+                            kw_type.display_with(db, env, settings),
                         ));
                     }
                 }
@@ -332,16 +348,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_string_literal()
             .map(|literal| literal.value(db));
 
+        let expected_name_type = KnownClass::Str.to_instance(db, env);
         if name.is_none()
-            && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+            && !name_type.is_assignable_to(db, env, expected_name_type)
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
+            let settings = DisplaySettings::from_possibly_ambiguous_types(
+                &self.context,
+                [expected_name_type, name_type],
+            );
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `typename` of `{kind}()`"
             ));
             diagnostic.set_primary_annotation_message(format_args!(
-                "Expected `str`, found `{}`",
-                name_type.display(db, env)
+                "Expected `{}`, found `{}`",
+                expected_name_type.display_with(db, env, settings.clone()),
+                name_type.display_with(db, env, settings),
             ));
         } else if let Some(actual_name) = name
             && let Some(definition) = definition
@@ -471,12 +493,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if !fields_type.is_assignable_to(db, env, valid_type)
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
             {
+                let expected_string_type = KnownClass::Str.to_instance(db, env);
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    &self.context,
+                    [expected_string_type, fields_type],
+                );
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid argument to parameter `field_names` of `namedtuple()`"
                 ));
                 diagnostic.set_primary_annotation_message(format_args!(
-                    "Expected `str` or an iterable of strings, found `{}`",
-                    fields_type.display(db, env)
+                    "Expected `{}` or an iterable of strings, found `{}`",
+                    expected_string_type.display_with(db, env, settings.clone()),
+                    fields_type.display_with(db, env, settings),
                 ));
             }
         }

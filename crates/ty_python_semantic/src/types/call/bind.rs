@@ -16,7 +16,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::fmt;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
@@ -86,21 +86,32 @@ pub(crate) use self::constructor::ConstructorCallableKind;
 /// The original call-error message is retained on the primary annotation if the call reporter
 /// does not supply its own annotation message, or as an info sub-diagnostic otherwise. `info`
 /// explains why the call happened. `argument_ranges` maps synthetic call arguments back to source
-/// ranges.
-pub(crate) struct CallDiagnosticOverride<'a> {
+/// ranges. `display_settings` keeps the implicit call consistent with the enclosing diagnostic.
+pub(crate) struct CallDiagnosticOverride<'db, 'a> {
     pub(crate) lint: &'static LintMetadata,
     pub(crate) message: String,
     pub(crate) info: &'a str,
     pub(crate) argument_ranges: &'a [TextRange],
+    pub(crate) display_settings: DisplaySettings<'db>,
 }
 
 struct CallDiagnosticContext<'context, 'overrides, 'db, 'ast> {
     context: &'context InferContext<'db, 'ast>,
-    overrides: Option<&'context CallDiagnosticOverride<'overrides>>,
+    overrides: Option<&'context CallDiagnosticOverride<'db, 'overrides>>,
+    compound_display_settings: Option<&'context DisplaySettings<'db>>,
     argument_index_offset: usize,
 }
 
 impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
+    fn display_settings(&self) -> Option<&DisplaySettings<'db>> {
+        self.compound_display_settings
+            .or_else(|| self.overrides.map(|overrides| &overrides.display_settings))
+    }
+
+    fn callable_description(&self, callable_type: Type<'db>) -> Option<CallableDescription<'db>> {
+        CallableDescription::new_with_settings(self.context, callable_type, self.display_settings())
+    }
+
     fn report_lint<'env, T: Ranged>(
         &'env self,
         lint: &'static LintMetadata,
@@ -908,6 +919,53 @@ impl<'db> Bindings<'db> {
         self.elements.iter().flat_map(BindingsElement::callables)
     }
 
+    /// Returns the signatures that can be included in diagnostics for this call.
+    pub(crate) fn overload_signatures(&self) -> impl Iterator<Item = &Signature<'db>> {
+        self.iter_flat()
+            .flat_map(CallableBinding::overloads)
+            .map(|binding| &binding.signature)
+    }
+
+    /// Returns the types displayed by failed argument matches and generic specializations.
+    pub(crate) fn invalid_argument_types<'a>(
+        &'a self,
+        context: &'a InferContext<'db, '_>,
+    ) -> impl Iterator<Item = Type<'db>> + 'a {
+        let db = context.db();
+        let env = context.program_environment();
+
+        self.iter_flat()
+            .flatten()
+            .flat_map(Binding::errors)
+            .filter_map(move |error| match error {
+                BindingError::InvalidArgumentType {
+                    provided_ty,
+                    expected_ty,
+                    ..
+                } => Some(Either::Left([*provided_ty, *expected_ty].into_iter())),
+                BindingError::SpecializationError { error, .. } => {
+                    let bound_or_constraints = error
+                        .bound_typevar()
+                        .typevar(db)
+                        .require_bound_or_constraints(db, env);
+                    let expected_types = match bound_or_constraints {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            Either::Left(std::iter::once(bound))
+                        }
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            Either::Right(constraints.elements(db).iter().copied())
+                        }
+                    };
+
+                    Some(Either::Right(
+                        std::iter::once(error.argument_type()).chain(expected_types),
+                    ))
+                }
+                _ => None,
+            })
+            .flatten()
+    }
+
     /// Returns a mutable iterator over all `CallableBinding`s, flattening the two-level structure.
     ///
     /// Note: This loses the union/intersection distinction. Use only when you need to
@@ -1428,6 +1486,7 @@ impl<'db> Bindings<'db> {
             &CallDiagnosticContext {
                 context,
                 overrides: None,
+                compound_display_settings: None,
                 argument_index_offset: 0,
             },
             node,
@@ -1438,12 +1497,13 @@ impl<'db> Bindings<'db> {
         &self,
         context: &InferContext<'db, '_>,
         node: ast::AnyNodeRef,
-        overrides: &CallDiagnosticOverride<'_>,
+        overrides: &CallDiagnosticOverride<'db, '_>,
     ) {
         self.report_diagnostics_impl(
             &CallDiagnosticContext {
                 context,
                 overrides: Some(overrides),
+                compound_display_settings: None,
                 argument_index_offset: 0,
             },
             node,
@@ -1474,10 +1534,43 @@ impl<'db> Bindings<'db> {
                 item.callable().report_diagnostics(context, node, None);
             }
         } else {
+            let callable_types = self.iter_flat().flat_map(|binding| {
+                let defining_class =
+                    CallableDescription::defining_class(db, binding.signature_type)
+                        .map(Type::ClassLiteral);
+                [binding.callable_type, binding.signature_type]
+                    .into_iter()
+                    .chain(defining_class)
+            });
+            let types = std::iter::once(self.callable_type())
+                .chain(callable_types)
+                .chain(self.invalid_argument_types(context));
+            let display_settings = DisplaySettings::from_possibly_ambiguous_types_and_signatures(
+                context,
+                types,
+                self.overload_signatures(),
+            );
+            let display_settings = if let Some(shared_settings) = context.display_settings() {
+                shared_settings.with_qualification_from(&display_settings)
+            } else {
+                display_settings
+            };
+            let compound_context = CallDiagnosticContext {
+                context: context.context,
+                overrides: context.overrides,
+                compound_display_settings: Some(&display_settings),
+                argument_index_offset: context.argument_index_offset,
+            };
+
             // Report diagnostics for each element (union variant).
             // Each element may be a single binding or an intersection of bindings.
             for element in &self.elements {
-                self.report_element_diagnostics(context, node, element);
+                self.report_element_diagnostics(
+                    &compound_context,
+                    node,
+                    element,
+                    &display_settings,
+                );
             }
         }
 
@@ -1501,6 +1594,7 @@ impl<'db> Bindings<'db> {
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
         element: &BindingsElement<'db>,
+        display_settings: &DisplaySettings<'db>,
     ) {
         // If this element succeeded, no diagnostics to report
         if element.as_result(context.db()).is_ok() {
@@ -1527,6 +1621,7 @@ impl<'db> Bindings<'db> {
                             union_callable_type: self.callable_type(),
                             intersection_callable_type: element.callable_type,
                             binding,
+                            display_settings: display_settings.clone(),
                         };
                         binding.report_diagnostics(context, node, Some(&layered_diag));
                     } else {
@@ -1534,6 +1629,7 @@ impl<'db> Bindings<'db> {
                         let intersection_diag = IntersectionDiagnostic {
                             callable_type: element.callable_type,
                             binding,
+                            display_settings: display_settings.clone(),
                         };
                         binding.report_diagnostics(context, node, Some(&intersection_diag));
                     }
@@ -1552,6 +1648,7 @@ impl<'db> Bindings<'db> {
                 let union_diag = UnionDiagnostic {
                     callable_type: self.callable_type(),
                     variant_type: element.callable_type,
+                    display_settings: display_settings.clone(),
                 };
                 binding.report_diagnostics(context, node, Some(&union_diag));
             }
@@ -4447,9 +4544,12 @@ impl<'db> CallableBinding<'db> {
         if !self.is_callable() {
             let range = all_arguments_range(node);
             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
+                let callable_type = context
+                    .display_settings()
+                    .map(|settings| self.callable_type.display_with(db, env, settings.clone()))
+                    .unwrap_or_else(|| self.callable_type.display(db, env));
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Object of type `{}` is not callable",
-                    self.callable_type.display(db, env),
+                    "Object of type `{callable_type}` is not callable",
                 ));
                 if let Some(compound_diag) = compound_diag {
                     compound_diag.add_context(db, env, &mut diag);
@@ -4461,9 +4561,12 @@ impl<'db> CallableBinding<'db> {
         if self.dunder_call_is_possibly_unbound {
             let range = all_arguments_range(node);
             if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
+                let callable_type = context
+                    .display_settings()
+                    .map(|settings| self.callable_type.display_with(db, env, settings.clone()))
+                    .unwrap_or_else(|| self.callable_type.display(db, env));
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Object of type `{}` is not callable (possibly missing `__call__` method)",
-                    self.callable_type.display(db, env),
+                    "Object of type `{callable_type}` is not callable (possibly missing `__call__` method)",
                 ));
                 if let Some(compound_diag) = compound_diag {
                     compound_diag.add_context(db, env, &mut diag);
@@ -4475,7 +4578,7 @@ impl<'db> CallableBinding<'db> {
         match self.overloads.as_slice() {
             [] => {}
             [overload] => {
-                let callable_description = CallableDescription::new(db, self.signature_type);
+                let callable_description = context.callable_description(self.signature_type);
                 overload.report_diagnostics(
                     context,
                     node,
@@ -4505,7 +4608,7 @@ impl<'db> CallableBinding<'db> {
 
                 // If only one overload passed arity check, report its errors directly.
                 if let Some(matching_overload_index) = self.matching_overload_before_type_checking {
-                    let callable_description = CallableDescription::new(db, self.signature_type);
+                    let callable_description = context.callable_description(self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
                             index: self.overloads[matching_overload_index].source_overload_index(),
@@ -4528,7 +4631,7 @@ impl<'db> CallableBinding<'db> {
                 // (possibly with semantic errors), report its errors directly instead
                 // of the generic "no matching overload" message.
                 if let Ok((matching_overload_index, _)) = self.matching_overloads().exactly_one() {
-                    let callable_description = CallableDescription::new(db, self.signature_type);
+                    let callable_description = context.callable_description(self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
                             index: self.overloads[matching_overload_index].source_overload_index(),
@@ -4551,7 +4654,45 @@ impl<'db> CallableBinding<'db> {
                 let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, range) else {
                     return;
                 };
-                let callable_description = CallableDescription::new(db, self.callable_type);
+
+                let possible_overloads = function_type_and_kind.map(|(kind, function)| {
+                    let (overloads, implementation) =
+                        function.overloads_and_implementation(context.db());
+                    let diagnostic_overload_indexes =
+                        self.diagnostic_overload_indexes(db, kind, function);
+                    let overloads = diagnostic_overload_indexes
+                        .iter()
+                        .filter_map(|&index| overloads.get(index).copied())
+                        .collect_vec();
+                    let signatures = overloads
+                        .iter()
+                        .take(MAXIMUM_OVERLOADS)
+                        .map(|overload| overload.signature(db));
+                    let defining_class =
+                        CallableDescription::defining_class(db, self.callable_type)
+                            .map(Type::ClassLiteral);
+                    let types = std::iter::once(self.callable_type).chain(defining_class);
+                    let settings = DisplaySettings::from_possibly_ambiguous_types_and_signatures(
+                        context, types, signatures,
+                    );
+                    let settings = if let Some(shared_settings) = context.display_settings() {
+                        shared_settings.with_qualification_from(&settings)
+                    } else {
+                        settings
+                    };
+
+                    (kind, function, overloads, implementation, settings)
+                });
+
+                let callable_description = CallableDescription::new_with_settings(
+                    context,
+                    self.callable_type,
+                    context.display_settings().or_else(|| {
+                        possible_overloads
+                            .as_ref()
+                            .map(|(_, _, _, _, settings)| settings)
+                    }),
+                );
                 let mut diag = builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
                     callable_description
@@ -4575,16 +4716,14 @@ impl<'db> CallableBinding<'db> {
                     ));
                 }
 
-                if let Some((kind, function)) = function_type_and_kind {
-                    let (overloads, implementation) =
-                        function.overloads_and_implementation(context.db());
-                    let diagnostic_overload_indexes =
-                        self.diagnostic_overload_indexes(db, kind, function);
-                    let possible_overloads = diagnostic_overload_indexes
-                        .iter()
-                        .filter_map(|&index| overloads.get(index).copied())
-                        .collect_vec();
-
+                if let Some((
+                    kind,
+                    function,
+                    possible_overloads,
+                    implementation,
+                    display_settings,
+                )) = possible_overloads
+                {
                     if let Some(overload) = possible_overloads.first() {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
@@ -4615,7 +4754,9 @@ impl<'db> CallableBinding<'db> {
                     for overload in possible_overloads.iter().take(MAXIMUM_OVERLOADS) {
                         diag.info(format_args!(
                             "  {}",
-                            overload.signature(db).display(db, env)
+                            overload
+                                .signature(db)
+                                .display_with(db, env, display_settings.clone())
                         ));
                     }
                     if possible_overloads.len() > MAXIMUM_OVERLOADS {
@@ -8293,6 +8434,7 @@ pub(crate) struct CallableDescription<'a> {
 }
 
 impl<'db> CallableDescription<'db> {
+    /// Returns the class whose name appears in a method or constructor description.
     fn defining_class(db: &'db dyn Db, callable_type: Type<'db>) -> Option<ClassLiteral<'db>> {
         let function = match callable_type {
             Type::FunctionLiteral(function) => function,
@@ -8309,14 +8451,14 @@ impl<'db> CallableDescription<'db> {
     }
 
     pub(crate) fn new(
-        db: &'db dyn Db,
+        context: &InferContext<'db, '_>,
         callable_type: Type<'db>,
     ) -> Option<CallableDescription<'db>> {
-        Self::new_with_settings(db, callable_type, None)
+        Self::new_with_settings(context, callable_type, None)
     }
 
     fn new_with_settings(
-        db: &'db dyn Db,
+        context: &InferContext<'db, '_>,
         callable_type: Type<'db>,
         settings: Option<&DisplaySettings<'db>>,
     ) -> Option<CallableDescription<'db>> {
@@ -8343,6 +8485,9 @@ impl<'db> CallableDescription<'db> {
                 Cow::Borrowed(function.name(db))
             }
         }
+
+        let db = context.db();
+        let env = context.program_environment();
 
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
@@ -8397,15 +8542,39 @@ impl<'db> CallableDescription<'db> {
                     name: Cow::Borrowed("`__delete__` of property"),
                 })
             }
-            Type::WrapperDescriptor(kind) => Some(CallableDescription {
-                kind: Some("wrapper descriptor"),
-                name: Cow::Borrowed(match kind {
-                    WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
-                    WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
-                    WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
-                    WrapperDescriptorKind::PropertyDunderDelete => "property.__delete__",
-                }),
-            }),
+            Type::WrapperDescriptor(kind) => {
+                let (owner, method, unqualified_name) = match kind {
+                    WrapperDescriptorKind::FunctionTypeDunderGet => {
+                        (KnownClass::FunctionType, "__get__", "FunctionType.__get__")
+                    }
+                    WrapperDescriptorKind::PropertyDunderGet => {
+                        (KnownClass::Property, "__get__", "property.__get__")
+                    }
+                    WrapperDescriptorKind::PropertyDunderSet => {
+                        (KnownClass::Property, "__set__", "property.__set__")
+                    }
+                    WrapperDescriptorKind::PropertyDunderDelete => {
+                        (KnownClass::Property, "__delete__", "property.__delete__")
+                    }
+                };
+
+                let name = settings
+                    .and_then(|settings| {
+                        owner.try_to_class_literal(db, env).map(|class| {
+                            Cow::Owned(format!(
+                                "{}.{}",
+                                ClassLiteral::Static(class).display_with(db, settings.clone()),
+                                method
+                            ))
+                        })
+                    })
+                    .unwrap_or(Cow::Borrowed(unqualified_name));
+
+                Some(CallableDescription {
+                    kind: Some("wrapper descriptor"),
+                    name,
+                })
+            }
             _ => None,
         }
     }
@@ -8881,21 +9050,31 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let defining_class =
-                    CallableDescription::defining_class(db, callable_ty).map(Type::ClassLiteral);
-                let types = [*provided_ty, *expected_ty]
-                    .into_iter()
-                    .chain(defining_class);
-                let display_settings =
-                    DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                let display_settings = context.display_settings().cloned().unwrap_or_else(|| {
+                    let signatures = matching_overload.into_iter().flat_map(|matching| {
+                        matching
+                            .candidate_overloads(db)
+                            .take(MAXIMUM_OVERLOADS)
+                            .map(|(_, overload)| overload.signature(db))
+                    });
+                    let defining_class = CallableDescription::defining_class(db, callable_ty)
+                        .map(Type::ClassLiteral);
+                    let types = [*provided_ty, *expected_ty, callable_ty]
+                        .into_iter()
+                        .chain(defining_class);
+                    DisplaySettings::from_possibly_ambiguous_types_and_signatures(
+                        context, types, signatures,
+                    )
+                });
                 let qualified_callable_description = CallableDescription::new_with_settings(
-                    db,
+                    context,
                     callable_ty,
                     Some(&display_settings),
                 );
                 let provided_ty_display =
                     provided_ty.display_with(db, env, display_settings.clone());
-                let expected_ty_display = expected_ty.display_with(db, env, display_settings);
+                let expected_ty_display =
+                    expected_ty.display_with(db, env, display_settings.clone());
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
@@ -8920,7 +9099,7 @@ impl<'db> BindingError<'db> {
                 }
 
                 let error_context = provided_ty.assignability_error_context(db, env, *expected_ty);
-                error_context.attach_to(db, env, &mut diag);
+                error_context.attach_to(context.context, &display_settings, &mut diag);
 
                 if let Some(parameter_source) = parameter_source {
                     let (name_span, parameter_span) =
@@ -8994,7 +9173,11 @@ impl<'db> BindingError<'db> {
                             }
                             diag.info(format_args!(
                                 "  {}",
-                                overload.signature(db).display(db, env)
+                                overload.signature(db).display_with(
+                                    db,
+                                    env,
+                                    display_settings.clone()
+                                )
                             ));
                         }
                         if matching_overload.candidate_count() > MAXIMUM_OVERLOADS {
@@ -9041,7 +9224,13 @@ impl<'db> BindingError<'db> {
                     );
                 }
 
-                add_invariant_generic_hints(db, env, &mut diag, *expected_ty, *provided_ty);
+                add_invariant_generic_hints(
+                    context.context,
+                    &mut diag,
+                    *expected_ty,
+                    *provided_ty,
+                    &display_settings,
+                );
             }
 
             Self::InvalidKeyType {
@@ -9052,10 +9241,21 @@ impl<'db> BindingError<'db> {
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let provided_ty_display = provided_ty.display(db, env);
-                let mut diag = builder.into_diagnostic(
-                    "Argument expression after ** must be a mapping with `str` key type",
+                let expected_ty = KnownClass::Str.to_instance(db, env);
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    context,
+                    [*provided_ty, expected_ty],
                 );
+                let settings = if let Some(shared_settings) = context.display_settings() {
+                    shared_settings.with_qualification_from(&settings)
+                } else {
+                    settings
+                };
+                let provided_ty_display = provided_ty.display_with(db, env, settings.clone());
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Argument expression after ** must be a mapping with `{}` key type",
+                    expected_ty.display_with(db, env, settings),
+                ));
                 diag.set_primary_annotation_message(format_args!("Found `{provided_ty_display}`"));
 
                 if let Some(compound_diag) = compound_diag {
@@ -9236,11 +9436,42 @@ impl<'db> BindingError<'db> {
                     return;
                 };
                 let argument_type = error.argument_type();
-                let argument_ty_display = argument_type.display(db, env);
+                let bound_or_constraints = error
+                    .bound_typevar()
+                    .typevar(db)
+                    .require_bound_or_constraints(db, env);
+                let expected_types = match bound_or_constraints {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        Either::Left(std::iter::once(bound))
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        Either::Right(constraints.elements(db).iter().copied())
+                    }
+                };
+                let defining_class =
+                    CallableDescription::defining_class(db, callable_ty).map(Type::ClassLiteral);
+                let types = expected_types
+                    .chain([argument_type, callable_ty])
+                    .chain(defining_class);
+                let display_settings =
+                    DisplaySettings::from_possibly_ambiguous_types(context, types);
+                let display_settings = if let Some(shared_settings) = context.display_settings() {
+                    shared_settings.with_qualification_from(&display_settings)
+                } else {
+                    display_settings
+                };
+
+                let qualified_callable_description = CallableDescription::new_with_settings(
+                    context,
+                    callable_ty,
+                    Some(&display_settings),
+                );
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    callable_description
+                    qualified_callable_description
+                        .as_ref()
+                        .or(callable_description)
                         .map(|description| format!(" to {description}"))
                         .unwrap_or_default()
                 ));
@@ -9249,32 +9480,33 @@ impl<'db> BindingError<'db> {
                     SpecializationError::MismatchedBound { bound_typevar, .. } => {
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
+                        let bound = typevar.upper_bound(db, env).expect(
+                            "type variable should have an upper bound if this error occurs",
+                        );
+
                         diag.set_primary_annotation_message(format_args!(
-                            "Argument type `{argument_ty_display}` does not \
+                            "Argument type `{}` does not \
                                 satisfy upper bound `{}` of type variable `{typevar_name}`",
-                            typevar
-                                .upper_bound(db, env)
-                                .expect(
-                                    "type variable should have an upper bound if this error occurs"
-                                )
-                                .display(db, env)
+                            argument_type.display_with(db, env, display_settings.clone()),
+                            bound.display_with(db, env, display_settings.clone()),
                         ));
                     }
                     SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
+                        let constraints = typevar
+                            .constraints(db, env)
+                            .expect("type variable should have constraints if this error occurs");
+
                         diag.set_primary_annotation_message(format_args!(
-                            "Argument type `{argument_ty_display}` does not \
+                            "Argument type `{}` does not \
                                 satisfy constraints ({}) of type variable `{typevar_name}`",
-                            typevar
-                                .constraints(db, env)
-                                .expect(
-                                    "type variable should have constraints if this error occurs"
-                                )
+                            argument_type.display_with(db, env, display_settings.clone()),
+                            constraints
                                 .iter()
                                 .format_with(", ", |ty, f| f(&format_args!(
                                     "`{}`",
-                                    ty.display(db, env)
+                                    ty.display_with(db, env, display_settings.clone())
                                 )))
                         ));
                     }
@@ -9342,6 +9574,7 @@ impl<'db> BindingError<'db> {
                 let context = CallDiagnosticContext {
                     context: context.context,
                     overrides: context.overrides,
+                    compound_display_settings: context.compound_display_settings,
                     argument_index_offset: error.argument_index_offset,
                 };
                 error.bindings.report_diagnostics_impl(&context, node);
@@ -9488,6 +9721,7 @@ struct UnionDiagnostic<'db> {
     callable_type: Type<'db>,
     /// The type associated with the specific union variant that failed.
     variant_type: Type<'db>,
+    display_settings: DisplaySettings<'db>,
 }
 
 impl CompoundDiagnostic for UnionDiagnostic<'_> {
@@ -9496,7 +9730,9 @@ impl CompoundDiagnostic for UnionDiagnostic<'_> {
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Union variant `{callable_ty}` is incompatible with this call site",
-                callable_ty = self.variant_type.display(db, env),
+                callable_ty =
+                    self.variant_type
+                        .display_with(db, env, self.display_settings.clone()),
             ),
         );
         diag.sub(sub);
@@ -9505,7 +9741,8 @@ impl CompoundDiagnostic for UnionDiagnostic<'_> {
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Attempted to call union type `{}`",
-                self.callable_type.display(db, env)
+                self.callable_type
+                    .display_with(db, env, self.display_settings.clone())
             ),
         );
         diag.sub(sub);
@@ -9522,6 +9759,7 @@ struct IntersectionDiagnostic<'b, 'db> {
     callable_type: Type<'db>,
     /// The specific binding that failed.
     binding: &'b CallableBinding<'db>,
+    display_settings: DisplaySettings<'db>,
 }
 
 impl CompoundDiagnostic for IntersectionDiagnostic<'_, '_> {
@@ -9530,7 +9768,10 @@ impl CompoundDiagnostic for IntersectionDiagnostic<'_, '_> {
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Intersection element `{callable_ty}` is incompatible with this call site",
-                callable_ty = self.binding.callable_type.display(db, env),
+                callable_ty =
+                    self.binding
+                        .callable_type
+                        .display_with(db, env, self.display_settings.clone()),
             ),
         );
         diag.sub(sub);
@@ -9539,7 +9780,8 @@ impl CompoundDiagnostic for IntersectionDiagnostic<'_, '_> {
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Attempted to call intersection type `{}`",
-                self.callable_type.display(db, env)
+                self.callable_type
+                    .display_with(db, env, self.display_settings.clone())
             ),
         );
         diag.sub(sub);
@@ -9557,6 +9799,7 @@ struct LayeredDiagnostic<'b, 'db> {
     intersection_callable_type: Type<'db>,
     /// The specific binding that failed.
     binding: &'b CallableBinding<'db>,
+    display_settings: DisplaySettings<'db>,
 }
 
 impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
@@ -9566,7 +9809,10 @@ impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Intersection element `{callable_ty}` is incompatible with this call site",
-                callable_ty = self.binding.callable_type.display(db, env),
+                callable_ty =
+                    self.binding
+                        .callable_type
+                        .display_with(db, env, self.display_settings.clone()),
             ),
         );
         diag.sub(sub);
@@ -9575,7 +9821,11 @@ impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Attempted to call intersection type `{}`",
-                self.intersection_callable_type.display(db, env)
+                self.intersection_callable_type.display_with(
+                    db,
+                    env,
+                    self.display_settings.clone()
+                )
             ),
         );
         diag.sub(sub);
@@ -9585,7 +9835,8 @@ impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Attempted to call union type `{}`",
-                self.union_callable_type.display(db, env)
+                self.union_callable_type
+                    .display_with(db, env, self.display_settings.clone())
             ),
         );
         diag.sub(sub);

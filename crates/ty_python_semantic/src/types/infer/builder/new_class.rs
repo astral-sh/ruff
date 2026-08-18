@@ -12,7 +12,9 @@ use crate::types::infer::builder::{
         DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
     },
 };
-use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
+use crate::types::{
+    DisplaySettings, KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type,
+};
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 use ty_python_core::definition::Definition;
 
@@ -74,16 +76,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name = if let Some(literal) = name_type.as_string_literal() {
             literal.value(db)
         } else {
+            let expected_name_type = KnownClass::Str.to_instance(db, env);
             if let Some(name_node) = name_node
-                && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+                && !name_type.is_assignable_to(db, env, expected_name_type)
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_node)
             {
+                let types = [expected_name_type, name_type];
+                let settings = DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
                 let mut diagnostic = builder.into_diagnostic(
                     "Invalid argument to parameter 1 (`name`) of `types.new_class()`",
                 );
                 diagnostic.set_primary_annotation_message(format_args!(
-                    "Expected `str`, found `{}`",
-                    name_type.display(db, env)
+                    "Expected `{}`, found `{}`",
+                    expected_name_type.display_with(db, env, settings.clone()),
+                    name_type.display_with(db, env, settings)
                 ));
             }
             "<unknown>"
@@ -158,7 +164,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut disjoint_bases = self.validate_dynamic_type_bases(
                 bases_arg,
                 explicit_bases,
-                dynamic_class.name(db),
+                dynamic_class,
                 DynamicClassKind::NewClass,
             );
 
@@ -188,11 +194,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 report_conflicting_metaclass_from_bases(
                     &self.context,
                     call_expr.into(),
-                    dynamic_class.name(db),
+                    ClassLiteral::Dynamic(dynamic_class),
                     metaclass1,
-                    base1.display(db, env),
+                    base1,
                     metaclass2,
-                    base2.display(db, env),
+                    base2,
                 );
             }
         }
@@ -209,8 +215,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         definition: Definition<'db>,
         call_expr: &ast::Expr,
     ) {
-        let db = self.db();
-
         let ast::Expr::Call(call) = call_expr else {
             return;
         };
@@ -243,8 +247,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         // Validate individual bases for special types that aren't allowed in dynamic classes.
-        let name = dynamic_class.name(db);
-        self.validate_dynamic_type_bases(bases_arg, &bases, name, DynamicClassKind::NewClass);
+        self.validate_dynamic_type_bases(
+            bases_arg,
+            &bases,
+            dynamic_class,
+            DynamicClassKind::NewClass,
+        );
     }
 
     /// Preserve normal call-binding diagnostics for `types.new_class()` while still allowing

@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-use crate::types::class::DynamicClassLiteral;
+use crate::types::class::{ClassLiteral, DynamicClassLiteral};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE,
@@ -12,7 +12,9 @@ use crate::types::diagnostic::{
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::infer::builder::TypeInferenceBuilder;
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
-use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
+use crate::types::{
+    ClassBase, DisplaySettings, KnownClass, Type, extract_fixed_length_iterable_element_types,
+};
 
 /// Whether a dynamic class is being created via `type()` or `types.new_class()`.
 ///
@@ -60,13 +62,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if !bases_type.is_assignable_to(db, env, formal_parameter_type)
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
         {
+            let types = [formal_parameter_type, bases_type];
+            let settings = DisplaySettings::from_possibly_ambiguous_types(&self.context, types);
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
             ));
             diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `{}`, found `{}`",
-                formal_parameter_type.display(db, env),
-                bases_type.display(db, env)
+                formal_parameter_type.display_with(db, env, settings.clone()),
+                bases_type.display_with(db, env, settings)
             ));
         }
 
@@ -86,10 +90,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         bases_node: &ast::Expr,
         bases: &[Type<'db>],
-        name: &Name,
+        dynamic_class: DynamicClassLiteral<'db>,
         kind: DynamicClassKind,
     ) -> IncompatibleBases<'db> {
         let db = self.db();
+        let name = dynamic_class.name(db);
 
         let bases_tuple_elts = bases_node
             .as_tuple_expr()
@@ -165,9 +170,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .context
                             .report_lint(&SUBCLASS_OF_FINAL_CLASS, diagnostic_node)
                         {
+                            let types = [Type::from(dynamic_class), Type::from(class_type)];
+                            let settings = DisplaySettings::from_possibly_ambiguous_types(
+                                &self.context,
+                                types,
+                            );
                             builder.into_diagnostic(format_args!(
-                                "Class `{name}` cannot inherit from final class `{}`",
-                                class_type.name(db)
+                                "Class `{}` cannot inherit from final class `{}`",
+                                ClassLiteral::Dynamic(dynamic_class)
+                                    .display_with(db, settings.clone()),
+                                class_type.class_literal(db).display_with(db, settings)
                             ));
                         }
                         if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
@@ -226,15 +238,19 @@ pub(super) fn report_dynamic_mro_errors<'db>(
     let Err(error) = dynamic_class.try_mro(db) else {
         return true;
     };
+    let types = std::iter::once(Type::from(dynamic_class))
+        .chain(dynamic_class.explicit_bases(db).iter().copied());
+    let settings = DisplaySettings::from_possibly_ambiguous_types(context, types);
     let bases_display = dynamic_class
         .explicit_bases(db)
         .iter()
-        .map(|base| base.display(db, env))
+        .map(|base| base.display_with(db, env, settings.clone()))
         .join(", ");
     report_mro_error_kind(
         context,
         error,
-        dynamic_class.name(db),
+        ClassLiteral::Dynamic(dynamic_class),
+        &settings,
         call_expr,
         Some(bases),
         Some(&bases_display),
@@ -283,12 +299,14 @@ pub(super) fn report_inconsistent_dynamic_generic_bases<'db>(
 pub(super) fn report_mro_error_kind<'db>(
     context: &InferContext<'db, '_>,
     error: &DynamicMroError<'db>,
-    class_name: &Name,
+    class: ClassLiteral<'db>,
+    settings: &DisplaySettings<'db>,
     call_expr: &ast::ExprCall,
     bases_expr: Option<&ast::Expr>,
     bases_display: Option<&str>,
 ) {
     let db = context.db();
+    let class_name = class.display_with(db, settings.clone());
     match error.reason() {
         DynamicMroErrorKind::InvalidBases(invalid_bases) => {
             let Some(bases) = bases_expr else {
@@ -310,7 +328,7 @@ pub(super) fn report_mro_error_kind<'db>(
                         let mut diagnostic = builder.into_diagnostic("Unsupported class base");
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Has type `{}`",
-                            base_type.display(db, env)
+                            base_type.display_with(db, env, settings.clone())
                         ));
                         diagnostic.info(format_args!(
                             "ty cannot determine a MRO for class `{class_name}` due to this base",
@@ -320,7 +338,7 @@ pub(super) fn report_mro_error_kind<'db>(
                 } else if let Some(builder) = context.report_lint(&INVALID_BASE, diagnostic_range) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Invalid class base with type `{}`",
-                        base_type.display(db, env)
+                        base_type.display_with(db, env, settings.clone())
                     ));
                     if specific_base.is_none() {
                         diagnostic
@@ -337,12 +355,18 @@ pub(super) fn report_mro_error_kind<'db>(
         DynamicMroErrorKind::DuplicateBases(duplicates) => {
             if let Some(builder) = context.report_lint(&DUPLICATE_BASE, call_expr) {
                 let env = context.program_environment();
+                let types = std::iter::once(Type::ClassLiteral(class))
+                    .chain(duplicates.iter().map(Type::from));
+                let settings = settings.with_possibly_ambiguous_types(context, types);
+                let class_name = class.display_with(db, settings.clone());
                 builder.into_diagnostic(format_args!(
                     "Duplicate base class{maybe_s} {dupes} in class `{class_name}`",
                     maybe_s = if duplicates.len() == 1 { "" } else { "es" },
                     dupes = duplicates
                         .iter()
-                        .map(|base: &ClassBase<'_>| base.display(db, env))
+                        .map(|base: &ClassBase<'_>| {
+                            base.display_with(db, env, settings.clone())
+                        })
                         .join(", "),
                 ));
             }

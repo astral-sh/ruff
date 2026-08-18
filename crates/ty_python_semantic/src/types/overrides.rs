@@ -19,8 +19,9 @@ use crate::{
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     reachability::ReachabilityConstraintsExtension,
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
-        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, DisplaySettings, IntersectionType,
+        KnownClass, Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeContext,
+        TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
@@ -601,10 +602,15 @@ fn check_class_declaration<'db>(
                                 "Enum member `{}` value is not assignable to expected type",
                                 member.name
                             ));
+
+                            let types = [expected_type, member_value_type];
+                            let settings =
+                                DisplaySettings::from_possibly_ambiguous_types(context, types);
+
                             diagnostic.info(format_args!(
                                 "Expected `{}`, got `{}`",
-                                expected_type.display(db, env),
-                                member_value_type.display(db, env)
+                                expected_type.display_with(db, env, settings.clone()),
+                                member_value_type.display_with(db, env, settings)
                             ));
                         }
                     }
