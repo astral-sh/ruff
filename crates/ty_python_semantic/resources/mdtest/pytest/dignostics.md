@@ -77,3 +77,84 @@ error[pytest-request-keyword]: `request` is a reserved Pytest keyword and cannot
 6 | @pytest.mark.parametrize(("request", "x"), [(None, 1), (None, 2)])  # snapshot: pytest-request-keyword
   |                           ^^^^^^^^^
 ```
+
+## Duplicate Argnames
+
+```py
+import pytest
+from typing import Any
+
+@pytest.mark.parametrize("x, y", [(1.0, 1)])
+# snapshot: pytest-duplicate-argname
+# snapshot: pytest-duplicate-argname
+@pytest.mark.parametrize("x, y", [(2.0, 2)])
+def test_duplicate_argnames_csv(x: float, y: int) -> None: ...
+@pytest.mark.parametrize(["x", "y"], [(1.0, 1)])
+# snapshot: pytest-duplicate-argname
+@pytest.mark.parametrize(("x", "z"), [(2.0, "2")])
+# snapshot: pytest-duplicate-argname
+# snapshot: pytest-duplicate-argname
+@pytest.mark.parametrize(("y", "z"), [(3, "3")])
+def test_duplicate_argnames_sequence(x: float, y: int, z: str) -> None: ...
+```
+
+```snapshot
+error[pytest-duplicate-argname]: Duplicate argname `x`
+ --> src/mdtest_snippet.py:7:26
+  |
+7 | @pytest.mark.parametrize("x, y", [(2.0, 2)])
+  |                          ^^^^^^
+info: `x` already used here
+ --> src/mdtest_snippet.py:4:26
+  |
+4 | @pytest.mark.parametrize("x, y", [(1.0, 1)])
+  |                          ^^^^^^
+
+
+error[pytest-duplicate-argname]: Duplicate argname `y`
+ --> src/mdtest_snippet.py:7:26
+  |
+7 | @pytest.mark.parametrize("x, y", [(2.0, 2)])
+  |                          ^^^^^^
+info: `y` already used here
+ --> src/mdtest_snippet.py:4:26
+  |
+4 | @pytest.mark.parametrize("x, y", [(1.0, 1)])
+  |                          ^^^^^^
+
+
+error[pytest-duplicate-argname]: Duplicate argname `x`
+  --> src/mdtest_snippet.py:11:27
+   |
+11 | @pytest.mark.parametrize(("x", "z"), [(2.0, "2")])
+   |                           ^^^
+info: `x` already used here
+ --> src/mdtest_snippet.py:9:27
+  |
+9 | @pytest.mark.parametrize(["x", "y"], [(1.0, 1)])
+  |                           ^^^
+
+
+error[pytest-duplicate-argname]: Duplicate argname `y`
+  --> src/mdtest_snippet.py:14:27
+   |
+14 | @pytest.mark.parametrize(("y", "z"), [(3, "3")])
+   |                           ^^^
+info: `y` already used here
+ --> src/mdtest_snippet.py:9:32
+  |
+9 | @pytest.mark.parametrize(["x", "y"], [(1.0, 1)])
+  |                                ^^^
+
+
+error[pytest-duplicate-argname]: Duplicate argname `z`
+  --> src/mdtest_snippet.py:14:32
+   |
+14 | @pytest.mark.parametrize(("y", "z"), [(3, "3")])
+   |                                ^^^
+info: `z` already used here
+  --> src/mdtest_snippet.py:11:32
+   |
+11 | @pytest.mark.parametrize(("x", "z"), [(2.0, "2")])
+   |                                ^^^
+```

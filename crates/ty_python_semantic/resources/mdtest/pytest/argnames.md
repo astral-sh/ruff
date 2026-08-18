@@ -180,7 +180,7 @@ def _(x: int, y: int) -> None: ...
 
 # Separate decorators
 # Even though the top decorator is applied first,
-# it is simpler for users if the error is shown on the bottom on.
+# it is simpler for users if the error is shown on the bottom one.
 @pytest.mark.parametrize(["x", "y"], [(1, 2)])
 @pytest.mark.parametrize(["y", "z"], [(3, 4)])  # error: [pytest-duplicate-argname]
 def _(x: int, y: int, z: int) -> None: ...
