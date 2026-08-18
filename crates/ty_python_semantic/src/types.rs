@@ -873,12 +873,13 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
                     policy,
                     Some(*constraint),
                 );
-                let result = map_member_lookup_type(db, result, |ty| match ty {
-                    Type::BoundMethod(method) => Type::BoundMethod(
-                        method.with_distributed_receiver(db, symbolic_receiver, *constraint),
-                    ),
-                    _ => ty,
-                });
+                let result =
+                    map_member_lookup_type(db, result, |ty| match ty {
+                        Type::BoundMethod(method) => Type::BoundMethod(
+                            method.with_signature_receiver(db, symbolic_receiver, *constraint),
+                        ),
+                        _ => ty,
+                    });
                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
                 result.unwrap_or_else(|error| error.fallback_member(db))
             });
@@ -9460,73 +9461,37 @@ impl<'db> TypeMapping<'_, 'db> {
                         .unwrap_or(bound_typevar)
                 }),
             ),
-            TypeMapping::ApplySpecialization(
-                specialization @ ApplySpecialization::Specialization {
-                    specialize_self_domain: true,
-                    ..
-                },
-            ) => GenericContext::from_typevar_instances(
-                db,
-                env,
-                context.variables(db).filter_map(|bound_typevar| {
-                    match specialization.get(db, bound_typevar) {
-                        Some(Type::TypeVar(mapped))
-                            if mapped.identity(db) == bound_typevar.identity(db) => {}
-                        None => {}
-                        Some(_) => return None,
-                    }
-                    Type::TypeVar(bound_typevar)
-                        .apply_type_mapping(
-                            db,
-                            env,
-                            &TypeMapping::ApplySpecialization(*specialization),
-                            TypeContext::default(),
-                        )
-                        .as_typevar()
-                }),
-            ),
-            TypeMapping::ApplySpecializationWithMaterialization {
-                specialization:
-                    ApplySpecialization::Specialization {
-                        specialization,
-                        specialize_self_domain: true,
-                    },
-                ..
-            } => GenericContext::from_typevar_instances(
-                db,
-                env,
-                context.variables(db).filter_map(|bound_typevar| {
-                    match specialization.get(db, bound_typevar) {
-                        Some(Type::TypeVar(mapped))
-                            if mapped.identity(db) == bound_typevar.identity(db) => {}
-                        None => {}
-                        Some(_) => return None,
-                    }
-                    Type::TypeVar(bound_typevar)
-                        .apply_type_mapping(db, env, self, TypeContext::default())
-                        .as_typevar()
-                }),
-            ),
             TypeMapping::ApplySpecialization(specialization)
             | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
                 // Filter out type variables that are already specialized
                 // (i.e., mapped to a non-TypeVar type)
-                GenericContext::from_typevar_instances(
-                    db,
-                    env,
-                    context.variables(db).filter(|bound_typevar| {
-                        // Keep the type variable if it's not in the specialization
-                        // or if it's mapped to itself (still a TypeVar)
-                        match specialization.get(db, *bound_typevar) {
-                            None => true,
-                            Some(Type::TypeVar(mapped_typevar)) => {
-                                // Still a TypeVar, keep it if it's mapping to itself
-                                mapped_typevar.identity(db) == bound_typevar.identity(db)
-                            }
-                            Some(_) => false, // Specialized to a concrete type, filter out
+                let kept = context.variables(db).filter(|bound_typevar| {
+                    // Keep the type variable if it's not in the specialization
+                    // or if it's mapped to itself (still a TypeVar)
+                    match specialization.get(db, *bound_typevar) {
+                        None => true,
+                        Some(Type::TypeVar(mapped_typevar)) => {
+                            // Still a TypeVar, keep it if it's mapping to itself
+                            mapped_typevar.identity(db) == bound_typevar.identity(db)
                         }
-                    }),
-                )
+                        Some(_) => false, // Specialized to a concrete type, filter out
+                    }
+                });
+                if specialization.specialize_self_domain() {
+                    let kept = kept.filter_map(|bound_typevar| {
+                        Type::TypeVar(bound_typevar)
+                            .apply_type_mapping(
+                                db,
+                                env,
+                                &TypeMapping::ApplySpecialization(*specialization),
+                                TypeContext::default(),
+                            )
+                            .as_typevar()
+                    });
+                    GenericContext::from_typevar_instances(db, env, kept)
+                } else {
+                    GenericContext::from_typevar_instances(db, env, kept)
+                }
             }
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)

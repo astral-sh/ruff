@@ -2213,6 +2213,16 @@ impl<'db> ApplySpecialization<'_, 'db> {
         }
     }
 
+    pub(crate) fn specialize_self_domain(self) -> bool {
+        match self {
+            Self::Specialization {
+                specialize_self_domain,
+                ..
+            } => specialize_self_domain,
+            _ => false,
+        }
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(

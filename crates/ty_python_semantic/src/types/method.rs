@@ -86,7 +86,7 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    pub(crate) fn with_distributed_receiver(
+    pub(crate) fn with_signature_receiver(
         self,
         db: &'db dyn Db,
         self_instance: Type<'db>,
