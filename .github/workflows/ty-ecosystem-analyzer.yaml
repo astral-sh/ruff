@@ -44,7 +44,7 @@ env:
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
   # TODO: Update the mypy-primer revision in scripts/setup_primer_project.py
   # and regenerate its lockfile when updating ecosystem-analyzer.
-  ECOSYSTEM_ANALYZER_COMMIT: f6f1b7b8586c8a6c60dc3d37c3f6ae917a9ad9c4
+  ECOSYSTEM_ANALYZER_COMMIT: a602846d9c13d7c6d7268dff728442f68c47d923
 
 jobs:
   build-ty:
@@ -60,7 +60,7 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           lookup-only: false
 
@@ -78,7 +78,8 @@ jobs:
             # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
             git fetch --no-tags --filter=blob:none --unshallow origin
 
-            MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
+            # The first parent contains any preceding layers in a stacked pull request.
+            MERGE_BASE="$(git rev-parse "${GITHUB_SHA}^1")"
             echo "${MERGE_BASE}" > merge-base.txt
             echo "Merge base: ${MERGE_BASE}"
             echo "PR commit: ${GITHUB_SHA}"
@@ -129,7 +130,7 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.12.1"
+          version: "0.12.3"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
           # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
@@ -189,7 +190,7 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.12.1"
+          version: "0.12.3"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
           # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
@@ -209,6 +210,7 @@ jobs:
         id: generate-reports
         env:
           REF_NAME: ${{ github.ref_name }}
+          BASE_REF_NAME: ${{ github.event.pull_request.base.ref }}
         run: |
           # Merge shard diagnostics
           jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-*.json > diagnostics-base.json
@@ -218,13 +220,16 @@ jobs:
 
           mkdir dist
 
+          # Upload a structured JSON report alongside the HTML report to make
+          # ecosystem changes easier for agents to analyze.
           ecosystem-analyzer \
             generate-diff \
             diagnostics-base.json \
             diagnostics-PR.json \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
-            --output-html dist/diff.html
+            --output-html dist/diff.html \
+            --output-json dist/diff.json
 
           set +e
           ecosystem-analyzer \
@@ -232,7 +237,7 @@ jobs:
             diagnostics-base.json \
             diagnostics-PR.json \
             --fail-on-new-abnormal-exits \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
             --output diff-statistics.md
           DIFF_STATISTICS_EXIT_CODE=$?
@@ -242,7 +247,7 @@ jobs:
             generate-timing-diff \
             diagnostics-base.json \
             diagnostics-PR.json \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
             --output-html dist/timing.html
 
@@ -252,8 +257,8 @@ jobs:
 
           echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      # NOTE: astral-bot deploys both HTML files in this artifact and uses the
-      # deployed URLs for the report links in its PR comment.
+      # NOTE: astral-bot deploys every file in this artifact and uses the
+      # deployed HTML URLs for the report links in its PR comment.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

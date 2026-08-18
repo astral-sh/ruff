@@ -5,6 +5,7 @@ pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
+use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
@@ -31,6 +32,7 @@ use crate::types::constraints::{
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
@@ -43,7 +45,7 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypingModule,
     UnionBuilder, VarianceInferable,
 };
 use crate::{
@@ -66,6 +68,7 @@ use ty_python_core::{ProgramFile, place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
+mod implicit_attributes;
 mod known;
 mod named_tuple;
 mod static_literal;
@@ -111,7 +114,7 @@ fn dynamic_class_header_range<'db>(
 }
 
 bitflags::bitflags! {
-    /// Properties that affect the representation of instances of a class.
+    /// Properties shared by all instances of a class.
     ///
     /// This combines properties derived from the MRO into the existing class-classification
     /// query, avoiding a separate cached query for each property.
@@ -121,6 +124,10 @@ bitflags::bitflags! {
         const TYPED_DICT = 1 << 0;
         /// The class directly or indirectly inherits from an explicit `Any` base.
         const INHERITS_FROM_EXPLICIT_ANY = 1 << 1;
+        /// The class may define or inherit a custom `__getattribute__` method.
+        const HAS_CUSTOM_GETATTRIBUTE = 1 << 2;
+        /// An unknown base may provide an attribute-interception method.
+        const HAS_DYNAMIC_GETATTRIBUTE = 1 << 3;
     }
 }
 
@@ -610,8 +617,8 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, self, None)
     }
 
-    /// Return the properties that affect how instances of this class are represented.
-    fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+    /// Return the properties shared by all instances of this class.
+    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         match self {
             Self::Static(literal) => literal.instance_flags(db),
             Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
@@ -634,6 +641,12 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return whether this class directly or indirectly inherits from an explicit `Any` base.
     pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
+        if let Some(class) = self.as_static()
+            && (class.known(db).is_some() || !class.has_explicit_bases(db))
+        {
+            return false;
+        }
+
         self.instance_flags(db)
             .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
     }
@@ -764,7 +777,10 @@ impl<'db> ClassLiteral<'db> {
     ) -> Type<'db> {
         self.metaclass(db)
             .to_instance_approximation(db, env)
-            .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
+            .expect(
+                "`Type::to_instance()` should always return `Some()` \
+                when called on the type of a metaclass",
+            )
     }
 
     /// Returns whether this class is type-check only.
@@ -1727,10 +1743,12 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self
-            .metaclass(db)
+        self.metaclass(db)
             .to_instance_approximation(db, env)
-            .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
+            .expect(
+                "`Type::to_instance()` should always return `Some()` \
+                when called on the type of a metaclass",
+            )
     }
 
     /// Returns the class member of this class named `name`.
@@ -2038,7 +2056,8 @@ impl<'db> ClassType<'db> {
                             assert_eq!(
                                 tuple.iter_element_types(db).count(),
                                 1,
-                                "Tuple specialization should have exactly one element when it has no length restriction"
+                                "Tuple specialization should have exactly one element when it has \
+                                 no length restriction"
                             );
                             iterable_parameter = iterable_parameter.with_annotated_type(
                                 KnownClass::Iterable.to_specialized_instance(
@@ -2180,6 +2199,42 @@ impl<'db> ClassType<'db> {
                     .own_instance_member(db, env, name)
                     .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
+        }
+    }
+
+    /// Pair an ordinary member lookup with augmented assignments that first read their target.
+    ///
+    /// ```python
+    /// class Counter:
+    ///     value = 0
+    ///
+    ///     def increment(self):
+    ///         self.value += 1
+    ///
+    ///     @classmethod
+    ///     def increment_class(cls):
+    ///         cls.value += 1
+    /// ```
+    ///
+    /// MRO lookup can infer either assignment only after locating an existing `value`. If ordinary
+    /// lookup suppressed an implicit attribute, such as a generated `NamedTuple` field, its writes
+    /// must remain suppressed too.
+    fn member_with_augmented_bindings(
+        self,
+        db: &'db dyn Db,
+        member: Member<'db>,
+        name: &str,
+        target_method_decorator: MethodDecorator,
+    ) -> ImplicitAttribute<'db> {
+        let augmented_bindings = self
+            .static_class_literal(db)
+            .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator))
+            .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
+            .and_then(|implicit| implicit.augmented_bindings);
+
+        ImplicitAttribute {
+            member,
+            augmented_bindings,
         }
     }
 
@@ -2730,6 +2785,60 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         }
     }
 
+    /// Infer augmented-assignment results after finding the existing attribute they read.
+    ///
+    /// ```python
+    /// class Counter:
+    ///     def __init__(self):
+    ///         self.value = (1,)
+    ///
+    ///     def update(self):
+    ///         self.value += (self.value,)
+    /// ```
+    ///
+    /// Inferring these bindings earlier would recursively look up the same attribute and
+    /// allow an augmented assignment to incorrectly establish an otherwise missing attribute.
+    /// Once recursive inference produces a concrete result, top-level cycle placeholders do not
+    /// represent additional runtime values. Other inferred alternatives remain intact, as do
+    /// nested placeholders in genuinely expanding recursive types such as the tuple above.
+    fn infer_augmented_bindings(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
+    ) -> (Type<'db>, Provenance<'db>) {
+        let mut union = UnionBuilder::new(db, env);
+        let mut provenance = Provenance::Unknown;
+
+        for (class, bindings) in bindings {
+            let (_, specialization) = class.class_literal_and_specialization(db);
+
+            for definition in bindings.definitions(db) {
+                let inferred_ty = infer_definition_types(db, *definition)
+                    .binding_type(*definition)
+                    .apply_optional_specialization(db, specialization);
+                union = union.add(inferred_ty);
+                provenance = provenance.or(Provenance::SingleDefinition(*definition));
+            }
+        }
+
+        let inferred_ty = union.build().promote(db, env).promote_singletons(db, env);
+        let inferred_ty = if let Some(elements) =
+            inferred_ty.as_union().map(|union| union.elements(db))
+            && elements.iter().any(Type::is_divergent)
+            && elements.iter().any(|ty| !ty.is_divergent())
+        {
+            UnionType::from_elements(
+                db,
+                env,
+                elements.iter().copied().filter(|ty| !ty.is_divergent()),
+            )
+        } else {
+            inferred_ty
+        };
+
+        (inferred_ty, provenance)
+    }
+
     /// Look up a class member by iterating through the MRO.
     ///
     /// Parameters:
@@ -2756,6 +2865,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut dynamic_type: Option<Type<'db>> = None;
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Undefined(TypeQualifiers::empty()));
+        let mut pending_augmented_bindings = Vec::new();
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2793,14 +2903,40 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         continue;
                     }
 
+                    let implicit = class.member_with_augmented_bindings(
+                        db,
+                        class.own_class_member(db, &self.env, inherited_generic_context, name),
+                        name,
+                        MethodDecorator::ClassMethod,
+                    );
+                    if let Some(bindings) = implicit.augmented_bindings {
+                        pending_augmented_bindings.push((class, bindings));
+                    }
+
+                    let mut member = implicit.member.inner;
+                    if let Place::Defined(defined) = &mut member.place
+                        && !pending_augmented_bindings.is_empty()
+                    {
+                        if !defined.origin.is_declared() {
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                                db,
+                                &self.env,
+                                &pending_augmented_bindings,
+                            );
+                            defined.ty = UnionType::from_two_elements(
+                                db,
+                                &self.env,
+                                defined.ty,
+                                inferred_ty,
+                            );
+                            defined.provenance = defined.provenance.or(inferred_provenance);
+                        }
+
+                        pending_augmented_bindings.clear();
+                    }
+
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(
-                            db,
-                            &self.env,
-                            class
-                                .own_class_member(db, &self.env, inherited_generic_context, name)
-                                .inner,
-                        )
+                        lookup_error.or_fall_back_to(db, &self.env, member)
                     });
                 }
                 ClassBase::TypedDict(module) => {
@@ -2831,8 +2967,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let db = self.db;
         let mut union = UnionBuilder::new(db, &self.env);
         let mut union_qualifiers = TypeQualifiers::empty();
-        let mut is_definitely_bound = false;
+        let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
         let mut provenance = Provenance::Unknown;
+        let mut pending_augmented_bindings = Vec::new();
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2846,6 +2983,16 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
+                    let implicit = class.member_with_augmented_bindings(
+                        db,
+                        class.own_instance_member(db, &self.env, name),
+                        name,
+                        MethodDecorator::None,
+                    );
+                    if let Some(bindings) = implicit.augmented_bindings {
+                        pending_augmented_bindings.push((class, bindings));
+                    }
+
                     if let member @ PlaceAndQualifiers {
                         place:
                             Place::Defined(DefinedPlace {
@@ -2856,16 +3003,28 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ..
                             }),
                         qualifiers,
-                    } = class.own_instance_member(db, &self.env, name).inner
+                    } = implicit.member.inner
                     {
                         if boundness == Definedness::AlwaysDefined {
                             if origin.is_declared() {
+                                if definitely_bound_member.is_some_and(|member| {
+                                    !member
+                                        .qualifiers
+                                        .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                                }) && !qualifiers
+                                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                                {
+                                    // An overriding class default shadows inherited declarations,
+                                    // but inherited instance assignments must still be collected.
+                                    continue;
+                                }
+
                                 // We found a definitely-declared attribute. Discard possibly collected
                                 // inferred types from subclasses and return the declared type.
                                 return InstanceMemberResult::Done(member);
                             }
 
-                            is_definitely_bound = true;
+                            definitely_bound_member = Some(member);
                         }
 
                         // If the attribute is not definitely declared on this class, keep looking
@@ -2877,6 +3036,64 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // TODO: We could raise a diagnostic here if there are conflicting type
                         // qualifiers
                         union_qualifiers |= qualifiers;
+
+                        if !pending_augmented_bindings.is_empty() {
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                                db,
+                                &self.env,
+                                &pending_augmented_bindings,
+                            );
+                            union = union.add(inferred_ty);
+                            provenance = provenance.or(inferred_provenance);
+                            union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
+                            pending_augmented_bindings.clear();
+                        }
+                    }
+
+                    if !pending_augmented_bindings.is_empty()
+                        && let class_member @ Member {
+                            inner:
+                                PlaceAndQualifiers {
+                                    place:
+                                        Place::Defined(DefinedPlace {
+                                            ty: class_member_ty,
+                                            origin,
+                                            definedness: class_member_definedness,
+                                            provenance: class_member_provenance,
+                                            ..
+                                        }),
+                                    ..
+                                },
+                        } = class.own_class_member(db, &self.env, None, name)
+                    {
+                        if !class_member_ty.is_definitely_non_data_descriptor(db, &self.env) {
+                            pending_augmented_bindings.clear();
+                            continue;
+                        }
+
+                        if origin.is_declared() {
+                            if union.is_empty() {
+                                return InstanceMemberResult::Done(class_member.inner);
+                            }
+
+                            union = union.add(class_member_ty);
+                            provenance = provenance.or(class_member_provenance);
+                            union_qualifiers |= class_member.inner.qualifiers;
+                        } else {
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                                db,
+                                &self.env,
+                                &pending_augmented_bindings,
+                            );
+                            union = union.add(inferred_ty);
+                            provenance = provenance.or(inferred_provenance);
+                            union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
+                        }
+
+                        pending_augmented_bindings.clear();
+                        if class_member_definedness == Definedness::AlwaysDefined {
+                            definitely_bound_member = Some(class_member.inner);
+                        }
                     }
                 }
                 ClassBase::TypedDict(_) => {
@@ -2888,7 +3105,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let result = if union.is_empty() {
             Place::Undefined.with_qualifiers(TypeQualifiers::empty())
         } else {
-            let boundness = if is_definitely_bound {
+            let boundness = if definitely_bound_member.is_some() {
                 Definedness::AlwaysDefined
             } else {
                 Definedness::PossiblyUndefined
@@ -2913,7 +3130,7 @@ pub(super) enum ClassMemberResult<'db> {
     /// Found the member or exhausted the MRO.
     Done(CompletedMemberLookup<'db>),
     /// Encountered a `TypedDict` base.
-    TypedDict(TypedDictModule),
+    TypedDict(TypingModule),
 }
 
 pub(super) struct CompletedMemberLookup<'db> {

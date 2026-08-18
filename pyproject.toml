@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.16.1"
+version = "0.16.3"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -57,11 +57,14 @@ exclude = [
 
 [dependency-groups]
 dev = [
-    "prek==0.4.11",
+    "prek==0.4.12",
 ]
 release = [
     "rooster==0.1.1",
 ]
+
+[tool.uv]
+exclude-newer = "P7D"
 
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
@@ -133,6 +136,7 @@ version_files = [
     "pyproject.toml",
     # Might become unneeded once Markdown formatting is stabilized.
     "docs/formatter.md",
+    "docs/installation.md",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",

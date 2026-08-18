@@ -5,6 +5,7 @@
 //! methods.
 
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::Definition;
 
 use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
 
@@ -13,6 +14,7 @@ use super::{
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder,
     bool::BoolError,
+    cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -693,6 +695,23 @@ fn evaluate_structural_comparison<'db>(
         (other, Type::Union(union)) => {
             evaluate_union_right(evaluator, other, union.elements(db), branch, operator)
         }
+        // An excluded string literal rules out its runtime value only when the intersection
+        // already proves that the string has literal origin.
+        (Type::Intersection(intersection), Type::LiteralValue(literal))
+        | (Type::LiteralValue(literal), Type::Intersection(intersection))
+            if literal.is_string()
+                && intersection
+                    .positive(db)
+                    .iter()
+                    .any(|element| element.is_subtype_of(db, env, Type::literal_string()))
+                && Type::Intersection(intersection).is_disjoint_from(
+                    db,
+                    env,
+                    Type::LiteralValue(literal),
+                ) =>
+        {
+            operator.result_from_equality(false)
+        }
         (Type::Intersection(intersection), other) => evaluate_intersection_left(
             evaluator,
             Type::Intersection(intersection),
@@ -999,23 +1018,60 @@ pub(super) fn is_same_enum_domain<'db>(
     ty: Type<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::LiteralValue(literal) => matches!(
-            literal.kind(),
-            LiteralValueTypeKind::Enum(left)
-                if left.enum_class(db) == right.enum_class(db)
-        ),
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| is_same_enum_domain(db, env, *element, right)),
-        Type::NominalInstance(instance) => instance.class_literal(db, env) == right.enum_class(db),
-        Type::EnumComplement(complement) => complement.enum_class(db) == right.enum_class(db),
-        Type::Intersection(intersection) => intersection
-            .enum_complement(db, env)
-            .is_some_and(|complement| complement.enum_class(db) == right.enum_class(db)),
-        _ => false,
+    // A proof made while another alias is active can still be disproved by a later union arm, so
+    // completed visits must not be cached.
+    #[derive(Default)]
+    struct EnumDomainVisitor<'db> {
+        active_specializations: ActiveRecursionDetector<Type<'db>>,
+        active_definitions: ActiveRecursionDetector<Definition<'db>>,
     }
+
+    fn visit<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        right: EnumLiteralType<'db>,
+        visitor: &EnumDomainVisitor<'db>,
+    ) -> bool {
+        match ty {
+            // The same specialization preserves the domain; different arguments can introduce
+            // values outside it even when the alias definition is the same.
+            Type::TypeAlias(alias) => visitor.active_specializations.visit(
+                &ty,
+                || true,
+                || {
+                    visitor.active_definitions.visit(
+                        &alias.definition(db),
+                        || false,
+                        || visit(db, env, alias.value_type(db), right, visitor),
+                    )
+                },
+            ),
+            Type::LiteralValue(literal) => matches!(
+                literal.kind(),
+                LiteralValueTypeKind::Enum(left)
+                    if left.enum_class(db) == right.enum_class(db)
+            ),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|&element| visit(db, env, element, right, visitor)),
+            Type::NewTypeInstance(newtype) => {
+                visit(db, env, newtype.concrete_base_type(db), right, visitor)
+            }
+            Type::NominalInstance(instance) => {
+                instance.class_literal(db, env) == right.enum_class(db)
+            }
+            Type::EnumComplement(complement) => complement.enum_class(db) == right.enum_class(db),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|&element| visit(db, env, element, right, visitor)),
+            _ => false,
+        }
+    }
+
+    visit(db, env, ty, right, &EnumDomainVisitor::default())
 }
 
 /// Evaluate each alternative of the union being constrained and combine their branch results.
@@ -1110,7 +1166,13 @@ fn evaluate_target_union<'db>(
         let Some(mut narrowed) = narrowed else {
             continue;
         };
-        if let Some(removed) = removed {
+        // A surviving alternative that is disjoint from every rejected alternative already
+        // satisfies their exclusions. Constructing those redundant exclusions can exponentially
+        // expand intersections such as `Any & Literal["a"]` when the rejected alternatives are
+        // similarly shaped intersections with other string literals.
+        if let Some(removed) = removed
+            && !narrowed.is_disjoint_from(db, env, removed)
+        {
             narrowed = IntersectionBuilder::new(db, env)
                 .add_positive(narrowed)
                 .add_negative(removed)
@@ -1262,6 +1324,18 @@ fn evaluate_intersection_left<'db>(
             ComparisonResult::AlwaysTrue => any_true = true,
             ComparisonResult::AlwaysFalse => any_false = true,
             ComparisonResult::CanNarrow(narrowed) => {
+                // Literal-string origin is a static proof, not a runtime object property. An
+                // untrusted string can therefore equal a literal even when their static types
+                // are disjoint. Keep its original proof instead of making that branch unreachable.
+                if operator.condition_expects_equality(branch)
+                    && original.is_disjoint_from(db, &evaluator.env, narrowed)
+                    && original
+                        .identity_comparison_truthiness(db, &evaluator.env, narrowed)
+                        .may_be_true()
+                {
+                    return ComparisonResult::Ambiguous;
+                }
+
                 any_narrowing = true;
                 builder.add_positive_in_place(narrowed);
             }
@@ -1298,10 +1372,41 @@ fn finite_alternatives<'db>(
                 .then(|| complement.remaining_literal_types(db, env))
         }
         Type::Intersection(intersection) => {
-            let complement = intersection.enum_complement(db, env)?;
-            KnownComparisonSemantics::of_type(db, env, ty, operator)
+            let (comparison_type, complement) = if let Some(complement) =
+                intersection.enum_complement(db, env)
+            {
+                (ty, complement)
+            } else {
+                if !intersection.positive(db).iter().any(|positive| {
+                    matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_))
+                }) {
+                    return None;
+                }
+
+                let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
+                let complement = match expanded {
+                    Type::LiteralValue(literal) if literal.is_enum() => {
+                        return KnownComparisonSemantics::of_type(db, env, expanded, operator)
+                            .is_some()
+                            .then(|| vec![expanded]);
+                    }
+                    Type::EnumComplement(complement) => complement,
+                    Type::Intersection(intersection) => intersection.enum_complement(db, env)?,
+                    _ => return None,
+                };
+                (expanded, complement)
+            };
+            KnownComparisonSemantics::of_type(db, env, comparison_type, operator)
                 .is_some()
                 .then(|| complement.remaining_literal_types(db, env))
+        }
+        Type::NewTypeInstance(newtype) => {
+            let base = newtype.concrete_base_type(db);
+            if base.is_enum(db, env) {
+                finite_alternatives(db, env, base, operator)
+            } else {
+                None
+            }
         }
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
             Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
@@ -1423,17 +1528,16 @@ fn compare_literal_to_other<'db>(
     };
     let condition_expects_equality = operator.condition_expects_equality(branch);
 
-    // Treat broad builtin types as if they exclude subclasses with custom equality. This is
-    // intentionally unsafe: an instance of such a subclass can compare equal to the literal
-    // without inhabiting its literal type. Explicitly typed subclasses do not take this path.
+    // Treat broad builtin types as if only the literal itself can compare equal. This is
+    // intentionally unsafe: subclasses, including `bool` for `int`, can compare equal without
+    // inhabiting the literal type. Explicitly typed subclasses do not take this path.
     if evaluator.soundness_policy.allow_unsafe_equality
         && condition_expects_equality
         && literal_operand == LiteralOperand::Other
-        && let Some(equal_to_literal) = builtin_literals_equal_to(db, env, literal_type, literal)
         && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, other)
     {
         return if literal_semantics == other_semantics {
-            ComparisonResult::CanNarrow(equal_to_literal)
+            ComparisonResult::CanNarrow(literal_type)
         } else {
             operator.result_from_equality(false)
         };
@@ -1664,9 +1768,11 @@ impl KnownComparisonSemantics {
             Type::NominalInstance(instance)
                 if instance.class(db, env).is_final(db)
                     || soundness_policy.allow_unsafe_equality
-                        // `object` can contain values whose classes define their own comparison
-                        // method, so treating it as exact would incorrectly eliminate those values.
-                        && !instance.has_known_class(db, KnownClass::Object) =>
+                        && (
+                            // `object` can contain values whose classes define their own comparison
+                            // method, so treating it as exact would incorrectly eliminate those values.
+                            !instance.has_known_class(db, KnownClass::Object)
+                        ) =>
             {
                 Self::of_instance(db, env, ty, operator)
             }

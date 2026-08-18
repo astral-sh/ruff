@@ -69,7 +69,10 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
         let line_index = LineIndex::from_source_text(source);
         let source_code = SourceCode::new(source, &line_index);
 
-        let mut message = "Expected no syntax errors for a valid program but the parser generated the following errors:\n".to_string();
+        let mut message = "\
+            Expected no syntax errors for a valid program \
+                but the parser generated the following errors:\n"
+            .to_string();
 
         for error in parsed.errors() {
             writeln!(
@@ -218,7 +221,8 @@ fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     assert!(
         parsed.has_syntax_errors() || !semantic_syntax_errors.is_empty(),
-        "Expected parser to generate at least one syntax error for a program containing syntax errors."
+        "Expected parser to generate at least one syntax error \
+            for a program containing syntax errors."
     );
 
     if !semantic_syntax_errors.is_empty() {
@@ -463,7 +467,13 @@ impl ValidateAstVisitor<'_> {
             // At this point, next_token.end() > node.start()
             assert!(
                 next.start() >= node.start(),
-                "The start of the node falls within a token.\nNode: {node:#?}\n\nToken: {next:#?}\n\nRoot: {root:#?}",
+                "\
+The start of the node falls within a token.
+Node: {node:#?}
+
+Token: {next:#?}
+
+Root: {root:#?}",
                 root = self.parents.first()
             );
         }
@@ -482,7 +492,13 @@ impl ValidateAstVisitor<'_> {
             // At this point, `next_token.end() > node.end()`
             assert!(
                 next.start() >= node.end(),
-                "The end of the node falls within a token.\nNode: {node:#?}\n\nToken: {next:#?}\n\nRoot: {root:#?}",
+                "\
+The end of the node falls within a token.
+Node: {node:#?}
+
+Token: {next:#?}
+
+Root: {root:#?}",
                 root = self.parents.first()
             );
         }
@@ -500,7 +516,13 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
             assert_ne!(
                 previous.range().ordering(node.range()),
                 Ordering::Greater,
-                "The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
+                "\
+The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.
+Previous node: {previous:#?}
+
+Current node: {node:#?}
+
+Root: {root:#?}",
                 root = self.parents.first()
             );
         }
@@ -508,7 +530,13 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         if let Some(parent) = self.parents.last() {
             assert!(
                 parent.range().contains_range(node.range()),
-                "The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
+                "\
+The range of the parent node does not fully enclose the range of the child node.
+Parent node: {parent:#?}
+
+Child node: {node:#?}
+
+Root: {root:#?}",
                 root = self.parents.first()
             );
         }

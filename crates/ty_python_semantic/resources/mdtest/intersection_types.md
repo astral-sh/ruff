@@ -449,6 +449,27 @@ def example_type_bool_type_str(
     reveal_type(i)  # revealed: Never
 ```
 
+Ordinary types accept values with any `NewType` tag, so an integer-based `NewType` can overlap
+`bool`. Distinct `NewType` tags are mutually exclusive even when their runtime values overlap;
+nested `NewType`s retain their relationship with their parent.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+OtherUserId = NewType("OtherUserId", int)
+NestedUserId = NewType("NestedUserId", UserId)
+
+def newtype_intersections(
+    user_bool: UserId & bool,
+    user_nested: UserId & NestedUserId,
+    user_other: UserId & OtherUserId,
+) -> None:
+    reveal_type(user_bool)  # revealed: UserId & bool
+    reveal_type(user_nested)  # revealed: NestedUserId
+    reveal_type(user_other)  # revealed: Never
+```
+
 #### Positive and negative contributions
 
 If we intersect a type `X` with the negation `~Y` of a disjoint type `Y`, we can remove the negative
@@ -819,6 +840,52 @@ def _(d: Single & ~Single) -> None:
 
 def _(e: (Single | int) & ~Single) -> None:
     reveal_type(e)  # revealed: int
+```
+
+A `NewType` is preserved when all but one member of its underlying enum are excluded. The resulting
+intersection is also assignable to the remaining member.
+
+```pyi
+from typing import NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
+
+ColorId = NewType("ColorId", Color)
+NestedColorId = NewType("NestedColorId", ColorId)
+type NestedAlias = NestedColorId
+
+def enum_newtype(value: ColorId & ~(Red | Green), nested: NestedAlias & ~Red & ~Green) -> None:
+    reveal_type(value)  # revealed: ColorId & Literal[Color.BLUE]
+    reveal_type(nested)  # revealed: NestedColorId & Literal[Color.BLUE]
+
+static_assert(is_assignable_to(ColorId & ~(Red | Green), ColorId))
+static_assert(is_assignable_to(ColorId & ~(Red | Green), Blue))
+static_assert(is_equivalent_to(ColorId & ~(Red | Green), ColorId & Blue))
+```
+
+Aliases name the same enum member, while `Flag` members are not exhaustive.
+
+```pyi
+from enum import Flag
+
+class Aliased(Enum):
+    FIRST = 1
+    FIRST_ALIAS = 1
+    LAST = 2
+
+AliasedId = NewType("AliasedId", Aliased)
+
+def aliased_member(value: AliasedId & ~Literal[Aliased.FIRST_ALIAS]) -> None:
+    reveal_type(value)  # revealed: AliasedId & Literal[Aliased.LAST]
+
+class Permission(Flag):
+    READ = 1
+    WRITE = 2
+
+PermissionId = NewType("PermissionId", Permission)
+
+def non_exhaustive(value: PermissionId & ~Literal[Permission.READ]) -> None:
+    reveal_type(value)  # revealed: PermissionId & ~Literal[Permission.READ]
 ```
 
 ## Addition of a type to an intersection with many non-disjoint types

@@ -1972,6 +1972,17 @@ impl<'db> InnerIntersectionBuilder<'db> {
             if speculative.is_never() {
                 return Type::Never;
             }
+
+            if let Type::EnumComplement(complement) = speculative
+                && complement.is_singleton(db)
+                && self
+                    .positive
+                    .iter()
+                    .any(|positive| matches!(positive, Type::NewTypeInstance(_)))
+            {
+                // Preserve the NewType while making its remaining enum member explicit.
+                self.add_positive(db, env, complement.remaining_literal_union(db, env));
+            }
         }
 
         if let Some(complement) =

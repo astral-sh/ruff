@@ -664,6 +664,17 @@ mod tests {
         2 |
           |
 
+        info[code-action]: import typing_extensions.reveal_type
+         --> main.py:2:1
+          |
+        2 | reveal_type(1)
+          | ^^^^^^^^^^^
+        help: This is a preferred code action
+          |
+        1 + from typing_extensions import reveal_type
+        2 |
+          |
+
         info[code-action]: Ignore 'undefined-reveal' for this line
          --> main.py:2:1
           |
@@ -695,6 +706,17 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from warnings import deprecated
+        2 |
+          |
+
+        info[code-action]: import typing_extensions.deprecated
+         --> main.py:2:2
+          |
+        2 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        help: This is a preferred code action
+          |
+        1 + from typing_extensions import deprecated
         2 |
           |
 
@@ -732,6 +754,17 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from warnings import deprecated
+        2 |
+          |
+
+        info[code-action]: import typing_extensions.deprecated
+         --> main.py:4:2
+          |
+        4 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        help: This is a preferred code action
+          |
+        1 + from typing_extensions import deprecated
         2 |
           |
 

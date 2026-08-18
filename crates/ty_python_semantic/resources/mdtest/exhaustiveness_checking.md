@@ -283,7 +283,11 @@ def match_non_exhaustive(x: Color):
             assert_never(x)  # error: [type-assertion-failure]
 ```
 
-Matching every named member is not exhaustive for enums that can also have unnamed members.
+Matching every named member is not exhaustive for `Flag` classes.
+
+Custom `_missing_` methods technically could create a new undeclared member via `object.__new__`,
+but this is also possible outside a `_missing_` method. We choose to in general ignore this
+possibility; we don't assume that a `_missing_` method will do this.
 
 ```py
 from enum import Enum, Flag
@@ -296,17 +300,47 @@ class MissingValueEnum(Enum):
 
     @classmethod
     def _missing_(cls, value: object) -> "MissingValueEnum":
-        return object.__new__(cls)
+        return cls.ONLY
 
 def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
     match value:
         case Permission.READ:
             return 1
 
-def match_open_enum(value: MissingValueEnum) -> int:  # error: [invalid-return-type]
+def match_custom_missing_enum(value: MissingValueEnum) -> int:
     match value:
         case MissingValueEnum.ONLY:
             return 1
+```
+
+## Checks on enums with custom missing methods
+
+An enum remains exhaustive when it overrides `_missing_`, even if its value comes from a function
+with the enum as its return type.
+
+```py
+from enum import Enum
+from typing import assert_never
+
+class FallbackColor(Enum):
+    RED = 1
+    BLUE = 2
+
+    @classmethod
+    def _missing_(cls, value: object) -> "FallbackColor":
+        return FallbackColor.RED
+
+def get_color() -> FallbackColor:
+    return FallbackColor.BLUE
+
+color = get_color()
+match color:
+    case FallbackColor.RED:
+        pass
+    case FallbackColor.BLUE:
+        pass
+    case _:
+        assert_never(color)
 ```
 
 ## Checks on enum literal subsets

@@ -80,7 +80,7 @@ fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::Call(ast::ExprCall {
             func,
             arguments,
-            range: _,
+            range_start: _,
             node_index: _,
         }) => {
             if arguments.is_empty() {

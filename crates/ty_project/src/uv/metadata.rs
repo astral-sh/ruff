@@ -1,38 +1,43 @@
 use std::path::PathBuf;
 
 use pep440_rs::Version;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{Command, System, SystemPath, SystemPathBuf, WhichError};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
 use ty_static::EnvVars;
 
-use super::python_version::SupportedPythonVersion;
+use crate::metadata::python_version::SupportedPythonVersion;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub(super) struct UvWorkspace {
+pub(crate) struct UvWorkspace {
     root: SystemPathBuf,
     environment: Option<SystemPathBuf>,
     python_version: Option<RangedValue<SupportedPythonVersion>>,
 }
 
 impl UvWorkspace {
-    pub(super) fn discover(
+    pub(crate) fn discover(
         path: &SystemPath,
         system: &dyn System,
     ) -> Result<Self, UvWorkspaceError> {
-        let uv = system
-            .env_var(EnvVars::UV)
-            .unwrap_or_else(|_| "uv".to_string());
+        let uv = match system.env_var(EnvVars::UV) {
+            Ok(uv) => uv,
+            Err(_) => system
+                .which("uv")
+                .map(SystemPathBuf::into_string)
+                .map_err(uv_executable_error)
+                .map_err(UvWorkspaceError::Invocation)?,
+        };
 
         // `uv check` has already selected and synchronized the environment. Keep this query
         // read-only so package selection and `--isolated` aren't overwritten by a second sync.
+        let mut command = Command::new(uv);
+        command
+            .args(["workspace", "metadata", "--frozen", "--active"])
+            .current_dir(path);
         let output = system
-            .run_command(
-                &uv,
-                &["workspace", "metadata", "--frozen", "--active"],
-                path,
-            )
+            .run_command(command)
             .map_err(UvWorkspaceError::Invocation)?;
 
         if !output.status.success() {
@@ -45,7 +50,7 @@ impl UvWorkspace {
         Self::from_metadata(&output.stdout, system)
     }
 
-    pub(super) fn from_metadata(
+    pub(crate) fn from_metadata(
         metadata: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvWorkspaceError> {
@@ -73,17 +78,24 @@ impl UvWorkspace {
         })
     }
 
-    pub(super) fn root(&self) -> &SystemPath {
+    pub(crate) fn root(&self) -> &SystemPath {
         &self.root
     }
 
-    pub(super) fn environment(&self) -> Option<&SystemPath> {
+    pub(crate) fn environment(&self) -> Option<&SystemPath> {
         self.environment.as_deref()
     }
 
-    pub(super) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
+    pub(crate) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
         self.python_version.as_ref()
     }
+}
+
+fn uv_executable_error(error: WhichError) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("failed to resolve uv executable: {error}"),
+    )
 }
 
 fn resolve_python_version(
@@ -117,7 +129,7 @@ fn existing_directory(
 }
 
 #[derive(Debug, Error)]
-pub(super) enum UvWorkspaceError {
+pub(crate) enum UvWorkspaceError {
     #[error("Failed to invoke `uv workspace metadata`: {0}")]
     Invocation(#[source] std::io::Error),
 
@@ -166,6 +178,7 @@ struct WorkspacePython {
 #[cfg(test)]
 mod tests {
     use ruff_db::system::{SystemPath, TestSystem};
+    use ty_static::EnvVars;
 
     use super::{UvWorkspace, UvWorkspaceError};
 
@@ -176,6 +189,18 @@ mod tests {
         assert!(matches!(
             UvWorkspace::from_metadata(b"{", &system),
             Err(UvWorkspaceError::InvalidMetadata(_))
+        ));
+    }
+
+    #[test]
+    fn explicit_uv_override_skips_path_lookup() {
+        let system = TestSystem::default();
+        system.set_env_var(EnvVars::UV, "/custom/uv");
+
+        assert!(matches!(
+            UvWorkspace::discover(SystemPath::new("/app"), &system),
+            Err(UvWorkspaceError::Invocation(error))
+                if error.kind() == std::io::ErrorKind::Unsupported
         ));
     }
 

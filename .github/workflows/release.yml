@@ -71,7 +71,7 @@ jobs:
 
   # Run 'dist plan' (or host) to determine what tasks we need to do
   plan:
-    runs-on: "depot-ubuntu-latest-4"
+    runs-on: "depot-ubuntu-24.04-4"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
       tag: ${{ (inputs.tag != 'dry-run' && inputs.tag) || '' }}
@@ -117,7 +117,7 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
-    uses: ./.github/workflows/build-binaries.yml
+    uses: $/.github/workflows/build-binaries.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -127,7 +127,7 @@ jobs:
       - plan
       - release-gate
     if: ${{ always() && needs.plan.result == 'success' && (needs.release-gate.result == 'success' || needs.release-gate.result == 'skipped') && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run') }}
-    uses: ./.github/workflows/build-docker.yml
+    uses: $/.github/workflows/build-docker.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -141,7 +141,7 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
-    uses: ./.github/workflows/build-wasm.yml
+    uses: $/.github/workflows/build-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -153,7 +153,7 @@ jobs:
       - custom-build-binaries
       - custom-build-docker
       - custom-build-wasm
-    runs-on: "depot-ubuntu-latest-4"
+    runs-on: "depot-ubuntu-24.04-4"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
@@ -206,7 +206,7 @@ jobs:
     if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-build-binaries.result == 'skipped' || needs.custom-build-binaries.result == 'success') && (needs.custom-build-docker.result == 'skipped' || needs.custom-build-docker.result == 'success') && (needs.custom-build-wasm.result == 'skipped' || needs.custom-build-wasm.result == 'success') }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    runs-on: "depot-ubuntu-latest-4"
+    runs-on: "depot-ubuntu-24.04-4"
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
@@ -248,7 +248,7 @@ jobs:
       - host
       - release-gate
     if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish-pypi.yml
+    uses: $/.github/workflows/publish-pypi.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -263,7 +263,7 @@ jobs:
       - host
       - release-gate
     if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish-wasm.yml
+    uses: $/.github/workflows/publish-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -281,7 +281,7 @@ jobs:
       - custom-publish-pypi # DIRTY: see #16989
       - custom-publish-wasm # DIRTY: see #16989
     if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish-crates.yml
+    uses: $/.github/workflows/publish-crates.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -304,7 +304,7 @@ jobs:
     # `custom-publish-crates` is intentionally not a dependency because a crates.io outage should
     # not block the rest of the release.
     if: ${{ always() && needs.host.result == 'success' && needs.release-gate.result == 'success' && (needs.custom-publish-pypi.result == 'skipped' || needs.custom-publish-pypi.result == 'success') && (needs.custom-publish-wasm.result == 'skipped' || needs.custom-publish-wasm.result == 'success') }}
-    runs-on: "depot-ubuntu-latest-4"
+    runs-on: "depot-ubuntu-24.04-4"
     permissions:
       "attestations": "write"
       "contents": "write"
@@ -352,7 +352,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/notify-dependents.yml
+    uses: $/.github/workflows/notify-dependents.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -361,7 +361,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/publish-docs.yml
+    uses: $/.github/workflows/publish-docs.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -370,7 +370,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/publish-playground.yml
+    uses: $/.github/workflows/publish-playground.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -379,7 +379,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/publish-versions.yml
+    uses: $/.github/workflows/publish-versions.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -388,7 +388,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/publish-mirror.yml
+    uses: $/.github/workflows/publish-mirror.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit

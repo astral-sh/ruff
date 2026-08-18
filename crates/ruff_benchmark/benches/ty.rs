@@ -584,9 +584,12 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
 fn benchmark_optional_str_enum_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
-    let mut code =
-        "from dataclasses import dataclass\nfrom enum import StrEnum\n\nclass ModelSlug(StrEnum):\n"
-            .to_string();
+    let mut code = "from dataclasses import dataclass
+from enum import StrEnum
+
+class ModelSlug(StrEnum):
+"
+    .to_string();
     for index in 0..NUM_ENUM_MEMBERS {
         writeln!(&mut code, "    M{index} = \"m{index}\"").ok();
     }
@@ -620,9 +623,12 @@ def belongs(slug: ModelSlug, category: Category) -> bool:
 fn benchmark_enum_literal_union_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
-    let mut code =
-        "from enum import StrEnum\nfrom typing import Literal\n\nclass LargeEnum(StrEnum):\n"
-            .to_string();
+    let mut code = "from enum import StrEnum
+from typing import Literal
+
+class LargeEnum(StrEnum):
+"
+    .to_string();
     for index in 0..NUM_ENUM_MEMBERS {
         writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
     }
@@ -668,7 +674,13 @@ fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
         }
     }
     code.push_str(
-        "\n\ndef compare(left: Left, right: Right):\n    if left != right:\n        return\n    return left == right\n",
+        "
+
+def compare(left: Left, right: Right):
+    if left != right:
+        return
+    return left == right
+",
     );
 
     benchmark_enum_comparison(criterion, "ty_micro[cross_str_enum_comparison]", &code);
@@ -700,7 +712,11 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
     };
     writeln!(
         &mut code,
-        "\ndef compare(left: {}, right: {}):\n    if left != right:\n        return\n    return left == right",
+        "
+def compare(left: {}, right: {}):
+    if left != right:
+        return
+    return left == right",
         class_union("Left"),
         class_union("Right"),
     )
@@ -1136,7 +1152,14 @@ fn literal_equality_fallthrough_code() -> String {
 }
 
 fn literal_or_pattern_reachability_code() -> String {
-    let mut code = "from typing import Any\n\ndef check(item: Any) -> None:\n    x: int\n    match item:\n        case ".to_string();
+    let mut code = "\
+from typing import Any
+
+def check(item: Any) -> None:
+    x: int
+    match item:
+        case "
+        .to_string();
 
     for index in 0..NUM_LITERAL_OR_PATTERN_ALTERNATIVES {
         if index > 0 {
@@ -1229,6 +1252,39 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
         "ty_micro[literal_equality_fallthrough_guarded_any]",
         &literal_equality_fallthrough_code(),
     );
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4256>.
+///
+/// Excluding rejected gradual string literals must not expand the complement of each intersection
+/// into exponentially many equivalent alternatives.
+fn benchmark_gradual_literal_union_equality(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from typing import Any, Literal\nfrom ty_extensions import Intersection\n\ndef check(value: (\n",
+    );
+    for index in 0..20 {
+        writeln!(
+            &mut code,
+            "    {}Intersection[Any, Literal[\"{index}\"]]",
+            if index == 0 { "" } else { "| " },
+        )
+        .ok();
+    }
+    code.push_str(")) -> None:\n    assert value == \"0\"\n    repr(value)\n");
+
+    criterion.bench_function("ty_micro[gradual_literal_union_equality]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3880>.
@@ -1335,6 +1391,39 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
             );
         });
     }
+
+    for (name, parameters, statement) in [
+        (
+            "ty_micro[repeated_statement_calls_in_try]",
+            "value: str",
+            "        value.upper()\n",
+        ),
+        (
+            "ty_micro[repeated_statement_calls_in_try_with_if_branches]",
+            "value: str, flag: bool",
+            "        if flag is True:\n            pass\n        value.upper()\n",
+        ),
+    ] {
+        let mut code = format!("def f({parameters}) -> None:\n");
+        for index in 0..800 {
+            writeln!(&mut code, "    local_{index} = {index}").ok();
+        }
+        code.push_str("    try:\n");
+        code.push_str(&statement.repeat(800));
+        code.push_str("    except Exception:\n        pass\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 struct ProjectBenchmark<'a> {
@@ -1421,7 +1510,8 @@ fn bench_project_named(
                 .join("\n  ");
             assert!(
                 diagnostics <= max_diagnostics,
-                "{project_name}: Expected <={max_diagnostics} diagnostics but got {diagnostics}:\n  {details}",
+                "{project_name}: Expected <={max_diagnostics} diagnostics \
+                but got {diagnostics}:\n  {details}",
             );
         }
     }
@@ -1538,6 +1628,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_gradual_literal_union_equality,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,

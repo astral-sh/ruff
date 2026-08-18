@@ -44,6 +44,8 @@ env:
 
   CARGO_NET_RETRY: 10
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CARGO_TERM_COLOR: always
   NEXTEST_PROFILE: "ci"
   RUSTUP_MAX_RETRIES: 10
@@ -86,7 +88,7 @@ jobs:
           git config --global user.email '<>'
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.12.1"
+          version: "0.12.3"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -142,7 +144,7 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.12.1"
+          version: "0.12.3"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -184,7 +186,7 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.12.1"
+          version: "0.12.3"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -257,7 +259,7 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           # Reuse the cache populated by the `cargo test (linux)` CI job on `main`.
           shared-key: ruff-linux-debug
@@ -268,7 +270,7 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
+        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
         with:
           tool: |
             cargo-nextest

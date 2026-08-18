@@ -6,6 +6,7 @@ use std::{cmp, fmt};
 pub use self::changes::ChangeResult;
 use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
+use crate::script::Script;
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
@@ -325,137 +326,125 @@ fn bytes_to_mb(total: usize) -> f64 {
 
 impl SalsaMemoryDump {
     /// Returns a short report that provides total memory usage information.
-    pub fn display_short(&self) -> impl fmt::Display + '_ {
-        struct DisplayShort<'a>(&'a SalsaMemoryDump);
+    pub fn display_short(self) -> impl fmt::Display {
+        std::fmt::from_fn(move |f| {
+            let SalsaMemoryDump {
+                total_fields,
+                total_metadata,
+                total_memo_fields,
+                total_memo_metadata,
+                ref ingredients,
+                ref memos,
+            } = self;
 
-        impl fmt::Display for DisplayShort<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let SalsaMemoryDump {
-                    total_fields,
-                    total_metadata,
-                    total_memo_fields,
-                    total_memo_metadata,
-                    ref ingredients,
-                    ref memos,
-                } = *self.0;
+            writeln!(f, "=======SALSA SUMMARY=======")?;
 
-                writeln!(f, "=======SALSA SUMMARY=======")?;
+            writeln!(
+                f,
+                "TOTAL MEMORY USAGE: {:.2}MB",
+                bytes_to_mb(
+                    total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                )
+            )?;
 
-                writeln!(
-                    f,
-                    "TOTAL MEMORY USAGE: {:.2}MB",
-                    bytes_to_mb(
-                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
-                    )
-                )?;
+            writeln!(
+                f,
+                "    struct metadata = {:.2}MB",
+                bytes_to_mb(total_metadata),
+            )?;
+            writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
+            writeln!(
+                f,
+                "    memo metadata = {:.2}MB",
+                bytes_to_mb(total_memo_metadata),
+            )?;
+            writeln!(
+                f,
+                "    memo fields = {:.2}MB",
+                bytes_to_mb(total_memo_fields),
+            )?;
 
-                writeln!(
-                    f,
-                    "    struct metadata = {:.2}MB",
-                    bytes_to_mb(total_metadata),
-                )?;
-                writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
-                writeln!(
-                    f,
-                    "    memo metadata = {:.2}MB",
-                    bytes_to_mb(total_memo_metadata),
-                )?;
-                writeln!(
-                    f,
-                    "    memo fields = {:.2}MB",
-                    bytes_to_mb(total_memo_fields),
-                )?;
+            writeln!(f, "QUERY COUNT: {}", memos.len())?;
+            writeln!(f, "STRUCT COUNT: {}", ingredients.len())?;
 
-                writeln!(f, "QUERY COUNT: {}", memos.len())?;
-                writeln!(f, "STRUCT COUNT: {}", ingredients.len())?;
-
-                Ok(())
-            }
-        }
-
-        DisplayShort(self)
+            Ok(())
+        })
     }
 
     /// Returns a short report that provides fine-grained memory usage information per
     /// Salsa ingredient.
-    pub fn display_full(&self) -> impl fmt::Display + '_ {
-        struct DisplayFull<'a>(&'a SalsaMemoryDump);
+    pub fn display_full(self) -> impl fmt::Display {
+        std::fmt::from_fn(move |f| {
+            let SalsaMemoryDump {
+                total_fields,
+                total_metadata,
+                total_memo_fields,
+                total_memo_metadata,
+                ref ingredients,
+                ref memos,
+            } = self;
 
-        impl fmt::Display for DisplayFull<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let SalsaMemoryDump {
-                    total_fields,
-                    total_metadata,
-                    total_memo_fields,
-                    total_memo_metadata,
-                    ref ingredients,
-                    ref memos,
-                } = *self.0;
+            writeln!(f, "=======SALSA STRUCTS=======")?;
 
-                writeln!(f, "=======SALSA STRUCTS=======")?;
-
-                for ingredient in ingredients {
-                    let size_of_fields =
-                        ingredient.size_of_fields() + ingredient.heap_size_of_fields().unwrap_or(0);
-
-                    writeln!(
-                        f,
-                        "{:<50} metadata={:<8} fields={:<8} count={}",
-                        format!("`{}`", ingredient.debug_name()),
-                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
-                        ingredient.count()
-                    )?;
-                }
-
-                writeln!(f, "=======SALSA QUERIES=======")?;
-
-                for (query_fn, memo) in memos {
-                    let size_of_fields =
-                        memo.size_of_fields() + memo.heap_size_of_fields().unwrap_or(0);
-
-                    writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
-
-                    writeln!(
-                        f,
-                        "    metadata={:<8} fields={:<8} count={}",
-                        format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
-                        memo.count()
-                    )?;
-                }
-
-                writeln!(f, "=======SALSA SUMMARY=======")?;
-                writeln!(
-                    f,
-                    "TOTAL MEMORY USAGE: {:.2}MB",
-                    bytes_to_mb(
-                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
-                    )
-                )?;
+            for ingredient in ingredients {
+                let size_of_fields =
+                    ingredient.size_of_fields() + ingredient.heap_size_of_fields().unwrap_or(0);
 
                 writeln!(
                     f,
-                    "    struct metadata = {:.2}MB",
-                    bytes_to_mb(total_metadata),
+                    "{:<50} metadata={:<8} fields={:<8} count={}",
+                    format!("`{}`", ingredient.debug_name()),
+                    format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
+                    format!("{:.2}MB", bytes_to_mb(size_of_fields)),
+                    ingredient.count()
                 )?;
-                writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
-                writeln!(
-                    f,
-                    "    memo metadata = {:.2}MB",
-                    bytes_to_mb(total_memo_metadata),
-                )?;
-                writeln!(
-                    f,
-                    "    memo fields = {:.2}MB",
-                    bytes_to_mb(total_memo_fields),
-                )?;
-
-                Ok(())
             }
-        }
 
-        DisplayFull(self)
+            writeln!(f, "=======SALSA QUERIES=======")?;
+
+            for (query_fn, memo) in memos {
+                let size_of_fields =
+                    memo.size_of_fields() + memo.heap_size_of_fields().unwrap_or(0);
+
+                writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
+
+                writeln!(
+                    f,
+                    "    metadata={:<8} fields={:<8} count={}",
+                    format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
+                    format!("{:.2}MB", bytes_to_mb(size_of_fields)),
+                    memo.count()
+                )?;
+            }
+
+            writeln!(f, "=======SALSA SUMMARY=======")?;
+            writeln!(
+                f,
+                "TOTAL MEMORY USAGE: {:.2}MB",
+                bytes_to_mb(
+                    total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                )
+            )?;
+
+            writeln!(
+                f,
+                "    struct metadata = {:.2}MB",
+                bytes_to_mb(total_metadata),
+            )?;
+            writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
+            writeln!(
+                f,
+                "    memo metadata = {:.2}MB",
+                bytes_to_mb(total_memo_metadata),
+            )?;
+            writeln!(
+                f,
+                "    memo fields = {:.2}MB",
+                bytes_to_mb(total_memo_fields),
+            )?;
+
+            Ok(())
+        })
     }
 
     /// Serializes the memory dump to JSON.
@@ -539,11 +528,19 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
-        self.project().program(self).program_file(self, file)
+        let program = match Script::for_file(self, file) {
+            None => self.project().program(self),
+            Some(script) => script.program(self),
+        };
+
+        program.program_file(self, file)
     }
 
-    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
-        &self.project().program_settings(self).python_version
+    fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
+        match Script::for_file(self, file) {
+            None => &self.project().program_settings(self).python_version,
+            Some(script) => script.python_version_with_source(self),
+        }
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -654,6 +651,8 @@ pub(crate) mod testing {
     use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
 
     use crate::db::Db;
+    use crate::metadata::settings::file_settings;
+    use crate::script::Script;
     use crate::{Project, ProjectMetadata};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -785,11 +784,19 @@ pub(crate) mod testing {
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
         fn program_file(&self, file: File) -> ProgramFile<'_> {
-            self.project().program(self).program_file(self, file)
+            let program = match Script::for_file(self, file) {
+                None => self.project().program(self),
+                Some(script) => script.program(self),
+            };
+
+            program.program_file(self, file)
         }
 
-        fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
-            &self.project().program_settings(self).python_version
+        fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
+            match Script::for_file(self, file) {
+                None => &self.project().program_settings(self).python_version,
+                Some(script) => script.python_version_with_source(self),
+            }
         }
 
         #[inline]
@@ -797,16 +804,16 @@ pub(crate) mod testing {
             crate::check_file(self, file)
         }
 
-        fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
-            self.project().rules(self)
+        fn rule_selection(&self, file: ruff_db::files::File) -> &RuleSelection {
+            file_settings(self, file).rules(self)
         }
 
         fn lint_registry(&self) -> &LintRegistry {
             ty_python_semantic::default_lint_registry()
         }
 
-        fn analysis_settings(&self, _file: ruff_db::files::File) -> &AnalysisSettings {
-            self.project().settings(self).analysis()
+        fn analysis_settings(&self, file: ruff_db::files::File) -> &AnalysisSettings {
+            file_settings(self, file).analysis(self)
         }
 
         fn verbose(&self) -> bool {

@@ -293,6 +293,17 @@ mod tests {
     }
 
     #[test]
+    fn continue_in_finally_python_38() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/continue_in_finally.py"),
+            &LinterSettings::for_rule(Rule::ContinueInFinally)
+                .with_target_version(PythonVersion::PY38),
+        )?;
+        assert!(diagnostics.is_empty());
+        Ok(())
+    }
+
+    #[test]
     fn allow_magic_value_types() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/magic_value_comparison.py"),

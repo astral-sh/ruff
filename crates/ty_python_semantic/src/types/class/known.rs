@@ -112,6 +112,7 @@ pub enum KnownClass {
     TypeVarTuple,
     ExtensionsTypeVarTuple, // must be distinct from typing.TypeVarTuple, backports new features
     TypeAliasType,
+    ExtensionsTypeAliasType, // may be distinct from typing.TypeAliasType
     NoDefaultType,
     NewType,
     Hashable,
@@ -193,6 +194,7 @@ impl KnownClass {
             | Self::FunctionType
             | Self::VersionInfo
             | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
@@ -202,7 +204,6 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
-            | Self::Super
             | Self::WrapperDescriptorType
             | Self::UnionType
             | Self::GeneratorType
@@ -210,8 +211,7 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::CoroutineType
             | Self::BuiltinFunctionType
-            | Self::Template
-            | Self::Path => Some(Truthiness::AlwaysTrue),
+            | Self::Template => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
@@ -271,12 +271,9 @@ impl KnownClass {
             | Self::Mapping
             | Self::MutableMapping
             | Self::SupportsKeysAndGetItem
-            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
-            // and raises a `TypeError` in Python >=3.14
-            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
-            | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Super
             | Self::Awaitable
             | Self::Generator
             | Self::AsyncGenerator
@@ -291,6 +288,7 @@ impl KnownClass {
             | Self::Specialization
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
+            | Self::Path
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
             | Self::PydanticBaseModel
@@ -298,6 +296,11 @@ impl KnownClass {
             | Self::PydanticConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict => Some(Truthiness::Ambiguous),
+
+            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
+            // and raises a `TypeError` in Python >=3.14
+            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
+            Self::NotImplementedType => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
         }
@@ -372,6 +375,7 @@ impl KnownClass {
             | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
             | KnownClass::Hashable
@@ -486,6 +490,7 @@ impl KnownClass {
             | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
             | KnownClass::Hashable
@@ -601,6 +606,7 @@ impl KnownClass {
             | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
             | KnownClass::Hashable
@@ -723,6 +729,7 @@ impl KnownClass {
             | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
             | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
             | Self::NoDefaultType
             | Self::NewType
             | Self::ChainMap
@@ -848,6 +855,7 @@ impl KnownClass {
             | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
             | KnownClass::Hashable
@@ -945,7 +953,7 @@ impl KnownClass {
             Self::TypeVarTuple => "TypeVarTuple",
             Self::ExtensionsTypeVarTuple => "TypeVarTuple",
             Self::Sentinel => "sentinel",
-            Self::TypeAliasType => "TypeAliasType",
+            Self::TypeAliasType | Self::ExtensionsTypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
             Self::Hashable => "Hashable",
@@ -1016,30 +1024,14 @@ impl KnownClass {
     }
 
     pub(crate) fn display(self, python_version: PythonVersion) -> impl std::fmt::Display {
-        struct KnownClassDisplay {
-            class: KnownClass,
-            python_version: PythonVersion,
-        }
-
-        impl std::fmt::Display for KnownClassDisplay {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let KnownClassDisplay {
-                    class: known_class,
-                    python_version,
-                } = *self;
-                write!(
-                    f,
-                    "{module}.{class}",
-                    module = known_class.canonical_module(python_version),
-                    class = known_class.name(python_version)
-                )
-            }
-        }
-
-        KnownClassDisplay {
-            class: self,
-            python_version,
-        }
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "{module}.{class}",
+                module = self.canonical_module(python_version),
+                class = self.name(python_version)
+            )
+        })
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing all
@@ -1389,7 +1381,7 @@ impl KnownClass {
             | Self::ParamSpec
             | Self::Hashable
             | Self::SupportsIndex => KnownModule::Typing,
-            Self::TypeAliasType
+            Self::ExtensionsTypeAliasType
             | Self::ExtensionsTypeVar
             | Self::ExtensionsTypeVarTuple
             | Self::ExtensionsParamSpec
@@ -1398,6 +1390,13 @@ impl KnownClass {
             | Self::Deprecated
             | Self::ExtensionTypedDictFallback
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::TypeAliasType => {
+                if python_version >= PythonVersion::PY312 {
+                    KnownModule::Typing
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::TypeVarTuple => {
                 if python_version >= PythonVersion::PY311 {
                     KnownModule::Typing
@@ -1509,6 +1508,7 @@ impl KnownClass {
             | Self::AsyncGenerator
             | Self::Deprecated
             | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
@@ -1618,7 +1618,7 @@ impl KnownClass {
             "WrapperDescriptorType" => &[Self::WrapperDescriptorType],
             "BuiltinFunctionType" => &[Self::BuiltinFunctionType],
             "NewType" => &[Self::NewType],
-            "TypeAliasType" => &[Self::TypeAliasType],
+            "TypeAliasType" => &[Self::TypeAliasType, Self::ExtensionsTypeAliasType],
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
             "Iterable" => &[Self::Iterable, Self::TyExtensionsIterable],
             "Iterator" => &[Self::Iterator, Self::TyExtensionsIterator],
@@ -1716,7 +1716,6 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
-            | Self::StdlibAlias  // no equivalent class exists in typing_extensions, nor ever will
             | Self::ModuleType
             | Self::VersionInfo
             | Self::BaseException
@@ -1762,6 +1761,8 @@ impl KnownClass {
             | Self::ExtensionsParamSpec
             | Self::TypeVarTuple
             | Self::ExtensionsTypeVarTuple
+            | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
             | Self::Sentinel
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -1783,9 +1784,13 @@ impl KnownClass {
             | Self::PydanticConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict => module == self.canonical_module(python_version),
+
+            // no equivalent class exists in typing_extensions, nor ever will
+            Self::StdlibAlias => module == self.canonical_module(python_version),
+
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
+
             Self::SpecialForm
-            | Self::TypeAliasType
             | Self::NoDefaultType
             | Self::Hashable
             | Self::SupportsIndex
@@ -1798,8 +1803,14 @@ impl KnownClass {
             | Self::Mapping
             | Self::MutableMapping
             | Self::ProtocolMeta
-            | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
-            Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
+            | Self::NewType => {
+                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+
+            Self::Deprecated => matches!(
+                module,
+                KnownModule::Warnings | KnownModule::TypingExtensions
+            ),
         }
     }
 
@@ -1996,62 +2007,42 @@ impl<'db> KnownClassLookupError<'db> {
     }
 
     fn display<'env>(
-        &self,
+        self,
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
         class: KnownClass,
     ) -> impl std::fmt::Display + 'env {
-        struct ErrorDisplay<'env, 'db> {
-            db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
-            class: KnownClass,
-            error: KnownClassLookupError<'db>,
-        }
+        std::fmt::from_fn(move |f| {
+            let python_version = env.python_version(db);
+            let class = class.display(python_version);
+            let location = if self.is_third_party() {
+                ""
+            } else {
+                " in typeshed"
+            };
 
-        impl std::fmt::Display for ErrorDisplay<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                let ErrorDisplay {
-                    db: _,
-                    env,
-                    class,
-                    error,
-                } = self;
-
-                let python_version = env.python_version(db);
-                let class = class.display(python_version);
-                let location = if error.is_third_party() {
-                    ""
-                } else {
-                    " in typeshed"
-                };
-
-                match error {
-                    KnownClassLookupError::ClassNotFound { .. } => write!(
-                        f,
-                        "Could not find class `{class}`{location} on Python {python_version}",
-                    ),
-                    KnownClassLookupError::SymbolNotAClass { found_type, .. } => write!(
-                        f,
-                        "Error looking up `{class}`{location}: expected to find a class definition \
-                        on Python {python_version}, but found a symbol of type `{found_type}` instead",
-                        found_type = found_type.display(db, env),
-                    ),
-                    KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
-                        f,
-                        "Error looking up `{class}`{location} on Python {python_version}: expected \
-                        to find a fully bound symbol, but found one that is possibly unbound",
-                    ),
-                }
+            match self {
+                KnownClassLookupError::ClassNotFound { .. } => write!(
+                    f,
+                    "Could not find class `{class}`{location} on Python {python_version}",
+                ),
+                KnownClassLookupError::SymbolNotAClass { found_type, .. } => write!(
+                    f,
+                    "Error looking up `{class}`{location}: \
+                    expected to find a class definition \
+                    on Python {python_version}, \
+                    but found a symbol of type `{found_type}` instead",
+                    found_type = found_type.display(db, env),
+                ),
+                KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
+                    f,
+                    "Error looking up `{class}`{location} \
+                    on Python {python_version}: expected \
+                    to find a fully bound symbol, \
+                    but found one that is possibly unbound",
+                ),
             }
-        }
-
-        ErrorDisplay {
-            db,
-            env,
-            class,
-            error: *self,
-        }
+        })
     }
 }
 
@@ -2173,7 +2164,7 @@ mod tests {
                     python_platform: python_platform.clone(),
                     search_paths: search_paths.clone(),
                 };
-                program = Program::from_settings(&db, settings);
+                program = Program::from_settings(&db, &settings);
                 current_version = version_added;
             }
 

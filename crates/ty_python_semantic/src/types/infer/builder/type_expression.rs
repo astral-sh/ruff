@@ -1071,7 +1071,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_tuple_type_expression(
         &mut self,
         tuple: &ast::ExprSubscript,
-    ) -> Option<TupleType<'db>> {
+    ) -> TupleType<'db> {
         let db = self.db();
         let env = self.program_environment();
         match &*tuple.slice {
@@ -1099,8 +1099,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
                     }
                     let result = TupleType::homogeneous(db, env, element_ty);
-                    self.store_expression_type(&tuple.slice, Type::tuple(Some(result)));
-                    return Some(result);
+                    self.store_expression_type(&tuple.slice, Type::tuple(result));
+                    return result;
                 }
 
                 let mut element_types = TupleSpecBuilder::with_capacity(elements.len());
@@ -1297,6 +1297,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(slice, TypeContext::default());
                 KnownClass::NoneType.to_subclass_of(db, env)
             }
+            ast::Expr::Subscript(ast::ExprSubscript { value, .. }) if !is_dotted_name(value) => {
+                infer_type_argument(self, slice)
+            }
             ast::Expr::Subscript(
                 subscript @ ast::ExprSubscript {
                     value,
@@ -1323,8 +1326,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if class_literal.is_tuple(self.db()) {
                             let class_type = self
                                 .infer_tuple_type_expression(subscript)
-                                .map(|tuple_type| tuple_type.to_class_type(self.db()))
-                                .unwrap_or_else(|| class_literal.default_specialization(db));
+                                .to_class_type(self.db());
                             SubclassOfType::from(db, env, class_type)
                         } else {
                             match class_literal.generic_context(db) {
@@ -1378,9 +1380,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         invalid_type_argument(self, slice)
                     }
                     value_ty @ (Type::SpecialForm(
-                        SpecialFormType::Top | SpecialFormType::Bottom,
+                        SpecialFormType::Top | SpecialFormType::Bottom | SpecialFormType::Annotated,
                     )
-                    | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))) => {
+                    | Type::KnownInstance(_)
+                    | Type::GenericAlias(_)
+                    | Type::Callable(_)) => {
                         let slice_ty = self.infer_subscript_type_expression(subscript, value_ty);
                         subclass_of_type_argument(self, slice, slice_ty)
                     }
@@ -1436,7 +1440,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // instead of two. So until we properly support these, specialize all remaining type
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
-        if any_over_type(db, env, value_ty, true, |ty| ty.is_divergent()) {
+        //
+        // A lazily inferred class member can contain its own unrelated recursive type, so only
+        // inspect the alias structure and generic arguments when checking whether it is recursive.
+        if any_over_type(db, env, value_ty, false, |ty| ty.is_divergent()) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(
@@ -2058,33 +2065,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     std::slice::from_ref(arguments_slice)
                 };
                 let mut has_unpacked_typevartuple = false;
-                let union_ty = UnionType::from_elements_leave_aliases(db, env,
+                let union_ty = UnionType::from_elements_leave_aliases(
+                    db,
+                    env,
                     arguments.iter().map(|argument| {
                         let ty = self.infer_type_expression(argument);
                         if self
                             .type_expression_flags(argument)
                             .contains(TypeExpressionFlags::UNPACK)
                         {
-                            let is_typevartuple = matches!(
-                                ty,
-                                Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                            ) || if let ast::Expr::Subscript(subscript) = argument {
-                                let previously_in_unpack_type_argument = self
-                                    .context
-                                    .inference_flags
-                                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
-                                let inner_ty = self.infer_type_expression(&subscript.slice);
-                                self.context.inference_flags.set(
-                                    InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
-                                    previously_in_unpack_type_argument,
-                                );
+                            let is_typevartuple =
                                 matches!(
-                                    inner_ty,
+                                    ty,
                                     Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                                )
-                            } else {
-                                false
-                            };
+                                ) || if let ast::Expr::Subscript(subscript) = argument {
+                                    matches!(
+                                        self.expression_type(&subscript.slice),
+                                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                                    )
+                                } else {
+                                    false
+                                };
+
                             if is_typevartuple {
                                 has_unpacked_typevartuple = true;
                                 if !ty.is_unknown()
@@ -2093,7 +2095,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 {
                                     diagnostic::add_type_expression_reference_link(
                                         builder.into_diagnostic(
-                                            "Unpacking a `TypeVarTuple` in `Union` is not supported",
+                                            "Unpacking a `TypeVarTuple` in `Union` \
+                                            is not supported",
                                         ),
                                     );
                                 }
@@ -2470,10 +2473,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     TypeExpressionFlags::UNPACK,
                 );
 
-                if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)
+                let inference_flags = self.inference_flags();
+                let is_nested_unpack =
+                    inference_flags.contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT);
+                let is_nested_kwargs = inference_flags
+                    .contains(InferenceFlags::IN_KWARG_ANNOTATION)
+                    && inference_flags.contains(InferenceFlags::IN_NESTED_TYPE_EXPRESSION);
+                let is_invalid_context = !inference_flags.intersects(
+                    InferenceFlags::IN_VARARG_ANNOTATION
+                        | InferenceFlags::IN_KWARG_ANNOTATION
+                        | InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+                );
+
+                let previously_in_unpack_type_argument = self
+                    .context
+                    .inference_flags
+                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
+                let inner_ty = if self.in_string_annotation()
+                    && (is_nested_unpack || is_nested_kwargs || is_invalid_context)
                 {
+                    // Invalid string annotations never execute, so their operands must not
+                    // produce runtime errors even though their inferred types are still needed.
+                    let mut speculative = self.speculate_without_diagnostics();
+                    let inner_ty = speculative.infer_type_expression(arguments_slice);
+                    self.extend(speculative);
+                    inner_ty
+                } else {
+                    self.infer_type_expression(arguments_slice)
+                };
+                self.context.inference_flags.set(
+                    InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
+                    previously_in_unpack_type_argument,
+                );
+
+                if is_nested_unpack {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(
                             builder.into_diagnostic("`Unpack` cannot be nested"),
@@ -2482,13 +2515,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 }
 
-                if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_KWARG_ANNOTATION)
-                    && self
-                        .inference_flags()
-                        .contains(InferenceFlags::IN_NESTED_TYPE_EXPRESSION)
-                {
+                if is_nested_kwargs {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(builder.into_diagnostic(
                             "`Unpack` is only valid as the top-level `**kwargs` annotation form",
@@ -2497,11 +2524,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 }
 
-                if !self.inference_flags().intersects(
-                    InferenceFlags::IN_VARARG_ANNOTATION
-                        | InferenceFlags::IN_KWARG_ANNOTATION
-                        | InferenceFlags::IN_VALID_UNPACK_CONTEXT,
-                ) {
+                if is_invalid_context {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(builder.into_diagnostic(
                             format_args!(
@@ -2512,16 +2535,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     return Type::unknown();
                 }
-
-                let previously_in_unpack_type_argument = self
-                    .context
-                    .inference_flags
-                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
-                let inner_ty = self.infer_type_expression(arguments_slice);
-                self.context.inference_flags.set(
-                    InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
-                    previously_in_unpack_type_argument,
-                );
 
                 if self
                     .inference_flags()

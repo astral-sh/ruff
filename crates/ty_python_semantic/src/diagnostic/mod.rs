@@ -27,8 +27,12 @@ pub fn inferred_python_version_source_annotation(
     source: &PythonVersionSource,
 ) -> Option<Annotation> {
     match source {
-        PythonVersionSource::ConfigFile(source) => source.span(db).map(Annotation::primary),
-        PythonVersionSource::PyvenvCfgFile(source) => source.span(db).map(Annotation::primary),
+        PythonVersionSource::ConfigFile(source) | PythonVersionSource::PyvenvCfgFile(source) => {
+            source.span(db).map(Annotation::primary)
+        }
+        PythonVersionSource::ScriptMetadata(span) => {
+            span.range().map(|_| Annotation::primary(span.clone()))
+        }
         PythonVersionSource::InstallationDirectoryLayout { source, .. } => source
             .as_ref()
             .and_then(|source| source.span(db))
@@ -71,6 +75,18 @@ pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
                     "Python {version} was assumed when {action} because of your configuration file(s)",
                 ));
             }
+        }
+        source @ crate::PythonVersionSource::ScriptMetadata(_) => {
+            let mut sub_diagnostic = SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format_args!(
+                    "Python {version} was assumed when {action} because it was specified in script metadata"
+                ),
+            );
+            if let Some(annotation) = inferred_python_version_source_annotation(db, source) {
+                sub_diagnostic.annotate(annotation.message("Python version configured here"));
+            }
+            diagnostic.sub(sub_diagnostic);
         }
         source @ crate::PythonVersionSource::PyvenvCfgFile(_) => {
             if let Some(annotation) = inferred_python_version_source_annotation(db, source) {

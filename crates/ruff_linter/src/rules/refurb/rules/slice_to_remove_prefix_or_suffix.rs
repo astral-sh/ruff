@@ -358,7 +358,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
         (
             AffixKind::StartsWith,
             ast::Expr::Call(ast::ExprCall {
-                range: _,
+                range_start: _,
                 node_index: _,
                 func,
                 arguments,
@@ -407,7 +407,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             _,
         ) => operand.as_call_expr().is_some_and(
             |ast::ExprCall {
-                 range: _,
+                 range_start: _,
                  node_index: _,
                  func,
                  arguments,

@@ -23,6 +23,32 @@ def f() -> None:
     reveal_type(x)  # revealed: int | str
 ```
 
+## Runtime classes
+
+On Python 3.12, aliases defined by a `type` statement or the `typing.TypeAliasType` constructor are
+instances of the standard-library class, while aliases created with
+`typing_extensions.TypeAliasType` are instances of the distinct backport class.
+
+```py
+from typing import TypeAliasType as StdlibTypeAliasType
+from typing_extensions import TypeAliasType as ExtensionsTypeAliasType
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+type StatementAlias = int
+StdlibAlias = StdlibTypeAliasType("StdlibAlias", int)
+ExtensionsAlias = ExtensionsTypeAliasType("ExtensionsAlias", int)
+
+static_assert(is_subtype_of(TypeOf[StatementAlias], StdlibTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[StatementAlias], ExtensionsTypeAliasType))
+
+static_assert(is_subtype_of(TypeOf[StdlibAlias], StdlibTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[StdlibAlias], ExtensionsTypeAliasType))
+
+static_assert(is_subtype_of(TypeOf[ExtensionsAlias], ExtensionsTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[ExtensionsAlias], StdlibTypeAliasType))
+```
+
 ## Type aliases in `type[...]`
 
 ```py
@@ -203,7 +229,8 @@ def _(flag: bool):
 
 ```py
 type ListOrSet[T] = list[T] | set[T]
-reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+# revealed: tuple[typing.TypeVar | typing_extensions.TypeVar | typing.ParamSpec | typing_extensions.ParamSpec | typing.TypeVarTuple | typing_extensions.TypeVarTuple, ...]
+reveal_type(ListOrSet.__type_params__)
 type Tuple1[T] = tuple[T]
 
 def _(cond: bool):

@@ -11,6 +11,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::package::PackageRoot;
+use crate::rules::pylint::helpers::is_underscore_prefixed_public_member;
 
 /// ## What it does
 /// Checks for import statements that import a private name (a name starting
@@ -121,6 +122,10 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         else {
             continue;
         };
+
+        if is_underscore_prefixed_public_member(import_info.qualified_name) {
+            continue;
+        }
 
         // Ignore private imports used exclusively for typing.
         if !binding.references.is_empty()

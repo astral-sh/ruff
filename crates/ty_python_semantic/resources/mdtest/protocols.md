@@ -776,12 +776,12 @@ static_assert(is_assignable_to(Qux, HasXWithDefault))
 class HasClassVarX(Protocol):
     x: ClassVar[int]
 
-static_assert(is_subtype_of(FooWithZero, HasClassVarX))
-static_assert(is_assignable_to(FooWithZero, HasClassVarX))
+static_assert(not is_subtype_of(FooWithZero, HasClassVarX))
+static_assert(not is_assignable_to(FooWithZero, HasClassVarX))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(Foo, HasClassVarX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Foo, HasClassVarX))  # error: [static-assert-error]
+# An instance declaration does not become a class variable without an explicit qualifier.
+static_assert(not is_subtype_of(Foo, HasClassVarX))
+static_assert(not is_assignable_to(Foo, HasClassVarX))
 
 static_assert(not is_subtype_of(Qux, HasClassVarX))
 static_assert(not is_assignable_to(Qux, HasClassVarX))
@@ -1046,7 +1046,8 @@ class AnySelf(Protocol):
 ```
 
 Assignments in a comprehension and augmented assignments are also writes to the instance.
-`__getattr__` provides the read side of `+=` below, so that case tests only the write:
+`__getattr__` provides the read side of `+=` below, although the write is not yet recognized as
+establishing an instance attribute:
 
 ```py
 class AssignmentForms(Protocol):
@@ -1057,14 +1058,15 @@ class AssignmentForms(Protocol):
         [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
 
     def augmented_assignment(self) -> None:
+        # error: [unresolved-attribute]
         self.augmented += 1  # snapshot: ambiguous-protocol-member
 ```
 
 ```snapshot
 warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
-   --> src/mdtest_snippet.py:326:9
+   --> src/mdtest_snippet.py:327:9
     |
-326 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+327 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
    --> src/mdtest_snippet.py:318:7
@@ -1242,9 +1244,11 @@ static_assert(not is_assignable_to(HasX, Foo))
 static_assert(not is_subtype_of(HasX, Foo))
 ```
 
-Since `object` defines a `__hash__` method, this means that the standard-library `Hashable` protocol
-is currently understood by ty as being equivalent to `object`, much like `SupportsStr` and
-`UniversalSet` above:
+Although `object` defines a `__hash__` method, its subclasses can disable hashing by replacing that
+method with `None`. The standard-library `Hashable` protocol is therefore not equivalent to
+`object`, unlike `SupportsStr` and `UniversalSet` above. Modeling this distinction violates normal
+subtyping rules and is therefore unsound, but it is widely relied on throughout the Python
+ecosystem:
 
 ```py
 from typing import Hashable, Protocol
@@ -1252,9 +1256,9 @@ from typing import Hashable, Protocol
 class SupportsHash(Protocol):
     def __hash__(self) -> int: ...
 
-static_assert(is_equivalent_to(object, Hashable))
+static_assert(not is_equivalent_to(object, Hashable))
 static_assert(is_assignable_to(object, Hashable))
-static_assert(is_subtype_of(object, Hashable))
+static_assert(not is_subtype_of(object, Hashable))
 
 def check_object_or_hashable(x: object | Hashable):
     reveal_type(x)  # revealed: object
@@ -1266,14 +1270,13 @@ def check_hashable_or_supports_hash(x: Hashable | SupportsHash):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_universal(x: Hashable | UniversalSet):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: UniversalSet
 ```
 
-This means that any type considered assignable to `object` (which is all types) is considered by ty
-to be assignable to `Hashable`. However, ty preserves a non-final nominal type in a union with
-`Hashable` instead of discarding it as redundant. A non-final class can have unhashable subclasses,
-so keeping the corresponding union element retains the annotation's more precise description of
-those subclasses. For example, `list[str]` is unhashable but is a subtype of `Sequence[Hashable]`:
+ty checks whether a type actually provides a callable `__hash__` method instead of assuming all
+subtypes of `object` are hashable. It also preserves a non-final nominal type in a union with
+`Hashable` instead of discarding it as redundant, since a subclass can disable hashing. For example,
+`list[str]` is unhashable but is a subtype of `Sequence[Hashable]`:
 
 ```py
 from collections.abc import Hashable as AbcHashable
@@ -1297,8 +1300,9 @@ static_assert(is_subtype_of(list[Hashable], Sequence[Hashable]))
 static_assert(is_subtype_of(list[str], Sequence[Hashable]))
 ```
 
-The additional union element is still simplified if it is a final class, because instances of the
-class cannot override their inherited hashability:
+The additional union element is still simplified if it is a final hashable class, because instances
+of that class cannot override their inherited hashability. Final classes with `__hash__ = None` must
+remain in the union:
 
 ```py
 from dataclasses import dataclass
@@ -1330,9 +1334,8 @@ class UnhashableDataclass: ...
 def check_hashable_or_final(x: Hashable | C):
     reveal_type(x)  # revealed: Hashable
 
-# TODO: Preserve final classes that are known to be unhashable.
 def check_hashable_or_unhashable_final(x: Hashable | Unhashable):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | Unhashable
 
 def check_hashable_or_eq_only(x: Hashable | EqOnly):
     reveal_type(x)  # revealed: Hashable
@@ -1341,10 +1344,10 @@ def check_hashable_or_eq_only_child(x: Hashable | EqOnlyChild):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_unhashable_dataclass(x: Hashable | UnhashableDataclass):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | UnhashableDataclass
 ```
 
-The special case is currently limited to nominal instance types:
+Type variables and protocols that can contain unhashable values also remain in the union:
 
 ```py
 from typing import TypeVar, TypedDict
@@ -1354,24 +1357,24 @@ T = TypeVar("T")
 class Payload(TypedDict):
     value: int
 
-# TODO: Preserve non-nominal types that can contain unhashable values.
 def check_hashable_or_typevar(x: Hashable | T):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | T@check_hashable_or_typevar
 
+# TODO: Preserve TypedDict types, which are unhashable at runtime.
 def check_hashable_or_typed_dict(x: Hashable | Payload):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_protocol(x: Hashable | HasX):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | HasX
 ```
 
-We do not detect errors in cases like the following, which are flagged by other type checkers:
+A list does not satisfy `Hashable`, even though it inherits from `object`:
 
 ```py
 def needs_something_hashable(x: Hashable):
     hash(x)
 
-needs_something_hashable([])
+needs_something_hashable([])  # error: [invalid-argument-type]
 ```
 
 ## Diagnostics for protocols with invalid attribute members
@@ -1433,6 +1436,148 @@ from typing import Protocol
 
 class C(A, Protocol):
     x = 42  # fine, due to declaration in the base class
+```
+
+## Hashable protocol assignability
+
+An explicitly disabled `__hash__` method makes an object incompatible with the standard-library
+`Hashable` protocol, even though `object` itself defines a valid `__hash__` method.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Hashable
+from typing import ClassVar, Hashable as TypingHashable, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+def accepts_hashable(value: Hashable) -> None: ...
+
+class AnnotationOnly:
+    __hash__: ClassVar[None]
+
+class ExplicitNone:
+    __hash__: ClassVar[None] = None
+
+accepts_hashable(AnnotationOnly())  # error: [invalid-argument-type]
+accepts_hashable(ExplicitNone())  # error: [invalid-argument-type]
+```
+
+Disabling `__hash__` also applies to subclasses, and declaring an unhashable class final does not
+make it hashable.
+
+```py
+class InheritedNone(ExplicitNone): ...
+
+@final
+class FinalExplicitNone:
+    __hash__: ClassVar[None] = None
+
+accepts_hashable(InheritedNone())  # error: [invalid-argument-type]
+accepts_hashable(FinalExplicitNone())  # error: [invalid-argument-type]
+```
+
+The standard-library stubs mark mutable built-in containers as unhashable.
+
+```py
+accepts_hashable([])  # error: [invalid-argument-type]
+accepts_hashable({})  # error: [invalid-argument-type]
+accepts_hashable(set())  # error: [invalid-argument-type]
+```
+
+The `typing` alias imposes the same requirements as `collections.abc.Hashable`.
+
+```py
+def accepts_typing_hashable(value: TypingHashable) -> None: ...
+
+accepts_typing_hashable(ExplicitNone())  # error: [invalid-argument-type]
+accepts_typing_hashable([])  # error: [invalid-argument-type]
+```
+
+Explicitly hashable classes and immutable built-in values remain valid.
+
+```py
+class ExplicitHash:
+    def __hash__(self) -> int:
+        return 1
+
+accepts_hashable(ExplicitHash())
+accepts_hashable(1)
+accepts_hashable("value")
+accepts_hashable(("value",))
+```
+
+Concrete `object()` instances are hashable and commonly used as sentinel values, even though the
+`object` type can also include unhashable subclasses.
+
+```py
+SENTINEL = object()
+
+def accepts_hashable_default(value: Hashable = SENTINEL) -> None: ...
+
+accepts_hashable(object())
+accepts_hashable(SENTINEL)
+```
+
+The same distinction applies to both assignability and subtyping checks.
+
+```py
+static_assert(not is_assignable_to(ExplicitNone, Hashable))
+static_assert(not is_subtype_of(ExplicitNone, Hashable))
+static_assert(not is_assignable_to(list[str], Hashable))
+static_assert(not is_subtype_of(list[str], Hashable))
+```
+
+## User-defined hash protocols
+
+A user-defined protocol that explicitly requires a callable `__hash__` method imposes the same
+requirement as the standard-library `Hashable` protocol.
+
+```py
+from typing import ClassVar, Protocol
+
+class SupportsHash(Protocol):
+    def __hash__(self) -> int: ...
+
+class ExplicitNone:
+    __hash__: ClassVar[None] = None
+
+class ExplicitHash:
+    def __hash__(self) -> int:
+        return 1
+
+def accepts_hashable(value: SupportsHash) -> None: ...
+
+accepts_hashable(ExplicitNone())  # error: [invalid-argument-type]
+accepts_hashable([])  # error: [invalid-argument-type]
+accepts_hashable(ExplicitHash())
+accepts_hashable(object())
+```
+
+## Hashability of dataclasses
+
+Mutable dataclasses disable hashing by default, while frozen dataclasses synthesize a callable
+`__hash__` method.
+
+```py
+from collections.abc import Hashable
+from dataclasses import dataclass
+
+@dataclass
+class Mutable:
+    value: int
+
+@dataclass(frozen=True)
+class Frozen:
+    value: int
+
+def accepts_hashable(value: Hashable) -> None: ...
+
+accepts_hashable(Mutable(1))  # error: [invalid-argument-type]
+accepts_hashable(Frozen(1))
 ```
 
 ## Equivalence of protocols
@@ -1907,14 +2052,16 @@ static_assert(is_assignable_to(UsesMeta, HasX))
 
 If a protocol `ClassVarX` has a `ClassVar` attribute member `x` with type `int`, this indicates that
 the non-callable attribute must be readable with the same type through both an inhabitant of
-`ClassVarX` and the type of that inhabitant:
+`ClassVarX` and the type of that inhabitant. An implementing class must declare the member as a
+`ClassVar`; an instance attribute does not satisfy the requirement merely because it has a default
+value in the class body:
 
 `classvars.py`:
 
 ```py
-from typing import Any, ClassVar, Protocol
-from ty_extensions import static_assert
-from ty_extensions._internal import is_subtype_of, is_assignable_to
+from typing import Any, ClassVar, Protocol, final
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
 
 class ClassVarXProto(Protocol):
     x: ClassVar[int]
@@ -1927,9 +2074,14 @@ def f(obj: ClassVarXProto):
 class InstanceAttrX:
     x: int
 
-# TODO: these should pass
-static_assert(not is_assignable_to(InstanceAttrX, ClassVarXProto))  # error: [static-assert-error]
-static_assert(not is_subtype_of(InstanceAttrX, ClassVarXProto))  # error: [static-assert-error]
+static_assert(not is_assignable_to(InstanceAttrX, ClassVarXProto))
+static_assert(not is_subtype_of(InstanceAttrX, ClassVarXProto))
+
+class InstanceAttrXWithDefault:
+    x: int = 42
+
+static_assert(not is_assignable_to(InstanceAttrXWithDefault, ClassVarXProto))
+static_assert(not is_subtype_of(InstanceAttrXWithDefault, ClassVarXProto))
 
 class PropertyX:
     @property
@@ -1944,6 +2096,14 @@ class ClassVarX:
 
 static_assert(is_assignable_to(ClassVarX, ClassVarXProto))
 static_assert(is_subtype_of(ClassVarX, ClassVarXProto))
+
+class InheritedClassVarX(ClassVarX):
+    x = 1
+
+static_assert(is_assignable_to(InheritedClassVarX, ClassVarXProto))
+static_assert(is_subtype_of(InheritedClassVarX, ClassVarXProto))
+static_assert(is_assignable_to(TypeOf[InheritedClassVarX], type[ClassVarXProto]))
+static_assert(is_subtype_of(TypeOf[InheritedClassVarX], type[ClassVarXProto]))
 
 class XMeta(type):
     def x(cls) -> str:
@@ -1974,6 +2134,51 @@ class NotHashable:
 
 static_assert(is_assignable_to(NotHashable, NotHashableProto))
 static_assert(is_subtype_of(NotHashable, NotHashableProto))
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> "Descriptor":
+        return self
+
+    def __set__(self, instance: object, value: "Descriptor") -> None: ...
+
+class HasClassDescriptor(Protocol):
+    descriptor: ClassVar[Descriptor]
+
+class DescriptorImplementation:
+    descriptor: ClassVar[Descriptor] = Descriptor()
+
+static_assert(is_assignable_to(DescriptorImplementation, HasClassDescriptor))
+static_assert(is_subtype_of(DescriptorImplementation, HasClassDescriptor))
+
+@final
+class FinalInstanceAttrX:
+    x: int = 42
+
+@final
+class FinalClassVarX:
+    x: ClassVar[int] = 42
+
+static_assert(is_disjoint_from(FinalInstanceAttrX, ClassVarXProto))
+static_assert(not is_disjoint_from(InstanceAttrXWithDefault, ClassVarXProto))
+static_assert(not is_disjoint_from(FinalClassVarX, ClassVarXProto))
+
+def impossible(value: Intersection[FinalInstanceAttrX, ClassVarXProto]) -> None:
+    reveal_type(value)  # revealed: Never
+
+implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `InstanceAttrX` is not assignable to `ClassVarXProto`
+   --> src/classvars.py:107:34
+    |
+107 | implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
+    |                 --------------   ^^^^^^^^^^^^^^^ Incompatible value of type `InstanceAttrX`
+    |                 |
+    |                 Declared type
+info: type `InstanceAttrX` is not assignable to protocol `ClassVarXProto`
+info: └── protocol member `x` is incompatible
+info:     └── protocol member `x` is an instance variable on type `InstanceAttrX`, but a class variable is required
 ```
 
 This is mentioned by the
@@ -2291,7 +2496,7 @@ class ReadClass(Protocol[JustT_co]):
     def __class__(self, /) -> type[JustT_co]: ...
 
 def takes_read_class(value: ReadClass[float]) -> None:
-    reveal_type(value)  # revealed: ReadClass[int | float]
+    reveal_type(value)  # revealed: ReadClass[float]
 
 takes_read_class(1)
 takes_read_class(1.0)
@@ -2303,7 +2508,7 @@ class WritableValue(Protocol[JustT]):
     def value(self, value: type[JustT], /) -> None: ...
 
 def takes_writable_value(value: WritableValue[float]) -> None:
-    reveal_type(value)  # revealed: WritableValue[int | float]
+    reveal_type(value)  # revealed: WritableValue[float]
 ```
 
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the
@@ -3808,6 +4013,119 @@ class DateTime(Protocol[T]):
         return datetime.now(tz)  # error: [invalid-return-type]
 ```
 
+## Recursive protocol receiver binding with an incompatible override
+
+An incompatible override of a covariant generic protocol method can recursively compare the
+protocol's explicitly annotated receiver with the implementing class. The receiver-binding and
+assignability queries must converge and report the incompatible override instead of panicking.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Result(Generic[T_co]): ...
+
+class SupportsMethod(Protocol[T_co]):
+    def method(self: "SupportsMethod[T]") -> Result[T]: ...
+
+class Compatible(SupportsMethod[T_co]):
+    def method(self: "Compatible[T]") -> Result[T]:
+        raise NotImplementedError
+
+class Incompatible(SupportsMethod[T_co]):
+    def method(self: "Incompatible[T]", value: int) -> Result[T]:  # error: [invalid-method-override]
+        raise NotImplementedError
+```
+
+## Recursive protocol receiver binding with an overloaded class method
+
+Accessing an overloaded class method on a generic protocol can recursively bind the protocol's
+receiver. The receiver-binding query must converge and preserve both overload signatures.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, overload
+
+class Container[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    @classmethod
+    def from_value[Self, S](cls: type[Self], value: S) -> object: ...
+    @overload
+    @classmethod
+    def from_value[Self, S](cls: type[Self], value: S, flag: bool) -> object: ...
+
+reveal_type(Container.from_value)  # revealed: Overload[[S](value: S) -> object, [S](value: S, flag: bool) -> object]
+```
+
+## Recursive protocol receiver binding with a bounded type variable
+
+A class method can recursively bind a protocol receiver through a type variable with a declared
+upper bound. Its declared bound is metadata, not another part of the receiver constraint.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=object)
+
+class Box(Protocol[T]):
+    value: T
+
+    @classmethod
+    def first(cls: type[S]) -> S:
+        return cls()
+
+    def second(self) -> S: ...
+    @classmethod
+    def last(cls: type[S]) -> object: ...
+
+reveal_type(Box.first())  # revealed: Box[Unknown]
+```
+
+## Recursive protocol receiver binding with a defaulted type variable
+
+A method type variable with a declared default can also appear while recursively binding a protocol
+receiver. Its default is declaration metadata, not a type-variable occurrence in the constraint.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class Box[T](Protocol):
+    value: T
+
+    @classmethod
+    def first[S = int](cls: type[S]) -> S:
+        return cls()
+
+    def second[S = int](self) -> S: ...
+    @classmethod
+    def last[S = int](cls: type[S]) -> object: ...
+
+reveal_type(Box.first())  # revealed: Box[Unknown]
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
@@ -4369,6 +4687,44 @@ static_assert(not is_assignable_to(TypeOf[StringMembership], Container[int]))
 static_assert(not is_assignable_to(TypeOf[NonBooleanMembership], Container[int]))
 ```
 
+## Class objects with bounded type-variable receivers
+
+An iterable class combined with an empty fallback must contribute its member type to generic call
+inference. A classmethod can therefore collect its own instances without losing `Self`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterator
+from typing import Self
+
+class IterableMeta(type):
+    def __iter__[T](self: type[T]) -> Iterator[T]:
+        raise NotImplementedError
+
+class Item(metaclass=IterableMeta):
+    @classmethod
+    def all(cls, enabled: bool) -> frozenset[Self]:
+        items = frozenset(cls if enabled else ())
+        reveal_type(items)  # revealed: frozenset[Self@all]
+        return items
+```
+
+## Generic inference from gradual class objects
+
+`type[Any]` can be assigned to an iterable protocol. A concrete fallback must still contribute its
+element type to generic inference.
+
+```py
+from typing import Any
+
+def collect(cls: type[Any], enabled: bool) -> None:
+    reveal_type(list(cls if enabled else (1,)))  # revealed: list[int]
+```
+
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
 
 The typing spec states that protocols may have `@classmethod` or `@staticmethod` method members.
@@ -4710,6 +5066,53 @@ static_assert(is_subtype_of(MethodPSub, MethodPSuper))
 static_assert(not is_assignable_to(MethodPUnrelated, MethodPSuper))
 static_assert(not is_assignable_to(MethodPSuper, MethodPUnrelated))
 static_assert(not is_assignable_to(MethodPSuper, MethodPSub))
+```
+
+## Object members in protocol-to-protocol comparisons
+
+A protocol inherits ordinary `object` members even when they are not part of its declared interface.
+Those inherited members can satisfy compatible requirements on another protocol.
+
+```py
+from collections.abc import Hashable, Iterator
+from typing import Literal, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class HasValue(Protocol):
+    value: int
+
+class HasValueAndRepr(Protocol):
+    value: int
+
+    def __repr__(self) -> str: ...
+
+static_assert(is_assignable_to(HasValue, HasValueAndRepr))
+static_assert(is_subtype_of(HasValue, HasValueAndRepr))
+```
+
+An inherited method must still have a compatible signature.
+
+```py
+class HasValueAndPreciseRepr(Protocol):
+    value: int
+
+    def __repr__(self) -> Literal["precise"]: ...
+
+static_assert(not is_assignable_to(HasValue, HasValueAndPreciseRepr))
+```
+
+Unlike other inherited `object` methods, `__hash__` can be disabled by a subclass. Protocols must
+explicitly require a callable `__hash__` before they can satisfy a hashability requirement.
+
+```py
+class HasValueAndHash(Protocol):
+    value: int
+
+    def __hash__(self) -> int: ...
+
+static_assert(not is_assignable_to(HasValue, HasValueAndHash))
+static_assert(not is_assignable_to(Iterator[int], Hashable))
 ```
 
 ## Subtyping between protocols with method members and protocols with non-method members
@@ -5898,6 +6301,15 @@ def check(value: Left[int]) -> None:
     expect_right1(value)  # error: [invalid-argument-type]
     # This should be an error
     expect_right2(value)  # error: [invalid-argument-type]
+```
+
+Generic-call inference must also avoid expanding recursive protocol members when checking whether
+its argument constraints are independent:
+
+```py
+def accept[U, V](outer: U, recursive: V) -> None: ...
+def infer[T](outer: T, recursive: C[int]) -> None:
+    accept(outer, recursive)
 ```
 
 ### Recursive legacy generic protocol

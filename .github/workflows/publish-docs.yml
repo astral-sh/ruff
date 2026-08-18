@@ -20,6 +20,10 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
+
 jobs:
   mkdocs:
     environment:
@@ -65,7 +69,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - name: "Install dependencies"
         run: pip install -r docs/requirements.txt

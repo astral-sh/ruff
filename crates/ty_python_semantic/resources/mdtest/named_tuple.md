@@ -132,6 +132,33 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Fields declared in stubs
+
+An annotation-only field in a stub remains a required constructor argument. An explicit ellipsis
+assignment represents a default and makes its field optional.
+
+`records.pyi`:
+
+```pyi
+from typing import NamedTuple
+
+class Record(NamedTuple):
+    required: int
+    optional: str = ...
+```
+
+The generated constructor requires the first field but permits omitting the second:
+
+```py
+from records import Record
+
+reveal_type(Record.__new__)  # revealed: [Self](_cls: type[Self], required: int, optional: str = ...) -> Self
+
+Record(1)
+Record(1, "value")
+Record()  # error: [missing-argument]
+```
+
 ### Name mismatch diagnostics
 
 <!-- snapshot-diagnostics -->
@@ -211,7 +238,7 @@ class Point(NamedTuple("Point", [("x", int), ("y", int)])):
 p = Point(3, 4)
 reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
-reveal_type(p.magnitude())  # revealed: int | float
+reveal_type(p.magnitude())  # revealed: float
 ```
 
 String annotations in dangling calls work correctly for forward references to classes defined in the
@@ -1197,11 +1224,11 @@ class Property[T](NamedTuple):
     name: str
     value: T
 
-reveal_type(Property("height", 3.4))  # revealed: Property[float]
+reveal_type(Property("height", 3.4))  # revealed: Property[float*]
 reveal_type(Property.value)  # revealed: property
 reveal_type(Property.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(Property[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(Property("height", 3.4).value)  # revealed: float
+reveal_type(Property("height", 3.4).value)  # revealed: float*
 
 T = TypeVar("T")
 
@@ -1213,7 +1240,7 @@ reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
 reveal_type(LegacyProperty.value)  # revealed: property
 reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
+reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
 ```
 
 ### Functional syntax with generics
@@ -2030,5 +2057,5 @@ class GenericChild(GenericBase[T]):
         reveal_type(instance)  # revealed: Self@__new__
         return instance
 
-reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]
+reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[float]
 ```

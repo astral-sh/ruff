@@ -624,10 +624,9 @@ fn handle_own_line_comment_between_branches<'a>(
         //     pass
         // ```
         || {
-            comment_indentation
-            // This can be any positive number - we just
-            // want to hit the `Less` branch below
-            + TextSize::new(1)
+            // We could use any positive number here, it doesn't have to be `1`
+            // - we just want to hit the `Less` branch below
+            comment_indentation + TextSize::new(1)
         },
         ruff_text_size::TextLen::text_len,
     );

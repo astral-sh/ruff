@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::ProgramEnvironment;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
@@ -6,7 +8,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
     KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, TypedDictModule, todo_type,
+    TypeMapping, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -35,7 +37,7 @@ pub enum ClassBase<'db> {
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
     Generic,
-    TypedDict(TypedDictModule),
+    TypedDict(TypingModule),
 }
 
 impl<'db> ClassBase<'db> {
@@ -89,7 +91,7 @@ impl<'db> ClassBase<'db> {
         self.typed_dict_module().is_some()
     }
 
-    pub(super) const fn typed_dict_module(self) -> Option<TypedDictModule> {
+    pub(super) const fn typed_dict_module(self) -> Option<TypingModule> {
         match self {
             ClassBase::TypedDict(module) => Some(module),
             _ => None,
@@ -102,7 +104,7 @@ impl<'db> ClassBase<'db> {
     /// pseudo-base when detecting duplicate or conflicting bases.
     pub(super) const fn mro_identity(self) -> Self {
         match self {
-            Self::TypedDict(_) => Self::TypedDict(TypedDictModule::Typing),
+            Self::TypedDict(_) => Self::TypedDict(TypingModule::Typing),
             _ => self,
         }
     }
@@ -162,7 +164,7 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::Union(union) => {
-                if let Some(module) = TypedDictModule::from_type(db, ty) {
+                if let Some(module) = TypingModule::from_typed_dict_type(db, ty) {
                     return Some(ClassBase::TypedDict(module));
                 }
 
@@ -227,6 +229,10 @@ impl<'db> ClassBase<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
+                // A class inheriting from a newtype would make intuitive sense, but newtype
+                // wrappers are just identity callables at runtime, so this sort of inheritance
+                // doesn't work and isn't allowed.
+                KnownInstanceType::NewType(_) => None,
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
@@ -242,28 +248,19 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::Sentinel(_)
                 | KnownInstanceType::Range { .. }
-                // A class inheriting from a newtype would make intuitive sense, but newtype
-                // wrappers are just identity callables at runtime, so this sort of inheritance
-                // doesn't work and isn't allowed.
-                | KnownInstanceType::NewType(_)
                 | KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::FunctoolsPartialCall(_) => None,
-                KnownInstanceType::TypeGenericAlias(_) => {
-                    Self::try_from_type(
-                        db, env,
-                        KnownClass::Type.to_class_literal(db, env),
-                        subclass,
-                    )
-                }
-                KnownInstanceType::Annotated(ty) => {
-                    match ty.inner(db) {
-                        Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-                        Type::NominalInstance(instance) => {
-                            Some(Self::Class(instance.class(db, env)))
-                        }
-                        _ => None,
-                    }
-                }
+                KnownInstanceType::TypeGenericAlias(_) => Self::try_from_type(
+                    db,
+                    env,
+                    KnownClass::Type.to_class_literal(db, env),
+                    subclass,
+                ),
+                KnownInstanceType::Annotated(ty) => match ty.inner(db) {
+                    Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+                    Type::NominalInstance(instance) => Some(Self::Class(instance.class(db, env))),
+                    _ => None,
+                },
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -311,7 +308,7 @@ impl<'db> ClassBase<'db> {
                             db,
                             env,
                             fields.values().map(|field| field.declared_ty),
-                        )?
+                        )
                         .to_class_type(db)
                         .into(),
                         subclass,
@@ -495,37 +492,18 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
         display_settings: DisplaySettings<'db>,
-    ) -> impl std::fmt::Display + 'env {
-        struct ClassBaseDisplay<'env, 'db> {
-            db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
-            base: ClassBase<'db>,
-            settings: DisplaySettings<'db>,
-        }
-
-        impl std::fmt::Display for ClassBaseDisplay<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                match self.base {
-                    ClassBase::Any => f.write_str("Any"),
-                    ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Divergent(_) => f.write_str("Divergent"),
-                    ClassBase::Class(class) => Type::from(class)
-                        .display_with(db, self.env, self.settings.clone())
-                        .fmt(f),
-                    ClassBase::Protocol => f.write_str("typing.Protocol"),
-                    ClassBase::Generic => f.write_str("typing.Generic"),
-                    ClassBase::TypedDict(_) => f.write_str("typing.TypedDict"),
-                }
-            }
-        }
-
-        ClassBaseDisplay {
-            db,
-            env,
-            base: self,
-            settings: display_settings,
-        }
+    ) -> impl Display + 'env {
+        std::fmt::from_fn(move |f| match self {
+            ClassBase::Any => f.write_str("Any"),
+            ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
+            ClassBase::Divergent(_) => f.write_str("Divergent"),
+            ClassBase::Class(class) => Type::from(class)
+                .display_with(db, env, display_settings.clone())
+                .fmt(f),
+            ClassBase::Protocol => f.write_str("typing.Protocol"),
+            ClassBase::Generic => f.write_str("typing.Generic"),
+            ClassBase::TypedDict(_) => f.write_str("typing.TypedDict"),
+        })
     }
 }
 

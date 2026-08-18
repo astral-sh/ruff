@@ -3,7 +3,6 @@ use std::fmt;
 use std::fmt::Display;
 use std::hash::{DefaultHasher, Hash, Hasher as _};
 use std::panic::RefUnwindSafe;
-use std::process::Output;
 use std::sync::Arc;
 
 use crate::Db;
@@ -14,7 +13,7 @@ use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    CommandExecutor, DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
     SystemVirtualPath, SystemVirtualPathBuf, WhichResult, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
@@ -182,16 +181,6 @@ impl System for LSPSystem {
         self.native_system.is_same_file(first, second)
     }
 
-    fn run_command(
-        &self,
-        program: &str,
-        args: &[&str],
-        current_directory: &SystemPath,
-    ) -> Result<Output> {
-        self.native_system
-            .run_command(program, args, current_directory)
-    }
-
     fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
         let document = self.system_path_to_document(path)?;
         Self::source_type_from_document(document, path.extension())
@@ -288,6 +277,10 @@ impl System for LSPSystem {
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
         self.native_system.env_var(name)
+    }
+
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        self.native_system.command_executor()
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {

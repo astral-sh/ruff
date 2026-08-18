@@ -1,5 +1,5 @@
 use crate::glob::IncludeExcludeFilter;
-use crate::metadata::script::script_metadata;
+use crate::script::script_metadata;
 use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};

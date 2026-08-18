@@ -9,12 +9,12 @@
 # # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
 # # revision and project Python version, as shown in the module docstring.
 # # `exclude-newer` still constrains mypy-primer's registry dependencies.
-# exclude-newer = "7 days"
+# exclude-newer = "P7D"
 #
 # [tool.uv.sources]
 # # Keep this revision and the script's lockfile in sync with ecosystem-analyzer's
 # # mypy-primer pin so memory reports and ecosystem jobs use the same project definitions.
-# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer", rev = "6d6eebd8d37c9b8931381e79aa99808d9378c988" }
+# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer", rev = "db37f8a384c45c02fc52544fd819f979d66e174a" }
 # ///
 
 """Clone a mypy-primer project and set up a virtualenv with its dependencies installed.
@@ -93,12 +93,20 @@ def main() -> None:
         "--exclude-newer",
         help="Limit dependency resolution to packages uploaded before this timestamp",
     )
+    parser.add_argument(
+        "--print-ty-command",
+        action="store_true",
+        help="Print the project-specific ty command without setting up the project",
+    )
     args = parser.parse_args()
 
     project = find_project(args.project)
     revision = args.revision or project.revision
 
     target_dir = Path(args.directory or project.name).resolve()
+    if args.print_ty_command:
+        print(get_ty_command(project, ty_binary="{ty}", venv_dir=target_dir / ".venv"))
+        return
 
     # Use a full clone only when a historical ecosystem report revision must be checked out.
     clone_cmd = [

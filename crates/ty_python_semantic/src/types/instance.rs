@@ -99,11 +99,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
-        let Some(tuple) = tuple else {
-            return Type::Never;
-        };
-        Type::tuple_instance(tuple)
+    pub(crate) fn tuple(tuple: TupleType<'db>) -> Self {
+        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
     pub fn homogeneous_tuple(
@@ -111,7 +108,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         element: Type<'db>,
     ) -> Self {
-        Type::tuple_instance(TupleType::homogeneous(db, env, element))
+        Type::tuple(TupleType::homogeneous(db, env, element))
     }
 
     pub(crate) fn heterogeneous_tuple<I, T>(
@@ -131,12 +128,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn empty_tuple(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
-        Type::tuple_instance(TupleType::empty(db, env))
-    }
-
-    /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
-    fn tuple_instance(tuple: TupleType<'db>) -> Self {
-        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
+        Type::tuple(TupleType::empty(db, env))
     }
 
     pub(crate) const fn sys_version_info() -> Self {
@@ -1074,6 +1066,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     } else {
         match protocol.inner {
             Protocol::FromClass(_) | Protocol::Materialized(_) => {
+                visitor.notify_skipped_lazy_type_attributes();
                 if let Some((_, Some(specialization))) = protocol
                     .class_origin(db)
                     .and_then(|class| class.static_class_literal(db))
@@ -1279,7 +1272,16 @@ impl<'db> ProtocolInstanceType<'db> {
             protocol: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
-            let env = ProgramEnvironment::from_program(protocol.interface(db).base().program(db));
+            let interface = protocol.interface(db);
+
+            // Hashability is not preserved by inheritance: subclasses can replace
+            // `object.__hash__` with `None`. A protocol that explicitly requires `__hash__`
+            // therefore does not describe every object, despite `object` defining that method.
+            if interface.includes_member(db, "__hash__") {
+                return false;
+            }
+
+            let env = ProgramEnvironment::from_program(interface.base().program(db));
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);

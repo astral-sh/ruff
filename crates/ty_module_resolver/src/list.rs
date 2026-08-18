@@ -626,6 +626,20 @@ mod tests {
     }
 
     #[test]
+    fn ty_extensions_vendored() {
+        let TestCase { db, .. } = TestCaseBuilder::new().with_vendored_typeshed().build();
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |module| module.name(&db).as_str() == "ty_extensions"),
+            @r#"
+        [
+            Module::File("ty_extensions", "std-vendored", "stdlib/ty_extensions/__init__.pyi", Package, Some(TyExtensions)),
+        ]
+        "#,
+        );
+    }
+
+    #[test]
     fn builtins_custom() {
         const TYPESHED: MockedTypeshed = MockedTypeshed {
             stdlib_files: &[("builtins.pyi", "def min(a, b): ...")],

@@ -280,13 +280,16 @@ impl<'a> FileNoqaDirectives<'a> {
 
                         for warning in warnings {
                             warn!(
-                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                                "Missing or joined rule code(s) at {path_display}:{line}: \
+                                {warning}"
                             );
                         }
 
                         if no_indentation_at_offset {
                             warn!(
-                                "Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix."
+                                "Unexpected `# ruff: noqa` directive at {path_display}:{line}. \
+                                File-level suppression comments must appear on their own line. \
+                                For line-level suppression, omit the `ruff:` prefix."
                             );
                             continue;
                         }
@@ -748,14 +751,18 @@ pub(crate) enum LexicalError {
 impl Display for LexicalError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LexicalError::MissingCodes => fmt.write_str("expected a comma-separated list of codes (e.g., `# noqa: F401, F841`)."),
-            LexicalError::InvalidSuffix => {
-                fmt.write_str("expected `:` followed by a comma-separated list of codes (e.g., `# noqa: F401, F841`).")
-            }
-            LexicalError::InvalidCodeSuffix => {
-                fmt.write_str("expected code to consist of uppercase letters followed by digits only (e.g. `F401`)")
-            }
-
+            LexicalError::MissingCodes => fmt.write_str(
+                "expected a comma-separated list of codes \
+                (e.g., `# noqa: F401, F841`).",
+            ),
+            LexicalError::InvalidSuffix => fmt.write_str(
+                "expected `:` followed by a comma-separated list of codes \
+                (e.g., `# noqa: F401, F841`).",
+            ),
+            LexicalError::InvalidCodeSuffix => fmt.write_str(
+                "expected code to consist of uppercase letters followed by digits only \
+                (e.g. `F401`)",
+            ),
         }
     }
 }
@@ -1216,7 +1223,8 @@ impl<'a> NoqaDirectives<'a> {
                         let path_display = relativize_path(path);
                         for warning in warnings {
                             warn!(
-                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                                "Missing or joined rule code(s) \
+                                at {path_display}:{line}: {warning}"
                             );
                         }
                     }
@@ -1464,7 +1472,8 @@ mod tests {
         if second_count > 0 {
             writeln!(
                 output,
-                "## Additional suppressions added on a second pass: {second_count}\n\n```py\n{fixed}\n```\n"
+                "## Additional suppressions added on a second pass: \
+                {second_count}\n\n```py\n{fixed}\n```\n"
             )?;
         }
 

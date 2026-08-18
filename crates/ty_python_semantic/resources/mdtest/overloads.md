@@ -274,7 +274,7 @@ def union_receiver(reader: Reader[int | str]):
 
 ## Method type variables inferred from `self`
 
-Binding an overload whose explicit receiver introduces a method type variable should infer that
+Binding a method whose explicit receiver introduces a method type variable should infer that
 variable from the concrete receiver and apply it to the remainder of the signature.
 
 ```toml
@@ -295,6 +295,9 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
+    def single[S, U](self: "ReceiverGeneric[S]", value: U) -> tuple[S, U]:
+        return self.value, value
+
 reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
 
 def takes_callable(fn: Callable[..., Any]) -> None: ...
@@ -302,6 +305,60 @@ def use_generic_receiver[T](value: ReceiverGeneric[T]) -> None:
     # revealed: Overload[(value: T@use_generic_receiver) -> T@use_generic_receiver, (value: bytes) -> bytes]
     reveal_type(value.method)
     takes_callable(value.method)
+```
+
+Non-overloaded methods should also specialize receiver-determined type variables while preserving
+other type variables for argument inference.
+
+```py
+# revealed: bound method ReceiverGeneric[str].single[U](value: U) -> tuple[str, U]
+reveal_type(ReceiverGeneric[str]().single)
+reveal_type(ReceiverGeneric[str]().single(1))  # revealed: tuple[str, Literal[1]]
+```
+
+Type aliases in the receiver, return type, or another parameter must not conceal a method type
+variable determined by the receiver.
+
+```py
+type ReceiverAlias[T] = ReceiverGeneric[T]
+type ValueAlias[T] = T
+
+class AliasedReceiver[T](ReceiverGeneric[T]):
+    def aliased_return[S](self: ReceiverAlias[S]) -> tuple[ValueAlias[S]]:
+        return (self.value,)
+
+    def aliased_argument[S](self: ReceiverGeneric[S], value: ValueAlias[S]) -> None: ...
+
+value = AliasedReceiver[str]()
+
+# revealed: bound method AliasedReceiver[str].aliased_return() -> tuple[ValueAlias[str]]
+reveal_type(value.aliased_return)
+
+# revealed: bound method AliasedReceiver[str].aliased_argument(value: ValueAlias[str]) -> None
+reveal_type(value.aliased_argument)
+# error: [invalid-argument-type] "Expected `ValueAlias[str]`, found `Literal[1]`"
+value.aliased_argument(1)
+```
+
+## Method type variables used only in the receiver
+
+A method type variable that appears only in the receiver does not affect argument inference or the
+return type, so binding the method does not need to specialize it.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Factory:
+    @classmethod
+    def describe[Receiver](cls: type[Receiver], value: int) -> str:
+        return str(value)
+
+# revealed: bound method <class 'Factory'>.describe[Receiver](value: int) -> str
+reveal_type(Factory.describe)
+reveal_type(Factory.describe(1))  # revealed: str
 ```
 
 ## Constrained method type variables inferred from `self`
