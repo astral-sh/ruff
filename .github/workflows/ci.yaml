@@ -1043,11 +1043,11 @@ jobs:
       - name: Run ruff-lsp tests
         run: |
           # Setup development binary
-          export PATH="${PWD}/target/debug:${PATH}"
+          export PATH="${PWD}/target/debug:${PWD}/.venv/bin:${PATH}"
           ruff version
 
           cd ruff-lsp
-          uv run --project .. --locked --only-group ruff-lsp-test --python 3.12 pytest
+          pytest
 
   check-playground:
     name: "check playground"
