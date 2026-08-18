@@ -27,11 +27,8 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    environment: release-playground
-    env:
-      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,6 +56,48 @@ jobs:
           test -f ty/dist/assets/pyodide-lock.json
           test -f ty/dist/assets/python_stdlib.zip
         working-directory: playground
+      - name: "Upload ty playground"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-playground-dist
+          path: playground/ty/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release-playground
+    env:
+      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: "Download ty playground"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ty-playground-dist
+          path: playground/ty/dist
+          digest-mismatch: error
+      - name: "Verify static playground assets"
+        run: |
+          test -f playground/ty/dist/index.html
+          test -f playground/ty/dist/assets/pyodide.asm.mjs
+          test -f playground/ty/dist/assets/pyodide.asm.wasm
+          test -f playground/ty/dist/assets/pyodide-lock.json
+          test -f playground/ty/dist/assets/python_stdlib.zip
+          # Pages treats these paths as server-side code, not static assets.
+          test ! -e playground/ty/dist/_worker.js
+          test ! -e functions
+          if [[ -n "$(find playground/ty/dist ! -type f ! -type d -print -quit)" ]]; then
+            echo "Playground artifacts must contain only regular files and directories"
+            exit 1
+          fi
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
