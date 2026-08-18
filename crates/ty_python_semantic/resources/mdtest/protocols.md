@@ -4432,8 +4432,8 @@ reveal_type(get_value(values))  # revealed: int
 
 ## Generic protocol inference through type aliases
 
-An alias for an instance type must not hide the members that determine a protocol's type arguments.
-Inference should preserve those arguments and check their bounds.
+An alias for an instance type does not obscure the members that determine a protocol's type arguments.
+Inference sees through these aliases and checks the bounds of these arguments.
 
 ```toml
 [environment]
