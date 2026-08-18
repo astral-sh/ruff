@@ -310,6 +310,9 @@ impl ScriptEnvironments {
     ///
     /// Returns the files whose environments were updated so callers can recheck them.
     pub fn poll_sync(&self, db: &mut dyn Db) -> Vec<File> {
+        // Updating a Salsa input waits for outstanding snapshots to be dropped. Cancel
+        // them before taking an entry lock, which their queries may need to finish.
+        db.trigger_cancellation();
         let mut changed_files = Vec::new();
 
         while let Ok(result) = self.inner.sync_results.try_recv() {
@@ -854,7 +857,8 @@ mod tests {
     #[cfg(feature = "test-uv")]
     mod uv {
         use std::process::Command;
-        use std::time::Duration;
+        use std::thread;
+        use std::time::{Duration, Instant};
 
         use anyhow::Context;
         use ruff_db::files::{File, system_path_to_file};
@@ -862,6 +866,7 @@ mod tests {
             DbWithTestSystem, DbWithWritableSystem, OsSystem, System as _, SystemPath,
             SystemPathBuf,
         };
+        use salsa::Database as _;
         use ty_static::EnvVars;
 
         use super::super::{ScriptEnvironmentAvailability, script_environment};
@@ -962,6 +967,48 @@ mod tests {
             assert_eq!(changed, vec![case.file]);
             case.assert_can_import("attrs")?;
 
+            Ok(())
+        }
+
+        #[test]
+        fn background_result_cancels_snapshots_before_locking_entry() -> anyhow::Result<()> {
+            let mut case = UvTestCase::new("# /// script\n# dependencies = []\n# ///\n")?;
+            let environments = case.db.script_environments().clone();
+            environments.request_sync(
+                &mut case.db,
+                case.file,
+                ScriptEnvironmentAvailability::Pending,
+                &|_, _| None,
+            );
+            environments
+                .sync_wakeups()
+                .recv_timeout(Duration::from_secs(30))
+                .context("script synchronization did not finish")?;
+
+            let entry = environments
+                .existing_entry(case.file)
+                .context("expected a script environment entry")?;
+            let snapshot = case.db.clone();
+            let reader = thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                while salsa::Cancelled::catch(|| snapshot.unwind_if_revision_cancelled()).is_ok() {
+                    assert!(Instant::now() < deadline, "snapshot was not cancelled");
+                    thread::sleep(Duration::from_millis(1));
+                }
+
+                // A cancelled query may need this lock before it can drop its snapshot. Use a
+                // timeout so a regression fails instead of deadlocking the test itself.
+                assert!(
+                    entry.state.try_lock_for(Duration::from_secs(1)).is_some(),
+                    "the entry lock was held while waiting for a cancelled snapshot"
+                );
+                drop(snapshot);
+            });
+
+            assert_eq!(environments.poll_sync(&mut case.db), vec![case.file]);
+            reader
+                .join()
+                .map_err(|_| anyhow::anyhow!("reader panicked"))?;
             Ok(())
         }
 
