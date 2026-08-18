@@ -1728,12 +1728,8 @@ impl<'db> Bindings<'db> {
                                 Some(property @ Type::NominalInstance(_)),
                                 Some(instance),
                                 ..,
-                            ] => {
-                                overload.set_return_type(if instance.is_none(db) {
-                                    *property
-                                } else {
-                                    Type::any()
-                                });
+                            ] if instance.is_none(db) => {
+                                overload.set_return_type(*property);
                             }
                             _ => {}
                         }

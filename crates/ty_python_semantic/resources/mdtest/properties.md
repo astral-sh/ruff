@@ -237,7 +237,7 @@ class C:
     value = descriptor
 
 reveal_type(C.value)  # revealed: CustomProperty
-reveal_type(C().value)  # revealed: Any
+reveal_type(C().value)  # revealed: Unknown
 ```
 
 ## Property subclass truthiness
@@ -569,7 +569,7 @@ class C:
     attr: property = property(attr_getter)
 
 c = C()
-reveal_type(c.attr)  # revealed: Any
+reveal_type(c.attr)  # revealed: Unknown
 ```
 
 ### Attempting to write to a read-only manually constructed property
