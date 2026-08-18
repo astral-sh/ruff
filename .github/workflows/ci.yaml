@@ -1032,19 +1032,12 @@ jobs:
           repository: "astral-sh/ruff-lsp"
           path: ruff-lsp
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          # installation fails on 3.13 and newer
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
       - name: Install ruff-lsp dependencies
-        run: |
-          cd ruff-lsp
-          uv venv
-          uv pip install --no-deps -r requirements.txt
-          uv pip install --no-deps -r requirements-dev.txt
+        run: uv sync --locked --only-group ruff-lsp-test --python 3.12
 
       - name: Run ruff-lsp tests
         run: |
@@ -1053,8 +1046,7 @@ jobs:
           ruff version
 
           cd ruff-lsp
-          uv pip uninstall ruff
-          uv run --no-sync pytest
+          uv run --project .. --locked --only-group ruff-lsp-test --python 3.12 pytest
 
   check-playground:
     name: "check playground"
