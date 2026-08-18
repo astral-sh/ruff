@@ -184,14 +184,14 @@ crates.io as part of Ruff's releases:
 For a publishable crate, generate its README and verify that the workspace can still be packaged:
 
 ```shell
-uv run --script scripts/generate-crate-readmes.py
+uv run scripts/generate-crate-readmes.py
 cargo publish --workspace --dry-run
 ```
 
 Before merging a publishable crate, ask a crates.io owner to bootstrap it by running:
 
 ```shell
-CARGO_REGISTRY_TOKEN=<token> uv run --no-config --script scripts/setup-crates-io-publish.py
+CARGO_REGISTRY_TOKEN=<token> uv run --no-config scripts/setup-crates-io-publish.py
 ```
 
 The bootstrap script reserves the crate name, configures the release workflow as its trusted
@@ -468,7 +468,7 @@ To preview any changes to the documentation locally:
 1. Generate the MkDocs site with:
 
     ```shell
-    uv run --script scripts/generate_mkdocs.py
+    uv run scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
@@ -560,7 +560,7 @@ Commit each step of this process separately for easier review.
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
-    1. Run `uv run --script scripts/update_schemastore.py --proto <https|ssh>`
+    1. Run `uv run scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
 1. Update the [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repository by following

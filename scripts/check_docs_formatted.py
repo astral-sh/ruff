@@ -295,20 +295,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Check code snippets in docs are formatted by Ruff.",
     )
     parser.add_argument("--skip-errors", action="store_true")
-    parser.add_argument("--generate-docs", action="store_true")
     args = parser.parse_args(argv)
-
-    if args.generate_docs:
-        subprocess.run(
-            [
-                "uv",
-                "run",
-                "--locked",
-                "--script",
-                Path(__file__).with_name("generate_mkdocs.py"),
-            ],
-            check=True,
-        )
 
     # Get static docs
     static_docs = [Path("docs") / f for f in os.listdir("docs") if f.endswith(".md")]

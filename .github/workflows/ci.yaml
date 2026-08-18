@@ -966,11 +966,11 @@ jobs:
           python-version: 3.13
           version: "0.12.3"
       - name: "Update README File"
-        run: uv run --script scripts/transform_readme.py --target mkdocs
+        run: uv run scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
-        run: uv run --script scripts/395kdocs.py
+        run: uv run scripts/395kdocs.py
       - name: "Check docs formatting"
-        run: uv run --script scripts/check_docs_formatted.py
+        run: uv run scripts/check_docs_formatted.py
       - name: "Build docs"
         run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
 

@@ -73,8 +73,8 @@ jobs:
 
       - name: "Copy README File"
         run: |
-          uv run --script scripts/transform_readme.py --target mkdocs
-          uv run --script scripts/generate_mkdocs.py
+          uv run scripts/transform_readme.py --target mkdocs
+          uv run scripts/generate_mkdocs.py
 
       - name: "Build docs"
         run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
