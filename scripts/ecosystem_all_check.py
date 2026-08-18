@@ -9,7 +9,7 @@
 """This is @konstin's scripts for checking an entire checkout of ~2.1k packages for
 panics, fix errors and similar problems.
 
-It's a less elaborate, more hacky version of check_ecosystem.py
+It's a less elaborate, more hacky ecosystem checker.
 """
 
 from __future__ import annotations
