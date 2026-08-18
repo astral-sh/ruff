@@ -62,6 +62,17 @@ dev = [
 release = [
     "rooster==0.1.1",
 ]
+docs = [
+    "mdformat==1.0.0",
+    "mdformat-mkdocs==5.3.0",
+    "mkdocs==1.6.1",
+    "mkdocs-github-admonitions-plugin",
+    "mkdocs-llmstxt==0.2.0",
+    "mkdocs-material==9.7.7",
+    "mkdocs-redirects==1.2.3",
+    "pyyaml==6.0.3",
+    "ruff==0.16.2",
+]
 
 [tool.uv]
 exclude-newer = "P7D"
@@ -69,6 +80,11 @@ exclude-newer = "P7D"
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
 release = { requires-python = ">=3.12" }
+docs = { requires-python = ">=3.12" }
+
+[tool.uv.sources]
+ruff = { workspace = true }
+mkdocs-github-admonitions-plugin = { git = "https://github.com/PGijsbers/admonitions.git" }
 
 [tool.ruff]
 target-version = "py38"

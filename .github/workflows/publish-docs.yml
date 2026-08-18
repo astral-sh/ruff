@@ -35,9 +35,7 @@ jobs:
           ref: ${{ inputs.ref }}
           persist-credentials: true
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: 3.12
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: "Set docs version"
         env:
@@ -80,7 +78,7 @@ jobs:
           python scripts/generate_mkdocs.py
 
       - name: "Build docs"
-        run: mkdocs build --strict -f mkdocs.yml
+        run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
 
       - name: "Clone docs repo"
         run: git clone https://${{ secrets.ASTRAL_DOCS_PAT }}@github.com/astral-sh/docs.git astral-docs

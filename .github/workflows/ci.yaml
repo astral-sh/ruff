@@ -968,8 +968,6 @@ jobs:
           python-version: 3.13
           activate-environment: true
           version: "0.12.3"
-      - name: "Install dependencies"
-        run: uv pip install -r docs/requirements.txt
       - name: "Update README File"
         run: python scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
@@ -977,7 +975,7 @@ jobs:
       - name: "Check docs formatting"
         run: python scripts/check_docs_formatted.py
       - name: "Build docs"
-        run: mkdocs build --strict -f mkdocs.yml
+        run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
 
   check-formatter-instability-and-black-similarity:
     name: "formatter instabilities and black similarity"
