@@ -931,7 +931,9 @@ def class_decorator_raises(decorator) -> None:
 A function decorator is applied after its parameter defaults have been evaluated:
 
 ```py
-def function_decorator_raises(decorator) -> None:
+from typing import Any, Callable
+
+def function_decorator_raises(decorator: Callable[[Any], None]) -> None:
     state = 0
     try:
         @decorator
@@ -945,7 +947,7 @@ def function_decorator_raises(decorator) -> None:
 Decorator application can also raise when the function has no parameter defaults:
 
 ```py
-def function_decorator_without_defaults(decorator) -> None:
+def function_decorator_without_defaults(decorator: Callable[[Any], None]) -> None:
     caught = False
     try:
         @decorator

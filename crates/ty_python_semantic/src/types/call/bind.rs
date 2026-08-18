@@ -4785,13 +4785,22 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         positional: bool,
         variable_argument_length: bool,
     ) {
-        if self.parameter_info[parameter_index].matched {
-            if !parameter.is_variadic() && !parameter.is_keyword_variadic() {
-                self.errors.push(BindingError::ParameterAlreadyAssigned {
-                    argument_index: self.get_argument_index(argument_index),
-                    parameter: ParameterContext::new(parameter, parameter_index, positional),
-                });
-            }
+        if self.parameter_info[parameter_index].matched
+            && !parameter.is_variadic()
+            && !parameter.is_keyword_variadic()
+            // Repeated explicit keywords are already reported as syntax errors.
+            && !matches!(
+                argument,
+                Argument::Keyword(name)
+                    if self.arguments.iter().take(argument_index).any(|(previous, _)| {
+                        matches!(previous, Argument::Keyword(previous_name) if previous_name == name)
+                    })
+            )
+        {
+            self.errors.push(BindingError::ParameterAlreadyAssigned {
+                argument_index: self.get_argument_index(argument_index),
+                parameter: ParameterContext::new(parameter, parameter_index, positional),
+            });
         }
         if variable_argument_length
             && matches!(
@@ -8321,6 +8330,10 @@ impl<'db> CallableDescription<'db> {
         callable_type: Type<'db>,
     ) -> Option<CallableDescription<'db>> {
         Self::new_with_settings(db, callable_type, None)
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
     }
 
     fn new_with_settings(

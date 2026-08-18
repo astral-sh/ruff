@@ -62,6 +62,14 @@ dev = [
 release = [
     "rooster==0.1.1",
 ]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-github-admonitions-plugin>=0.1.1",
+    "mkdocs-llmstxt>=0.2.0",
+    "mkdocs-material>=9.7.7",
+    "mkdocs-redirects>=1.2.3",
+    "pyyaml>=6.0.3",
+]
 
 [tool.uv]
 exclude-newer = "P7D"
@@ -69,6 +77,7 @@ exclude-newer = "P7D"
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
 release = { requires-python = ">=3.12" }
+docs = { requires-python = ">=3.12" }
 
 [tool.ruff]
 target-version = "py38"
@@ -114,6 +123,7 @@ combine-as-imports = true
 [tool.ruff.per-file-target-version]
 "crates/ty_python_semantic/mdtest.py" = "py310"
 "crates/ty_vendored/ty_extensions/*.pyi" = "py312"
+"scripts/*.py" = "py312"
 
 [tool.black]
 force-exclude = '''
