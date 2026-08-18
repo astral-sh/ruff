@@ -158,10 +158,6 @@ For Salsa-cached values, avoid retaining excess collection capacity. Prefer boxe
 
 Salsa caching can occur due to a function/method having `#[salsa::tracked]` on it, or due to a struct with `#[salsa::interned]` being constructed.
 
-## Release Workflow
-
-`.github/workflows/release.yml` is maintained manually. Edit it or its referenced reusable workflows directly. `cargo-dist` still uses `dist-workspace.toml` to plan releases and build artifacts, but configuration changes do not automatically update the workflow. Avoid blindly regenerating the workflow, as doing so can overwrite customizations.
-
 ## Development Guidelines
 
 - All significant changes must be tested. Add or update focused tests for semantic changes when existing coverage does not already establish the intended behavior.
