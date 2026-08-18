@@ -3,6 +3,7 @@ use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::TextRange;
 
+use crate::types::class::functional_generic_context_from_candidates;
 use crate::types::{GenericAlias, GenericClassLiteral};
 use crate::{
     Db,
@@ -504,6 +505,30 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_fields(db)
+    }
+
+    pub(super) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn named_tuple_generic_context_from_candidates<'db>(
+            db: &'db dyn Db,
+            named_tuple: DynamicNamedTupleLiteral<'db>,
+        ) -> Option<GenericContext<'db>> {
+            let DynamicNamedTupleAnchor::TypingDefinition(definition) = named_tuple.anchor(db)
+            else {
+                return None;
+            };
+            functional_generic_context_from_candidates(
+                db,
+                *definition,
+                named_tuple.typevar_candidates(db),
+            )
+        }
+
+        named_tuple_generic_context_from_candidates(db, self)
     }
 }
 

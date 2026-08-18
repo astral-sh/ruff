@@ -11,6 +11,7 @@ use ty_module_resolver::KnownModule;
 use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::class::functional_generic_context_from_candidates;
 use crate::types::class::{
     DynamicClassHeaderAnchor, FunctionalTypeVarCandidate, dynamic_class_header_range,
 };
@@ -990,6 +991,29 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             }
             DynamicTypedDictAnchor::ScopeOffset { schema, .. } => schema,
         }
+    }
+
+    pub(super) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn typed_dict_generic_context_from_candidates<'db>(
+            db: &'db dyn Db,
+            typed_dict: DynamicTypedDictLiteral<'db>,
+        ) -> Option<GenericContext<'db>> {
+            let DynamicTypedDictAnchor::Definition(definition) = typed_dict.anchor(db) else {
+                return None;
+            };
+            functional_generic_context_from_candidates(
+                db,
+                *definition,
+                typed_dict.typevar_candidates(db),
+            )
+        }
+
+        typed_dict_generic_context_from_candidates(db, self)
     }
 
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {

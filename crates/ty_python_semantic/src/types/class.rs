@@ -20,8 +20,9 @@ pub(super) use self::typed_dict::{
 };
 use super::dedicated::pydantic;
 use super::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
-    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, KnownInstanceType, MemberLookupPolicy, MroIterator,
+    SpecialFormType, SubclassOfType, Type, TypeQualifiers, class_base::ClassBase,
+    function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -31,7 +32,7 @@ use crate::types::constraints::{
 };
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
-use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::generics::{GenericContext, Specialization, bind_typevar, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
@@ -64,7 +65,7 @@ use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{ProgramFile, place_table, use_def_map};
+use ty_python_core::{ProgramFile, place_table, semantic_index, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
@@ -378,6 +379,60 @@ impl<'db> CodeGeneratorKind<'db> {
 pub struct FunctionalTypeVarCandidate<'db> {
     pub(super) root_bindings: Box<[Definition<'db>]>,
     pub(super) attributes: Box<[Name]>,
+}
+
+/// Resolve binding separately from the generic-context query so that its dependency on the
+/// file's semantic index does not invalidate a cached context after an unrelated edit.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn bind_functional_typevar<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    typevar: crate::types::typevar::TypeVarInstance<'db>,
+) -> Option<BoundTypeVarInstance<'db>> {
+    let index = semantic_index(db, definition.program_file(db));
+    bind_typevar(
+        db,
+        index,
+        definition.scope(db).file_scope_id(db),
+        Some(definition),
+        typevar,
+    )
+}
+
+pub(super) fn functional_generic_context_from_candidates<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    candidates: &[FunctionalTypeVarCandidate<'db>],
+) -> Option<GenericContext<'db>> {
+    let env = ProgramEnvironment::from_definition(definition);
+    let mut variables = FxOrderSet::default();
+
+    for candidate in candidates {
+        for root_binding in &candidate.root_bindings {
+            let root_ty = infer_definition_types(db, *root_binding).binding_type(*root_binding);
+            let Some(ty) = candidate
+                .attributes
+                .iter()
+                .try_fold(root_ty, |ty, attribute| {
+                    ty.member(db, &env, attribute).ignore_possibly_undefined()
+                })
+            else {
+                continue;
+            };
+
+            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+                && let Some(bound) = bind_functional_typevar(db, definition, typevar)
+            {
+                variables.insert(bound);
+            }
+        }
+    }
+
+    (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(db, &env, variables))
 }
 
 /// A class that can be the origin of a [`GenericAlias`].
@@ -878,7 +933,12 @@ impl<'db> ClassLiteral<'db> {
 
     /// Returns the generic context if this is a generic class.
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.as_static().and_then(|class| class.generic_context(db))
+        match self {
+            Self::Static(class) => class.generic_context(db),
+            Self::DynamicNamedTuple(class) => class.generic_context(db),
+            Self::DynamicTypedDict(class) => class.generic_context(db),
+            Self::Dynamic(_) | Self::DynamicEnum(_) => None,
+        }
     }
 
     /// Returns whether this class is a protocol.
