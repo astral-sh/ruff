@@ -2596,6 +2596,18 @@ def narrowed_class(person: OptionalPerson) -> None:
         reveal_type(person.__class__)  # revealed: <class 'dict[str, object]'>
 ```
 
+Excluding `None` from a type variable's `TypedDict` bound should also identify `dict` as the runtime
+class. This is difficult to represent while preserving the type variable: `type[Person]` describes
+the `TypedDict` schema constructor, not the runtime `dict` class.
+
+```py
+def exclude_none[T: Person | None](value: T) -> None:
+    if value is not None:
+        # TODO: Preserve the runtime class. Intersecting `type[T]` with the exact `dict`
+        # class is not sufficient: specializing `T` to `Person` makes that intersection `Never`.
+        reveal_type(type(value))  # revealed: type[T@exclude_none]
+```
+
 Passing a `TypedDict` to `dict()` copies it into a regular dictionary:
 
 ```py
