@@ -20,7 +20,9 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 use smallvec::smallvec_inline;
-use ty_module_resolver::{ImportingFile, KnownModule, Module, ModuleName, resolve_module};
+use ty_module_resolver::{
+    ImportingFile, KnownModule, Module, ModuleName, file_to_module, resolve_module,
+};
 
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
@@ -1108,7 +1110,92 @@ pub enum PropertyAccessorRole {
     Deleter,
 }
 
-/// Represents an instance of `builtins.property` or `enum.property`.
+/// The nominal class of a precise property. Known classes remain lazy so synthesized properties
+/// do not need to resolve typeshed just to record their class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum PropertyInstanceClass<'db> {
+    Builtin,
+    Enum,
+    Subclass(ClassType<'db>),
+}
+
+impl<'db> PropertyInstanceClass<'db> {
+    fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        match class.known(db) {
+            Some(KnownClass::Property) => Self::Builtin,
+            Some(KnownClass::EnumProperty) => Self::Enum,
+            _ => Self::Subclass(class),
+        }
+    }
+
+    fn to_class_literal(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self {
+            Self::Builtin => KnownClass::Property.to_class_literal(db, env),
+            Self::Enum => KnownClass::EnumProperty.to_class_literal(db, env),
+            Self::Subclass(class) => class.into(),
+        }
+    }
+
+    fn to_instance(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self {
+            Self::Builtin => KnownClass::Property.to_instance(db, env),
+            Self::Enum => KnownClass::EnumProperty.to_instance(db, env),
+            Self::Subclass(class) => Type::instance(db, env, class),
+        }
+    }
+}
+
+/// Identifies the actual implementation, rather than a method with the same name on a subclass.
+fn is_property_method<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    function: FunctionType<'db>,
+) -> bool {
+    let class = match file_to_module(db, function.program_file(db).resolver_file(db))
+        .and_then(|module| module.known(db))
+    {
+        Some(KnownModule::Builtins) => KnownClass::Property,
+        Some(KnownModule::Enum | KnownModule::Types) => KnownClass::EnumProperty,
+        _ => return false,
+    };
+
+    class
+        .try_to_class_literal(db, env)
+        .and_then(|class| {
+            ClassLiteral::Static(class)
+                .class_member(db, env, function.name(db), MemberLookupPolicy::default())
+                .place
+                .ignore_possibly_undefined()
+        })
+        .and_then(Type::as_function_literal)
+        // Comparing literals avoids the cross-module AST dependency of `FunctionType::definition`.
+        .is_some_and(|original| original.literal(db) == function.literal(db))
+}
+
+/// Recognizes inherited property descriptor methods without replacing subclass overrides.
+fn property_wrapper_descriptor<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    name: &str,
+    member: Type<'db>,
+) -> Type<'db> {
+    let wrapper = match name {
+        "__get__" => WrapperDescriptorKind::PropertyDunderGet,
+        "__set__" => WrapperDescriptorKind::PropertyDunderSet,
+        "__delete__" => WrapperDescriptorKind::PropertyDunderDelete,
+        _ => return member,
+    };
+    if member
+        .as_function_literal()
+        .is_some_and(|function| is_property_method(db, env, function))
+    {
+        Type::WrapperDescriptor(wrapper)
+    } else {
+        member
+    }
+}
+
+/// Represents a property with known accessors and the standard descriptor behavior.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
     #[returns(copy)]
@@ -1118,7 +1205,7 @@ pub struct PropertyInstanceType<'db> {
     #[returns(copy)]
     pub deleter: Option<Type<'db>>,
     #[returns(copy)]
-    instance_class: KnownClass,
+    instance_class: PropertyInstanceClass<'db>,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -1126,6 +1213,9 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     property: PropertyInstanceType<'db>,
     visitor: &V,
 ) {
+    if let PropertyInstanceClass::Subclass(class) = property.instance_class(db) {
+        visitor.visit_type(db, class.into());
+    }
     if let Some(getter) = property.getter(db) {
         visitor.visit_type(db, getter);
     }
@@ -1147,16 +1237,23 @@ impl<'db> PropertyInstanceType<'db> {
         setter: Option<Type<'db>>,
         deleter: Option<Type<'db>>,
     ) -> Self {
-        Self::new_internal(db, getter, setter, deleter, KnownClass::Property)
+        Self::new_internal(db, getter, setter, deleter, PropertyInstanceClass::Builtin)
     }
 
-    fn new_enum_property(
+    fn new_with_class(
         db: &'db dyn Db,
+        class: ClassType<'db>,
         getter: Option<Type<'db>>,
         setter: Option<Type<'db>>,
         deleter: Option<Type<'db>>,
     ) -> Self {
-        Self::new_internal(db, getter, setter, deleter, KnownClass::EnumProperty)
+        Self::new_internal(
+            db,
+            getter,
+            setter,
+            deleter,
+            PropertyInstanceClass::from_class(db, class),
+        )
     }
 
     fn with_accessors(
@@ -1220,7 +1317,13 @@ impl<'db> PropertyInstanceType<'db> {
         let deleter = self
             .deleter(db)
             .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-        self.with_accessors(db, getter, setter, deleter)
+        let instance_class = match self.instance_class(db) {
+            PropertyInstanceClass::Subclass(class) => PropertyInstanceClass::Subclass(
+                class.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
+            class => class,
+        };
+        Self::new_internal(db, getter, setter, deleter, instance_class)
     }
 
     fn recursive_type_normalized_impl(
@@ -1254,7 +1357,19 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             None => None,
         };
-        Some(self.with_accessors(db, getter, setter, deleter))
+        let instance_class = match self.instance_class(db) {
+            PropertyInstanceClass::Subclass(class) => PropertyInstanceClass::Subclass(
+                class.recursive_type_normalized_impl(db, env, div, nested)?,
+            ),
+            class => class,
+        };
+        Some(Self::new_internal(
+            db,
+            getter,
+            setter,
+            deleter,
+            instance_class,
+        ))
     }
 
     fn find_legacy_typevars_impl(
@@ -1265,6 +1380,9 @@ impl<'db> PropertyInstanceType<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
+        if let PropertyInstanceClass::Subclass(class) = self.instance_class(db) {
+            class.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+        }
         if let Some(ty) = self.getter(db) {
             ty.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
@@ -3211,7 +3329,11 @@ impl<'db> Type<'db> {
                         .into(),
                     ),
 
-                    _ => Some(class.class_member(db, env, name, policy)),
+                    _ => Some(
+                        class
+                            .class_member(db, env, name, policy)
+                            .map_type(|member| property_wrapper_descriptor(db, env, name, member)),
+                    ),
                 }
             }
 
@@ -3225,9 +3347,11 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            Type::GenericAlias(alias) => {
-                Some(ClassType::from(*alias).class_member(db, env, name, policy))
-            }
+            Type::GenericAlias(alias) => Some(
+                ClassType::from(*alias)
+                    .class_member(db, env, name, policy)
+                    .map_type(|member| property_wrapper_descriptor(db, env, name, member)),
+            ),
 
             Type::SubclassOf(subclass_of_ty) => {
                 subclass_of_ty.find_name_in_mro_with_policy(db, env, name, policy)
@@ -4943,29 +5067,13 @@ impl<'db> Type<'db> {
                     ))
                     .into()
                 }
-                Type::ClassLiteral(class)
-                    if name == "__get__" && class.is_known(db, KnownClass::Property) =>
+                Type::ClassLiteral(_) | Type::GenericAlias(_)
+                    if matches!(name_str, "__get__" | "__set__" | "__delete__")
+                        && let Some(wrapper @ Type::WrapperDescriptor(_)) = this
+                            .find_name_in_mro_with_policy(db, env, name_str, policy)
+                            .and_then(|member| member.place.ignore_possibly_undefined()) =>
                 {
-                    Place::bound(Type::WrapperDescriptor(
-                        WrapperDescriptorKind::PropertyDunderGet,
-                    ))
-                    .into()
-                }
-                Type::ClassLiteral(class)
-                    if name == "__set__" && class.is_known(db, KnownClass::Property) =>
-                {
-                    Place::bound(Type::WrapperDescriptor(
-                        WrapperDescriptorKind::PropertyDunderSet,
-                    ))
-                    .into()
-                }
-                Type::ClassLiteral(class)
-                    if name == "__delete__" && class.is_known(db, KnownClass::Property) =>
-                {
-                    Place::bound(Type::WrapperDescriptor(
-                        WrapperDescriptorKind::PropertyDunderDelete,
-                    ))
-                    .into()
+                    Place::bound(wrapper).into()
                 }
                 Type::BoundMethod(bound_method) => match name_str {
                     "__self__" => Place::bound(bound_method.self_instance(db)).into(),
@@ -9033,13 +9141,16 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::EnumComplement(complement) => complement
                 .to_intersection(db, env)
                 .variance_of(db, env, typevar),
-            Type::PropertyInstance(property_instance_type) => property_instance_type
-                .getter(db)
-                .iter()
-                .chain(&property_instance_type.setter(db))
-                .chain(&property_instance_type.deleter(db))
-                .map(|ty| ty.variance_of(db, env, typevar))
-                .collect(),
+            Type::PropertyInstance(property_instance_type) => [
+                Some(property_instance_type.instance_fallback(db, env)),
+                property_instance_type.getter(db),
+                property_instance_type.setter(db),
+                property_instance_type.deleter(db),
+            ]
+            .into_iter()
+            .flatten()
+            .map(|ty| ty.variance_of(db, env, typevar))
+            .collect(),
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, env, typevar),
             Type::TypeIs(type_is_type) => type_is_type.variance_of(db, env, typevar),
             Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, env, typevar),

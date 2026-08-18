@@ -33,10 +33,10 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType,
-    Protocol, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
-    visitor,
+    KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceClass,
+    PropertyInstanceType, Protocol, SpecialFormType, StringLiteralType, SubclassOfInner,
+    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType,
+    WrapperDescriptorKind, visitor,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -1017,11 +1017,11 @@ struct DisplayRepresentation<'env, 'db> {
     settings: DisplaySettings<'db>,
 }
 
-fn property_display_name(db: &dyn Db, property: PropertyInstanceType<'_>) -> &'static str {
-    if property.instance_class(db) == KnownClass::EnumProperty {
-        "enum.property"
-    } else {
-        "property"
+fn property_display_name<'db>(db: &'db dyn Db, property: PropertyInstanceType<'db>) -> &'db str {
+    match property.instance_class(db) {
+        PropertyInstanceClass::Builtin => "property",
+        PropertyInstanceClass::Enum => "enum.property",
+        PropertyInstanceClass::Subclass(class) => class.name(db),
     }
 }
 
@@ -1129,6 +1129,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     f.write_char('>')
                 }
             },
+            Type::PropertyInstance(property)
+                if let PropertyInstanceClass::Subclass(class) = property.instance_class(db) =>
+            {
+                Type::instance(db, self.env, class)
+                    .display_with(db, self.env, self.settings.clone())
+                    .fmt_detailed(f)
+            }
             Type::PropertyInstance(property) => f
                 .with_type(self.ty)
                 .write_str(property_display_name(db, property)),
@@ -1279,23 +1286,23 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             }
             Type::KnownBoundMethod(method_type) => {
                 f.set_invalid_type_annotation();
-                let (cls, member_name, cls_name, ty, ty_name) = match method_type {
+                let (class_ty, member_name, cls_name, ty, ty_name) = match method_type {
                     KnownBoundMethodType::FunctionTypeDunderGet(function) => (
-                        KnownClass::FunctionType,
+                        KnownClass::FunctionType.to_class_literal(db, self.env),
                         "__get__",
                         "function",
                         Type::FunctionLiteral(function),
                         Some(&**function.name(db)),
                     ),
                     KnownBoundMethodType::FunctionTypeDunderCall(function) => (
-                        KnownClass::FunctionType,
+                        KnownClass::FunctionType.to_class_literal(db, self.env),
                         "__call__",
                         "function",
                         Type::FunctionLiteral(function),
                         Some(&**function.name(db)),
                     ),
                     KnownBoundMethodType::PropertyDunderGet(property) => (
-                        property.instance_class(db),
+                        property.instance_class(db).to_class_literal(db, self.env),
                         "__get__",
                         property_display_name(db, property),
                         Type::PropertyInstance(property),
@@ -1305,7 +1312,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                             .map(|getter| &**getter.name(db)),
                     ),
                     KnownBoundMethodType::PropertyDunderSet(property) => (
-                        property.instance_class(db),
+                        property.instance_class(db).to_class_literal(db, self.env),
                         "__set__",
                         property_display_name(db, property),
                         Type::PropertyInstance(property),
@@ -1315,7 +1322,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                             .map(|setter| &**setter.name(db)),
                     ),
                     KnownBoundMethodType::PropertyDunderDelete(property) => (
-                        property.instance_class(db),
+                        property.instance_class(db).to_class_literal(db, self.env),
                         "__delete__",
                         property_display_name(db, property),
                         Type::PropertyInstance(property),
@@ -1325,7 +1332,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                             .map(|deleter| &**deleter.name(db)),
                     ),
                     KnownBoundMethodType::StrStartswith(literal) => (
-                        KnownClass::Property,
+                        KnownClass::Property.to_class_literal(db, self.env),
                         "startswith",
                         "string",
                         Type::LiteralValue(LiteralValueType::promotable(
@@ -1374,7 +1381,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     }
                 };
 
-                let class_ty = cls.to_class_literal(db, self.env);
                 f.write_char('<')?;
                 f.with_type(KnownClass::MethodWrapperType.to_class_literal(db, self.env))
                     .write_str("method-wrapper")?;

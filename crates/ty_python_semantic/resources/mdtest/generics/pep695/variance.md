@@ -727,6 +727,35 @@ static_assert(not is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
 ```
 
+### Property subclasses
+
+A property subclass can carry mutable state in its own type parameters. That state makes the owning
+class invariant even when the property's getter does not mention the type parameter.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def get_value(obj: object) -> int:
+    return 1
+
+class CustomProperty[T](property):
+    metadata: T
+
+class Owner[T]:
+    value = CustomProperty[T](get_value)
+
+static_assert(not is_subtype_of(Owner[str], Owner[object]))
+static_assert(not is_subtype_of(Owner[object], Owner[str]))
+
+def overwrite(owner: Owner[object]) -> None:
+    type(owner).value.metadata = object()
+
+def misuse(owner: Owner[str]) -> str:
+    overwrite(owner)  # error: [invalid-argument-type]
+    return type(owner).value.metadata
+```
+
 ### Implicit Attributes
 
 Implicit attributes work like normal ones
