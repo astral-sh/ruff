@@ -708,6 +708,19 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        // F722
+        if self.semantic.in_string_type_definition() {
+            if self.is_rule_enabled(Rule::ForwardAnnotationSyntaxError) {
+                self.report_type_diagnostic(
+                    pyflakes::rules::ForwardAnnotationSyntaxError {
+                        parse_error: error.to_string(),
+                    },
+                    error.range,
+                );
+            }
+            return;
+        }
+
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 // F404
