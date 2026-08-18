@@ -787,6 +787,65 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 }
 
 #[test]
+fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        def f(x: int = 1) -> int: return x
+        def annotated(x: int) -> int: return x
+        def defaulted(x=1): return x
+        "#,
+    )?;
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, file, "f"),
+        &events,
+    );
+    assert_function_query_was_not_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, file, "annotated"),
+        &events,
+    );
+    assert_function_query_was_not_run(
+        &db,
+        infer_deferred_types,
+        first_public_binding(&db, file, "defaulted"),
+        &events,
+    );
+
+    let definition = first_public_binding(&db, file, "f");
+    let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
+    let DefinitionKind::Function(function) = definition.kind(&db) else {
+        anyhow::bail!("expected a function definition");
+    };
+    let Some(parameter) = function.node(&module).parameters.find("x") else {
+        anyhow::bail!("expected parameter x");
+    };
+    let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default()) else {
+        anyhow::bail!("expected an annotated parameter with a default");
+    };
+
+    let annotations = infer_deferred_types(&db, definition);
+    assert!(annotations.try_expression_type(annotation).is_some());
+    assert!(annotations.try_expression_type(default).is_none());
+    let defaults = infer_function_default_types(&db, definition);
+    assert!(defaults.try_expression_type(default).is_some());
+    assert!(defaults.try_expression_type(annotation).is_none());
+    assert_eq!(
+        crate::types::definition_expression_type(&db, definition, default),
+        defaults.expression_type(default)
+    );
+    Ok(())
+}
+
+#[test]
 fn lazy_parameter_defaults() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_files([
@@ -804,7 +863,7 @@ fn lazy_parameter_defaults() -> anyhow::Result<()> {
     let events = db.take_salsa_events();
     assert_function_query_was_not_run(
         &db,
-        infer_deferred_types,
+        infer_function_default_types,
         first_public_binding(&db, source, "f"),
         &events,
     );
@@ -818,7 +877,7 @@ fn lazy_parameter_defaults() -> anyhow::Result<()> {
     let events = db.take_salsa_events();
     assert_function_query_was_run(
         &db,
-        infer_deferred_types,
+        infer_function_default_types,
         first_public_binding(&db, source, "f"),
         &events,
     );

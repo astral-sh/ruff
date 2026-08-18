@@ -272,6 +272,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
+/// Function parameter defaults are inferred separately by [`infer_function_default_types`].
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
@@ -313,10 +314,11 @@ pub(crate) fn infer_deferred_types<'db>(
     .finish_definition(definition)
 }
 
-/// Infer a function's annotations without evaluating its parameter defaults.
+/// Infer a function's parameter defaults without retaining its annotation types.
 ///
 /// Callable signature checking only needs to know which parameters are optional. Inferring their
-/// default values here can re-enter the decorated function's own signature.
+/// default values while inferring annotations can re-enter the decorated function's own signature.
+/// Keeping the results separate also avoids caching annotation expressions twice.
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
@@ -327,7 +329,7 @@ pub(crate) fn infer_deferred_types<'db>(
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn infer_function_signature_types<'db>(
+pub(crate) fn infer_function_default_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
@@ -340,7 +342,7 @@ pub(crate) fn infer_function_signature_types<'db>(
     TypeInferenceBuilder::new(
         db,
         &env,
-        InferenceRegion::FunctionSignature(definition),
+        InferenceRegion::FunctionDefaults(definition),
         python_file.file(db),
         program_file,
         index,
@@ -868,8 +870,8 @@ pub(crate) enum InferenceRegion<'db> {
     Definition(Definition<'db>),
     /// infer types for the decorators on a function [`Definition`]
     FunctionDecorators(Definition<'db>),
-    /// Infer a function's signature annotations, but not its default values.
-    FunctionSignature(Definition<'db>),
+    /// Infer a function's parameter default values, but not its annotations.
+    FunctionDefaults(Definition<'db>),
     /// infer deferred types for a [`Definition`]
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
@@ -883,7 +885,7 @@ impl<'db> InferenceRegion<'db> {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
             InferenceRegion::Definition(definition)
             | InferenceRegion::FunctionDecorators(definition)
-            | InferenceRegion::FunctionSignature(definition)
+            | InferenceRegion::FunctionDefaults(definition)
             | InferenceRegion::Deferred(definition) => definition.scope(db),
             InferenceRegion::Scope(scope, _) => scope,
         }

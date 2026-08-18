@@ -25,8 +25,8 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorator_flags, function_known_decorators,
-            infer_function_signature_types, infer_statement_types, nearest_enclosing_function,
+            function_known_decorator_flags, function_known_decorators, infer_deferred_types,
+            infer_function_default_types, infer_statement_types, nearest_enclosing_function,
             original_class_type,
         },
         infer_scope_types,
@@ -58,6 +58,17 @@ fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
             .kwarg
             .as_deref()
             .is_some_and(|param| param.annotation.is_some())
+}
+
+fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
+    parameters
+        .iter_non_variadic_params()
+        .any(|param| param.default.is_some())
+}
+
+fn function_has_deferred_annotations(function: &ast::StmtFunctionDef) -> bool {
+    function.type_params.is_none()
+        && (function.returns.is_some() || parameters_have_annotations(&function.parameters))
 }
 
 /// Whether a non-static method receives an instance or the class itself.
@@ -411,7 +422,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             is_async: _,
             name,
-            type_params,
+            type_params: _,
             parameters,
             returns: _,
             body: _,
@@ -505,19 +516,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
         }
 
-        let has_defaults = parameters
-            .iter_non_variadic_params()
-            .any(|param| param.default.is_some());
-
         // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
         // we defer the inference of any parameter and return annotations. That ensures that we do
         // not add any spurious salsa cycles when applying decorators below. (Applying a decorator
         // requires getting the signature of this function definition, which in turn requires
         // (lazily) inferring the parameter and return types.) If defaults exist, we also defer so
         // they can be inferred once with type context in the enclosing scope.
-        let has_signature_annotations =
-            function.returns.is_some() || parameters_have_annotations(parameters);
-        if (type_params.is_none() && has_signature_annotations) || has_defaults {
+        if function_has_deferred_annotations(function) || parameters_have_defaults(parameters) {
             self.deferred.insert(definition);
         }
 
@@ -665,13 +670,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn infer_function_signature(
+    pub(super) fn extend_function_deferred(
+        &mut self,
+        definition: Definition<'db>,
+        function: &ast::StmtFunctionDef,
+    ) {
+        let db = self.db();
+        if function_has_deferred_annotations(function) {
+            self.extend_definition(definition, infer_deferred_types(db, definition));
+        }
+        if parameters_have_defaults(&function.parameters) {
+            self.extend_definition(definition, infer_function_default_types(db, definition));
+        }
+    }
+
+    pub(super) fn infer_function_annotations(
         &mut self,
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
         // PEP 695 annotations are inferred in the function's type-parameter scope.
-        if function.type_params.is_some() {
+        if !function_has_deferred_annotations(function) {
             return;
         }
 
@@ -681,23 +700,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
-    pub(super) fn infer_function_deferred(
+    pub(super) fn infer_function_defaults(
         &mut self,
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
         let db = self.db();
-        if function.type_params.is_none()
-            && (function.returns.is_some() || parameters_have_annotations(&function.parameters))
-        {
-            self.extend_definition(definition, infer_function_signature_types(db, definition));
-        }
-
-        if !function
-            .parameters
-            .iter_non_variadic_params()
-            .any(|param| param.default.is_some())
-        {
+        if !parameters_have_defaults(&function.parameters) {
             return;
         }
 
@@ -708,8 +717,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let in_stub = self.in_stub();
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
 
-        // Generic function annotations come from their type-parameter scope; other annotations
-        // were merged from `infer_function_signature_types` above.
+        // Borrow annotation types from their own inference result instead of copying that result
+        // into this query. Scope inference merges both regions when checking the whole function.
         let type_params_inference = function.type_params.as_ref().map(|_| {
             let type_params_scope = self
                 .index
@@ -724,7 +733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             let annotation = param_with_default.annotation().map(|annotation| {
                 type_params_inference.map_or_else(
-                    || self.expression_type(annotation),
+                    || infer_deferred_types(db, definition).expression_type(annotation),
                     |inference| inference.expression_type(annotation),
                 )
             });

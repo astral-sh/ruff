@@ -32,7 +32,7 @@ use crate::types::generics::{
     walk_generic_context,
 };
 use crate::types::infer::{
-    TypeExpressionFlags, infer_deferred_types, infer_function_signature_types,
+    TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
 };
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
@@ -83,7 +83,7 @@ fn function_signature_expression_type<'db>(
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
-        infer_function_signature_types(db, definition).expression_type(expression)
+        infer_deferred_types(db, definition).expression_type(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).expression_type(expression)
@@ -101,7 +101,7 @@ fn function_signature_type_expression_flags<'db>(
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
-        infer_function_signature_types(db, definition).type_expression_flags(expression)
+        infer_deferred_types(db, definition).type_expression_flags(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).type_expression_flags(expression)
@@ -5735,9 +5735,9 @@ fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> T
     let Some(default) = node.node(&module).default() else {
         return Type::unknown();
     };
-    // Use the function's deferred inference so the default retains its annotation context.
+    // Use the function's default inference so the default retains its annotation context.
     // Nested callable defaults still need the existing cycle-breaking normalization.
-    infer_deferred_types(db, function)
+    infer_function_default_types(db, function)
         .expression_type(default)
         .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(function))
 }
