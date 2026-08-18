@@ -974,7 +974,6 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           python-version: 3.13
-          activate-environment: true
           version: "0.12.3"
       - name: "Update README File"
         run: uv run --script scripts/transform_readme.py --target mkdocs
