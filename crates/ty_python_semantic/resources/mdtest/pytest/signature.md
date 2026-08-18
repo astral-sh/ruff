@@ -46,30 +46,30 @@ from typing import Any
 
 # Positional-only arg
 @pytest.mark.parametrize("", [])
-# error: [pytest-test-argument-wrong-kind] "Pytest tests only accept keyword arguments. `x` is a positional only argument."
+# error: [pytest-test-parameter-wrong-kind] "Pytest tests only accept keyword arguments. `x` is a positional only argument."
 def _(x: int, /) -> None: ...
 
 # Variadic positional args
 @pytest.mark.parametrize("", [])
-# error: [pytest-test-argument-wrong-kind] "Pytest tests only accept keyword arguments. `*args` is a variadic positional argument."
+# error: [pytest-test-parameter-wrong-kind] "Pytest tests only accept keyword arguments. `*args` is a variadic positional argument."
 def _(*args: Any) -> None: ...
 
 # Variadic keyword args
 @pytest.mark.parametrize("", [])
-# error: [pytest-test-argument-wrong-kind] "Pytest tests only accept keyword arguments. `**kwargs` is a variadic keyword argument."
+# error: [pytest-test-parameter-wrong-kind] "Pytest tests only accept keyword arguments. `**kwargs` is a variadic keyword argument."
 def _(**kwargs: Any) -> None: ...
 
 # Optional arg
 @pytest.mark.parametrize("foo", [1, 2, 3])
-# error: [pytest-test-optional-argument] "Pytest tests ignore optional arguments. `bar` has a default value."
+# error: [pytest-test-optional-parameter] "Pytest tests ignore optional arguments. `bar` has a default value."
 def _(foo: int, bar: int = 3) -> None: ...
 
 # Combination
 @pytest.mark.parametrize("", [])
-# error: [pytest-test-argument-wrong-kind] "Pytest tests only accept keyword arguments. `x` is a positional only argument."
-# error: [pytest-test-argument-wrong-kind] "Pytest tests only accept keyword arguments. `y` is a positional only argument."
-# error: [pytest-test-optional-argument] "Pytest tests ignore optional arguments. `z` has a default value."
-# error: [pytest-test-argument-wrong-kind] "Pytest tests only accept keyword arguments. `**kwargs` is a variadic keyword argument."
+# error: [pytest-test-parameter-wrong-kind] "Pytest tests only accept keyword arguments. `x` is a positional only argument."
+# error: [pytest-test-parameter-wrong-kind] "Pytest tests only accept keyword arguments. `y` is a positional only argument."
+# error: [pytest-test-optional-parameter] "Pytest tests ignore optional arguments. `z` has a default value."
+# error: [pytest-test-parameter-wrong-kind] "Pytest tests only accept keyword arguments. `**kwargs` is a variadic keyword argument."
 def _(x: int, y: int, /, z: int = 8, **kwargs) -> None: ...
 ```
 
@@ -84,7 +84,7 @@ def opaque(f: Any) -> Any:
 
 # Other decorator should still be checked
 @pytest.mark.skip
-def _(**kwargs) -> None: ...  # error: [pytest-test-argument-wrong-kind]
+def _(**kwargs) -> None: ...  # error: [pytest-test-parameter-wrong-kind]
 
 # But when there's a different one, only check the parametrization
 @pytest.mark.parametrize("a a", [])  # error: [pytest-invalid-argnames-literal]
@@ -97,7 +97,7 @@ def _(**kwargs) -> None: ...
 # When there's a combination, still check
 @pytest.mark.xfail
 @pytest.mark.parametrize("a a", [])  # error: [pytest-invalid-argnames-literal]
-def _(*args) -> None: ...  # error: [pytest-test-argument-wrong-kind]
+def _(*args) -> None: ...  # error: [pytest-test-parameter-wrong-kind]
 
 # Except when there's an extra decorator
 @opaque

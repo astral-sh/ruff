@@ -320,9 +320,9 @@ def overloaded_test(x: str | None) -> None: ...
 @pytest.mark.parametrize("y", ["2"])  # error: [pytest-param-mismatched-type]
 @pytest.mark.parametrize("z", ["3"])  # error: [pytest-param-mismatched-type]
 @pytest.mark.parametrize("optional", ["4"])
-# error: [pytest-test-argument-wrong-kind]
-# error: [pytest-test-optional-argument]
-# error: [pytest-test-argument-wrong-kind]
+# error: [pytest-test-parameter-wrong-kind]
+# error: [pytest-test-optional-parameter]
+# error: [pytest-test-parameter-wrong-kind]
 def _(x: int, /, y: int, *, z: int, optional=None, **kwargs) -> None: ...
 
 # Type variables are ignored, and treated as `object`.

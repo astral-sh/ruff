@@ -1,6 +1,6 @@
 use crate::types::{
     GenericContext, Parameter, Parameters, Type,
-    diagnostic::{PYTEST_TEST_ARGUMENT_WRONG_KIND, PYTEST_TEST_OPTIONAL_ARGUMENT},
+    diagnostic::{PYTEST_TEST_OPTIONAL_PARAMETER, PYTEST_TEST_PARAMETER_WRONG_KIND},
     infer::TypeInferenceBuilder,
 };
 use itertools::Itertools;
@@ -79,18 +79,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .zip_eq(ty_parameters)
             .filter_map(|(ast_parameter, ty_parameter)| {
-                self.request_from_parameter(
-                    ast_parameter.as_parameter(),
-                    ty_parameter,
-                    generic_context,
-                )
+                self.request_from_parameter(ast_parameter, ty_parameter, generic_context)
             })
             .collect_vec()
     }
 
     fn request_from_parameter(
         &self,
-        ast_parameter: &'ast ast::Parameter,
+        ast_parameter: ast::AnyParameterRef<'ast>,
         ty_parameter: &Parameter<'db>,
         generic_context: Option<GenericContext<'db>>,
     ) -> Option<Request<'db, 'ast>> {
@@ -118,7 +114,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(parameter_kind) = parameter_error_kind {
             if let Some(builder) = self
                 .context
-                .report_lint(&PYTEST_TEST_ARGUMENT_WRONG_KIND, range)
+                .report_lint(&PYTEST_TEST_PARAMETER_WRONG_KIND, range)
             {
                 // The display name exists because we are parsing a signature from a real function.
                 builder.into_diagnostic(format!("Pytest tests only accept keyword arguments. `{}` is a {parameter_kind} argument.", parameter.display_name().unwrap()) );
@@ -138,7 +134,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if has_default_value {
             if let Some(builder) = self
                 .context
-                .report_lint(&PYTEST_TEST_OPTIONAL_ARGUMENT, range)
+                .report_lint(&PYTEST_TEST_OPTIONAL_PARAMETER, range)
             {
                 builder.into_diagnostic(format!(
                     "Pytest tests ignore optional arguments. `{}` has a default value.",

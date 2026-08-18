@@ -158,3 +158,61 @@ info: `z` already used here
 11 | @pytest.mark.parametrize(("x", "z"), [(2.0, "2")])
    |                                ^^^
 ```
+
+## Signature
+
+Pytest ignores optional parameterss and parameters must have the correct type.
+
+```py
+import pytest
+from typing import Any
+
+@pytest.mark.parametrize("", [])
+# snapshot: pytest-test-parameter-wrong-kind
+# snapshot: pytest-test-parameter-wrong-kind
+def test_invalid_variadic_parameters(*args, **kwargs) -> None: ...
+@pytest.mark.parametrize("", [])
+# snapshot: pytest-test-parameter-wrong-kind
+# snapshot: pytest-test-parameter-wrong-kind
+def test_invalid_positional_only_parameters(x: int, y: float, /) -> None: ...
+@pytest.mark.parametrize("x", [1, 2, 3])
+@pytest.mark.parametrize("y", [None, None])
+# snapshot: pytest-test-optional-parameter
+def test_invalid_optional_parameter(x: int, *, y: None = None) -> None: ...
+```
+
+```snapshot
+warning[pytest-test-parameter-wrong-kind]: Pytest tests only accept keyword arguments. `*args` is a variadic positional argument.
+ --> src/mdtest_snippet.py:7:38
+  |
+7 | def test_invalid_variadic_parameters(*args, **kwargs) -> None: ...
+  |                                      ^^^^^
+
+
+warning[pytest-test-parameter-wrong-kind]: Pytest tests only accept keyword arguments. `**kwargs` is a variadic keyword argument.
+ --> src/mdtest_snippet.py:7:45
+  |
+7 | def test_invalid_variadic_parameters(*args, **kwargs) -> None: ...
+  |                                             ^^^^^^^^
+
+
+warning[pytest-test-parameter-wrong-kind]: Pytest tests only accept keyword arguments. `x` is a positional only argument.
+  --> src/mdtest_snippet.py:11:45
+   |
+11 | def test_invalid_positional_only_parameters(x: int, y: float, /) -> None: ...
+   |                                             ^^^^^^
+
+
+warning[pytest-test-parameter-wrong-kind]: Pytest tests only accept keyword arguments. `y` is a positional only argument.
+  --> src/mdtest_snippet.py:11:53
+   |
+11 | def test_invalid_positional_only_parameters(x: int, y: float, /) -> None: ...
+   |                                                     ^^^^^^^^
+
+
+warning[pytest-test-optional-parameter]: Pytest tests ignore optional arguments. `y` has a default value.
+  --> src/mdtest_snippet.py:15:48
+   |
+15 | def test_invalid_optional_parameter(x: int, *, y: None = None) -> None: ...
+   |                                                ^^^^^^^^^^^^^^
+```
