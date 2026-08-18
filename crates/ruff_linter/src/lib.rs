@@ -88,6 +88,7 @@ mod tests {
             &source_kind,
             Path::new("ruff_linter/rules/quick_test"),
             &LinterSettings::for_rule(rule),
+            true,
         );
 
         assert_eq!(print_messages(&diagnostics), "");

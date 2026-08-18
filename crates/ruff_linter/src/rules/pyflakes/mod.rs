@@ -319,6 +319,7 @@ mod tests {
                 },
                 ..LinterSettings::for_rule(Rule::UnusedImport)
             },
+            true,
         )
         .0;
         assert_diagnostics!(snapshot, diagnostics);
@@ -601,6 +602,7 @@ mod tests {
             },
             Path::new("f401_preview_submodule.py"),
             &LinterSettings::for_rule(Rule::UnusedImport).with_preview_mode(),
+            true,
         )
         .0;
         assert_diagnostics!(snapshot, diagnostics);

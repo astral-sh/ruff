@@ -124,7 +124,7 @@ fn run_test(
                                     is_stub: file.is_stub(db),
                                 }
                             };
-                            test_contents(&source_kind, path, &settings.linter).0
+                            test_contents(&source_kind, path, &settings.linter, true).0
                         }
                         SourceType::Toml(source_type) => {
                             lint_toml(path, source.as_str(), &settings.linter, source_type)

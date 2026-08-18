@@ -957,6 +957,7 @@ mod tests {
             &source_kind,
             path,
             &LinterSettings::for_rule(Rule::UnusedImport),
+            true,
         );
         let linted_notebook = transformed.into_owned().expect_ipy_notebook();
         let mut writer = Vec::new();
@@ -1236,6 +1237,7 @@ mod tests {
             },
             path,
             settings,
+            true,
         )
         .0;
         assert_diagnostics!(snapshot, diagnostics);

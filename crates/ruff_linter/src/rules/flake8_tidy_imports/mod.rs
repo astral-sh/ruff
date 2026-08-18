@@ -255,6 +255,7 @@ mod tests {
             &LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
                 .with_preview_mode()
                 .with_target_version(PythonVersion::PY315),
+            true,
         );
 
         assert_eq!(diagnostics.len(), 2);
@@ -333,6 +334,7 @@ mod tests {
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
+            true,
         );
 
         assert_eq!(diagnostics.len(), 3);
@@ -379,6 +381,7 @@ mod tests {
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
+            true,
         );
 
         assert_eq!(diagnostics.len(), 2);
@@ -422,6 +425,7 @@ mod tests {
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
+            true,
         );
 
         assert_eq!(diagnostics.len(), 2);
@@ -465,6 +469,7 @@ mod tests {
                     .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
+            true,
         );
 
         assert_eq!(diagnostics.len(), 2);
