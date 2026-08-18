@@ -81,6 +81,14 @@ takes_foo1(foo2)
 takes_foo2(foo1)
 ```
 
+The classes also remain distinct when both calls occur in the same string annotation, even though
+the surrounding type expression is invalid:
+
+```py
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+distinct: "static_assert(type('Foo', (), {}) is not type('Foo', (), {}))[int]"
+```
+
 ## Instances and attribute access
 
 Instances of dynamic classes are typed with the synthesized class name. Attributes from all base
@@ -975,6 +983,30 @@ bases: tuple[type[C], type[D]] = (C, D)
 Y = type("Y", bases, {})
 ```
 
+Inside a string annotation, the diagnostic still highlights the class-creation call, not the whole
+string:
+
+```py
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+# snapshot: instance-layout-conflict
+bad: "type('Bad', (A, B), {})[int]"
+```
+
+```snapshot
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:20:7
+   |
+20 | bad: "type('Bad', (A, B), {})[int]"
+   |       ^^^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:20:20
+   |
+20 | bad: "type('Bad', (A, B), {})[int]"
+   |                    -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+   |                    |
+   |                    `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
+```
+
 ## Cyclic functional class definitions
 
 ### Self-referential
@@ -1178,6 +1210,20 @@ class Unrelated: ...
 
 # error: [invalid-assignment]
 Bad: type[Unrelated] = type("Bad", (Base,), {})
+```
+
+## Dynamic class calls in string annotations
+
+An invalid subscript of a `type()` call should produce the usual diagnostic, including when the call
+appears in a nested string annotation:
+
+```py
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+plain: "type('X', (), {})[int]"
+
+name = "Nested"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+nested: "'type(name, (), {})[int]'"
 ```
 
 ## Dynamic class reassignment in a loop
