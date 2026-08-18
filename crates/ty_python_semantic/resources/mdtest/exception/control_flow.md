@@ -86,6 +86,18 @@ def incompatible_fallback() -> None:
         value = "wrong"  # error: [invalid-assignment]
 ```
 
+An earlier call in the `try` block does not hide a declaration reached before a later call raises.
+
+```py
+def declaration_after_call() -> None:
+    value = int()
+    try:
+        could_raise_int()
+        value: int = could_raise_int()
+    except Exception:
+        value = "wrong"  # error: [invalid-assignment]
+```
+
 The declaration does not make the new value available before the assignment completes. A handler
 still sees the previous value, or an unbound name if there was no previous binding.
 
