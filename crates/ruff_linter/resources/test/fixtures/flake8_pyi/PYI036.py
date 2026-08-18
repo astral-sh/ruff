@@ -167,3 +167,22 @@ class UnacceptableOverload2:
     @overload
     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
+
+
+# PEP 695 generic `__exit__` — type[T] and T where T: BaseException should not trigger PYI036.
+# https://github.com/astral-sh/ruff/issues/25905
+class GenericExit:
+    def __exit__[T: BaseException](
+        self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    ) -> bool: ...  # OK
+
+    def __aexit__[T: BaseException](
+        self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    ) -> bool: ...  # OK
+
+
+class GenericExitUnboundedT:
+    # T has no bound — could be anything, so type[T] is not a valid first-arg annotation.
+    def __exit__[T](
+        self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    ) -> bool: ...  # PYI036: T has no bound constraining it to BaseException
