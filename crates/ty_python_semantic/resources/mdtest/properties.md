@@ -49,6 +49,130 @@ c.my_property = 2
 c.my_property = "a"
 ```
 
+## Property subclasses
+
+A subclass that inherits the built-in descriptor behavior preserves its concrete class and the
+return type of its getter.
+
+```py
+class CustomProperty(property):
+    label: str
+
+class C:
+    @CustomProperty
+    def value(self) -> int:
+        return 1
+
+reveal_type(C.value)  # revealed: CustomProperty
+reveal_type(C.value.label)  # revealed: str
+reveal_type(C().value)  # revealed: int
+
+# error: [invalid-assignment]
+C().value = 1
+```
+
+## Generic property subclasses
+
+A specialized property subclass retains its type arguments as well as the getter return type.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class CustomProperty(property, Generic[T]): ...
+
+class C:
+    @CustomProperty[int]
+    def value(self) -> int:
+        return 1
+
+reveal_type(C.value)  # revealed: CustomProperty[int]
+reveal_type(C().value)  # revealed: int
+```
+
+## Property subclasses with setters
+
+An inherited setter creates another instance of the same property subclass while retaining both
+accessor signatures.
+
+```py
+class CustomProperty(property): ...
+
+class C:
+    @CustomProperty
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: str) -> None:
+        pass
+
+reveal_type(C.value)  # revealed: CustomProperty
+reveal_type(C().value)  # revealed: int
+
+C().value = "allowed"
+
+# error: [invalid-assignment]
+C().value = 1
+```
+
+## Property subclasses with replacement accessors
+
+Replacing a getter or adding a deleter also preserves the property subclass and the other existing
+accessors.
+
+```py
+class CustomProperty(property): ...
+
+class C:
+    @CustomProperty
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: str) -> None:
+        pass
+
+    @value.getter
+    def value(self) -> bool:
+        return True
+
+    @value.deleter
+    def value(self) -> None:
+        pass
+
+reveal_type(C.value)  # revealed: CustomProperty
+reveal_type(C().value)  # revealed: bool
+
+C().value = "allowed"
+del C().value
+
+# error: [invalid-assignment]
+C().value = 1
+```
+
+## Property subclasses with custom descriptor behavior
+
+A property subclass may override the descriptor protocol, in which case the override determines the
+result instead of the original getter.
+
+```py
+from typing import Any
+
+class CustomProperty(property):
+    def __get__(self, instance: Any, owner: type | None = None, /) -> str:
+        return "custom descriptor"
+
+class C:
+    @CustomProperty
+    def value(self) -> int:
+        return 1
+
+reveal_type(C.value)  # revealed: str
+reveal_type(C().value)  # revealed: str
+```
+
 ## Properties returning `Self`
 
 A property that returns `Self` refers to an instance of the class:

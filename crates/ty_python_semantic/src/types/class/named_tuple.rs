@@ -361,7 +361,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // Check if it's a field name (returns a property descriptor).
         for field in self.fields(db) {
             if field.name == name {
-                return Member::definitely_declared(create_field_property(db, field.ty));
+                return Member::definitely_declared(create_field_property(db, &env, field.ty));
             }
         }
 
@@ -627,12 +627,16 @@ impl<'db> NamedTupleSpec<'db> {
 impl get_size2::GetSize for NamedTupleSpec<'_> {}
 
 /// Create a property type for a namedtuple field.
-fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db> {
+fn create_field_property<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    field_ty: Type<'db>,
+) -> Type<'db> {
     let property_getter_signature = Signature::new(
         Parameters::standard([Parameter::positional_only(Some(Name::new_static("self")))]),
         field_ty,
     );
     let property_getter = Type::single_callable(db, property_getter_signature);
-    let property = PropertyInstanceType::new(db, Some(property_getter), None, None);
+    let property = PropertyInstanceType::new(db, env, Some(property_getter), None, None);
     Type::PropertyInstance(property)
 }

@@ -1108,7 +1108,7 @@ pub enum PropertyAccessorRole {
     Deleter,
 }
 
-/// Represents an instance of `builtins.property` or `enum.property`.
+/// Represents an instance of `builtins.property`, `enum.property`, or one of their subclasses.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
     #[returns(copy)]
@@ -1118,7 +1118,7 @@ pub struct PropertyInstanceType<'db> {
     #[returns(copy)]
     pub deleter: Option<Type<'db>>,
     #[returns(copy)]
-    instance_class: KnownClass,
+    instance_class: ClassType<'db>,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -1126,6 +1126,9 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     property: PropertyInstanceType<'db>,
     visitor: &V,
 ) {
+    if let ClassType::Generic(class) = property.instance_class(db) {
+        visitor.visit_type(db, class.into());
+    }
     if let Some(getter) = property.getter(db) {
         visitor.visit_type(db, getter);
     }
@@ -1143,20 +1146,26 @@ impl get_size2::GetSize for PropertyInstanceType<'_> {}
 impl<'db> PropertyInstanceType<'db> {
     fn new(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         getter: Option<Type<'db>>,
         setter: Option<Type<'db>>,
         deleter: Option<Type<'db>>,
     ) -> Self {
-        Self::new_internal(db, getter, setter, deleter, KnownClass::Property)
+        let class = KnownClass::Property
+            .to_class_literal(db, env)
+            .to_class_type(db)
+            .unwrap_or_else(|| ClassType::object(db, env));
+        Self::new_for_class(db, class, getter, setter, deleter)
     }
 
-    fn new_enum_property(
+    fn new_for_class(
         db: &'db dyn Db,
+        class: ClassType<'db>,
         getter: Option<Type<'db>>,
         setter: Option<Type<'db>>,
         deleter: Option<Type<'db>>,
     ) -> Self {
-        Self::new_internal(db, getter, setter, deleter, KnownClass::EnumProperty)
+        Self::new_internal(db, getter, setter, deleter, class)
     }
 
     fn with_accessors(
@@ -1170,7 +1179,7 @@ impl<'db> PropertyInstanceType<'db> {
     }
 
     fn instance_fallback(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        self.instance_class(db).to_instance(db, env)
+        Type::instance(db, env, self.instance_class(db))
     }
 
     /// Returns the [`PropertyAccessorRole`] that `def` plays in this property, or `None` when
@@ -1220,7 +1229,10 @@ impl<'db> PropertyInstanceType<'db> {
         let deleter = self
             .deleter(db)
             .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-        self.with_accessors(db, getter, setter, deleter)
+        let class = self
+            .instance_class(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        Self::new_internal(db, getter, setter, deleter, class)
     }
 
     fn recursive_type_normalized_impl(
@@ -1254,7 +1266,10 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             None => None,
         };
-        Some(self.with_accessors(db, getter, setter, deleter))
+        let class = self
+            .instance_class(db)
+            .recursive_type_normalized_impl(db, env, div, nested)?;
+        Some(Self::new_internal(db, getter, setter, deleter, class))
     }
 
     fn find_legacy_typevars_impl(
@@ -1265,6 +1280,13 @@ impl<'db> PropertyInstanceType<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
+        self.instance_class(db).find_legacy_typevars_impl(
+            db,
+            env,
+            binding_context,
+            typevars,
+            visitor,
+        );
         if let Some(ty) = self.getter(db) {
             ty.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
@@ -3372,6 +3394,18 @@ impl<'db> Type<'db> {
             Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, env, |elem| {
                 elem.class_member_with_policy(db, env, name, policy)
             }),
+            Type::PropertyInstance(_) if name == "__get__" => Place::bound(
+                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet),
+            )
+            .into(),
+            Type::PropertyInstance(_) if name == "__set__" => Place::bound(
+                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet),
+            )
+            .into(),
+            Type::PropertyInstance(_) if name == "__delete__" => Place::bound(
+                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderDelete),
+            )
+            .into(),
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 class::synthesized_typed_dict_class_member(db, env, synthesized, policy, name)
             }
@@ -3800,8 +3834,7 @@ impl<'db> Type<'db> {
             Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Undefined.into(),
 
             Type::PropertyInstance(property) => property
-                .instance_class(db)
-                .to_instance(db, env)
+                .instance_fallback(db, env)
                 .instance_member(db, env, name),
 
             // Note: `super(pivot, owner).__dict__` refers to the `__dict__` of the `builtins.super` instance,
@@ -7493,9 +7526,7 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => instance.to_meta_type(db, env),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db, env),
             Type::SpecialForm(special_form) => special_form.to_meta_type(db, env),
-            Type::PropertyInstance(property) => {
-                property.instance_class(db).to_class_literal(db, env)
-            }
+            Type::PropertyInstance(property) => property.instance_class(db).into(),
             Type::Union(union) => union.map(db, env, |ty| ty.to_meta_type(db, env)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db, env),
             Type::TypeForm(_) => Type::object().to_meta_type(db, env),

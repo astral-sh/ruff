@@ -1182,6 +1182,30 @@ assert_type(descriptor.clsname, str)
 assert_type(descriptor.member, Enum | None)
 ```
 
+Subclasses of `enum.property` also retain their concrete descriptor class and their accessor types.
+
+```py
+class CustomEnumProperty(enum_property): ...
+
+class CustomAnswer(Enum):
+    YES = 1
+
+    @CustomEnumProperty
+    def text(self) -> str:
+        return "yes"
+
+    @text.setter
+    def text(self, value: int) -> None:
+        pass
+
+descriptor = CustomEnumProperty(get)
+reveal_type(descriptor)  # revealed: CustomEnumProperty
+assert_type(CustomAnswer.YES.text, str)
+
+CustomAnswer.YES.text = 1
+CustomAnswer.YES.text = "wrong"  # error: [invalid-assignment]
+```
+
 Enum attributes defined using `enum.property` take precedence over generated attributes.
 
 ```py

@@ -9,7 +9,7 @@
 //! `ty_python_semantic::types::call::bind`.
 
 mod constructor;
-mod enum_property;
+mod property;
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
@@ -3150,7 +3150,7 @@ impl<'db> Bindings<'db> {
                                 let setter = setter.filter(|ty| !ty.is_none(db));
                                 let deleter = deleter.filter(|ty| !ty.is_none(db));
                                 overload.set_return_type(Type::PropertyInstance(
-                                    PropertyInstanceType::new(db, getter, setter, deleter),
+                                    PropertyInstanceType::new(db, env, getter, setter, deleter),
                                 ));
                             }
                         }
@@ -3197,7 +3197,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        self.evaluate_enum_property_calls(db, call_arguments);
+        self.evaluate_property_calls(db, env, call_arguments);
     }
 }
 
