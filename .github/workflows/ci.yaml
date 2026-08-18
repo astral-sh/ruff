@@ -388,6 +388,16 @@ jobs:
         run: cargo test --doc --all-features
       - name: Dogfood ty on py-fuzzer
         run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
+      - name: Dogfood ty on scripts
+        run: |
+          for script in scripts/*.py; do
+            echo "Checking $script"
+            script_python="$(
+              uv sync --quiet --locked --script "$script" --output-format json |
+                jq --raw-output '.sync.environment.python.path'
+            )"
+            cargo run --quiet -p ty check --project scripts --python "$script_python" "$script"
+          done
       - name: Dogfood ty on ty_benchmark
         run: uv run --project=./scripts/ty_benchmark cargo run -p ty check --project=./scripts/ty_benchmark
       # Check for broken links in the documentation.
