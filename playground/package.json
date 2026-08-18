@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "npm": ">=11.10.0"
+  },
   "scripts": {
     "check": "npm run dev:wasm && npm run lint && npm run tsc",
     "dev:wasm": "npm run dev:wasm --workspace ty-playground && npm run dev:wasm --workspace ruff-playground",

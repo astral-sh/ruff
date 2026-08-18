@@ -4,6 +4,8 @@ In-browser playground for Ruff. Available [https://play.ruff.rs/](https://play.r
 
 ## Getting started
 
+Use npm 11.10.0 or newer so that the dependency cooldown in `.npmrc` is enforced.
+
 Install the NPM dependencies with `npm ci --ignore-scripts`, and run the development server with
 `npm start --workspace ruff-playground` or `npm start --workspace ty-playground`.
 You may need to restart the server after making changes to Ruff or ty to re-build the WASM
