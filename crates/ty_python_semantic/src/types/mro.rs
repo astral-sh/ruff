@@ -10,7 +10,8 @@ use crate::types::class::{DynamicClassLiteral, DynamicEnumLiteral};
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{
-    ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, StaticClassLiteral, Type,
+    ClassLiteral, ClassType, GenericAlias, GenericClassLiteral, KnownInstanceType, SpecialFormType,
+    StaticClassLiteral, Type,
 };
 
 use itertools::Itertools;
@@ -620,6 +621,24 @@ impl<'db> MroIterator<'db> {
         }
     }
 
+    fn dynamic_specialization(&self) -> Option<Specialization<'db>> {
+        match self.class {
+            ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => {
+                self.specialization
+            }
+            ClassLiteral::Static(_) | ClassLiteral::Dynamic(_) | ClassLiteral::DynamicEnum(_) => {
+                None
+            }
+        }
+    }
+
+    fn dynamic_class_type(&self, origin: GenericClassLiteral<'db>) -> ClassType<'db> {
+        self.specialization.map_or_else(
+            || ClassType::NonGeneric(origin.class_literal()),
+            |specialization| ClassType::Generic(GenericAlias::new(self.db, origin, specialization)),
+        )
+    }
+
     fn first_element(&self) -> ClassBase<'db> {
         let db = self.db;
         match self.class {
@@ -629,12 +648,12 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::Dynamic(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
-            ClassLiteral::DynamicNamedTuple(literal) => {
-                ClassBase::Class(ClassType::NonGeneric(literal.into()))
-            }
-            ClassLiteral::DynamicTypedDict(literal) => {
-                ClassBase::Class(ClassType::NonGeneric(literal.into()))
-            }
+            ClassLiteral::DynamicNamedTuple(literal) => ClassBase::Class(
+                self.dynamic_class_type(GenericClassLiteral::DynamicNamedTuple(literal)),
+            ),
+            ClassLiteral::DynamicTypedDict(literal) => ClassBase::Class(
+                self.dynamic_class_type(GenericClassLiteral::DynamicTypedDict(literal)),
+            ),
             ClassLiteral::DynamicEnum(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
@@ -696,7 +715,11 @@ impl<'db> Iterator for MroIterator<'db> {
             self.first_element_yielded = true;
             return Some(self.first_element());
         }
-        self.full_mro_except_first_element().next().copied()
+        let specialization = self.dynamic_specialization();
+        self.full_mro_except_first_element()
+            .next()
+            .copied()
+            .map(|base| base.apply_optional_specialization(self.db, specialization))
     }
 }
 
@@ -704,9 +727,11 @@ impl std::iter::FusedIterator for MroIterator<'_> {}
 
 impl DoubleEndedIterator for MroIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
+        let specialization = self.dynamic_specialization();
         self.full_mro_except_first_element()
             .next_back()
             .copied()
+            .map(|base| base.apply_optional_specialization(self.db, specialization))
             .or_else(|| {
                 if self.first_element_yielded {
                     None

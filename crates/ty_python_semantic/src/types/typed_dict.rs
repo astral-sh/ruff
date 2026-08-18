@@ -250,7 +250,19 @@ impl<'db> TypedDictType<'db> {
             let static_class = match class_literal {
                 ClassLiteral::Static(static_class) => static_class,
                 ClassLiteral::DynamicTypedDict(dynamic) => {
-                    return dynamic.openness(db);
+                    let openness = dynamic.openness(db);
+                    return match (openness, specialization) {
+                        (TypedDictOpenness::Extra(extra_items), Some(specialization)) => {
+                            TypedDictOpenness::extra(
+                                db,
+                                extra_items
+                                    .declared_ty
+                                    .apply_optional_specialization(db, Some(specialization)),
+                                extra_items.is_read_only,
+                            )
+                        }
+                        _ => openness,
+                    };
                 }
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
@@ -366,7 +378,7 @@ impl<'db> TypedDictType<'db> {
     /// An undeclared key can still exist in an implicitly open `TypedDict` or one with explicit
     /// extra items. An optional field with an uninhabited value type can never be present.
     pub(crate) fn key_membership_truthiness(self, db: &'db dyn Db, key: &str) -> Truthiness {
-        match self.items(db).get(key) {
+        match self.item(db, key) {
             Some(field) if field.is_required() => Truthiness::AlwaysTrue,
             Some(field) if field.may_be_present(db) => Truthiness::Ambiguous,
             Some(_) => Truthiness::AlwaysFalse,
@@ -380,7 +392,24 @@ impl<'db> TypedDictType<'db> {
     /// Undeclared keys synthesize a field only for explicit extra items. Hidden items on an
     /// implicitly open `TypedDict` are intentionally not directly accessible.
     pub(crate) fn item(self, db: &'db dyn Db, key: &str) -> Option<TypedDictField<'db>> {
-        self.items(db).get(key).cloned().or_else(|| {
+        let declared = match self {
+            Self::Class(class) => {
+                let (literal, specialization) = class.class_literal_and_specialization(db);
+                match literal {
+                    ClassLiteral::DynamicTypedDict(dynamic) => {
+                        dynamic.items(db).get(key).cloned().map(|mut field| {
+                            field.declared_ty = field
+                                .declared_ty
+                                .apply_optional_specialization(db, specialization);
+                            field
+                        })
+                    }
+                    _ => self.items(db).get(key).cloned(),
+                }
+            }
+            Self::Synthesized(_) => self.items(db).get(key).cloned(),
+        };
+        declared.or_else(|| {
             let extra_items = self.explicit_extra_items(db)?;
             Some(
                 TypedDictFieldBuilder::new(extra_items.declared_ty)
@@ -555,11 +584,34 @@ impl<'db> TypedDictType<'db> {
                 .collect()
         }
 
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn specialized_dynamic_items<'db>(
+            db: &'db dyn Db,
+            class: super::class::DynamicTypedDictLiteral<'db>,
+            specialization: super::Specialization<'db>,
+        ) -> TypedDictSchema<'db> {
+            class
+                .items(db)
+                .iter()
+                .map(|(name, field)| {
+                    let mut field = field.clone();
+                    field.declared_ty = field
+                        .declared_ty
+                        .apply_optional_specialization(db, Some(specialization));
+                    (name.clone(), field)
+                })
+                .collect()
+        }
+
         match self {
             Self::Class(defining_class) => {
-                // Check if this is a dynamic TypedDict
-                if let ClassLiteral::DynamicTypedDict(class) = defining_class.class_literal(db) {
-                    return class.items(db);
+                let (class_literal, specialization) =
+                    defining_class.class_literal_and_specialization(db);
+                if let ClassLiteral::DynamicTypedDict(class) = class_literal {
+                    return specialization.map_or_else(
+                        || class.items(db),
+                        |specialization| specialized_dynamic_items(db, class, specialization),
+                    );
                 }
 
                 class_based_items(db, defining_class)

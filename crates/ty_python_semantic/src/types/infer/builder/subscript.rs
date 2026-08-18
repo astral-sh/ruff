@@ -28,9 +28,9 @@ use crate::types::typed_dict::{
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
-    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, ClassLiteral,
+    CycleDetector, DynamicType, GenericClassLiteral, InternedType, KnownClass, KnownInstanceType,
+    LintDiagnosticGuard, MemberLookupPolicy, Parameter, Parameters, SpecialFormType, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
     UnionTypeInstance, any_over_type, todo_type,
 };
@@ -80,8 +80,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if typed_dict.explicit_extra_items(db).is_some() {
                         return Some(KnownClass::Str.to_instance(db, env));
                     }
-                    let keys = typed_dict
-                        .items(db)
+                    let items = typed_dict
+                        .defining_class()
+                        .and_then(|class| match class.class_literal(db) {
+                            ClassLiteral::DynamicTypedDict(dynamic) => Some(dynamic.items(db)),
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| typed_dict.items(db));
+                    let keys = items
                         .keys()
                         .map(|key| Type::string_literal(db, key))
                         .collect_vec();
@@ -255,7 +261,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if let Some(generic_context) = class.generic_context(db)
-                    && let Some(class) = class.as_static()
+                    && let Some(class) = class.as_generic_class()
                 {
                     return Ok(self.infer_explicit_class_specialization(
                         subscript,
@@ -496,7 +502,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        generic_class: StaticClassLiteral<'db>,
+        generic_class: GenericClassLiteral<'db>,
         generic_context: GenericContext<'db>,
     ) -> Type<'db> {
         let env = self.program_environment();
@@ -509,23 +515,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Avoid constructing an identity specialization and a full protocol interface for the
         // many generic protocols that do not directly declare `__class__`.
-        let disable_int_float_special_case = generic_class.is_protocol(db)
-            && place_table(db, generic_class.body_scope(db))
-                .symbol_id("__class__")
-                .is_some()
-            && generic_class
-                .identity_specialization(db)
-                .into_protocol_class(db)
-                .is_some_and(|protocol| {
-                    protocol
-                        .interface(db)
-                        .includes_generic_writable_instance_member(
-                            db,
-                            env,
-                            "__class__",
-                            generic_context,
-                        )
-                });
+        let disable_int_float_special_case = generic_class.as_static().is_some_and(|class| {
+            class.is_protocol(db)
+                && place_table(db, class.body_scope(db))
+                    .symbol_id("__class__")
+                    .is_some()
+                && generic_class
+                    .identity_specialization(db)
+                    .into_protocol_class(db)
+                    .is_some_and(|protocol| {
+                        protocol
+                            .interface(db)
+                            .includes_generic_writable_instance_member(
+                                db,
+                                env,
+                                "__class__",
+                                generic_context,
+                            )
+                    })
+        });
         let previously_disabled_int_float_special_case =
             disable_int_float_special_case.then(|| {
                 self.context

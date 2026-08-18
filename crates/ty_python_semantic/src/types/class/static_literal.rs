@@ -2346,7 +2346,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> FxIndexMap<Name, Field<'db>> {
         enum FieldSource<'db> {
             Static(StaticClassLiteral<'db>, Option<Specialization<'db>>),
-            DynamicTypedDict(DynamicTypedDictLiteral<'db>),
+            DynamicTypedDict(DynamicTypedDictLiteral<'db>, Option<Specialization<'db>>),
         }
 
         debug_assert_ne!(
@@ -2372,9 +2372,10 @@ impl<'db> StaticClassLiteral<'db> {
                 }
 
                 if field_policy == CodeGeneratorKind::TypedDict
-                    && let ClassLiteral::DynamicTypedDict(typeddict) = class.class_literal(db)
+                    && let (ClassLiteral::DynamicTypedDict(typed_dict), specialization) =
+                        class.class_literal_and_specialization(db)
                 {
-                    return Some(FieldSource::DynamicTypedDict(typeddict));
+                    return Some(FieldSource::DynamicTypedDict(typed_dict, specialization));
                 }
 
                 None
@@ -2398,12 +2399,14 @@ impl<'db> StaticClassLiteral<'db> {
                             .map(|(name, field)| (name.clone(), field.clone())),
                     )
                 }
-                FieldSource::DynamicTypedDict(typeddict) => {
-                    Either::Right(typeddict.items(db).iter().map(|(name, td_field)| {
+                FieldSource::DynamicTypedDict(typed_dict, specialization) => {
+                    Either::Right(typed_dict.items(db).iter().map(move |(name, td_field)| {
                         (
                             name.clone(),
                             Field {
-                                declared_ty: td_field.declared_ty,
+                                declared_ty: td_field
+                                    .declared_ty
+                                    .apply_optional_specialization(db, specialization),
                                 kind: FieldKind::TypedDict {
                                     is_required: td_field.is_required(),
                                     is_read_only: td_field.is_read_only(),

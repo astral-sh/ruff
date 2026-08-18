@@ -3750,7 +3750,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if func_ty == Type::SpecialForm(SpecialFormType::NamedTuple) {
             // Only the `fields` argument is deferred for `NamedTuple`;
             // other arguments are inferred eagerly.
+            let previous_context = match self.region {
+                InferenceRegion::Deferred(definition) => {
+                    self.typevar_binding_context.replace(definition)
+                }
+                _ => None,
+            };
             self.infer_typing_namedtuple_fields(&arguments.args[1]);
+            self.typevar_binding_context = previous_context;
             return;
         }
         let known_class = func_ty
@@ -3775,7 +3782,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {}
         }
         if TypingModule::from_typed_dict_type(self.db(), func_ty).is_some() {
+            let previous_context = match self.region {
+                InferenceRegion::Deferred(definition) => {
+                    self.typevar_binding_context.replace(definition)
+                }
+                _ => None,
+            };
             self.infer_functional_typeddict_deferred(arguments);
+            self.typevar_binding_context = previous_context;
             return;
         }
         if let InferenceRegion::Deferred(definition) = self.region

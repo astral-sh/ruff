@@ -901,13 +901,17 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the default specialization for this class.
-    ///
-    /// For static classes, this applies default type arguments.
-    /// For dynamic classes, this returns a non-generic class type.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.as_static().map_or_else(
+        self.as_generic_class().map_or_else(
             || ClassType::NonGeneric(self),
-            |class| class.default_specialization(db),
+            |origin| {
+                origin.apply_specialization(db, |generic_context| {
+                    generic_context.default_specialization(
+                        db,
+                        origin.as_static().and_then(|class| class.known(db)),
+                    )
+                })
+            },
         )
     }
 
@@ -917,17 +921,24 @@ impl<'db> ClassLiteral<'db> {
     /// For a non-specialized generic class, we return a generic alias that maps each of the class's
     /// typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.as_static().map_or_else(
+        self.as_generic_class().map_or_else(
             || ClassType::NonGeneric(self),
-            |class| class.unknown_specialization(db),
+            |origin| {
+                origin.apply_specialization(db, |generic_context| {
+                    generic_context.unknown_specialization(
+                        db,
+                        origin.as_static().and_then(|class| class.known(db)),
+                    )
+                })
+            },
         )
     }
 
     /// Returns the identity specialization for this class (same as default for non-generic).
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.as_static().map_or_else(
+        self.as_generic_class().map_or_else(
             || ClassType::NonGeneric(self),
-            |class| class.identity_specialization(db),
+            |origin| origin.identity_specialization(db),
         )
     }
 
@@ -1051,6 +1062,16 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns this class if it is a supported generic-alias origin.
+    pub(crate) const fn as_generic_class(self) -> Option<GenericClassLiteral<'db>> {
+        match self {
+            Self::Static(class) => Some(GenericClassLiteral::Static(class)),
+            Self::DynamicNamedTuple(class) => Some(GenericClassLiteral::DynamicNamedTuple(class)),
+            Self::DynamicTypedDict(class) => Some(GenericClassLiteral::DynamicTypedDict(class)),
+            Self::Dynamic(_) | Self::DynamicEnum(_) => None,
+        }
+    }
+
     /// Returns the static class definition if this is one.
     pub(crate) fn as_static(self) -> Option<StaticClassLiteral<'db>> {
         match self {
@@ -1170,13 +1191,10 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
     ) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.apply_specialization(db, f),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
-        }
+        self.as_generic_class().map_or_else(
+            || ClassType::NonGeneric(self),
+            |origin| origin.apply_specialization(db, f),
+        )
     }
 
     /// Returns the instance member lookup.

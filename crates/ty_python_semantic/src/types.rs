@@ -3217,13 +3217,11 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
-                Some(alias.origin(db).typed_dict_member(
-                    db,
-                    env,
-                    (name == "__init__").then_some(alias.specialization(db)),
-                    name,
-                    policy,
-                ))
+                let origin = alias.origin(db);
+                let specialization = (name == "__init__"
+                    || matches!(origin, GenericClassLiteral::DynamicTypedDict(_)))
+                .then(|| alias.specialization(db));
+                Some(origin.typed_dict_member(db, env, specialization, name, policy))
             }
 
             Type::GenericAlias(alias) => {
