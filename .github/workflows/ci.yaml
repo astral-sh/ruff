@@ -969,11 +969,11 @@ jobs:
           activate-environment: true
           version: "0.12.3"
       - name: "Update README File"
-        run: python scripts/transform_readme.py --target mkdocs
+        run: uv run --only-group=docs python scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
-        run: python scripts/generate_mkdocs.py
+        run: uv run --only-group=docs python scripts/generate_mkdocs.py
       - name: "Check docs formatting"
-        run: python scripts/check_docs_formatted.py
+        run: uv run --only-group=docs python scripts/check_docs_formatted.py
       - name: "Build docs"
         run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
 

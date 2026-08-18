@@ -69,13 +69,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
-      - name: "Install dependencies"
-        run: pip install -r docs/requirements.txt
-
       - name: "Copy README File"
         run: |
-          python scripts/transform_readme.py --target mkdocs
-          python scripts/generate_mkdocs.py
+          uv run --only-group=docs python scripts/transform_readme.py --target mkdocs
+          uv run --only-group=docs python scripts/generate_mkdocs.py
 
       - name: "Build docs"
         run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
