@@ -92,6 +92,35 @@ typeshed-formatting = [
 ]
 
 [tool.uv]
+no-build = true
+# CI installs the local ecosystem runner and tools pinned to Git revisions.
+no-binary-package = [
+    "black",
+    "docstring-adder",
+    "ecosystem-analyzer",
+    "mypy-primer",
+    "ruff-ecosystem",
+    "typeshed-client",
+]
+# Pin the isolated build environment for source-build exceptions.
+build-constraint-dependencies = [
+    "editables==0.6",
+    "hatch-fancy-pypi-readme==25.1.0",
+    "hatch-vcs==0.5.0",
+    "hatchling==1.32.0",
+    "packaging==26.3",
+    "pathspec==1.1.1",
+    "pluggy==1.6.0",
+    "setuptools==84.0.0",
+    "setuptools-scm==10.2.1",
+    "tomli==2.4.1; python_version < '3.11'",
+    "tomlkit==0.15.1",
+    "trove-classifiers==2026.6.1.19",
+    "typing-extensions==4.16.0; python_version < '3.11'",
+    "uv-build==0.12.3",
+    "vcs-versioning==2.2.4",
+    "wheel==0.47.0",
+]
 exclude-newer = "P7D"
 
 [tool.uv.dependency-groups]
