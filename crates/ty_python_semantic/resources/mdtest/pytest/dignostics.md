@@ -14,8 +14,6 @@ dependencies = ["pytest==9.0.2"]
 
 ## Invalid Argnames
 
-The argnames are incorrect to these test functions.
-
 ```py
 import pytest
 
