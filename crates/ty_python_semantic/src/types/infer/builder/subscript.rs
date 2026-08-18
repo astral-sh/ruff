@@ -1,38 +1,49 @@
+use std::cell::RefCell;
+
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashSet;
 use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
-use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::class::GenericAlias;
+use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
-use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{
+    GenericContext, Specialization, SpecializationError, bind_typevar, walk_specialization,
+};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
+use crate::types::known_instance::walk_known_instance_type;
+use crate::types::protocol_class::walk_protocol_instance_interface;
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
+use crate::types::type_alias::walk_type_alias_type;
+use crate::types::typed_dict::walk_typed_dict_type;
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
 };
-use crate::types::typevar::TypeVarSet;
+use crate::types::typevar::TypeVarInstance;
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
     DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    UnionTypeInstance, any_over_type, todo_type,
+    MemberLookupPolicy, Parameter, Parameters, ProtocolInstanceType, SpecialFormType,
+    StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypedDictType,
+    UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -501,10 +512,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let env = self.program_environment();
         let db = self.db();
-        let specialize = &|types: &[Option<Type<'db>>]| {
-            Type::from(generic_class.apply_specialization(db, |_| {
-                generic_context.specialize_partial(db, types.iter().copied())
-            }))
+        let specialize = &|specialization: Specialization<'db>| {
+            Type::from(generic_class.apply_specialization(db, |_| specialization))
         };
 
         // Avoid constructing an identity specialization and a full protocol interface for the
@@ -572,10 +581,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         }
 
-        let specialize = &|types: &[Option<Type<'db>>]| {
-            let type_alias = generic_type_alias.apply_specialization(db, |_| {
-                generic_context.specialize_partial(db, types.iter().copied())
-            });
+        let specialize = &|specialization: Specialization<'db>| {
+            let type_alias = generic_type_alias.apply_specialization(db, |_| specialization);
 
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))
         };
@@ -593,7 +600,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_context: GenericContext<'db>,
-        specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
+        specialize: &dyn Fn(Specialization<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let previously_allowed_paramspec = self
             .context
@@ -617,13 +624,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_context: GenericContext<'db>,
-        specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
+        specialize: &dyn Fn(Specialization<'db>) -> Type<'db>,
     ) -> Type<'db> {
         enum ExplicitSpecializationError {
             InvalidParamSpec,
             ParamSpecForTypeVar,
-            UnsatisfiedBound,
-            UnsatisfiedConstraints,
             /// These two errors override the errors above, causing all specializations to be `Unknown`.
             MissingTypeVars,
             TooManyArguments,
@@ -661,7 +666,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let env = self.program_environment();
         let db = self.db();
-        let constraints = ConstraintSetBuilder::new();
         let slice_node = subscript.slice.as_ref();
 
         let exactly_one_paramspec = generic_context.exactly_one_paramspec(db);
@@ -1016,80 +1020,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    // TODO consider just accepting the given specialization without checking
-                    // against bounds/constraints, but recording the expression for deferred
-                    // checking at end of scope. This would avoid a lot of cycles caused by eagerly
-                    // doing assignment checks here.
-                    match typevar.typevar(db).bound_or_constraints(db, env) {
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            if provided_type
-                                .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
-                                .is_never_satisfied(db, env)
-                            {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Type `{}` is not assignable to upper bound `{}` \
-                                            of type variable `{}`",
-                                        provided_type.display(db, env),
-                                        bound.display(db, env),
-                                        typevar.identity(db).display(db),
-                                    ));
-                                    add_typevar_definition(db, &mut diagnostic, typevar);
-                                    provided_type
-                                        .assignability_error_context(db, env, bound)
-                                        .attach_to(db, env, &mut diagnostic);
-                                }
-                                error = Some(ExplicitSpecializationError::UnsatisfiedBound);
-                                specialization_types.push(Some(Type::unknown()));
-                            } else {
-                                specialization_types.push(Some(provided_type));
-                            }
-                        }
-                        Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
-                            // TODO: this is wrong, the given specialization needs to be assignable
-                            // to _at least one_ of the individual constraints, not to the union of
-                            // all of them. `int | str` is not a valid specialization of a typevar
-                            // constrained to `(int, str)`.
-                            if provided_type
-                                .when_assignable_to(
-                                    db,
-                                    env,
-                                    typevar_constraints.as_type(db, env),
-                                    &constraints,
-                                    TypeVarSet::None,
-                                )
-                                .is_never_satisfied(db, env)
-                            {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Type `{}` does not satisfy constraints `{}` \
-                                            of type variable `{}`",
-                                        provided_type.display(db, env),
-                                        typevar_constraints
-                                            .elements(db)
-                                            .iter()
-                                            .map(|c| c.display(db, env))
-                                            .format("`, `"),
-                                        typevar.identity(db).display(db),
-                                    ));
-                                    add_typevar_definition(db, &mut diagnostic, typevar);
-                                }
-                                error = Some(ExplicitSpecializationError::UnsatisfiedConstraints);
-                                specialization_types.push(Some(Type::unknown()));
-                            } else {
-                                specialization_types.push(Some(provided_type));
-                            }
-                        }
-                        None => {
-                            specialization_types.push(Some(provided_type));
-                        }
-                    }
+                    specialization_types.push(Some(provided_type));
                 }
                 EitherOrBoth::Left(typevar) => {
                     if typevar.default_type(db).is_none() {
@@ -1186,34 +1117,235 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        match error {
-            Some(ExplicitSpecializationError::NonGeneric) => Type::unknown(),
+        let source_specialization = match error {
+            Some(ExplicitSpecializationError::NonGeneric) => return Type::unknown(),
             Some(
                 ExplicitSpecializationError::MissingTypeVars
                 | ExplicitSpecializationError::TooManyArguments,
-            ) => {
-                let unknowns = generic_context
+            ) => generic_context.specialize(
+                db,
+                generic_context
                     .variables(db)
                     .map(|typevar| {
-                        Some(if typevar.is_paramspec(db) {
+                        if typevar.is_paramspec(db) {
                             Type::paramspec_value_callable(db, Parameters::unknown())
                         } else if typevar.is_typevartuple(db) {
                             Type::homogeneous_tuple(db, env, Type::unknown())
                         } else {
                             Type::unknown()
-                        })
+                        }
                     })
-                    .collect::<Vec<_>>();
-                specialize(&unknowns)
-            }
+                    .collect::<Vec<_>>(),
+            ),
             Some(
-                ExplicitSpecializationError::UnsatisfiedBound
-                | ExplicitSpecializationError::UnsatisfiedConstraints
-                | ExplicitSpecializationError::InvalidParamSpec
+                ExplicitSpecializationError::InvalidParamSpec
                 | ExplicitSpecializationError::ParamSpecForTypeVar,
             )
-            | None => specialize(&specialization_types),
+            | None => generic_context.specialize_partial(db, specialization_types),
+        };
+        let specialized = specialize(source_specialization);
+
+        for specialization_error in
+            Self::collect_specialization_errors(db, env, source_specialization, specialized)
+        {
+            let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_ARGUMENTS, slice_node)
+            else {
+                continue;
+            };
+            let mut diagnostic = match specialization_error {
+                SpecializationError::MismatchedBound {
+                    bound_typevar,
+                    assignment,
+                    bound,
+                } => {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Type `{}` is not assignable to upper bound `{}` of type variable `{}`",
+                        assignment.display(db, env),
+                        bound.display(db, env),
+                        bound_typevar.identity(db).display(db),
+                    ));
+                    assignment
+                        .assignability_error_context(db, env, bound)
+                        .attach_to(db, env, &mut diagnostic);
+                    diagnostic
+                }
+                SpecializationError::MismatchedConstraint {
+                    bound_typevar,
+                    assignment,
+                    constraints,
+                } => builder.into_diagnostic(format_args!(
+                    "Type `{}` does not satisfy constraints `{}` of type variable `{}`",
+                    assignment.display(db, env),
+                    constraints
+                        .elements(db)
+                        .iter()
+                        .map(|constraint| constraint.display(db, env))
+                        .format("`, `"),
+                    bound_typevar.identity(db).display(db),
+                )),
+            };
+            add_typevar_definition(db, &mut diagnostic, specialization_error.bound_typevar());
         }
+
+        specialized
+    }
+
+    /// Collects errors from the source specialization, `ty`, and every type nested within it.
+    ///
+    /// Lazy type attributes are visited so that errors introduced while specializing a type alias,
+    /// protocol, or typed dictionary body are included. Recursive definitions are guarded by their
+    /// definition identities because their specializations can grow on every recursive expansion.
+    fn collect_specialization_errors(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        source_specialization: Specialization<'db>,
+        ty: Type<'db>,
+    ) -> Vec<SpecializationError<'db>> {
+        struct SpecializationErrorCollector<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            recursion_guard: TypeCollector<'db>,
+            active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+            active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+            active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
+            visited_specializations: RefCell<FxHashSet<Specialization<'db>>>,
+            errors: RefCell<Vec<SpecializationError<'db>>>,
+        }
+
+        impl<'db> SpecializationErrorCollector<'_, 'db> {
+            fn visit_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) {
+                if !self
+                    .visited_specializations
+                    .borrow_mut()
+                    .insert(specialization)
+                {
+                    return;
+                }
+
+                if let Some(errors) = specialization.errors(db) {
+                    self.errors.borrow_mut().extend(errors.iter().cloned());
+                }
+                walk_specialization(db, specialization, self);
+            }
+        }
+
+        impl<'db> TypeVisitor<'db> for SpecializationErrorCollector<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                true
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+
+            // TypeVar declarations are not nested result types. Following their lazy metadata can
+            // recursively request the default specialization that is currently being inspected.
+            fn visit_bound_type_var_type(
+                &self,
+                _db: &'db dyn Db,
+                _bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+            }
+
+            fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {}
+
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                self.visit_specialization(db, alias.specialization(db));
+            }
+
+            fn visit_known_instance_type(
+                &self,
+                db: &'db dyn Db,
+                known_instance: KnownInstanceType<'db>,
+            ) {
+                if let KnownInstanceType::Specialization(specialization) = known_instance {
+                    self.visit_specialization(db, specialization);
+                } else {
+                    walk_known_instance_type(db, known_instance, self);
+                }
+            }
+
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                if let Some(specialization) = alias.specialization(db) {
+                    self.visit_specialization(db, specialization);
+                }
+                self.active_type_aliases.visit(
+                    &alias.definition(db),
+                    || {},
+                    || walk_type_alias_type(db, alias, self),
+                );
+            }
+
+            fn visit_protocol_instance_type(
+                &self,
+                db: &'db dyn Db,
+                protocol: ProtocolInstanceType<'db>,
+            ) {
+                let protocol_ty = Type::ProtocolInstance(protocol);
+                let Some(class) = protocol.class_origin(db) else {
+                    walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                    return;
+                };
+                let Some((origin, specialization)) = class.static_class_literal(db) else {
+                    walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                    return;
+                };
+
+                if let Some(specialization) = specialization {
+                    self.visit_specialization(db, specialization);
+                }
+                self.active_class_protocols.visit(
+                    &origin,
+                    || {},
+                    || {
+                        walk_protocol_instance_interface(
+                            db,
+                            protocol.interface(db),
+                            protocol_ty,
+                            self,
+                        );
+                    },
+                );
+            }
+
+            fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+                let Some(class) = typed_dict.defining_class() else {
+                    walk_typed_dict_type(db, typed_dict, self);
+                    return;
+                };
+                let Some((origin, specialization)) = class.static_class_literal(db) else {
+                    walk_typed_dict_type(db, typed_dict, self);
+                    return;
+                };
+
+                if let Some(specialization) = specialization {
+                    self.visit_specialization(db, specialization);
+                }
+                self.active_class_typed_dicts.visit(
+                    &origin,
+                    || {},
+                    || walk_typed_dict_type(db, typed_dict, self),
+                );
+            }
+        }
+
+        let collector = SpecializationErrorCollector {
+            env,
+            recursion_guard: TypeCollector::default(),
+            active_class_protocols: ActiveRecursionDetector::default(),
+            active_class_typed_dicts: ActiveRecursionDetector::default(),
+            active_type_aliases: ActiveRecursionDetector::default(),
+            visited_specializations: RefCell::default(),
+            errors: RefCell::default(),
+        };
+        collector.visit_specialization(db, source_specialization);
+        collector.visit_type(db, ty);
+        collector.errors.into_inner()
     }
 
     /// Infer the type of the expression that represents an explicit specialization of a

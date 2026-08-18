@@ -177,7 +177,7 @@ def _(kwargs: dict[str, int], bad_kwargs: dict[str, str]):
 The type parameter can be specified explicitly:
 
 ```py
-from typing import Literal
+from typing import Any, Literal
 
 class C[T]:
     x: T
@@ -215,25 +215,35 @@ reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion[str]
 reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion[int | str]
 ```
 
-If the type variable is constrained, the specialized type must satisfy those constraints:
+If the type variable is constrained, the specialized type must satisfy those constraints. Dynamic
+type assignments remain valid and preserve their gradual type:
 
 ```py
 class Constrained[T: (int, str)]: ...
 
 reveal_type(Constrained[int]())  # revealed: Constrained[int]
 
-# TODO: error: [invalid-argument-type]
-# TODO: revealed: Constrained[Unknown]
-reveal_type(Constrained[IntSubclass]())  # revealed: Constrained[IntSubclass]
+# error: [invalid-type-arguments]
+# revealed: Constrained[Unknown]
+reveal_type(Constrained[IntSubclass]())
 
 reveal_type(Constrained[str]())  # revealed: Constrained[str]
 
-# TODO: error: [invalid-argument-type]
-# TODO: revealed: Unknown
-reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
+# revealed: Constrained[Any]
+reveal_type(Constrained[Any]())
+
+# error: [invalid-type-arguments]
+# revealed: Constrained[Unknown]
+reveal_type(Constrained[int | str]())
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
 reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]
+
+class PartiallyConstrained[T: (int, str), U]: ...
+
+# error: [invalid-type-arguments]
+# revealed: PartiallyConstrained[Unknown, bytes]
+reveal_type(PartiallyConstrained[IntSubclass, bytes]())
 ```
 
 If the type variable has a default, it can be omitted:

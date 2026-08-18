@@ -409,15 +409,15 @@ class Constrained(Generic[ConstrainedT]): ...
 
 reveal_type(Constrained[int]())  # revealed: Constrained[int]
 
-# TODO: error: [invalid-argument-type]
-# TODO: revealed: Constrained[Unknown]
-reveal_type(Constrained[IntSubclass]())  # revealed: Constrained[IntSubclass]
+# error: [invalid-type-arguments]
+# revealed: Constrained[Unknown]
+reveal_type(Constrained[IntSubclass]())
 
 reveal_type(Constrained[str]())  # revealed: Constrained[str]
 
-# TODO: error: [invalid-argument-type]
-# TODO: revealed: Unknown
-reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
+# error: [invalid-type-arguments]
+# revealed: Constrained[Unknown]
+reveal_type(Constrained[int | str]())
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`"
 reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]

@@ -214,15 +214,15 @@ type Constrained[T: (int, str)] = list[T]
 
 reveal_type(Constrained[int])  # revealed: <type alias 'Constrained[int]'>
 
-# TODO: error: [invalid-argument-type]
-# TODO: revealed: Constrained[Unknown]
-reveal_type(Constrained[IntSubclass])  # revealed: <type alias 'Constrained[IntSubclass]'>
+# error: [invalid-type-arguments]
+# revealed: <type alias 'Constrained[Unknown]'>
+reveal_type(Constrained[IntSubclass])
 
 reveal_type(Constrained[str])  # revealed: <type alias 'Constrained[str]'>
 
-# TODO: error: [invalid-argument-type]
-# TODO: revealed: Unknown
-reveal_type(Constrained[int | str])  # revealed: <type alias 'Constrained[int | str]'>
+# error: [invalid-type-arguments]
+# revealed: <type alias 'Constrained[Unknown]'>
+reveal_type(Constrained[int | str])
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
 reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[Unknown]'>

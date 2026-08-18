@@ -739,6 +739,30 @@ info: Type variable defined here
   |       ^^^^^^^^^^^^^^
 ```
 
+An overloaded callback can produce alternative solutions for a constrained type variable. Those
+solutions cannot be merged into one union specialization because that union is not equivalent to
+either declared constraint. The invalid inferred specialization is reported at the call, and only
+its invalid type assignment recovers to `Unknown`.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+@overload
+def callback(value: int) -> int: ...
+@overload
+def callback(value: str) -> str: ...
+def callback(value: int | str) -> int | str:
+    return value
+
+def consume[T: (int, str)](callback: Callable[..., T]) -> T:
+    return callback()
+
+# error: [invalid-argument-type]
+# revealed: Unknown
+reveal_type(consume(callback))
+```
+
 ## Typevar constraints
 
 If a type parameter has an upper bound, that upper bound constrains which types can be used for that

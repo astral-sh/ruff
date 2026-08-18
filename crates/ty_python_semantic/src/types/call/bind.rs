@@ -5947,8 +5947,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // If we failed to prefer the declared type, attempt inference again, ignoring
         // the declared type.
         //
-        // Note that this will still lead to an invalid specialization, but may
-        // produce more precise diagnostics.
+        // This can still infer candidates outside a TypeVar's declared domain, but final
+        // specialization construction reports them and recovers invalid assignments to `Unknown`.
         if !assignable_to_declared_type {
             builder =
                 SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
@@ -6039,6 +6039,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             ),
         };
         let specialization = inference.specialization(db);
+        if let Some(errors) = specialization.errors(db) {
+            self.errors.extend(errors.iter().cloned().map(|error| {
+                BindingError::SpecializationError {
+                    error,
+                    argument_index: None,
+                }
+            }));
+        }
 
         self.return_ty = self.return_ty.apply_specialization(db, specialization);
         self.inference = Some(inference);
@@ -9191,7 +9199,7 @@ impl<'db> BindingError<'db> {
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let argument_type = error.argument_type();
+                let argument_type = error.assignment();
                 let argument_ty_display = argument_type.display(db, env);
 
                 let mut diag = builder.into_diagnostic(format_args!(
@@ -9202,36 +9210,30 @@ impl<'db> BindingError<'db> {
                 ));
 
                 match error {
-                    SpecializationError::MismatchedBound { bound_typevar, .. } => {
-                        let typevar = bound_typevar.typevar(context.db());
-                        let typevar_name = typevar.name(context.db());
+                    SpecializationError::MismatchedBound {
+                        bound_typevar,
+                        bound,
+                        ..
+                    } => {
+                        let typevar_name = bound_typevar.typevar(context.db()).name(context.db());
                         diag.set_primary_annotation_message(format_args!(
                             "Argument type `{argument_ty_display}` does not \
                                 satisfy upper bound `{}` of type variable `{typevar_name}`",
-                            typevar
-                                .upper_bound(db, env)
-                                .expect(
-                                    "type variable should have an upper bound if this error occurs"
-                                )
-                                .display(db, env)
+                            bound.display(db, env)
                         ));
                     }
-                    SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
-                        let typevar = bound_typevar.typevar(context.db());
-                        let typevar_name = typevar.name(context.db());
+                    SpecializationError::MismatchedConstraint {
+                        bound_typevar,
+                        constraints,
+                        ..
+                    } => {
+                        let typevar_name = bound_typevar.typevar(context.db()).name(context.db());
                         diag.set_primary_annotation_message(format_args!(
                             "Argument type `{argument_ty_display}` does not \
                                 satisfy constraints ({}) of type variable `{typevar_name}`",
-                            typevar
-                                .constraints(db, env)
-                                .expect(
-                                    "type variable should have constraints if this error occurs"
-                                )
-                                .iter()
-                                .format_with(", ", |ty, f| f(&format_args!(
-                                    "`{}`",
-                                    ty.display(db, env)
-                                )))
+                            constraints.elements(db).iter().format_with(", ", |ty, f| f(
+                                &format_args!("`{}`", ty.display(db, env))
+                            ))
                         ));
                     }
                 }

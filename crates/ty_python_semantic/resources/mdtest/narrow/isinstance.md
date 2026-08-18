@@ -1315,6 +1315,8 @@ def _(xs: list[str] | set[str]) -> str:
 ## Narrowing recursively bounded generics (strict mode)
 
 An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
+Strict narrowing would normally use `object` for an unknown type assignment, but `object` does not
+satisfy these recursive bounds, so the specialization recovers to `Unknown`.
 
 ```toml
 [environment]
@@ -1331,7 +1333,7 @@ class Recursive[T: "Recursive[Any]"]: ...
 
 def narrow(value: object) -> None:
     if isinstance(value, Recursive):
-        reveal_type(value)  # revealed: Recursive[object]
+        reveal_type(value)  # revealed: Recursive[Unknown]
 ```
 
 A self-referential bound must also be safe when its recursion is hidden behind a type alias.
@@ -1343,7 +1345,7 @@ type RecursiveAlias = AliasedRecursive[Any]
 
 def narrow_alias(value: object) -> None:
     if isinstance(value, AliasedRecursive):
-        reveal_type(value)  # revealed: AliasedRecursive[object]
+        reveal_type(value)  # revealed: AliasedRecursive[Unknown]
 ```
 
 The same cycle recovery must handle bounds shared by mutually recursive generic classes.
@@ -1354,10 +1356,10 @@ class Right[U: Left[Any]]: ...
 
 def narrow_mutual(value: object) -> None:
     if isinstance(value, Left):
-        reveal_type(value)  # revealed: Left[object]
+        reveal_type(value)  # revealed: Left[Unknown]
 
     if isinstance(value, Right):
-        reveal_type(value)  # revealed: Right[object]
+        reveal_type(value)  # revealed: Right[Unknown]
 ```
 
 ## Narrowing recursively bounded generics (gradual mode)
