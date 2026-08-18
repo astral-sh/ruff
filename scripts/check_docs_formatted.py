@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+#
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["ruff"]
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """Check code snippets in docs are formatted by Ruff."""
 
 from __future__ import annotations

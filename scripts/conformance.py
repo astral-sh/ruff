@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """
 Run typing conformance tests and compare results between two ty versions.
 

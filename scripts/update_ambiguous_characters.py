@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """Generate the confusables.rs file from the VS Code ambiguous.json file."""
 
 from __future__ import annotations

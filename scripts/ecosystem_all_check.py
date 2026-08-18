@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["tqdm"]
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """This is @konstin's scripts for checking an entire checkout of ~2.1k packages for
 panics, fix errors and similar problems.
 

@@ -468,7 +468,7 @@ To preview any changes to the documentation locally:
 1. Generate the MkDocs site with:
 
     ```shell
-    uv run --only-group=docs python scripts/generate_mkdocs.py
+    uv run --script scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
@@ -560,7 +560,7 @@ Commit each step of this process separately for easier review.
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
-    1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
+    1. Run `uv run --script scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
 1. Update the [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repository by following

@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """Update ruff.json in schemastore.
 
 This script will clone `astral-sh/schemastore`, update the schema and push the changes
@@ -6,7 +14,7 @@ to schemastore in the CLI.
 
 Usage:
 
-    uv run --only-dev scripts/update_schemastore.py
+    uv run --script scripts/update_schemastore.py
 """
 
 from __future__ import annotations

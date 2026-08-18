@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+#
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """
 **DEPRECATED** This script is being replaced by the ruff-ecosystem package.
 

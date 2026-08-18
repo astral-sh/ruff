@@ -63,15 +63,12 @@ release = [
     "rooster==0.1.1",
 ]
 docs = [
-    "mdformat>=1.0.0",
-    "mdformat-mkdocs>=5.3.0",
     "mkdocs>=1.6.1",
     "mkdocs-github-admonitions-plugin>=0.1.1",
     "mkdocs-llmstxt>=0.2.0",
     "mkdocs-material>=9.7.7",
     "mkdocs-redirects>=1.2.3",
     "pyyaml>=6.0.3",
-    "ruff",
 ]
 
 [tool.uv]
@@ -129,6 +126,7 @@ combine-as-imports = true
 [tool.ruff.per-file-target-version]
 "crates/ty_python_semantic/mdtest.py" = "py310"
 "crates/ty_vendored/ty_extensions/*.pyi" = "py312"
+"scripts/*.py" = "py312"
 
 [tool.black]
 force-exclude = '''

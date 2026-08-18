@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["stdlibs"]
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 from __future__ import annotations
 
 from pathlib import Path
