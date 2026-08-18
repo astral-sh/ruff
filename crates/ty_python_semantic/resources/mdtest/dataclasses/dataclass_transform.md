@@ -1691,7 +1691,7 @@ class OptionalModel(metaclass=KeywordOnlyModelMeta):
 class Child(RequiredModel, OptionalModel):
     pass
 
-reveal_type(Child.__init__)  # revealed: (self: Child, *, optional: int = ..., required: int) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, *, optional: int = 1, required: int) -> None
 Child(required=1)
 ```
 

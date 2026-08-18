@@ -67,7 +67,7 @@ class Person:
 
     metadata: InitVar[str] = "default"
 
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = ...) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = "default") -> None
 
 alice = Person("Alice", 30)
 bob = Person("Bob", 25, "custom metadata")
@@ -89,7 +89,7 @@ class C:
     a: Top[int]
     int: InitVar[int] = 0
 
-reveal_type(C.__init__)  # revealed: (self: C, a: int, int: int = ...) -> None
+reveal_type(C.__init__)  # revealed: (self: C, a: int, int: int = 0) -> None
 C()  # error: [missing-argument] "No argument provided for required parameter `a`"
 ```
 

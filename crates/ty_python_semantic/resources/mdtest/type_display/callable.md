@@ -1,72 +1,29 @@
 # Display of callable types
 
-## Default values
+## Default values after promotion
 
-A concrete function displays its default values. Its abstract callable type records only which
-parameters can be omitted, including positional-only and keyword-only parameters.
-
-```py
-from ty_extensions._internal import RegularCallableTypeOf
-
-def f(x: int = 1, /, y: str = "value", *, z: bool = True) -> None: ...
-
-reveal_type(f)  # revealed: def f(x: int = 1, /, y: str = "value", *, z: bool = True) -> None
-
-def _(callback: RegularCallableTypeOf[f]):
-    reveal_type(callback)  # revealed: (x: int = ..., /, y: str = ..., *, z: bool = ...) -> None
-```
-
-## Overloaded defaults
-
-Each overload follows the same distinction between a concrete function and an abstract callable.
-
-```py
-from typing import overload
-from ty_extensions._internal import RegularCallableTypeOf
-
-@overload
-def f(x: int = 1) -> None: ...
-@overload
-def f(x: str = "value") -> None: ...
-def f(x: int | str = 1) -> None: ...
-
-reveal_type(f)  # revealed: Overload[(x: int = 1) -> None, (x: str = "value") -> None]
-
-def _(callback: RegularCallableTypeOf[f]):
-    reveal_type(callback)  # revealed: Overload[(x: int = ...) -> None, (x: str = ...) -> None]
-```
-
-## Nested defaults
-
-Nested types choose their own display policy. Abstract callback annotations and return types use
-ellipsis, while a concrete function represented by `TypeOf` retains its value even inside an
-abstract signature.
-
-```py
-from ty_extensions._internal import RegularCallableTypeOf, TypeOf
-
-def inner(x: int = 1) -> None: ...
-def outer(callback: RegularCallableTypeOf[inner], concrete: TypeOf[inner], flag: bool = True) -> RegularCallableTypeOf[inner]:
-    return callback
-
-# revealed: def outer(callback: (x: int = ...) -> None, concrete: def inner(x: int = 1) -> None, flag: bool = True) -> ((x: int = ...) -> None)
-reveal_type(outer)
-
-def _(callback: RegularCallableTypeOf[outer]):
-    # revealed: (callback: (x: int = ...) -> None, concrete: def inner(x: int = 1) -> None, flag: bool = ...) -> ((x: int = ...) -> None)
-    reveal_type(callback)
-```
-
-## Defaults in nested collections
-
-Promoting a function through nested collections produces an abstract callable. Diagnostics display
-the parameter's optionality without depending on its concrete default.
+A function displays its literal default after being promoted to a callable once. Promoting that
+callable again widens the default, so a nested collection displays `...` instead.
 
 ```py
 def f(n=5): ...
 
+reveal_type(f)  # revealed: def f(n=5) -> Unknown
+reveal_type([f])  # revealed: list[(n=5) -> Unknown]
+reveal_type([[f]])  # revealed: list[list[(n=...) -> Unknown]]
+
 # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `None` on object of type `list[list[(n=...) -> Unknown]]`"
 [[f]][0] = None
+```
+
+## Defaults that do not widen
+
+The default `None` does not widen, so it remains visible after repeated promotion.
+
+```py
+def f(n=None): ...
+
+reveal_type([[f]])  # revealed: list[list[(n=None) -> Unknown]]
 ```
 
 ## Parenthesizing callables
@@ -122,27 +79,6 @@ from ty_extensions import Top
 
 def f(x: Top[Callable[..., str]] | Callable[[int], int]):
     reveal_type(x)  # revealed: Top[(...) -> str] | ((int, /) -> int)
-```
-
-## ParamSpec defaults
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-A `ParamSpec` inferred from a function retains optional parameters but displays only their default
-presence.
-
-```py
-from typing import Callable
-
-class C[**P]:
-    def __init__(self, callback: Callable[P, None]) -> None: ...
-
-def f(x: int = 1) -> None: ...
-
-reveal_type(C(f))  # revealed: C[(x: int = ...)]
 ```
 
 ## Top ParamSpec

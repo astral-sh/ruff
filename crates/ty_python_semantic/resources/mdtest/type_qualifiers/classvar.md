@@ -344,7 +344,7 @@ class D:
 Note that `class_attr` does not appear in the signature of `__init__`:
 
 ```py
-# revealed: (self: D, instance_attr: int = ...) -> None
+# revealed: (self: D, instance_attr: int = 1) -> None
 reveal_type(D.__init__)
 ```
 

@@ -45,9 +45,9 @@ use crate::types::typevar::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
-    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    MaterializationKind, ParamSpecAttrKind, ParameterDescription, PromotionKind, PromotionMode,
+    SelfBinding, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType,
+    UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -72,7 +72,7 @@ pub(super) enum ReturnCallableTypeVarScope {
 /// be deferred. (This prevents spurious salsa cycles when we need the signature of the function
 /// while in the middle of inferring its definition scope — for instance, when applying
 /// decorators.)
-fn function_signature_expression_type<'db>(
+pub(super) fn function_signature_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     expression: &ast::Expr,
@@ -5649,9 +5649,8 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    /// Infer the default-value type only when its value is needed, such as for a concrete
-    /// signature's display or a dataclass field specifier. Abstract callable types only need
-    /// [`Self::has_default`].
+    /// Infer the default-value type only when its value is needed, such as for display or a
+    /// dataclass field specifier. Callable compatibility only needs [`Self::has_default`].
     pub(crate) fn default_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.default().map(|default| default.ty(db))
     }
@@ -5686,6 +5685,8 @@ pub enum ParameterDefault<'db> {
     Inferred(Type<'db>),
     /// A source parameter whose default is inferred on demand.
     Deferred(Definition<'db>),
+    /// A source default whose promotable literals are widened when its type is requested.
+    DeferredPromoted(Definition<'db>),
 }
 
 impl<'db> ParameterDefault<'db> {
@@ -5693,13 +5694,15 @@ impl<'db> ParameterDefault<'db> {
         match self {
             Self::Inferred(ty) => ty,
             Self::Deferred(parameter) => parameter_default_type(db, parameter),
+            Self::DeferredPromoted(parameter) => parameter_default_type(db, parameter)
+                .promote(db, &ProgramEnvironment::from_definition(parameter)),
         }
     }
 
     fn eager_type(self) -> Option<Type<'db>> {
         match self {
             Self::Inferred(ty) => Some(ty),
-            Self::Deferred(_) => None,
+            Self::Deferred(_) | Self::DeferredPromoted(_) => None,
         }
     }
 
@@ -5708,7 +5711,7 @@ impl<'db> ParameterDefault<'db> {
             Self::Inferred(ty) => Self::Inferred(f(ty)),
             // A source default is a runtime value, not part of the callable's type parameters.
             // Specializing or otherwise transforming the signature must not evaluate it.
-            Self::Deferred(_) => self,
+            Self::Deferred(_) | Self::DeferredPromoted(_) => self,
         }
     }
 }
@@ -5870,13 +5873,21 @@ impl<'db> ParameterKind<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let apply_to_default_type = |default_type: &Option<ParameterDefault<'db>>| {
-            default_type.map(|default| {
-                if type_mapping == &TypeMapping::ReplaceParameterDefaults {
+            default_type.map(|default| match (default, type_mapping) {
+                (_, TypeMapping::ReplaceParameterDefaults) => {
                     ParameterDefault::Inferred(Type::unknown())
-                } else {
-                    default
-                        .map_type(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                 }
+                (
+                    ParameterDefault::Deferred(parameter),
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
+                ) => {
+                    // Preserve the old literal widening without evaluating the default here.
+                    // The mapping already accounts for the parameter's contravariance, and a
+                    // later promotion in the opposite direction must not restore the literal.
+                    ParameterDefault::DeferredPromoted(parameter)
+                }
+                (default, _) => default
+                    .map_type(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             })
         };
 

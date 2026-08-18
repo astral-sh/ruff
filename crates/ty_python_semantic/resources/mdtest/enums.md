@@ -3869,13 +3869,13 @@ dynamic construction of enums using the functional syntax:
 from enum import Enum, IntEnum, StrEnum
 from ty_extensions._internal import into_regular_callable
 
-# revealed: Overload[(value: Any, names: None = ...) -> Enum, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = ..., qualname: str | None = ..., type: type | None = ..., start: int = ..., boundary: FlagBoundary | None = ...) -> type[Enum]]
+# revealed: Overload[(value: Any, names: None = None) -> Enum, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
 reveal_type(into_regular_callable(Enum))
 
-# revealed: Overload[(value: Any, names: None = ...) -> IntEnum, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = ..., qualname: str | None = ..., type: type | None = ..., start: int = ..., boundary: FlagBoundary | None = ...) -> type[Enum]]
+# revealed: Overload[(value: Any, names: None = None) -> IntEnum, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
 reveal_type(into_regular_callable(IntEnum))
 
-# revealed: Overload[(value: Any, names: None = ...) -> StrEnum, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = ..., qualname: str | None = ..., type: type | None = ..., start: int = ..., boundary: FlagBoundary | None = ...) -> type[Enum]]
+# revealed: Overload[(value: Any, names: None = None) -> StrEnum, (value: str, names: Iterable[Iterable[str | Any]], *, module: str | None = None, qualname: str | None = None, type: type | None = None, start: int = 1, boundary: FlagBoundary | None = None) -> type[Enum]]
 reveal_type(into_regular_callable(StrEnum))
 ```
 

@@ -540,7 +540,7 @@ def decorator[**P](func: Callable[Concatenate[int, P], None]) -> Callable[P, Non
 @decorator
 def defaults(x: int, y: str = "default", z: int = 0) -> None: ...
 
-reveal_type(defaults)  # revealed: (y: str = ..., z: int = ...) -> None
+reveal_type(defaults)  # revealed: (y: str = "default", z: int = 0) -> None
 ```
 
 ### Function with `*args` and `**kwargs`

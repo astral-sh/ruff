@@ -69,7 +69,7 @@ class D:
     y: str = "default"
     z: int | None = 1 + 2
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int, y: str = ..., z: int | None = ...) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int, y: str = "default", z: int | None = 3) -> None
 ```
 
 This also works if the declaration and binding are split:
@@ -80,7 +80,7 @@ class D:
     x: int | None
     x = None
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int | None = ...) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int | None = None) -> None
 ```
 
 Non-fully static types are handled correctly:
@@ -324,7 +324,7 @@ class D:
     (x): int = 1  # fmt: skip
 
 # TODO: should ideally not include a `x` parameter
-reveal_type(D.__init__)  # revealed:(self: D, x: int = ...) -> None
+reveal_type(D.__init__)  # revealed:(self: D, x: int = 1) -> None
 ```
 
 ## `@dataclass` calls with arguments
@@ -1417,7 +1417,7 @@ class A:
     a: str = field(kw_only=False)
     b: int = 0
 
-reveal_type(A.__init__)  # revealed:(self: A, a: str, *, b: int = ...) -> None
+reveal_type(A.__init__)  # revealed:(self: A, a: str, *, b: int = 0) -> None
 
 A("hi")
 ```
@@ -1504,7 +1504,7 @@ from dataclasses import dataclass, field
 class PositionalField:
     value: int = field(default=1, kw_only=True)
 
-reveal_type(PositionalField.__init__)  # revealed: (self: PositionalField, value: int = ...) -> None
+reveal_type(PositionalField.__init__)  # revealed: (self: PositionalField, value: int = 1) -> None
 
 PositionalField(1)
 
@@ -1818,7 +1818,7 @@ class C:
     class_variable1: ClassVar[Final[int]] = 1
     class_variable2: ClassVar[Final[int]] = 1
 
-reveal_type(C.__init__)  # revealed:(self: C, instance_variable_no_default: int, instance_variable: int = ...) -> None
+reveal_type(C.__init__)  # revealed:(self: C, instance_variable_no_default: int, instance_variable: int = 1) -> None
 
 c = C(1)
 # error: [invalid-assignment] "Cannot assign to final attribute `instance_variable` on type `C`"
@@ -2228,7 +2228,7 @@ class C(Base):
     z: int = 10
     x: int = 15
 
-reveal_type(C.__init__)  # revealed:(self: C, x: int = ..., y: int = ..., z: int = ...) -> None
+reveal_type(C.__init__)  # revealed:(self: C, x: int = 15, y: int = 0, z: int = 10) -> None
 ```
 
 ## Conditionally defined fields
@@ -2435,7 +2435,7 @@ class ConvertToLength:
 class C:
     converter: ConvertToLength = ConvertToLength()
 
-reveal_type(C.__init__)  # revealed: (self: C, converter: str = ...) -> None
+reveal_type(C.__init__)  # revealed: (self: C, converter: str = "") -> None
 
 c = C("abc")
 reveal_type(c.converter)  # revealed: int
@@ -2832,7 +2832,7 @@ reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'object'>)
 The generated methods have the following signatures:
 
 ```py
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int | None = ...) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int | None = None) -> None
 
 reveal_type(Person.__repr__)  # revealed: def __repr__(self) -> str
 

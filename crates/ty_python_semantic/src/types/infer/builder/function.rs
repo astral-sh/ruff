@@ -29,9 +29,8 @@ use crate::{
             infer_function_default_types, infer_statement_types, nearest_enclosing_function,
             original_class_type,
         },
-        infer_scope_types,
         relation::TypeRelation,
-        signatures::ReturnCallableTypeVarScope,
+        signatures::{ReturnCallableTypeVarScope, function_signature_expression_type},
         tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
         typevar::TypeVarSet,
@@ -46,20 +45,6 @@ use ty_python_core::{
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
-    parameters
-        .iter_non_variadic_params()
-        .any(|param| param.parameter.annotation.is_some())
-        || parameters
-            .vararg
-            .as_deref()
-            .is_some_and(|param| param.annotation.is_some())
-        || parameters
-            .kwarg
-            .as_deref()
-            .is_some_and(|param| param.annotation.is_some())
-}
-
 fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
     parameters
         .iter_non_variadic_params()
@@ -68,7 +53,11 @@ fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
 
 fn function_has_deferred_annotations(function: &ast::StmtFunctionDef) -> bool {
     function.type_params.is_none()
-        && (function.returns.is_some() || parameters_have_annotations(&function.parameters))
+        && (function.returns.is_some()
+            || function
+                .parameters
+                .iter()
+                .any(|param| param.annotation().is_some()))
 }
 
 /// Whether a non-static method receives an instance or the class itself.
@@ -719,24 +708,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Borrow annotation types from their own inference result instead of copying that result
         // into this query. Scope inference merges both regions when checking the whole function.
-        let type_params_inference = function.type_params.as_ref().map(|_| {
-            let type_params_scope = self
-                .index
-                .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
-                .to_scope_id(db, self.program_file());
-            infer_scope_types(db, type_params_scope, TypeContext::default())
-        });
-
         for param_with_default in function.parameters.iter_non_variadic_params() {
             let Some(default) = param_with_default.default() else {
                 continue;
             };
-            let annotation = param_with_default.annotation().map(|annotation| {
-                type_params_inference.map_or_else(
-                    || infer_deferred_types(db, definition).expression_type(annotation),
-                    |inference| inference.expression_type(annotation),
-                )
-            });
+            let annotation = param_with_default
+                .annotation()
+                .map(|annotation| function_signature_expression_type(db, definition, annotation));
             self.infer_expression(default, TypeContext::new(annotation));
         }
 

@@ -24,8 +24,8 @@ reveal_type(lambda a, b: a + b)  # revealed: (a, b) -> Unknown
 But, it can have default values:
 
 ```py
-reveal_type(lambda a=1: a)  # revealed: (a=...) -> Unknown | Literal[1]
-reveal_type(lambda a, b=2: a)  # revealed: (a, b=...) -> Unknown
+reveal_type(lambda a=1: a)  # revealed: (a=1) -> Unknown | Literal[1]
+reveal_type(lambda a, b=2: a)  # revealed: (a, b=2) -> Unknown
 ```
 
 And, positional-only parameters:
@@ -37,7 +37,7 @@ reveal_type(lambda a, b, /, c: c)  # revealed: (a, b, /, c) -> Unknown
 And, keyword-only parameters:
 
 ```py
-reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=..., c) -> Unknown | Literal[2]
+reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=2, c) -> Unknown | Literal[2]
 ```
 
 And, variadic parameter:
@@ -55,7 +55,7 @@ reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> dict[str, Unknow
 Mixing all of them together:
 
 ```py
-# revealed: (a, b, /, c=..., *args, *, d=..., e=..., **kwargs) -> None
+# revealed: (a, b, /, c=True, *args, *, d="default", e=5, **kwargs) -> None
 reveal_type(lambda a, b, /, c=True, *args, d="default", e=5, **kwargs: None)
 ```
 

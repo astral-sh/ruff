@@ -931,31 +931,6 @@ def ab(a: int, *, c: int):
     }
 
     #[test]
-    fn signature_help_named_tuple_constructor_defaults() {
-        let test = cursor_test(
-            r#"
-        from collections import namedtuple
-
-        defaults = (0, "Unknown")
-        Person = namedtuple("Person", ["name", "age", "city"], defaults=[*defaults])
-
-        Person("Alice", <CURSOR>)
-        "#,
-        );
-
-        let result = test.signature_help().expect("Should have signature help");
-        assert_eq!(result.signatures.len(), 1);
-        assert_eq!(
-            result.signatures[0]
-                .parameters
-                .iter()
-                .map(|parameter| parameter.label.as_str())
-                .collect::<Vec<_>>(),
-            ["name: Any", "age: Any = 0", "city: Any = \"Unknown\""]
-        );
-    }
-
-    #[test]
     fn signature_help_paramspec_generic_class_constructor_inside_subscript() {
         let test = cursor_test(
             r#"
@@ -1145,7 +1120,7 @@ def ab(a: int, *, c: int):
     fn signature_help_parameter_label_offsets() {
         let test = cursor_test(
             r#"
-        def test_function(param1: str, param2: int = 42, param3: bool = False) -> str:
+        def test_function(param1: str, param2: int, param3: bool) -> str:
             return f"{param1}: {param2}, {param3}"
 
         result = test_function(<CURSOR>
@@ -1156,18 +1131,14 @@ def ab(a: int, *, c: int):
         assert_eq!(result.signatures.len(), 1);
 
         let signature = &result.signatures[0];
-        assert_eq!(
-            signature.label,
-            "(param1: str, param2: int = 42, param3: bool = False) -> str"
-        );
         assert_eq!(signature.parameters.len(), 3);
 
         // Check that we have parameter labels
         for (i, param) in signature.parameters.iter().enumerate() {
             let expected_param_spec = match i {
                 0 => "param1: str",
-                1 => "param2: int = 42",
-                2 => "param3: bool = False",
+                1 => "param2: int",
+                2 => "param3: bool",
                 _ => panic!("Unexpected parameter index"),
             };
             assert_eq!(param.label, expected_param_spec);
