@@ -1416,12 +1416,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.add_dict_key_assignment_definitions(&node.targets, &node.value, assignment);
             }
-            Some(CurrentAssignment::AnnAssign(ann_assign)) => {
+            Some(CurrentAssignment::AnnAssign {
+                node: ann_assign,
+                pending,
+            }) => {
                 self.add_standalone_type_expression(&ann_assign.annotation);
-                let assignment = self.add_definition(
-                    place_id,
-                    AnnotatedAssignmentDefinitionNodeRef { node: ann_assign },
-                );
+                let assignment = if let Some(pending) = pending {
+                    self.finish_annotated_assignment(pending)
+                } else {
+                    self.add_definition(
+                        place_id,
+                        AnnotatedAssignmentDefinitionNodeRef { node: ann_assign },
+                    )
+                };
 
                 if let Some(value) = ann_assign.value.as_deref() {
                     self.add_dict_key_assignment_definitions(
@@ -1498,7 +1505,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place: ScopedPlaceId,
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
-        let (definition, num_definitions) = self.push_additional_definition(place, definition_node);
+        let definition = self.create_definition(place, definition_node);
+        self.record_definition(place, definition, None);
+        definition
+    }
+
+    /// Create a definition without making its declaration or binding visible in control flow.
+    fn create_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>> + std::fmt::Debug + Copy,
+    ) -> Definition<'db> {
+        let (definition, num_definitions) =
+            self.create_additional_definition(place, definition_node);
         debug_assert_eq!(
             num_definitions, 1,
             "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
@@ -1528,14 +1547,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Push a new [`Definition`] onto the list of definitions
     /// associated with the `definition_node` AST node.
     ///
-    /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
-    /// and the second element is the number of definitions that are now associated with
-    /// `definition_node`.
-    ///
     /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
     /// `add_definition` above, which enforces that. This method should currently only be used with
     /// `*` imports and loop headers.
     fn push_additional_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) {
+        let (definition, _) = self.create_additional_definition(place, definition_node);
+        self.record_definition(place, definition, None);
+    }
+
+    /// Create a [`Definition`] without recording it in control flow.
+    ///
+    /// Returns the new definition and the number of definitions now associated with its AST
+    /// node. Loop headers are not stored by AST node, so their count is zero. Prefer
+    /// [`Self::create_definition`] when the node must have exactly one definition.
+    fn create_additional_definition(
         &mut self,
         place: ScopedPlaceId,
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
@@ -1560,8 +1589,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions.len()
         };
 
-        self.record_definition(place, definition, None);
-
         (definition, num_definitions)
     }
 
@@ -1578,8 +1605,82 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         previous_definitions: Option<PreviousDefinitions>,
     ) {
         let kind = definition.kind(self.db);
-        let is_loop_header = kind.is_loop_header();
         let category = kind.category(self.source_type.is_stub(), self.module);
+        match category {
+            DefinitionCategory::Declaration => {
+                self.mark_place_declared(place);
+                self.current_use_def_map_mut()
+                    .record_declaration(place, definition);
+            }
+            DefinitionCategory::DeclarationAndBinding => {
+                self.mark_place_declared(place);
+                self.record_binding_with(definition, |use_def, place| {
+                    use_def.record_combined_definition(place, definition, category);
+                });
+            }
+            DefinitionCategory::Binding => {
+                let previous = previous_definitions.unwrap_or(if kind.is_loop_header() {
+                    PreviousDefinitions::AreKept
+                } else {
+                    PreviousDefinitions::AreShadowed
+                });
+                self.record_binding_with(definition, |use_def, place| {
+                    use_def.record_binding(
+                        place,
+                        definition,
+                        previous,
+                        FutureDefinitions::ShadowThisOne,
+                    );
+                });
+            }
+        }
+    }
+
+    /// Declare an annotated name assignment whose value will be bound after visiting its RHS.
+    /// Other targets and annotations without a RHS are recorded in full by `add_definition`.
+    fn begin_annotated_assignment(
+        &mut self,
+        node: &'ast ast::StmtAnnAssign,
+    ) -> Option<PendingAnnotatedAssignment<'db>> {
+        let ast::Expr::Name(name) = &*node.target else {
+            return None;
+        };
+        node.value.as_ref()?;
+
+        let place = self.add_symbol(name.id.clone()).into();
+        let definition =
+            self.create_definition(place, AnnotatedAssignmentDefinitionNodeRef { node });
+        self.mark_place_declared(place);
+        self.current_use_def_map_mut().record_combined_definition(
+            place,
+            definition,
+            DefinitionCategory::Declaration,
+        );
+        Some(PendingAnnotatedAssignment { definition })
+    }
+
+    /// Bind the value of an annotated assignment whose declaration was recorded before its RHS.
+    fn finish_annotated_assignment(
+        &mut self,
+        pending: PendingAnnotatedAssignment<'db>,
+    ) -> Definition<'db> {
+        let definition = pending.definition;
+        self.record_binding_with(definition, |use_def, place| {
+            use_def.record_combined_definition(place, definition, DefinitionCategory::Binding);
+        });
+        definition
+    }
+
+    /// Record one binding while keeping aliases, captures, and lazy snapshots in sync.
+    /// The callback receives the definition's place and must append that binding to the current
+    /// use-def map.
+    fn record_binding_with(
+        &mut self,
+        definition: Definition<'db>,
+        record: impl FnOnce(&mut UseDefMapBuilder<'db>, ScopedPlaceId),
+    ) {
+        let place = definition.place(self.db);
+        let is_loop_header = definition.kind(self.db).is_loop_header();
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
         // definition for them, because that would lead to false-positive semantic syntax errors in
@@ -1589,43 +1690,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         //     global x  # [invalid-syntax] if `x` is already used or bound
         //     x = 1
         // ```
-        if category.is_binding() && !is_loop_header {
+        if !is_loop_header {
             self.mark_place_bound(place);
             self.invalidate_narrowing_aliases_for(place);
         }
-        if category.is_declaration() {
-            self.mark_place_declared(place);
-        }
 
         let definition_id = self.current_use_def_map().next_definition_id();
-        let use_def = self.current_use_def_map_mut();
-        match category {
-            DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(place, definition);
-                self.delete_associated_bindings(place);
-            }
-            DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
-            DefinitionCategory::Binding => {
-                let previous = previous_definitions.unwrap_or(if is_loop_header {
-                    PreviousDefinitions::AreKept
-                } else {
-                    PreviousDefinitions::AreShadowed
-                });
-                use_def.record_binding(
-                    place,
-                    definition,
-                    previous,
-                    FutureDefinitions::ShadowThisOne,
-                );
-                if !is_loop_header {
-                    self.delete_associated_bindings(place);
-                }
-            }
+        record(self.current_use_def_map_mut(), place);
+
+        if !is_loop_header {
+            self.delete_associated_bindings(place);
         }
 
-        if category.is_binding()
-            && let Some(id) = place.as_symbol()
-        {
+        if let Some(id) = place.as_symbol() {
             self.record_pending_capture_binding(id, definition_id);
             self.update_lazy_snapshots(id);
         }
@@ -2235,6 +2312,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Records the current flow state immediately before an operation that may raise an exception.
+    ///
+    /// This models exceptions from ordinary operations, not every possible interruption. In
+    /// particular, we do not add arbitrary exception points for asynchronously raised exceptions
+    /// such as those originating in signal handlers.
     ///
     /// Child expressions must already have been visited, so their completed assignments are
     /// visible if the parent operation fails:
@@ -3848,6 +3929,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
+                // For an assignment with a value, an exception from the annotation or RHS must
+                // not discard the declared type. The value is still bound only after the RHS
+                // completes, so a handler can observe an earlier binding (or an unbound name).
+                let pending = self.begin_annotated_assignment(node);
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
@@ -3888,7 +3973,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     *node.target,
                     ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
                 ) {
-                    self.push_assignment(CurrentAssignment::AnnAssign(node));
+                    self.push_assignment(CurrentAssignment::AnnAssign { node, pending });
                     self.visit_expr(&node.target);
                     self.pop_assignment();
 
@@ -5705,13 +5790,23 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 }
 
+/// A simple-name annotated assignment with an RHS whose declaration is already recorded.
+/// Created only by `begin_annotated_assignment`; finishing it records the value binding.
+#[derive(Copy, Clone, Debug, PartialEq)]
+struct PendingAnnotatedAssignment<'db> {
+    definition: Definition<'db>,
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CurrentAssignment<'ast, 'db> {
     Assign {
         node: &'ast ast::StmtAssign,
         unpack: Option<Unpack<'db>>,
     },
-    AnnAssign(&'ast ast::StmtAnnAssign),
+    AnnAssign {
+        node: &'ast ast::StmtAnnAssign,
+        pending: Option<PendingAnnotatedAssignment<'db>>,
+    },
     AugAssign(&'ast ast::StmtAugAssign),
     For {
         node: &'ast ast::StmtFor,
@@ -5736,7 +5831,9 @@ impl CurrentAssignment<'_, '_> {
             Self::For { unpack, .. }
             | Self::WithItem { unpack, .. }
             | Self::Comprehension { unpack, .. } => unpack.as_mut().map(|(position, _)| position),
-            Self::Assign { .. } | Self::AnnAssign(_) | Self::AugAssign(_) | Self::Named(_) => None,
+            Self::Assign { .. } | Self::AnnAssign { .. } | Self::AugAssign(_) | Self::Named(_) => {
+                None
+            }
         }
     }
 }
