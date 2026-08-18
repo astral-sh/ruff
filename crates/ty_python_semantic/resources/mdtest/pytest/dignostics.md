@@ -48,3 +48,32 @@ error[pytest-invalid-argnames-literal]: `x,y` is not a valid Python identifier.
 7 | @pytest.mark.parametrize(("x,y",), [])  # snapshot: pytest-invalid-argnames-literal
   |                           ^^^^^
 ```
+
+## Request Keyword
+
+`request` is a keyword in `pytest`.
+
+```py
+import pytest
+from typing import Any
+
+@pytest.mark.parametrize("request, x", [(None, 1), (None, 2)])  # snapshot: pytest-request-keyword
+def test_request_keyword_csv(x: int, request: Any) -> None: ...
+@pytest.mark.parametrize(("request", "x"), [(None, 1), (None, 2)])  # snapshot: pytest-request-keyword
+def test_request_keyword_tuple(x: int, request: Any) -> None: ...
+```
+
+```snapshot
+error[pytest-request-keyword]: `request` is a reserved Pytest keyword and cannot be used during parametrization.
+ --> src/mdtest_snippet.py:4:26
+  |
+4 | @pytest.mark.parametrize("request, x", [(None, 1), (None, 2)])  # snapshot: pytest-request-keyword
+  |                          ^^^^^^^^^^^^
+
+
+error[pytest-request-keyword]: `request` is a reserved Pytest keyword and cannot be used during parametrization.
+ --> src/mdtest_snippet.py:6:27
+  |
+6 | @pytest.mark.parametrize(("request", "x"), [(None, 1), (None, 2)])  # snapshot: pytest-request-keyword
+  |                           ^^^^^^^^^
+```

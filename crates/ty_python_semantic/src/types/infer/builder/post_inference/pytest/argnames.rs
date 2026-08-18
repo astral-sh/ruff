@@ -174,7 +174,7 @@ impl TypeInferenceBuilder<'_, '_> {
         if name == "request" {
             if let Some(builder) = self.context.report_lint(&PYTEST_REQUEST_KEYWORD, range) {
                 builder.into_diagnostic(
-                    "`request` is a reserved Python keyword and cannot be used during parametrization.",
+                    "`request` is a reserved Pytest keyword and cannot be used during parametrization.",
                 );
             }
             return false;
