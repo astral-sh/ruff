@@ -4418,6 +4418,119 @@ class IntParser:
 parser: Parser = IntParser
 ```
 
+## Generic protocol inference from class attributes
+
+A class object can supply the type argument of a protocol through an ordinary attribute. Passing the
+class itself should infer the same type as passing an instance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    value: T
+
+class IntValue:
+    value: int = 1
+
+def get_value[T](obj: HasValue[T]) -> T:
+    return obj.value
+
+reveal_type(get_value(IntValue))  # revealed: int
+reveal_type(get_value(IntValue()))  # revealed: int
+
+def _(cls: type[IntValue]) -> None:
+    reveal_type(get_value(cls))  # revealed: int
+```
+
+## Generic protocol inference from class methods
+
+The return type of a class method can determine a protocol's type argument, including when the
+argument is the class object itself.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Factory(Protocol[T_co]):
+    @classmethod
+    def make(cls) -> T_co: ...
+
+class Concrete:
+    @classmethod
+    def make(cls) -> "Concrete":
+        return cls()
+
+def from_protocol(factory: Factory[T]) -> T:
+    return factory.make()
+
+reveal_type(from_protocol(Concrete))  # revealed: Concrete
+reveal_type(from_protocol(Concrete()))  # revealed: Concrete
+
+bad: Factory[str] = Concrete  # error: [invalid-assignment]
+```
+
+Specialized generic class objects and unions of class objects also contribute their method return
+types to inference.
+
+```py
+class GenericFactory[T]:
+    @classmethod
+    def make(cls) -> T:
+        raise NotImplementedError
+
+reveal_type(from_protocol(GenericFactory[int]))  # revealed: int
+
+def _(cls: type[GenericFactory[int]] | type[GenericFactory[str]]) -> None:
+    reveal_type(from_protocol(cls))  # revealed: int | str
+```
+
+## Generic protocol inference from static methods
+
+A static method on a class object can satisfy either a static-method or an instance-method protocol
+member. Both forms should contribute the method's return type to inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class StaticFactory[T](Protocol):
+    @staticmethod
+    def make() -> T: ...
+
+class InstanceFactory[T](Protocol):
+    def make(self) -> T: ...
+
+class IntFactory:
+    @staticmethod
+    def make() -> int:
+        return 1
+
+def from_static[T](factory: StaticFactory[T]) -> T:
+    return factory.make()
+
+def from_instance[T](factory: InstanceFactory[T]) -> T:
+    return factory.make()
+
+reveal_type(from_static(IntFactory))  # revealed: int
+reveal_type(from_instance(IntFactory))  # revealed: int
+```
+
 ## Class objects and `Self`-returning class-method protocol members
 
 When a class object is checked against a class-method protocol member, `Self` in the protocol
@@ -5576,6 +5689,57 @@ class Constructor(Protocol):
     def __call__(value: int) -> Product: ...
 
 constructor: Constructor = Product
+```
+
+## Generic constructor callback inference
+
+Passing `type[T]` to a generic callback protocol must preserve the type variable returned by the
+class's constructor.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Callback[T](Protocol):
+    def __call__(self) -> T: ...
+
+def invoke[T](callback: Callback[T]) -> T:
+    return callback()
+
+def create[T](cls: type[T]) -> T:
+    reveal_type(invoke(cls))  # revealed: T@create
+    return invoke(cls)
+```
+
+## Generic callback inference from other members
+
+A callable protocol can infer a type argument from another member. Comparing only its `__call__`
+signature would miss the class attribute that determines `T` here.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class ConstructorWithValue[T](Protocol):
+    value: T
+
+    def __call__(self) -> object: ...
+
+class Product:
+    value: int = 1
+
+def get_value[T](factory: ConstructorWithValue[T]) -> T:
+    return factory.value
+
+reveal_type(get_value(Product))  # revealed: int
 ```
 
 ## Generic protocols and union arguments
