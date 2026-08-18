@@ -104,6 +104,14 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
+    /// Whether this type uses the exact-tuple representation that can become an argument pack.
+    pub(super) const fn is_exact_tuple_instance(self) -> bool {
+        matches!(
+            self,
+            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(_)))
+        )
+    }
+
     /// Marks a tuple-shaped type as a generic argument sequence instead of a runtime value.
     pub(crate) fn into_typevartuple_pack(self, db: &'db dyn Db) -> Self {
         match self {

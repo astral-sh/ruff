@@ -1261,9 +1261,11 @@ impl<'db> Specialization<'db> {
         tuple_inner: Option<TupleType<'db>>,
     ) -> Self {
         let mut types = types.into();
-        for (typevar, ty) in generic_context.variables(db).zip(types.iter_mut()) {
-            if typevar.is_typevartuple(db) {
-                *ty = ty.into_typevartuple_pack(db);
+        if tuple_inner.is_none() && types.iter().copied().any(Type::is_exact_tuple_instance) {
+            for (typevar, ty) in generic_context.variables(db).zip(types.iter_mut()) {
+                if typevar.is_typevartuple(db) {
+                    *ty = ty.into_typevartuple_pack(db);
+                }
             }
         }
         Self::new_internal(

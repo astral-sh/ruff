@@ -503,9 +503,12 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
     /// guards must remain shared so recursive aliases still terminate.
     fn for_new_mapping_root(&self) -> Self {
         let materialization_equivalence = OnceCell::new();
-        let was_empty =
-            materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
-        debug_assert!(was_empty.is_ok());
+        // Preserve an active equivalence guard, but do not allocate one just to specialize an
+        // ordinary alias that never compares materialized types.
+        if let Some(visitor) = self.materialization_equivalence.get() {
+            let was_empty = materialization_equivalence.set(Rc::clone(visitor));
+            debug_assert!(was_empty.is_ok());
+        }
 
         let alias_expansion = OnceCell::new();
         if let Some(visitor) = self.alias_expansion.get() {
@@ -1758,8 +1761,24 @@ impl<'db> Type<'db> {
     /// its tuple shape is preserved for display. Type aliases do not change inhabitance. Variadic
     /// type argument packs are not runtime tuples, so their `Never` elements remain meaningful.
     pub(crate) fn is_uninhabited(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        self.may_be_uninhabited()
-            && (*self == Type::Never || self.is_equivalent_to(db, env, Type::Never))
+        if *self == Type::Never {
+            return true;
+        }
+
+        if !self.may_be_uninhabited() {
+            return false;
+        }
+
+        if let Type::NominalInstance(instance) = self
+            && (instance.is_typevartuple_pack(db)
+                || instance
+                    .tuple_spec(db, env)
+                    .is_none_or(|tuple| !tuple.fixed_elements().any(Type::may_be_uninhabited)))
+        {
+            return false;
+        }
+
+        self.is_equivalent_to(db, env, Type::Never)
     }
 
     /// Avoid relation checks for type variants that always have at least one possible value.
