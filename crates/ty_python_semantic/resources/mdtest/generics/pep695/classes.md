@@ -730,6 +730,10 @@ propagate through:
 class Parent[T]:
     x: T
 
+    @staticmethod
+    def static(value: T) -> T:
+        return value
+
 class Child[U](Parent[U]): ...
 class Grandchild[V](Child[V]): ...
 class Greatgrandchild[W](Child[W]): ...
@@ -738,6 +742,38 @@ reveal_type(Parent[int]().x)  # revealed: int
 reveal_type(Child[int]().x)  # revealed: int
 reveal_type(Grandchild[int]().x)  # revealed: int
 reveal_type(Greatgrandchild[int]().x)  # revealed: int
+```
+
+Attributes and static methods inherited by an unspecialized generic subclass use its default type
+arguments instead of exposing its class-scoped type variables.
+
+```py
+reveal_type(Parent.x)  # revealed: Unknown
+reveal_type(Child.x)  # revealed: Unknown
+reveal_type(Grandchild.x)  # revealed: Unknown
+
+# revealed: def static(value: Unknown) -> Unknown
+reveal_type(Child.static)
+Child.static(1)
+reveal_type(Child[int].static(1))  # revealed: int
+```
+
+Declared defaults must be preserved, and concrete arguments in partially specialized bases must not
+be replaced with `Unknown`.
+
+```py
+class DefaultChild[T = int](Parent[T]): ...
+
+class PairParent[T, U]:
+    fixed: T
+    unresolved: U
+
+class PartiallyFixed[T](PairParent[int, T]): ...
+
+reveal_type(DefaultChild.x)  # revealed: int
+reveal_type(DefaultChild[str].x)  # revealed: str
+reveal_type(PartiallyFixed.fixed)  # revealed: int
+reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
 ```
 
 ## Generic methods

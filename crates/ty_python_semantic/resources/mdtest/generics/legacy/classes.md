@@ -1024,7 +1024,7 @@ When a generic subclass fills its superclass's type parameter with one of its ow
 propagate through:
 
 ```py
-from typing_extensions import Generic, TypeVar
+from typing_extensions import Generic, Self, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -1033,6 +1033,17 @@ W = TypeVar("W")
 
 class Parent(Generic[T]):
     x: T
+
+    @staticmethod
+    def static(value: T) -> T:
+        return value
+
+    @classmethod
+    def class_method(cls, value: T) -> T:
+        return value
+
+    def method(self, value: T, other: U) -> U:
+        return other
 
 class ExplicitlyGenericChild(Parent[U], Generic[U]): ...
 class ExplicitlyGenericGrandchild(ExplicitlyGenericChild[V], Generic[V]): ...
@@ -1048,6 +1059,68 @@ reveal_type(ExplicitlyGenericGrandchild[int]().x)  # revealed: int
 reveal_type(ImplicitlyGenericGrandchild[int]().x)  # revealed: int
 reveal_type(ExplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
 reveal_type(ImplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
+```
+
+Implicitly generic subclasses, explicitly generic subclasses, and longer inheritance chains all
+replace an unresolved class type variable with `Unknown`.
+
+```py
+reveal_type(Parent.x)  # revealed: Unknown
+reveal_type(ExplicitlyGenericChild.x)  # revealed: Unknown
+reveal_type(ImplicitlyGenericChild.x)  # revealed: Unknown
+reveal_type(ImplicitlyGenericGrandchild.x)  # revealed: Unknown
+```
+
+The same specialization applies to inherited static methods, class methods, and ordinary methods.
+Type variables belonging to a method remain generic.
+
+```py
+# revealed: def static(value: Unknown) -> Unknown
+reveal_type(ImplicitlyGenericChild.static)
+# revealed: bound method <class 'ImplicitlyGenericChild'>.class_method(value: Unknown) -> Unknown
+reveal_type(ImplicitlyGenericChild.class_method)
+# revealed: def method[U](self, value: Unknown, other: U) -> U
+reveal_type(ImplicitlyGenericChild.method)
+
+ImplicitlyGenericChild.static(1)
+ImplicitlyGenericChild.class_method(1)
+reveal_type(ImplicitlyGenericChild[int].static(1))  # revealed: int
+```
+
+Constructor methods inherit their class's type variables into their own generic contexts, so they
+remain generic when accessed explicitly. Calling the class itself also infers its type arguments.
+
+```py
+class ConstructorParent(Generic[T]):
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, value: T) -> None: ...
+
+class ConstructorChild(ConstructorParent[T]): ...
+
+# revealed: def __new__[Self, T](cls, value: T) -> Self
+reveal_type(ConstructorChild.__new__)
+# revealed: def __init__[T](self, value: T) -> None
+reveal_type(ConstructorChild.__init__)
+reveal_type(ConstructorChild(1))  # revealed: ConstructorChild[int]
+```
+
+A generic descriptor inherited from the parent also receives the receiver's specialization before
+its `__get__` method is called.
+
+```py
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object | None, owner: type[object]) -> T:
+        raise NotImplementedError
+
+class DescriptorParent(Generic[T]):
+    descriptor: Descriptor[T] = Descriptor()
+
+class DescriptorChild(DescriptorParent[T]): ...
+
+reveal_type(DescriptorChild.descriptor)  # revealed: Unknown
+reveal_type(DescriptorChild[int].descriptor)  # revealed: int
 ```
 
 ## Generic methods
