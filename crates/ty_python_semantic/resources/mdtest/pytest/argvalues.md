@@ -224,6 +224,7 @@ incorrect, but on errors are changed. If you update the `pytest` implementation,
 import pytest
 from typing import cast, overload, Any, Iterable
 
+# This function generates no errors either.
 def identity[T](x: T, /) -> T:
     return x
 
