@@ -1,4 +1,12 @@
 fail_fast: false
+minimum_prek_version: "0.4.13"
+
+default_language_version:
+  node: "24.19.0"
+
+update:
+  freeze: true
+  cooldown_days: 7
 
 exclude: |
   (?x)^(
@@ -53,14 +61,22 @@ repos:
         types: [rust]
         priority: 0
   # Prettier
-  - repo: local
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: 0ee178619d696787ca73d210cc191d720868c631 # frozen: v3.9.6
     hooks:
       - id: prettier
-        name: prettier
-        entry: node scripts/prettier.cjs --write --ignore-unknown --
-        language: system
         types: [yaml]
-        require_serial: true
+        priority: 0
+
+  # Invoked by scripts/generate-crate-readmes.py through `prek exec`.
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: 515f543f5718ebfd6ce22e16708bb32c68ff96e1 # frozen: v3.8.3
+    hooks:
+      - id: prettier
+        alias: prettier-readmes
+        name: prettier (crate READMEs)
+        stages: [manual]
+        files: "^$"
         priority: 0
 
   # zizmor detects security vulnerabilities in GitHub Actions workflows.

@@ -9,11 +9,8 @@ export UV_PREVIEW=1
 script_root="$(realpath "$(dirname "$0")")"
 project_root="$(dirname "$script_root")"
 
-cd "$project_root"
-echo "Installing formatting tools..."
-npm ci --ignore-scripts
-
 echo "Updating metadata with rooster..."
+cd "$project_root"
 uv run --locked --python 3.12 --only-group release \
     rooster release "$@"
 

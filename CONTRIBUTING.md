@@ -74,14 +74,15 @@ cargo install cargo-insta
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
-Install [Node.js 24](https://nodejs.org/en/download) with `npm` 11.10.0 or later to run the
-Prettier hook. The hook installs the checked-in `package-lock.json` with
-`npm ci --ignore-scripts` before formatting files.
+`prek` manages the pinned Node.js version used by JavaScript hooks. Set the following npm options in
+your shell before running `prek` or committing with installed hooks. They disable lifecycle scripts
+and require newly resolved npm versions to be at least seven days old.
 
-You can optionally install hooks to automatically run the validation checks
-when making a commit:
+You can optionally install hooks to automatically run the validation checks when making a commit:
 
 ```shell
+export npm_config_ignore_scripts=true
+export npm_config_min_release_age=7
 uv run --only-group dev --locked prek install
 ```
 
@@ -188,7 +189,6 @@ crates.io as part of Ruff's releases:
 For a publishable crate, generate its README and verify that the workspace can still be packaged:
 
 ```shell
-npm ci --ignore-scripts
 uv run --script scripts/generate-crate-readmes.py
 cargo publish --workspace --dry-run
 ```

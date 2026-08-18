@@ -24,7 +24,7 @@
   npm: {
     // The default for this package manager is to only search for `package.json` files
     // found at the repository root: https://docs.renovatebot.com/modules/manager/npm/#file-matching
-    managerFilePatterns: ["^package\\.json$", "^playground/.*package\\.json$"],
+    managerFilePatterns: ["^playground/.*package\\.json$"],
   },
   packageRules: [
     {
@@ -41,6 +41,22 @@
       groupName: "prek dependencies",
       matchManagers: ["pre-commit"],
       description: "Weekly update of prek dependencies",
+    },
+    {
+      groupName: "prek dependencies",
+      matchManagers: ["custom.regex"],
+      matchDatasources: ["node-version"],
+      matchPackageNames: ["node"],
+      matchFileNames: [".pre-commit-config.yaml"],
+      allowedVersions: ">=24.19.0 <25",
+    },
+    {
+      // Update the crate README formatter deliberately.
+      matchManagers: ["pre-commit"],
+      matchPackageNames: ["rbubley/mirrors-prettier"],
+      matchFileNames: [".pre-commit-config.yaml"],
+      matchCurrentValue: "v3.8.3",
+      enabled: false,
     },
     {
       groupName: "NPM Development dependencies",
@@ -87,6 +103,17 @@
     },
   ],
   customManagers: [
+    // Node.js toolchain managed by prek
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^\\.pre-commit-config\\.yaml$/"],
+      matchStrings: [
+        "(?:^|\\r?\\n)default_language_version:[ \\t]*\\r?\\n(?:[ \\t]+[^\\r\\n]*\\r?\\n)*?[ \\t]+node:[ \\t]+[\"']?(?<currentValue>\\d+\\.\\d+\\.\\d+)",
+      ],
+      depNameTemplate: "node",
+      datasourceTemplate: "node-version",
+      versioningTemplate: "node",
+    },
     // Maturin version used in maturin-action
     {
       customType: "regex",

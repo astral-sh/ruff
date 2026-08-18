@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import subprocess
 
@@ -187,9 +188,28 @@ def main() -> None:
         print(f"Generated README for {name}")
 
     # Format all generated READMEs once at the end.
-    prettier = workspace_root / "node_modules/prettier-readmes/bin/prettier.cjs"
+    env = os.environ.copy()
+    env.pop("NPM_CONFIG_IGNORE_SCRIPTS", None)
+    env.pop("NPM_CONFIG_MIN_RELEASE_AGE", None)
+    env["npm_config_ignore_scripts"] = "true"
+    env["npm_config_min_release_age"] = "7"
     subprocess.run(
-        ["node", str(prettier), "--write", *map(str, generated_paths)],
+        [
+            "uv",
+            "run",
+            "--only-group",
+            "dev",
+            "--locked",
+            "prek",
+            "exec",
+            "prettier-readmes",
+            "--",
+            "prettier",
+            "--write",
+            *map(str, generated_paths),
+        ],
+        cwd=workspace_root,
+        env=env,
         check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
