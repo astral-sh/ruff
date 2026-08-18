@@ -10,6 +10,7 @@ use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use self::message::DiagnosticNameQualification;
 pub use self::message::{
     DiagnosticMessage, DiagnosticName, DiagnosticNameKind, DiagnosticNameRecord,
     DiagnosticNameResolver, IntoDiagnosticMessage,
@@ -234,7 +235,7 @@ impl Diagnostic {
         Arc::make_mut(&mut self.inner).message = message.into_diagnostic_message();
     }
 
-    /// Resolves semantic names against every message belonging to this diagnostic.
+    /// Resolves semantic names against the messages visible in each diagnostic format.
     ///
     /// Qualified names are resolved only when distinct identities have the same displayed
     /// spelling. Source locations are resolved only when their qualified names also coincide.
@@ -246,69 +247,134 @@ impl Diagnostic {
             Located(String),
         }
 
-        let mut observed: FxHashMap<Box<str>, Vec<DiagnosticName>> = FxHashMap::default();
-        self.for_each_message(|message| {
-            for occurrence in message.names() {
-                let name = occurrence.name();
-                let identities = observed.entry(name.spelling().into()).or_default();
-                if !identities
-                    .iter()
-                    .any(|existing| existing.has_same_identity(name))
-                {
-                    identities.push(name.clone());
+        let observe =
+            |message: &DiagnosticMessage,
+             observed: &mut FxHashMap<Box<str>, Vec<DiagnosticName>>| {
+                for occurrence in message.names() {
+                    let name = occurrence.name();
+                    let identities = observed.entry(name.spelling().into()).or_default();
+                    if !identities
+                        .iter()
+                        .any(|existing| existing.has_same_identity(name))
+                    {
+                        identities.push(name.clone());
+                    }
                 }
-            }
-        });
+            };
 
-        let mut qualification: FxHashMap<DiagnosticName, Qualification> = FxHashMap::default();
-        for identities in observed.into_values() {
-            if identities.len() < 2 {
-                continue;
-            }
+        let mut full_names: FxHashMap<Box<str>, Vec<DiagnosticName>> = FxHashMap::default();
+        self.for_each_full_message(|message| observe(message, &mut full_names));
 
-            let qualified_names: Vec<_> = identities
-                .iter()
-                .map(|identity| resolver.qualified_name(identity))
-                .collect();
-            let located = qualified_names
-                .iter()
-                .enumerate()
-                .any(|(index, qualified)| {
-                    qualified_names[..index]
+        let mut concise_names: FxHashMap<Box<str>, Vec<DiagnosticName>> = FxHashMap::default();
+        if let Some(message) = &self.inner.custom_concise_message {
+            observe(message, &mut concise_names);
+        } else {
+            observe(&self.inner.message, &mut concise_names);
+            if let Some(message) = self
+                .primary_annotation()
+                .and_then(|annotation| annotation.message.as_ref())
+            {
+                observe(message, &mut concise_names);
+            }
+        }
+
+        let mut qualified_names: FxHashMap<DiagnosticName, String> = FxHashMap::default();
+        let mut qualify = |observed: FxHashMap<Box<str>, Vec<DiagnosticName>>| {
+            let mut qualification: FxHashMap<DiagnosticName, Qualification> = FxHashMap::default();
+            for identities in observed.into_values() {
+                if identities.len() < 2 {
+                    continue;
+                }
+
+                let resolved_names: Vec<_> = identities
+                    .iter()
+                    .map(|identity| {
+                        qualified_names
+                            .entry(identity.clone())
+                            .or_insert_with(|| resolver.qualified_name(identity))
+                            .clone()
+                    })
+                    .collect();
+                let located = resolved_names.iter().enumerate().any(|(index, qualified)| {
+                    resolved_names[..index]
                         .iter()
                         .any(|other| qualified == other)
                 });
 
-            qualification.extend(identities.into_iter().zip(qualified_names).map(
-                |(identity, qualified)| {
-                    (
-                        identity,
-                        if located {
-                            Qualification::Located(qualified)
-                        } else {
-                            Qualification::Qualified(qualified)
-                        },
-                    )
-                },
-            ));
+                qualification.extend(identities.into_iter().zip(resolved_names).map(
+                    |(identity, qualified)| {
+                        (
+                            identity,
+                            if located {
+                                Qualification::Located(qualified)
+                            } else {
+                                Qualification::Qualified(qualified)
+                            },
+                        )
+                    },
+                ));
+            }
+
+            qualification
+        };
+
+        let full_qualification = qualify(full_names);
+        let concise_qualification = qualify(concise_names);
+        let replacement =
+            |name: &DiagnosticName, qualification: &FxHashMap<DiagnosticName, Qualification>| {
+                match qualification.get(name) {
+                    None => None,
+                    Some(Qualification::Qualified(qualified)) => Some(qualified.clone()),
+                    Some(Qualification::Located(qualified)) => {
+                        Some(format!("{qualified}{}", resolver.location(name)))
+                    }
+                }
+            };
+        let full_replacement = |name: &DiagnosticName| replacement(name, &full_qualification);
+        let concise_replacement = |name: &DiagnosticName| replacement(name, &concise_qualification);
+        let concise_replacement: DiagnosticNameQualification<'_> = &concise_replacement;
+
+        let custom_concise = self.inner.custom_concise_message.is_some();
+        let primary_index = self
+            .inner
+            .annotations
+            .iter()
+            .position(|annotation| annotation.is_primary);
+        let inner = Arc::make_mut(&mut self.inner);
+        inner.message.resolve_names(
+            full_replacement,
+            (!custom_concise).then_some(concise_replacement),
+        );
+
+        if let Some(message) = &mut inner.custom_concise_message {
+            message.resolve_names(concise_replacement, None);
         }
 
-        self.for_each_message_mut(|message| {
-            message.resolve_names(|name| match qualification.get(name) {
-                None => None,
-                Some(Qualification::Qualified(qualified)) => Some(qualified.clone()),
-                Some(Qualification::Located(qualified)) => {
-                    Some(format!("{qualified}{}", resolver.location(name)))
+        for (index, annotation) in inner.annotations.iter_mut().enumerate() {
+            if let Some(message) = &mut annotation.message {
+                message.resolve_names(
+                    full_replacement,
+                    (!custom_concise && primary_index == Some(index))
+                        .then_some(concise_replacement),
+                );
+            }
+        }
+
+        for diagnostic in &mut inner.subs {
+            diagnostic
+                .inner
+                .message
+                .resolve_names(full_replacement, None);
+            for annotation in &mut diagnostic.inner.annotations {
+                if let Some(message) = &mut annotation.message {
+                    message.resolve_names(full_replacement, None);
                 }
-            });
-        });
+            }
+        }
     }
 
-    fn for_each_message(&self, mut visit: impl FnMut(&DiagnosticMessage)) {
+    fn for_each_full_message(&self, mut visit: impl FnMut(&DiagnosticMessage)) {
         visit(&self.inner.message);
-        if let Some(message) = &self.inner.custom_concise_message {
-            visit(message);
-        }
         for annotation in &self.inner.annotations {
             if let Some(message) = &annotation.message {
                 visit(message);
@@ -318,27 +384,6 @@ impl Diagnostic {
             visit(&diagnostic.inner.message);
             for annotation in &diagnostic.inner.annotations {
                 if let Some(message) = &annotation.message {
-                    visit(message);
-                }
-            }
-        }
-    }
-
-    fn for_each_message_mut(&mut self, mut visit: impl FnMut(&mut DiagnosticMessage)) {
-        let inner = Arc::make_mut(&mut self.inner);
-        visit(&mut inner.message);
-        if let Some(message) = &mut inner.custom_concise_message {
-            visit(message);
-        }
-        for annotation in &mut inner.annotations {
-            if let Some(message) = &mut annotation.message {
-                visit(message);
-            }
-        }
-        for diagnostic in &mut inner.subs {
-            visit(&mut diagnostic.inner.message);
-            for annotation in &mut diagnostic.inner.annotations {
-                if let Some(message) = &mut annotation.message {
                     visit(message);
                 }
             }
@@ -358,13 +403,14 @@ impl Diagnostic {
     /// you want.
     pub fn concise_message(&self) -> ConciseMessage<'_> {
         if let Some(custom_message) = &self.inner.custom_concise_message {
-            return ConciseMessage::Custom(custom_message.as_str());
+            return ConciseMessage::Custom(custom_message.as_concise_str());
         }
 
-        let main = self.inner.message.as_str();
+        let main = self.inner.message.as_concise_str();
         let annotation = self
             .primary_annotation()
-            .and_then(|ann| ann.get_message())
+            .and_then(|annotation| annotation.message.as_ref())
+            .map(DiagnosticMessage::as_concise_str)
             .unwrap_or_default();
         if annotation.is_empty() {
             ConciseMessage::MainDiagnostic(main)

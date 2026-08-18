@@ -214,11 +214,42 @@ struct StructuredDiagnosticMessage {
     names: Box<[DiagnosticNameOccurrence]>,
 }
 
+impl StructuredDiagnosticMessage {
+    fn resolve_names(&self, qualification: &dyn Fn(&DiagnosticName) -> Option<String>) -> Box<str> {
+        let mut text = self.text.to_string();
+        let mut occurrences: Vec<_> = self.names.iter().collect();
+        occurrences.sort_unstable_by_key(|occurrence| occurrence.start);
+
+        for occurrence in occurrences.into_iter().rev() {
+            if occurrence.replace_when_ambiguous
+                && let Some(replacement) = qualification(&occurrence.name)
+                && occurrence.end <= text.len()
+                && text.is_char_boundary(occurrence.start)
+                && text.is_char_boundary(occurrence.end)
+            {
+                text.replace_range(occurrence.start..occurrence.end, &replacement);
+            }
+        }
+
+        text.into_boxed_str()
+    }
+}
+
+/// Separate message text is retained only when full and concise qualification actually differ.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+struct DiagnosticMessageVariants {
+    full: Box<str>,
+    concise: Box<str>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 enum DiagnosticMessageRepr {
     Plain(Box<str>),
     Structured(Box<StructuredDiagnosticMessage>),
+    Variants(Box<DiagnosticMessageVariants>),
 }
+
+pub(super) type DiagnosticNameQualification<'a> = &'a dyn Fn(&DiagnosticName) -> Option<String>;
 
 /// A diagnostic message that may temporarily retain semantic names until finalization.
 ///
@@ -253,6 +284,15 @@ impl DiagnosticMessage {
         match &self.0 {
             DiagnosticMessageRepr::Plain(text) => text,
             DiagnosticMessageRepr::Structured(message) => &message.text,
+            DiagnosticMessageRepr::Variants(message) => &message.full,
+        }
+    }
+
+    pub(super) fn as_concise_str(&self) -> &str {
+        match &self.0 {
+            DiagnosticMessageRepr::Variants(message) => &message.concise,
+            DiagnosticMessageRepr::Plain(text) => text,
+            DiagnosticMessageRepr::Structured(message) => &message.text,
         }
     }
 
@@ -273,40 +313,40 @@ impl DiagnosticMessage {
                 }
                 Self(DiagnosticMessageRepr::Structured(message))
             }
+            DiagnosticMessageRepr::Variants(mut message) => {
+                message.full = format!("{prefix}{}", message.full).into_boxed_str();
+                message.concise = format!("{prefix}{}", message.concise).into_boxed_str();
+                Self(DiagnosticMessageRepr::Variants(message))
+            }
         }
     }
 
     pub(super) fn names(&self) -> &[DiagnosticNameOccurrence] {
         match &self.0 {
-            DiagnosticMessageRepr::Plain(_) => &[],
+            DiagnosticMessageRepr::Plain(_) | DiagnosticMessageRepr::Variants(_) => &[],
             DiagnosticMessageRepr::Structured(message) => &message.names,
         }
     }
 
     pub(super) fn resolve_names(
         &mut self,
-        qualification: impl Fn(&DiagnosticName) -> Option<String>,
+        full_qualification: impl Fn(&DiagnosticName) -> Option<String>,
+        concise_qualification: Option<DiagnosticNameQualification<'_>>,
     ) {
         let DiagnosticMessageRepr::Structured(message) = &self.0 else {
             return;
         };
 
-        let mut text = message.text.to_string();
-        let mut occurrences: Vec<_> = message.names.iter().collect();
-        occurrences.sort_unstable_by_key(|occurrence| occurrence.start);
+        let full = message.resolve_names(&full_qualification);
+        let concise = concise_qualification
+            .map(|qualification| message.resolve_names(qualification))
+            .filter(|concise| concise != &full);
 
-        for occurrence in occurrences.into_iter().rev() {
-            if occurrence.replace_when_ambiguous
-                && let Some(replacement) = qualification(&occurrence.name)
-                && occurrence.end <= text.len()
-                && text.is_char_boundary(occurrence.start)
-                && text.is_char_boundary(occurrence.end)
-            {
-                text.replace_range(occurrence.start..occurrence.end, &replacement);
-            }
-        }
-
-        self.0 = DiagnosticMessageRepr::Plain(text.into_boxed_str());
+        self.0 = if let Some(concise) = concise {
+            DiagnosticMessageRepr::Variants(Box::new(DiagnosticMessageVariants { full, concise }))
+        } else {
+            DiagnosticMessageRepr::Plain(full)
+        };
     }
 }
 
@@ -523,10 +563,7 @@ mod tests {
         diagnostic.disambiguate_names(&resolver);
 
         assert_eq!(diagnostic.headline_message(), "Expected `first.Model`");
-        assert_eq!(
-            diagnostic.concise_message().to_string(),
-            "Concise `second.Model`"
-        );
+        assert_eq!(diagnostic.concise_message().to_string(), "Concise `Model`");
         assert_eq!(
             diagnostic
                 .primary_annotation()
@@ -547,6 +584,102 @@ mod tests {
         );
         assert_eq!(resolver.qualified_calls.get(), 2);
         assert_eq!(resolver.location_calls.get(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn concise_messages_ignore_names_visible_only_in_notes() -> Result<(), Box<dyn Error>> {
+        let (_db, first, second) = files()?;
+        let mut diagnostic = Diagnostic::new(
+            DiagnosticId::InvalidSyntax,
+            Severity::Error,
+            format_args!("Expected `{}`", name(first, "Model")),
+        );
+        diagnostic.info(format_args!("Found `{}`", name(second, "Model")));
+
+        diagnostic.disambiguate_names(&TestNameResolver::new(&[
+            (first, "first.Model"),
+            (second, "second.Model"),
+        ]));
+
+        assert_eq!(diagnostic.headline_message(), "Expected `first.Model`");
+        assert_eq!(diagnostic.concise_message().to_string(), "Expected `Model`");
+        assert_eq!(
+            diagnostic.sub_diagnostics()[0].headline_message(),
+            "Found `second.Model`"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn concise_messages_disambiguate_visible_headlines_and_annotations()
+    -> Result<(), Box<dyn Error>> {
+        let (_db, first, second) = files()?;
+        let mut diagnostic = Diagnostic::new(
+            DiagnosticId::InvalidSyntax,
+            Severity::Error,
+            format_args!("Expected `{}`", name(first, "Model")),
+        );
+        diagnostic.annotate(
+            Annotation::primary(Span::from(second))
+                .message(format_args!("Found `{}`", name(second, "Model"))),
+        );
+
+        diagnostic.disambiguate_names(&TestNameResolver::new(&[
+            (first, "first.Model"),
+            (second, "second.Model"),
+        ]));
+
+        assert_eq!(
+            diagnostic.concise_message().to_string(),
+            "Expected `first.Model`: Found `second.Model`"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn custom_concise_messages_do_not_affect_full_diagnostics() -> Result<(), Box<dyn Error>> {
+        let (_db, first, second) = files()?;
+        let mut diagnostic = Diagnostic::new(
+            DiagnosticId::InvalidSyntax,
+            Severity::Error,
+            format_args!("Expected `{}`", name(first, "Model")),
+        );
+        diagnostic.set_concise_message(format_args!("Found `{}`", name(second, "Model")));
+
+        let resolver = TestNameResolver::new(&[(first, "first.Model"), (second, "second.Model")]);
+        diagnostic.disambiguate_names(&resolver);
+
+        assert_eq!(diagnostic.headline_message(), "Expected `Model`");
+        assert_eq!(diagnostic.concise_message().to_string(), "Found `Model`");
+        assert_eq!(resolver.qualified_calls.get(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn custom_concise_messages_disambiguate_their_own_names() -> Result<(), Box<dyn Error>> {
+        let (_db, first, second) = files()?;
+        let mut diagnostic = Diagnostic::new(
+            DiagnosticId::InvalidSyntax,
+            Severity::Error,
+            format_args!("Expected `{}`", name(first, "Model")),
+        );
+        diagnostic.set_concise_message(format_args!(
+            "Expected `{}`, found `{}`",
+            name(first, "Model"),
+            name(second, "Model"),
+        ));
+
+        diagnostic.disambiguate_names(&TestNameResolver::new(&[
+            (first, "first.Model"),
+            (second, "second.Model"),
+        ]));
+
+        assert_eq!(diagnostic.headline_message(), "Expected `Model`");
+        assert_eq!(
+            diagnostic.concise_message().to_string(),
+            "Expected `first.Model`, found `second.Model`"
+        );
         Ok(())
     }
 

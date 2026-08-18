@@ -929,7 +929,7 @@ def _(flag: bool):
         def __iter__(self) -> Iterator:
             return Iterator()
 
-    # error: [not-iterable] "Object of type `mdtest_snippet.<locals of function '_'>.Iterable` may not be iterable"
+    # error: [not-iterable] "Object of type `Iterable` may not be iterable"
     for x in Iterable():
         reveal_type(x)  # revealed: int
 ```
