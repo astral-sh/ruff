@@ -299,10 +299,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.generate_docs:
-        # Generate docs
-        from generate_mkdocs import main as generate_docs
-
-        generate_docs()
+        subprocess.run(
+            [
+                "uv",
+                "run",
+                "--locked",
+                "--script",
+                Path(__file__).with_name("generate_mkdocs.py"),
+            ],
+            check=True,
+        )
 
     # Get static docs
     static_docs = [Path("docs") / f for f in os.listdir("docs") if f.endswith(".md")]
