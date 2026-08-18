@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+assertion_line: 58
 ---
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
  --> SIM117.py:2:1
@@ -102,212 +103,275 @@ help: Combine `with` statements
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:53:5
    |
-51 |   while True:
-52 |       # SIM117
-53 | /     with A() as a:
-54 | |         with B() as b:
-   | |______________________^
-55 |               """this
-56 |   is valid"""
+51 |   # SIM117 — nested async with under a sync with parent (issue #27800).
+52 |   with A() as a:
+53 | /     async with B() as b:
+54 | |         async with C() as c:
+   | |____________________________^
+55 |               print(a, b, c)
    |
 help: Combine `with` statements
    |
-52 |     # SIM117
+52 | with A() as a:
+   -     async with B() as b:
+   -         async with C() as c:
+   -             print(a, b, c)
+53 +     async with B() as b, C() as c:
+54 +         print(a, b, c)
+55 |
+   |
+
+SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+  --> SIM117.py:59:5
+   |
+57 |   # SIM117 — nested sync with under an async with parent.
+58 |   async with A() as a:
+59 | /     with B() as b:
+60 | |         with C() as c:
+   | |______________________^
+61 |               print(a, b, c)
+   |
+help: Combine `with` statements
+   |
+58 | async with A() as a:
+   -     with B() as b:
+   -         with C() as c:
+   -             print(a, b, c)
+59 +     with B() as b, C() as c:
+60 +         print(a, b, c)
+61 |
+   |
+
+SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+  --> SIM117.py:65:5
+   |
+63 |   while True:
+64 |       # SIM117
+65 | /     with A() as a:
+66 | |         with B() as b:
+   | |______________________^
+67 |               """this
+68 |   is valid"""
+   |
+help: Combine `with` statements
+   |
+64 |     # SIM117
    -     with A() as a:
    -         with B() as b:
    -             """this
-53 +     with A() as a, B() as b:
-54 +         """this
-55 | is valid"""
-56 |
+65 +     with A() as a, B() as b:
+66 +         """this
+67 | is valid"""
+68 |
    -             """the indentation on
-57 +         """the indentation on
-58 |             this line is significant"""
-59 |
+69 +         """the indentation on
+70 |             this line is significant"""
+71 |
    -             "this is" \
-60 +         "this is" \
-61 | "allowed too"
-62 |
+72 +         "this is" \
+73 | "allowed too"
+74 |
    -             ("so is"
-63 +         ("so is"
-64 | "this for some reason")
+75 +         ("so is"
+76 | "this for some reason")
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
-  --> SIM117.py:68:1
+  --> SIM117.py:80:1
    |
-67 |   # SIM117
-68 | / with (
-69 | |     A() as a,
-70 | |     B() as b,
-71 | | ):
-72 | |     with C() as c:
+79 |   # SIM117
+80 | / with (
+81 | |     A() as a,
+82 | |     B() as b,
+83 | | ):
+84 | |     with C() as c:
    | |__________________^
-73 |           print("hello")
+85 |           print("hello")
    |
 help: Combine `with` statements
    |
-69 |     A() as a,
+81 |     A() as a,
    -     B() as b,
-70 +     B() as b,C() as c
-71 | ):
+82 +     B() as b,C() as c
+83 | ):
    -     with C() as c:
    -         print("hello")
-72 +     print("hello")
-73 |
+84 +     print("hello")
+85 |
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
-  --> SIM117.py:76:1
+  --> SIM117.py:88:1
    |
-75 |   # SIM117
-76 | / with A() as a:
-77 | |     with (
-78 | |         B() as b,
-79 | |         C() as c,
-80 | |     ):
+87 |   # SIM117
+88 | / with A() as a:
+89 | |     with (
+90 | |         B() as b,
+91 | |         C() as c,
+92 | |     ):
    | |______^
-81 |           print("hello")
+93 |           print("hello")
    |
 help: Combine `with` statements
    |
-75 | # SIM117
+87 | # SIM117
    - with A() as a:
    -     with (
    -         B() as b,
    -         C() as c,
    -     ):
    -         print("hello")
-76 + with (
-77 +     A() as a, B() as b,
-78 +     C() as c,
-79 + ):
-80 +     print("hello")
-81 |
+88 + with (
+89 +     A() as a, B() as b,
+90 +     C() as c,
+91 + ):
+92 +     print("hello")
+93 |
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
-  --> SIM117.py:84:1
-   |
-83 |   # SIM117
-84 | / with (
-85 | |     A() as a,
-86 | |     B() as b,
-87 | | ):
-88 | |     with (
-89 | |         C() as c,
-90 | |         D() as d,
-91 | |     ):
-   | |______^
-92 |           print("hello")
-   |
-help: Combine `with` statements
-   |
-85 |     A() as a,
-   -     B() as b,
-86 +     B() as b,C() as c,
-87 +     D() as d,
-88 | ):
-   -     with (
-   -         C() as c,
-   -         D() as d,
-   -     ):
-   -         print("hello")
-89 +     print("hello")
-90 |
-   |
-
-SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
-  --> SIM117.py:95:1
-   |
-94 |   # SIM117 (auto-fixable)
-95 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
-96 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
-   | |__________________________________________________^
-97 |           print("hello")
-   |
-help: Combine `with` statements
-   |
-94 | # SIM117 (auto-fixable)
-   - with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
-   -     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
-   -         print("hello")
-95 + with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a, B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
-96 +     print("hello")
-97 |
-   |
-
-SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
-   --> SIM117.py:100:1
+   --> SIM117.py:96:1
     |
- 99 |   # SIM117 (not auto-fixable too long)
-100 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
-101 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+ 95 |   # SIM117
+ 96 | / with (
+ 97 | |     A() as a,
+ 98 | |     B() as b,
+ 99 | | ):
+100 | |     with (
+101 | |         C() as c,
+102 | |         D() as d,
+103 | |     ):
+    | |______^
+104 |           print("hello")
+    |
+help: Combine `with` statements
+    |
+97  |     A() as a,
+    -     B() as b,
+98  +     B() as b,C() as c,
+99  +     D() as d,
+100 | ):
+    -     with (
+    -         C() as c,
+    -         D() as d,
+    -     ):
+    -         print("hello")
+101 +     print("hello")
+102 |
+    |
+
+SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   --> SIM117.py:107:1
+    |
+106 |   # SIM117 (auto-fixable)
+107 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
+108 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
     | |__________________________________________________^
-102 |           print("hello")
+109 |           print("hello")
+    |
+help: Combine `with` statements
+    |
+106 | # SIM117 (auto-fixable)
+    - with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
+    -     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+    -         print("hello")
+107 + with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a, B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+108 +     print("hello")
+109 |
+    |
+
+SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+   --> SIM117.py:112:1
+    |
+111 |   # SIM117 (not auto-fixable too long)
+112 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
+113 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+    | |__________________________________________________^
+114 |           print("hello")
     |
 help: Combine `with` statements
 
 SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
-   --> SIM117.py:106:5
+   --> SIM117.py:118:5
     |
-104 |   # From issue #3025.
-105 |   async def main():
-106 | /     async with A() as a: # SIM117.
-107 | |         async with B() as b:
+116 |   # From issue #3025.
+117 |   async def main():
+118 | /     async with A() as a: # SIM117.
+119 | |         async with B() as b:
     | |____________________________^
-108 |               print("async-inside!")
+120 |               print("async-inside!")
     |
 help: Combine `with` statements
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
-   --> SIM117.py:126:1
+   --> SIM117.py:138:1
     |
-125 |   # SIM117
-126 | / with A() as a:
-127 | |     with B() as b:
+137 |   # SIM117
+138 | / with A() as a:
+139 | |     with B() as b:
     | |__________________^
-128 |           type ListOrSet[T] = list[T] | set[T]
+140 |           type ListOrSet[T] = list[T] | set[T]
     |
 help: Combine `with` statements
     |
-125 | # SIM117
+137 | # SIM117
     - with A() as a:
     -     with B() as b:
     -         type ListOrSet[T] = list[T] | set[T]
-126 + with A() as a, B() as b:
-127 +     type ListOrSet[T] = list[T] | set[T]
-128 |
+138 + with A() as a, B() as b:
+139 +     type ListOrSet[T] = list[T] | set[T]
+140 |
     -         class ClassA[T: str]:
     -             def method1(self) -> T:
     -                 ...
-129 +     class ClassA[T: str]:
-130 +         def method1(self) -> T:
-131 +             ...
-132 |
+141 +     class ClassA[T: str]:
+142 +         def method1(self) -> T:
+143 +             ...
+144 |
     -         f" something { my_dict["key"] } something else "
-133 +     f" something { my_dict["key"] } something else "
-134 |
+145 +     f" something { my_dict["key"] } something else "
+146 |
     -         f"foo {f"bar {x}"} baz"
-135 +     f"foo {f"bar {x}"} baz"
-136 |
+147 +     f"foo {f"bar {x}"} baz"
+148 |
     |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
-   --> SIM117.py:163:1
+   --> SIM117.py:175:1
     |
-162 |   # Do not suppress combination, if a context manager is already combined with another.
-163 | / async with asyncio.timeout(1), A():
-164 | |     async with B():
+174 |   # Do not suppress combination, if a context manager is already combined with another.
+175 | / async with asyncio.timeout(1), A():
+176 | |     async with B():
     | |___________________^
-165 |           pass
+177 |           pass
     |
 help: Combine `with` statements
     |
-162 | # Do not suppress combination, if a context manager is already combined with another.
+174 | # Do not suppress combination, if a context manager is already combined with another.
     - async with asyncio.timeout(1), A():
     -     async with B():
     -         pass
-163 + async with asyncio.timeout(1), A(), B():
-164 +     pass
+175 + async with asyncio.timeout(1), A(), B():
+176 +     pass
+177 |
+    |
+
+SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   --> SIM117.py:181:5
+    |
+179 |   # SIM117 — nested async with under an exempt async parent (issue #27800 class).
+180 |   async with asyncio.timeout(1):
+181 | /     async with A() as a:
+182 | |         async with B() as b:
+    | |____________________________^
+183 |               print(a, b)
+    |
+help: Combine `with` statements
+    |
+180 | async with asyncio.timeout(1):
+    -     async with A() as a:
+    -         async with B() as b:
+    -             print(a, b)
+181 +     async with A() as a, B() as b:
+182 +         print(a, b)
     |

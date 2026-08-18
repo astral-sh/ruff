@@ -148,8 +148,22 @@ pub(crate) fn multiple_with_statements(
     //     with B(), C():
     //         print("hello")
     // ```
-    if let Some(Stmt::With(ast::StmtWith { body, .. })) = with_parent {
-        if body.len() == 1 {
+    //
+    // Only defer to the parent when it can actually combine with this statement.
+    // Differing async/sync (or an exempt standalone manager) means the parent will
+    // not emit SIM117 for this nesting, so we must still check here — e.g.:
+    // ```python
+    // with sync_cm():
+    //     async with async_cm1():
+    //         async with async_cm2():
+    //             ...
+    // ```
+    if let Some(Stmt::With(parent_with)) = with_parent {
+        if parent_with.body.len() == 1
+            && parent_with.is_async == with_stmt.is_async
+            && !explicit_with_items(checker, &parent_with.items)
+            && !explicit_with_items(checker, &with_stmt.items)
+        {
             return;
         }
     }
