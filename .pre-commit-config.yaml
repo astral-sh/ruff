@@ -53,11 +53,14 @@ repos:
         types: [rust]
         priority: 0
   # Prettier
-  - repo: https://github.com/rbubley/mirrors-prettier
-    rev: 0ee178619d696787ca73d210cc191d720868c631 # frozen: v3.9.6
+  - repo: local
     hooks:
       - id: prettier
+        name: prettier
+        entry: node scripts/prettier.cjs --write --ignore-unknown --
+        language: system
         types: [yaml]
+        require_serial: true
         priority: 0
 
   # zizmor detects security vulnerabilities in GitHub Actions workflows.

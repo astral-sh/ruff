@@ -74,6 +74,10 @@ cargo install cargo-insta
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
+Install [Node.js 24](https://nodejs.org/en/download) (including npm) to run the
+Prettier hook. The hook installs the checked-in `package-lock.json` with
+`npm ci --ignore-scripts` before formatting files.
+
 You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
@@ -184,6 +188,7 @@ crates.io as part of Ruff's releases:
 For a publishable crate, generate its README and verify that the workspace can still be packaged:
 
 ```shell
+npm ci --ignore-scripts
 uv run --script scripts/generate-crate-readmes.py
 cargo publish --workspace --dry-run
 ```

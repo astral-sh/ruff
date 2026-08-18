@@ -60,7 +60,6 @@ MEMBER_TEMPLATE = """{GENERATED_HEADER}
 
 
 REPO_URL = "https://github.com/astral-sh/ruff"
-PRETTIER_VERSION = "3.8.3"
 
 
 def replace_generated_section(readme: str, generated_content: str) -> str:
@@ -188,9 +187,9 @@ def main() -> None:
         print(f"Generated README for {name}")
 
     # Format all generated READMEs once at the end.
+    prettier = workspace_root / "node_modules/prettier-readmes/bin/prettier.cjs"
     subprocess.run(
-        ["npx", "--yes", f"prettier@{PRETTIER_VERSION}", "--write"]
-        + [str(path) for path in generated_paths],
+        ["node", str(prettier), "--write", *map(str, generated_paths)],
         check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

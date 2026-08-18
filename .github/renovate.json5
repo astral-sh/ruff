@@ -24,7 +24,7 @@
   npm: {
     // The default for this package manager is to only search for `package.json` files
     // found at the repository root: https://docs.renovatebot.com/modules/manager/npm/#file-matching
-    managerFilePatterns: ["^playground/.*package\\.json$"],
+    managerFilePatterns: ["^package\\.json$", "^playground/.*package\\.json$"],
   },
   packageRules: [
     {
