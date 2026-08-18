@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::iter;
 
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
@@ -89,6 +88,15 @@ impl Violation for DuplicateIsinstanceCall {
 /// if foo in (x, y):
 ///     ...
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always unsafe. It may change the value of the expression if any of the
+/// comparators have side effects, and, for expressions that mix equality comparisons with
+/// other operands, it can change the order in which operands are evaluated. Ruff preserves
+/// the original order when an operand falls before or after the group of merged comparisons,
+/// but if an unmatched operand falls *between* two merged comparisons (e.g. `foo == x or bar
+/// or foo == y`), it's moved after the merged `in` comparison.
 ///
 /// ## References
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
@@ -529,6 +537,16 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             continue;
         }
 
+        // Anchor the replacement expression to the position of the earliest matched
+        // comparator, so that it sorts correctly against any unmatched operands below.
+        let Some(node_range) = comparators
+            .iter()
+            .map(Ranged::range)
+            .min_by_key(Ranged::start)
+        else {
+            continue;
+        };
+
         // Create a `x in (a, b)` expression.
         let node = ast::ExprTuple {
             elts: comparators.into_iter().cloned().collect(),
@@ -547,7 +565,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             left: Box::new(node1.into()),
             ops: Box::from([CmpOp::In]),
             comparators: Box::from([node.into()]),
-            range: TextRange::default(),
+            range: node_range,
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         let in_expr = node2.into();
@@ -557,7 +575,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             },
             expr.range(),
         );
-        let unmatched: Vec<Expr> = values
+        let mut unmatched: Vec<Expr> = values
             .iter()
             .enumerate()
             .filter(|(index, _)| !indices.contains(index))
@@ -566,10 +584,13 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
         let in_expr = if unmatched.is_empty() {
             in_expr
         } else {
-            // Wrap in a `x in (a, b) or ...` boolean operation.
+            // Wrap in a `x in (a, b) or ...` boolean operation, preserving the original
+            // left-to-right order of the replacement and any unmatched operands.
+            unmatched.push(in_expr);
+            unmatched.sort_by_key(Ranged::start);
             let node = ast::ExprBoolOp {
                 op: BoolOp::Or,
-                values: iter::once(in_expr).chain(unmatched).collect(),
+                values: unmatched,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
