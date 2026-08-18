@@ -304,3 +304,376 @@ def get_models_tuple() -> tuple[Model]:
     # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[mdtest_snippet.Model]`, found `tuple[module.Model]`"
     return (Model(),)
 ```
+
+## Callable special forms
+
+ty distinguishes same-named classes nested in the signatures of two callable special forms.
+
+`first.py`:
+
+```py
+from typing import Callable
+
+class StartResponse: ...
+
+Application = Callable[[StartResponse], int]
+```
+
+```py
+from typing import Callable
+
+try:
+    from first import Application, StartResponse
+except ImportError:
+    class StartResponse: ...
+
+    # error: [invalid-assignment] "Object of type `<Callable special-form '(mdtest_snippet.StartResponse, /) -> int'>` is not assignable to `<Callable special-form '(first.StartResponse, /) -> int'>`"
+    Application = Callable[[StartResponse], int]
+```
+
+## Method and constructor descriptions
+
+ty distinguishes the defining class of a bound method, unbound method, or constructor from a
+same-named argument type. Method owners with no visible ambiguity remain unqualified.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+import first
+
+class Model:
+    def __init__(self, value: first.Model) -> None: ...
+    def method(self, value: first.Model) -> None: ...
+
+class Other:
+    def method(self, value: first.Model) -> None: ...
+```
+
+```py
+import second
+
+def calls(value: second.Model, other: second.Other) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `second.Model.method` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    value.method(1)
+
+    # error: [invalid-argument-type] "Argument to function `second.Model.method` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    second.Model.method(value, 1)
+
+    # error: [invalid-argument-type] "Argument to `second.Model.__init__` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    second.Model(1)
+
+    # No competing type named `Other` appears in this diagnostic, so its method owner stays unqualified.
+    # error: [invalid-argument-type] "Argument to bound method `Other.method` is incorrect: Expected `Model`, found `Literal[1]`"
+    other.method(1)
+```
+
+## Builtin class descriptions
+
+ty distinguishes a builtin class used as a callable from a same-named argument type.
+
+```py
+import builtins
+
+class tuple: ...
+
+def convert(value: tuple) -> None:
+    # error: [invalid-argument-type] "Argument to class `builtins.tuple` is incorrect: Expected `Iterable[Unknown]`, found `mdtest_snippet.tuple`"
+    builtins.tuple(value)
+```
+
+## Identifying union members
+
+ty uses the same qualification for a union member missing an attribute as for the complete union.
+
+`first.py`:
+
+```py
+class Model:
+    present: int
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+def missing_attribute(value: first.Model | second.Model) -> int:
+    # error: [unresolved-attribute] "Attribute `present` is not defined on `second.Model` in union `first.Model | second.Model`"
+    return value.present
+```
+
+## Aliased union members
+
+ty distinguishes a union's type alias from a same-named member that does not define an attribute.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`first.py`:
+
+```py
+class Present:
+    present: int
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+`alias.py`:
+
+```py
+import first
+import second
+
+type Model = first.Present | second.Model
+```
+
+```py
+from alias import Model
+
+def missing_attribute(value: Model) -> int:
+    # error: [unresolved-attribute] "Attribute `present` is not defined on `second.Model` in union `alias.Model`"
+    return value.present
+```
+
+## Redefined union members
+
+When distinct union members have the same name in the same module, ty identifies the missing member
+using both its source location and its module name.
+
+`test.py`:
+
+```py
+def coinflip() -> bool:
+    return True
+
+if coinflip():
+    class Model:
+        present: int
+
+else:
+    class Model: ...
+
+# error: [unresolved-attribute] "Attribute `present` is not defined on `test.Model @ src/test.py:9:11` in union `test.Model @ src/test.py:5:11 | test.Model @ src/test.py:9:11`"
+Model().present
+```
+
+## Attribute assignments
+
+For ordinary and union attribute assignments, ty distinguishes the assigned class from a same-named
+class appearing elsewhere in the diagnostic.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+class Owner:
+    item: first.Model
+
+class Other:
+    item: int
+
+def assign_attribute(owner: Owner, value: second.Model) -> None:
+    # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` of type `first.Model`"
+    owner.item = value
+
+def assign_union_attribute(owner: first.Model | Other, value: second.Model) -> None:
+    # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` on type `first.Model | Other`"
+    owner.item = value
+```
+
+## Subscript assignments
+
+ty distinguishes an incompatible assigned value or subscript key from a same-named class nested in
+the subscripted object's type.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+def assign_value(values: list[first.Model], value: second.Model) -> None:
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `second.Model` on object of type `list[first.Model]`"
+    values[0] = value
+
+def assign_key(values: dict[first.Model, int], key: second.Model) -> None:
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `second.Model` and value of type `Literal[1]` on object of type `dict[first.Model, int]`"
+    values[key] = 1
+```
+
+## Type assertions
+
+ty distinguishes an asserted class from a same-named inferred class.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+from typing import assert_type
+
+import first
+import second
+
+def invalid_assertion(value: second.Model) -> None:
+    assert_type(value, first.Model)  # snapshot: type-assertion-failure
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `first.Model`
+ --> src/mdtest_snippet.py:7:5
+  |
+7 |     assert_type(value, first.Model)  # snapshot: type-assertion-failure
+  |     ^^^^^^^^^^^^-----^^^^^^^^^^^^^^
+  |                 |
+  |                 Inferred type is `second.Model`
+info: `first.Model` and `second.Model` are not equivalent types
+```
+
+## Unspellable subtype assertions
+
+ty distinguishes same-named classes throughout a type assertion about an unspellable intersection.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+from typing import assert_type
+
+import first
+import second
+
+def invalid_subtype_assertion(value: first.Model) -> None:
+    if isinstance(value, second.Model):
+        assert_type(value, second.Model)  # snapshot: assert-type-unspellable-subtype
+```
+
+```snapshot
+error[assert-type-unspellable-subtype]: Argument does not have asserted type `second.Model`
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |         assert_type(value, second.Model)  # snapshot: assert-type-unspellable-subtype
+  |         ^^^^^^^^^^^^-----^^^^^^^^^^^^^^^
+  |                     |
+  |                     Inferred type is `first.Model & second.Model`
+info: `first.Model & second.Model` is a subtype of `second.Model`, but they are not equivalent
+```
+
+## Incompatible inherited methods
+
+ty distinguishes a derived class from its same-named base when their inherited methods are
+incompatible.
+
+`first.py`:
+
+```py
+class Model:
+    def method(self, value: int) -> int:
+        return value
+```
+
+`second.py`:
+
+```py
+class Different:
+    def method(self, value: str) -> str:
+        return value
+```
+
+```py
+import first
+import second
+
+# error: [invalid-method-override] "Base classes for class `mdtest_snippet.Model` define method `method` incompatibly: `first.Model.method` is incompatible with `Different.method`"
+class Model(first.Model, second.Different): ...
+```
+
+## Conflicting metaclasses
+
+ty distinguishes same-named classes and metaclasses throughout a metaclass-conflict diagnostic.
+
+`first.py`:
+
+```py
+class Meta(type): ...
+class Model(metaclass=Meta): ...
+```
+
+```py
+import first
+
+class OtherMeta(type): ...
+
+# error: [conflicting-metaclass] "derived class (`mdtest_snippet.Model`) must be a subclass of the metaclasses of all its bases, but `OtherMeta` (metaclass of `mdtest_snippet.Model`) and `Meta` (metaclass of base class `first.Model`) have no subclass relationship"
+class Model(first.Model, metaclass=OtherMeta): ...
+class Meta(type): ...
+
+# error: [conflicting-metaclass] "derived class (`Other`) must be a subclass of the metaclasses of all its bases, but `mdtest_snippet.Meta` (metaclass of `Other`) and `first.Meta` (metaclass of base class `Model`) have no subclass relationship"
+class Other(first.Model, metaclass=Meta): ...
+```

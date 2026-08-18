@@ -1763,13 +1763,14 @@ pub(super) fn report_invalid_attribute_assignment(
     // diagnostic being emitted here.
 
     let env = &context.program_environment();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display(db, env),
-            target_ty.display(db, env),
+            source_ty.display_with(db, env, settings.clone()),
+            target_ty.display_with(db, env, settings),
         ),
     ) else {
         return;
@@ -4365,20 +4366,20 @@ pub(super) fn report_incompatible_base_method<'db>(
 
     let (selected_owner, selected_definition, selected_decorator) = selected;
     let (contract_owner, contract_definition, contract_decorator) = contract;
-    let (selected_name, contract_name) = if selected_owner.name(db) == contract_owner.name(db) {
-        (
-            selected_owner.qualified_name(db).to_string(),
-            contract_owner.qualified_name(db).to_string(),
-        )
-    } else {
-        (
-            selected_owner.name(db).to_string(),
-            contract_owner.name(db).to_string(),
-        )
-    };
+    let types = [
+        Type::from(class),
+        Type::from(selected_owner),
+        Type::from(contract_owner),
+    ];
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, context.program_environment(), types);
+    let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
+    let selected_name = selected_owner
+        .class_literal(db)
+        .display_with(db, settings.clone());
+    let contract_name = contract_owner.class_literal(db).display_with(db, settings);
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Base classes for class `{}` define method `{member}` incompatibly",
-        class.name(db)
+        "Base classes for class `{class_name}` define method `{member}` incompatibly",
     ));
     diagnostic.set_primary_annotation_message(format_args!(
         "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
