@@ -5,6 +5,7 @@
 [rules]
 blanket-ignore-comment = "warn"
 division-by-zero = "warn"
+dynamic-function-decorator-return = "warn"
 missing-type-argument = "warn"
 possibly-missing-attribute = "warn"
 possibly-missing-import = "warn"

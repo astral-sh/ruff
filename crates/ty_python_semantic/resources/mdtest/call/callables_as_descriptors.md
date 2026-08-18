@@ -237,6 +237,7 @@ except* Exception:
 
 unknown_decorator: Any
 
+# error: [dynamic-function-decorator-return]
 @unknown_decorator  # error: [unresolved-reference]
 def decorated(argument: lambda: decorated, /):  # error: [invalid-type-form]
     pass
