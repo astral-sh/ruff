@@ -1274,6 +1274,7 @@ def opaque_decorator(f: Any) -> Any:
 def transparent_decorator[F: Callable[..., Any]](f: F) -> F:
     return f
 
+# error: [dynamic-function-decorator-return]
 @opaque_decorator
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]

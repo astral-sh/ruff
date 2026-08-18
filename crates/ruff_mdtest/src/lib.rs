@@ -172,6 +172,7 @@ fn run_test(
                     test_file,
                     &inline_diagnostics,
                     &mut markdown_edits,
+                    str::to_owned,
                 )
             }) {
                 Ok(()) => None,

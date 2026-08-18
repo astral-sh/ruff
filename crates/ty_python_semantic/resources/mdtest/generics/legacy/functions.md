@@ -985,6 +985,7 @@ def opaque_decorator(f: Any) -> Any:
 def transparent_decorator(f: F) -> F:
     return f
 
+# error: [dynamic-function-decorator-return]
 @opaque_decorator
 def decorated(t: T) -> None:
     # error: [redundant-cast]
