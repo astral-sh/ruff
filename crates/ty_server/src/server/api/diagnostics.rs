@@ -647,6 +647,7 @@ pub(crate) struct FullDiagnosticData {
 pub(crate) struct DiagnosticFixData {
     pub(crate) fix_title: String,
     pub(crate) edits: HashMap<Uri, Vec<lsp_types::TextEdit>>,
+    pub(crate) preferred: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -722,6 +723,7 @@ impl DiagnosticData {
                 .map(ToString::to_string)
                 .unwrap_or_else(|| format!("Fix {}", diagnostic.id())),
             edits: lsp_edits,
+            preferred: fix.applies(Applicability::Safe),
         })
     }
 }
