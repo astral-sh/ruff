@@ -1447,6 +1447,44 @@ def exclude_none[T: Bound | None](value: T) -> None:
         reveal_type(type(value).label)  # revealed: str
 ```
 
+### Excluded alternatives in class-object bounds
+
+If the remaining bound is a class object, its class is its metaclass. Preserve that metaclass
+constraint alongside the original type variable.
+
+```py
+class Meta(type): ...
+class Bound(metaclass=Meta): ...
+
+def accepts_meta(value: type[Meta]) -> None: ...
+def exclude_none[T: type[Bound] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none] & type[Meta]
+        accepts_meta(type(value))
+```
+
+For a final class, the metaclass is known exactly. This also holds for a specialized generic class.
+
+```py
+from typing import final
+
+@final
+class FinalBound(metaclass=Meta): ...
+
+@final
+class FinalGenericBound[U](metaclass=Meta): ...
+
+def exclude_none_final[T: type[FinalBound] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none_final] & <class 'Meta'>
+        accepts_meta(type(value))
+
+def exclude_none_generic[T: type[FinalGenericBound[int]] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none_generic] & <class 'Meta'>
+        accepts_meta(type(value))
+```
+
 ### Truthiness refinements
 
 Whether an individual object is truthy or falsy does not constrain its runtime class. Both positive

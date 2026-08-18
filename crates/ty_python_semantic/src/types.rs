@@ -7313,12 +7313,25 @@ impl<'db> Type<'db> {
 
                     // An exclusion can narrow a type variable's union bound to a definite class:
                     // `(T: C | None) & ~None` has meta-type `type[T] & type[C]`.
+                    // If the remaining bound is a class object, retain its metaclass instead.
+                    // Structural bounds need separate runtime-class handling (see `dunder_class`).
                     if !intersection.negative(db).is_empty()
                         && intersection
                             .iter_positive(db)
                             .any(|positive| matches!(positive, Type::TypeVar(_)))
-                        && let Type::NominalInstance(narrowed_bound) =
-                            intersection.with_expanded_typevars_and_newtypes(db, env)
+                        && let Some(narrowed_bound) = match intersection
+                            .with_expanded_typevars_and_newtypes(db, env)
+                        {
+                            bound @ (Type::NominalInstance(_)
+                            | Type::ClassLiteral(_)
+                            | Type::GenericAlias(_)) => Some(bound),
+                            bound @ Type::SubclassOf(subclass_of)
+                                if let SubclassOfInner::Class(_) = subclass_of.subclass_of() =>
+                            {
+                                Some(bound)
+                            }
+                            _ => None,
+                        }
                     {
                         builder.add_positive_in_place(narrowed_bound.to_meta_type(db, env));
                     }
