@@ -40,6 +40,14 @@ impl Violation for RepeatedKeywordArgument {
 pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
     let ExprCall { arguments, .. } = call;
 
+    // Avoid allocating if there's only one non-unpacked keyword argument, or the unpacked value is
+    // not a dict literal.
+    if let [keyword] = &*arguments.keywords {
+        if keyword.arg.is_some() || !keyword.value.is_dict_expr() {
+            return;
+        }
+    }
+
     let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
     for keyword in &*arguments.keywords {
