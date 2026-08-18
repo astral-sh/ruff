@@ -1268,6 +1268,24 @@ class IntPair(Pair[int]):
 reveal_type(IntPair(1, 2).first)  # revealed: int
 ```
 
+### Functional syntax with recursive generics
+
+Type variables are also discovered inside forward annotations. Recursive fields retain the active
+specialization:
+
+```py
+from typing import NamedTuple, TypeVar
+
+T = TypeVar("T")
+
+Node = NamedTuple("Node", [("value", "T"), ("next", "Node[T] | None")])
+node = Node[int](1, None)
+
+reveal_type(node.value)  # revealed: int
+reveal_type(node[0])  # revealed: int
+reveal_type(node.next)  # revealed: Node[int] | None
+```
+
 ## Attributes on `NamedTuple`
 
 The following attributes are available on `NamedTuple` classes / instances:
