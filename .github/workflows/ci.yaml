@@ -387,9 +387,9 @@ jobs:
       - name: "Run doctests"
         run: cargo test --doc --all-features
       - name: Dogfood ty on py-fuzzer
-        run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
+        run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer --color=always
       - name: Dogfood ty on ty_benchmark
-        run: uv run --project=./scripts/ty_benchmark cargo run -p ty check --project=./scripts/ty_benchmark
+        run: uv run --project=./scripts/ty_benchmark cargo run -p ty check --project=./scripts/ty_benchmark --color=always
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
