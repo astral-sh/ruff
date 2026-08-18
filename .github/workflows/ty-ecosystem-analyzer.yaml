@@ -16,6 +16,7 @@ on:
       - "crates/ruff_python_parser/**"
       - "crates/ruff_python_stdlib/**"
       - ".github/workflows/ty-ecosystem-analyzer.yaml"
+      - "scripts/install-mold.sh"
       - ".github/ty-ecosystem.toml"
       - "crates/ty_python_semantic/resources/primer/**"
       - "Cargo.lock"
@@ -68,7 +69,7 @@ jobs:
         run: rustup show
 
       - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+        run: bash scripts/install-mold.sh
 
       - name: Build ty
         env:
