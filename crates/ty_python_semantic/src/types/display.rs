@@ -36,8 +36,8 @@ use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType,
     Protocol, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, TypingModule, UnionType,
-    WrapperDescriptorKind, visitor, walk_property_instance_type, walk_signature,
+    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
+    visitor, walk_property_instance_type, walk_signature,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;

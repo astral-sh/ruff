@@ -206,8 +206,7 @@ wrong_range: custom.range = range(3)
 
 type Alias = int
 
-# TODO: PEP 695 aliases are actually instances of `typing.TypeAliasType`.
-# error: [invalid-assignment] "Object of type `typing_extensions.TypeAliasType` is not assignable to `custom.TypeAliasType`"
+# error: [invalid-assignment] "Object of type `typing.TypeAliasType` is not assignable to `custom.TypeAliasType`"
 wrong_alias: custom.TypeAliasType = Alias
 
 T = TypeVar("T")
@@ -631,10 +630,383 @@ def get_models_tuple() -> tuple[Model]:
     return (Model(),)
 ```
 
+## Callable special forms
+
+ty distinguishes same-named classes nested in the signatures of two callable special forms.
+
+`first.py`:
+
+```py
+from typing import Callable
+
+class StartResponse: ...
+
+Application = Callable[[StartResponse], int]
+```
+
+```py
+from typing import Callable
+
+try:
+    from first import Application, StartResponse
+except ImportError:
+    class StartResponse: ...
+
+    # error: [invalid-assignment] "Object of type `<Callable special-form '(mdtest_snippet.StartResponse, /) -> int'>` is not assignable to `<Callable special-form '(first.StartResponse, /) -> int'>`"
+    Application = Callable[[StartResponse], int]
+```
+
+## Method and constructor descriptions
+
+ty distinguishes the defining class of a bound method, unbound method, or constructor from a
+same-named argument type. Method owners with no visible ambiguity remain unqualified.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+import first
+
+class Model:
+    def __init__(self, value: first.Model) -> None: ...
+    def method(self, value: first.Model) -> None: ...
+
+class Other:
+    def method(self, value: first.Model) -> None: ...
+```
+
+```py
+import second
+
+def calls(value: second.Model, other: second.Other) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `second.Model.method` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    value.method(1)
+
+    # error: [invalid-argument-type] "Argument to function `second.Model.method` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    second.Model.method(value, 1)
+
+    # error: [invalid-argument-type] "Argument to `second.Model.__init__` is incorrect: Expected `first.Model`, found `Literal[1]`"
+    second.Model(1)
+
+    # No competing type named `Other` appears in this diagnostic, so its method owner stays unqualified.
+    # error: [invalid-argument-type] "Argument to bound method `Other.method` is incorrect: Expected `Model`, found `Literal[1]`"
+    other.method(1)
+```
+
+## Builtin class descriptions
+
+ty distinguishes a builtin class used as a callable from a same-named argument type.
+
+```py
+import builtins
+
+class tuple: ...
+
+def convert(value: tuple) -> None:
+    # error: [invalid-argument-type] "Argument to class `builtins.tuple` is incorrect: Expected `Iterable[Unknown]`, found `mdtest_snippet.tuple`"
+    builtins.tuple(value)
+```
+
+## Identifying union members
+
+ty uses the same qualification for a union member missing an attribute as for the complete union.
+
+`first.py`:
+
+```py
+class Model:
+    present: int
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+def missing_attribute(value: first.Model | second.Model) -> int:
+    # error: [unresolved-attribute] "Attribute `present` is not defined on `second.Model` in union `first.Model | second.Model`"
+    return value.present
+```
+
+## Aliased union members
+
+ty distinguishes a union's type alias from a same-named member that does not define an attribute.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`first.py`:
+
+```py
+class Present:
+    present: int
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+`alias.py`:
+
+```py
+import first
+import second
+
+type Model = first.Present | second.Model
+```
+
+```py
+from alias import Model
+
+def missing_attribute(value: Model) -> int:
+    # error: [unresolved-attribute] "Attribute `present` is not defined on `second.Model` in union `alias.Model`"
+    return value.present
+```
+
+## Redefined union members
+
+When distinct union members have the same name in the same module, ty identifies the missing member
+using both its source location and its module name.
+
+`test.py`:
+
+```py
+def coinflip() -> bool:
+    return True
+
+if coinflip():
+    class Model:
+        present: int
+
+else:
+    class Model: ...
+
+# error: [unresolved-attribute] "Attribute `present` is not defined on `test.Model @ src/test.py:9:11` in union `test.Model @ src/test.py:5:11 | test.Model @ src/test.py:9:11`"
+Model().present
+```
+
+## Attribute assignments
+
+For ordinary and union attribute assignments, ty distinguishes the assigned class from a same-named
+class appearing elsewhere in the diagnostic.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+class Owner:
+    item: first.Model
+
+class Other:
+    item: int
+
+def assign_attribute(owner: Owner, value: second.Model) -> None:
+    # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` of type `first.Model`"
+    owner.item = value
+
+def assign_union_attribute(owner: first.Model | Other, value: second.Model) -> None:
+    # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` on type `first.Model | Other`"
+    owner.item = value
+```
+
+## Subscript assignments
+
+ty distinguishes an incompatible assigned value or subscript key from a same-named class nested in
+the subscripted object's type.
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+import first
+import second
+
+def assign_value(values: list[first.Model], value: second.Model) -> None:
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `second.Model` on object of type `list[first.Model]`"
+    values[0] = value
+
+def assign_key(values: dict[first.Model, int], key: second.Model) -> None:
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `second.Model` and value of type `Literal[1]` on object of type `dict[first.Model, int]`"
+    values[key] = 1
+```
+
+## Type assertions
+
+ty distinguishes an asserted class from a same-named inferred class.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+from typing import assert_type
+
+import first
+import second
+
+def invalid_assertion(value: second.Model) -> None:
+    assert_type(value, first.Model)  # snapshot: type-assertion-failure
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `first.Model`
+ --> src/mdtest_snippet.py:7:5
+  |
+7 |     assert_type(value, first.Model)  # snapshot: type-assertion-failure
+  |     ^^^^^^^^^^^^-----^^^^^^^^^^^^^^
+  |                 |
+  |                 Inferred type is `second.Model`
+info: `first.Model` and `second.Model` are not equivalent types
+```
+
+## Unspellable subtype assertions
+
+ty distinguishes same-named classes throughout a type assertion about an unspellable intersection.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`first.py`:
+
+```py
+class Model: ...
+```
+
+`second.py`:
+
+```py
+class Model: ...
+```
+
+```py
+from typing import assert_type
+
+import first
+import second
+
+def invalid_subtype_assertion(value: first.Model) -> None:
+    if isinstance(value, second.Model):
+        assert_type(value, second.Model)  # snapshot: assert-type-unspellable-subtype
+```
+
+```snapshot
+error[assert-type-unspellable-subtype]: Argument does not have asserted type `second.Model`
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |         assert_type(value, second.Model)  # snapshot: assert-type-unspellable-subtype
+  |         ^^^^^^^^^^^^-----^^^^^^^^^^^^^^^
+  |                     |
+  |                     Inferred type is `first.Model & second.Model`
+info: `first.Model & second.Model` is a subtype of `second.Model`, but they are not equivalent
+```
+
+## Incompatible inherited methods
+
+ty distinguishes a derived class from its same-named base when their inherited methods are
+incompatible.
+
+`first.py`:
+
+```py
+class Model:
+    def method(self, value: int) -> int:
+        return value
+```
+
+`second.py`:
+
+```py
+class Different:
+    def method(self, value: str) -> str:
+        return value
+```
+
+```py
+import first
+import second
+
+# error: [invalid-method-override] "Base classes for class `mdtest_snippet.Model` define method `method` incompatibly: `first.Model.method` is incompatible with `Different.method`"
+class Model(first.Model, second.Different): ...
+```
+
+## Conflicting metaclasses
+
+ty distinguishes same-named classes and metaclasses throughout a metaclass-conflict diagnostic.
+
+`first.py`:
+
+```py
+class Meta(type): ...
+class Model(metaclass=Meta): ...
+```
+
+```py
+import first
+
+class OtherMeta(type): ...
+
+# error: [conflicting-metaclass] "derived class (`mdtest_snippet.Model`) must be a subclass of the metaclasses of all its bases, but `OtherMeta` (metaclass of `mdtest_snippet.Model`) and `Meta` (metaclass of base class `first.Model`) have no subclass relationship"
+class Model(first.Model, metaclass=OtherMeta): ...
+class Meta(type): ...
+
+# error: [conflicting-metaclass] "derived class (`Other`) must be a subclass of the metaclasses of all its bases, but `mdtest_snippet.Meta` (metaclass of `Other`) and `first.Meta` (metaclass of base class `Model`) have no subclass relationship"
+class Other(first.Model, metaclass=Meta): ...
+```
+
 ## Assignments and declarations
 
-Attribute assignments, annotated instance attributes, declarations, conflicting declarations, and
-assignment annotations distinguish unrelated classes with the same name.
+Annotated instance attributes, declarations, conflicting declarations, and assignment annotations
+distinguish unrelated classes with the same name.
 
 `first.py`:
 
@@ -661,10 +1033,6 @@ class Owner:
         # error: [invalid-assignment] "Object of type `second.Model` is not assignable to `first.Model`"
         self.item: first.Model = value
 
-def assign_attribute(owner: Owner, value: second.Model) -> None:
-    # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` of type `first.Model`"
-    owner.item = value
-
 declared_later = second.Model()
 # error: [invalid-declaration] "Cannot declare type `first.Model` for inferred type `second.Model`"
 declared_later: first.Model
@@ -683,9 +1051,9 @@ def assignment_annotations(value: first.Model, replacement: second.Model) -> Non
 
 ```snapshot
 error[invalid-assignment]: Object of type `second.Model` is not assignable to `first.Model`
-  --> src/test.py:28:13
+  --> src/test.py:24:13
    |
-28 |     value = replacement  # snapshot: invalid-assignment
+24 |     value = replacement  # snapshot: invalid-assignment
    |     -----   ^^^^^^^^^^^ Incompatible value of type `second.Model`
    |     |
    |     Declared type `first.Model`
@@ -1098,64 +1466,9 @@ info: Overload implementation defined here
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-## Method and constructor descriptions
+## Static method descriptions
 
-Call diagnostics distinguish the class that defines a method or constructor from a same-named
-parameter type.
-
-`first.py`:
-
-```py
-class Model: ...
-```
-
-`second.py`:
-
-```py
-import first
-
-class Model:
-    def __init__(self, value: first.Model) -> None: ...
-    def method(self, value: first.Model) -> None: ...
-```
-
-```py
-import second
-
-def calls(value: second.Model) -> None:
-    value.method(1)  # snapshot: invalid-argument-type
-    second.Model(1)  # snapshot: invalid-argument-type
-```
-
-```snapshot
-error[invalid-argument-type]: Argument to bound method `second.Model.method` is incorrect
- --> src/mdtest_snippet.py:4:18
-  |
-4 |     value.method(1)  # snapshot: invalid-argument-type
-  |                  ^ Expected `first.Model`, found `Literal[1]`
-info: Method defined here
- --> src/second.py:5:9
-  |
-5 |     def method(self, value: first.Model) -> None: ...
-  |         ^^^^^^       ------------------ Parameter declared here
-
-
-error[invalid-argument-type]: Argument to `second.Model.__init__` is incorrect
- --> src/mdtest_snippet.py:5:18
-  |
-5 |     second.Model(1)  # snapshot: invalid-argument-type
-  |                  ^ Expected `first.Model`, found `Literal[1]`
-info: Method defined here
- --> src/second.py:4:9
-  |
-4 |     def __init__(self, value: first.Model) -> None: ...
-  |         ^^^^^^^^       ------------------ Parameter declared here
-```
-
-## Static and unbound method descriptions
-
-Static and unbound method diagnostics distinguish the class that defines the method from a
-same-named parameter type.
+Static method diagnostics distinguish the defining class from a same-named parameter type.
 
 `first.py`:
 
@@ -1171,7 +1484,6 @@ import first
 class Model:
     @staticmethod
     def static(value: first.Model) -> None: ...
-    def instance(self, value: first.Model) -> None: ...
 ```
 
 ```py
@@ -1179,10 +1491,6 @@ import owner
 
 # error: [invalid-argument-type] "Argument to function `owner.Model.static` is incorrect: Expected `first.Model`, found `Literal[1]`"
 owner.Model.static(1)
-
-def unbound(value: owner.Model) -> None:
-    # error: [invalid-argument-type] "Argument to function `owner.Model.instance` is incorrect: Expected `first.Model`, found `Literal[1]`"
-    owner.Model.instance(value, 1)
 ```
 
 ## Inherited method and constructor descriptions
@@ -1383,10 +1691,9 @@ async def asynchronous() -> custom.AsyncGeneratorType:
     yield 1
 ```
 
-## Function defaults, assertions, and narrowing
+## Function defaults and narrowing
 
-The expected and actual types remain distinct in parameter defaults, `assert_type`, and `TypeIs`
-definitions.
+The expected and actual types remain distinct in parameter defaults and `TypeIs` definitions.
 
 ```toml
 [environment]
@@ -1406,16 +1713,13 @@ class Model: ...
 ```
 
 ```py
-from typing import TypeIs, assert_type
+from typing import TypeIs
 
 import first
 import second
 
 # error: [invalid-parameter-default] "Default value of type `second.Model` is not assignable to annotated parameter type `first.Model`"
 def invalid_default(value: first.Model = second.Model()) -> None: ...
-def invalid_assertion(value: second.Model) -> None:
-    # error: [type-assertion-failure] "Type `second.Model` does not match asserted type `first.Model`"
-    assert_type(value, first.Model)
 
 # error: [invalid-type-guard-definition] "Narrowed type `second.Model` is not assignable to the declared parameter type `first.Model`"
 def invalid_type_is(value: first.Model) -> TypeIs[second.Model]:
@@ -3004,17 +3308,14 @@ info: Field defined here
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
 ```
 
-## Identifying union members
+## Identifying union members in context managers and boolean conversions
 
-Diagnostics identify the particular union member that lacks an attribute, context-manager method, or
-valid boolean conversion.
+Diagnostics identify the union member that lacks a context-manager method or valid boolean
+conversion.
 
 `first.py`:
 
 ```py
-class Model:
-    present: int
-
 class Context:
     def __enter__(self) -> None: ...
     def __exit__(self, *args: object) -> None: ...
@@ -3027,7 +3328,6 @@ class Bool:
 `second.py`:
 
 ```py
-class Model: ...
 class Context: ...
 
 class Bool:
@@ -3038,10 +3338,6 @@ class Bool:
 ```py
 import first
 import second
-
-def missing_attribute(value: first.Model | second.Model) -> int:
-    # error: [unresolved-attribute] "Attribute `present` is not defined on `second.Model` in union `first.Model | second.Model`"
-    return value.present
 
 def context_manager(value: first.Context | second.Context) -> None:
     with value:  # snapshot: invalid-context-manager
@@ -3055,9 +3351,9 @@ def boolean(value: first.Bool | second.Bool) -> None:
 
 ```snapshot
 error[invalid-context-manager]: Object of type `first.Context | second.Context` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing
- --> src/mdtest_snippet.py:9:10
+ --> src/mdtest_snippet.py:5:10
   |
-9 |     with value:  # snapshot: invalid-context-manager
+5 |     with value:  # snapshot: invalid-context-manager
   |          ^^^^^
 info: `second.Context` does not implement `__enter__` or `__exit__`
 ```

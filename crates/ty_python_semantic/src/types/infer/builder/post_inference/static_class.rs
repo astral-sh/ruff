@@ -16,8 +16,7 @@ use crate::{
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
         KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters,
-        Signature, SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule,
-        TypingModule,
+        Signature, SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypingModule,
         binding_type,
         call::Argument,
         class::{

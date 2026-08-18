@@ -20,7 +20,7 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     ClassType, DisplaySettings, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext,
-    TypedDictModule, TypedDictType, TypingModule, any_over_type,
+    TypedDictType, TypingModule, any_over_type,
 };
 use crate::{Db, ProgramEnvironment, TypeQualifiers};
 use ty_python_core::definition::Definition;
