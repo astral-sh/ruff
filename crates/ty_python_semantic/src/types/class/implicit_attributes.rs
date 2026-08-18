@@ -13,7 +13,7 @@ use crate::{
         member::Member,
     },
 };
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ty_python_core::{
     attribute_scopes,
@@ -64,6 +64,7 @@ impl<'db> StaticClassLiteral<'db> {
             return ImplicitAttribute {
                 member: Member::unbound(),
                 augmented_bindings: None,
+                established_in_constructor: false,
             };
         };
 
@@ -86,6 +87,7 @@ impl<'db> StaticClassLiteral<'db> {
                 inner: Place::bound(Type::divergent(id)).into(),
             },
             augmented_bindings: None,
+            established_in_constructor: false,
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -111,6 +113,7 @@ impl<'db> StaticClassLiteral<'db> {
         // any method, we build a union of the raw types inferred from all bindings of that
         // attribute, then apply public-type promotion to the final union.
         let mut union_of_inferred_types = UnionBuilder::new(db, env);
+        let mut established_in_constructor = false;
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
@@ -215,6 +218,10 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_qualifiers(all_qualifiers),
                             },
                             augmented_bindings: None,
+                            established_in_constructor: is_constructor_scope(
+                                declaration.scope(db).scope(db),
+                                &module,
+                            ),
                         };
                     }
 
@@ -226,6 +233,10 @@ impl<'db> StaticClassLiteral<'db> {
                 return ImplicitAttribute {
                     member: Member { inner: annotation },
                     augmented_bindings: None,
+                    established_in_constructor: is_constructor_scope(
+                        declaration.scope(db).scope(db),
+                        &module,
+                    ),
                 };
             }
         }
@@ -297,6 +308,9 @@ impl<'db> StaticClassLiteral<'db> {
 
                 if let Some(inferred_ty) = inferred_ty {
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
+                    if is_constructor_scope(scope_for_reachability_analysis, &module) {
+                        established_in_constructor = true;
+                    }
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }
@@ -321,6 +335,7 @@ impl<'db> StaticClassLiteral<'db> {
             member,
             augmented_bindings: (!augmented_bindings.is_empty())
                 .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
+            established_in_constructor,
         }
     }
 }
@@ -336,6 +351,9 @@ pub(super) struct ImplicitAttribute<'db> {
     pub(super) member: Member<'db>,
     /// Augmented assignments that require an existing instance or class attribute.
     pub(super) augmented_bindings: Option<AugmentedBindings<'db>>,
+    /// Whether `__init__` or `__new__` assigned this attribute, so its inferred type
+    /// should shadow inherited instance types.
+    pub(super) established_in_constructor: bool,
 }
 
 /// Augmented assignments deferred until MRO lookup finds the attribute they read.
@@ -360,6 +378,12 @@ struct ImplicitAttributeName<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
+
+fn is_constructor_scope(scope: &Scope, module: &ParsedModuleRef) -> bool {
+    scope.node().as_function().is_some_and(|function| {
+        matches!(function.node(module).name.as_str(), "__init__" | "__new__")
+    })
+}
 
 /// Infer the value written by an attribute definition, including unpacked and iteration targets.
 fn implicit_attribute_binding_type<'db>(
