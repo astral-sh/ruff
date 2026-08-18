@@ -651,9 +651,13 @@ wheels = [
 [[package]]
 name = "mkdocs-github-admonitions-plugin"
 version = "0.1.1"
-source = { git = "https://github.com/PGijsbers/admonitions.git#e15bb5ec736279a4141c236527f58b8ebd3eac32" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mkdocs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/12/62/37f2080af26ec1d569bb21eb2a4d54f5ea54d36a92938abbbc37c6ab671b/mkdocs_github_admonitions_plugin-0.1.1.tar.gz", hash = "sha256:7f81520a0681b9955952d73b21ce99b923921830b6b6d1ace9b3fb95cd1fb61f", size = 5151, upload-time = "2025-06-02T09:45:12.321Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/a3/8cfd5d9a651612b0d2a15176341b040d43d27b063e17684cb353ec7ce789/mkdocs_github_admonitions_plugin-0.1.1-py3-none-any.whl", hash = "sha256:824dc821764171943c1043c88218d4af0329693870ba9be657f890d484a0aa85", size = 5493, upload-time = "2025-06-02T09:45:11.068Z" },
 ]
 
 [[package]]
@@ -1301,14 +1305,14 @@ release = [
 [package.metadata.requires-dev]
 dev = [{ name = "prek", marker = "python_full_version >= '3.12'", specifier = "==0.4.12" }]
 docs = [
-    { name = "mdformat", marker = "python_full_version >= '3.12'", specifier = "==1.0.0" },
-    { name = "mdformat-mkdocs", marker = "python_full_version >= '3.12'", specifier = "==5.3.0" },
-    { name = "mkdocs", marker = "python_full_version >= '3.12'", specifier = "==1.6.1" },
-    { name = "mkdocs-github-admonitions-plugin", marker = "python_full_version >= '3.12'", git = "https://github.com/PGijsbers/admonitions.git" },
-    { name = "mkdocs-llmstxt", marker = "python_full_version >= '3.12'", specifier = "==0.2.0" },
-    { name = "mkdocs-material", marker = "python_full_version >= '3.12'", specifier = "==9.7.7" },
-    { name = "mkdocs-redirects", marker = "python_full_version >= '3.12'", specifier = "==1.2.3" },
-    { name = "pyyaml", marker = "python_full_version >= '3.12'", specifier = "==6.0.3" },
+    { name = "mdformat", marker = "python_full_version >= '3.12'", specifier = ">=1.0.0" },
+    { name = "mdformat-mkdocs", marker = "python_full_version >= '3.12'", specifier = ">=5.3.0" },
+    { name = "mkdocs", marker = "python_full_version >= '3.12'", specifier = ">=1.6.1" },
+    { name = "mkdocs-github-admonitions-plugin", marker = "python_full_version >= '3.12'", specifier = ">=0.1.1" },
+    { name = "mkdocs-llmstxt", marker = "python_full_version >= '3.12'", specifier = ">=0.2.0" },
+    { name = "mkdocs-material", marker = "python_full_version >= '3.12'", specifier = ">=9.7.7" },
+    { name = "mkdocs-redirects", marker = "python_full_version >= '3.12'", specifier = ">=1.2.3" },
+    { name = "pyyaml", marker = "python_full_version >= '3.12'", specifier = ">=6.0.3" },
     { name = "ruff", marker = "python_full_version >= '3.12'", editable = "." },
 ]
 release = [{ name = "rooster", marker = "python_full_version >= '3.12'", specifier = "==0.1.1" }]
