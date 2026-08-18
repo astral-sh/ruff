@@ -10,22 +10,40 @@ use insta_cmd::assert_cmd_snapshot;
 use crate::CliTest;
 
 #[test]
-fn find_uses_cwd_and_ignores_configuration() -> anyhow::Result<()> {
+fn find_uses_discovered_project_root() -> anyhow::Result<()> {
     let case = CliTest::new()?.with_filter(r"/Scripts/ty\b", "/bin/ty");
     venv_with_ty(&case, "project with spaces/.venv")?;
+    venv_with_ty(&case, "project with spaces/src/.venv")?;
     let project = case.root().join("project with spaces");
-    // We could consider respecting `tool.ty.environment.python` in the future. For now,
-    // executable discovery does not read project configuration.
+    // Configuration identifies the project root, but does not select the executable's environment.
     case.write_file(
         project.join("ty.toml"),
         "[environment]\npython = 'missing configured environment'\n",
     )?;
 
-    assert_cmd_snapshot!(find_command(&case).current_dir(&project), @"
+    assert_cmd_snapshot!(find_command(&case).current_dir(project.join("src")), @"
     success: true
     exit_code: 0
     ----- stdout -----
     <temp_dir>/project with spaces/.venv/bin/ty
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn find_uses_cwd_when_project_discovery_fails() -> anyhow::Result<()> {
+    let case = CliTest::with_file("pyproject.toml", "not valid TOML [")?
+        .with_filter(r"/Scripts/ty\b", "/bin/ty");
+    venv_with_ty(&case, "src/.venv")?;
+
+    assert_cmd_snapshot!(find_command(&case).current_dir(case.root().join("src")), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    <temp_dir>/src/.venv/bin/ty
 
     ----- stderr -----
     ");
@@ -143,7 +161,7 @@ fn find_rejects_broken_symlink() -> anyhow::Result<()> {
 }
 
 #[test]
-fn find_returns_no_match_on_discovery_error() -> anyhow::Result<()> {
+fn find_returns_no_match_on_python_environment_error() -> anyhow::Result<()> {
     let case = CliTest::new()?;
 
     assert_cmd_snapshot!(find_command(&case).env("VIRTUAL_ENV", "missing"), @"

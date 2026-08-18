@@ -392,7 +392,7 @@ impl ProjectMetadata {
         Ok(metadata)
     }
 
-    pub(crate) fn root(&self) -> &SystemPath {
+    pub fn root(&self) -> &SystemPath {
         &self.root
     }
 

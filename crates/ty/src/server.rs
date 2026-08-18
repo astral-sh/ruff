@@ -5,6 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 
 use anyhow::Result;
 use ruff_db::system::OsSystem;
+use ty_project::ProjectMetadata;
 use ty_site_packages::PythonEnvironment;
 
 use crate::args::{ServerCommand, TerminalColor};
@@ -31,7 +32,15 @@ fn find_executable() -> Result<ExitStatus> {
     let cwd = current_directory()?;
     let system = OsSystem::new(&cwd);
 
-    let environment = match PythonEnvironment::discover(Some(&cwd), &system) {
+    let project_root = match ProjectMetadata::discover(&cwd, &system) {
+        Ok(project) => project.root().to_path_buf(),
+        Err(error) => {
+            tracing::debug!("Failed to discover a project, falling back to `{cwd}`: {error}");
+            cwd.clone()
+        }
+    };
+
+    let environment = match PythonEnvironment::discover(Some(&project_root), &system) {
         Ok(Some(environment)) => environment,
         Ok(None) => return Ok(ExitStatus::Failure),
         Err(error) => {
