@@ -13,6 +13,7 @@ on:
         type: string
 
 env:
+  ACTIONS_CACHE_MODE: none
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_PROFILE_DEV_LTO: "false"

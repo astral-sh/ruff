@@ -21,6 +21,7 @@ permissions:
   contents: read
 
 env:
+  ACTIONS_CACHE_MODE: none
   CARGO_PROFILE_DEV_LTO: "false"
   CARGO_PROFILE_DEV_OPT_LEVEL: 0
 
