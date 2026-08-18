@@ -526,31 +526,6 @@ impl<'db> ProtocolInterfaceView<'db> {
         })
     }
 
-    /// Returns the callable signature exposed by instance access to a protocol's `__call__`
-    /// method.
-    ///
-    /// The callable is already in its instance-bound form, so callers must not bind it again.
-    pub(super) fn call_method(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<CallableType<'db>> {
-        self.member_by_name(db, "__call__").and_then(|member| {
-            if !member.is_method() {
-                return None;
-            }
-            match member
-                .access(db, env, ProtocolMemberAccessMode::Instance)
-                .read
-                .and_then(|read| read.resolve(db, env))
-                .map(ProtocolMemberType::ty)
-            {
-                Some(Type::Callable(callable)) => Some(callable),
-                _ => None,
-            }
-        })
-    }
-
     pub(super) fn instance_member(
         self,
         db: &'db dyn Db,
