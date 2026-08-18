@@ -8333,6 +8333,10 @@ impl<'db> CallableDescription<'db> {
         Self::new_with_settings(db, callable_type, None)
     }
 
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
     fn new_with_settings(
         db: &'db dyn Db,
         callable_type: Type<'db>,

@@ -589,7 +589,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 Type::FunctionLiteral(function.with_deprecated(db, *deprecated))
             } else {
-                self.apply_decorator(*decorator_ty, inferred_ty, decorator_node)
+                self.apply_decorator(
+                    *decorator_ty,
+                    inferred_ty,
+                    decorator_node,
+                    (!is_decorated_overload_implementation).then_some(function),
+                )
             };
         }
 

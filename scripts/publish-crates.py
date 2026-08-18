@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 # Publish workspace crates to crates.io idempotently.
 #
 # `cargo publish --workspace` fails if any selected crate version already exists on crates.io. That

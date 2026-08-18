@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+#
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """Generate boilerplate for a new Flake8 plugin.
 
 Example usage:
@@ -12,8 +21,23 @@ Example usage:
 from __future__ import annotations
 
 import argparse
+import re
+from pathlib import Path
 
-from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
+ROOT_DIR = Path(__file__).resolve().parent.parent
+
+
+def dir_name(linter_name: str) -> str:
+    return linter_name.replace("-", "_")
+
+
+def pascal_case(linter_name: str) -> str:
+    """Convert from snake-case to PascalCase."""
+    return "".join(word.title() for word in linter_name.split("-"))
+
+
+def get_indent(line: str) -> str:
+    return re.match(r"^\s*", line).group()  # type: ignore[union-attr, ty:unresolved-attribute]
 
 
 def main(*, plugin: str, url: str, prefix_code: str) -> None:

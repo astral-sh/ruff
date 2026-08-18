@@ -387,11 +387,9 @@ jobs:
       - name: "Run doctests"
         run: cargo test --doc --all-features
       - name: Dogfood ty on py-fuzzer
-        run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
-      - name: Dogfood ty on the scripts directory
-        run: uv run --project=./scripts cargo run -p ty check --project=./scripts
+        run: uv run --quiet --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer --color=always
       - name: Dogfood ty on ty_benchmark
-        run: uv run --project=./scripts/ty_benchmark cargo run -p ty check --project=./scripts/ty_benchmark
+        run: uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark --color=always
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -499,7 +497,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
@@ -966,18 +964,15 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           python-version: 3.13
-          activate-environment: true
           version: "0.12.3"
-      - name: "Install dependencies"
-        run: uv pip install -r docs/requirements.txt
       - name: "Update README File"
-        run: python scripts/transform_readme.py --target mkdocs
+        run: uv run scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
-        run: python scripts/generate_mkdocs.py
+        run: uv run scripts/generate_mkdocs.py
       - name: "Check docs formatting"
-        run: python scripts/check_docs_formatted.py
+        run: uv run scripts/check_docs_formatted.py
       - name: "Build docs"
-        run: mkdocs build --strict -f mkdocs.yml
+        run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
 
   check-formatter-instability-and-black-similarity:
     name: "formatter instabilities and black similarity"
