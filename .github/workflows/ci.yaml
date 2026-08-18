@@ -1075,7 +1075,7 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: playground
       - name: "Build playgrounds"
-        run: npm run dev:wasm
+        run: npm run dev:build
         working-directory: playground
       - name: "Run TypeScript checks"
         run: npm run check
