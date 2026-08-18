@@ -1245,32 +1245,45 @@ reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
 
 ### Functional syntax with generics
 
-Generic namedtuples can also be defined using the functional syntax with type variables in the field
-types. We don't currently support this, but mypy does:
+A functional named tuple is generic when a field annotation contains a type variable:
 
 ```py
 from typing import NamedTuple, TypeVar
 
 T = TypeVar("T")
 
-# TODO: ideally this would create a generic namedtuple class
 Pair = NamedTuple("Pair", [("first", T), ("second", T)])
 
-# For now, the TypeVar is not specialized, so the field types remain as `T@Pair` and argument type
-# errors are emitted when calling the constructor.
 reveal_type(Pair)  # revealed: <class 'Pair'>
+reveal_type(Pair(1, 2))  # revealed: Pair[int]
+reveal_type(Pair(1, 2).first)  # revealed: int
+reveal_type(Pair[str]("one", "two").second)  # revealed: str
 
 # error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(Pair(1, 2))  # revealed: Pair
+Pair[int]("one", 2)
 
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(Pair(1, 2).first)  # revealed: TypeVar
+class IntPair(Pair[int]):
+    pass
 
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(Pair(1, 2).second)  # revealed: TypeVar
+reveal_type(IntPair(1, 2).first)  # revealed: int
+```
+
+### Functional syntax with recursive generics
+
+Type variables are also discovered inside forward annotations. Recursive fields retain the active
+specialization:
+
+```py
+from typing import NamedTuple, TypeVar
+
+T = TypeVar("T")
+
+Node = NamedTuple("Node", [("value", "T"), ("next", "Node[T] | None")])
+node = Node[int](1, None)
+
+reveal_type(node.value)  # revealed: int
+reveal_type(node[0])  # revealed: int
+reveal_type(node.next)  # revealed: Node[int] | None
 ```
 
 ## Attributes on `NamedTuple`

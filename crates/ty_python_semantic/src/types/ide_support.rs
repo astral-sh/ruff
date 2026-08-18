@@ -2969,7 +2969,7 @@ fn extract_class_literal<'db>(
                 | crate::types::SubclassOfInner::TypeVar(_) => None,
             }
         }
-        Type::GenericAlias(generic_alias) => Some(ClassLiteral::Static(generic_alias.origin(db))),
+        Type::GenericAlias(generic_alias) => Some(generic_alias.origin(db).class_literal()),
         Type::NominalInstance(instance) => Some(instance.class(db, env).class_literal(db)),
         Type::Union(union) => union
             .elements(db)

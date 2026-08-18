@@ -363,9 +363,7 @@ impl<'db> ConstructorBinding<'db> {
         // constructing an already-specialized generic alias (`C[str](...)`), it'll be the
         // specialization of that alias.
         let (_, class_specialization) = constructed_instance_type.class_specialization(db, env)?;
-        let static_class_literal = self
-            .constructed_class_literal(db, env)
-            .and_then(ClassLiteral::as_static);
+        let class_literal = self.constructed_class_literal(db, env);
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Specialization<'db>> = None;
@@ -376,7 +374,7 @@ impl<'db> ConstructorBinding<'db> {
             else {
                 return;
             };
-            let return_specialization = static_class_literal
+            let return_specialization = class_literal
                 // Use the already-resolved overload return type when possible.
                 .and_then(|lit| overload.return_ty.specialization_of(db, env, lit));
 
@@ -395,7 +393,7 @@ impl<'db> ConstructorBinding<'db> {
                             .is_some_and(|mapped_ty| !mapped_ty.is_unknown())
                     })
                 });
-            let self_parameter_specialization = static_class_literal.and_then(|lit| {
+            let self_parameter_specialization = class_literal.and_then(|lit| {
                 let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
                 let resolved_self_param_ty = overload
                     .specialization(db)

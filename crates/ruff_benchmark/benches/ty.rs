@@ -163,6 +163,92 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     });
 }
 
+fn setup_incremental_case(code: String, expect_no_diagnostics: bool) -> FileCase {
+    let system = TestSystem::default();
+    let fs = system.memory_file_system().clone();
+    let file_path = SystemPathBuf::from("src/test.py");
+    fs.write_file_all(file_path.clone(), code).unwrap();
+
+    let src_root = SystemPath::new("/src");
+    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+    metadata.apply_override_options(Options {
+        environment: Some(EnvironmentOptions {
+            python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    });
+
+    let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
+    let file = system_path_to_file(&db, &file_path).unwrap();
+    db.set_check_mode(CheckMode::OpenFiles);
+    db.project()
+        .set_open_files(&mut db, FxHashSet::from_iter([file]));
+    let diagnostics = db.check();
+    if expect_no_diagnostics {
+        assert!(diagnostics.is_empty());
+    } else {
+        std::hint::black_box(diagnostics.len());
+    }
+
+    fs.write_file_all(
+        file_path.clone(),
+        format!(
+            "{}\n# unrelated incremental edit\n",
+            source_text(&db, file).as_str()
+        ),
+    )
+    .unwrap();
+
+    FileCase {
+        db,
+        fs,
+        file,
+        file_path,
+    }
+}
+
+fn setup_functional_incremental_case() -> FileCase {
+    let mut code = String::from("from typing import NamedTuple, TypedDict\n\n");
+    for index in 0..500 {
+        writeln!(
+            &mut code,
+            "NT{index} = NamedTuple(\"NT{index}\", [(\"value\", int), (\"payload\", list[tuple[str, int]])])"
+        )
+        .unwrap();
+        writeln!(
+            &mut code,
+            "TD{index} = TypedDict(\"TD{index}\", {{\"value\": int, \"payload\": list[tuple[str, int]]}})"
+        )
+        .unwrap();
+        writeln!(&mut code, "nt_{index} = NT{index}(1, [(\"x\", 1)])").unwrap();
+        writeln!(
+            &mut code,
+            "td_{index} = TD{index}(value=1, payload=[(\"x\", 1)])"
+        )
+        .unwrap();
+    }
+    setup_incremental_case(code, true)
+}
+
+fn benchmark_functional_incremental(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_check_file[functional_incremental]", |b| {
+        b.iter_batched_ref(
+            setup_functional_incremental_case,
+            |case| {
+                case.db.apply_changes(&[ChangeEvent::Changed {
+                    path: case.file_path.clone(),
+                    kind: ChangedKind::FileContent,
+                }]);
+                assert!(case.db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_cold(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -1426,6 +1512,311 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     }
 }
 
+/// Measures the cold cost of unused, non-generic functional definitions.
+///
+/// The generic-context query should not execute for this workload.
+fn benchmark_unused_functional_type_definitions(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("from typing import NamedTuple, TypedDict\n\n");
+    for index in 0..500 {
+        writeln!(
+            &mut code,
+            "NT{index} = NamedTuple(\"NT{index}\", [(\"value\", int), (\"payload\", list[tuple[str, int]])])"
+        )
+        .unwrap();
+        writeln!(
+            &mut code,
+            "TD{index} = TypedDict(\"TD{index}\", {{\"value\": int, \"odd key\": list[tuple[str, int]]}})"
+        )
+        .unwrap();
+    }
+
+    criterion.bench_function("ty_micro[unused_functional_type_definitions]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                std::hint::black_box(db.check().len());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Measures non-generic functional definitions whose constructors are called.
+///
+/// The generic-context query should execute once per definition on a cold check.
+fn benchmark_demanded_functional_type_definitions(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("from typing import NamedTuple, TypedDict\n\n");
+    for index in 0..500 {
+        writeln!(
+            &mut code,
+            "NT{index} = NamedTuple(\"NT{index}\", [(\"value\", int), (\"payload\", list[tuple[str, int]])])"
+        )
+        .unwrap();
+        writeln!(
+            &mut code,
+            "TD{index} = TypedDict(\"TD{index}\", {{\"value\": int, \"payload\": list[tuple[str, int]]}})"
+        )
+        .unwrap();
+        writeln!(&mut code, "nt_{index} = NT{index}(1, [(\"x\", 1)])").unwrap();
+        writeln!(
+            &mut code,
+            "td_{index} = TD{index}(value=1, payload=[(\"x\", 1)])"
+        )
+        .unwrap();
+    }
+
+    criterion.bench_function("ty_micro[demanded_functional_type_definitions]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                std::hint::black_box(db.check().len());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Measures recording `TypeVar` candidates for unused functional definitions.
+///
+/// The generic-context query should not execute for this workload.
+fn benchmark_functional_typevar_candidates(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("from typing import NamedTuple, TypeVar\n\nT = TypeVar(\"T\")\n");
+    for index in 0..1_000 {
+        writeln!(
+            &mut code,
+            "NT{index} = NamedTuple(\"NT{index}\", [(\"value\", T), (\"payload\", list[tuple[str, T]])])"
+        )
+        .unwrap();
+    }
+
+    criterion.bench_function("ty_micro[functional_typevar_candidates]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                std::hint::black_box(db.check().len());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Measures resolving the generic context of every functional definition.
+fn benchmark_demanded_functional_typevar_candidates(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("from typing import NamedTuple, TypeVar\n\nT = TypeVar(\"T\")\n");
+    for index in 0..500 {
+        writeln!(
+            &mut code,
+            "NT{index} = NamedTuple(\"NT{index}\", [(\"value\", T), (\"payload\", list[tuple[str, T]])])"
+        )
+        .unwrap();
+        writeln!(
+            &mut code,
+            "def f{index}(value: NT{index}[int]) -> None: ..."
+        )
+        .unwrap();
+    }
+
+    criterion.bench_function("ty_micro[demanded_functional_typevar_candidates]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                assert!(db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn static_generic_origins_code(count: usize) -> String {
+    let mut code = String::from("from typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\n");
+    for index in 0..count {
+        writeln!(
+            &mut code,
+            "class Box{index}(Generic[T]):\n    value: T\n\ndef use{index}(value: Box{index}[int]) -> int:\n    return value.value"
+        )
+        .unwrap();
+    }
+    code
+}
+
+fn static_generic_aliases_code(count: usize) -> String {
+    let mut code = String::from(
+        "from typing import Generic, Literal, TypeVar\n\nT = TypeVar(\"T\")\n\nclass Box(Generic[T]):\n    value: T\n",
+    );
+    for index in 0..count {
+        writeln!(
+            &mut code,
+            "def use{index}(value: Box[Literal[{index}]]) -> Literal[{index}]:\n    return value.value"
+        )
+        .unwrap();
+    }
+    code
+}
+
+/// Measures generic-alias origins across many distinct static generic classes.
+fn benchmark_static_generic_origins(criterion: &mut Criterion) {
+    setup_rayon();
+    let code = static_generic_origins_code(500);
+
+    criterion.bench_function("ty_micro[static_generic_origins]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                assert!(db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Measures generic-alias interning across many specializations of one static generic class.
+fn benchmark_static_generic_aliases(criterion: &mut Criterion) {
+    setup_rayon();
+    let code = static_generic_aliases_code(1_000);
+
+    criterion.bench_function("ty_micro[static_generic_aliases]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                assert!(db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn setup_static_generic_incremental_case() -> FileCase {
+    setup_incremental_case(static_generic_origins_code(500), true)
+}
+
+fn benchmark_static_generic_incremental(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_check_file[static_generic_incremental]", |b| {
+        b.iter_batched_ref(
+            setup_static_generic_incremental_case,
+            |case| {
+                case.db.apply_changes(&[ChangeEvent::Changed {
+                    path: case.file_path.clone(),
+                    kind: ChangedKind::FileContent,
+                }]);
+                assert!(case.db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn functional_generic_origins_code(count: usize) -> String {
+    let mut code =
+        String::from("from typing import NamedTuple, TypeVar, TypedDict\n\nT = TypeVar(\"T\")\n");
+    for index in 0..count {
+        writeln!(
+            &mut code,
+            "Pair{index} = NamedTuple(\"Pair{index}\", [(\"left\", \"T\"), (\"right\", \"T\"), (\"payload\", \"list[T]\")])"
+        )
+        .unwrap();
+        writeln!(
+            &mut code,
+            "Movie{index} = TypedDict(\"Movie{index}\", {{\"name\": str, \"payload\": \"T\", \"odd key\": \"list[T]\"}})"
+        )
+        .unwrap();
+        writeln!(
+            &mut code,
+            "def use{index}(pair: Pair{index}[int], movie: Movie{index}[str]) -> tuple[int, int, str, list[str]]:\n    return pair.left, pair[1], movie[\"payload\"], movie[\"odd key\"]"
+        )
+        .unwrap();
+    }
+    code
+}
+
+fn functional_generic_specializations_code(count: usize) -> String {
+    let movie_fields = (0..32)
+        .map(|index| format!("\"field{index}\": T"))
+        .chain(std::iter::once("\"odd key\": list[T]".to_string()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut code = format!(
+        "from typing import Literal, NamedTuple, TypeVar, TypedDict\n\nT = TypeVar(\"T\")\nPair = NamedTuple(\"Pair\", [(\"left\", T), (\"right\", T), (\"payload\", list[T])])\nMovie = TypedDict(\"Movie\", {{{movie_fields}}})\n"
+    );
+    for index in 0..count {
+        writeln!(
+            &mut code,
+            "def use{index}(pair: Pair[Literal[{index}]], movie: Movie[Literal[{index}]]) -> tuple[Literal[{index}], Literal[{index}], Literal[{index}], Literal[{index}], Literal[{index}], list[Literal[{index}]]]:\n    return pair.left, pair[1], movie[\"field0\"], movie[\"field15\"], movie[\"field31\"], movie[\"odd key\"]"
+        )
+        .unwrap();
+    }
+    code
+}
+
+fn benchmark_functional_generic_origins(criterion: &mut Criterion) {
+    setup_rayon();
+    let code = functional_generic_origins_code(250);
+
+    criterion.bench_function("ty_micro[functional_generic_origins]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                assert!(db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_functional_generic_specializations(criterion: &mut Criterion) {
+    setup_rayon();
+    let code = functional_generic_specializations_code(1_000);
+
+    criterion.bench_function("ty_micro[functional_generic_specializations]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                assert!(db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn setup_functional_generic_incremental_case() -> FileCase {
+    setup_incremental_case(functional_generic_origins_code(250), true)
+}
+
+fn benchmark_functional_generic_incremental(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_check_file[functional_generic_incremental]", |b| {
+        b.iter_batched_ref(
+            setup_functional_generic_incremental_case,
+            |case| {
+                case.db.apply_changes(&[ChangeEvent::Changed {
+                    path: case.file_path.clone(),
+                    kind: ChangedKind::FileContent,
+                }]);
+                assert!(case.db.check().is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -1601,7 +1992,14 @@ fn datetype(criterion: &mut Criterion) {
     bench_project(&benchmark, criterion);
 }
 
-criterion_group!(check_file, benchmark_cold, benchmark_incremental);
+criterion_group!(
+    check_file,
+    benchmark_cold,
+    benchmark_incremental,
+    benchmark_functional_incremental,
+    benchmark_static_generic_incremental,
+    benchmark_functional_generic_incremental
+);
 criterion_group!(
     micro,
     benchmark_many_string_assignments,
@@ -1632,6 +2030,14 @@ criterion_group!(
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
+    benchmark_unused_functional_type_definitions,
+    benchmark_demanded_functional_type_definitions,
+    benchmark_functional_typevar_candidates,
+    benchmark_demanded_functional_typevar_candidates,
+    benchmark_static_generic_origins,
+    benchmark_static_generic_aliases,
+    benchmark_functional_generic_origins,
+    benchmark_functional_generic_specializations,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

@@ -4579,6 +4579,83 @@ inline_ref = TypedDict("InlineRef", {"director": "Director"})(director=Director(
 reveal_type(inline_ref["director"])  # revealed: Director
 ```
 
+## Generic function/assignment syntax
+
+A functional `TypedDict` is generic when a field annotation contains a type variable. Requiredness
+and read-only qualifiers are preserved when its fields are specialized:
+
+```py
+from typing import TypeVar
+from typing_extensions import NotRequired, ReadOnly, Required, TypedDict
+
+T = TypeVar("T")
+
+Payload = TypedDict(
+    "Payload",
+    {
+        "required": Required[T],
+        "optional": "NotRequired[list[T]]",
+        "readonly": ReadOnly[T],
+    },
+)
+
+def inspect_payload(payload: Payload[bytes]) -> None:
+    reveal_type(payload["required"])  # revealed: bytes
+    reveal_type(payload["optional"])  # revealed: list[bytes]
+    reveal_type(payload.get("optional"))  # revealed: list[bytes] | None
+    reveal_type(payload["readonly"])  # revealed: bytes
+
+    # error: [invalid-assignment] "key is marked read-only"
+    payload["readonly"] = b"new"
+
+# error: [invalid-argument-type]
+Payload[bytes](required="wrong", readonly=b"value")
+
+class BytesPayload(Payload[bytes]):
+    pass
+
+reveal_type(BytesPayload(required=b"value", readonly=b"value")["required"])  # revealed: bytes
+```
+
+## Recursive generic function/assignment syntax
+
+Type variables can occur only inside forward annotations, including recursive references:
+
+```py
+from typing import TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+Node = TypedDict("Node", {"value": "T", "next": "Node[T] | None"})
+
+def inspect_node(node: Node[int]) -> None:
+    reveal_type(node["value"])  # revealed: int
+    reveal_type(node["next"])  # revealed: Node[int] | None
+```
+
+## Generic functional syntax with extra items
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+The `extra_items` annotation participates in the same specialization:
+
+```py
+from typing import TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+Extras = TypedDict("Extras", {"known": T}, extra_items="list[T]")
+
+def inspect_extras(value: Extras[int]) -> None:
+    reveal_type(value["known"])  # revealed: int
+    reveal_type(value["other"])  # revealed: list[int]
+```
+
 ## Function syntax with `total=False`
 
 The `total=False` keyword makes all fields optional by default:

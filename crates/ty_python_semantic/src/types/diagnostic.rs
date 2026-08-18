@@ -1626,7 +1626,10 @@ pub(super) fn add_invariant_generic_hints<'db>(
     };
     diag.info(message);
 
-    if let Some(note) = covariant_supertype_hint(expected_class, db, &mismatch_indices) {
+    if let Some(note) = expected_class
+        .as_static()
+        .and_then(|class| covariant_supertype_hint(class, db, &mismatch_indices))
+    {
         diag.info(note);
     }
     diag.info(
@@ -4000,7 +4003,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     // specialization seen and the index of the explicit base it
     // came from.
     let mut ancestor_specs =
-        FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
+        FxHashMap::<super::class::GenericClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
 
     for (i, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {

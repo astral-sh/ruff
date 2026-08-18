@@ -1787,12 +1787,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 value_ty
             }
             Type::ClassLiteral(class) => {
-                match (class.generic_context(self.db()), class.as_static()) {
-                    (Some(generic_context), Some(static_class)) => {
+                match (class.generic_context(self.db()), class.as_generic_class()) {
+                    (Some(generic_context), Some(generic_class)) => {
                         let specialized_class = self.infer_explicit_class_specialization(
                             subscript,
                             value_ty,
-                            static_class,
+                            generic_class,
                             generic_context,
                         );
 

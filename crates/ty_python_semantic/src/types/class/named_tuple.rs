@@ -3,6 +3,8 @@ use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::TextRange;
 
+use crate::types::class::functional_generic_context_from_candidates;
+use crate::types::{GenericAlias, GenericClassLiteral};
 use crate::{
     Db,
     place::{Place, PlaceAndQualifiers},
@@ -10,7 +12,7 @@ use crate::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
         PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
-        class::{DynamicClassHeaderAnchor, dynamic_class_header_range},
+        class::{DynamicClassHeaderAnchor, FunctionalTypeVarCandidate, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
         mro::Mro,
@@ -165,6 +167,9 @@ pub struct DynamicNamedTupleLiteral<'db> {
     ///   is relative to the enclosing scope's anchor node index.
     #[returns(ref)]
     pub anchor: DynamicNamedTupleAnchor<'db>,
+
+    #[returns(deref)]
+    pub(super) typevar_candidates: Box<[FunctionalTypeVarCandidate<'db>]>,
 }
 
 impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
@@ -182,6 +187,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             self.name(db),
             self.anchor(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
+            self.typevar_candidates(db),
         ))
     }
 }
@@ -207,8 +213,23 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     /// Returns an instance type for this dynamic namedtuple.
-    fn to_instance(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        Type::instance(db, env, ClassType::NonGeneric(self.into()))
+    fn to_instance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Option<crate::types::Specialization<'db>>,
+    ) -> Type<'db> {
+        let class = specialization.map_or_else(
+            || ClassType::NonGeneric(self.into()),
+            |specialization| {
+                ClassType::Generic(GenericAlias::new(
+                    db,
+                    GenericClassLiteral::DynamicNamedTuple(self),
+                    specialization,
+                ))
+            },
+        );
+        Type::instance(db, env, class)
     }
 
     /// Returns the range of the namedtuple call expression.
@@ -323,11 +344,12 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        specialization: Option<crate::types::Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // First check synthesized members and fields.
-        let member = self.own_class_member(db, name);
+        let member = self.own_class_member(db, specialization, name);
         if !member.is_undefined() {
             return member.inner;
         }
@@ -351,10 +373,15 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     ///
     /// This only checks synthesized members and field properties, without falling
     /// back to tuple or other base classes.
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<crate::types::Specialization<'db>>,
+        name: &str,
+    ) -> Member<'db> {
         let env = ProgramEnvironment::from_scope(self.scope(db));
         // Handle synthesized namedtuple attributes.
-        if let Some(ty) = self.synthesized_class_member(db, &env, name) {
+        if let Some(ty) = self.synthesized_class_member(db, &env, specialization, name) {
             return Member::definitely_declared(ty);
         }
 
@@ -373,9 +400,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        specialization: Option<crate::types::Specialization<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
-        let instance_ty = self.to_instance(db, env);
+        let instance_ty = self.to_instance(db, env, specialization);
 
         // When fields are unknown, handle constructor and field-specific methods specially.
         if !self.has_known_fields(db) {
@@ -477,6 +505,30 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_fields(db)
+    }
+
+    pub(super) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn named_tuple_generic_context_from_candidates<'db>(
+            db: &'db dyn Db,
+            named_tuple: DynamicNamedTupleLiteral<'db>,
+        ) -> Option<GenericContext<'db>> {
+            let DynamicNamedTupleAnchor::TypingDefinition(definition) = named_tuple.anchor(db)
+            else {
+                return None;
+            };
+            functional_generic_context_from_candidates(
+                db,
+                *definition,
+                named_tuple.typevar_candidates(db),
+            )
+        }
+
+        named_tuple_generic_context_from_candidates(db, self)
     }
 }
 
