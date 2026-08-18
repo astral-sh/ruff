@@ -25,8 +25,9 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorator_flags, function_known_decorators, infer_statement_types,
-            nearest_enclosing_function, original_class_type,
+            function_known_decorator_flags, function_known_decorators,
+            infer_function_signature_types, infer_statement_types, nearest_enclosing_function,
+            original_class_type,
         },
         infer_scope_types,
         relation::TypeRelation,
@@ -664,94 +665,89 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    pub(super) fn infer_function_signature(
+        &mut self,
+        definition: Definition<'db>,
+        function: &ast::StmtFunctionDef,
+    ) {
+        // PEP 695 annotations are inferred in the function's type-parameter scope.
+        if function.type_params.is_some() {
+            return;
+        }
+
+        self.suppress_errors_for_no_type_check(definition, function);
+        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        self.infer_function_signature_annotations(function, definition);
+        self.typevar_binding_context = previous_typevar_binding_context;
+    }
+
     pub(super) fn infer_function_deferred(
         &mut self,
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
         let db = self.db();
-        let mut prev_in_no_type_check = self
-            .context
-            .inference_flags
-            .replace(InferenceFlags::IN_NO_TYPE_CHECK, true);
-        for decorator in &function.decorator_list {
-            let decorator_type = self.infer_decorator(decorator);
-            if let Type::FunctionLiteral(function) = decorator_type
-                && let Some(KnownFunction::NoTypeCheck) = function.known(db)
-            {
-                // If the function is decorated with the `no_type_check` decorator,
-                // we need to suppress any errors that come after the decorators.
-                prev_in_no_type_check = true;
-                break;
-            }
+        if function.type_params.is_none()
+            && (function.returns.is_some() || parameters_have_annotations(&function.parameters))
+        {
+            self.extend_definition(definition, infer_function_signature_types(db, definition));
         }
-        self.context
-            .inference_flags
-            .set(InferenceFlags::IN_NO_TYPE_CHECK, prev_in_no_type_check);
 
-        let has_type_params = function.type_params.is_some();
-        let has_defaults = function
+        if !function
             .parameters
             .iter_non_variadic_params()
-            .any(|param| param.default.is_some());
+            .any(|param| param.default.is_some())
+        {
+            return;
+        }
 
+        self.suppress_errors_for_no_type_check(definition, function);
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
-        if !has_type_params {
-            self.infer_function_signature_annotations(function, definition);
+        // In stub files, default values may reference names that are defined later in the file.
+        let in_stub = self.in_stub();
+        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
+
+        // Generic function annotations come from their type-parameter scope; other annotations
+        // were merged from `infer_function_signature_types` above.
+        let type_params_inference = function.type_params.as_ref().map(|_| {
+            let type_params_scope = self
+                .index
+                .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
+                .to_scope_id(db, self.program_file());
+            infer_scope_types(db, type_params_scope, TypeContext::default())
+        });
+
+        for param_with_default in function.parameters.iter_non_variadic_params() {
+            let Some(default) = param_with_default.default() else {
+                continue;
+            };
+            let annotation = param_with_default.annotation().map(|annotation| {
+                type_params_inference.map_or_else(
+                    || self.expression_type(annotation),
+                    |inference| inference.expression_type(annotation),
+                )
+            });
+            self.infer_expression(default, TypeContext::new(annotation));
         }
 
-        if has_defaults {
-            // In stub files, default values may reference names that are defined later in the file.
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
-
-            // For generic functions, only defaults are inferred here; annotation types come from
-            // the type-params scope.
-            if has_type_params {
-                let type_params_scope = self
-                    .index
-                    .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
-                    .to_scope_id(db, self.program_file());
-                let type_params_inference =
-                    infer_scope_types(self.db(), type_params_scope, TypeContext::default());
-
-                for param_with_default in function.parameters.iter_non_variadic_params() {
-                    let Some(default) = param_with_default.default.as_deref() else {
-                        continue;
-                    };
-                    let tcx = param_with_default
-                        .parameter
-                        .annotation
-                        .as_deref()
-                        .map(|annotation| {
-                            TypeContext::new(Some(
-                                type_params_inference.expression_type(annotation),
-                            ))
-                        })
-                        .unwrap_or_else(TypeContext::default);
-                    self.infer_expression(default, tcx);
-                }
-            } else {
-                for param_with_default in function.parameters.iter_non_variadic_params() {
-                    let Some(default) = param_with_default.default.as_deref() else {
-                        continue;
-                    };
-                    let tcx = param_with_default
-                        .parameter
-                        .annotation
-                        .as_deref()
-                        .map(|annotation| TypeContext::new(Some(self.expression_type(annotation))))
-                        .unwrap_or_else(TypeContext::default);
-                    self.infer_expression(default, tcx);
-                }
-            }
-
-            self.deferred_state = previous_deferred_state;
-        }
-
+        self.deferred_state = previous_deferred_state;
         self.typevar_binding_context = previous_typevar_binding_context;
+    }
+
+    fn suppress_errors_for_no_type_check(
+        &mut self,
+        definition: Definition<'db>,
+        function: &ast::StmtFunctionDef,
+    ) {
+        if !function.decorator_list.is_empty()
+            && function_known_decorator_flags(self.db(), definition)
+                .contains(FunctionDecorators::NO_TYPE_CHECK)
+        {
+            // Decorator expressions and their diagnostics belong to their own inference query.
+            // Signature and default inference only need to know whether errors are suppressed.
+            self.context.inference_flags |= InferenceFlags::IN_NO_TYPE_CHECK;
+        }
     }
 
     fn infer_return_type_annotation(&mut self, returns: Option<&ast::Expr>) {

@@ -251,6 +251,63 @@ class C:
         reveal_type(self.d)
 ```
 
+### Self-referential decorated functions
+
+Resolving a decorated function's callable signature must not eagerly infer its default values.
+Otherwise, a default that refers back to the decorated name can re-enter the reachability check for
+an earlier assertion and prevent inference from converging. This is a regression test for
+<https://github.com/astral-sh/ty/issues/4308>.
+
+```py
+f = lambda: f
+assert f
+
+@property
+def f(x=lambda: f): ...
+```
+
+The same cycle must converge when the parameter and return type are annotated:
+
+```py
+g = lambda: g
+assert g
+
+@property
+def g(x: object = lambda: g) -> None: ...
+```
+
+### Self-referential property construction
+
+Constructing a property explicitly has the same behavior as decorator syntax:
+
+```py
+f = lambda: f
+assert f
+
+def getter(x=lambda: f): ...
+
+f = property(getter)
+```
+
+### Self-referential callable decorators
+
+The cycle is not specific to properties. A decorator that returns a callable with a fixed signature
+must also terminate:
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def decorator(fn: Callable[[Any], Any]) -> Callable[[Any], Any]:
+    return fn
+
+f = lambda: f
+assert f
+
+@decorator
+def f(x=lambda: f): ...
+```
+
 ## Self-referential implicit attributes
 
 ```py
