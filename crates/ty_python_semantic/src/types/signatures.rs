@@ -2524,6 +2524,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut source_parameters = source.parameters.expand_starred_variadic_annotations(db);
         let mut target_parameters = target.parameters.expand_starred_variadic_annotations(db);
 
+        // Expanding `*args: *tuple[*tuple[int, ...], str]` creates a synthetic positional `str`
+        // parameter immediately after the variadic `int` parameter. Check whether either
+        // signature contains such a positional suffix.
         let source_has_unpacked_suffix = source_parameters.variadic().is_some_and(|(index, _)| {
             source_parameters
                 .get(index + 1)
@@ -2535,7 +2538,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_some_and(Parameter::is_positional)
         });
 
-        if source_has_unpacked_suffix || target_has_unpacked_suffix {
+        // Gradual, top, and ParamSpec signatures use synthetic keyword variadics that do not
+        // represent concrete keyword arguments; their specialized handling occurs below.
+        if (source_has_unpacked_suffix || target_has_unpacked_suffix)
+            && target_parameters.is_standard()
+        {
             // A target call can fill a source parameter positionally and also pass its name as a
             // keyword. A matching target prefix protects that name only when the same call must
             // already have filled the target parameter, including every prefix before a suffix.

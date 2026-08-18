@@ -1426,6 +1426,21 @@ static_assert(is_subtype_of(StringSuffix, Callable[[*tuple[object, ...], int, st
 static_assert(is_subtype_of(IntegerStringSuffix, Callable[[*tuple[int, ...], int, str], None]))
 ```
 
+A named positional prefix cannot make a callback with a required unpacked suffix compatible with a
+target that accepts no positional arguments.
+
+```py
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+def accepts_no_positional_arguments() -> None: ...
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[named_prefix_and_suffix],
+        RegularCallableTypeOf[accepts_no_positional_arguments],
+    )
+)
+```
+
 A positional parameter cannot also be filled by a target keyword argument.
 
 ```py
@@ -1492,6 +1507,16 @@ static_assert(
         RegularCallableTypeOf[required_keyword_target],
     )
 )
+```
+
+The same mismatch produces an assignment diagnostic when the target signature is used as an
+annotation.
+
+```py
+type PositionalKeywordTarget = RegularCallableTypeOf[positional_keyword_target]
+
+# error: [invalid-assignment]
+callback: PositionalKeywordTarget = requires_named_keyword
 ```
 
 A positional-only target prefix cannot prevent variadic keywords from colliding with an occupied
