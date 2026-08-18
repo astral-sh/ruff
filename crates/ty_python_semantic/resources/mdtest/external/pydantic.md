@@ -1582,7 +1582,7 @@ class RequiredAfterDefault(BaseModel):
     defaulted: int = 0
     required: int
 
-# revealed: (self: RequiredAfterDefault, *, defaulted: LaxInt = 0, required: LaxInt, **extra: Any) -> None
+# revealed: (self: RequiredAfterDefault, *, defaulted: LaxInt = ..., required: LaxInt, **extra: Any) -> None
 reveal_type(RequiredAfterDefault.__init__)
 RequiredAfterDefault(required=1)
 ```
@@ -1811,7 +1811,7 @@ class Person:
     age: int = Field(default=0)
 
 # `id` is absent in the constructor signature:
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int = 0) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int = ...) -> None
 
 Person(name="Alice")
 Person(name="Alice", age=20)
@@ -1833,7 +1833,7 @@ class User(BaseModel, metaclass=RegistryMeta):
     name: str
     age: int = 0
 
-reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, age: LaxInt = 0, **extra: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, age: LaxInt = ..., **extra: Any) -> None
 
 User(name="alice")
 User(name="alice", age=1)
