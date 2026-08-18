@@ -48,6 +48,18 @@ async with A() as a:
     async with B() as b:
         print("hello")
 
+# SIM117 — nested async with under a sync with parent (issue #27800).
+with A() as a:
+    async with B() as b:
+        async with C() as c:
+            print(a, b, c)
+
+# SIM117 — nested sync with under an async with parent.
+async with A() as a:
+    with B() as b:
+        with C() as c:
+            print(a, b, c)
+
 while True:
     # SIM117
     with A() as a:
@@ -163,3 +175,9 @@ async with asyncio.timeout(1):
 async with asyncio.timeout(1), A():
     async with B():
         pass
+
+# SIM117 — nested async with under an exempt async parent (issue #27800 class).
+async with asyncio.timeout(1):
+    async with A() as a:
+        async with B() as b:
+            print(a, b)
