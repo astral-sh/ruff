@@ -15,6 +15,26 @@ use crate::{
     },
 };
 
+/// A file-valued workspace initializes successfully and discovers its parent configuration.
+#[test]
+fn single_file_workspace() -> Result<()> {
+    let main = SystemPath::new("project/main.py");
+    let mut server = TestServerBuilder::new()?
+        .with_file(main, "missing")?
+        .with_file("project/ty.toml", "[rules]\nunresolved-reference = 'warn'")?
+        .with_workspace(main, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(main, "missing", 1);
+    assert_eq!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(main, None)),
+        "0:0..0:7[WARNING]: Name `missing` used when not defined",
+    );
+
+    Ok(())
+}
+
 /// Test that we can initialize multiple workspace folders.
 #[test]
 fn initialize_multiple_workspace_folders() -> Result<()> {
