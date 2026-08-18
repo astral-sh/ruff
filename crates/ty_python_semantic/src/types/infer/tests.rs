@@ -8,6 +8,7 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
+use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 use ty_python_core::program::{Program, ProgramSettings};
@@ -492,6 +493,146 @@ fn pep695_type_params() {
 
     // a typevar with less than two constraints is treated as unconstrained
     check_typevar("Y", "TypeVar", None, None, None);
+}
+
+#[test]
+fn functional_generic_context_is_precisely_invalidated() {
+    fn executions(db: &TestDb, events: &[salsa::Event], query: &str, input: salsa::Id) -> usize {
+        events
+            .iter()
+            .filter(|event| {
+                let salsa::EventKind::WillExecute { database_key } = event.kind else {
+                    return false;
+                };
+                db.ingredient_debug_name(database_key.ingredient_index()) == query
+                    && database_key.key_index() == input
+            })
+            .count()
+    }
+
+    fn request_context(db: &TestDb, file: File, name: &str) -> (salsa::Id, bool) {
+        let class = global_symbol(db, file, name)
+            .place
+            .expect_type()
+            .as_class_literal()
+            .unwrap_or_else(|| panic!("expected `{name}` to be a class"));
+        let context_exists = class.generic_context(db).is_some();
+        let id = match class {
+            ClassLiteral::DynamicNamedTuple(class) => class.as_id(),
+            ClassLiteral::DynamicTypedDict(class) => class.as_id(),
+            _ => panic!("expected `{name}` to be a functional class"),
+        };
+        (id, context_exists)
+    }
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        r#"
+        from typing import NamedTuple, TypedDict, TypeVar
+        T = TypeVar("T")
+        Pair = NamedTuple("Pair", [("value", "list[T]"), ("next", "Pair[T] | None")])
+        Movie = TypedDict("Movie", {"value": "list[T]", "next": "Movie[T] | None"})
+        "#,
+    )
+    .unwrap();
+    let file = system_path_to_file(&db, "src/a.py").unwrap();
+
+    db.clear_salsa_events();
+    let (pair_id, pair_has_context) = request_context(&db, file, "Pair");
+    let (movie_id, movie_has_context) = request_context(&db, file, "Movie");
+    assert!(pair_has_context);
+    assert!(movie_has_context);
+    let events = db.take_salsa_events();
+    assert_eq!(
+        executions(
+            &db,
+            &events,
+            "named_tuple_generic_context_from_candidates",
+            pair_id,
+        ),
+        1
+    );
+    assert_eq!(
+        executions(
+            &db,
+            &events,
+            "typed_dict_generic_context_from_candidates",
+            movie_id,
+        ),
+        1
+    );
+    drop(events);
+
+    db.write_dedented(
+        "src/a.py",
+        r#"
+        from typing import NamedTuple, TypedDict, TypeVar
+        T = TypeVar("T")
+        # unrelated edit
+        Pair = NamedTuple("Pair", [("value", "list[T]"), ("next", "Pair[T] | None")])
+        Movie = TypedDict("Movie", {"value": "list[T]", "next": "Movie[T] | None"})
+        "#,
+    )
+    .unwrap();
+    db.clear_salsa_events();
+    assert_eq!(request_context(&db, file, "Pair"), (pair_id, true));
+    assert_eq!(request_context(&db, file, "Movie"), (movie_id, true));
+    let events = db.take_salsa_events();
+    assert_eq!(
+        executions(
+            &db,
+            &events,
+            "named_tuple_generic_context_from_candidates",
+            pair_id,
+        ),
+        0
+    );
+    assert_eq!(
+        executions(
+            &db,
+            &events,
+            "typed_dict_generic_context_from_candidates",
+            movie_id,
+        ),
+        0
+    );
+    drop(events);
+
+    db.write_dedented(
+        "src/a.py",
+        r#"
+        from typing import NamedTuple, TypedDict, TypeVar
+        T = TypeVar("T")
+        # unrelated edit
+        Pair = NamedTuple("Pair", [("value", "list[T]"), ("next", "Pair[T] | None")])
+        Movie = TypedDict("Movie", {"value": "list[int]", "next": "Movie[int] | None"})
+        "#,
+    )
+    .unwrap();
+    db.clear_salsa_events();
+    assert_eq!(request_context(&db, file, "Pair"), (pair_id, true));
+    let (new_movie_id, movie_has_context) = request_context(&db, file, "Movie");
+    assert!(!movie_has_context);
+    let events = db.take_salsa_events();
+    assert_eq!(
+        executions(
+            &db,
+            &events,
+            "named_tuple_generic_context_from_candidates",
+            pair_id,
+        ),
+        0
+    );
+    assert_eq!(
+        executions(
+            &db,
+            &events,
+            "typed_dict_generic_context_from_candidates",
+            new_movie_id,
+        ),
+        1
+    );
 }
 
 #[test]
