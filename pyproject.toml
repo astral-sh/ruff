@@ -72,13 +72,13 @@ docs = [
 ]
 # The compatibility tests use the Ruff binary built from this checkout.
 ruff-lsp-test = [
-    "cattrs==23.1.2",
-    "lsprotocol==2023.0.0",
+    "lsprotocol>=2023.0.0",
     "packaging>=23.1",
-    "pygls==1.2.1",
-    "pytest==7.4.4",
-    "pytest-asyncio==0.21.2",
-    "python-lsp-jsonrpc==1.0.0",
+    # ruff-lsp uses the pygls 1.x server API.
+    "pygls>=1.1.0,<2",
+    "pytest>=7.3.1,<8",
+    "pytest-asyncio>=0.21.2",
+    "python-lsp-jsonrpc>=1.0.0",
     "typing-extensions>=4.7.1",
 ]
 ty-ecosystem = [

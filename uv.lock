@@ -1519,7 +1519,6 @@ release = [
     { name = "rooster", marker = "python_full_version >= '3.12'" },
 ]
 ruff-lsp-test = [
-    { name = "cattrs", marker = "python_full_version >= '3.12'" },
     { name = "lsprotocol", marker = "python_full_version >= '3.12'" },
     { name = "packaging", marker = "python_full_version >= '3.12'" },
     { name = "pygls", marker = "python_full_version >= '3.12'" },
@@ -1552,13 +1551,12 @@ docs = [
 ]
 release = [{ name = "rooster", marker = "python_full_version >= '3.12'", specifier = "==0.1.1" }]
 ruff-lsp-test = [
-    { name = "cattrs", marker = "python_full_version >= '3.12'", specifier = "==23.1.2" },
-    { name = "lsprotocol", marker = "python_full_version >= '3.12'", specifier = "==2023.0.0" },
+    { name = "lsprotocol", marker = "python_full_version >= '3.12'", specifier = ">=2023.0.0" },
     { name = "packaging", marker = "python_full_version >= '3.12'", specifier = ">=23.1" },
-    { name = "pygls", marker = "python_full_version >= '3.12'", specifier = "==1.2.1" },
-    { name = "pytest", marker = "python_full_version >= '3.12'", specifier = "==7.4.4" },
-    { name = "pytest-asyncio", marker = "python_full_version >= '3.12'", specifier = "==0.21.2" },
-    { name = "python-lsp-jsonrpc", marker = "python_full_version >= '3.12'", specifier = "==1.0.0" },
+    { name = "pygls", marker = "python_full_version >= '3.12'", specifier = ">=1.1.0,<2" },
+    { name = "pytest", marker = "python_full_version >= '3.12'", specifier = ">=7.3.1,<8" },
+    { name = "pytest-asyncio", marker = "python_full_version >= '3.12'", specifier = ">=0.21.2" },
+    { name = "python-lsp-jsonrpc", marker = "python_full_version >= '3.12'", specifier = ">=1.0.0" },
     { name = "typing-extensions", marker = "python_full_version >= '3.12'", specifier = ">=4.7.1" },
 ]
 ty-ecosystem = [{ name = "ecosystem-analyzer", marker = "python_full_version >= '3.13'", git = "https://github.com/astral-sh/ecosystem-analyzer" }]
