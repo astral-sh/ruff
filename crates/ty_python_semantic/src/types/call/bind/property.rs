@@ -39,17 +39,49 @@ impl<'db> Bindings<'db> {
                 }
             };
 
+            // The accessor passed to a property subclass is not necessarily the accessor
+            // stored by the resulting descriptor. For example:
+            //
+            // class ReplacingProperty(property):
+            //     def __init__(self, getter):
+            //         super().__init__(lambda _: "replacement")
+            //
+            // class Example:
+            //     @ReplacingProperty
+            //     def value(self) -> int:
+            //         return 1
+            //
+            // Here, `Example().value` is a string despite the original getter returning
+            // an integer. A custom `__get__` can likewise ignore the stored getter:
+            //
+            // class ConstantProperty(property):
+            //     def __get__(self, instance, owner=None):
+            //         return "replacement"
+            //
+            // Accessor decorators can also replace the descriptor entirely:
+            //
+            // class ReplacingSetter(property):
+            //     def setter(self, setter):
+            //         return property(lambda _: "replacement")
+            //
+            // Check the subclass and its intermediate bases, but stop before the known
+            // property base: its own methods are exactly the behavior modeled below.
+            // Leave subclasses that override any of these methods to ordinary descriptor
+            // inference rather than assuming they retain the supplied accessors.
             if class
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
                 .take_while(|base| !base.is_known(db, property_base))
                 .any(|base| {
                     [
+                        // Constructors can replace or discard the supplied accessors.
                         "__new__",
                         "__init__",
+                        // Descriptor methods control attribute reads, writes, and deletion.
                         "__get__",
                         "__set__",
                         "__delete__",
+                        // Accessor decorators can construct a different descriptor.
                         "getter",
                         "setter",
                         "deleter",
