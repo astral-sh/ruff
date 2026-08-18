@@ -4398,6 +4398,38 @@ factory_object: FactoryObject = factory
 factory_module: FactoryModule = factory
 ```
 
+## Generic protocol inference from module objects
+
+A module attribute can determine a protocol's type argument when the module itself is passed to a
+generic function.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`values.py`:
+
+```py
+value: int = 1
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+
+import values
+
+class HasValue[T](Protocol):
+    value: T
+
+def get_value[T](obj: HasValue[T]) -> T:
+    return obj.value
+
+reveal_type(get_value(values))  # revealed: int
+```
+
 ## Class objects with class-method protocol members
 
 A class object implements a protocol when its directly accessible members have compatible types. The
@@ -4458,21 +4490,18 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol, TypeVar
+from typing import Protocol
 
-T_co = TypeVar("T_co", covariant=True)
-T = TypeVar("T")
-
-class Factory(Protocol[T_co]):
+class Factory[T](Protocol):
     @classmethod
-    def make(cls) -> T_co: ...
+    def make(cls) -> T: ...
 
 class Concrete:
     @classmethod
     def make(cls) -> "Concrete":
         return cls()
 
-def from_protocol(factory: Factory[T]) -> T:
+def from_protocol[T](factory: Factory[T]) -> T:
     return factory.make()
 
 reveal_type(from_protocol(Concrete))  # revealed: Concrete
@@ -5740,6 +5769,32 @@ def get_value[T](factory: ConstructorWithValue[T]) -> T:
     return factory.value
 
 reveal_type(get_value(Product))  # revealed: int
+```
+
+## Generic callback inference from function attributes
+
+A function object's attributes also contribute to protocol inference. Here, the type argument comes
+from `__name__`, not the callback's return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class NamedCallback[T](Protocol):
+    __name__: T
+
+    def __call__(self) -> object: ...
+
+def get_name[T](callback: NamedCallback[T]) -> T:
+    return callback.__name__
+
+def callback() -> None: ...
+
+reveal_type(get_name(callback))  # revealed: str
 ```
 
 ## Generic protocols and union arguments

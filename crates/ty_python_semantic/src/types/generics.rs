@@ -4006,29 +4006,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return Ok(());
             }
 
-            (
-                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
-                Type::NominalInstance(actual_nominal),
-            ) => {
-                // Extract formal_alias if this is a generic class
-                let formal_alias = match formal {
-                    Type::NominalInstance(formal_nominal) => {
-                        formal_nominal.class(db, self.env).into_generic_alias()
-                    }
-
-                    Type::ProtocolInstance(_) => {
-                        // TODO: For protocols, we use the new constraint set implementation, which
-                        // will handle implicitly implemented protocols and generic protocols. We
-                        // eventually want this logic to be used for _all_ nominal instances
-                        // (replacing the logic below).
-                        let when = self.constraint_for_relation(formal, actual, relation_polarity);
-                        return self.infer_from_constraint_set(when);
-                    }
-
-                    _ => None,
-                };
-
-                if let Some(formal_alias) = formal_alias {
+            (Type::NominalInstance(formal_nominal), Type::NominalInstance(actual_nominal)) => {
+                if let Some(formal_alias) = formal_nominal.class(db, self.env).into_generic_alias()
+                {
                     let formal_origin = formal_alias.origin(db);
                     for base in actual_nominal.class(db, self.env).iter_mro(db) {
                         let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
@@ -4056,13 +4036,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            // TODO: in principle this could be a generalized Union-actual arm that maps over the
-            // union, but the old solver isn't well-equipped to handle that (due to side effects
-            // from even failed matches), so for now we handle this particular case.
-            (formal @ Type::ProtocolInstance(_), actual @ Type::Union(actual_union)) => {
+            (formal @ Type::ProtocolInstance(_), actual) => {
                 // Common TypedDict constraints prove only `actual <= formal`. Contravariance
                 // reverses that relation, while invariance additionally requires the reverse.
-                let when = if matches!(relation_polarity, TypeVarVariance::Covariant)
+                let when = if let Type::Union(actual_union) = actual
+                    && matches!(relation_polarity, TypeVarVariance::Covariant)
                     && let Some(common) =
                         self.common_typed_dict_protocol_constraints(formal, actual_union)
                 {
@@ -4071,40 +4049,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.constraint_for_relation(formal, actual, relation_polarity)
                 };
                 return self.infer_from_constraint_set(when);
-            }
-
-            (
-                formal @ Type::ProtocolInstance(_),
-                actual @ (Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
-                | Type::SubclassOf(_)
-                | Type::TypedDict(_)),
-            ) => {
-                // A class object can itself implement a protocol. Compare its members directly;
-                // converting it to its instance type would infer from a different interface.
-                let when = self.constraint_for_relation(formal, actual, relation_polarity);
-                return self.infer_from_constraint_set(when);
-            }
-
-            // When the formal type is a protocol with a `__call__` method, infer the specialization
-            // from matching the actual type's callable signature against the protocol's `__call__`
-            // method signature.
-            (Type::ProtocolInstance(formal_protocol), _) => {
-                let Some(call_method) = formal_protocol.interface(db).call_method(db, self.env)
-                else {
-                    return Ok(());
-                };
-                let Some(actual_callables) = actual.try_upcast_to_callable(db, self.env) else {
-                    return Ok(());
-                };
-
-                // The protocol interface exposes the callable signature already bound for
-                // instance access.
-                self.infer_from_callable_signature(
-                    call_method,
-                    actual_callables,
-                    relation_polarity,
-                )?;
             }
 
             (Type::Callable(formal_callable), _) => {
