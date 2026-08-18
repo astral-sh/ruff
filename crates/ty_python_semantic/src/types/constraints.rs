@@ -518,6 +518,20 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node == ALWAYS_TRUE
     }
 
+    /// Returns whether this constraint set mentions this exact bound type-variable occurrence.
+    pub(super) fn mentions_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let storage = self.builder.storage.borrow();
+        storage.node_support(self.node).is_some_and(|support| {
+            support
+                .iter()
+                .any(|id| storage.typevar_data(id) == typevar.identity(db))
+        })
+    }
+
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
     /// constraints in this constraint set hold. Panics if neither of the types being compared are
     /// a typevar. (That case is handled by `Type::has_relation_to`.)
@@ -7206,6 +7220,13 @@ mod tests {
 
         assert_eq!(mentioned, vec![t.identity(db), u.identity(db)]);
         assert!(support.is_complete());
+
+        let builder = ConstraintSetBuilder::new();
+        let constraint =
+            ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, actual_bound);
+        assert!(constraint.mentions_typevar(db, t));
+        assert!(constraint.mentions_typevar(db, u));
+        assert!(!constraint.mentions_typevar(db, metadata));
     }
 
     #[test]

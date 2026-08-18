@@ -5936,6 +5936,32 @@ def _(x: Foo):
         pass
 ```
 
+## Structural matches for explicitly inherited protocols
+
+A class can satisfy a different specialization of an inherited protocol by overriding one of its
+members. Constructor inference must preserve those structural solutions instead of treating the
+inherited specialization as the only possible match.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+
+class Consumer[T](Protocol):
+    def consume(self, value: T) -> None: ...
+
+class Permissive[T](Consumer[T]):
+    def __init__(self, callback: Callable[[T], object]) -> None: ...
+    def consume(self, value: object) -> None: ...
+
+contextual: Consumer[int] = Permissive(lambda value: reveal_type(value))  # revealed: Unknown
+also_valid: Consumer[int] = Permissive(lambda value: value.upper())
+```
+
 ## Protocols are never singleton types
 
 It *might* be possible to have a singleton protocol-instance type...?
@@ -6682,6 +6708,219 @@ class Recursive[T](Protocol):
 
 def check(value: Recursive[int]) -> None:
     rejected: Recursive[str] = value  # error: [invalid-assignment]
+```
+
+### Generic constructors inheriting recursive protocols
+
+A generic constructor can infer its specialization from an expected protocol type. Explicitly
+constrained receivers on inherited recursive methods must not repeatedly expand the protocol while
+inferring that specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def first[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ...
+    def second[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ...
+    def third[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ...
+    def fourth[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ...
+
+class Concrete[T](Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+contextual: Chain[int] = Concrete(())
+reveal_type(contextual)  # revealed: Concrete[int]
+
+explicit: Chain[int] = Concrete[int](())
+
+def make() -> Chain[int]:
+    return Concrete(())
+
+wrong: Chain[int] = Concrete(("wrong",))  # error: [invalid-assignment]
+```
+
+### Fully specialized sources for generic protocol inference
+
+A fully specialized source can contribute more structural inference information than its nominal
+specialization. In particular, an empty tuple's `Never` element type must not be discarded.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterable, Iterator
+from typing import Never
+
+class Container[T]:
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+reveal_type(Container(()))  # revealed: Container[Never]
+
+def infer[T](values: Iterable[T]) -> T:
+    raise NotImplementedError
+
+def preserve_iterator(values: Iterator[Never]) -> None:
+    reveal_type(infer(values))  # revealed: Never
+
+reveal_type(infer(()))  # revealed: Never
+```
+
+### Class and static methods on recursive protocols
+
+A static method's annotated first argument is not a receiver, and a class method's receiver has
+already been bound. Neither method's first ordinary argument should enable the shortcut for
+explicitly constrained receivers or discard a fully specialized source's `Never` type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Never, Protocol
+
+class Recursive[T](Protocol):
+    @classmethod
+    def classify(cls, value: object) -> None: ...
+    @staticmethod
+    def describe(value: object) -> None: ...
+    @property
+    def child(self) -> Recursive[T]: ...
+    def get(self) -> T: ...
+
+class Concrete[T](Recursive[T]): ...
+
+def infer[T](value: Recursive[T]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer(Concrete[Never]()))  # revealed: Never
+```
+
+### Fully specialized sources with constrained protocol receivers
+
+A concrete class can inherit recursive methods with explicitly constrained receivers. Both concrete
+and unknown specializations must bind those receivers without repeatedly expanding the inherited
+protocol interface.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    def accumulate[S](self: Chain[S], callback: None = None) -> Chain[S]: ...
+    @overload
+    def accumulate[I, N](self: Chain[N], callback: Callable[[I, N], I], initial: I) -> Chain[I]: ...
+
+class Concrete[T](Chain[T]): ...
+
+def specialized(value: Concrete[int]) -> None:
+    reveal_type(value.accumulate())  # revealed: Chain[int]
+
+def unspecialized() -> None:
+    reveal_type(Concrete().accumulate())  # revealed: Chain[Unknown]
+```
+
+### Structural inference from recursive protocol requirements
+
+An inherited protocol specialization can erase a class type parameter. A recursive member can still
+recover that parameter structurally, so satisfying the nominal relation is not enough to stop
+collecting protocol constraints.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from typing import Any, Protocol
+
+class RecursivePair[A, B](Protocol):
+    first: A
+
+    @property
+    def child(self) -> RecursivePair[A, Any]: ...
+    def value(self, child: RecursivePair[Any, Any]) -> B: ...
+
+class PartiallyErased[T, U](RecursivePair[T, Any]):
+    first: T
+
+    @property
+    def child(self) -> RecursivePair[T, Any]:
+        raise NotImplementedError
+
+    def value(self, child: RecursivePair[Any, Any]) -> U:
+        raise NotImplementedError
+
+    def __init__(self, values: Iterable[T], callback: Callable[[U], object]) -> None: ...
+
+contextual: RecursivePair[int, str] = PartiallyErased(
+    [],
+    lambda value: reveal_type(value),  # revealed: str
+)
+```
+
+### Overridden recursive protocol requirements
+
+Recursive requirements remain significant when a concrete class overrides them. Their constraints
+must still reject incompatible assignments and preserve generic inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Node[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> Node[T]: ...
+
+class Mismatched[T](Node[object]):
+    def __init__(self, value: T) -> None: ...
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+    @property
+    def child(self) -> Node[str]:
+        raise NotImplementedError
+
+bad_assignment: Node[int] = Mismatched(1)  # error: [invalid-assignment]
+
+def extract[U](node: Node[U]) -> U:
+    raise NotImplementedError
+
+reveal_type(extract(Mismatched(1)))  # revealed: object
 ```
 
 ### Recursive legacy generic protocol
