@@ -10,7 +10,7 @@ use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::bind::CallableDescription;
-use crate::types::call::{Bindings, CallDiagnosticOverride, CallError, CallableBinding};
+use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
@@ -2096,38 +2096,31 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
 
     diagnostic.annotate(secondary_annotation);
 
-    let mut decorator_binding_functions =
-        decorator_bindings
-            .iter_flat()
-            .filter_map(|binding| match binding.signature_type {
-                Type::FunctionLiteral(function) => Some(function),
-                Type::BoundMethod(method) => Some(method.function(db)),
-                _ => None,
-            });
-
-    let Some(decorator_function) = decorator_binding_functions.next() else {
+    // Union and intersection bindings can refer to different callables, so there is no single
+    // decorator definition or set of overloads that can be safely highlighted.
+    let Some(decorator_binding) = decorator_bindings.single_element() else {
         return;
     };
 
-    // Don't bother adding secondary annotations for the extremely rare edge case
-    // where `decorator_bindings` is a union of functions
-    if decorator_binding_functions.next().is_some() {
-        return;
-    }
+    let decorator_function = match decorator_binding.signature_type {
+        Type::FunctionLiteral(function) => function,
+        Type::BoundMethod(method) => method.function(db),
+        _ => return,
+    };
 
     let decorator_definition = decorator_function.definition(db);
     let (overloads, _) = decorator_function.overloads_and_implementation(db);
 
-    let mut matching_overloads = decorator_bindings
-        .iter_flat()
-        .flat_map(CallableBinding::matching_overloads)
-        .filter_map(|(overload_index, binding)| {
-            let overload_index = binding
-                .signature
-                .source_overload_index()
-                .unwrap_or(overload_index);
-            overloads.get(overload_index).copied()
-        });
+    let mut matching_overloads =
+        decorator_binding
+            .matching_overloads()
+            .filter_map(|(overload_index, binding)| {
+                let overload_index = binding
+                    .signature
+                    .source_overload_index()
+                    .unwrap_or(overload_index);
+                overloads.get(overload_index).copied()
+            });
 
     let matched_overload = matching_overloads.next();
     let next_matching_overload = matching_overloads.next();

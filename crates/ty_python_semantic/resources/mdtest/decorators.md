@@ -1183,6 +1183,40 @@ info[dynamic-function-decorator-return]: Decorator returns `Any`
    |     --------- Signature of `decorated` will be obscured by the decorator
 ```
 
+### Edge case: the decorator is a union of an overloaded function and `Callable`
+
+When one union member is an overloaded function and another is a `Callable`, the latter's bindings
+must not be attributed to the overloaded function.
+
+```py
+from typing import Any, Callable, overload
+
+@overload
+def overloaded_dynamic(value: None): ...
+@overload
+def overloaded_dynamic(value: Callable[[int], str]) -> Any: ...
+def overloaded_dynamic(value: object) -> Any:
+    return value
+
+def apply_decorator(flag: bool, other: Callable[[Callable[..., object]], Any]) -> None:
+    decorator = overloaded_dynamic if flag else other
+
+    # snapshot: dynamic-function-decorator-return
+    @decorator
+    def decorated(value: int) -> str:
+        return str(value)
+```
+
+```snapshot
+info[dynamic-function-decorator-return]: Decorator returns `Any`
+  --> src/mdtest_snippet.py:14:5
+   |
+14 |     @decorator
+   |     ^^^^^^^^^^
+15 |     def decorated(value: int) -> str:
+   |         --------- Signature of `decorated` will be obscured by the decorator
+```
+
 ### Multiple dynamic decorators
 
 Only the first decorator that replaces a precise type with a dynamic type is reported. Outer
