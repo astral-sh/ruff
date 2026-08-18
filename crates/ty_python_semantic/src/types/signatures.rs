@@ -2538,49 +2538,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_some_and(Parameter::is_positional)
         });
 
-        // Gradual, top, and ParamSpec signatures use synthetic keyword variadics that do not
-        // represent concrete keyword arguments; their specialized handling occurs below.
-        if (source_has_unpacked_suffix || target_has_unpacked_suffix)
-            && target_parameters.is_standard()
-        {
-            // A target call can fill a source parameter positionally and also pass its name as a
-            // keyword. A matching target prefix protects that name only when the same call must
-            // already have filled the target parameter, including every prefix before a suffix.
-            for (source_index, source_parameter) in source_parameters.positional().enumerate() {
-                let Some(source_name) = source_parameter.keyword_name() else {
-                    continue;
-                };
-
-                if target_parameters.variadic().is_none()
-                    && source_index >= target_parameters.positional().count()
-                {
-                    continue;
-                }
-
-                let target_keyword = target_parameters.keyword_by_name(source_name.as_str());
-                if target_keyword.is_some_and(|(target_index, target_parameter)| {
-                    target_parameter.is_positional()
-                        && (target_index <= source_index || target_has_unpacked_suffix)
-                }) {
-                    continue;
-                }
-
-                let accepts_keyword = target_keyword.map_or_else(
-                    || {
-                        target_parameters
-                            .keyword_variadic()
-                            .is_some_and(|(_, parameter)| {
-                                !parameter.annotated_type().resolve_type_alias(db).is_never()
-                            })
-                    },
-                    |(_, parameter)| !parameter.annotated_type().resolve_type_alias(db).is_never(),
-                );
-                if accepts_keyword {
-                    return self.never();
-                }
-            }
-        }
-
         // Gradual variadics and TypeVarTuples need their original suffix boundaries for
         // materialization and inference. Named source prefixes must also remain visible when a
         // target keyword could fill the same parameter.
@@ -2729,6 +2686,55 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 source: source.return_ty,
                 target: target.return_ty,
             });
+        }
+
+        // Concrete target keywords can collide with a fixed source prefix even when the source
+        // has a gradual or ParamSpec tail. Check them before those specialized paths can return.
+        let mut keyword_collision_checks = true;
+        if (source_has_unpacked_suffix || target_has_unpacked_suffix)
+            && target_parameters.is_standard()
+        {
+            // A target call can fill a source parameter positionally and also pass its name as a
+            // keyword. A matching target prefix protects that name only when the same call must
+            // already have filled the target parameter, including every prefix before a suffix.
+            for (source_index, source_parameter) in source_parameters.positional().enumerate() {
+                let Some(source_name) = source_parameter.keyword_name() else {
+                    continue;
+                };
+
+                if target_parameters.variadic().is_none()
+                    && source_index >= target_parameters.positional().count()
+                {
+                    continue;
+                }
+
+                let target_keyword = target_parameters.keyword_by_name(source_name.as_str());
+                if target_keyword.is_some_and(|(target_index, target_parameter)| {
+                    target_parameter.is_positional()
+                        && (target_index <= source_index || target_has_unpacked_suffix)
+                }) {
+                    continue;
+                }
+
+                let Some((_, keyword)) =
+                    target_keyword.or_else(|| target_parameters.keyword_variadic())
+                else {
+                    continue;
+                };
+
+                // The keyword must be uninhabited to avoid the collision. Keep this as a
+                // constraint so gradual types can materialize to `Never` and inferable type
+                // variables can be constrained to it.
+                let no_collision = self.check_type_pair(db, keyword.annotated_type(), Type::Never);
+                if result
+                    .intersect(db, self.constraints, no_collision)
+                    .is_never_satisfied(db, env)
+                {
+                    // Still allow the ParamSpec handling below to preserve its inferred binding.
+                    keyword_collision_checks = false;
+                    break;
+                }
+            }
         }
 
         let check_types = |result: &mut ConstraintSet<'db, 'c>,
@@ -3364,7 +3370,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        if !return_type_checks {
+        if !return_type_checks || !keyword_collision_checks {
             return result;
         }
 
