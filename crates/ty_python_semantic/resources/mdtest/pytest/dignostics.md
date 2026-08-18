@@ -482,3 +482,134 @@ error[pytest-param-mismatched-type]: Invalid parameter passed to `test_non_tuple
 info: Argument is incorrect
 info: This happens when testing `test_non_tuples`.
 ```
+
+### Sequence of Single Values
+
+A single argname is passed in a string and the argvalues are not a list nor tuple expression.
+
+```py
+import pytest
+import itertools
+from typing import Any, Iterable, Literal
+
+@pytest.mark.parametrize("x", itertools.count())
+@pytest.mark.parametrize("y", "abracadabra")
+@pytest.mark.parametrize("z", dict.fromkeys([set, list, tuple]))
+def test_unusual_iterables(x: float, y: str, z: type) -> None: ...
+@pytest.mark.parametrize("x", range(5))  # snapshot: pytest-param-mismatched-type
+@pytest.mark.parametrize("y", b"oops")  # snapshot: pytest-param-mismatched-type
+@pytest.mark.parametrize("z", dict.fromkeys([{}, (), []]))  # snapshot: pytest-param-mismatched-type
+def test_wrong_type_iterables(x: Literal[2], y: str, z: type) -> None: ...
+```
+
+```snapshot
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_wrong_type_iterables`.
+ --> src/mdtest_snippet.py:9:31
+  |
+9 | @pytest.mark.parametrize("x", range(5))  # snapshot: pytest-param-mismatched-type
+  |                               ^^^^^^^^ Expected `Iterable[Literal[2] | ParameterSet]`, found `range`
+info: Argument is incorrect
+info: This happens when testing `test_wrong_type_iterables`.
+info: type `range` is not assignable to protocol `Iterable[Literal[2] | ParameterSet]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator[int]` is not assignable to `Iterator[Literal[2] | ParameterSet]`
+info:         └── protocol `Iterator[int]` is not assignable to protocol `Iterator[Literal[2] | ParameterSet]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── incompatible return types: `int` is not assignable to `Literal[2] | ParameterSet`
+
+
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_wrong_type_iterables`.
+  --> src/mdtest_snippet.py:10:31
+   |
+10 | @pytest.mark.parametrize("y", b"oops")  # snapshot: pytest-param-mismatched-type
+   |                               ^^^^^^^ Expected `Iterable[str | ParameterSet]`, found `Literal[b"oops"]`
+info: Argument is incorrect
+info: This happens when testing `test_wrong_type_iterables`.
+info: type `Literal[b"oops"]` is not assignable to protocol `Iterable[str | ParameterSet]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator[int]` is not assignable to `Iterator[str | ParameterSet]`
+info:         └── protocol `Iterator[int]` is not assignable to protocol `Iterator[str | ParameterSet]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── incompatible return types: `int` is not assignable to `str | ParameterSet`
+info:                     └── type `int` is not assignable to any element of the union `str | ParameterSet`
+info:                         ├── type `int` is not assignable to any element of the union `str | ParameterSet`
+info:                         │   ├── element `Literal[112]` of union `Literal[112, 115, 111]` is not assignable to `str | ParameterSet`
+info:                         │   └── ... omitted 1 union element without additional context
+info:                         └── ... omitted 1 union element without additional context
+
+
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_wrong_type_iterables`.
+  --> src/mdtest_snippet.py:11:31
+   |
+11 | @pytest.mark.parametrize("z", dict.fromkeys([{}, (), []]))  # snapshot: pytest-param-mismatched-type
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `Iterable[type | ParameterSet]`, found `dict[dict[Unknown, Unknown] | tuple[()] | list[Unknown], Any | None]`
+info: Argument is incorrect
+info: This happens when testing `test_wrong_type_iterables`.
+info: type `dict[dict[Unknown, Unknown] | tuple[()] | list[Unknown], Any | None]` is not assignable to protocol `Iterable[type | ParameterSet]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator[dict[Unknown, Unknown] | tuple[()] | list[Unknown]]` is not assignable to `Iterator[type | ParameterSet]`
+info:         └── protocol `Iterator[dict[Unknown, Unknown] | tuple[()] | list[Unknown]]` is not assignable to protocol `Iterator[type | ParameterSet]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── incompatible return types: `dict[Unknown, Unknown] | tuple[()] | list[Unknown]` is not assignable to `type | ParameterSet`
+info:                     └── element `dict[Unknown, Unknown]` of union `dict[Unknown, Unknown] | tuple[()] | list[Unknown]` is not assignable to `type | ParameterSet`
+info:                         └── type `dict[Unknown, Unknown]` is not assignable to any element of the union `type | ParameterSet`
+info:                             ├── element `dict[Unknown, Unknown]` of union `dict[Unknown, Unknown] | tuple[()] | list[Unknown]` is not assignable to `type | ParameterSet`
+info:                             │   └── type `dict[Unknown, Unknown]` is not assignable to any element of the union `type | ParameterSet`
+info:                             │       ├── element `dict[Unknown, Unknown]` of union `dict[Unknown, Unknown] | tuple[()] | list[Unknown]` is not assignable to `type | ParameterSet`
+info:                             │       └── ... omitted 1 union element without additional context
+info:                             └── ... omitted 1 union element without additional context
+```
+
+### Sequence of Multiple Values
+
+Multiple argnames are passed in a string or sequence and the argvalues are not a list nor tuple
+expression.
+
+```py
+import pytest
+import itertools
+from typing import Literal, Never
+
+@pytest.mark.parametrize(["x", "y"], dict(a=1, b=2, c=3).items())
+def test_dict_items(x: str, y: int) -> None: ...
+@pytest.mark.parametrize(("x", "y"), zip([], itertools.count()))
+def test_zip(x: Never, y: int) -> None: ...
+@pytest.mark.parametrize(("x",), range(5))  # snapshot: pytest-param-mismatched-type
+def test_range_over_tuple(x: int) -> None: ...
+@pytest.mark.parametrize("x,y,z", zip(["a"], ("b",), {b"c"}))  # snapshot: pytest-param-mismatched-type
+def test_invalid_zip(x: Literal["a"], y: Literal["b"], z: Literal["c"]) -> None: ...
+```
+
+```snapshot
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_range_over_tuple`.
+ --> src/mdtest_snippet.py:9:34
+  |
+9 | @pytest.mark.parametrize(("x",), range(5))  # snapshot: pytest-param-mismatched-type
+  |                                  ^^^^^^^^ Expected `Iterable[tuple[int] | ParameterSet]`, found `range`
+info: Argument is incorrect
+info: This happens when testing `test_range_over_tuple`.
+info: type `range` is not assignable to protocol `Iterable[tuple[int] | ParameterSet]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator[int]` is not assignable to `Iterator[tuple[int] | ParameterSet]`
+info:         └── protocol `Iterator[int]` is not assignable to protocol `Iterator[tuple[int] | ParameterSet]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── incompatible return types: `int` is not assignable to `tuple[int] | ParameterSet`
+
+
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_invalid_zip`.
+  --> src/mdtest_snippet.py:11:35
+   |
+11 | @pytest.mark.parametrize("x,y,z", zip(["a"], ("b",), {b"c"}))  # snapshot: pytest-param-mismatched-type
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `Iterable[tuple[Literal["a"], Literal["b"], Literal["c"]] | ParameterSet]`, found `zip[tuple[str, Literal["b"], bytes]]`
+info: Argument is incorrect
+info: This happens when testing `test_invalid_zip`.
+info: type `zip[tuple[str, Literal["b"], bytes]]` is not assignable to protocol `Iterable[tuple[Literal["a"], Literal["b"], Literal["c"]] | ParameterSet]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `zip[tuple[str, Literal["b"], bytes]]` is not assignable to `Iterator[tuple[Literal["a"], Literal["b"], Literal["c"]] | ParameterSet]`
+info:         └── type `zip[tuple[str, Literal["b"], bytes]]` is not assignable to protocol `Iterator[tuple[Literal["a"], Literal["b"], Literal["c"]] | ParameterSet]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── incompatible return types: `tuple[str, Literal["b"], bytes]` is not assignable to `tuple[Literal["a"], Literal["b"], Literal["c"]] | ParameterSet`
+info:                     └── type `tuple[str, Literal["b"], bytes]` is not assignable to any element of the union `tuple[Literal["a"], Literal["b"], Literal["c"]] | ParameterSet`
+info:                         ├── the first tuple element is not compatible: `str` is not assignable to `Literal["a"]`
+info:                         └── ... omitted 1 union element without additional context
+```
