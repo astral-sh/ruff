@@ -15,17 +15,95 @@ fn find_uses_discovered_project_root() -> anyhow::Result<()> {
     venv_with_ty(&case, "project with spaces/.venv")?;
     venv_with_ty(&case, "project with spaces/src/.venv")?;
     let project = case.root().join("project with spaces");
-    // Configuration identifies the project root, but does not select the executable's environment.
-    case.write_file(
-        project.join("ty.toml"),
-        "[environment]\npython = 'missing configured environment'\n",
-    )?;
+    case.write_file(project.join("ty.toml"), "")?;
 
     assert_cmd_snapshot!(find_command(&case).current_dir(project.join("src")), @"
     success: true
     exit_code: 0
     ----- stdout -----
     <temp_dir>/project with spaces/.venv/bin/ty
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn find_uses_configured_environment() -> anyhow::Result<()> {
+    let case = CliTest::new()?.with_filter(r"/Scripts/ty\b", "/bin/ty");
+    venv_with_ty(&case, "project with spaces/configured environment")?;
+    venv_with_ty(&case, "project with spaces/.venv")?;
+    let project = case.root().join("project with spaces");
+    fs::create_dir(project.join("src"))?;
+    case.write_file(
+        project.join("pyproject.toml"),
+        "[tool.ty.environment]\npython = 'configured environment'\n",
+    )?;
+
+    assert_cmd_snapshot!(find_command(&case)
+        .current_dir(project.join("src"))
+        .env("VIRTUAL_ENV", project.join(".venv")), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    <temp_dir>/project with spaces/configured environment/bin/ty
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn find_uses_configured_interpreter() -> anyhow::Result<()> {
+    let case = CliTest::new()?.with_filter(r"/Scripts/ty\b", "/bin/ty");
+    venv_with_ty(&case, "configured environment")?;
+    let interpreter = if cfg!(windows) {
+        "configured environment/Scripts/python.exe"
+    } else {
+        "configured environment/bin/python3"
+    };
+    write_executable(&case, interpreter)?;
+    case.write_file(
+        "ty.toml",
+        &format!("[environment]\npython = '{interpreter}'\n"),
+    )?;
+
+    assert_cmd_snapshot!(find_command(&case), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    <temp_dir>/configured environment/bin/ty
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn find_does_not_fall_back_from_configured_environment() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "ty.toml",
+        "[environment]\npython = 'configured environment'\n",
+    )?;
+    venv_with_ty(&case, ".venv")?;
+
+    assert_cmd_snapshot!(find_command(&case), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    case.write_file("configured environment/pyvenv.cfg", "home = .\n")?;
+
+    assert_cmd_snapshot!(find_command(&case), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
 
     ----- stderr -----
     ");

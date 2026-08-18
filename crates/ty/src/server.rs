@@ -32,15 +32,19 @@ fn find_executable() -> Result<ExitStatus> {
     let cwd = current_directory()?;
     let system = OsSystem::new(&cwd);
 
-    let project_root = match ProjectMetadata::discover(&cwd, &system) {
-        Ok(project) => project.root().to_path_buf(),
+    let environment = match ProjectMetadata::discover(&cwd, &system) {
+        Ok(project) => match project.to_merged_options().python_environment(&system) {
+            Ok(None) => PythonEnvironment::discover(Some(project.root()), &system)
+                .map_err(anyhow::Error::from),
+            configured => configured,
+        },
         Err(error) => {
             tracing::debug!("Failed to discover a project, falling back to `{cwd}`: {error}");
-            cwd.clone()
+            PythonEnvironment::discover(Some(&cwd), &system).map_err(anyhow::Error::from)
         }
     };
 
-    let environment = match PythonEnvironment::discover(Some(&project_root), &system) {
+    let environment = match environment {
         Ok(Some(environment)) => environment,
         Ok(None) => return Ok(ExitStatus::Failure),
         Err(error) => {

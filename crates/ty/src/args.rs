@@ -314,9 +314,9 @@ impl CheckCommand {
 pub(crate) struct ServerCommand {
     /// Print the absolute path to the ty executable to use for the current folder.
     ///
-    /// Discover the project from the current working directory, then find its Python environment
-    /// using the normal environment-discovery order. Project configuration is used to locate the
-    /// root, but `environment.python` is ignored. Print the path to ty if it is installed there.
+    /// Discover the project from the current working directory. Use `environment.python` if it
+    /// is configured; otherwise, discover the Python environment in the normal order.
+    /// Print the path to ty if it is installed there.
     /// If project discovery fails, use the current working directory as the discovery root.
     /// Exit with status 0 if ty is found, 1 if discovery fails, or 2 on an unexpected error.
     #[arg(long, hide = true)]
