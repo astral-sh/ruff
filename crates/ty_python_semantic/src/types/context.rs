@@ -21,7 +21,6 @@ use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
-use crate::types::display::diagnostic_file_location;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
@@ -543,9 +542,6 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
             });
         }
 
-        diag.disambiguate_names(|file, offset| {
-            diagnostic_file_location(self.ctx.db(), file, offset)
-        });
         self.ctx.diagnostics.borrow_mut().push(diag);
     }
 }
@@ -757,6 +753,6 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
     ) -> DiagnosticGuard<'ctx> {
         let diag = Diagnostic::new(self.id, self.severity, message);
 
-        DiagnosticGuard::new(self.ctx.db(), self.ctx.file, &self.ctx.diagnostics, diag)
+        DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
     }
 }

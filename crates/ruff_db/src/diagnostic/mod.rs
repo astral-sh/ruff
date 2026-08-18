@@ -12,7 +12,7 @@ use serde::Serialize;
 
 pub use self::message::{
     DiagnosticMessage, DiagnosticName, DiagnosticNameKind, DiagnosticNameRecord,
-    IntoDiagnosticMessage,
+    DiagnosticNameResolver, IntoDiagnosticMessage,
 };
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
@@ -236,13 +236,14 @@ impl Diagnostic {
 
     /// Resolves semantic names against every message belonging to this diagnostic.
     ///
-    /// The location formatter is evaluated only when two distinct definitions also share the same
-    /// fully qualified name. All temporary name metadata is discarded before this method returns.
-    pub fn disambiguate_names(&mut self, format_location: impl Fn(File, TextSize) -> String) {
-        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    /// Qualified names are resolved only when distinct identities have the same displayed
+    /// spelling. Source locations are resolved only when their qualified names also coincide.
+    /// All temporary name metadata is discarded before this method returns.
+    pub fn disambiguate_names(&mut self, resolver: &impl DiagnosticNameResolver) {
+        #[derive(Clone, Debug, Eq, PartialEq)]
         enum Qualification {
-            Qualified,
-            Located,
+            Qualified(String),
+            Located(String),
         }
 
         let mut observed: FxHashMap<Box<str>, Vec<DiagnosticName>> = FxHashMap::default();
@@ -259,38 +260,46 @@ impl Diagnostic {
             }
         });
 
-        let qualification: FxHashMap<Box<str>, Qualification> = observed
-            .into_iter()
-            .filter_map(|(spelling, identities)| {
-                if identities.len() < 2 {
-                    return None;
-                }
+        let mut qualification: FxHashMap<DiagnosticName, Qualification> = FxHashMap::default();
+        for identities in observed.into_values() {
+            if identities.len() < 2 {
+                continue;
+            }
 
-                let located = identities.iter().enumerate().any(|(index, identity)| {
-                    identities[..index]
+            let qualified_names: Vec<_> = identities
+                .iter()
+                .map(|identity| resolver.qualified_name(identity))
+                .collect();
+            let located = qualified_names
+                .iter()
+                .enumerate()
+                .any(|(index, qualified)| {
+                    qualified_names[..index]
                         .iter()
-                        .any(|other| identity.qualified() == other.qualified())
+                        .any(|other| qualified == other)
                 });
-                Some((
-                    spelling,
-                    if located {
-                        Qualification::Located
-                    } else {
-                        Qualification::Qualified
-                    },
-                ))
-            })
-            .collect();
+
+            qualification.extend(identities.into_iter().zip(qualified_names).map(
+                |(identity, qualified)| {
+                    (
+                        identity,
+                        if located {
+                            Qualification::Located(qualified)
+                        } else {
+                            Qualification::Qualified(qualified)
+                        },
+                    )
+                },
+            ));
+        }
 
         self.for_each_message_mut(|message| {
-            message.resolve_names(|name| match qualification.get(name.spelling()) {
+            message.resolve_names(|name| match qualification.get(name) {
                 None => None,
-                Some(Qualification::Qualified) => Some(name.qualified().to_string()),
-                Some(Qualification::Located) => Some(format!(
-                    "{}{}",
-                    name.qualified(),
-                    format_location(name.file(), name.offset())
-                )),
+                Some(Qualification::Qualified(qualified)) => Some(qualified.clone()),
+                Some(Qualification::Located(qualified)) => {
+                    Some(format!("{qualified}{}", resolver.location(name)))
+                }
             });
         });
     }

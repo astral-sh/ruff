@@ -1,55 +1,48 @@
 use std::cell::RefCell;
 use std::fmt::{self, Write};
 
-use ruff_text_size::TextSize;
-
-use crate::files::File;
-
 // `fmt::Formatter` does not expose its underlying writer, so semantic `Display` implementations
 // need a scoped transport to associate a name with the diagnostic message currently being written.
 // This is not persistent Salsa query state: each synchronous `from_display` call owns one stack
 // frame, nested calls receive independent frames, and `Drop` removes a frame even during unwinding.
-// Captured names contain only owned data and are resolved before a diagnostic is retained by Salsa.
+// Captured names contain only owned data and lifetime-free Salsa identities.
 thread_local! {
     static MESSAGE_CAPTURES: RefCell<Vec<MessageCapture>> = const { RefCell::new(Vec::new()) };
 }
 
 /// The semantic category of a named item embedded in a diagnostic message.
 ///
-/// Classes and aliases can have the same spelling and source position while still denoting
-/// different items, so their category participates in their identity.
+/// Classes and aliases can have the same spelling while denoting different items. Their category
+/// determines which semantic value is reconstructed from its Salsa identity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum DiagnosticNameKind {
     Class,
     TypeAlias,
 }
 
-/// The identity and alternative spellings of a name displayed in a diagnostic.
+/// The spelling and semantic identity of a name displayed in a diagnostic.
 ///
-/// This representation is deliberately independent of Salsa database lifetimes. It is retained
-/// only while a diagnostic is assembled and discarded once its messages have been resolved.
+/// The identity carries no database lifetime, allowing inference queries to retain unresolved
+/// diagnostics without reading another file's syntax tree. It must be resolved against its
+/// originating database. Qualified names and source locations are requested only when the
+/// completed diagnostic actually needs them.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct DiagnosticName {
     spelling: Box<str>,
-    qualified: Box<str>,
-    file: File,
-    offset: TextSize,
+    #[get_size(ignore)]
+    identity: salsa::Id,
     kind: DiagnosticNameKind,
 }
 
 impl DiagnosticName {
     pub fn new(
         spelling: impl Into<Box<str>>,
-        qualified: impl Into<Box<str>>,
-        file: File,
-        offset: TextSize,
+        identity: salsa::Id,
         kind: DiagnosticNameKind,
     ) -> Self {
         Self {
             spelling: spelling.into(),
-            qualified: qualified.into(),
-            file,
-            offset,
+            identity,
             kind,
         }
     }
@@ -58,21 +51,28 @@ impl DiagnosticName {
         &self.spelling
     }
 
-    pub(super) fn qualified(&self) -> &str {
-        &self.qualified
+    /// Returns the underlying Salsa identity for this named item.
+    pub fn identity(&self) -> salsa::Id {
+        self.identity
     }
 
-    pub(super) fn file(&self) -> File {
-        self.file
-    }
-
-    pub(super) fn offset(&self) -> TextSize {
-        self.offset
+    /// Returns the semantic category needed to reconstruct this named item.
+    pub fn kind(&self) -> DiagnosticNameKind {
+        self.kind
     }
 
     pub(super) fn has_same_identity(&self, other: &Self) -> bool {
-        self.file == other.file && self.offset == other.offset && self.kind == other.kind
+        self.identity == other.identity && self.kind == other.kind
     }
+}
+
+/// Resolves presentation details only for genuinely ambiguous diagnostic names.
+pub trait DiagnosticNameResolver {
+    /// Returns the fully qualified spelling of this named item.
+    fn qualified_name(&self, name: &DiagnosticName) -> String;
+
+    /// Returns a source-location suffix when qualified spellings are also identical.
+    fn location(&self, name: &DiagnosticName) -> String;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
@@ -354,9 +354,10 @@ mod tests {
     use crate::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
     };
-    use crate::files::system_path_to_file;
+    use crate::files::{File, system_path_to_file};
     use crate::system::DbWithWritableSystem;
     use crate::tests::TestDb;
+    use salsa::plumbing::AsId;
     use std::cell::Cell;
     use std::error::Error;
 
@@ -370,38 +371,54 @@ mod tests {
         Ok((db, first, second))
     }
 
-    fn name(
-        file: File,
-        spelling: &'static str,
-        qualified: &'static str,
-        offset: u32,
-    ) -> impl fmt::Display {
+    fn name(file: File, spelling: &'static str) -> impl fmt::Display {
         fmt::from_fn(move |f| {
             DiagnosticNameRecord {
                 render: || f.write_str(spelling),
-                name: || {
-                    DiagnosticName::new(
-                        spelling,
-                        qualified,
-                        file,
-                        TextSize::new(offset),
-                        DiagnosticNameKind::Class,
-                    )
-                },
+                name: || DiagnosticName::new(spelling, file.as_id(), DiagnosticNameKind::Class),
             }
             .render()
         })
     }
 
+    struct TestNameResolver {
+        names: Vec<(File, &'static str)>,
+        qualified_calls: Cell<usize>,
+        location_calls: Cell<usize>,
+    }
+
+    impl TestNameResolver {
+        fn new(names: &[(File, &'static str)]) -> Self {
+            Self {
+                names: names.to_vec(),
+                qualified_calls: Cell::new(0),
+                location_calls: Cell::new(0),
+            }
+        }
+    }
+
+    impl DiagnosticNameResolver for TestNameResolver {
+        fn qualified_name(&self, name: &DiagnosticName) -> String {
+            self.qualified_calls.set(self.qualified_calls.get() + 1);
+            self.names
+                .iter()
+                .find(|(file, _)| file.as_id() == name.identity())
+                .map(|(_, qualified)| (*qualified).to_owned())
+                .unwrap_or_else(|| panic!("missing qualified name for {:?}", name.identity()))
+        }
+
+        fn location(&self, _name: &DiagnosticName) -> String {
+            self.location_calls.set(self.location_calls.get() + 1);
+            " @ definition".to_owned()
+        }
+    }
+
     #[salsa::tracked(returns(clone))]
     fn cached_nested_message(db: &dyn crate::Db, file: File) -> String {
         let _ = file.path(db);
-        DiagnosticMessage::from_display(format_args!(
-            "Nested `{}`",
-            name(file, "Model", "first.Model", 6)
-        ))
-        .as_str()
-        .to_owned()
+        DiagnosticMessage::from_display(format_args!("Nested `{}`", name(file, "Model")))
+            .as_str()
+            .to_owned()
     }
 
     #[test]
@@ -413,13 +430,7 @@ mod tests {
                 render: || f.write_str("Model"),
                 name: || {
                     metadata_created.set(true);
-                    DiagnosticName::new(
-                        "Model",
-                        "first.Model",
-                        first,
-                        TextSize::new(6),
-                        DiagnosticNameKind::Class,
-                    )
+                    DiagnosticName::new("Model", first.as_id(), DiagnosticNameKind::Class)
                 },
             }
             .render()
@@ -444,13 +455,7 @@ mod tests {
                         f.write_str("Model")
                     },
                     name: || {
-                        DiagnosticName::new(
-                            "Model",
-                            "second.Model",
-                            second,
-                            TextSize::new(6),
-                            DiagnosticNameKind::Class,
-                        )
+                        DiagnosticName::new("Model", second.as_id(), DiagnosticNameKind::Class)
                     },
                 }
                 .render()
@@ -460,12 +465,12 @@ mod tests {
                 Severity::Error,
                 format_args!("Expected `{outer}`"),
             );
-            diagnostic.info(format_args!(
-                "Found `{}`",
-                name(first, "Model", "first.Model", 6)
-            ));
+            diagnostic.info(format_args!("Found `{}`", name(first, "Model")));
 
-            diagnostic.disambiguate_names(|_, _| String::new());
+            diagnostic.disambiguate_names(&TestNameResolver::new(&[
+                (first, "first.Model"),
+                (second, "second.Model"),
+            ]));
 
             assert_eq!(diagnostic.headline_message(), "Expected `second.Model`");
             assert_eq!(
@@ -495,34 +500,27 @@ mod tests {
         let mut diagnostic = Diagnostic::new(
             DiagnosticId::InvalidSyntax,
             Severity::Error,
-            format_args!("Expected `{}`", name(first, "Model", "first.Model", 6)),
+            format_args!("Expected `{}`", name(first, "Model")),
         );
-        diagnostic.set_concise_message(format_args!(
-            "Concise `{}`",
-            name(second, "Model", "second.Model", 6)
-        ));
-        diagnostic.annotate(Annotation::primary(Span::from(first)).message(format_args!(
-            "Primary `{}`",
-            name(first, "Model", "first.Model", 6)
-        )));
-        diagnostic.info(format_args!(
-            "Found `{}`",
-            name(second, "Model", "second.Model", 6)
-        ));
+        diagnostic.set_concise_message(format_args!("Concise `{}`", name(second, "Model")));
+        diagnostic.annotate(
+            Annotation::primary(Span::from(first))
+                .message(format_args!("Primary `{}`", name(first, "Model"))),
+        );
+        diagnostic.info(format_args!("Found `{}`", name(second, "Model")));
 
         let mut detail = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
-            format_args!("Detail `{}`", name(first, "Model", "first.Model", 6)),
+            format_args!("Detail `{}`", name(first, "Model")),
         );
         detail.annotate(
-            Annotation::secondary(Span::from(second)).message(format_args!(
-                "Secondary `{}`",
-                name(second, "Model", "second.Model", 6)
-            )),
+            Annotation::secondary(Span::from(second))
+                .message(format_args!("Secondary `{}`", name(second, "Model"))),
         );
         diagnostic.sub(detail);
 
-        diagnostic.disambiguate_names(|_, _| String::new());
+        let resolver = TestNameResolver::new(&[(first, "first.Model"), (second, "second.Model")]);
+        diagnostic.disambiguate_names(&resolver);
 
         assert_eq!(diagnostic.headline_message(), "Expected `first.Model`");
         assert_eq!(
@@ -547,6 +545,51 @@ mod tests {
             diagnostic.sub_diagnostics()[1].annotations()[0].get_message(),
             Some("Secondary `second.Model`")
         );
+        assert_eq!(resolver.qualified_calls.get(), 2);
+        assert_eq!(resolver.location_calls.get(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn unambiguous_names_do_not_resolve_qualified_names_or_locations() -> Result<(), Box<dyn Error>>
+    {
+        let (_db, first, _second) = files()?;
+        let mut diagnostic = Diagnostic::new(
+            DiagnosticId::InvalidSyntax,
+            Severity::Error,
+            format_args!("Expected `{}`", name(first, "Model")),
+        );
+        diagnostic.info(format_args!("Found `{}`", name(first, "Model")));
+
+        let resolver = TestNameResolver::new(&[(first, "first.Model")]);
+        diagnostic.disambiguate_names(&resolver);
+
+        assert_eq!(diagnostic.headline_message(), "Expected `Model`");
+        assert_eq!(resolver.qualified_calls.get(), 0);
+        assert_eq!(resolver.location_calls.get(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn identical_qualified_names_resolve_source_locations() -> Result<(), Box<dyn Error>> {
+        let (_db, first, second) = files()?;
+        let mut diagnostic = Diagnostic::new(
+            DiagnosticId::InvalidSyntax,
+            Severity::Error,
+            format_args!("Expected `{}`", name(first, "Model")),
+        );
+        diagnostic.info(format_args!("Found `{}`", name(second, "Model")));
+
+        let resolver =
+            TestNameResolver::new(&[(first, "package.Model"), (second, "package.Model")]);
+        diagnostic.disambiguate_names(&resolver);
+
+        assert_eq!(
+            diagnostic.headline_message(),
+            "Expected `package.Model @ definition`"
+        );
+        assert_eq!(resolver.qualified_calls.get(), 2);
+        assert_eq!(resolver.location_calls.get(), 2);
         Ok(())
     }
 
@@ -556,16 +599,17 @@ mod tests {
         let mut diagnostic = Diagnostic::new(
             DiagnosticId::InvalidSyntax,
             Severity::Error,
-            format_args!("Expected `{}`", name(first, "Model", "first.Model", 6)),
+            format_args!("Expected `{}`", name(first, "Model")),
         );
-        let explanation = DiagnosticMessage::from_display(format_args!(
-            "élément `{}`",
-            name(second, "Model", "second.Model", 6)
-        ))
-        .with_prefix("├─ ");
+        let explanation =
+            DiagnosticMessage::from_display(format_args!("élément `{}`", name(second, "Model")))
+                .with_prefix("├─ ");
         diagnostic.info(explanation);
 
-        diagnostic.disambiguate_names(|_, _| String::new());
+        diagnostic.disambiguate_names(&TestNameResolver::new(&[
+            (first, "first.Model"),
+            (second, "second.Model"),
+        ]));
 
         assert_eq!(diagnostic.headline_message(), "Expected `first.Model`");
         assert_eq!(
@@ -582,15 +626,7 @@ mod tests {
         let module = fmt::from_fn(|f| {
             DiagnosticNameRecord {
                 render: || f.write_str("module"),
-                name: || {
-                    DiagnosticName::new(
-                        "module",
-                        "types.ModuleType",
-                        first,
-                        TextSize::new(6),
-                        DiagnosticNameKind::Class,
-                    )
-                },
+                name: || DiagnosticName::new("module", first.as_id(), DiagnosticNameKind::Class),
             }
             .render_fixed()
         });
@@ -599,12 +635,12 @@ mod tests {
             Severity::Error,
             format_args!("Found `<{module} 'os'>`"),
         );
-        diagnostic.info(format_args!(
-            "Expected `{}`",
-            name(second, "module", "custom.module", 6)
-        ));
+        diagnostic.info(format_args!("Expected `{}`", name(second, "module")));
 
-        diagnostic.disambiguate_names(|_, _| String::new());
+        diagnostic.disambiguate_names(&TestNameResolver::new(&[
+            (first, "types.ModuleType"),
+            (second, "custom.module"),
+        ]));
 
         assert_eq!(diagnostic.headline_message(), "Found `<module 'os'>`");
         assert_eq!(

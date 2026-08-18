@@ -829,6 +829,84 @@ fn dependency_internal_symbol_change() -> anyhow::Result<()> {
 }
 
 #[test]
+fn diagnostic_class_names_do_not_invalidate_dependent_inference() -> anyhow::Result<()> {
+    for (source, expected) in [
+        (
+            "from dependency import Model\nvalue: Model = 1",
+            "Object of type `Literal[1]` is not assignable to `Model`",
+        ),
+        (
+            "import dependency\nclass Model: ...\nvalue: dependency.Model = Model()",
+            "Object of type `main.Model` is not assignable to `dependency.Model`",
+        ),
+    ] {
+        let mut db = setup_db();
+        db.write_files([
+            ("/src/main.py", source),
+            ("/src/dependency.py", "class Model:\n    pass"),
+        ])?;
+
+        let main = system_path_to_file(&db, "/src/main.py").unwrap();
+        assert_file_diagnostics(&db, "/src/main.py", &[expected]);
+
+        db.write_file(
+            "/src/dependency.py",
+            "class Model:\n    # This does not change the class.\n    pass",
+        )?;
+        db.clear_salsa_events();
+
+        assert_file_diagnostics(&db, "/src/main.py", &[expected]);
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(
+            &db,
+            infer_definition_types,
+            first_public_binding(&db, main, "value"),
+            &events,
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
+fn diagnostic_alias_names_do_not_invalidate_dependent_inference() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        (
+            "/src/main.py",
+            "from dependency import Model\ndef make() -> Model: return \"\"\nvalue = make().present",
+        ),
+        (
+            "/src/dependency.py",
+            "class Item:\n    present: int\ntype Model = Item | str",
+        ),
+    ])?;
+
+    let main = system_path_to_file(&db, "/src/main.py").unwrap();
+    let expected = "Attribute `present` is not defined on `str` in union `Model`";
+    assert_file_diagnostics(&db, "/src/main.py", &[expected]);
+
+    db.write_file(
+        "/src/dependency.py",
+        "class Item:\n    # This does not change the class.\n    present: int\ntype Model = Item | str",
+    )?;
+    db.clear_salsa_events();
+
+    assert_file_diagnostics(&db, "/src/main.py", &[expected]);
+
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(
+        &db,
+        infer_definition_types,
+        first_public_binding(&db, main, "value"),
+        &events,
+    );
+
+    Ok(())
+}
+
+#[test]
 fn dependency_unrelated_symbol() -> anyhow::Result<()> {
     let mut db = setup_db();
 

@@ -799,8 +799,7 @@ info: parameter `value` has an incompatible type: `first.Model` is not assignabl
 
 ## Specialized runtime classes
 
-Specialized runtime values retain the identity of their actual class even when their formatter
-normally uses a short, hand-written name.
+Diagnostics distinguish specialized runtime values from unrelated classes with the same name.
 
 ```toml
 [environment]
@@ -823,7 +822,8 @@ class module: ...
 `main.py`:
 
 ```py
-from typing import ParamSpec, TypeVar, TypeVarTuple
+from typing import ParamSpec, TypeAliasType, TypeVar, TypeVarTuple
+from typing_extensions import TypeAliasType as ExtensionsTypeAliasType
 import os
 import custom
 
@@ -833,6 +833,8 @@ class Owner:
         return 1
 
 type Alias = int
+StdlibAlias = TypeAliasType("StdlibAlias", int)
+ExtensionsAlias = ExtensionsTypeAliasType("ExtensionsAlias", int)
 T = TypeVar("T")
 P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
@@ -845,6 +847,12 @@ wrong_range: custom.range = range(3)
 
 # error: [invalid-assignment] "Object of type `typing.TypeAliasType` is not assignable to `custom.TypeAliasType`"
 wrong_alias: custom.TypeAliasType = Alias
+
+# error: [invalid-assignment] "Object of type `typing_extensions.TypeAliasType` is not assignable to `typing.TypeAliasType`"
+wrong_extensions_alias: TypeAliasType = ExtensionsAlias
+
+# error: [invalid-assignment] "Object of type `typing.TypeAliasType` is not assignable to `typing_extensions.TypeAliasType`"
+wrong_stdlib_alias: ExtensionsTypeAliasType = StdlibAlias
 
 # error: [invalid-assignment] "Object of type `typing.TypeVar` is not assignable to `custom.TypeVar`"
 wrong_typevar: custom.TypeVar = T
@@ -941,7 +949,7 @@ async def asynchronous() -> custom.AsyncGeneratorType:
 ## Generator yield and send types
 
 Yielded values and delegated send types retain their class identities in concise messages and
-annotations until the complete diagnostic is finalized.
+annotations.
 
 `first.py`:
 
@@ -1004,8 +1012,7 @@ wrong_descriptor: custom.property = property.__get__
 
 ## Conflicting declaration enumerations
 
-A human-readable enumeration formats each declared type directly into the diagnostic instead of
-flattening the list into a string before name resolution.
+A human-readable enumeration distinguishes declared types with the same name.
 
 `first.py`:
 

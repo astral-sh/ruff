@@ -71,7 +71,6 @@ use crate::types::diagnostic::{
     AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
     report_bad_dunder_get_call, report_bad_import_call,
 };
-pub(crate) use crate::types::display::diagnostic_file_location;
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 pub(crate) use crate::types::equality::{ComparisonSoundnessPolicy, equality_truthiness};
@@ -207,7 +206,8 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(source_file, error, error)),
     );
 
-    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
+    let mut diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
+    display::disambiguate_diagnostic_names(db, &mut diagnostics);
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {

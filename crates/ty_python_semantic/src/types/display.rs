@@ -7,7 +7,9 @@ use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
-use ruff_db::diagnostic::{DiagnosticName, DiagnosticNameKind, DiagnosticNameRecord};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticName, DiagnosticNameKind, DiagnosticNameRecord, DiagnosticNameResolver,
+};
 use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
@@ -16,6 +18,7 @@ use ruff_python_literal::escape::AsciiEscape;
 use ruff_source_file::LineColumn;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::plumbing::{AsId, FromIdWithDb};
 
 use ty_module_resolver::file_to_module;
 
@@ -85,28 +88,66 @@ impl<'db> NamedItem<'db> {
 
     fn diagnostic_name(self, db: &'db dyn Db, spelling: &str) -> DiagnosticName {
         match self {
-            NamedItem::Class(class) => DiagnosticName::new(
+            NamedItem::Class(class) => {
+                DiagnosticName::new(spelling, class.as_id(), DiagnosticNameKind::Class)
+            }
+            NamedItem::TypeAlias(alias) => DiagnosticName::new(
                 spelling,
-                class.qualified_name(db).to_string(),
-                class.file(db),
-                class.header_range(db).start(),
-                DiagnosticNameKind::Class,
+                alias.unspecialized(db).as_id(),
+                DiagnosticNameKind::TypeAlias,
             ),
-            NamedItem::TypeAlias(alias) => {
-                let definition = alias.definition(db);
-                let offset = definition
-                    .focus_range(db, &parsed_module(db, definition.python_file(db)).load(db))
-                    .range()
-                    .start();
-                DiagnosticName::new(
-                    spelling,
-                    alias.qualified_name(db).to_string(),
-                    definition.file(db),
-                    offset,
-                    DiagnosticNameKind::TypeAlias,
-                )
+        }
+    }
+
+    fn from_diagnostic_name(db: &'db dyn Db, name: &DiagnosticName) -> Self {
+        match name.kind() {
+            DiagnosticNameKind::Class => {
+                Self::Class(FromIdWithDb::from_id(name.identity(), db.zalsa()))
+            }
+            DiagnosticNameKind::TypeAlias => {
+                Self::TypeAlias(FromIdWithDb::from_id(name.identity(), db.zalsa()))
             }
         }
+    }
+}
+
+struct TypeDiagnosticNameResolver<'db> {
+    db: &'db dyn Db,
+}
+
+impl DiagnosticNameResolver for TypeDiagnosticNameResolver<'_> {
+    fn qualified_name(&self, name: &DiagnosticName) -> String {
+        match NamedItem::from_diagnostic_name(self.db, name) {
+            NamedItem::Class(class) => class.qualified_name(self.db).to_string(),
+            NamedItem::TypeAlias(alias) => alias.qualified_name(self.db).to_string(),
+        }
+    }
+
+    fn location(&self, name: &DiagnosticName) -> String {
+        let (file, offset) = match NamedItem::from_diagnostic_name(self.db, name) {
+            NamedItem::Class(class) => (class.file(self.db), class.header_range(self.db).start()),
+            NamedItem::TypeAlias(alias) => {
+                let definition = alias.definition(self.db);
+                let offset = definition
+                    .focus_range(
+                        self.db,
+                        &parsed_module(self.db, definition.python_file(self.db)).load(self.db),
+                    )
+                    .range()
+                    .start();
+                (definition.file(self.db), offset)
+            }
+        };
+
+        diagnostic_file_location(self.db, file, offset)
+    }
+}
+
+/// Finalizes names only after all fine-grained inference queries have completed.
+pub(super) fn disambiguate_diagnostic_names(db: &dyn Db, diagnostics: &mut [Diagnostic]) {
+    let resolver = TypeDiagnosticNameResolver { db };
+    for diagnostic in diagnostics {
+        diagnostic.disambiguate_names(&resolver);
     }
 }
 
@@ -855,7 +896,7 @@ impl fmt::Debug for DisplayType<'_, '_> {
 }
 
 /// Format a file location suffix for disambiguation (e.g., " @ path:line:column")
-pub(crate) fn diagnostic_file_location(db: &dyn Db, file: File, offset: TextSize) -> String {
+fn diagnostic_file_location(db: &dyn Db, file: File, offset: TextSize) -> String {
     let path = file.path(db);
     let path = match path {
         FilePath::System(path) => Cow::Owned(FilePath::from(
@@ -3834,7 +3875,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                     f.write_known_class(
                         db,
                         self.env,
-                        KnownClassName::displayed_as(KnownClass::TypeAliasType, "TypeAliasType")
+                        KnownClassName::displayed_as(alias.known_class(db), "TypeAliasType")
                             .with_detailed_type(ty),
                     )
                 }

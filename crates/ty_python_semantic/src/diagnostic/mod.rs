@@ -1,7 +1,6 @@
 use crate::{
-    Db, PythonVersionSource, PythonVersionWithSource,
-    lint::lint_documentation_url,
-    types::{TypeCheckDiagnostics, diagnostic_file_location},
+    Db, PythonVersionSource, PythonVersionWithSource, lint::lint_documentation_url,
+    types::TypeCheckDiagnostics,
 };
 use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
 use ruff_db::{
@@ -187,8 +186,6 @@ pub(crate) fn format_enumeration<D: std::fmt::Display>(
 /// if either is violated, then the `Drop` impl on `DiagnosticGuard` will
 /// panic.
 pub(super) struct DiagnosticGuard<'sink> {
-    db: &'sink dyn Db,
-
     /// The file of the primary span (to which file does this diagnostic belong).
     file: File,
 
@@ -216,13 +213,11 @@ pub(super) struct DiagnosticGuard<'sink> {
 
 impl<'sink> DiagnosticGuard<'sink> {
     pub(crate) fn new(
-        db: &'sink dyn Db,
         file: File,
         sink: &'sink std::cell::RefCell<TypeCheckDiagnostics>,
         diag: Diagnostic,
     ) -> Self {
         Self {
-            db,
             file,
             sink,
             diag: Some(diag),
@@ -300,7 +295,6 @@ impl Drop for DiagnosticGuard<'_> {
             diag.set_documentation_url(Some(lint_documentation_url(lint_name)));
         }
 
-        diag.disambiguate_names(|file, offset| diagnostic_file_location(self.db, file, offset));
         self.sink.borrow_mut().push(diag);
     }
 }

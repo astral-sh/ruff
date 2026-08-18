@@ -303,7 +303,7 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
 
         let primary_span = Span::from(self.ctx.file).with_range(self.range);
         diag.annotate(Annotation::primary(primary_span));
-        DiagnosticGuard::new(self.ctx.db, self.ctx.file, &self.ctx.diagnostics, diag)
+        DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
     }
 }
 

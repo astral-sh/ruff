@@ -78,7 +78,7 @@ use crate::types::{
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
-use ty_python_core::{ProgramFile, semantic_index};
+use ty_python_core::{ProgramFile, scope::NodeWithScopeKind, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
@@ -8303,14 +8303,11 @@ impl<'db> CallableDescription<'db> {
         ) -> Option<ClassLiteral<'db>> {
             let semantic_index = semantic_index(db, function.program_file(db));
             let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
-            if let Some(class_node) = enclosing_scope.node().as_class()
-                && let Some(class) =
-                    original_class_type(db, semantic_index.expect_single_definition(class_node))
-            {
-                Some(class)
-            } else {
-                None
-            }
+            let NodeWithScopeKind::Class(class_node) = enclosing_scope.node() else {
+                return None;
+            };
+
+            original_class_type(db, semantic_index.expect_single_definition(class_node))
         }
 
         match callable_type {
