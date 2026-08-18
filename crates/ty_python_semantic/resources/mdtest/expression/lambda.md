@@ -97,6 +97,25 @@ expression.
 reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Literal[2]
 ```
 
+## Defaults inside string annotations
+
+Names in a lambda's default value can still be resolved when the lambda appears in an invalid string
+annotation. The annotation should produce the usual diagnostic rather than panic.
+
+`runtime.py`:
+
+```py
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+x: "(lambda value=int: None)[int]"
+```
+
+`stub.pyi`:
+
+```pyi
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+x: "(lambda value=int: None)[int]"
+```
+
 ## Assignment
 
 This does not enumerate all combinations of parameter kinds as that should be covered by the

@@ -4748,6 +4748,18 @@ class TD12(TypedDict("TD12", {}, extra_items=InitVar[int])): ...  # error: [inva
 class TD13(TypedDict("TD13", {}, extra_items=Final[int])): ...  # error: [invalid-type-form]
 ```
 
+## Function syntax with `extra_items` in string annotations
+
+The `extra_items` type can still be resolved when the functional `TypedDict` call appears in an
+invalid string annotation in a stub file.
+
+```pyi
+from typing_extensions import TypedDict
+
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+x: "TypedDict('T', {}, extra_items=int)[int]"
+```
+
 ## Function syntax with forward references
 
 Functional TypedDict supports forward references (string annotations):

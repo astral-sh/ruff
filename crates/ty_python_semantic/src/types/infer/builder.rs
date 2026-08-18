@@ -8372,8 +8372,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = lambda_expression;
 
         // In stub files, default values may reference names that are defined later in the file.
-        let in_stub = self.in_stub();
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
+        // String annotations must retain their context because their nodes are not in the semantic
+        // index.
+        let previous_deferred_state = self.deferred_state;
+        if !previous_deferred_state.in_string_annotation() {
+            self.deferred_state = self.in_stub().into();
+        }
 
         // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
         // in the union/intersection.
