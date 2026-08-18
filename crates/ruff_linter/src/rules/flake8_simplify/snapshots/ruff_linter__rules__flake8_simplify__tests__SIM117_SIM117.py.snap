@@ -310,4 +310,71 @@ help: Combine `with` statements
     -         pass
 163 + async with asyncio.timeout(1), A(), B():
 164 +     pass
+165 |
+    |
+
+SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   --> SIM117.py:171:5
+    |
+169 |   with A() as a:
+170 |       # SIM117
+171 | /     async with B() as b:
+172 | |         async with C() as c:
+    | |____________________________^
+173 |               print(a, b, c)
+    |
+help: Combine `with` statements
+    |
+170 |     # SIM117
+    -     async with B() as b:
+    -         async with C() as c:
+    -             print(a, b, c)
+171 +     async with B() as b, C() as c:
+172 +         print(a, b, c)
+173 |
+    |
+
+SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   --> SIM117.py:180:5
+    |
+178 |   with A() as a:
+179 |       # SIM117
+180 | /     async with B() as b:
+181 | |         async with C() as c:
+    | |____________________________^
+182 |               async with D() as d:
+183 |                   print(a, b, c, d)
+    |
+help: Combine `with` statements
+    |
+179 |     # SIM117
+    -     async with B() as b:
+    -         async with C() as c:
+    -             async with D() as d:
+    -                 print(a, b, c, d)
+180 +     async with B() as b, C() as c:
+181 +         async with D() as d:
+182 +             print(a, b, c, d)
+183 |
+    |
+
+SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   --> SIM117.py:190:9
+    |
+188 |       with B() as b:
+189 |           # SIM117
+190 | /         async with C() as c:
+191 | |             async with D() as d:
+    | |________________________________^
+192 |                   print(a, b, c, d)
+    |
+help: Combine `with` statements
+    |
+189 |         # SIM117
+    -         async with C() as c:
+    -             async with D() as d:
+    -                 print(a, b, c, d)
+190 +         async with C() as c, D() as d:
+191 +             print(a, b, c, d)
+192 |
     |

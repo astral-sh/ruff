@@ -123,6 +123,31 @@ fn explicit_with_items(checker: &Checker, with_items: &[WithItem]) -> bool {
         })
 }
 
+/// Returns `true` if a `with` statement using `is_async`/`items` could be combined with an
+/// adjacent, singly-nested `with` statement using `other_is_async`/`other_items`.
+///
+/// The two statements are combinable if they're both sync or both async, and neither one is
+/// exempt via [`explicit_with_items`].
+fn are_combinable(
+    checker: &Checker,
+    is_async: bool,
+    items: &[WithItem],
+    other_is_async: bool,
+    other_items: &[WithItem],
+) -> bool {
+    if is_async != other_is_async {
+        // One of the statements is an async with, while the other is not,
+        // we can't merge those statements.
+        return false;
+    }
+
+    if explicit_with_items(checker, items) || explicit_with_items(checker, other_items) {
+        return false;
+    }
+
+    true
+}
+
 /// SIM117
 pub(crate) fn multiple_with_statements(
     checker: &Checker,
@@ -148,20 +173,36 @@ pub(crate) fn multiple_with_statements(
     //     with B(), C():
     //         print("hello")
     // ```
-    if let Some(Stmt::With(ast::StmtWith { body, .. })) = with_parent {
-        if body.len() == 1 {
+    if let Some(Stmt::With(ast::StmtWith {
+        is_async: parent_is_async,
+        items: parent_items,
+        body: parent_body,
+        ..
+    })) = with_parent
+    {
+        if parent_body.len() == 1
+            && are_combinable(
+                checker,
+                *parent_is_async,
+                parent_items,
+                with_stmt.is_async,
+                &with_stmt.items,
+            )
+        {
+            // The parent statement will already be flagged for combination with `with_stmt`,
+            // so don't also flag `with_stmt` for combination with its own child.
             return;
         }
     }
 
     if let Some((is_async, items, _body)) = next_with(&with_stmt.body) {
-        if is_async != with_stmt.is_async {
-            // One of the statements is an async with, while the other is not,
-            // we can't merge those statements.
-            return;
-        }
-
-        if explicit_with_items(checker, &with_stmt.items) || explicit_with_items(checker, items) {
+        if !are_combinable(
+            checker,
+            with_stmt.is_async,
+            &with_stmt.items,
+            is_async,
+            items,
+        ) {
             return;
         }
 

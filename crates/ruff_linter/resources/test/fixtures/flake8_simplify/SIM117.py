@@ -163,3 +163,37 @@ async with asyncio.timeout(1):
 async with asyncio.timeout(1), A():
     async with B():
         pass
+
+# Regression test for #27800: an incompatible sync parent should not prevent
+# flagging a combinable pair of `async with` statements nested beneath it.
+with A() as a:
+    # SIM117
+    async with B() as b:
+        async with C() as c:
+            print(a, b, c)
+
+# Same as above, with an extra compatible level nested below. Only the top of
+# the async run is flagged; the inner pair is deferred to a subsequent lint
+# pass, matching the existing top-to-bottom fixing behavior for sync nesting.
+with A() as a:
+    # SIM117
+    async with B() as b:
+        async with C() as c:
+            async with D() as d:
+                print(a, b, c, d)
+
+# A sync/async mismatch deeper in the chain should not suppress a combinable
+# pair further down either.
+async with A() as a:
+    with B() as b:
+        # SIM117
+        async with C() as c:
+            async with D() as d:
+                print(a, b, c, d)
+
+# The `explicit_with_items` exemption should still suppress combination when
+# it directly follows an incompatible sync parent.
+with A() as a:
+    async with asyncio.timeout(1):
+        async with B() as b:
+            print(a, b)
