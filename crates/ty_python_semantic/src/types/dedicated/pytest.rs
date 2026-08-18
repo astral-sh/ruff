@@ -397,25 +397,39 @@ fn fixture_provider_names<'db>(
 ) -> Box<[FixtureProviderName<'db>]> {
     let is_class_scope = scope.node(db).scope_kind() == ScopeKind::Class;
     let table = place_table(db, scope);
-    use_def_map(db, scope)
-        .all_end_of_scope_symbol_bindings()
-        .filter_map(|(symbol_id, definitions)| {
-            let symbol = table.symbol(symbol_id);
-            let name = symbol.name().clone();
-            let is_bound_class_attribute = is_class_scope && symbol.is_bound();
-            let exposures: Box<[_]> = definitions
-                .filter_map(|binding| binding.binding.definition())
-                .filter_map(|definition| fixture_declaration(db, definition).clone())
-                .filter_map(|declaration| FixtureExposure::new(&name, declaration))
-                .collect();
-            // Reject names that neither expose a fixture nor bind a class attribute that can
-            // shadow an inherited fixture.
-            if exposures.is_empty() && !is_bound_class_attribute {
-                return None;
-            }
-            Some(FixtureProviderName { name, exposures })
-        })
-        .collect()
+    let mut provider_names = Vec::new();
+
+    for (symbol_id, definitions) in use_def_map(db, scope).all_end_of_scope_symbol_bindings() {
+        let symbol = table.symbol(symbol_id);
+        let name = symbol.name().clone();
+        let is_bound_class_attribute = is_class_scope && symbol.is_bound();
+        let mut exposures = Vec::new();
+
+        for binding in definitions {
+            let Some(definition) = binding.binding.definition() else {
+                continue;
+            };
+            let Some(declaration) = fixture_declaration(db, definition).clone() else {
+                continue;
+            };
+            let Some(exposure) = FixtureExposure::new(&name, declaration) else {
+                continue;
+            };
+            exposures.push(exposure);
+        }
+
+        // Reject names that neither expose a fixture nor bind a class attribute that can
+        // shadow an inherited fixture.
+        if exposures.is_empty() && !is_bound_class_attribute {
+            continue;
+        }
+        provider_names.push(FixtureProviderName {
+            name,
+            exposures: exposures.into_boxed_slice(),
+        });
+    }
+
+    provider_names.into_boxed_slice()
 }
 
 /// Resolves a request against the fixture exposures in `provider`.
