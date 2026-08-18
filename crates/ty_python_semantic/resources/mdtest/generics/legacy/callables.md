@@ -296,6 +296,44 @@ def f(val: str | bytes) -> None:
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
+## Rejected overloaded callbacks preserve valid specializations
+
+An overloaded callback may contain one alternative whose return type violates a type variable's
+upper bound or declared constraints. The valid alternative must determine the specialization
+regardless of the order in which the overloads appear.
+
+```py
+from typing import Callable, TypeVar, overload
+
+Bounded = TypeVar("Bounded", bound=int)
+Constrained = TypeVar("Constrained", int, bytes)
+
+@overload
+def invalid_first(value: str) -> str: ...
+@overload
+def invalid_first(value: int) -> int: ...
+def invalid_first(value: str | int) -> str | int:
+    return value
+
+@overload
+def invalid_last(value: int) -> int: ...
+@overload
+def invalid_last(value: str) -> str: ...
+def invalid_last(value: str | int) -> str | int:
+    return value
+
+def infer_bound(callback: Callable[..., Bounded]) -> Bounded:
+    raise NotImplementedError
+
+def infer_constrained(callback: Callable[..., Constrained]) -> Constrained:
+    raise NotImplementedError
+
+reveal_type(infer_bound(invalid_first))  # revealed: int
+reveal_type(infer_bound(invalid_last))  # revealed: int
+reveal_type(infer_constrained(invalid_first))  # revealed: int
+reveal_type(infer_constrained(invalid_last))  # revealed: int
+```
+
 ## Overloaded callable with a constrained type variable
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
