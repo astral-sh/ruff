@@ -5,7 +5,20 @@ use crate::types::{ClassBase, KnownClass, ProgramEnvironment, PropertyInstanceTy
 use itertools::Itertools;
 
 impl<'db> Bindings<'db> {
-    /// Replaces inherited property constructor results with their accessor-aware instance types.
+    /// Preserves property subclasses and their accessor signatures when construction uses the
+    /// inherited descriptor behavior.
+    ///
+    /// ```python
+    /// class CustomProperty(property): ...
+    ///
+    /// class Example:
+    ///     @CustomProperty
+    ///     def value(self) -> int: ...
+    /// ```
+    ///
+    /// `Example.value` retains its `CustomProperty` type, while `Example().value` uses the
+    /// getter's `int` return type. Subclasses with custom construction, descriptor methods, or
+    /// accessor decorators retain ordinary descriptor inference instead.
     pub(super) fn evaluate_property_calls(
         &mut self,
         db: &'db dyn Db,
@@ -93,34 +106,33 @@ impl<'db> Bindings<'db> {
                 continue;
             }
 
-            let property = {
-                let Ok((_, overload)) = constructor.callable().matching_overloads().exactly_one()
-                else {
-                    continue;
-                };
-                let accessor = |parameter_index| {
-                    call_arguments
-                        .iter()
-                        .zip(overload.argument_matches())
-                        .find_map(|((_, argument_types), argument_matches)| {
-                            let parameter = argument_matches
-                                .parameters
-                                .iter()
-                                .find(|parameter| parameter.index == parameter_index)?;
-                            parameter
-                                .argument_type
-                                .or_else(|| argument_types.get_default())
-                        })
-                };
-                let getter = accessor(0).filter(|ty| !ty.is_none(db));
-                let setter = accessor(1).filter(|ty| !ty.is_none(db));
-                let deleter = accessor(2).filter(|ty| !ty.is_none(db));
-
-                Type::PropertyInstance(PropertyInstanceType::new_for_class(
-                    db, class, getter, setter, deleter,
-                ))
+            let Ok((_, overload)) = constructor.callable().matching_overloads().exactly_one()
+            else {
+                continue;
             };
-            constructor.set_constructed_instance_type(property);
+            let accessor = |parameter_index| {
+                call_arguments
+                    .iter()
+                    .zip(overload.argument_matches())
+                    .find_map(|((_, argument_types), argument_matches)| {
+                        let parameter = argument_matches
+                            .parameters
+                            .iter()
+                            .find(|parameter| parameter.index == parameter_index)?;
+                        parameter
+                            .argument_type
+                            .or_else(|| argument_types.get_default())
+                    })
+                    .filter(|ty| !ty.is_none(db))
+            };
+            let property = PropertyInstanceType::new_for_class(
+                db,
+                class,
+                accessor(0),
+                accessor(1),
+                accessor(2),
+            );
+            constructor.set_constructed_instance_type(Type::PropertyInstance(property));
         }
     }
 }

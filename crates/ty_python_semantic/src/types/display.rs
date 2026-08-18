@@ -1014,13 +1014,11 @@ struct DisplayRepresentation<'env, 'db> {
 }
 
 fn property_display_name<'db>(db: &'db dyn Db, property: PropertyInstanceType<'db>) -> &'db str {
-    if property
-        .instance_class(db)
-        .is_known(db, KnownClass::EnumProperty)
-    {
+    let class = property.instance_class(db);
+    if class.is_known(db, KnownClass::EnumProperty) {
         "enum.property"
     } else {
-        property.instance_class(db).name(db)
+        class.name(db)
     }
 }
 

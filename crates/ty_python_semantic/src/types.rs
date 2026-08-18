@@ -1158,6 +1158,10 @@ impl<'db> PropertyInstanceType<'db> {
         Self::new_for_class(db, class, getter, setter, deleter)
     }
 
+    /// Retains the descriptor's concrete class and generic arguments alongside its accessors.
+    ///
+    /// For `@CustomProperty[int]`, the class-level descriptor remains `CustomProperty[int]`
+    /// instead of collapsing to `property`.
     fn new_for_class(
         db: &'db dyn Db,
         class: ClassType<'db>,
