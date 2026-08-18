@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.14"
+# requires-python = ">=3.13"
 # dependencies = [
 #     "mdformat>=1.0.0",
 #     "mdformat-mkdocs>=5.3.0",
