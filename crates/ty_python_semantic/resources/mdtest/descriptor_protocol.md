@@ -1226,8 +1226,16 @@ class Right: ...
 def receiver(value: Left & Right) -> None:
     # Only `Left` supplies the descriptor, but its owner must retain `Right` too.
     # Passing `type[Left]` instead of `type[Left] & type[Right]` would cause an
-    # `invalid-argument-type` error.
+    # `invalid-attribute-access` error.
     reveal_type(value.value)  # revealed: int
+```
+
+A receiver known only to be `Left` does not satisfy the descriptor's owner type.
+
+```py
+def incomplete_owner(value: Left) -> None:
+    # error: [invalid-attribute-access] "Expected `type[Left] & type[Right]`, found `type[Left]`"
+    value.value
 ```
 
 ### Every `__get__` definition must accept the call
