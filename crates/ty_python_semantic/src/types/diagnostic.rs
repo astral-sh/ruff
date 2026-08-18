@@ -2079,7 +2079,9 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
 
     let mut secondary_annotation = context.secondary(&decorated_function.name);
 
-    // Special-casing of function-literal types is necessary to workaround <https://github.com/astral-sh/ty/issues/4308>
+    // A function literal is already known to be callable. Resolving its signature here can
+    // create a cycle if an annotation refers back to the decorated name, as in
+    // `def f(x: lambda: f): ...`.
     secondary_annotation = if decorated_ty.is_function_literal()
         || decorated_ty.try_upcast_to_callable(db, env).is_some()
     {
