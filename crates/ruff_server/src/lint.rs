@@ -47,6 +47,8 @@ pub(crate) struct AssociatedDiagnosticData {
     code: String,
     /// Possible edit to add a suppression comment which will disable this diagnostic.
     noqa_edit: Option<lsp_types::TextEdit>,
+    /// Whether this fix corresponds to a preferred action that can be used by auto fix commands.
+    is_preferred: Option<bool>,
 }
 
 /// Describes a fix for `fixed_diagnostic` that may have quick fix
@@ -64,6 +66,8 @@ pub(crate) struct DiagnosticFix {
     pub(crate) edits: Vec<lsp_types::TextEdit>,
     /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
+    /// Whether this fix corresponds to a preferred action that can be used by auto fix commands.
+    pub(crate) is_preferred: Option<bool>,
 }
 
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
@@ -306,6 +310,7 @@ pub(crate) fn fixes_for_diagnostics(
                 title: associated_data.title,
                 noqa_edit: associated_data.noqa_edit,
                 edits: associated_data.edits,
+                is_preferred: associated_data.is_preferred,
             }))
         })
         .filter_map(crate::Result::transpose)
@@ -418,6 +423,7 @@ fn to_lsp_diagnostic(
                 noqa_edit,
                 edits,
                 code: code.clone(),
+                is_preferred: fix.map(|fix| fix.applicability().is_safe()),
             })
             .ok()
         })

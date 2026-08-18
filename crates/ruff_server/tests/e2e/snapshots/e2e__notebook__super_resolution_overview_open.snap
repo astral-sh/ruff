@@ -40,6 +40,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: I002\n",
           "range": {
@@ -78,6 +79,7 @@ expression: diagnostics
       "data": {
         "code": "RUF900",
         "edits": [],
+        "is_preferred": null,
         "noqa_edit": {
           "newText": "  # noqa: RUF900\n",
           "range": {
@@ -130,6 +132,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: RUF901\n",
           "range": {
@@ -182,6 +185,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": false,
         "noqa_edit": {
           "newText": "  # noqa: RUF902\n",
           "range": {
@@ -234,6 +238,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": false,
         "noqa_edit": {
           "newText": "  # noqa: RUF903\n",
           "range": {
@@ -272,6 +277,7 @@ expression: diagnostics
       "data": {
         "code": "RUF950",
         "edits": [],
+        "is_preferred": null,
         "noqa_edit": {
           "newText": "  # noqa: RUF950\n",
           "range": {
@@ -327,6 +333,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: I001\n",
           "range": {
@@ -381,6 +388,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -437,6 +445,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -489,6 +498,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -541,6 +551,7 @@ expression: diagnostics
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: F541\n",
           "range": {
