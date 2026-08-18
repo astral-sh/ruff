@@ -26,7 +26,7 @@ def f(a: int, b: str) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello") -> bool]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = ...) -> bool]
 ```
 
 ### Leading parameter bound by keyword
@@ -41,7 +41,7 @@ def f(a: int, b: str) -> bool:
     return True
 
 p = partial(f, a=1)
-reveal_type(p)  # revealed: partial[(*, a: int = 1, b: str) -> bool]
+reveal_type(p)  # revealed: partial[(*, a: int = ..., b: str) -> bool]
 reveal_type(p(b="hello"))  # revealed: bool
 # error: [missing-argument]
 # error: [too-many-positional-arguments]
@@ -117,7 +117,7 @@ def f(a: int, *, b: str) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello") -> bool]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = ...) -> bool]
 ```
 
 ### Variadic preserved
@@ -213,7 +213,7 @@ def f(a: int, b: str = "default") -> bool:
     return True
 
 p = partial(f, 1)
-reveal_type(p)  # revealed: partial[(b: str = "default") -> bool]
+reveal_type(p)  # revealed: partial[(b: str = ...) -> bool]
 ```
 
 ### Lambda
@@ -236,7 +236,7 @@ class Greeter:
 
 g = Greeter()
 p = partial(g.greet, "world")
-reveal_type(p)  # revealed: partial[(greeting: str = "Hello") -> str]
+reveal_type(p)  # revealed: partial[(greeting: str = ...) -> str]
 reveal_type(p())  # revealed: str
 ```
 
@@ -276,7 +276,7 @@ def f(a: int, b: str) -> bool:
     return True
 
 p = partial(f, b=42)  # error: [invalid-argument-type]
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = 42) -> bool]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = ...) -> bool]
 ```
 
 ### Unknown keyword argument
@@ -619,7 +619,7 @@ def g(path: bytes | str, start: bytes | str | None = None) -> bytes | str:
 
 p = partial(g, start=".")
 paths: list[str] = ["x"]
-reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ".") -> str]
+reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ...) -> str]
 reveal_type(list(map(p, paths)))  # revealed: list[str]
 ```
 
@@ -1288,7 +1288,7 @@ def f(a: int, b: str, c: float, d: bool) -> int:
     return 0
 
 p = partial(f, b="hello", d=True)
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: float, d: bool = True) -> int]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = ..., c: float, d: bool = ...) -> int]
 ```
 
 ### Mixed positional-only, regular, and keyword-only
@@ -1415,7 +1415,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: float) -> bool]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = ..., c: float) -> bool]
 
 # Override b at call time
 reveal_type(p(1, b="world", c=3.14))  # revealed: bool
@@ -1436,7 +1436,7 @@ def pair(a: T, b: T) -> tuple[T, T]:
     return (a, b)
 
 p = partial(pair, b=1)
-reveal_type(p)  # revealed: partial[(a: int, *, b: int = 1) -> tuple[int, int]]
+reveal_type(p)  # revealed: partial[(a: int, *, b: int = ...) -> tuple[int, int]]
 p("x")  # error: [invalid-argument-type]
 p(1, b="y")  # error: [invalid-argument-type]
 ```
@@ -1488,7 +1488,7 @@ def build(
     pass
 
 p = partial(build, _target_="set")
-reveal_type(p)  # revealed: partial[(_args_: tuple[Any, ...], *, _target_: str = "set", CBuildsFn: type[Any]) -> None]
+reveal_type(p)  # revealed: partial[(_args_: tuple[Any, ...], *, _target_: str = ..., CBuildsFn: type[Any]) -> None]
 
 conversion: dict[type, Conv] = {}
 conversion[set] = p
@@ -1594,7 +1594,7 @@ def has_same_ip_version(addr_or_net: str, is_ipv6: bool) -> bool:
 
 values = ["127.0.0.1", "::1"]
 predicate = partial(has_same_ip_version, is_ipv6=False)
-reveal_type(predicate)  # revealed: partial[(addr_or_net: str, *, is_ipv6: bool = False) -> bool]
+reveal_type(predicate)  # revealed: partial[(addr_or_net: str, *, is_ipv6: bool = ...) -> bool]
 reveal_type(list(filter(predicate, values)))  # revealed: list[str]
 ```
 

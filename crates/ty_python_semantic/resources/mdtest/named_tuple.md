@@ -684,7 +684,7 @@ reveal_type(nt2_starred.right)  # revealed: Any
 # Keyword arguments can be combined with other kwargs like `defaults`
 NT3 = collections.namedtuple(typename="NT3", field_names="x y z", defaults=[None])
 reveal_type(NT3)  # revealed: <class 'NT3'>
-reveal_type(NT3.__new__)  # revealed: [Self](_cls: type[Self], x: Any, y: Any, z: Any = None) -> Self
+reveal_type(NT3.__new__)  # revealed: [Self](_cls: type[Self], x: Any, y: Any, z: Any = ...) -> Self
 
 nt3 = NT3(1, 2)
 reveal_type(nt3.z)  # revealed: Any
@@ -749,7 +749,7 @@ reveal_type(Invalid)  # revealed: <class 'Invalid'>
 # `defaults` provides default values for the rightmost fields
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
-reveal_type(Person.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any, city: Any = "Unknown") -> Self
+reveal_type(Person.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any, city: Any = ...) -> Self
 
 defaults = (0, "Unknown")
 PersonStarred = collections.namedtuple(
@@ -757,7 +757,7 @@ PersonStarred = collections.namedtuple(
     ["name", "age", "city"],
     defaults=[*defaults],
 )
-reveal_type(PersonStarred.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any = 0, city: Any = "Unknown") -> Self
+reveal_type(PersonStarred.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any = ..., city: Any = ...) -> Self
 
 # revealed: (<class 'Person'>, <class 'tuple[Any, Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Person)
@@ -776,7 +776,7 @@ reveal_type(Config)  # revealed: <class 'Config'>
 # error: [invalid-named-tuple] "Too many defaults for `namedtuple()`"
 TooManyDefaults = collections.namedtuple("TooManyDefaults", ["x", "y"], defaults=("a", "b", "c"))
 reveal_type(TooManyDefaults)  # revealed: <class 'TooManyDefaults'>
-reveal_type(TooManyDefaults.__new__)  # revealed: [Self](_cls: type[Self], x: Any = "a", y: Any = "b") -> Self
+reveal_type(TooManyDefaults.__new__)  # revealed: [Self](_cls: type[Self], x: Any = ..., y: Any = ...) -> Self
 
 # Unknown keyword arguments produce an error
 # error: [unknown-argument]

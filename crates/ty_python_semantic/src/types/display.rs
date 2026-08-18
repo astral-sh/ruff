@@ -105,6 +105,14 @@ impl SignatureNameDisplay {
     }
 }
 
+/// Whether a signature shows concrete default values or only which arguments can be omitted.
+/// This is local to each signature: nested types choose their own display policy.
+#[derive(Debug, Clone, Copy)]
+enum ParameterDefaultDisplay {
+    Value,
+    Ellipsis,
+}
+
 /// Controls whether numeric-tower unions use annotation spelling or expose their exact members.
 #[derive(Debug, Clone, Copy, Default)]
 enum NumericTowerDisplay {
@@ -2289,7 +2297,12 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                     }
                     signature
                         .parameters()
-                        .display_with(db, self.env, self.settings.clone())
+                        .display_with(
+                            db,
+                            self.env,
+                            self.settings.clone(),
+                            ParameterDefaultDisplay::Ellipsis,
+                        )
                         .fmt_detailed(f)?;
                     if signature.parameters().is_top() {
                         f.write_str("]")?;
@@ -2297,6 +2310,7 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 } else {
                     signature
                         .display_with(db, self.env, self.settings.clone())
+                        .hide_default_values()
                         .fmt_detailed(f)?;
                 }
             }
@@ -2311,7 +2325,11 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(db, self.env, self.settings.clone()));
+                    join.entry(
+                        &signature
+                            .display_with(db, self.env, self.settings.clone())
+                            .hide_default_values(),
+                    );
                 }
                 join.finish()?;
                 if !self.settings.multiline {
@@ -2372,6 +2390,7 @@ impl<'db> Signature<'db> {
             definition: self.definition(),
             generic_context: self.generic_context.as_ref(),
             parameters: self.parameters(),
+            default_display: ParameterDefaultDisplay::Value,
             return_ty: self.return_ty,
             db,
             env,
@@ -2384,6 +2403,7 @@ pub(crate) struct DisplaySignature<'a, 'db> {
     definition: Option<Definition<'db>>,
     generic_context: Option<&'a GenericContext<'db>>,
     parameters: &'a Parameters<'db>,
+    default_display: ParameterDefaultDisplay,
     return_ty: Type<'db>,
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
@@ -2391,6 +2411,14 @@ pub(crate) struct DisplaySignature<'a, 'db> {
 }
 
 impl DisplaySignature<'_, '_> {
+    #[must_use]
+    fn hide_default_values(self) -> Self {
+        Self {
+            default_display: ParameterDefaultDisplay::Ellipsis,
+            ..self
+        }
+    }
+
     #[must_use]
     pub(crate) fn multiline(self) -> Self {
         Self {
@@ -2488,7 +2516,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             ..settings.clone()
         };
         self.parameters
-            .display_with(db, self.env, param_settings)
+            .display_with(db, self.env, param_settings, self.default_display)
             .fmt_detailed(&mut f)?;
 
         // Return type
@@ -2539,9 +2567,11 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
         settings: DisplaySettings<'db>,
+        default_display: ParameterDefaultDisplay,
     ) -> DisplayParameters<'a, 'db> {
         DisplayParameters {
             parameters: self,
+            default_display,
             db,
             env,
             settings,
@@ -2551,6 +2581,7 @@ impl<'db> Parameters<'db> {
 
 struct DisplayParameters<'a, 'db> {
     parameters: &'a Parameters<'db>,
+    default_display: ParameterDefaultDisplay,
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     settings: DisplaySettings<'db>,
@@ -2606,7 +2637,12 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     .map(|name| name.to_string())
                     .unwrap_or_default();
                 parameter
-                    .display_with(db, display.env, display.settings.singleline())
+                    .display_with(
+                        db,
+                        display.env,
+                        display.settings.singleline(),
+                        display.default_display,
+                    )
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
 
                 after_synthetic_unpack |= is_synthetic_unpack;
@@ -2707,9 +2743,11 @@ impl<'db> Parameter<'db> {
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
         settings: DisplaySettings<'db>,
+        default_display: ParameterDefaultDisplay,
     ) -> DisplayParameter<'a, 'db> {
         DisplayParameter {
             param: self,
+            default_display,
             db,
             env,
             settings,
@@ -2719,6 +2757,7 @@ impl<'db> Parameter<'db> {
 
 struct DisplayParameter<'a, 'db> {
     param: &'a Parameter<'db>,
+    default_display: ParameterDefaultDisplay,
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     settings: DisplaySettings<'db>,
@@ -2749,14 +2788,18 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
-            if let Some(default_type) = self.param.default_type(db) {
+            if self.param.has_default() {
                 if self.param.should_annotation_be_displayed() {
                     f.write_str(" = ")?;
                 } else {
                     f.write_str("=")?;
                 }
+                let default_type = match self.default_display {
+                    ParameterDefaultDisplay::Value => self.param.default_type(db),
+                    ParameterDefaultDisplay::Ellipsis => None,
+                };
                 match default_type {
-                    Type::LiteralValue(literal)
+                    Some(default_type @ Type::LiteralValue(literal))
                         if matches!(
                             literal.kind(),
                             LiteralValueTypeKind::Int(_)
@@ -2771,7 +2814,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                             default_type.representation(db, self.env, self.settings.clone());
                         representation.fmt_detailed(f)?;
                     }
-                    Type::NominalInstance(instance) => {
+                    Some(default_type @ Type::NominalInstance(instance)) => {
                         // Some key default types like `None` are worth showing
                         let class = instance.class(db, self.env);
 

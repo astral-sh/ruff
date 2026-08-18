@@ -1162,14 +1162,14 @@ def _(
     k: RegularCallableTypeOf[str.startswith],
     l: RegularCallableTypeOf["foo".startswith],
 ):
-    # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = None, /) -> Unknown]
+    # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = ..., /) -> Unknown]
     reveal_type(a)
 
     # revealed: (obj: type) -> None
     reveal_type(b)
 
     # TODO: ideally this would have precise return types rather than `Unknown`
-    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
+    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = ..., /) -> Unknown]
     reveal_type(c)
 
     # revealed: (self, *args: Any, **kwargs: Any) -> Any
@@ -1178,14 +1178,14 @@ def _(
     # revealed: (obj: type) -> None
     reveal_type(e)
 
-    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> None) | None = None, doc: str | None = None) -> property
+    # revealed: (fget: ((Any, /) -> Any) | None = ..., fset: ((Any, Any, /) -> None) | None = ..., fdel: ((Any, /) -> None) | None = ..., doc: str | None = ...) -> property
     reveal_type(f)
 
-    # revealed: Overload[(self: property, instance: None, owner: type, /) -> Unknown, (self: property, instance: object, owner: type | None = None, /) -> Unknown]
+    # revealed: Overload[(self: property, instance: None, owner: type, /) -> Unknown, (self: property, instance: object, owner: type | None = ..., /) -> Unknown]
     reveal_type(g)
 
     # TODO: ideally this would have precise return types rather than `Unknown`
-    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
+    # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = ..., /) -> Unknown]
     reveal_type(h)
 
     # TODO: ideally this would have `-> None` rather than `-> Unknown`
@@ -1196,10 +1196,10 @@ def _(
     # revealed: (instance: object, value: object, /) -> Unknown
     reveal_type(j)
 
-    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> bool
     reveal_type(k)
 
-    # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
+    # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> bool
     reveal_type(l)
 ```
 

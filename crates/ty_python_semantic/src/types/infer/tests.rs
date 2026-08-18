@@ -868,7 +868,28 @@ fn lazy_parameter_defaults() -> anyhow::Result<()> {
         &events,
     );
 
-    // Display needs the actual default, unlike call checking.
+    let function = global_symbol(&db, source, "f").place.expect_type();
+    let callable = Type::Callable(function.expect_function_literal().into_callable_type(&db));
+    assert_eq!(
+        callable.display(&db, &db.program_environment()).to_string(),
+        "(x: int = ...) -> int"
+    );
+    assert_eq!(
+        callable
+            .display(&db, &db.program_environment())
+            .multiline()
+            .to_string(),
+        "def f(x: int = ...) -> int"
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, source, "f"),
+        &events,
+    );
+
+    // Only the concrete function's display needs the actual default value.
     let function = global_symbol(&db, source, "f").place.expect_type();
     assert_eq!(
         function.display(&db, &db.program_environment()).to_string(),

@@ -5649,8 +5649,9 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    /// Infer the default-value type only when its value is needed, such as for display or a
-    /// dataclass field specifier. Callable compatibility only needs [`Self::has_default`].
+    /// Infer the default-value type only when its value is needed, such as for a concrete
+    /// signature's display or a dataclass field specifier. Abstract callable types only need
+    /// [`Self::has_default`].
     pub(crate) fn default_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.default().map(|default| default.ty(db))
     }
