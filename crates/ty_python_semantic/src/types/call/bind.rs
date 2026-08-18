@@ -6004,17 +6004,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             else {
                 return None;
             };
-            let promoted = solution.promote(db, self.env);
 
-            // If the TypeVar has an upper bound, only use the promoted type if it
-            // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(db, self.env, bound) {
-                    return None;
-                }
-            }
-
-            Some(promoted)
+            Some(solution.promote(db, self.env))
         };
 
         let mut choose = |typevar: BoundTypeVarInstance<'db>, bounds: Option<&PathBound<'db>>| {
@@ -6031,12 +6022,28 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
         let inference = match builder.build_inference_with(generic_context, &mut choose) {
             Ok(inference) => inference,
-            Err(()) => builder.build_diagnostic_inference_with(
-                generic_context,
-                self.argument_relations()
-                    .map(|relation| (relation.declared_type, relation.argument_type)),
-                choose,
-            ),
+            Err(()) => {
+                // Contextual preferences can hide incompatible arguments in the fallback
+                // specialization, so only promote types inferred from the arguments.
+                let (inference, errors) = builder.build_diagnostic_inference_with(
+                    generic_context,
+                    self.argument_relations()
+                        .map(|relation| (relation.declared_type, relation.argument_type, relation)),
+                    |typevar, bounds| maybe_promote(typevar, bounds?),
+                );
+
+                for (relation, error) in errors {
+                    if !self.constraint_set_errors[relation.argument_index] {
+                        self.constraint_set_errors[relation.argument_index] = true;
+                        self.errors.push(BindingError::SpecializationError {
+                            error,
+                            argument_index: relation.adjusted_argument_index,
+                        });
+                    }
+                }
+
+                inference
+            }
         };
         let specialization = inference.specialization(db);
 

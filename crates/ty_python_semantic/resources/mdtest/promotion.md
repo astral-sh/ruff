@@ -639,14 +639,37 @@ reveal_type(i(1))  # revealed: list[Literal[1]]
 
 ## Promotion respects inferred upper bounds
 
-Promotion must not select a solution that violates its inferred upper bound.
+Literal promotion must not widen a type beyond an upper bound inferred from a callable argument.
 
 ```py
-from typing import Callable
+from typing import Callable, Literal
 
 def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
     return [value]
 
+def accepts_one(value: Literal[1]) -> None: ...
+def accepts_int(value: int) -> None: ...
+
+reveal_type(f(1, accepts_one))  # revealed: list[Literal[1]]
+reveal_type(f(1, accepts_int))  # revealed: list[int]
+```
+
+A contravariant generic argument can impose the same upper bound without using a callable.
+
+```py
+class Consumer[T]:
+    def consume(self, value: T) -> None: ...
+
+def collect[T](value: T, consumer: Consumer[T]) -> list[T]:
+    return [value]
+
+def _(consumer: Consumer[Literal[1]]):
+    reveal_type(collect(1, consumer))  # revealed: list[Literal[1]]
+```
+
+An incompatible inferred lower bound must still produce an argument error.
+
+```py
 def _(upper: Callable[[int], None]):
     # error: [invalid-argument-type]
     reveal_type(f("x", upper))  # revealed: list[str | int]

@@ -1048,6 +1048,39 @@ x5: Callable[[Any], bool] | None = maybe_make_callable(0)
 reveal_type(x5)  # revealed: ((Any, /) -> bool) | None
 ```
 
+## Declared type preferences respect argument constraints
+
+A declared type must not override constraints inferred from call arguments. In particular, `Any`
+must not make incompatible callable arguments assignable.
+
+```py
+from typing import Any, Callable
+
+def f[T](
+    value: T,
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+) -> list[T]:
+    return [value]
+
+def _(value: Any, ints: Callable[[int], None], strings: Callable[[str], None]):
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    f(value, ints, strings)
+
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    x: list[Any] = f(value, ints, strings)
+```
+
+Compatible callable arguments still permit a contextual `Any`.
+
+```py
+def _(value: Any, ints: Callable[[int], None], objects: Callable[[object], None]):
+    f(value, ints, objects)
+    x: list[Any] = f(value, ints, objects)
+```
+
 ## Declared type preference sees through subtyping
 
 Additionally, if the inferred type is a subtype of the declared type, we prefer declared type

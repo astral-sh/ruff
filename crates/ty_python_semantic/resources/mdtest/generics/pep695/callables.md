@@ -563,6 +563,14 @@ def consume_int_or_str(value: int | str) -> None: ...
 reveal_type(infer_str(consume_int_or_str))  # revealed: str
 ```
 
+An incompatible upper bound can still infer `Never` when no argument provides a lower bound.
+
+```py
+def consume_bytes(value: bytes) -> None: ...
+
+reveal_type(infer_str(consume_bytes))  # revealed: Never
+```
+
 ## Inferring `Never` from a callable parameter
 
 `Never` is a valid upper-bound inference result and should not be replaced with the fallback for an
@@ -620,6 +628,22 @@ def callback(value: Input) -> Base:
 
 # error: [invalid-argument-type] "Argument to function `call` is incorrect: Expected `(Base, /) -> Base`, found `def callback(value: Input) -> Base`"
 call(callback, Base())
+```
+
+An `Any` argument must not hide a conflict between an inferred upper bound and the type variable's
+declared bound.
+
+```py
+from typing import Any
+
+def bounded[T: int](value: T, consumer: Callable[[T], None]) -> T:
+    return value
+
+def _(value: Any, ints: Callable[[int], None], bytes_: Callable[[bytes], None]):
+    reveal_type(bounded(value, ints))  # revealed: int & Any
+
+    # error: [invalid-argument-type]
+    reveal_type(bounded(value, bytes_))  # revealed: Any
 ```
 
 ## Combined upper bounds uses redundancy
