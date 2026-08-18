@@ -468,13 +468,13 @@ To preview any changes to the documentation locally:
 1. Generate the MkDocs site with:
 
     ```shell
-    uv run --no-project --isolated --with-requirements docs/requirements.txt scripts/generate_mkdocs.py
+    uv run --only-group=docs python scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
 
     ```shell
-    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.yml
+    uv run --only-group=docs mkdocs serve -f mkdocs.yml
     ```
 
 The documentation should then be available locally at
