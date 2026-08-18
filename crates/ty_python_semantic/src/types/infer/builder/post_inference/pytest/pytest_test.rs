@@ -232,8 +232,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 arguments.into(),
                 &CallDiagnosticOverride {
                     lint: &PYTEST_PARAM_MISMATCHED_TYPE,
-                    message: format!("Invalid parameter passed to {test_name}."),
-                    info: "",
+                    message: format!("Invalid parameter passed to `{test_name}`."),
+                    info: &format!("This happens when testing `{test_name}`."),
                     argument_ranges: &arguments
                         .iter_source_order()
                         .map(|arg| arg.range())
