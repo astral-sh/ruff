@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// A rule entry in the big match statement such a
-/// `(Pycodestyle, "E112") => (RuleStatus::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+/// `(Pycodestyle, "E112") => rules::pycodestyle::rules::logical_lines::NoIndentedBlock,`
 #[derive(Clone)]
 struct Rule {
     /// The actual name of the rule, e.g., `NoIndentedBlock`.
@@ -59,7 +59,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     };
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
-    // `(Rule::UnaryPrefixIncrement, RuleStatus::Stable, vec![])`).
+    // `(Rule::UnaryPrefixIncrement, vec![])`).
     let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
     for arm in arms {
