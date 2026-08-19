@@ -2081,7 +2081,8 @@ mod resolve_definition {
     use rustc_hash::FxHashSet;
     use tracing::trace;
     use ty_module_resolver::{
-        ImportingFile, ModuleName, file_to_module, resolve_module, resolve_real_module,
+        ImportingFile, ModuleName, file_to_module, resolve_module, resolve_module_for_import_from,
+        resolve_real_module,
     };
 
     use crate::Db;
@@ -2365,13 +2366,8 @@ mod resolve_definition {
             }
         }
 
-        // Resolve the module being imported from (handles both relative and absolute imports)
-        let Some(module_name) =
-            ModuleName::from_import_statement(db, importing_file, import_node).ok()
+        let Some(resolved_module) = resolve_module_for_import_from(db, importing_file, import_node)
         else {
-            return Vec::new();
-        };
-        let Some(resolved_module) = resolve_module(db, importing_file, &module_name) else {
             return Vec::new();
         };
 
@@ -2387,7 +2383,7 @@ mod resolve_definition {
                 env,
                 importing_file,
                 symbol_name,
-                module_name,
+                resolved_module.name(db),
             ));
         };
 
@@ -2421,7 +2417,7 @@ mod resolve_definition {
                 env,
                 importing_file,
                 symbol_name,
-                module_name,
+                resolved_module.name(db),
             ))
         } else {
             resolved_definitions
@@ -2434,10 +2430,10 @@ mod resolve_definition {
         env: &ProgramEnvironment<'db>,
         importing_file: ImportingFile<'db>,
         symbol_name: &str,
-        module_name: ModuleName,
+        module_name: &ModuleName,
     ) -> Option<ResolvedDefinition<'db>> {
         let submodule_name = ModuleName::new(symbol_name)?;
-        let mut full_submodule_name = module_name;
+        let mut full_submodule_name = module_name.clone();
         full_submodule_name.extend(&submodule_name);
         let module = resolve_module(db, importing_file, &full_submodule_name)?;
         let file = ProgramFile::new(db, module.file(db)?, env.program(db));
