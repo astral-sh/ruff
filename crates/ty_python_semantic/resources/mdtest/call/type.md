@@ -1214,6 +1214,30 @@ Bad: type[Unrelated] = type("Bad", (Base,), {})
 
 ## Dynamic class calls in string annotations
 
+Dynamic class constructors can appear as `Annotated` metadata inside valid string annotations:
+
+```py
+from collections import namedtuple
+from enum import Enum
+from types import new_class
+from typing import Annotated, NamedTuple, TypedDict
+
+def f(
+    builtin: "Annotated[int, type('X', (), {})]",
+    new: "Annotated[int, new_class('X', ())]",
+    enum: "Annotated[int, Enum('X', {'VALUE': 1})]",
+    named_tuple: "Annotated[int, NamedTuple('X', [('value', int)])]",
+    collections_named_tuple: "Annotated[int, namedtuple('X', ['value'])]",
+    typed_dict: "Annotated[int, TypedDict('X', {'value': int})]",
+):
+    reveal_type(builtin)  # revealed: int
+    reveal_type(new)  # revealed: int
+    reveal_type(enum)  # revealed: int
+    reveal_type(named_tuple)  # revealed: int
+    reveal_type(collections_named_tuple)  # revealed: int
+    reveal_type(typed_dict)  # revealed: int
+```
+
 An invalid subscript of a `type()` call should produce the usual diagnostic, including when the call
 appears in a nested string annotation:
 
