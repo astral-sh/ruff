@@ -983,28 +983,29 @@ bases: tuple[type[C], type[D]] = (C, D)
 Y = type("Y", bases, {})
 ```
 
-Inside a string annotation, the diagnostic still highlights the class-creation call, not the whole
-string:
+When a class is created in the metadata of a string annotation, the diagnostic still highlights the
+class-creation call, not the whole string:
 
 ```py
-# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+from typing import Annotated
+
 # snapshot: instance-layout-conflict
-bad: "type('Bad', (A, B), {})[int]"
+bad: "Annotated[int, type('Bad', (A, B), {})]"
 ```
 
 ```snapshot
 error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
-  --> src/mdtest_snippet.py:20:7
+  --> src/mdtest_snippet.py:21:22
    |
-20 | bad: "type('Bad', (A, B), {})[int]"
-   |       ^^^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+21 | bad: "Annotated[int, type('Bad', (A, B), {})]"
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
-  --> src/mdtest_snippet.py:20:20
+  --> src/mdtest_snippet.py:21:35
    |
-20 | bad: "type('Bad', (A, B), {})[int]"
-   |                    -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
-   |                    |
-   |                    `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
+21 | bad: "Annotated[int, type('Bad', (A, B), {})]"
+   |                                   -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+   |                                   |
+   |                                   `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
 ```
 
 ## Cyclic functional class definitions
