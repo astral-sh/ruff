@@ -6,7 +6,8 @@ use std::{cmp, fmt};
 pub use self::changes::ChangeResult;
 use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
-use crate::script::{Script, ScriptEnvironments};
+use crate::script::Script;
+use crate::uv::UvEnvironments;
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
@@ -27,7 +28,7 @@ mod changes;
 pub trait Db: SemanticDb {
     fn project(&self) -> Project;
 
-    fn script_environments(&self) -> &ScriptEnvironments;
+    fn uv_environments(&self) -> &UvEnvironments;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
 }
@@ -55,7 +56,7 @@ fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
     }
 
     let program = db
-        .script_environments()
+        .uv_environments()
         .files()
         .into_iter()
         .filter_map(|script| Script::for_file(db, script))
@@ -90,7 +91,7 @@ pub struct ProjectDatabase {
     // setters instead of swapping in a freshly constructed handle.
     project: Option<Project>,
     files: Files,
-    script_environments: ScriptEnvironments,
+    uv_environments: UvEnvironments,
 
     // IMPORTANT: Never return clones of `system` outside `ProjectDatabase` (only return references)
     // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
@@ -146,7 +147,7 @@ impl ProjectDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let script_environments = ScriptEnvironments::new(project_metadata.use_uv());
+        let uv_environments = UvEnvironments::new(project_metadata.use_uv());
         let mut db = Self {
             project: None,
             storage: salsa::Storage::new(if tracing::enabled!(tracing::Level::TRACE) {
@@ -163,7 +164,7 @@ impl ProjectDatabase {
                 None
             }),
             files: Files::default(),
-            script_environments,
+            uv_environments,
             system: Arc::new(system),
         };
 
@@ -645,8 +646,8 @@ impl Db for ProjectDatabase {
         self.project.unwrap()
     }
 
-    fn script_environments(&self) -> &ScriptEnvironments {
-        &self.script_environments
+    fn uv_environments(&self) -> &UvEnvironments {
+        &self.uv_environments
     }
 
     fn dyn_clone(&self) -> Box<dyn Db> {
@@ -694,7 +695,8 @@ pub(crate) mod testing {
 
     use crate::db::Db;
     use crate::metadata::settings::file_settings;
-    use crate::script::{Script, ScriptEnvironments};
+    use crate::script::Script;
+    use crate::uv::UvEnvironments;
     use crate::{Project, ProjectMetadata};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -705,7 +707,7 @@ pub(crate) mod testing {
         storage: salsa::Storage<Self>,
         events: Events,
         files: Files,
-        script_environments: ScriptEnvironments,
+        uv_environments: UvEnvironments,
         system: TestSystem,
         vendored: VendoredFileSystem,
         project: Option<Project>,
@@ -714,7 +716,7 @@ pub(crate) mod testing {
     impl TestDb {
         pub fn new(project: ProjectMetadata) -> Self {
             let events = Events::default();
-            let script_environments = ScriptEnvironments::new(project.use_uv());
+            let uv_environments = UvEnvironments::new(project.use_uv());
             let mut db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -726,7 +728,7 @@ pub(crate) mod testing {
                 system: TestSystem::default(),
                 vendored: ty_vendored::file_system().clone(),
                 files: Files::default(),
-                script_environments,
+                uv_environments,
                 events,
                 project: None,
             };
@@ -875,8 +877,8 @@ pub(crate) mod testing {
             self.project.unwrap()
         }
 
-        fn script_environments(&self) -> &ScriptEnvironments {
-            &self.script_environments
+        fn uv_environments(&self) -> &UvEnvironments {
+            &self.uv_environments
         }
 
         fn dyn_clone(&self) -> Box<dyn Db> {

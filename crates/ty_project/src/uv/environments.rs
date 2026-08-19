@@ -56,9 +56,9 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPathBuf;
 use salsa::Setter;
 
-use super::script_tag;
+use crate::script::script_tag;
 use crate::uv::{
-    ScriptSyncRequest, ScriptSyncResult, ScriptSyncTask, Uv, UvMetadata, UvSyncService,
+    ScriptSyncRequest, ScriptSyncResult, ScriptSyncTask, Uv, UvMetadata, UvMetadataService,
 };
 use crate::{Db, ProgressReporter, ScriptSyncProgress, UseUv};
 
@@ -82,22 +82,22 @@ type ProgressFactory<'factory> =
 /// a second [`ScriptEnvironment`] input.
 ///
 /// Returns `None` if script integration is disabled or the script is not an actual file on disk.
-pub(super) fn script_environment(db: &dyn Db, file: File) -> Option<ScriptEnvironment> {
-    db.script_environments().environment(db, file)
+pub(crate) fn script_environment(db: &dyn Db, file: File) -> Option<ScriptEnvironment> {
+    db.uv_environments().environment(db, file)
 }
 
 /// Manages and synchronizes PEP 723 script environments using `uv metadata`.
 #[derive(Clone, Default)]
-pub struct ScriptEnvironments {
-    inner: Arc<ScriptEnvironmentsInner>,
+pub struct UvEnvironments {
+    inner: Arc<UvEnvironmentsInner>,
 }
 
-impl ScriptEnvironments {
+impl UvEnvironments {
     pub(crate) fn new(use_uv: UseUv) -> Self {
         Self {
-            inner: Arc::new(ScriptEnvironmentsInner {
+            inner: Arc::new(UvEnvironmentsInner {
                 use_uv,
-                ..ScriptEnvironmentsInner::default()
+                ..UvEnvironmentsInner::default()
             }),
         }
     }
@@ -416,7 +416,7 @@ impl ScriptEnvironments {
     ///
     /// Can be used to delay checking until all requested synchronizations have completed.
     pub fn has_pending_synchronizations(&self) -> bool {
-        self.inner.by_file.iter().any(|entry| {
+        self.inner.scripts.iter().any(|entry| {
             matches!(
                 *entry.state.lock(),
                 ScriptEnvironmentState::InitializingBlocking { .. }
@@ -428,7 +428,7 @@ impl ScriptEnvironments {
     /// Returns every file for which a `ScriptEnvironment` input has been created.
     pub fn files(&self) -> Vec<File> {
         self.inner
-            .by_file
+            .scripts
             .iter()
             .filter_map(|entry| entry.state.lock().environment().map(|_| *entry.key()))
             .collect()
@@ -465,18 +465,18 @@ impl ScriptEnvironments {
     }
 
     fn existing_entry(&self, file: File) -> Option<Arc<ScriptEnvironmentEntry>> {
-        let entry = self.inner.by_file.get(&file)?;
+        let entry = self.inner.scripts.get(&file)?;
         Some(Arc::clone(entry.value()))
     }
 
     fn entry(&self, file: File) -> Arc<ScriptEnvironmentEntry> {
         // Return an owned entry so the map's shard lock is released before the caller waits
         // for synchronization. Otherwise, unrelated scripts in the same shard would also be blocked.
-        Arc::clone(self.inner.by_file.entry(file).or_default().value())
+        Arc::clone(self.inner.scripts.entry(file).or_default().value())
     }
 }
 
-impl std::panic::RefUnwindSafe for ScriptEnvironments {}
+impl std::panic::RefUnwindSafe for UvEnvironments {}
 
 /// Whether a script environment is suitable for operations that depend on its dependencies.
 ///
@@ -520,7 +520,7 @@ pub(crate) type ScriptEnvironmentCacheKey = u64;
 /// environment when its Python version, module search paths, or initialization error changes.
 #[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
-pub(super) struct ScriptEnvironment {
+pub(crate) struct ScriptEnvironment {
     /// The cache key of the most recently completed synchronization.
     ///
     /// `None` means the environment has not been synchronized yet. Both successful and failed
@@ -534,31 +534,31 @@ pub(super) struct ScriptEnvironment {
     /// `None` means the environment has not been synchronized or synchronization failed.
     /// [`initialization_error`](Self::initialization_error) distinguishes those cases.
     #[returns(as_ref)]
-    pub(super) uv_metadata: Option<UvMetadata>,
+    pub(crate) uv_metadata: Option<UvMetadata>,
 
     /// The error from the most recent synchronization.
     ///
     /// `None` if synchronization has not completed or completed successfully.
     #[returns(as_deref)]
-    pub(super) initialization_error: Option<Box<str>>,
+    pub(crate) initialization_error: Option<Box<str>>,
 }
 
-struct ScriptEnvironmentsInner {
+struct UvEnvironmentsInner {
     use_uv: UseUv,
-    by_file: FxDashMap<File, Arc<ScriptEnvironmentEntry>>,
-    sync_service: UvSyncService,
+    scripts: FxDashMap<File, Arc<ScriptEnvironmentEntry>>,
+    sync_service: UvMetadataService,
     sync_results: Receiver<ScriptSyncResult>,
     sync_wakeups: Receiver<()>,
 }
 
-impl Default for ScriptEnvironmentsInner {
+impl Default for UvEnvironmentsInner {
     fn default() -> Self {
         let (results_sender, sync_results) = crossbeam::channel::unbounded();
         let (wake_sender, sync_wakeups) = crossbeam::channel::bounded(1);
         Self {
             use_uv: UseUv::default(),
-            by_file: FxDashMap::default(),
-            sync_service: UvSyncService::new(results_sender, wake_sender),
+            scripts: FxDashMap::default(),
+            sync_service: UvMetadataService::new(results_sender, wake_sender),
             sync_results,
             sync_wakeups,
         }
@@ -870,7 +870,7 @@ mod tests {
         let mut db = TestDb::new(metadata);
         db.write_file(&path, "# /// script\n# dependencies = []\n# ///\n")?;
         let file = system_path_to_file(&db, &path)?;
-        let environments = db.script_environments().clone();
+        let environments = db.uv_environments().clone();
 
         // Semantic queries can reach a script before its environment has been synchronized. They
         // create one stable Salsa input with no uv metadata or initialization error.
@@ -914,7 +914,7 @@ mod tests {
                 from attrs import define
                 "#,
             )?;
-            let environments = case.db.script_environments().clone();
+            let environments = case.db.uv_environments().clone();
 
             environments.request_sync(
                 &mut case.db,
@@ -943,7 +943,7 @@ mod tests {
                 from attrs import define
                 "#,
             )?;
-            let environments = case.db.script_environments().clone();
+            let environments = case.db.uv_environments().clone();
             let environment = script_environment(&case.db, case.file)
                 .context("expected a default script environment")?;
 
@@ -973,7 +973,7 @@ mod tests {
             from attrs import define
             "#;
             let mut case = UvTestCase::new(initial)?;
-            let environments = case.db.script_environments().clone();
+            let environments = case.db.uv_environments().clone();
             environments.request_sync(
                 &mut case.db,
                 case.file,
@@ -1034,7 +1034,7 @@ mod tests {
                 # ///
                 "#,
             )?;
-            let environments = case.db.script_environments().clone();
+            let environments = case.db.uv_environments().clone();
             environments.request_sync(
                 &mut case.db,
                 case.file,
@@ -1116,7 +1116,7 @@ mod tests {
             }
 
             fn wait_for_synchronizations(&mut self) -> anyhow::Result<Vec<File>> {
-                let environments = self.db.script_environments().clone();
+                let environments = self.db.uv_environments().clone();
                 let wakeups = environments.sync_wakeups();
                 let mut changed = Vec::new();
 

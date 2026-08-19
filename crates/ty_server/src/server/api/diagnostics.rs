@@ -399,7 +399,7 @@ pub(super) fn compute_diagnostics(
     // The first uv result supplies the module paths needed for correct diagnostics. Do not analyze
     // the script until that result is available. Waiting would not help: publishing the environment
     // advances the database revision and cancels this snapshot, so the request must retry anyway.
-    if db.script_environments().is_initialization_pending(db, file) {
+    if db.uv_environments().is_initialization_pending(db, file) {
         return None;
     }
 

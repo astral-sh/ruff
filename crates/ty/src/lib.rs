@@ -341,7 +341,7 @@ impl MainLoop {
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
-        let script_sync_wakeups = db.script_environments().sync_wakeups();
+        let script_sync_wakeups = db.uv_environments().sync_wakeups();
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
         request_check(db, &check_sender);
 
@@ -349,7 +349,7 @@ impl MainLoop {
         // cancels the running check.
         while let Ok(message) = crossbeam_channel::select_biased! {
             recv(script_sync_wakeups) -> wakeup => {
-                wakeup.map(|()| MainLoopMessage::PollScriptEnvironments)
+                wakeup.map(|()| MainLoopMessage::PollUvEnvironments)
             }
             recv(self.receiver) -> message => message,
             recv(check_receiver) -> request => request.map(|()| MainLoopMessage::CheckWorkspace),
@@ -357,7 +357,7 @@ impl MainLoop {
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     // Synchronization may have started after this request was queued.
-                    if db.script_environments().has_pending_synchronizations() {
+                    if db.uv_environments().has_pending_synchronizations() {
                         tracing::debug!("Deferring check until script synchronization completes");
                         continue;
                     }
@@ -487,8 +487,8 @@ impl MainLoop {
                     return Ok(exit_status);
                 }
 
-                MainLoopMessage::PollScriptEnvironments => {
-                    let environments = db.script_environments().clone();
+                MainLoopMessage::PollUvEnvironments => {
+                    let environments = db.uv_environments().clone();
                     if !environments.poll_sync(db).is_empty() {
                         revision += 1;
                     }
@@ -504,7 +504,7 @@ impl MainLoop {
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(&changes);
 
-                    let environments = db.script_environments().clone();
+                    let environments = db.uv_environments().clone();
                     for file in environments.files() {
                         environments.request_sync(
                             db,
@@ -785,13 +785,13 @@ enum MainLoopMessage {
         result: Vec<Diagnostic>,
         revision: u64,
     },
-    PollScriptEnvironments,
+    PollUvEnvironments,
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
 }
 
 fn request_check(db: &dyn Db, sender: &crossbeam_channel::Sender<()>) {
-    if db.script_environments().has_pending_synchronizations() {
+    if db.uv_environments().has_pending_synchronizations() {
         return;
     }
 

@@ -6,11 +6,14 @@ use ruff_db::system::{Command, CommandExecutor, System, SystemPath, WhichError};
 use ty_combine::Combine;
 use ty_static::EnvVars;
 
+pub use environments::{ScriptEnvironmentAvailability, UvEnvironments};
+pub(crate) use environments::{ScriptEnvironmentCacheKey, script_environment};
 pub(crate) use metadata::{UvMetadata, UvMetadataError};
-pub(crate) use sync::{ScriptSyncRequest, ScriptSyncResult, ScriptSyncTask, UvSyncService};
+pub(crate) use service::{ScriptSyncRequest, ScriptSyncResult, ScriptSyncTask, UvMetadataService};
 
+mod environments;
 mod metadata;
-mod sync;
+mod service;
 
 /// Controls which uv integrations ty uses.
 #[derive(
@@ -53,7 +56,7 @@ impl UseUv {
         matches!(self, Self::On)
     }
 
-    pub(super) const fn script_environments_enabled(self) -> bool {
+    const fn script_environments_enabled(self) -> bool {
         matches!(self, Self::Scripts | Self::On)
     }
 }

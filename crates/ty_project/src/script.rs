@@ -17,14 +17,8 @@ use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::UvMetadata;
+use crate::uv::{UvMetadata, script_environment};
 use crate::{Db, ProjectMetadata};
-
-mod environment;
-
-pub(crate) use environment::ScriptEnvironmentCacheKey;
-use environment::script_environment;
-pub use environment::{ScriptEnvironmentAvailability, ScriptEnvironments};
 
 /// A standalone PEP 723 script and its resolved settings.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]

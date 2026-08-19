@@ -261,7 +261,7 @@ impl Session {
     ) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
         self.projects
             .iter()
-            .map(|(root, state)| (root.clone(), state.db.script_environments().sync_wakeups()))
+            .map(|(root, state)| (root.clone(), state.db.uv_environments().sync_wakeups()))
             .collect()
     }
 
@@ -270,7 +270,7 @@ impl Session {
         let capabilities = self.resolved_client_capabilities;
         for state in self.projects.values_mut() {
             let db = &mut state.db;
-            for file in db.script_environments().files() {
+            for file in db.uv_environments().files() {
                 // Open documents are synchronized when opened or saved. Ignore watcher events
                 // for them because the file on disk may differ from the open document.
                 if db.is_open_file(file) {
@@ -297,13 +297,13 @@ impl Session {
             return;
         };
         let db = &mut project.db;
-        let environments = db.script_environments().clone();
+        let environments = db.uv_environments().clone();
         let changed_files = environments.poll_sync(db);
 
-        self.script_environments_changed(client, project_root, changed_files);
+        self.uv_environments_changed(client, project_root, changed_files);
     }
 
-    fn script_environments_changed(
+    fn uv_environments_changed(
         &mut self,
         client: &Client,
         project_root: &SystemPath,
@@ -345,7 +345,7 @@ impl Session {
         capabilities: ResolvedClientCapabilities,
         availability: ScriptEnvironmentAvailability,
     ) {
-        let environments = db.script_environments().clone();
+        let environments = db.uv_environments().clone();
         environments.request_sync(db, file, availability, &|db, file| {
             let file_path = file.path(db);
             let display_path = file_path.as_system_path().map_or_else(
