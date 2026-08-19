@@ -20,7 +20,6 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-  ECOSYSTEM_ANALYZER_COMMIT: a602846d9c13d7c6d7268dff728442f68c47d923
 
 jobs:
   ty-ecosystem-report:
@@ -58,9 +57,10 @@ jobs:
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
-
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             --verbose \
             --repository . \
             --flaky-runs 20 \
@@ -70,7 +70,10 @@ jobs:
 
           mkdir dist
 
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             generate-report \
             --max-diagnostics-per-project=1000 \
             ecosystem-diagnostics.json \
