@@ -6579,6 +6579,111 @@ def infer[T](outer: T, recursive: C[int]) -> None:
     accept(outer, recursive)
 ```
 
+### Nested protocol source members with finite targets
+
+A source specialization can contain its own protocol even when the target has no recursive
+requirements. This must not activate a recursive matching shortcut or discard the source member.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+class Consumer[T](Protocol):
+    def consume(self, value: T | int) -> None: ...
+
+static_assert(is_constraint_set_assignable_to(Consumer[Consumer[int]], Consumer[int]))
+```
+
+### Recursive members in the source specialization
+
+A protocol member can contain the same protocol in the source specialization but remain finite in
+the target specialization. Its structural requirements must still contribute all valid solutions,
+even when nominal inheritance alone would infer a narrower type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Consumer[T](Protocol):
+    def consume(self, value: T | int) -> None: ...
+    @property
+    def child(self) -> Consumer[T]: ...
+
+def extract[T](consumer: Consumer[T]) -> T:
+    raise NotImplementedError
+
+def check(value: Consumer[Consumer[int]]) -> None:
+    reveal_type(extract(value))  # revealed: Consumer[int] | int
+```
+
+### Repeated applications of a nonrecursive alias
+
+Nested applications of the same finite alias do not create an alias cycle. Their protocol
+requirement must still contribute its type-variable constraints.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+type Identity[T] = T
+
+class Recursive[T](Protocol):
+    @property
+    def value(self) -> Identity[Identity[T]]: ...
+    @property
+    def child(self) -> Recursive[T]: ...
+
+def inspect[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Recursive[int], Recursive[T])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=int]]
+```
+
+### Growing aliases in recursive protocol requirements
+
+A recursive alias can change its specialization every time its definition is expanded. Finite
+protocol matching must detect the repeated alias definition instead of following the growing
+specializations indefinitely.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+type GrowingAlias[T] = T | GrowingAlias[list[T]]
+
+class Recursive[T](Protocol):
+    def consume(self, value: T) -> None: ...
+    def growing(self) -> GrowingAlias[T]: ...
+    def child(self) -> Recursive[T]: ...
+
+def check(value: Recursive[int]) -> None:
+    rejected: Recursive[str] = value  # error: [invalid-assignment]
+```
+
 ### Recursive legacy generic protocol
 
 ```py
