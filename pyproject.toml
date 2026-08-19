@@ -76,7 +76,7 @@ ruff-lsp-test = [
     "packaging>=23.1",
     # ruff-lsp uses the pygls 1.x server API.
     "pygls>=1.1.0,<2",
-    "pytest>=7.3.1,<8",
+    "pytest>=9.0.3,<10",
     "pytest-asyncio>=0.21.2",
     "python-lsp-jsonrpc>=1.0.0",
     "typing-extensions>=4.7.1",
