@@ -201,9 +201,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     node_index: _,
                 } = subscript;
 
-                let value_ty = self.infer_expression(value, TypeContext::default());
-
                 if is_dotted_name(value) {
+                    let value_ty = self.infer_expression(value, TypeContext::default());
+
                     // Preserve the flag for another `Unpack` so that nested unpacking emits a
                     // diagnostic. Other subscripts are no longer the direct unpack operand.
                     let previously_in_unpack_type_argument =
@@ -229,6 +229,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ty
                 } else {
                     if !self.in_string_annotation() {
+                        self.infer_expression(value, TypeContext::default());
                         self.infer_expression(slice, TypeContext::default());
                     }
                     self.report_invalid_type_expression(
