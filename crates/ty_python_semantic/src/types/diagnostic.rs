@@ -461,6 +461,7 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[expect(clippy::doc_link_with_quotes)]
     #[doc = include_str!("../../resources/lint_docs/unsound-yield.md")]
     pub(crate) static UNSOUND_YIELD = {
         summary: "detects yield expressions that unsoundly yield a type that is not a subtype of the generator's annotated yield type",
@@ -488,6 +489,7 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[expect(clippy::doc_link_with_quotes)]
     #[doc = include_str!("../../resources/lint_docs/unsound-assignment.md")]
     pub(crate) static UNSOUND_ASSIGNMENT = {
         summary: "detects assignments that unsoundly assign a type that is not a subtype of the declared type",
@@ -1655,9 +1657,16 @@ pub(super) fn add_invariant_generic_hints<'db>(
     );
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum DeclarationKind {
+    VariadicParameter,
+    KeywordVariadicParameter,
+    Regular,
+}
+
 struct AssignmentDeclarationAnnotation {
     range: TextRange,
-    variadic_parameter_kind: Option<&'static str>,
+    declaration_kind: DeclarationKind,
 }
 
 impl AssignmentDeclarationAnnotation {
@@ -1669,12 +1678,14 @@ impl AssignmentDeclarationAnnotation {
     ) -> Annotation {
         let annotation = context.secondary(self.range);
 
-        if let Some(kind) = self.variadic_parameter_kind {
-            annotation.message(format_args!(
-                "{kind} parameter annotation declares the type as `{target_type_display}`"
-            ))
-        } else {
-            annotation.message(ordinary_message)
+        match self.declaration_kind {
+            DeclarationKind::KeywordVariadicParameter => annotation.message(format_args!(
+                "Keyword-variadic parameter annotation declares the type as `{target_type_display}`"
+            )),
+            DeclarationKind::VariadicParameter => annotation.message(format_args!(
+                "Variadic parameter annotation declares the type as `{target_type_display}`"
+            )),
+            DeclarationKind::Regular => annotation.message(ordinary_message),
         }
     }
 }
@@ -1686,21 +1697,23 @@ fn assignment_declaration_annotation<'db>(
     declaration: Option<Definition<'db>>,
 ) -> Option<AssignmentDeclarationAnnotation> {
     let db = context.db();
-    let (annotation, variadic_parameter_kind) = match definition_kind {
-        DefinitionKind::AnnotatedAssignment(assignment) => {
-            Some((assignment.annotation(context.module()), None))
-        }
+    let (annotation, declaration_kind) = match definition_kind {
+        DefinitionKind::AnnotatedAssignment(assignment) => Some((
+            assignment.annotation(context.module()),
+            DeclarationKind::Regular,
+        )),
         _ => declaration.and_then(|declaration| match declaration.kind(db) {
-            DefinitionKind::AnnotatedAssignment(assignment) => {
-                Some((assignment.annotation(context.module()), None))
-            }
+            DefinitionKind::AnnotatedAssignment(assignment) => Some((
+                assignment.annotation(context.module()),
+                DeclarationKind::Regular,
+            )),
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
                 parameter
                     .node(context.module())
                     .parameter
                     .annotation
                     .as_deref()
-                    .map(|annotation| (annotation, None))
+                    .map(|annotation| (annotation, DeclarationKind::Regular))
             }
             DefinitionKind::Parameter(
                 ParameterDefinitionNodeKind::VariadicPositionalParameter(parameter),
@@ -1708,14 +1721,14 @@ fn assignment_declaration_annotation<'db>(
                 .node(context.module())
                 .annotation
                 .as_deref()
-                .map(|annotation| (annotation, Some("Variadic"))),
+                .map(|annotation| (annotation, DeclarationKind::VariadicParameter)),
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(
                 parameter,
             )) => parameter
                 .node(context.module())
                 .annotation
                 .as_deref()
-                .map(|annotation| (annotation, Some("Keyword-variadic"))),
+                .map(|annotation| (annotation, DeclarationKind::KeywordVariadicParameter)),
             DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
             | DefinitionKind::ImportFromSubmodule(_)
@@ -1743,8 +1756,79 @@ fn assignment_declaration_annotation<'db>(
 
     Some(AssignmentDeclarationAnnotation {
         range: annotation.range(),
-        variadic_parameter_kind,
+        declaration_kind,
     })
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum AssignmentDiagnosticKind {
+    Invalid,
+    Unsound,
+}
+
+/// Return the expression assigned by an ordinary or named assignment.
+fn assignment_value_node<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    definition_kind: &DefinitionKind<'db>,
+) -> Option<&'ast ast::Expr> {
+    match definition_kind {
+        DefinitionKind::Assignment(assignment) => Some(assignment.value(context.module())),
+        DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(context.module()),
+        DefinitionKind::NamedExpression(assignment) => {
+            Some(&*assignment.node(context.module()).value)
+        }
+        DefinitionKind::Import(_)
+        | DefinitionKind::ImportFrom(_)
+        | DefinitionKind::ImportFromSubmodule(_)
+        | DefinitionKind::StarImport(_)
+        | DefinitionKind::Function(_)
+        | DefinitionKind::Class(_)
+        | DefinitionKind::TypeAlias(_)
+        | DefinitionKind::AugmentedAssignment(_)
+        | DefinitionKind::DictKeyAssignment(_)
+        | DefinitionKind::For(_)
+        | DefinitionKind::Comprehension(_)
+        | DefinitionKind::Parameter(_)
+        | DefinitionKind::LambdaParameter(_)
+        | DefinitionKind::WithItem(_)
+        | DefinitionKind::MatchPattern(_)
+        | DefinitionKind::ExceptHandler(_)
+        | DefinitionKind::TypeVar(_)
+        | DefinitionKind::ParamSpec(_)
+        | DefinitionKind::TypeVarTuple(_)
+        | DefinitionKind::LoopHeader(_)
+        | DefinitionKind::NestedBindings(_) => None,
+    }
+}
+
+/// Set an assignment's primary message and return whether a message was added.
+fn set_assignment_primary_annotation(
+    diagnostic: &mut LintDiagnosticGuard,
+    definition_kind: &DefinitionKind,
+    value_node: Option<&ast::Expr>,
+    value_type_display: impl fmt::Display,
+    diagnostic_kind: AssignmentDiagnosticKind,
+) -> bool {
+    match (value_node, definition_kind, diagnostic_kind) {
+        (None, DefinitionKind::AugmentedAssignment(_), _) => {
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Augmented assignment produces a value of type `{value_type_display}`"
+            ));
+            true
+        }
+        (Some(_), _, AssignmentDiagnosticKind::Invalid) => {
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Incompatible value of type `{value_type_display}`"
+            ));
+            true
+        }
+        (_, _, AssignmentDiagnosticKind::Unsound) => {
+            diagnostic
+                .set_primary_annotation_message(format_args!("Inferred as `{value_type_display}`"));
+            true
+        }
+        (None, _, AssignmentDiagnosticKind::Invalid) => false,
+    }
 }
 
 pub(super) fn report_invalid_assignment<'db>(
@@ -1757,12 +1841,7 @@ pub(super) fn report_invalid_assignment<'db>(
 ) {
     let db = context.db();
     let definition_kind = definition.kind(context.db());
-    let value_node = match definition_kind {
-        DefinitionKind::Assignment(def) => Some(def.value(context.module())),
-        DefinitionKind::AnnotatedAssignment(def) => def.value(context.module()),
-        DefinitionKind::NamedExpression(def) => Some(&*def.node(context.module()).value),
-        _ => None,
-    };
+    let value_node = assignment_value_node(context, definition_kind);
 
     if let Some(value_node) = value_node
         && is_invalid_typed_dict_literal(
@@ -1841,22 +1920,20 @@ pub(super) fn report_invalid_assignment<'db>(
         )));
     }
 
-    if value_node.is_some() {
-        diag.set_primary_annotation_message(format_args!(
-            "Incompatible value of type `{}`",
-            value_ty.display_with(db, env, settings),
-        ));
+    let has_primary_annotation = set_assignment_primary_annotation(
+        &mut diag,
+        definition_kind,
+        value_node,
+        value_ty.display_with(db, env, settings),
+        AssignmentDiagnosticKind::Invalid,
+    );
 
+    if value_node.is_some() {
         let error_context = value_ty.assignability_error_context(db, env, target_ty);
         error_context.attach_to(db, env, &mut diag);
-    } else if matches!(definition_kind, DefinitionKind::AugmentedAssignment(_)) {
-        diag.set_primary_annotation_message(format_args!(
-            "Augmented assignment produces a value of type `{}`",
-            value_ty.display_with(db, env, settings),
-        ));
     }
 
-    if value_node.is_some() || matches!(definition_kind, DefinitionKind::AugmentedAssignment(_)) {
+    if has_primary_annotation {
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.headline_message().to_string();
         diag.set_concise_message(message);
@@ -1871,13 +1948,28 @@ pub(super) fn report_invalid_assignment<'db>(
 pub(super) fn report_unsound_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
-    definition_kind: &DefinitionKind<'db>,
+    definition: Definition<'db>,
     declaration: Option<Definition<'db>>,
-    value_node: Option<&ast::Expr>,
     target_ty: Type<'db>,
     value_ty: Type<'db>,
+    expression_type: impl FnOnce(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
+    let env = context.program_environment();
+    let definition_kind = definition.kind(db);
+    let (target_node, value_node) =
+        if let DefinitionKind::AugmentedAssignment(assignment) = definition_kind {
+            let assignment = assignment.node(context.module());
+
+            if expression_type(&assignment.value).is_equivalent_to(db, env, value_ty) {
+                (target_node, Some(assignment.value.as_ref()))
+            } else {
+                (assignment.into(), None)
+            }
+        } else {
+            (target_node, assignment_value_node(context, definition_kind))
+        };
+
     let diagnostic_range = value_node
         .map(|value| {
             parentheses_iterator(value.into(), None, context.module().tokens())
@@ -1890,7 +1982,6 @@ pub(super) fn report_unsound_assignment<'db>(
         return;
     };
 
-    let env = context.program_environment();
     let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [target_ty, value_ty]);
     let actual_display = value_ty.display_with(db, env, settings.clone());
     let expected_display = target_ty.display_with(db, env, settings);
@@ -1899,13 +1990,13 @@ pub(super) fn report_unsound_assignment<'db>(
     diagnostic.set_concise_message(format_args!(
         "Unsound assignment: `{actual_display}` is not a subtype of `{expected_display}`"
     ));
-    if value_node.is_none() && matches!(definition_kind, DefinitionKind::AugmentedAssignment(_)) {
-        diagnostic.set_primary_annotation_message(format_args!(
-            "Augmented assignment produces a value of type `{actual_display}`"
-        ));
-    } else {
-        diagnostic.set_primary_annotation_message(format_args!("Inferred as `{actual_display}`"));
-    }
+    set_assignment_primary_annotation(
+        &mut diagnostic,
+        definition_kind,
+        value_node,
+        &actual_display,
+        AssignmentDiagnosticKind::Unsound,
+    );
 
     if let Some(declaration_annotation) =
         assignment_declaration_annotation(context, definition_kind, declaration)

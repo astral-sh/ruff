@@ -1819,39 +1819,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && target_ty.is_fully_static(db, env)
                 && !value_ty.is_pure_redundant_with(db, env, target_ty)
             {
-                let definition_kind = definition.kind(db);
-                let (diagnostic_target_node, value_node) = match definition_kind {
-                    DefinitionKind::Assignment(assignment) => {
-                        (target_node, Some(assignment.value(self.module())))
-                    }
-                    DefinitionKind::AnnotatedAssignment(assignment) => {
-                        (target_node, assignment.value(self.module()))
-                    }
-                    DefinitionKind::AugmentedAssignment(assignment) => {
-                        let assignment = assignment.node(self.module());
-                        if self
-                            .expression_type(&assignment.value)
-                            .is_equivalent_to(db, env, value_ty)
-                        {
-                            (target_node, Some(assignment.value.as_ref()))
-                        } else {
-                            (assignment.into(), None)
-                        }
-                    }
-                    DefinitionKind::NamedExpression(assignment) => {
-                        (target_node, Some(&*assignment.node(self.module()).value))
-                    }
-                    _ => (target_node, None),
-                };
-
                 report_unsound_assignment(
                     &self.context,
-                    diagnostic_target_node,
-                    definition_kind,
+                    target_node,
+                    definition,
                     declaration,
-                    value_node,
                     target_ty,
                     value_ty,
+                    |expression| self.expression_type(expression),
                 );
             }
             true
