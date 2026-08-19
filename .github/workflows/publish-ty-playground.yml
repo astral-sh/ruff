@@ -86,12 +86,17 @@ jobs:
           digest-mismatch: error
       - name: "Verify static playground assets"
         run: |
+          # The build runs without deployment credentials, but its output may
+          # still be compromised. Check for missing required assets, and reject
+          # links and special files before the publisher consumes the artifact.
+          # Wrangler can deploy `_worker.js` in the output or `functions/` in its
+          # working directory as server-side Pages code, so reject both.
+          # These checks do not establish that the generated HTML or JavaScript is safe.
           test -f playground/ty/dist/index.html
           test -f playground/ty/dist/assets/pyodide.asm.mjs
           test -f playground/ty/dist/assets/pyodide.asm.wasm
           test -f playground/ty/dist/assets/pyodide-lock.json
           test -f playground/ty/dist/assets/python_stdlib.zip
-          # Pages treats these paths as server-side code, not static assets.
           test ! -e playground/ty/dist/_worker.js
           test ! -e functions
           if [[ -n "$(find playground/ty/dist ! -type f ! -type d -print -quit)" ]]; then
