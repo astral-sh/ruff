@@ -5730,9 +5730,10 @@ impl SequentMap {
         // implication. (That is, this check directly encodes `(L ≤ T ≤ U) → (L ≤ U)` as an
         // implication.)
         //
-        // TODO: Use the fully static sequent boundary here once lazy subtyping can preserve an
-        // existing gradual witness instead of materializing it away (see PR #26873). Until then,
-        // keep this dedicated single-range symbolic derivation assignability-based.
+        // TODO(ibraheem/gradual-constraints): Use the fully static sequent boundary here once
+        // lazy subtyping can preserve an existing gradual witness instead of materializing it away
+        // (see PR #26873). Until then, keep this dedicated single-range symbolic derivation
+        // assignability-based.
 
         // Skip trivial cases where the assignability check won't produce useful results.
         if lower.is_never() || upper.is_object() {

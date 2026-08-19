@@ -100,8 +100,8 @@ materializations instead of using gradual assignability to prove them equivalent
 
 ```py
 def _[T]() -> None:
-    # TODO: Decide whether these atoms should remain distinct or recover materialization
-    # equivalence without reintroducing gradual sequent implication.
+    # TODO(ibraheem/gradual-constraints): Rewrite these as direct inequality assertions once
+    # lazy gradual constraints make preserving the distinct atoms the intended behavior.
     constraints = ConstraintSet.range(Base, T, Any)
     expected = ConstraintSet.range(Base, T, object)
     # error: [static-assert-error]
@@ -273,8 +273,8 @@ materialization ranges.
 
 ```pyi
 def _[T]() -> None:
-    # TODO: Decide whether these atoms should remain distinct or recover materialization
-    # equivalence without reintroducing gradual sequent implication.
+    # TODO(ibraheem/gradual-constraints): Rewrite these as direct inequality assertions once
+    # lazy gradual constraints make preserving the distinct atoms the intended behavior.
     constraints = ~ConstraintSet.range(Base, T, Any)
     expected = ~ConstraintSet.range(Base, T, object)
     # error: [static-assert-error]

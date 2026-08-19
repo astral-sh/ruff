@@ -3138,13 +3138,12 @@ class StringValue(TypedDict):
 class GetAnyValue(Protocol):
     def __getitem__(self, key: Literal["value"], /) -> Any: ...
 
-def get_value(value: GetValue[ValueT]) -> ValueT:
+def get_any_value(value: GetValue[ValueT]) -> ValueT:
     raise NotImplementedError
 
 def _(value: StringValue | dict[str, Any]) -> None:
     if isinstance(value, GetAnyValue):
-        # XXX: Preserve the gradual `Any` evidence instead of defaulting to `object`.
-        reveal_type(get_value(value))  # revealed: object
+        reveal_type(get_any_value(value))  # revealed: Any
 ```
 
 The same `Any` result must remain valid when the mapping protocol uses a bounded type variable:
