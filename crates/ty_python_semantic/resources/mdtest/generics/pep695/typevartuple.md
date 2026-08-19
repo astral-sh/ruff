@@ -482,6 +482,18 @@ def forward_mixed[*Ts](
     accept_mixed_forwarded(callback, args)
 ```
 
+An unsolved `TypeVarTuple` should use an unknown variadic argument shape instead of leaking a single
+provisional type variable into an unannotated callback.
+
+```py
+def schedule[*Ts](callback: Callable[[*Ts], object], *args: *Ts) -> None:
+    callback(*args)
+
+items: list[int] = []
+schedule(lambda item: items.append(item), 1)
+schedule(lambda item, /: items.append(item), 1)
+```
+
 ### Unsupported callable checks are deferred
 
 Until call binding can infer a `TypeVarTuple` from `*args`, a generic callback can leave the

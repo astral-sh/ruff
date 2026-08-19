@@ -903,6 +903,30 @@ A.bar(5)
 A.bar(x=10)
 ```
 
+### Overloaded staticmethod assignment
+
+A declared callable context must not force every overload of a `ParamSpec` constructor to share one
+return type. Until `ParamSpec` inference migrates to constraint sets, preserve the existing
+assignment diagnostic.
+
+```py
+from typing import Callable, overload
+
+@overload
+def callback() -> str: ...
+@overload
+def callback(value: bytes) -> bytes: ...
+def callback(value: bytes | None = None) -> str | bytes:
+    return value or ""
+
+class Owner:
+    target: Callable[[], str]
+
+    @classmethod
+    def setup(cls) -> None:
+        cls.target = staticmethod(callback)  # error: [invalid-assignment]
+```
+
 ### Accessing the staticmethod as a static member
 
 ```py

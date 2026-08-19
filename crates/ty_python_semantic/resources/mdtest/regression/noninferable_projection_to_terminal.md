@@ -112,12 +112,10 @@ constrained_identity(b"invalid")  # error: [invalid-argument-type]
 ## Bounded-union method calls with outer return contexts
 
 When a rigid outer variable is bounded by two receiver types, a method shared by those types should
-retain both the outer variable and the matching receiver bound. The return diagnostic should remain,
-because `Response` is not necessarily compatible with `T`, but it should report
-`Response | (T@Manager & Socket)` instead of `Response | Unknown`. Both receiver argument
-diagnostics are false positives and should disappear once
-[#26680](https://github.com/astral-sh/ruff/pull/26680) combines return-context and argument
-constraints.
+retain both the outer variable and the matching receiver bound. The return diagnostic remains
+because `Response` is not necessarily compatible with `T`. The receiver argument diagnostics are
+known false positives: member lookup binds each constrained alternative to the original `T` instead
+of intersecting it with the matching receiver type.
 
 ```py
 from __future__ import annotations
@@ -139,9 +137,7 @@ class Manager(Generic[T]):
     response: T
 
     async def __aenter__(self) -> T:
-        # TODO(#26680): Keep the return error, but report `Response | (T@Manager & Socket)`.
-        # TODO(#26680): Remove both invalid-argument-type errors.
-        # error: [invalid-return-type] "expected `T@Manager`, found `Response | T@Manager`"
+        # error: [invalid-return-type] "expected `T@Manager`, found `Response | (T@Manager & Socket)`"
         # error: [invalid-argument-type]
         # error: [invalid-argument-type]
         return await self.response.__aenter__()
