@@ -22,7 +22,9 @@ uv run --script "$project_root/scripts/generate-crate-readmes.py"
 
 echo "Updating lockfiles..."
 cargo update -p ruff
-uv lock --no-config
+# Use --no-config to prevent corporate PyPI proxies from rewriting lockfile URLs,
+# but preserve the dependency cooldown used elsewhere.
+uv lock --no-config --exclude-newer P7D
 
 echo "Checking crates.io publish setup..."
 uv run --no-config --script "$project_root/scripts/setup-crates-io-publish.py" --quiet
