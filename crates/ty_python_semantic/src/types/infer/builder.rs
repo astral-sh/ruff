@@ -824,6 +824,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .is_in_type_checking_block(scope.file_scope_id(self.db()), node.range())
     }
 
+    /// Returns whether the current scope is the body of a dataclass or dataclass-transform class.
+    ///
+    /// Methods and nested functions have separate scopes and are not considered class bodies.
+    fn is_in_dataclass_like_class_body(&self) -> bool {
+        let db = self.db();
+        let scope = self.scope();
+
+        self.index.scope(scope.file_scope_id(db)).kind() == ScopeKind::Class
+            && nearest_enclosing_class(db, self.index, scope)
+                .and_then(|class| CodeGeneratorKind::from_class(db, class.into()))
+                .is_some_and(|kind| {
+                    matches!(
+                        kind,
+                        CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_)
+                    )
+                })
+    }
+
     /// If the current scope is a class body scope of a dataclass-like class, populate
     /// `self.dataclass_field_specifiers` with the field specifiers from the class's
     /// `dataclass_params` or `dataclass_transform` parameters. This is needed so that
@@ -1818,7 +1836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // update those too if updating this!
         if self.context.is_lint_enabled(&UNSOUND_ASSIGNMENT)
             && target_ty.is_fully_static(db, env)
-            && !matches!(value_ty, Type::KnownInstance(KnownInstanceType::Field(_)))
+            && !self.is_in_dataclass_like_class_body()
             && !value_ty.is_pure_redundant_with(db, env, target_ty)
         {
             report_unsound_assignment(

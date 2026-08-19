@@ -67,45 +67,6 @@ assert isinstance(dynamic_value, int)
 narrowed_value: int = dynamic_value
 ```
 
-## Dataclass field specifiers
-
-Dataclass field specifiers describe how a field is initialized without assigning a value of its
-declared type.
-
-```py
-from dataclasses import dataclass, field
-from typing import Any
-
-def returns_any() -> Any:
-    return "not an integer"
-
-@dataclass
-class Example:
-    required: int = field()
-    without_init: int = field(init=False)
-    with_default: int = field(default=42)
-    with_factory: list[int] = field(default_factory=lambda: [42])
-    with_none: int | None = field(default=None)
-
-    dynamic_value: int = returns_any()  # error: [unsound-assignment]
-    invalid_default: int = field(default="not an integer")  # error: [invalid-assignment]
-```
-
-Field specifiers registered with `dataclass_transform` receive the same treatment.
-
-```py
-from typing_extensions import dataclass_transform
-
-def custom_field() -> Any:
-    return 42
-
-@dataclass_transform(field_specifiers=(custom_field,))
-class Model: ...
-
-class CustomExample(Model):
-    value: int = custom_field()
-```
-
 ## Unsound assignments to gradually typed targets
 
 The rule applies only when the target's declared type is fully static. An explicit `Any`, an alias
@@ -539,4 +500,107 @@ error[unsound-assignment]: Unsound assignment
    | ^^^^^^^^^^^^ Augmented assignment produces a value of type `Any`
 info: `Any` is assignable to `Counter`, but not a subtype of `Counter`
 help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Assignments in dataclass bodies
+
+Assignments directly in a dataclass body are ignored by `unsound-assignment` because of how heavily
+dataclass field specifiers are special-cased by ty and other type checkers. ty considers
+`dataclasses.Field[str]` assignable to `str` in order to avoid emitting a diagnostic for
+`x: str = dataclasses.field(default="foo")` in a dataclass class body, but limits this special case
+to assignability: it does not consider `dataclasses.Field[str]` a *subtype* of `str`. You might
+think that we could workaround this with a narrow special case for just `dataclasses.Field`, but
+this alone would not be sufficient: third-party libraries often wrap `dataclasses.field()` and
+annotate their field specifiers as returning `Any`, so the inferred assignment type no longer
+identifies the underlying `Field`. For example:
+
+- [`betterproto` explicitly explains why its field specifiers return `Any`](https://github.com/danielgtaylor/python-betterproto/blob/098989e9e93c97e16e10257b1b3575f987180f8c/src/betterproto/__init__.py#L192-L220).
+- [Expression's `case()` and `tag()` field specifiers do the same](https://github.com/cognitedata/Expression/blob/d0bcfbe1ce12634ef74531b4404d1bed6c05a090/expression/core/tagged_union.py#L190-L197).
+
+Flagging those assignments would report a huge number of dataclasses as being unsound, making it
+untenable for users to enable the rule.
+
+```py
+from dataclasses import dataclass, field
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+def wrapped_field() -> Any:
+    return field()
+
+@dataclass
+class Example:
+    required: int = field()
+    without_init: int = field(init=False)
+    with_default: int = field(default=42)
+    with_factory: list[int] = field(default_factory=lambda: [42])
+    with_none: int | None = field(default=None)
+
+    wrapped: int = wrapped_field()
+    dynamic_value: int = returns_any()
+    invalid_default: int = field(default="not an integer")  # error: [invalid-assignment]
+
+    def method(self) -> None:
+        value: int = returns_any()  # error: [unsound-assignment]
+
+    class Nested:
+        value: int = returns_any()  # error: [unsound-assignment]
+```
+
+An ordinary class does not receive the dataclass-body exemption.
+
+```py
+class Ordinary:
+    value: int = returns_any()  # error: [unsound-assignment]
+```
+
+## Assignments in dataclass-transform class bodies
+
+The body of a class inheriting from a `dataclass_transform` base is ignored even when its field
+specifier is not registered with the transform.
+
+```py
+from typing import Any, TypeVar
+from typing_extensions import dataclass_transform
+
+def custom_field() -> Any:
+    return 42
+
+@dataclass_transform()
+class Model: ...
+
+class CustomExample(Model):
+    value: int = custom_field()
+
+    def method(self) -> None:
+        value: int = custom_field()  # error: [unsound-assignment]
+
+    class Nested:
+        value: int = custom_field()  # error: [unsound-assignment]
+```
+
+The same exemption applies when a class becomes dataclass-like through its decorator.
+
+```py
+T = TypeVar("T")
+
+@dataclass_transform()
+def transform(cls: type[T]) -> type[T]:
+    return cls
+
+@transform
+class DecoratedModel:
+    value: int = custom_field()
+```
+
+A dataclass-transform metaclass also makes its class body exempt.
+
+```py
+@dataclass_transform()
+class ModelMetaclass(type): ...
+
+class MetaclassModel(metaclass=ModelMetaclass):
+    value: int = custom_field()
 ```
