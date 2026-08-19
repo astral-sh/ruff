@@ -1332,6 +1332,10 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
     #[doc = include_str!("../../resources/lint_docs/pytest-invalid-argnames-literal.md")]
     pub(crate) static PYTEST_INVALID_ARGNAMES_LITERAL = {
         summary: "Argnames literal is not a comma separated list of valid identifiers",
@@ -1341,6 +1345,10 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
     #[doc = include_str!("../../resources/lint_docs/pytest-request-keyword.md")]
     pub(crate) static PYTEST_REQUEST_KEYWORD = {
         summary: "`request` is reserved by `pytest` as a special argument",
@@ -1350,6 +1358,10 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
     #[doc = include_str!("../../resources/lint_docs/pytest-test-parameter-wrong-kind.md")]
     pub(crate) static PYTEST_TEST_PARAMETER_WRONG_KIND = {
         summary: "Pytest tests only use keyword arguments",
@@ -1359,6 +1371,10 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
     #[doc = include_str!("../../resources/lint_docs/pytest-test-optional-parameter.md")]
     pub(crate) static PYTEST_TEST_OPTIONAL_PARAMETER = {
         summary: "Pytest ignores optional arguments",
@@ -1368,6 +1384,10 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
     #[doc = include_str!("../../resources/lint_docs/pytest-duplicate-argname.md")]
     pub(crate) static PYTEST_DUPLICATE_ARGNAME = {
         summary: "Same argname used multiple times in `pytest.mark.parametrize`",
@@ -1377,6 +1397,10 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
     #[doc = include_str!("../../resources/lint_docs/pytest-param-mismatched-type.md")]
     pub(crate) static PYTEST_PARAM_MISMATCHED_TYPE = {
         summary: "`pytest.mark.parametrize` contains arvalue with wrong type.",
