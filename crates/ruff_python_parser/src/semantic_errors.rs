@@ -686,6 +686,41 @@ impl SemanticSyntaxChecker {
         }
     }
 
+    /// Check if `name` is `__debug__` in a `Store` or `Del` [`ExprContext`] and emit a
+    /// [`SemanticSyntaxErrorKind::WriteToDebug`] if so.
+    fn write_to_debug<Ctx: SemanticSyntaxContext>(
+        name: &str,
+        range: TextRange,
+        expr_ctx: ExprContext,
+        removed_in: PythonVersion,
+        ctx: &Ctx,
+    ) {
+        if name != "__debug__" {
+            return;
+        }
+        match expr_ctx {
+            ExprContext::Store => Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                range,
+            ),
+            ExprContext::Del => {
+                let version = ctx.python_version();
+                if version >= removed_in {
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Delete {
+                            version,
+                            removed_in,
+                        }),
+                        range,
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(
         type_params: &ast::TypeParams,
         ctx: &Ctx,
@@ -981,28 +1016,7 @@ impl SemanticSyntaxChecker {
                 // test_ok read_from_debug
                 // if __debug__: ...
                 // x = __debug__
-                if id == "__debug__" {
-                    match expr_ctx {
-                        ExprContext::Store => Self::add_error(
-                            ctx,
-                            SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                            *range,
-                        ),
-                        ExprContext::Del => {
-                            let version = ctx.python_version();
-                            if version >= PythonVersion::PY39 {
-                                Self::add_error(
-                                    ctx,
-                                    SemanticSyntaxErrorKind::WriteToDebug(
-                                        WriteToDebugKind::Delete(version),
-                                    ),
-                                    *range,
-                                );
-                            }
-                        }
-                        _ => {}
-                    }
-                }
+                Self::write_to_debug(id, *range, *expr_ctx, PythonVersion::PY39, ctx);
 
                 // PLE0118
                 if let Some(stmt) = ctx.global(id) {
@@ -1026,6 +1040,31 @@ impl SemanticSyntaxChecker {
                     Self::invalid_star_expression(value, ctx);
                 }
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
+            }
+            Expr::Attribute(ast::ExprAttribute {
+                attr,
+                range,
+                ctx: expr_ctx,
+                ..
+            }) => {
+                // test_err write_to_debug_attribute
+                // del x.__debug__
+                // del x.y, x.__debug__, z.a
+                // x.__debug__ = 1
+                // x.y, x.__debug__, z.a = 1, 2, 3
+
+                // test_err del_debug_attribute_py314
+                // # parse_options: {"target-version": "3.14"}
+                // del x.__debug__
+
+                // test_ok del_debug_attribute_py313
+                // # parse_options: {"target-version": "3.13"}
+                // del x.__debug__
+
+                // test_ok read_debug_attribute
+                // if x.__debug__: ...
+                // y = x.__debug__
+                Self::write_to_debug(attr, *range, *expr_ctx, PythonVersion::PY314, ctx);
             }
             Expr::YieldFrom(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
@@ -1386,10 +1425,13 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::WriteToDebug(kind) => match kind {
                 WriteToDebugKind::Store => f.write_str("cannot assign to `__debug__`"),
-                WriteToDebugKind::Delete(python_version) => {
+                WriteToDebugKind::Delete {
+                    version,
+                    removed_in,
+                } => {
                     write!(
                         f,
-                        "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)"
+                        "cannot delete `__debug__` on Python {version} (syntax was removed in {removed_in})"
                     )
                 }
             },
@@ -2061,7 +2103,12 @@ impl Display for InvalidExpressionKind {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum WriteToDebugKind {
     Store,
-    Delete(PythonVersion),
+    Delete {
+        /// The target Python version being checked against.
+        version: PythonVersion,
+        /// The Python version in which this syntax was removed.
+        removed_in: PythonVersion,
+    },
 }
 
 fn comprehension_target_names(
