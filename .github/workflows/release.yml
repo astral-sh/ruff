@@ -14,8 +14,7 @@
 # title/body based on your changelogs.
 
 name: Release
-permissions:
-  "contents": "write"
+permissions: {}
 
 # This task will run whenever you workflow_dispatch with a tag that looks like a version
 # like "1.0.0", "v0.1.0-prerelease.1", "my-app/0.1.0", "releases/v1.0.0", etc.
@@ -49,6 +48,8 @@ on:
         type: string
 
 env:
+  # Release actions must not consume shared GitHub Actions caches.
+  ACTIONS_CACHE_MODE: none
   CARGO_DIST_VERSION: "0.31.0"
   CARGO_DIST_CHECKSUM: "cd355dab0b4c02fb59038fef87655550021d07f45f1d82f947a34ef98560abb8"
 
@@ -71,6 +72,8 @@ jobs:
 
   # Run 'dist plan' (or host) to determine what tasks we need to do
   plan:
+    permissions:
+      "contents": "read"
     runs-on: "depot-ubuntu-24.04-4"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
@@ -102,11 +105,18 @@ jobs:
       # (PRs run on the *source* but secrets are usually on the *target* -- that's *good*
       # but also really annoying to build CI around when it needs secrets to work right.)
       - id: plan
+        shell: bash
         run: |
-          dist ${{ (inputs.tag && inputs.tag != 'dry-run' && format('host --steps=create --tag={0}', inputs.tag)) || 'plan' }} --output-format=json > plan-dist-manifest.json
+          dist_args=(plan)
+          if [[ -n "$DIST_TAG_FLAG" ]]; then
+            dist_args=(host --steps=create "$DIST_TAG_FLAG")
+          fi
+          dist "${dist_args[@]}" --output-format=json > plan-dist-manifest.json
           echo "dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
+        env:
+          DIST_TAG_FLAG: ${{ inputs.tag && inputs.tag != 'dry-run' && format('--tag={0}', inputs.tag) || '' }}
       - name: "Upload dist-manifest.json"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -153,6 +163,8 @@ jobs:
       - custom-build-binaries
       - custom-build-docker
       - custom-build-wasm
+    permissions:
+      "contents": "read"
     runs-on: "depot-ubuntu-24.04-4"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -178,7 +190,11 @@ jobs:
       - id: cargo-dist
         shell: bash
         run: |
-          dist build ${{ needs.plan.outputs.tag-flag }} --output-format=json "--artifacts=global" > dist-manifest.json
+          dist_args=()
+          if [[ -n "$DIST_TAG_FLAG" ]]; then
+            dist_args+=("$DIST_TAG_FLAG")
+          fi
+          dist build "${dist_args[@]}" --output-format=json "--artifacts=global" > dist-manifest.json
           echo "dist ran successfully"
 
           # Parse out what we just built and upload it to scratch storage
@@ -187,6 +203,8 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
           cp dist-manifest.json "$BUILD_MANIFEST_NAME"
+        env:
+          DIST_TAG_FLAG: ${{ needs.plan.outputs.tag-flag }}
       - name: "Upload artifacts"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -204,6 +222,8 @@ jobs:
       - build-global-artifacts
     # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
     if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-build-binaries.result == 'skipped' || needs.custom-build-binaries.result == 'success') && (needs.custom-build-docker.result == 'skipped' || needs.custom-build-docker.result == 'success') && (needs.custom-build-wasm.result == 'skipped' || needs.custom-build-wasm.result == 'success') }}
+    permissions:
+      "contents": "read"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: "depot-ubuntu-24.04-4"
@@ -231,10 +251,16 @@ jobs:
       - id: host
         shell: bash
         run: |
-          dist host ${{ needs.plan.outputs.tag-flag }} --steps=upload --steps=release --output-format=json > dist-manifest.json
+          dist_args=()
+          if [[ -n "$DIST_TAG_FLAG" ]]; then
+            dist_args+=("$DIST_TAG_FLAG")
+          fi
+          dist host "${dist_args[@]}" --steps=upload --steps=release --output-format=json > dist-manifest.json
           echo "artifacts uploaded and released successfully"
           cat dist-manifest.json
           echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
+        env:
+          DIST_TAG_FLAG: ${{ needs.plan.outputs.tag-flag }}
       - name: "Upload dist-manifest.json"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -342,11 +368,12 @@ jobs:
           ANNOUNCEMENT_TITLE: "${{ fromJson(needs.host.outputs.val).announcement_title }}"
           ANNOUNCEMENT_BODY: "${{ fromJson(needs.host.outputs.val).announcement_github_body }}"
           RELEASE_COMMIT: "${{ github.sha }}"
+          NEEDS_PLAN_OUTPUTS_TAG: ${{ needs.plan.outputs.tag }}
         run: |
           # Write and read notes from a file to avoid quoting breaking things
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
-          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+          gh release create "${NEEDS_PLAN_OUTPUTS_TAG}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
 
   custom-notify-dependents:
     needs:
@@ -365,6 +392,8 @@ jobs:
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
+    permissions:
+      "contents": "read"
 
   custom-publish-playground:
     needs:

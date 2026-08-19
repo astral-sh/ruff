@@ -2816,6 +2816,31 @@ def _(p: Person) -> None:
     reveal_type(p.__class__)  # revealed: <class 'dict[str, object]'>
 ```
 
+Truthiness narrowing can give a `TypedDict` value an intersection type, but its runtime class is
+still `dict`.
+
+```py
+class OptionalPerson(TypedDict, total=False):
+    name: str
+
+def narrowed_class(person: OptionalPerson) -> None:
+    if person:
+        reveal_type(type(person))  # revealed: <class 'dict[str, object]'>
+        reveal_type(person.__class__)  # revealed: <class 'dict[str, object]'>
+```
+
+Excluding `None` from a type variable's `TypedDict` bound should also identify `dict` as the runtime
+class. This is difficult to represent while preserving the type variable: `type[Person]` describes
+the `TypedDict` schema constructor, not the runtime `dict` class.
+
+```py
+def exclude_none[T: Person | None](value: T) -> None:
+    if value is not None:
+        # TODO: Preserve the runtime class. Intersecting `type[T]` with the exact `dict`
+        # class is not sufficient: specializing `T` to `Person` makes that intersection `Never`.
+        reveal_type(type(value))  # revealed: type[T@exclude_none]
+```
+
 Passing a `TypedDict` to `dict()` copies it into a regular dictionary:
 
 ```py

@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+#
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """Generate boilerplate for a new rule.
 
 Example usage:
@@ -13,10 +22,31 @@ Example usage:
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 from pathlib import Path
 
-from _utils import ROOT_DIR, dir_name, get_indent, pascal_case, snake_case
+ROOT_DIR = Path(__file__).resolve().parent.parent
+
+
+def dir_name(linter_name: str) -> str:
+    return linter_name.replace("-", "_")
+
+
+def pascal_case(linter_name: str) -> str:
+    """Convert from snake-case to PascalCase."""
+    return "".join(word.title() for word in linter_name.split("-"))
+
+
+def snake_case(name: str) -> str:
+    """Convert from PascalCase to snake_case."""
+    return "".join(
+        f"_{word.lower()}" if word.isupper() else word for word in name
+    ).lstrip("_")
+
+
+def get_indent(line: str) -> str:
+    return re.match(r"^\s*", line).group()  # type: ignore[union-attr, ty:unresolved-attribute]
 
 
 def main(*, name: str, prefix: str, code: str, linter: str) -> None:

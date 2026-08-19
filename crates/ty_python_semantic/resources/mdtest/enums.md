@@ -1214,6 +1214,39 @@ class InheritedChoices(BaseChoices):
 reveal_type(InheritedChoices.A.value)  # revealed: str
 ```
 
+### Subclasses of `enum.property`
+
+An inherited property initializer and accessor-copy methods retain the descriptor's subclass.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, property as enum_property
+
+class CustomProperty(enum_property): ...
+
+def get_value(obj: object) -> int:
+    return 1
+
+def set_value(obj: object, value: str) -> None:
+    pass
+
+descriptor = CustomProperty(get_value).setter(set_value)
+reveal_type(descriptor)  # revealed: CustomProperty
+retained: CustomProperty = descriptor
+
+class Choice(Enum):
+    A = 1
+    value = descriptor
+
+reveal_type(Choice.A.value)  # revealed: int
+Choice.A.value = "new"
+Choice.A.value = 1  # error: [invalid-assignment]
+```
+
 ### `types.DynamicClassAttribute`
 
 Attributes defined using `types.DynamicClassAttribute` are not considered members:
@@ -2064,8 +2097,7 @@ class Color(Enum):
 for color in Color:
     reveal_type(color)  # revealed: Color
 
-# TODO: Should be `list[Color]`
-reveal_type(list(Color))  # revealed: list[Unknown]
+reveal_type(list(Color))  # revealed: list[Color]
 ```
 
 ## Methods / non-member attributes

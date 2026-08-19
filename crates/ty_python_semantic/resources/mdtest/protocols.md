@@ -4398,6 +4398,86 @@ factory_object: FactoryObject = factory
 factory_module: FactoryModule = factory
 ```
 
+## Generic protocol inference from module objects
+
+A module attribute can determine a protocol's type argument when the module itself is passed to a
+generic function.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`values.py`:
+
+```py
+value: int = 1
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+
+import values
+
+class HasValue[T](Protocol):
+    value: T
+
+def get_value[T](obj: HasValue[T]) -> T:
+    return obj.value
+
+reveal_type(get_value(values))  # revealed: int
+```
+
+## Generic protocol inference through type aliases
+
+An alias for an instance type does not obscure the members that determine a protocol's type
+arguments. Inference sees through these aliases and checks the bounds of these arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    def get(self) -> T: ...
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+type Alias[T] = Box[T]
+
+def get_value[T](value: HasValue[T]) -> T:
+    return value.get()
+
+def require_str[T: str](value: HasValue[T]) -> T:
+    return value.get()
+
+def check_alias(value: Alias[int]):
+    reveal_type(get_value(value))  # revealed: int
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `str` of type variable `T`"
+    require_str(value)
+```
+
+An equivalent generic alias constructed with `TypeAliasType` preserves the same information.
+
+```py
+from typing import TypeAliasType, TypeVar
+
+U = TypeVar("U")
+ConstructedAlias = TypeAliasType("ConstructedAlias", Box[U], type_params=(U,))
+
+def check_constructed_alias(value: ConstructedAlias[int]):
+    reveal_type(get_value(value))  # revealed: int
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `str` of type variable `T`"
+    require_str(value)
+```
+
 ## Class objects with class-method protocol members
 
 A class object implements a protocol when its directly accessible members have compatible types. The
@@ -4416,6 +4496,116 @@ class IntParser:
         return int(value)
 
 parser: Parser = IntParser
+```
+
+## Generic protocol inference from class attributes
+
+A class object can supply the type argument of a protocol through an ordinary attribute. Passing the
+class itself should infer the same type as passing an instance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    value: T
+
+class IntValue:
+    value: int = 1
+
+def get_value[T](obj: HasValue[T]) -> T:
+    return obj.value
+
+reveal_type(get_value(IntValue))  # revealed: int
+reveal_type(get_value(IntValue()))  # revealed: int
+
+def _(cls: type[IntValue]) -> None:
+    reveal_type(get_value(cls))  # revealed: int
+```
+
+## Generic protocol inference from class methods
+
+The return type of a class method can determine a protocol's type argument, including when the
+argument is the class object itself.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Factory[T](Protocol):
+    @classmethod
+    def make(cls) -> T: ...
+
+class Concrete:
+    @classmethod
+    def make(cls) -> "Concrete":
+        return cls()
+
+def from_protocol[T](factory: Factory[T]) -> T:
+    return factory.make()
+
+reveal_type(from_protocol(Concrete))  # revealed: Concrete
+reveal_type(from_protocol(Concrete()))  # revealed: Concrete
+
+bad: Factory[str] = Concrete  # error: [invalid-assignment]
+```
+
+Specialized generic class objects and unions of class objects also contribute their method return
+types to inference.
+
+```py
+class GenericFactory[T]:
+    @classmethod
+    def make(cls) -> T:
+        raise NotImplementedError
+
+reveal_type(from_protocol(GenericFactory[int]))  # revealed: int
+
+def _(cls: type[GenericFactory[int]] | type[GenericFactory[str]]) -> None:
+    reveal_type(from_protocol(cls))  # revealed: int | str
+```
+
+## Generic protocol inference from static methods
+
+A static method on a class object can satisfy either a static-method or an instance-method protocol
+member. Both forms should contribute the method's return type to inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class StaticFactory[T](Protocol):
+    @staticmethod
+    def make() -> T: ...
+
+class InstanceFactory[T](Protocol):
+    def make(self) -> T: ...
+
+class IntFactory:
+    @staticmethod
+    def make() -> int:
+        return 1
+
+def from_static[T](factory: StaticFactory[T]) -> T:
+    return factory.make()
+
+def from_instance[T](factory: InstanceFactory[T]) -> T:
+    return factory.make()
+
+reveal_type(from_static(IntFactory))  # revealed: int
+reveal_type(from_instance(IntFactory))  # revealed: int
 ```
 
 ## Class objects and `Self`-returning class-method protocol members
@@ -5576,6 +5766,83 @@ class Constructor(Protocol):
     def __call__(value: int) -> Product: ...
 
 constructor: Constructor = Product
+```
+
+## Generic constructor callback inference
+
+Passing `type[T]` to a generic callback protocol must preserve the type variable returned by the
+class's constructor.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Callback[T](Protocol):
+    def __call__(self) -> T: ...
+
+def invoke[T](callback: Callback[T]) -> T:
+    return callback()
+
+def create[T](cls: type[T]) -> T:
+    reveal_type(invoke(cls))  # revealed: T@create
+    return invoke(cls)
+```
+
+## Generic callback inference from other members
+
+A callable protocol can infer a type argument from another member. Comparing only its `__call__`
+signature would miss the class attribute that determines `T` here.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class ConstructorWithValue[T](Protocol):
+    value: T
+
+    def __call__(self) -> object: ...
+
+class Product:
+    value: int = 1
+
+def get_value[T](factory: ConstructorWithValue[T]) -> T:
+    return factory.value
+
+reveal_type(get_value(Product))  # revealed: int
+```
+
+## Generic callback inference from function attributes
+
+A function object's attributes also contribute to protocol inference. Here, the type argument comes
+from `__name__`, not the callback's return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class NamedCallback[T](Protocol):
+    __name__: T
+
+    def __call__(self) -> object: ...
+
+def get_name[T](callback: NamedCallback[T]) -> T:
+    return callback.__name__
+
+def callback() -> None: ...
+
+reveal_type(get_name(callback))  # revealed: str
 ```
 
 ## Generic protocols and union arguments

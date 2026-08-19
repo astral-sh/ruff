@@ -9,7 +9,8 @@ use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
-use crate::types::call::{CallDiagnosticOverride, CallError};
+use crate::types::call::bind::CallableDescription;
+use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
@@ -47,7 +48,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{self, Formatter};
-use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
+use ty_module_resolver::{KnownModule, Module, ModuleName, SearchPath, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
 use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
@@ -69,6 +70,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CYCLIC_TYPE_ALIAS_DEFINITION);
     registry.register_lint(&DEPRECATED);
     registry.register_lint(&DIVISION_BY_ZERO);
+    registry.register_lint(&DYNAMIC_FUNCTION_DECORATOR_RETURN);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&DATACLASS_FIELD_ORDER);
@@ -426,6 +428,15 @@ declare_lint! {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/dynamic-function-decorator-return.md")]
+    pub(crate) static DYNAMIC_FUNCTION_DECORATOR_RETURN = {
+        summary: "detects decorators that replace a function with a dynamic type such as `Any`",
+        status: LintStatus::stable("0.0.73"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1763,13 +1774,14 @@ pub(super) fn report_invalid_attribute_assignment(
     // diagnostic being emitted here.
 
     let env = &context.program_environment();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display(db, env),
-            target_ty.display(db, env),
+            source_ty.display_with(db, env, settings.clone()),
+            target_ty.display_with(db, env, settings),
         ),
     ) else {
         return;
@@ -2044,6 +2056,158 @@ pub(super) fn report_bad_dunder_delattr_call(
             "Expected a signature at least as permissive as \
             `def __delattr__(self, name: str, /) -> None`",
         );
+    }
+}
+
+pub(super) fn report_dynamic_function_decorator_return<'db>(
+    context: &InferContext<'db, '_>,
+    decorator: &ast::Decorator,
+    decorated_ty: Type<'db>,
+    decorator_bindings: &Bindings<'db>,
+    decorated_function: &ast::StmtFunctionDef,
+    return_ty: Type<'db>,
+) {
+    let Some(builder) = context.report_lint(&DYNAMIC_FUNCTION_DECORATOR_RETURN, decorator) else {
+        return;
+    };
+
+    let db = context.db();
+    let env = context.program_environment();
+    let returned = return_ty.display(db, env);
+
+    let mut diagnostic = builder.into_diagnostic(format_args!("Decorator returns `{returned}`"));
+
+    let mut secondary_annotation = context.secondary(&decorated_function.name);
+
+    // Special-casing of function-literal types is necessary to workaround <https://github.com/astral-sh/ty/issues/4308>
+    secondary_annotation = if decorated_ty.is_function_literal()
+        || decorated_ty.try_upcast_to_callable(db, env).is_some()
+    {
+        secondary_annotation.message(format_args!(
+            "Signature of `{}` will be obscured by the decorator",
+            decorated_function.name.id
+        ))
+    } else {
+        secondary_annotation.message(format_args!(
+            "Previous type of `{}` will be obscured by the decorator",
+            decorated_function.name.id
+        ))
+    };
+
+    diagnostic.annotate(secondary_annotation);
+
+    // Union and intersection bindings can refer to different callables, so there is no single
+    // decorator definition or set of overloads that can be safely highlighted.
+    let Some(decorator_binding) = decorator_bindings.single_element() else {
+        return;
+    };
+
+    let decorator_function = match decorator_binding.signature_type {
+        Type::FunctionLiteral(function) => function,
+        Type::BoundMethod(method) => method.function(db),
+        _ => return,
+    };
+
+    let decorator_definition = decorator_function.definition(db);
+    let (overloads, _) = decorator_function.overloads_and_implementation(db);
+
+    let mut matching_overloads =
+        decorator_binding
+            .matching_overloads()
+            .filter_map(|(overload_index, binding)| {
+                let overload_index = binding
+                    .signature
+                    .source_overload_index()
+                    .unwrap_or(overload_index);
+                overloads.get(overload_index).copied()
+            });
+
+    let matched_overload = matching_overloads.next();
+    let next_matching_overload = matching_overloads.next();
+    let has_multiple_matching_overloads = next_matching_overload.is_some();
+
+    let definition_span = match (overloads, has_multiple_matching_overloads) {
+        ([first, .., last], true) => {
+            let first_span = first.spans(db).decorators_and_header;
+            let last_span = last.spans(db).decorators_and_header;
+            match (first_span.range(), last_span.range()) {
+                (Some(first_range), Some(last_range)) => {
+                    first_span.with_range(first_range.cover(last_range))
+                }
+                _ => decorator_function.spans(db).signature,
+            }
+        }
+        _ => matched_overload
+            .map(|overload| overload.spans(db).signature)
+            .unwrap_or_else(|| decorator_function.spans(db).signature),
+    };
+
+    let definition_annotation = Annotation::secondary(definition_span);
+
+    let missing_return_annotations = if let Some(matched_overload) = matched_overload {
+        !matched_overload.has_explicit_return_annotation(db)
+            || next_matching_overload
+                .into_iter()
+                .chain(matching_overloads)
+                .any(|overload| !overload.has_explicit_return_annotation(db))
+    } else {
+        !decorator_function.has_explicit_return_annotation(db)
+    };
+
+    let should_add_hint = missing_return_annotations
+        && (decorator_definition.file(db) == context.file()
+            || file_to_module(db, decorator_definition.program_file(db).resolver_file(db))
+                .and_then(|module| module.search_path(db))
+                .is_some_and(SearchPath::is_first_party));
+
+    match decorator_definition.name(db) {
+        Some(name) => {
+            let decorator_description =
+                CallableDescription::new(db, Type::FunctionLiteral(decorator_function));
+            let name = decorator_description
+                .as_ref()
+                .map(CallableDescription::name)
+                .unwrap_or_else(|| name.as_str());
+
+            if has_multiple_matching_overloads {
+                diagnostic.annotate(
+                    definition_annotation
+                        .message(format_args!("Overloads of `{name}` defined here")),
+                );
+            } else if matched_overload.is_some() {
+                diagnostic
+                    .annotate(definition_annotation.message("Matching overload defined here"));
+            } else {
+                diagnostic
+                    .annotate(definition_annotation.message(format_args!("`{name}` defined here")));
+            }
+            if should_add_hint {
+                if has_multiple_matching_overloads {
+                    diagnostic.help(format_args!(
+                        "Ensure all `{name}` overloads have a return annotation"
+                    ));
+                } else {
+                    diagnostic.help(format_args!("Add a return type annotation to `{name}`"));
+                }
+            }
+        }
+        None => {
+            diagnostic.annotate(definition_annotation.message(
+                if has_multiple_matching_overloads {
+                    "Decorator overloads defined here"
+                } else {
+                    "Decorator defined here"
+                },
+            ));
+
+            if should_add_hint {
+                diagnostic.help(if has_multiple_matching_overloads {
+                    "Ensure all overloads have a return annotation"
+                } else {
+                    "Add a return type annotation to the decorator"
+                });
+            }
+        }
     }
 }
 
@@ -4365,20 +4529,20 @@ pub(super) fn report_incompatible_base_method<'db>(
 
     let (selected_owner, selected_definition, selected_decorator) = selected;
     let (contract_owner, contract_definition, contract_decorator) = contract;
-    let (selected_name, contract_name) = if selected_owner.name(db) == contract_owner.name(db) {
-        (
-            selected_owner.qualified_name(db).to_string(),
-            contract_owner.qualified_name(db).to_string(),
-        )
-    } else {
-        (
-            selected_owner.name(db).to_string(),
-            contract_owner.name(db).to_string(),
-        )
-    };
+    let types = [
+        Type::from(class),
+        Type::from(selected_owner),
+        Type::from(contract_owner),
+    ];
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, context.program_environment(), types);
+    let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
+    let selected_name = selected_owner
+        .class_literal(db)
+        .display_with(db, settings.clone());
+    let contract_name = contract_owner.class_literal(db).display_with(db, settings);
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Base classes for class `{}` define method `{member}` incompatibly",
-        class.name(db)
+        "Base classes for class `{class_name}` define method `{member}` incompatibly",
     ));
     diagnostic.set_primary_annotation_message(format_args!(
         "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"

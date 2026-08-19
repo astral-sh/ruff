@@ -256,6 +256,50 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Unpacking tuple aliases
+
+Both unpack spellings accept a tuple alias and preserve positional argument types and arity.
+
+```py
+from typing import Unpack
+
+type Pair = tuple[int, str]
+
+def starred(*args: *Pair) -> None:
+    reveal_type(args)  # revealed: tuple[int, str]
+
+def explicit(*args: Unpack[Pair]) -> None:
+    reveal_type(args)  # revealed: tuple[int, str]
+
+starred(1, "a")
+starred(1)  # error: [missing-argument]
+starred(1, 2)  # error: [invalid-argument-type]
+explicit(1, "a")
+explicit(1, "a", 3)  # error: [too-many-positional-arguments]
+```
+
+Unpacking also follows alias chains and applies generic substitutions.
+
+```py
+type GenericPair[T] = tuple[T, str]
+type SpecializedPair = GenericPair[bytes]
+
+def specialized(*args: *SpecializedPair) -> None:
+    reveal_type(args)  # revealed: tuple[bytes, str]
+
+specialized(b"a", "b")
+specialized(1, "a")  # error: [invalid-argument-type]
+```
+
+Non-tuple aliases remain invalid.
+
+```py
+type NotTuple = list[int]
+
+def invalid_starred(*args: *NotTuple) -> None: ...  # error: [invalid-type-form]
+def invalid_explicit(*args: Unpack[NotTuple]) -> None: ...  # error: [invalid-type-form]
+```
+
 ## Stringified values
 
 Stringifying the right-hand side of a type alias is redundant, but allowed:

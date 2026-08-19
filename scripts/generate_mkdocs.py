@@ -1,3 +1,15 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "mdformat>=1.0.0",
+#     "mdformat-mkdocs>=5.3.0",
+#     "pyyaml>=6.0.3",
+# ]
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# ///
+
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
 
 from __future__ import annotations

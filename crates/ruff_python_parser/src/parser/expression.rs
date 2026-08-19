@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use bitflags::bitflags;
-use rustc_hash::{FxBuildHasher, FxHashSet};
 use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
@@ -2974,31 +2973,13 @@ impl<'src> Parser<'src> {
     }
 
     /// Performs the following validations on the arguments:
-    /// 1. There aren't any duplicate keyword argument
-    /// 2. Generator expressions are parenthesized when required by the argument context.
+    /// - Generator expressions are parenthesized when required by the argument context.
     fn validate_arguments(
         &mut self,
         arguments: &ast::Arguments,
         has_trailing_comma: bool,
         context: ArgumentsContext,
     ) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
-
-        for (name, range) in arguments
-            .keywords
-            .iter()
-            .filter_map(|argument| argument.arg.as_ref().map(|arg| (arg, argument.range)))
-        {
-            let arg_name = name.as_str();
-            if !all_arg_names.insert(arg_name) {
-                self.add_error(
-                    ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
-                    range,
-                );
-            }
-        }
-
         let generator_must_be_parenthesized = match context {
             ArgumentsContext::Call => has_trailing_comma || arguments.len() > 1,
             // CPython rejects an unparenthesized generator expression as a class base even though

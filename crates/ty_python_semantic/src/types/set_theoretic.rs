@@ -1038,8 +1038,8 @@ impl<'db> IntersectionType<'db> {
         builder.build()
     }
 
-    /// Compute the `__class__` type when this intersection contains a positive class-backed
-    /// protocol constraint.
+    /// Compute the `__class__` type for class-backed protocols and `TypedDict` instances,
+    /// whose runtime classes differ from their internal meta-types.
     ///
     /// Negative instance constraints are not transferred: an object not satisfying `P` does not
     /// imply that other instances of its class cannot satisfy `P`.
@@ -1052,7 +1052,7 @@ impl<'db> IntersectionType<'db> {
             matches!(
                 positive,
                 Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some()
-            )
+            ) || positive.is_typed_dict()
         }) {
             return None;
         }

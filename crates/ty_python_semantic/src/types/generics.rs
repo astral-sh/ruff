@@ -6,13 +6,14 @@ use std::collections::hash_map::Entry;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBounds, Solutions,
+    PathBounds, Solution, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -2436,14 +2437,100 @@ impl<'db> TypeVarInference<'db> {
     }
 }
 
-/// A failure to project a constraint set into the legacy type-mapping representation.
+/// The valid specializations of a constraint set, or evidence for why it is unsatisfiable.
 ///
-/// A type-variable declaration failure can be reported immediately. Other unsatisfiable
-/// relations must remain in the pending constraint set so that they invalidate the call-wide
-/// solution without producing a misleading bound diagnostic.
-enum ConstraintSetInferenceError<'db> {
-    InvalidTypeVar(SpecializationError<'db>),
-    Unsatisfiable,
+/// Failed paths can occur alongside valid paths, but their declaration failures matter only when
+/// every path is rejected. Preserve that evidence exclusively for unsatisfiable constraint sets.
+enum ConstraintSetAnalysis<'db> {
+    Unsatisfiable(SmallVec<[ConstraintFailure<'db>; 1]>),
+    Unconstrained,
+    Constrained(Vec<Solution<'db>>),
+}
+
+impl<'db> ConstraintSetAnalysis<'db> {
+    /// Reports why a type variable's declared bound or constraints cannot be satisfied.
+    ///
+    /// Multiple rejected paths describe one failure when their lower bounds violate the same type
+    /// variable's declaration in a contravariant position. Their argument types are combined into
+    /// an intersection. For example, paths rejecting `int` and `bool` for `T: bytes` report
+    /// `bool`, the intersection of `int` and `bool`.
+    ///
+    /// The inference API returns at most one declaration error per relation. Failures involving
+    /// different declarations, variances, or type variables cannot be combined meaningfully, so
+    /// only the first is reported.
+    fn specialization_error(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<SpecializationError<'db>> {
+        let Self::Unsatisfiable(failures) = self else {
+            return None;
+        };
+
+        let first = failures.first()?;
+        // A single failure needs no aggregation; failures for different declarations, type
+        // variables, or variances cannot be combined, so they also return the first failure.
+        // TODO: Rank incompatible failures by their diagnostic usefulness, or report them
+        // separately.
+        if failures.len() < 2
+            || failures.iter().any(|failure| {
+                failure.error.bound_typevar() != first.error.bound_typevar()
+                    || failure.variance != first.variance
+                    || !matches!(
+                        (&first.error, &failure.error),
+                        (
+                            SpecializationError::MismatchedBound { .. },
+                            SpecializationError::MismatchedBound { .. }
+                        ) | (
+                            SpecializationError::MismatchedConstraint { .. },
+                            SpecializationError::MismatchedConstraint { .. }
+                        )
+                    )
+            })
+        {
+            return Some(first.error.clone());
+        }
+
+        let arguments = failures.iter().map(|failure| failure.error.argument_type());
+        let argument = match first.variance {
+            ConstraintFailureVariance::Contravariant => {
+                IntersectionType::from_elements(db, env, arguments)
+            }
+            ConstraintFailureVariance::Invariant => {
+                // TODO: Combine invariant failures without losing their lower- or upper-bound
+                // evidence.
+                return Some(first.error.clone());
+            }
+        };
+
+        let mut error = first.error.clone();
+        let (SpecializationError::MismatchedBound {
+            argument: existing, ..
+        }
+        | SpecializationError::MismatchedConstraint {
+            argument: existing, ..
+        }) = &mut error;
+        *existing = argument;
+        Some(error)
+    }
+}
+
+/// A declared type-variable bound or constraint rejected while solving one alternative.
+///
+/// The variance identifies whether the rejected lower bound also has an upper bound, so multiple
+/// failures from the same relation can be combined into one diagnostic.
+struct ConstraintFailure<'db> {
+    error: SpecializationError<'db>,
+    variance: ConstraintFailureVariance,
+}
+
+/// The possible variances for a path with a lower bound that violates a declaration.
+///
+/// Covariant and bivariant paths have no lower bound, so they cannot produce declaration failures.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ConstraintFailureVariance {
+    Contravariant,
+    Invariant,
 }
 
 /// Returns the directional comparisons required by this comparison's polarity.
@@ -2551,7 +2638,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         for (formal, actual) in argument_relations {
             let when =
                 actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
-            let _ = self.add_type_mappings_from_constraint_set(when);
+            let analysis = self.analyze_constraint_set(when);
+            self.project_for_legacy_fallback(&analysis);
         }
 
         let types = self.solve_hash_map_with(generic_context, &mut choose);
@@ -2945,21 +3033,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.intersect_pending_typevar_constraint(bound_typevar, bounds);
     }
 
-    /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
-    /// the specialization that this builder is building up.
-    ///
-    /// TODO: This is a stopgap! Eventually, the builder will maintain a single constraint set for
-    /// the main specialization that we are building, and [`build_with`][Self::build_with] will
-    /// build the specialization directly from that constraint set. This method lets us migrate to
-    /// that brave new world incrementally, by using the new constraint set mechanism piecemeal for
-    /// certain type comparisons.
-    fn add_type_mappings_from_constraint_set(
-        &mut self,
-        set: ConstraintSet<'db, 'c>,
-    ) -> Result<(), ConstraintSetInferenceError<'db>> {
+    /// Solves one relation without recording it or changing the legacy type mappings.
+    fn analyze_constraint_set(&self, set: ConstraintSet<'db, 'c>) -> ConstraintSetAnalysis<'db> {
         let db = self.db;
-        let mut first_error = None;
-        let solutions = match set.solutions_with(
+        let mut failures = SmallVec::new();
+        let solutions = set.solutions_with(
             db,
             self.env,
             self.constraints,
@@ -2967,21 +3045,34 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             |_variance, path_bound| {
                 let solution =
                     PathBounds::preliminary_solve(db, self.env, self.constraints, path_bound);
-                if solution.is_err() && first_error.is_none() {
-                    first_error = self.specialization_error_from_failed_bounds(path_bound);
+                if solution.is_err()
+                    && let Some(failure) = self.constraint_failure_from_failed_bounds(path_bound)
+                {
+                    failures.push(failure);
                 }
                 solution
             },
-        ) {
-            Solutions::Unsatisfiable => {
-                return Err(first_error.map_or(
-                    ConstraintSetInferenceError::Unsatisfiable,
-                    ConstraintSetInferenceError::InvalidTypeVar,
-                ));
-            }
-            Solutions::Unconstrained => return Ok(()),
-            Solutions::Constrained(solutions) => solutions,
+        );
+
+        match solutions {
+            Solutions::Unsatisfiable => ConstraintSetAnalysis::Unsatisfiable(failures),
+            Solutions::Unconstrained => ConstraintSetAnalysis::Unconstrained,
+            Solutions::Constrained(solutions) => ConstraintSetAnalysis::Constrained(solutions),
+        }
+    }
+
+    /// Adds valid solutions to the compatibility mapping used by legacy inference consumers.
+    ///
+    /// This projection loses correlations between alternatives, so callers must only request it
+    /// after they have accepted the corresponding relation.
+    ///
+    /// TODO: Remove this compatibility path once [`build_with`][Self::build_with] and all other
+    /// inference consumers can build specializations solely from the call-wide constraint set.
+    fn project_for_legacy_fallback(&mut self, analysis: &ConstraintSetAnalysis<'db>) {
+        let ConstraintSetAnalysis::Constrained(solutions) = analysis else {
+            return;
         };
+
         for solution in solutions {
             for binding in solution {
                 let solution = self.remove_inferable_typevar_artifacts_from_solution(
@@ -2991,21 +3082,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.insert_hash_map_type_mapping(binding.bound_typevar, solution);
             }
         }
-        Ok(())
     }
 
-    /// Returns an actionable type-variable error for a failed projected path.
+    /// Classifies a failed path when its lower bound violates a type-variable declaration.
     ///
     /// Conflicting inferred lower and upper bounds are not necessarily violations of the type
     /// variable's declaration, so they remain generic unsatisfiable constraints.
-    fn specialization_error_from_failed_bounds(
+    fn constraint_failure_from_failed_bounds(
         &self,
         path_bound: &PathBound<'db>,
-    ) -> Option<SpecializationError<'db>> {
+    ) -> Option<ConstraintFailure<'db>> {
         let db = self.db;
         let bound_typevar = path_bound.bound_typevar;
         let argument = path_bound.lower?;
-        match bound_typevar
+        let variance = if path_bound.has_upper() {
+            ConstraintFailureVariance::Invariant
+        } else {
+            ConstraintFailureVariance::Contravariant
+        };
+        let error = match bound_typevar
             .typevar(db)
             .bound_or_constraints(db, self.env)?
         {
@@ -3022,24 +3117,34 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     argument,
                 })
             }
-        }
+        }?;
+        Some(ConstraintFailure { error, variance })
     }
 
-    /// Adds legacy type mappings from `when` and records it in the call-wide constraint set.
+    /// Records one relation in the call-wide constraint set.
     ///
-    /// Generic unsatisfiability is retained in `pending`; only failures against a type variable's
-    /// declared bound or constraints are returned for immediate diagnosis.
+    /// Generic unsatisfiability is retained in `pending` rather than reported as a misleading
+    /// type-variable declaration error.
+    fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
+        self.pending.intersect(self.db, self.constraints, when);
+    }
+
+    /// Records a relation and projects its solutions into the legacy type mapping.
+    ///
+    /// Contextual preference checks, variadic inference, and recursive-specialization recovery
+    /// require the projected mapping while processing the call.
     fn infer_from_constraint_set(
         &mut self,
         when: ConstraintSet<'db, 'c>,
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
-        let result = self.add_type_mappings_from_constraint_set(when);
-        self.pending.intersect(db, self.constraints, when);
-        match result {
-            Ok(()) | Err(ConstraintSetInferenceError::Unsatisfiable) => Ok(()),
-            Err(ConstraintSetInferenceError::InvalidTypeVar(error)) => Err(error),
+        let analysis = self.analyze_constraint_set(when);
+        self.record_constraint_set(when);
+        if let Some(error) = analysis.specialization_error(db, self.env) {
+            return Err(error);
         }
+        self.project_for_legacy_fallback(&analysis);
+        Ok(())
     }
 
     /// Returns the assignability constraints required by this comparison's polarity.
@@ -3292,41 +3397,48 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     );
                 self.infer_from_constraint_set(when)?;
             } else {
-                // An overloaded actual callable is compatible with the formal signature if at
-                // least one of its overloads is. We collect type mappings from all satisfiable
-                // overloads, and only report an error if none of them are satisfiable.
+                // An overloaded actual callable is compatible if at least one overload matches.
+                // Analyze every alternative without changing the builder; only accepted overloads
+                // contribute mappings after their combined relation has been committed.
 
                 let env = self.env.clone();
                 let constraints = self.constraints;
-                let mut first_error = None;
-                let combined = actual_callable
-                    .signatures(db)
-                    .overloads
-                    .iter()
-                    .filter_map(|actual_signature| {
-                        let when = actual_signature.when_constraint_set_assignable_to_signatures(
-                            db,
-                            &env,
-                            formal_signature,
-                            constraints,
-                        );
-                        match self.add_type_mappings_from_constraint_set(when) {
-                            Ok(()) => Some(when),
-                            Err(error) => {
-                                first_error.get_or_insert(error);
-                                None
-                            }
+                let mut first_rejection = None;
+                let mut accepted =
+                    SmallVec::<[(ConstraintSet<'db, 'c>, ConstraintSetAnalysis<'db>); 1]>::new();
+                for actual_signature in &actual_callable.signatures(db).overloads {
+                    let when = actual_signature.when_constraint_set_assignable_to_signatures(
+                        db,
+                        &env,
+                        formal_signature,
+                        constraints,
+                    );
+                    let analysis = self.analyze_constraint_set(when);
+                    match analysis {
+                        rejected @ ConstraintSetAnalysis::Unsatisfiable(_) => {
+                            first_rejection.get_or_insert(rejected);
                         }
-                    })
-                    .reduce(|lhs, rhs| lhs.or(db, constraints, || rhs));
-                let Some(combined) = combined else {
-                    self.pending = ConstraintSet::from_bool(self.constraints, false);
-                    if let Some(ConstraintSetInferenceError::InvalidTypeVar(error)) = first_error {
-                        return Err(error);
+                        analysis => accepted.push((when, analysis)),
                     }
-                    return Ok(());
+                }
+
+                let combined = accepted
+                    .iter()
+                    .map(|(when, _)| *when)
+                    .reduce(|left, right| left.or(db, constraints, || right));
+                let Some(combined) = combined else {
+                    self.record_constraint_set(ConstraintSet::from_bool(self.constraints, false));
+                    return first_rejection
+                        .and_then(|analysis| analysis.specialization_error(db, &env))
+                        .map_or(Ok(()), Err);
                 };
-                self.pending.intersect(db, self.constraints, combined);
+
+                // One accepted alternative proves that their disjunction is satisfiable; solving
+                // the combined TDD again would eagerly repeat the expensive path enumeration.
+                self.record_constraint_set(combined);
+                for (_, analysis) in accepted {
+                    self.project_for_legacy_fallback(&analysis);
+                }
             }
         }
         Ok(())
@@ -4006,29 +4118,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return Ok(());
             }
 
-            (
-                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
-                Type::NominalInstance(actual_nominal),
-            ) => {
-                // Extract formal_alias if this is a generic class
-                let formal_alias = match formal {
-                    Type::NominalInstance(formal_nominal) => {
-                        formal_nominal.class(db, self.env).into_generic_alias()
-                    }
-
-                    Type::ProtocolInstance(_) => {
-                        // TODO: For protocols, we use the new constraint set implementation, which
-                        // will handle implicitly implemented protocols and generic protocols. We
-                        // eventually want this logic to be used for _all_ nominal instances
-                        // (replacing the logic below).
-                        let when = self.constraint_for_relation(formal, actual, relation_polarity);
-                        return self.infer_from_constraint_set(when);
-                    }
-
-                    _ => None,
-                };
-
-                if let Some(formal_alias) = formal_alias {
+            (Type::NominalInstance(formal_nominal), Type::NominalInstance(actual_nominal)) => {
+                if let Some(formal_alias) = formal_nominal.class(db, self.env).into_generic_alias()
+                {
                     let formal_origin = formal_alias.origin(db);
                     for base in actual_nominal.class(db, self.env).iter_mro(db) {
                         let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
@@ -4056,13 +4148,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            // TODO: in principle this could be a generalized Union-actual arm that maps over the
-            // union, but the old solver isn't well-equipped to handle that (due to side effects
-            // from even failed matches), so for now we handle this particular case.
-            (formal @ Type::ProtocolInstance(_), actual @ Type::Union(actual_union)) => {
+            (formal @ Type::ProtocolInstance(_), actual) => {
                 // Common TypedDict constraints prove only `actual <= formal`. Contravariance
                 // reverses that relation, while invariance additionally requires the reverse.
-                let when = if matches!(relation_polarity, TypeVarVariance::Covariant)
+                let when = if let Type::Union(actual_union) = actual
+                    && matches!(relation_polarity, TypeVarVariance::Covariant)
                     && let Some(common) =
                         self.common_typed_dict_protocol_constraints(formal, actual_union)
                 {
@@ -4071,32 +4161,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.constraint_for_relation(formal, actual, relation_polarity)
                 };
                 return self.infer_from_constraint_set(when);
-            }
-
-            (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
-                let when = self.constraint_for_relation(formal, actual, relation_polarity);
-                return self.infer_from_constraint_set(when);
-            }
-
-            // When the formal type is a protocol with a `__call__` method, infer the specialization
-            // from matching the actual type's callable signature against the protocol's `__call__`
-            // method signature.
-            (Type::ProtocolInstance(formal_protocol), _) => {
-                let Some(call_method) = formal_protocol.interface(db).call_method(db, self.env)
-                else {
-                    return Ok(());
-                };
-                let Some(actual_callables) = actual.try_upcast_to_callable(db, self.env) else {
-                    return Ok(());
-                };
-
-                // The protocol interface exposes the callable signature already bound for
-                // instance access.
-                self.infer_from_callable_signature(
-                    call_method,
-                    actual_callables,
-                    relation_polarity,
-                )?;
             }
 
             (Type::Callable(formal_callable), _) => {
@@ -4189,5 +4253,116 @@ mod tests {
         assert_eq!(inferable.iter(db).collect::<Vec<_>>(), [t, u]);
         assert!(t.is_inferable(db, inferable));
         assert!(u.is_inferable(db, inferable));
+    }
+
+    #[test]
+    fn recording_constraints_does_not_project_legacy_mappings() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let typevar = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
+        let constraints = ConstraintSetBuilder::new();
+        let mut builder =
+            SpecializationBuilder::new(db, &env, &constraints, context.inferable_typevars(db));
+        let int = KnownClass::Int.to_instance(db, &env);
+        let set = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, int, int);
+
+        let analysis = builder.analyze_constraint_set(set);
+        assert!(builder.types.is_empty());
+        assert!(builder.pending.is_always_satisfied(db, &env));
+
+        builder.record_constraint_set(set);
+        assert!(builder.types.is_empty());
+        assert!(!builder.pending.is_always_satisfied(db, &env));
+
+        builder.project_for_legacy_fallback(&analysis);
+        assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
+    }
+
+    #[test]
+    fn satisfiable_constraint_analysis_discards_rejected_paths() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let typevar = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        )
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(int)));
+        let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
+        let constraints = ConstraintSetBuilder::new();
+        let mut builder =
+            SpecializationBuilder::new(db, &env, &constraints, context.inferable_typevars(db));
+        let lower_only =
+            ConstraintSet::constrain_typevar_lower_bound(db, &env, &constraints, typevar, str);
+        let rejected = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, str, str);
+        let accepted = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, int, int);
+
+        for (set, variance) in [
+            (lower_only, ConstraintFailureVariance::Contravariant),
+            (rejected, ConstraintFailureVariance::Invariant),
+        ] {
+            assert!(matches!(
+                builder.analyze_constraint_set(set),
+                ConstraintSetAnalysis::Unsatisfiable(failures)
+                    if matches!(failures.as_slice(), [failure] if failure.variance == variance)
+            ));
+        }
+
+        let analysis = builder.analyze_constraint_set(rejected.or(db, &constraints, || accepted));
+        assert!(analysis.specialization_error(db, &env).is_none());
+
+        builder.project_for_legacy_fallback(&analysis);
+        assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
+        assert!(!builder.inferred_type_is_assignable_to(typevar.identity(db), str));
+    }
+
+    #[test]
+    fn constraint_failure_diagnostics_preserve_variance() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let typevar = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let int = KnownClass::Int.to_instance(db, &env);
+        let bool = KnownClass::Bool.to_instance(db, &env);
+        let analysis = |variance, first, second| {
+            ConstraintSetAnalysis::Unsatisfiable(
+                [first, second]
+                    .into_iter()
+                    .map(|argument| ConstraintFailure {
+                        error: SpecializationError::MismatchedBound {
+                            bound_typevar: typevar,
+                            argument,
+                        },
+                        variance,
+                    })
+                    .collect(),
+            )
+        };
+
+        let contravariant = analysis(ConstraintFailureVariance::Contravariant, int, bool)
+            .specialization_error(db, &env)
+            .map(|error| error.argument_type());
+        assert_eq!(contravariant, Some(bool));
+
+        let invariant = analysis(ConstraintFailureVariance::Invariant, int, bool)
+            .specialization_error(db, &env)
+            .map(|error| error.argument_type());
+        assert_eq!(invariant, Some(int));
     }
 }

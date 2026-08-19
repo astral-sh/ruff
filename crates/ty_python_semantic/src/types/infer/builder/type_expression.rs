@@ -970,7 +970,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .context
             .inference_flags
             .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
-        let starred_type = self.infer_type_expression(value);
+        let starred_type = self.infer_type_expression(value).resolve_type_alias(db);
         self.context.inference_flags.set(
             InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
             previously_in_unpack_type_argument,
@@ -2542,6 +2542,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     return inner_ty;
                 }
+
+                let inner_ty = inner_ty.resolve_type_alias(db);
 
                 // Preserve valid unpack targets so that `Unpack[...]` follows the same
                 // argument-binding path as an equivalent starred annotation.

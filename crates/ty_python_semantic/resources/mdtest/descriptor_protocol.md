@@ -1358,6 +1358,37 @@ def descriptor_value(descriptor: Descriptor) -> None:
         C().value
 ```
 
+### Intersection receivers preserve their complete owner type
+
+A descriptor can require its owner to satisfy both classes in an intersection.
+
+```py
+from __future__ import annotations
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[Left] & type[Right]) -> int:
+        return 1
+
+class Left:
+    value = Descriptor()
+
+class Right: ...
+
+def receiver(value: Left & Right) -> None:
+    # Only `Left` supplies the descriptor, but its owner must retain `Right` too.
+    # Passing `type[Left]` instead of `type[Left] & type[Right]` would cause an
+    # `invalid-attribute-access` error.
+    reveal_type(value.value)  # revealed: int
+```
+
+A receiver known only to be `Left` does not satisfy the descriptor's owner type.
+
+```py
+def incomplete_owner(value: Left) -> None:
+    # error: [invalid-attribute-access] "Expected `type[Left] & type[Right]`, found `type[Left]`"
+    value.value
+```
+
 ### Every `__get__` definition must accept the call
 
 A conditionally defined method can have several callable signatures. The access is invalid if any

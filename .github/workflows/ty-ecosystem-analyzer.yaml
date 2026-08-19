@@ -128,9 +128,9 @@ jobs:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.3"
+          version: "0.12.5"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
           # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
@@ -188,9 +188,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.3"
+          version: "0.12.5"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
           # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available

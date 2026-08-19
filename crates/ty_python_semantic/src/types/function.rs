@@ -2305,6 +2305,13 @@ pub enum KnownFunction {
     #[strum(serialize = "field_validator")]
     PydanticFieldValidator,
 
+    /// `_pytest.fixtures.fixture`
+    #[strum(serialize = "fixture")]
+    PytestFixture,
+    /// `_pytest.fixtures.yield_fixture`
+    #[strum(serialize = "yield_fixture")]
+    PytestYieldFixture,
+
     /// `functools.total_ordering`
     TotalOrdering,
 
@@ -2427,6 +2434,9 @@ impl KnownFunction {
             Self::PydanticFieldValidator => {
                 matches!(module, KnownModule::PydanticFunctionalValidators)
             }
+            Self::PytestFixture | Self::PytestYieldFixture => {
+                matches!(module, KnownModule::PytestFixtures)
+            }
             Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
             Self::StaticAssert => module.is_ty_extensions(),
@@ -2518,9 +2528,14 @@ impl KnownFunction {
                     &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
                 };
                 if let Some(builder) = context.report_lint(diagnostic, call_expression) {
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(
+                        db,
+                        env,
+                        [*actual_ty, asserted_ty],
+                    );
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
-                        asserted_ty.display(db, env),
+                        asserted_ty.display_with(db, env, settings.clone()),
                     ));
 
                     diagnostic.annotate(
@@ -2532,28 +2547,28 @@ impl KnownFunction {
                         )
                         .message(format_args!(
                             "Inferred type is `{}`",
-                            actual_ty.display(db, env)
+                            actual_ty.display_with(db, env, settings.clone())
                         )),
                     );
 
                     if actual_ty.is_subtype_of(db, env, asserted_ty) {
                         diagnostic.info(format_args!(
                             "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
-                            asserted_type = asserted_ty.display(db, env),
-                            inferred_type = actual_ty.display(db, env),
+                            asserted_type = asserted_ty.display_with(db, env, settings.clone()),
+                            inferred_type = actual_ty.display_with(db, env, settings.clone()),
                         ));
                     } else {
                         diagnostic.info(format_args!(
                             "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                            asserted_type = asserted_ty.display(db, env),
-                            inferred_type = actual_ty.display(db, env),
+                            asserted_type = asserted_ty.display_with(db, env, settings.clone()),
+                            inferred_type = actual_ty.display_with(db, env, settings.clone()),
                         ));
                     }
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
-                        actual_ty.display(db, env),
-                        asserted_ty.display(db, env),
+                        actual_ty.display_with(db, env, settings.clone()),
+                        asserted_ty.display_with(db, env, settings),
                     ));
                 }
             }
@@ -2997,6 +3012,9 @@ pub(crate) mod tests {
 
                 KnownFunction::PydanticField => KnownModule::PydanticFields,
                 KnownFunction::PydanticFieldValidator => KnownModule::PydanticFunctionalValidators,
+                KnownFunction::PytestFixture | KnownFunction::PytestYieldFixture => {
+                    KnownModule::PytestFixtures
+                }
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 

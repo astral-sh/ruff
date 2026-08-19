@@ -4670,6 +4670,7 @@ dependencies = [
  "ty_python_core",
  "ty_python_semantic",
  "ty_server",
+ "ty_site_packages",
  "ty_static",
  "wild",
 ]

@@ -1274,6 +1274,7 @@ def opaque_decorator(f: Any) -> Any:
 def transparent_decorator[F: Callable[..., Any]](f: F) -> F:
     return f
 
+# error: [dynamic-function-decorator-return]
 @opaque_decorator
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]
@@ -1802,6 +1803,27 @@ def needs_str(value: str, *args: object, **kwargs: object) -> int:
 reveal_type(invoke(accepts_int))  # revealed: int
 # error: [invalid-argument-type]
 reveal_type(invoke(needs_str))  # revealed: int
+```
+
+### Inferring uninhabited keyword types
+
+Inferring a keyword type as `Never` can eliminate a collision with an occupied positional parameter.
+
+The callback's return type must still contribute its own inference constraint.
+
+```py
+from typing import Protocol
+
+class Callback[T, R](Protocol):
+    def __call__(self, x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: T) -> R: ...
+
+def infer[T, R](callback: Callback[T, R]) -> tuple[list[T], R]:
+    raise NotImplementedError
+
+def source(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> str:
+    return ""
+
+reveal_type(infer(source))  # revealed: tuple[list[Never], str]
 ```
 
 ### Class constructors
