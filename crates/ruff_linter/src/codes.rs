@@ -10,7 +10,7 @@ use std::sync::LazyLock;
 
 use ruff_db::diagnostic::SecondaryCode;
 use serde::Serialize;
-use strum::{EnumMessage, IntoEnumIterator, VariantArray as _};
+use strum::{IntoEnumIterator, VariantArray as _};
 use strum_macros::{Display, EnumIter, EnumMessage, EnumString, IntoStaticStr, VariantArray};
 
 use crate::registry::Linter;
@@ -140,8 +140,9 @@ pub enum Category {
 
 impl Category {
     /// Return the description of the category, derived from its documentation.
+    #[cfg(any(feature = "clap", test))]
     pub(crate) fn description(self) -> Option<&'static str> {
-        let docs = self.get_documentation();
+        let docs = strum::EnumMessage::get_documentation(&self);
         let Some(docs) = docs else {
             debug_assert!(false, "Categories must be documented");
             return None;
