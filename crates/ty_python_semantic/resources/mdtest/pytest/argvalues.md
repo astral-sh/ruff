@@ -287,7 +287,7 @@ unreadable_argnames = cast(str, "x, y")
 @pytest.mark.parametrize(unreadable_argnames, [None])
 def _(x: int, y: str) -> None: ...
 
-# Fixtures are also only checked in place.
+# Parametrizations are also only checked in place.
 x_range = pytest.mark.parametrize("x", range(5))
 
 @x_range
@@ -330,7 +330,7 @@ def _(x: int, y: str, z: bool) -> None: ...
 def _(request: tuple[()]) -> None: ...
 
 # Overloaded functions are not ignored (it's easier to include them).
-# The additional decorator mean that only the final version is checked.
+# The additional decorator means that only the final version is checked.
 @overload
 def overloaded_test(x: None) -> None: ...
 @overload

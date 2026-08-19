@@ -1334,7 +1334,7 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/pytest-invalid-argnames-literal.md")]
     pub(crate) static PYTEST_INVALID_ARGNAMES_LITERAL = {
-        summary: "Argnames literal is not a comma separated list",
+        summary: "Argnames literal is not a comma separated list of valid identifiers",
         status: LintStatus::stable("unknown"),
         default_level: Level::Error,
     }
@@ -1352,7 +1352,7 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/pytest-test-parameter-wrong-kind.md")]
     pub(crate) static PYTEST_TEST_PARAMETER_WRONG_KIND = {
-        summary: "Pytest tests only use positional arguments",
+        summary: "Pytest tests only use keyword arguments",
         status: LintStatus::stable("unknown"),
         default_level: Level::Warn,
     }

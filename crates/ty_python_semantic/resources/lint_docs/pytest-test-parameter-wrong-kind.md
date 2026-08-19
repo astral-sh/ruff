@@ -1,7 +1,7 @@
 ## What it does
 
 Enforces that `pytest` tests accept keyword arguments.
-Other kinds of arguments cause errors.
+Other kinds of arguments may cause errors.
 
 ## Examples
 

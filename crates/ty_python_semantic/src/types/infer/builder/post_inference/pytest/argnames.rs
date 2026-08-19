@@ -35,10 +35,10 @@ impl SingleArgname {
 }
 
 // Even though it is called multiple, it make contain a single argname.
-// This occurs when argnames passed as a sequence. For example,
+// This may occurs when argnames passed as a sequence. For example,
 // ```python
 // @pytest.mark.parametrize(["name"], [("first",), ("second",)])
-// def test_name(name: tuple[str]) -> None: ...
+// def test_name(name: str) -> None: ...
 //
 // ```
 #[derive(Debug, From, Constructor, IntoIterator)]
@@ -134,7 +134,7 @@ impl TypeInferenceBuilder<'_, '_> {
     }
 
     /// Converts the sequence (list or tuple elements) into multiple argnames.
-    /// If there is an error, `None` is returned and a diagnostic is generated.
+    /// If there is an error, `Argnames::Unknown` is returned and a diagnostic is generated.
     fn parse_argnames_sequence(&self, sequence: &[ast::Expr]) -> Argnames {
         self.parse_multiple_argnames_sequence(sequence)
             .map(Into::into)
@@ -156,7 +156,7 @@ impl TypeInferenceBuilder<'_, '_> {
                 }
             })
             .collect_vec();
-        Option::<MultipleArgnames>::from_iter(identifiers)
+        Option::from_iter(identifiers)
     }
 
     /// Checks whether an individual argname is valid as a Python identifier.

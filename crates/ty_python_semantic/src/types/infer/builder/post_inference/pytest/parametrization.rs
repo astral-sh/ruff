@@ -47,7 +47,7 @@ impl<'ast> TypeInferenceBuilder<'_, 'ast> {
             && let Some(argnames) = decorator_call.arguments.find_argument("argnames", 0)
             && let Argnames::Known(argnames) = self.parse_argnames_expression(argnames.value())
             && let Some(argvalues) = decorator_call.arguments.find_argument("argvalues", 1)
-            // If there are extra arguments, it is ignored in case of edge cases like indirect futures.
+            // If there are extra arguments, they are ignored in case of edge cases like indirect fixtures.
             // These edge cases may be handled in the future.
             && decorator_call.arguments.len() == 2
         {

@@ -48,9 +48,11 @@ enum TestParameters<'db, 'ast> {
 }
 
 #[derive(Clone)]
-/// The parameters expected to the test in a `PartialSignature`.
+/// Represents the signature that a parameterization must obey.
+/// This combines argument types from fixtures and arguments on the test function.
 pub(crate) struct PartialSignature<'db, 'ast> {
     test_name: &'ast ast::Identifier,
+    // The generic context is not bound correctly, but needed so that type variables are in scope.
     generic_context: Option<GenericContext<'db>>,
     parameters: TestParameters<'db, 'ast>,
 }
@@ -202,7 +204,7 @@ impl<'db, 'ast> PartialSignature<'db, 'ast> {
     }
 
     /// Union of a type with the `ParameterSet`.
-    /// `ParameterSet` is universally accepted by tests.
+    /// `ParameterSet` is universally accepted by tests for now.
     fn union_with_param_set(
         context: &InferContext<'db, 'ast>,
         ty: impl Into<Type<'db>>,
