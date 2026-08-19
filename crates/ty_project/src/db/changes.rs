@@ -240,66 +240,14 @@ impl ProjectDatabase {
         Files::sync_all_recursive(self, sync_recursively);
 
         if reload_project {
-            let new_project_metadata = project.metadata(self).rediscover(self.system());
-            match new_project_metadata {
-                Ok(mut metadata) => {
-                    if let Err(error) = metadata.apply_configuration_files(self.system()) {
-                        let error = anyhow::Error::new(error);
-                        tracing::error!(
-                            "Failed to apply configuration files, \
-                            continuing without applying them: {error:#}"
-                        );
-                    }
-
-                    metadata.try_add_project_root(self);
-                    let merged_options = metadata.to_merged_options();
-
-                    let program_settings_diagnostics = match merged_options.to_program_settings(
-                        self.system(),
-                        self.vendored(),
-                        &FallibleStrategy,
-                    ) {
-                        Ok((program_settings, diagnostics)) => {
-                            project.update_program(self, program_settings);
-                            diagnostics
-                        }
-                        Err(error) => {
-                            tracing::error!(
-                                "Failed to convert metadata to program settings, \
-                                continuing without applying them: {error}"
-                            );
-                            Vec::new()
-                        }
-                    };
-
-                    let (settings, mut settings_diagnostics) =
-                        match merged_options.to_settings(self, &FallibleStrategy) {
-                            Ok((settings, diagnostics)) => (Some(settings), diagnostics),
-                            Err(error) => {
-                                tracing::warn!(
-                                    "Keeping old project configuration because loading the new \
-                                     settings failed with: {error}"
-                                );
-                                (None, vec![error.into_diagnostic()])
-                            }
-                        };
-                    settings_diagnostics.extend(
-                        program_settings_diagnostics
-                            .into_iter()
-                            .map(|diagnostic| diagnostic.into_diagnostic(self)),
-                    );
-
-                    tracing::debug!("Reloading project after structural change");
-                    match project.reload(self, metadata, settings, settings_diagnostics) {
-                        ProjectReloadResult::Unchanged => {}
-                        ProjectReloadResult::Changed { files_changed } => {
-                            result.project_changed = true;
-                            if files_changed {
-                                // The project file set has already been rebuilt; continuing would
-                                // run incremental discovery from paths collected before the reload.
-                                return result;
-                            }
-                        }
+            match project.rediscover(self) {
+                Ok(ProjectReloadResult::Unchanged) => {}
+                Ok(ProjectReloadResult::Changed { files_changed }) => {
+                    result.project_changed = true;
+                    if files_changed {
+                        // The project file set has already been rebuilt; continuing would
+                        // run incremental discovery from paths collected before the reload.
+                        return result;
                     }
                 }
                 Err(error) => {
