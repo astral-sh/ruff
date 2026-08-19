@@ -2524,6 +2524,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut source_parameters = source.parameters.expand_starred_variadic_annotations(db);
         let mut target_parameters = target.parameters.expand_starred_variadic_annotations(db);
 
+        // Expanding `*args: *tuple[*tuple[int, ...], str]` creates a synthetic positional `str`
+        // parameter immediately after the variadic `int` parameter. Check whether either
+        // signature contains such a positional suffix.
+        let source_has_unpacked_suffix = source_parameters.variadic().is_some_and(|(index, _)| {
+            source_parameters
+                .get(index + 1)
+                .is_some_and(Parameter::is_positional)
+        });
+        let target_has_unpacked_suffix = target_parameters.variadic().is_some_and(|(index, _)| {
+            target_parameters
+                .get(index + 1)
+                .is_some_and(Parameter::is_positional)
+        });
+
         // Gradual variadics and TypeVarTuples need their original suffix boundaries for
         // materialization and inference. Named source prefixes must also remain visible when a
         // target keyword could fill the same parameter.
@@ -2672,6 +2686,55 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 source: source.return_ty,
                 target: target.return_ty,
             });
+        }
+
+        // Concrete target keywords can collide with a fixed source prefix even when the source
+        // has a gradual or ParamSpec tail. Check them before those specialized paths can return.
+        let mut keyword_collision_checks = true;
+        if (source_has_unpacked_suffix || target_has_unpacked_suffix)
+            && target_parameters.is_standard()
+        {
+            // A target call can fill a source parameter positionally and also pass its name as a
+            // keyword. A matching target prefix protects that name only when the same call must
+            // already have filled the target parameter, including every prefix before a suffix.
+            for (source_index, source_parameter) in source_parameters.positional().enumerate() {
+                let Some(source_name) = source_parameter.keyword_name() else {
+                    continue;
+                };
+
+                if target_parameters.variadic().is_none()
+                    && source_index >= target_parameters.positional().count()
+                {
+                    continue;
+                }
+
+                let target_keyword = target_parameters.keyword_by_name(source_name.as_str());
+                if target_keyword.is_some_and(|(target_index, target_parameter)| {
+                    target_parameter.is_positional()
+                        && (target_index <= source_index || target_has_unpacked_suffix)
+                }) {
+                    continue;
+                }
+
+                let Some((_, keyword)) =
+                    target_keyword.or_else(|| target_parameters.keyword_variadic())
+                else {
+                    continue;
+                };
+
+                // The keyword must be uninhabited to avoid the collision. Keep this as a
+                // constraint so gradual types can materialize to `Never` and inferable type
+                // variables can be constrained to it.
+                let no_collision = self.check_type_pair(db, keyword.annotated_type(), Type::Never);
+                if result
+                    .intersect(db, self.constraints, no_collision)
+                    .is_never_satisfied(db, env)
+                {
+                    // Still allow the ParamSpec handling below to preserve its inferred binding.
+                    keyword_collision_checks = false;
+                    break;
+                }
+            }
         }
 
         let check_types = |result: &mut ConstraintSet<'db, 'c>,
@@ -3307,7 +3370,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        if !return_type_checks {
+        if !return_type_checks || !keyword_collision_checks {
             return result;
         }
 
@@ -4105,6 +4168,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     default_type: target_default,
                 } => {
                     if let Some(source_param) = source_keywords.remove(&**target_name) {
+                        // The suffix forces a target prefix to be positional, so it cannot
+                        // provide a source parameter that must be supplied by keyword.
+                        if target_has_unpacked_suffix
+                            && source_param.is_keyword_only()
+                            && source_param.default_type().is_none()
+                            && !target_param.is_keyword_only()
+                        {
+                            if let Some(context) = self.report_context() {
+                                context.push(ErrorContext::ExtraRequiredParameter {
+                                    parameter: ParameterDescription::new(
+                                        target_index,
+                                        source_param.name(),
+                                    ),
+                                });
+                            }
+                            return self.never();
+                        }
+
                         match source_param.kind() {
                             ParameterKind::PositionalOrKeyword {
                                 default_type: source_default,
@@ -4167,6 +4248,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                         return self.never();
                     };
+
+                    // An explicit source keyword takes precedence over its `**kwargs`. Unless
+                    // the target also binds that name explicitly, values from its keyword
+                    // variadic must therefore be compatible with the source parameter too.
+                    for source_param in &source_parameters {
+                        let Some(source_name) = source_param.keyword_name() else {
+                            continue;
+                        };
+                        if !source_keywords.contains_key(source_name.as_str())
+                            || target_parameters
+                                .keyword_by_name(source_name.as_str())
+                                .is_some()
+                        {
+                            continue;
+                        }
+                        if !check_types(
+                            &mut result,
+                            target_param.annotated_type(),
+                            source_param.annotated_type(),
+                            Some(source_name),
+                            target_index,
+                        ) {
+                            return result;
+                        }
+                    }
+
                     if !check_types(
                         &mut result,
                         target_param.annotated_type(),
