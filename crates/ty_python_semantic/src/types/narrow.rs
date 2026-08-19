@@ -430,7 +430,7 @@ pub(crate) fn pattern_success_types<'db>(
             .into_iter()
             .map(|(place, binding)| (place, binding.ty(db, &env)))
             .collect(),
-        missing_binding_ty: if result.matched_subject_ty.is_never() {
+        missing_binding_ty: if result.matched_subject_ty.is_uninhabited(db, &env) {
             Type::Never
         } else {
             Type::unknown()
@@ -734,11 +734,11 @@ impl<'db> Conjunctions<'db> {
         if self
             .conjuncts
             .iter()
-            .any(|conjunct| conjunct.ty().is_never())
+            .any(|conjunct| conjunct.ty() == Type::Never)
             || other
                 .conjuncts
                 .iter()
-                .any(|conjunct| conjunct.ty().is_never())
+                .any(|conjunct| conjunct.ty() == Type::Never)
         {
             return Self::singleton(Type::Never);
         }
@@ -1912,7 +1912,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     },
                     |pattern| self.analyze_successful_pattern(pattern, subject_ty),
                 );
-                if !result.matched_subject_ty.is_never()
+                if !result.matched_subject_ty.is_uninhabited(db, &self.env)
                     && let Some(place) = name
                         .as_ref()
                         .and_then(|name| self.places().symbol_id(name.as_str()))
@@ -2455,7 +2455,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) -> Option<(Type<'db>, Vec<ClassPatternArgument<'db>>)> {
         let narrowed_subject_ty =
             self.filter_class_pattern_subject_type(context.class, context.class_ty, subject_ty);
-        if narrowed_subject_ty.is_never() {
+        if narrowed_subject_ty.is_uninhabited(self.db, &self.env) {
             return None;
         }
         let arguments = self.class_pattern_arguments_for_arm(
@@ -2503,7 +2503,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     .zip(arguments)
                 {
                     let child_ty = analyzer.matched_subject_type(pattern, argument.ty);
-                    if child_ty.is_never() {
+                    if child_ty.is_uninhabited(analyzer.db, &self.env) {
                         return None;
                     }
                     if argument.source == PatternValueSource::Subject {
@@ -2560,7 +2560,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     .zip(arguments)
                 {
                     let mut child = analyzer.analyze_successful_pattern(pattern, argument.ty);
-                    if child.matched_subject_ty.is_never() {
+                    if child
+                        .matched_subject_ty
+                        .is_uninhabited(analyzer.db, &self.env)
+                    {
                         return None;
                     }
                     if argument.source != PatternValueSource::Subject {
@@ -2591,7 +2594,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             let key_ty = key_ty.resolve_type_alias(db);
             let typed_dict_key_ty = typed_dict.key_type(db, &self.env);
             let policy = self.comparison_soundness_policy();
-            if typed_dict_key_ty.is_never()
+            if typed_dict_key_ty.is_uninhabited(db, &self.env)
                 || equality_truthiness(db, &self.env, typed_dict_key_ty, key_ty, policy)
                     == Truthiness::AlwaysFalse
             {
@@ -2690,7 +2693,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let db = self.db;
         let narrowed_subject_ty =
             self.intersect_types(subject_ty, mapping_pattern_type(db, &self.env));
-        if narrowed_subject_ty.is_never() {
+        if narrowed_subject_ty == Type::Never {
             return None;
         }
         let value_types = key_types
@@ -2715,7 +2718,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 for (entry, value_ty) in kind.entries.iter().zip(value_types) {
                     if analyzer
                         .matched_subject_type(&entry.pattern, value_ty)
-                        .is_never()
+                        .is_uninhabited(analyzer.db, &self.env)
                     {
                         return None;
                     }
@@ -2740,7 +2743,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 let mut bindings = BTreeMap::new();
                 for (entry, value_ty) in kind.entries.iter().zip(value_types) {
                     let mut child = analyzer.analyze_successful_pattern(&entry.pattern, value_ty);
-                    if child.matched_subject_ty.is_never() {
+                    if child
+                        .matched_subject_ty
+                        .is_uninhabited(analyzer.db, &analyzer.env)
+                    {
                         return None;
                     }
                     Self::demote_subject_bindings(&mut child.bindings);
@@ -2798,7 +2804,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 let mut persistent_element_types = Vec::with_capacity(kind.patterns.len());
                 for (pattern, element_ty) in kind.patterns.iter().zip(element_types) {
                     let child = analyzer.analyze_successful_pattern(pattern, element_ty);
-                    if child.matched_subject_ty.is_never() {
+                    if child.matched_subject_ty.is_uninhabited(db, &self.env) {
                         return None;
                     }
                     // Use the mutation-safe type so an exact tuple does not retain stale facts
@@ -2847,7 +2853,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 let mut binding_element_types = Vec::with_capacity(kind.patterns.len());
                 for (pattern, element_ty) in kind.patterns.iter().zip(element_types) {
                     let mut child = analyzer.analyze_successful_pattern(pattern, element_ty);
-                    if child.matched_subject_ty.is_never() {
+                    if child.matched_subject_ty.is_uninhabited(db, &self.env) {
                         return None;
                     }
                     matched_element_types.push(child.matched_subject_ty);
@@ -2973,7 +2979,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
         let db = self.db;
         let narrowed_subject_ty = self.intersect_types(subject_ty, sequence_ty);
-        if narrowed_subject_ty.is_never() {
+        if narrowed_subject_ty == Type::Never {
             return None;
         }
 
@@ -3055,7 +3061,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
             for binding in arm_bindings.values_mut() {
                 let subject_ty = binding.subject_ty(db, &self.env);
-                if !subject_ty.is_never() {
+                if !subject_ty.is_uninhabited(db, &self.env) {
                     binding.restore_subject(self.preserve_original_subject_type(
                         original_subject_ty,
                         subject_ty,
@@ -3681,7 +3687,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         element,
                         rhs_identity_ty,
                     );
-                    builder.add(if runtime_overlap.is_never() {
+                    builder.add(if runtime_overlap == Type::Never {
                         element
                     } else {
                         runtime_overlap
@@ -4046,7 +4052,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             } else {
                 let requires_key = |td: TypedDictType<'db>| -> bool {
-                    td.key_membership_truthiness(db, key).is_always_true()
+                    td.key_membership_truthiness(db, &self.env, key)
+                        .is_always_true()
                 };
 
                 let resolved_rhs_type = rhs_type.resolve_type_alias(db);
@@ -4418,7 +4425,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
         let definitely_matched =
             definite_match_pattern_type_for_subject(db, &self.env, pattern, subject_ty);
-        if definitely_matched.is_never() {
+        if definitely_matched.is_uninhabited(db, &self.env) {
             return None;
         }
 
@@ -4581,7 +4588,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         if NarrowingConstraint::intersection(subject_ty)
             .merge_constraint_and(constraint.clone())
             .evaluate_constraint_type(db, &self.env)
-            .is_never()
+            .is_uninhabited(db, &self.env)
         {
             return PatternNarrowingResult::Impossible;
         }
@@ -4831,7 +4838,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }),
             Type::TypedDict(typed_dict)
                 if typed_dict
-                    .key_membership_truthiness(db, key)
+                    .key_membership_truthiness(db, &self.env, key)
                     .is_always_false() =>
             {
                 Type::Never

@@ -185,9 +185,9 @@ fn divergent_type() {
     assert!(!top_div.has_dynamic(db, &env));
     assert!(!bottom_div.has_dynamic(db, &env));
     assert!(top_div.is_object());
-    assert!(!top_div.is_never());
+    assert!(!top_div.is_uninhabited(db, &env));
     assert!(!bottom_div.is_object());
-    assert!(bottom_div.is_never());
+    assert!(bottom_div.is_uninhabited(db, &env));
     assert_eq!(top_div.negate(db, &env), bottom_div);
     assert_eq!(bottom_div.negate(db, &env), top_div);
     assert_eq!(

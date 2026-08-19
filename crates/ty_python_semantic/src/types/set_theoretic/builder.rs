@@ -1517,7 +1517,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
 
         // `T & Never` -> `Never`
-        if new_positive.is_never() {
+        if new_positive.is_uninhabited(db, env) {
             *self = Self::default();
             self.positive.insert(Type::Never);
             return;
@@ -1779,8 +1779,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     self.add_positive(db, env, *neg);
                 }
             }
-            Type::Never => {
-                // Adding ~Never to an intersection is a no-op.
+            ty if ty.is_uninhabited(db, env) => {
+                // Adding the complement of an uninhabited type is a no-op.
             }
             Type::NominalInstance(instance) if instance.is_object() => {
                 // Adding ~object to an intersection results in Never.
@@ -1969,7 +1969,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         {
             let speculative =
                 expand_intersection_typevars_and_newtypes(db, env, &self.positive, &self.negative);
-            if speculative.is_never() {
+            if speculative.is_uninhabited(db, env) {
                 return Type::Never;
             }
 

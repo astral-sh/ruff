@@ -257,6 +257,60 @@ static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[int, ...
 static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [static-assert-error]
 ```
 
+## Tuple types containing `Never`
+
+A tuple with a required `Never` element has no inhabitants. It is equivalent to `Never` and is
+therefore disjoint from every type, including itself. Ordinary tuples with incompatible element
+types remain disjoint as well.
+
+```py
+from typing_extensions import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_equivalent_to, is_subtype_of
+
+static_assert(is_equivalent_to(tuple[Never], Never))
+static_assert(is_disjoint_from(tuple[Never], tuple[Never]))
+static_assert(is_subtype_of(tuple[Never], tuple[int]))
+static_assert(is_subtype_of(tuple[Never], tuple[str]))
+static_assert(is_disjoint_from(tuple[Never], tuple[int]))
+static_assert(is_disjoint_from(tuple[int], tuple[str]))
+static_assert(is_disjoint_from(tuple[int, Never], tuple[int, str]))
+static_assert(is_disjoint_from(tuple[int, Never], tuple[str, Never]))
+static_assert(is_disjoint_from(tuple[Never], tuple[Never, int]))
+```
+
+A variable-length tuple whose element type is uninhabited can only have zero such elements. It is
+therefore disjoint from every tuple with a required element, but not from the empty tuple.
+
+```py
+static_assert(not is_disjoint_from(tuple[tuple[Never], ...], tuple[()]))
+static_assert(is_disjoint_from(tuple[tuple[Never], ...], tuple[int]))
+```
+
+Subclasses of uninhabited tuple types are similarly disjoint from themselves and every other type.
+
+```py
+class UninhabitedTupleSubclass(tuple[int, Never]): ...
+class IndirectUninhabitedTupleSubclass(UninhabitedTupleSubclass): ...
+
+static_assert(is_disjoint_from(UninhabitedTupleSubclass, UninhabitedTupleSubclass))
+static_assert(is_disjoint_from(IndirectUninhabitedTupleSubclass, int))
+```
+
+A generic tuple subclass can be empty for one specialization and inhabited for another, even though
+both specializations have the same class origin.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class GenericTupleSubclass(tuple[T], Generic[T]): ...
+
+static_assert(is_disjoint_from(GenericTupleSubclass[Never], GenericTupleSubclass[Never]))
+static_assert(not is_disjoint_from(GenericTupleSubclass[int], GenericTupleSubclass[int]))
+```
+
 ## Unions
 
 A union is disjoint from another type when none of its alternatives overlap that type.
@@ -1464,4 +1518,49 @@ static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericF
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
+```
+
+## Variadic generic arguments containing `Never`
+
+A variadic generic specialization can be inhabited even when one of its type arguments is `Never`. A
+writable attribute makes the type variable tuple invariant, so specializations with incompatible
+type arguments are still disjoint.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+# Although `tuple` is covariant, the mutable attribute makes `Container` invariant.
+class Container[*Ts]:
+    values: tuple[*Ts]
+
+static_assert(not is_disjoint_from(Container[int, Never], Container[int, Never]))
+static_assert(not is_disjoint_from(Container[int, Never], Container[int, Any]))
+
+static_assert(not is_subtype_of(Container[Never, Never], Container[int, Never]))
+static_assert(not is_subtype_of(Container[Never, Never], Container[str, Never]))
+static_assert(is_disjoint_from(Container[int, Never], Container[str, Never]))
+
+static_assert(is_disjoint_from(Container[int, Never], Container[int, Never, Never]))
+static_assert(is_disjoint_from(Container[int, Never], Container[Never, int]))
+```
+
+If the type variable tuple appears only in covariant positions, as in a `tuple[*Ts]` return type, it
+is covariant. In that case, `CovariantContainer[Never, Never]` is a common subtype, so the two
+specializations are not disjoint.
+
+```py
+class CovariantContainer[*Ts]:
+    def values(self) -> tuple[*Ts]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(CovariantContainer[Never, Never], CovariantContainer[int, Never]))
+static_assert(is_subtype_of(CovariantContainer[Never, Never], CovariantContainer[str, Never]))
+static_assert(not is_disjoint_from(CovariantContainer[int, Never], CovariantContainer[str, Never]))
 ```

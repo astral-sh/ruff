@@ -936,8 +936,7 @@ fn try_sequence_pattern_binding_fallthrough_type<'db>(
                         env,
                         &PatternPredicateKind::Sequence(kind.clone()),
                         bound,
-                    )
-                    .is_never()
+                    ) == Type::Never
                 }) =>
         {
             Type::Never
@@ -1035,7 +1034,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
         if remaining == element {
             return Ok(Some(subject_ty));
         }
-        if remaining.is_never() {
+        if remaining == Type::Never {
             continue;
         }
 
@@ -1232,7 +1231,10 @@ fn build_definite_sequence_pattern_type<'db>(
         .map(element_type)
         .collect::<Option<_>>()?;
 
-    if element_types.iter().any(Type::is_never) {
+    if element_types
+        .iter()
+        .any(|element| element.is_uninhabited(db, env))
+    {
         Some(Type::Never)
     } else {
         Some(exact_sequence_pattern_type(

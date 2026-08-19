@@ -294,13 +294,13 @@ from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(Top[tuple[Any, int]], tuple[object, int]))
-static_assert(is_equivalent_to(Bottom[tuple[Any, int]], tuple[Never, int]))
+static_assert(is_equivalent_to(Bottom[tuple[Any, int]], Never))
 
 static_assert(is_equivalent_to(Top[tuple[Unknown, int]], tuple[object, int]))
-static_assert(is_equivalent_to(Bottom[tuple[Unknown, int]], tuple[Never, int]))
+static_assert(is_equivalent_to(Bottom[tuple[Unknown, int]], Never))
 
 static_assert(is_equivalent_to(Top[tuple[Any, int, Unknown]], tuple[object, int, object]))
-static_assert(is_equivalent_to(Bottom[tuple[Any, int, Unknown]], tuple[Never, int, Never]))
+static_assert(is_equivalent_to(Bottom[tuple[Any, int, Unknown]], Never))
 ```
 
 Except for when the tuple itself is in a contravariant position, then all positions in the tuple
@@ -469,9 +469,9 @@ from ty_extensions._internal import Unknown, is_equivalent_to
 static_assert(is_equivalent_to(Top[~Any], object))
 static_assert(is_equivalent_to(Bottom[~Any], Never))
 
-# tuple[Any, int] is in a contravariant position, so its top
-# materialization negates the tuple's bottom materialization.
-static_assert(is_equivalent_to(Top[~tuple[Any, int]], ~tuple[Never, int]))
+# tuple[Any, int] is in a contravariant position, so the
+# top materialization is Never and the negation of it
+static_assert(is_equivalent_to(Top[~tuple[Any, int]], object))
 static_assert(is_equivalent_to(Bottom[~tuple[Any, int]], ~tuple[object, int]))
 ```
 
@@ -681,6 +681,52 @@ def covariant(top: Top[CovariantCallable], bottom: Bottom[CovariantCallable]) ->
 def contravariant(top: Top[ContravariantCallable], bottom: Bottom[ContravariantCallable]) -> None:
     reveal_type(top)  # revealed: (GenericContravariant[object], /) -> None
     reveal_type(bottom)  # revealed: (GenericContravariant[Never], /) -> None
+```
+
+## Variadic generic arguments containing `Never`
+
+Materialization acts on every variadic type argument, even when another required argument is
+`Never`. Covariant arguments preserve the surrounding variance and contravariant arguments flip it.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Never
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Covariant[*Ts]:
+    def get(self) -> tuple[*Ts]:
+        raise NotImplementedError
+
+class Contravariant[*Ts]:
+    def put(self, value: tuple[*Ts]) -> None: ...
+
+class Invariant[*Ts]:
+    values: tuple[*Ts]
+
+static_assert(is_equivalent_to(Top[Covariant[Any, Never]], Covariant[object, Never]))
+static_assert(is_equivalent_to(Bottom[Covariant[Any, Never]], Covariant[Never, Never]))
+static_assert(is_equivalent_to(Top[Contravariant[Any, Never]], Contravariant[Never, Never]))
+static_assert(is_equivalent_to(Bottom[Contravariant[Any, Never]], Contravariant[object, Never]))
+
+def check(top: Top[Invariant[Any, Never]], bottom: Bottom[Invariant[Any, Never]]) -> None:
+    reveal_type(top)  # revealed: Top[Invariant[Any, Never]]
+    reveal_type(bottom)  # revealed: Bottom[Invariant[Any, Never]]
+```
+
+An unbounded sequence of `Never` elements can only contain zero elements, so materializing an
+unbounded gradual pack normalizes it to an empty sequence.
+
+```py
+static_assert(is_equivalent_to(Bottom[Covariant[*tuple[Any, ...]]], Covariant[()]))
+static_assert(is_equivalent_to(Top[Contravariant[*tuple[Any, ...]]], Contravariant[()]))
+
+def normalized(value: Bottom[Covariant[*tuple[Any, ...]]]) -> Covariant[()]:
+    return value
 ```
 
 ## Bounded generic type parameters

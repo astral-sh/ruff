@@ -14,6 +14,7 @@ use super::{
     MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
+use crate::types::class::ClassInstanceFlags;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
 };
@@ -101,6 +102,24 @@ impl<'db> Type<'db> {
 
     pub(crate) fn tuple(tuple: TupleType<'db>) -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
+    }
+
+    /// Whether this type uses the exact-tuple representation that can become an argument pack.
+    pub(super) const fn is_exact_tuple_instance(self) -> bool {
+        matches!(
+            self,
+            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(_)))
+        )
+    }
+
+    /// Marks a tuple-shaped type as a generic argument sequence instead of a runtime value.
+    pub(crate) fn into_typevartuple_pack(self, db: &'db dyn Db) -> Self {
+        match self {
+            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple))) => {
+                Type::tuple(tuple.into_typevartuple_pack(db))
+            }
+            _ => self,
+        }
     }
 
     pub fn homogeneous_tuple(
@@ -315,10 +334,19 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::Object => None,
             NominalInstanceInner::NonTuple(class) => {
                 let class = class.class(db);
-                // Avoid an expensive MRO traversal for common stdlib classes.
-                if class
-                    .known(db)
-                    .is_some_and(|known_class| !known_class.is_tuple_subclass())
+                let class_literal = class.class_literal(db);
+                let known_class = class_literal.known(db);
+                // Known non-tuple classes and user-defined classes without explicit bases cannot
+                // have a tuple ancestor. Other classes already cache this property with their
+                // remaining instance flags.
+                if known_class.is_some_and(|known_class| !known_class.is_tuple_subclass())
+                    || known_class.is_none()
+                        && class_literal
+                            .as_static()
+                            .is_some_and(|class| !class.has_explicit_bases(db))
+                    || !class_literal
+                        .instance_flags(db)
+                        .contains(ClassInstanceFlags::TUPLE_SUBCLASS)
                 {
                     return None;
                 }
@@ -353,6 +381,14 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => false,
             NominalInstanceInner::NonTuple(class) => class.class(db).is_generic(),
         }
+    }
+
+    /// Returns whether this instance represents an internal `TypeVarTuple` argument pack.
+    pub(super) fn is_typevartuple_pack(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.0,
+            NominalInstanceInner::ExactTuple(tuple) if tuple.is_typevartuple_pack(db)
+        )
     }
 
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the

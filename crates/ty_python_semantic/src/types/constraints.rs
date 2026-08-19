@@ -444,9 +444,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
-        lower: Option<Type<'db>>,
-        upper: Option<Type<'db>>,
+        mut lower: Option<Type<'db>>,
+        mut upper: Option<Type<'db>>,
     ) -> Self {
+        if typevar.is_typevartuple(db) {
+            lower = lower.map(|bound| bound.into_typevartuple_pack(db));
+            upper = upper.map(|bound| bound.into_typevartuple_pack(db));
+        }
         let mut storage = builder.storage.borrow_mut();
         let (node, source_order) =
             Constraint::new_node_with_bounds(db, env, &mut storage, typevar, lower, upper);
@@ -1985,12 +1989,12 @@ impl<'db> UpperBound<'db> {
         self.clauses.len() == 1 && self.clauses.contains(&Type::Never)
     }
 
-    fn add_clause(&mut self, clause: Type<'db>) {
+    fn add_clause(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, clause: Type<'db>) {
         if self.is_never() {
             return;
         }
 
-        if clause.is_never() {
+        if clause.is_uninhabited(db, env) {
             self.clauses.clear();
             self.clauses.insert(Type::Never);
             return;
@@ -2545,10 +2549,10 @@ impl ConstraintId {
         };
         let mut merged_upper = UpperBound::none();
         if let Some(upper) = self_constraint.bounds.upper {
-            merged_upper.add_clause(upper);
+            merged_upper.add_clause(db, env, upper);
         }
         if let Some(upper) = other_constraint.bounds.upper {
-            merged_upper.add_clause(upper);
+            merged_upper.add_clause(db, env, upper);
         }
         let effective_lower = lower.unwrap_or(Type::Never);
 
@@ -3490,7 +3494,7 @@ impl<'db> ConstraintBoundsBuilder<'db> {
 
     fn add_upper(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
         self.classify_evidence(db, env, ty);
-        self.upper.add_clause(ty);
+        self.upper.add_clause(db, env, ty);
     }
 
     fn finish(
@@ -4001,7 +4005,7 @@ impl<'db> PathBounds<'db> {
         let restricted = path_bound.restrict_gradual_solution(db, env, solution);
 
         // An empty gradual range makes the constraint path unsatisfiable.
-        if restricted.is_never() && !solution.is_never() {
+        if restricted == Type::Never && solution != Type::Never {
             return Err(());
         }
 
@@ -4753,7 +4757,7 @@ impl ConstraintAssignment {
                 );
             }
 
-            if lower.is_never() && upper.is_object() {
+            if upper.is_object() && lower.is_uninhabited(db, env) {
                 return write!(
                     f,
                     "({} {} *)",
@@ -4764,7 +4768,7 @@ impl ConstraintAssignment {
 
             f.write_str(range_prefix)?;
             f.write_str("(")?;
-            if !lower.is_never() {
+            if !lower.is_uninhabited(db, env) {
                 write!(f, "{} ≤ ", lower.display(db, env))?;
             }
             typevar.identity(db).display(db).fmt(f)?;
@@ -5002,7 +5006,7 @@ impl SequentMap {
         let constraint_data = storage.constraint_data(constraint);
         let lower = constraint_data.bounds.materialized_lower();
         let upper = constraint_data.bounds.materialized_upper();
-        if lower.is_never() && upper.is_object() {
+        if upper.is_object() && lower.is_uninhabited(db, env) {
             self.add_single_tautology(constraint);
             return;
         }
@@ -5045,7 +5049,7 @@ impl SequentMap {
         // Skip trivial cases where the assignability check won't produce useful results.
         if !constraint_data.bounds.has_lower()
             || !constraint_data.bounds.has_upper()
-            || lower.is_never()
+            || lower == Type::Never
             || upper.is_object()
         {
             return;
@@ -5271,8 +5275,8 @@ impl SequentMap {
 
             // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
             (constrained_lower, Some(constrained_upper), Some(bound_lower), _)
-                if !constrained_upper.is_never()
-                    && !constrained_upper.is_object()
+                if !constrained_upper.is_object()
+                    && !constrained_upper.is_uninhabited(db, env)
                     && storage.cached_is_constraint_set_subtype_of(
                         db,
                         env,
@@ -5285,8 +5289,8 @@ impl SequentMap {
 
             // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
             (Some(constrained_lower), constrained_upper, _, Some(bound_upper))
-                if !constrained_lower.is_never()
-                    && !constrained_lower.is_object()
+                if !constrained_lower.is_object()
+                    && !constrained_lower.is_uninhabited(db, env)
                     && storage.cached_is_constraint_set_subtype_of(
                         db,
                         env,
@@ -5305,7 +5309,7 @@ impl SequentMap {
         // explicit bounds that are equivalent to missing lower/upper bounds, so a derived
         // `T ≤ U ≤ object` can satisfy a later query for `T ≤ U` without requiring a separate
         // materialized-default implication.
-        let mut constrained_lower = new_lower.filter(|lower| !lower.is_never());
+        let mut constrained_lower = new_lower.filter(|lower| !lower.is_uninhabited(db, env));
         let mut constrained_upper = new_upper.filter(|upper| !upper.is_object());
 
         // The transitive rule above gives us an intended post-condition
@@ -5351,9 +5355,7 @@ impl SequentMap {
             constrained_upper = None;
         }
 
-        if !(constrained_lower.is_none_or(|ty| ty.is_never())
-            && constrained_upper.is_none_or(|ty| ty.is_object()))
-        {
+        if !(constrained_lower.is_none() && constrained_upper.is_none_or(|ty| ty.is_object())) {
             post_constraints.push(ConstraintId::new_with_bounds(
                 db,
                 env,
@@ -5462,13 +5464,13 @@ impl SequentMap {
                     // Contravariance flips direction: lower bound on T substitutes into upper
                     // bound. A ≤ B → G[B] ≤ G[A], so (l_B ≤ T) gives G[T] ≤ G[l_B].
                     (TypeVarVariance::Contravariant, Some(bound_lower), _)
-                        if !bound_lower.is_never() =>
+                        if !bound_lower.is_uninhabited(db, env) =>
                     {
                         bound_data.bounds.lower
                     }
                     // Invariance requires equality: only substitute if l_B = u_B.
                     (TypeVarVariance::Invariant, Some(bound_lower), Some(bound_upper))
-                        if bound_lower == bound_upper && !bound_lower.is_never() =>
+                        if bound_lower == bound_upper && !bound_lower.is_uninhabited(db, env) =>
                     {
                         bound_data.bounds.lower
                     }
@@ -5522,7 +5524,7 @@ impl SequentMap {
                     // Covariance preserves direction: lower bound on T substitutes into lower
                     // bound. A ≤ B → G[A] ≤ G[B], so (l_B ≤ T) gives G[l_B] ≤ G[T].
                     (TypeVarVariance::Covariant, Some(bound_lower), _)
-                        if !bound_lower.is_never() =>
+                        if !bound_lower.is_uninhabited(db, env) =>
                     {
                         bound_data.bounds.lower
                     }
@@ -5535,7 +5537,7 @@ impl SequentMap {
                     }
                     // Invariance requires equality: only substitute if l_B = u_B.
                     (TypeVarVariance::Invariant, Some(bound_lower), Some(bound_upper))
-                        if bound_lower == bound_upper && !bound_lower.is_never() =>
+                        if bound_lower == bound_upper && !bound_lower.is_uninhabited(db, env) =>
                     {
                         bound_data.bounds.lower
                     }
@@ -5635,9 +5637,9 @@ impl SequentMap {
                     //   - Contravariant + S is B's upper bound (B ≤ S): G[S] ≤ G[B] → weaker. Emit.
                     //   - Other combinations tighten rather than weaken. Skip.
                     let should_weaken_upper = !constrained_upper.is_type_var()
-                        && !constrained_upper.is_never()
                         && !constrained_upper.is_object()
                         && !constrained_upper.is_dynamic()
+                        && !constrained_upper.is_uninhabited(db, env)
                         && match constrained_upper.variance_of(db, env, nested_typevar.identity(db))
                         {
                             TypeVarVariance::Bivariant => false,
@@ -5645,7 +5647,7 @@ impl SequentMap {
                             TypeVarVariance::Contravariant => is_upper_bound,
                             TypeVarVariance::Invariant => {
                                 bound_data.bounds.lower == bound_data.bounds.upper
-                                    && !bound_lower.is_never()
+                                    && !bound_lower.is_uninhabited(db, env)
                             }
                         };
                     if should_weaken_upper {
@@ -5677,9 +5679,9 @@ impl SequentMap {
 
                     // Ditto for the lower bound.
                     let should_weaken_lower = !constrained_lower.is_type_var()
-                        && !constrained_lower.is_never()
                         && !constrained_lower.is_object()
                         && !constrained_lower.is_dynamic()
+                        && !constrained_lower.is_uninhabited(db, env)
                         && match constrained_lower.variance_of(db, env, nested_typevar.identity(db))
                         {
                             TypeVarVariance::Bivariant => false,
@@ -5687,7 +5689,7 @@ impl SequentMap {
                             TypeVarVariance::Contravariant => !is_upper_bound,
                             TypeVarVariance::Invariant => {
                                 bound_data.bounds.lower == bound_data.bounds.upper
-                                    && !bound_lower.is_never()
+                                    && !bound_lower.is_uninhabited(db, env)
                             }
                         };
                     if should_weaken_lower {
@@ -5774,7 +5776,8 @@ impl SequentMap {
                         // Avoid preserving explicit bounds that are equivalent to missing
                         // lower/upper bounds; direct constraints still retain their explicit
                         // bound presence.
-                        let mut constrained_lower = right_lower.filter(|lower| !lower.is_never());
+                        let mut constrained_lower =
+                            right_lower.filter(|lower| !lower.is_uninhabited(db, env));
                         let mut constrained_upper = right_upper.filter(|upper| !upper.is_object());
 
                         if let Some(Type::TypeVar(lower_bound_typevar)) = right_lower
@@ -5805,7 +5808,7 @@ impl SequentMap {
                             constrained_upper = None;
                         }
 
-                        if !(constrained_lower.unwrap_or(Type::Never).is_never()
+                        if !(constrained_lower.is_none()
                             && constrained_upper.unwrap_or(Type::object()).is_object())
                         {
                             post_constraints.push(ConstraintId::new_with_bounds(
@@ -7313,13 +7316,18 @@ mod tests {
         let env = db.program_environment();
         let int = known_instance(db, KnownClass::Int);
 
-        let mut upper = UpperBound::from_clause(int);
-        upper.add_clause(Type::Never);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
-        assert_eq!(upper.materialize_exact(db, &env), Type::Never);
+        for never in [
+            Type::Never,
+            Type::heterogeneous_tuple(db, &env, [Type::Never]),
+        ] {
+            let mut upper = UpperBound::from_clause(int);
+            upper.add_clause(db, &env, never);
+            assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
+            assert_eq!(upper.materialize_exact(db, &env), Type::Never);
 
-        upper.add_clause(int);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
+            upper.add_clause(db, &env, int);
+            assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
+        }
     }
 
     #[test]
@@ -7346,7 +7354,7 @@ mod tests {
         ] {
             let mut upper = UpperBound::none();
             for clause in clauses {
-                upper.add_clause(clause);
+                upper.add_clause(db, &env, clause);
             }
 
             assert_eq!(upper.clauses.len(), 2);
@@ -7381,7 +7389,7 @@ mod tests {
         for clauses in [[int_or_str, int_or_bytes], [int_or_bytes, int_or_str]] {
             let mut upper = UpperBound::none();
             for clause in clauses {
-                upper.add_clause(clause);
+                upper.add_clause(db, &env, clause);
             }
 
             assert_eq!(upper.materialize_exact(db, &env), int);
@@ -7397,7 +7405,7 @@ mod tests {
         let int = known_instance(db, KnownClass::Int);
         let u = Type::TypeVar(create_typevar(db, "U"));
         let mut upper = UpperBound::from_clause(u);
-        upper.add_clause(int);
+        upper.add_clause(db, &env, int);
 
         assert!(
             upper

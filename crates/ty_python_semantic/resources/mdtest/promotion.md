@@ -353,6 +353,59 @@ reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
 reveal_type(f13(1))  # revealed: ((bool, /) -> Invariant[int]) | None
 ```
 
+## Variadic constructor promotion follows parameter variance
+
+Variadic type parameters follow the same promotion rules as ordinary type parameters. Covariant and
+bivariant arguments retain their literal types, while invariant and contravariant arguments are
+promoted.
+
+```py
+from typing import Literal
+
+class Bivariant[*Ts]:
+    def __init__(self, *values: *Ts) -> None: ...
+
+class Covariant[*Ts]:
+    def __init__(self, *values: *Ts) -> None: ...
+    def get(self) -> tuple[*Ts]:
+        raise NotImplementedError
+
+class Contravariant[*Ts]:
+    def __init__(self, *values: *Ts) -> None: ...
+    def put(self, *values: *Ts) -> None: ...
+
+class Invariant[*Ts]:
+    values: tuple[*Ts]
+
+    def __init__(self, *values: *Ts) -> None: ...
+
+reveal_type(Bivariant(1))  # revealed: Bivariant[Literal[1]]
+reveal_type(Covariant(1))  # revealed: Covariant[Literal[1]]
+reveal_type(Contravariant(1))  # revealed: Contravariant[int]
+reveal_type(Invariant(1))  # revealed: Invariant[int]
+
+precise: Covariant[Literal[1]] = Covariant(1)
+```
+
+Explicitly declared legacy variance follows the same rules.
+
+```py
+from typing import Generic
+from typing_extensions import TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+Ts_invariant = TypeVarTuple("Ts_invariant")
+
+class LegacyCovariant(Generic[*Ts_co]):
+    def __init__(self, *values: *Ts_co) -> None: ...
+
+class LegacyInvariant(Generic[*Ts_invariant]):
+    def __init__(self, *values: *Ts_invariant) -> None: ...
+
+reveal_type(LegacyCovariant(1))  # revealed: LegacyCovariant[Literal[1]]
+reveal_type(LegacyInvariant(1))  # revealed: LegacyInvariant[int]
+```
+
 ## Promotion is recursive
 
 ```py

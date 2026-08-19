@@ -1331,7 +1331,9 @@ impl<'db> Signature<'db> {
                 && bound_signature
                     .variance_of(db, env, typevar.identity(db))
                     .is_covariant()
-                && bounds.lower.is_some_and(|lower| !lower.is_never())
+                && bounds
+                    .lower
+                    .is_some_and(|lower| !lower.is_uninhabited(db, env))
                 && let Ok(Some(solution)) = PathBounds::default_solve(db, env, &constraints, bounds)
             {
                 return Some(solution);
@@ -2557,13 +2559,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         match target_parameters.keyword_by_name(name) {
                             Some((_, parameter)) => {
                                 !parameter.is_keyword_only()
-                                    || parameter.annotated_type().resolve_type_alias(db).is_never()
+                                    || parameter.annotated_type().is_uninhabited(db, self.env)
                             }
                             None => {
                                 target_parameters
                                     .keyword_variadic()
                                     .is_none_or(|(_, parameter)| {
-                                        parameter.annotated_type().resolve_type_alias(db).is_never()
+                                        parameter.annotated_type().is_uninhabited(db, self.env)
                                     })
                             }
                         }
@@ -3974,7 +3976,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             captured_source_parameters()
                                                 .map(Parameter::annotated_type),
                                         )
-                                    };
+                                    }
+                                    .into_typevartuple_pack(db);
 
                                 reuse_current_source = source_parameter_count == 0;
                                 for _ in 1..source_parameter_count {

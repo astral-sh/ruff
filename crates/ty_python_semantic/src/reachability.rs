@@ -503,7 +503,9 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
     let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, narrowed_subject_ty);
-    if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
+    if !narrowed_subject_ty.is_uninhabited(db, &env)
+        && next_narrowed_subject_ty.is_uninhabited(db, &env)
+    {
         return Truthiness::AlwaysTrue;
     }
 
@@ -1518,7 +1520,7 @@ fn analyze_non_terminal_call<'db>(
     let mut any_overload_is_generic = false;
 
     for overload in overloads_iterator {
-        let returns_never = overload.return_ty.is_equivalent_to(db, &env, Type::Never);
+        let returns_never = overload.return_ty.is_uninhabited(db, &env);
         no_overloads_return_never &= !returns_never;
         all_overloads_return_never &= returns_never;
         any_overload_is_generic |= overload.return_ty.has_typevar(db, &env);
@@ -1530,7 +1532,7 @@ fn analyze_non_terminal_call<'db>(
         Truthiness::AlwaysFalse
     } else {
         let call_expr_ty = infer_same_file_expression_type(db, call_expr, TypeContext::default());
-        if call_expr_ty.is_equivalent_to(db, &env, Type::Never) {
+        if call_expr_ty.is_uninhabited(db, &env) {
             Truthiness::AlwaysFalse
         } else {
             Truthiness::AlwaysTrue

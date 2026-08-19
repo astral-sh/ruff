@@ -40,7 +40,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let value_ty = self
             .speculate_without_diagnostics()
             .infer_maybe_standalone_expression(expression, TypeContext::default());
-        if matches!(value_ty.resolve_type_alias(db), Type::Never)
+        if value_ty.is_uninhabited(db, env)
             || self.contains_type_form_value(expression, value_ty)
             || non_type_form_fallback
                 .is_some_and(|alternative| value_ty.is_assignable_to(db, env, alternative))

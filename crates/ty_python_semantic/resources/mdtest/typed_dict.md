@@ -7171,10 +7171,14 @@ type Bottom = Never
 class AliasedExtra(TypedDict, extra_items=Bottom):
     x: int
 
+class UninhabitedTupleExtra(TypedDict, extra_items=tuple[Never]):
+    x: int
+
 static_assert(is_equivalent_to(Extra, Closed))
 static_assert(is_subtype_of(Extra, Closed))
 static_assert(is_subtype_of(Closed, Extra))
 static_assert(is_equivalent_to(AliasedExtra, Closed))
+static_assert(is_equivalent_to(UninhabitedTupleExtra, Closed))
 ```
 
 ### Empty closed TypedDict truthiness
@@ -7187,6 +7191,7 @@ from typing_extensions import Never, NotRequired, TypedDict
 
 class Empty(TypedDict, closed=True): ...
 class EmptyByNever(TypedDict, extra_items=Never): ...
+class EmptyByUninhabitedTuple(TypedDict, extra_items=tuple[Never]): ...
 
 class OptionalClosed(TypedDict, closed=True):
     value: NotRequired[int]
@@ -7194,19 +7199,26 @@ class OptionalClosed(TypedDict, closed=True):
 class ImpossibleOptionalClosed(TypedDict, closed=True):
     value: NotRequired[Never]
 
+class ImpossibleTupleOptionalClosed(TypedDict, closed=True):
+    value: NotRequired[tuple[Never]]
+
 class EmptyOpen(TypedDict): ...
 
 def _(
     empty: Empty,
     empty_by_never: EmptyByNever,
+    empty_by_uninhabited_tuple: EmptyByUninhabitedTuple,
     optional_closed: OptionalClosed,
     impossible_optional_closed: ImpossibleOptionalClosed,
+    impossible_tuple_optional_closed: ImpossibleTupleOptionalClosed,
     empty_open: EmptyOpen,
 ) -> None:
     reveal_type(bool(empty))  # revealed: Literal[False]
     reveal_type(bool(empty_by_never))  # revealed: Literal[False]
+    reveal_type(bool(empty_by_uninhabited_tuple))  # revealed: Literal[False]
     reveal_type(bool(optional_closed))  # revealed: bool
     reveal_type(bool(impossible_optional_closed))  # revealed: Literal[False]
+    reveal_type(bool(impossible_tuple_optional_closed))  # revealed: Literal[False]
     reveal_type(bool(empty_open))  # revealed: bool
 ```
 

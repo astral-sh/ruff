@@ -1070,7 +1070,7 @@ fn infer_membership_test_comparison<'db>(
         && let Some(typed_dict) = right.as_typed_dict()
     {
         let truthiness = typed_dict
-            .key_membership_truthiness(db, key.value(db))
+            .key_membership_truthiness(db, env, key.value(db))
             .negate_if(op.is_not_in());
         return Ok(Type::from_truthiness(db, env, truthiness));
     }

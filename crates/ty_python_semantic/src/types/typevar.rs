@@ -1299,7 +1299,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         let env = visitor.env;
                         // Materialization uses a different mapping mode. Reuse of the outer
                         // visitor can incorrectly hit a cache entry from specialization.
-                        let materialization_visitor = visitor.for_new_materialization_root();
+                        let materialization_visitor = visitor.for_new_mapping_root();
                         let materialized =
                             mapped.materialize(db, *materialization_kind, &materialization_visitor);
 

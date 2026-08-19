@@ -193,6 +193,26 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_leave_aliases_impl(db, env, false, transform_fn)
+    }
+
+    /// Rebuild a potentially recursive alias body without starting independent relation checks.
+    pub(crate) fn map_leave_aliases_during_cycle_recovery(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_leave_aliases_impl(db, env, true, transform_fn)
+    }
+
+    fn map_leave_aliases_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        cycle_recovery: bool,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let elements = self.elements(db);
@@ -200,7 +220,9 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
-                let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+                let mut builder = UnionBuilder::new(db, env)
+                    .unpack_aliases(false)
+                    .cycle_recovery(cycle_recovery);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
                 }
@@ -900,7 +922,7 @@ impl<'db> IntersectionType<'db> {
         let non_union_elements = elements.clone().filter(|element| !element.is_union());
         let initial = Self::from_elements(db, env, non_union_elements);
         let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
-            if new_ty.is_never()
+            if new_ty == Type::Never
                 || candidates
                     .iter()
                     .any(|old| new_ty.is_redundant_with(db, env, *old))

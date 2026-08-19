@@ -422,6 +422,41 @@ def _(i: int, s: str) -> None:
     reveal_type(Variadic(i, s))  # revealed: Variadic[int, str]
 ```
 
+### Constructor inference with `Never` arguments
+
+A legacy variadic generic retains all constructor argument positions when one argument is `Never`.
+
+```py
+from typing import Generic, Never, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Factory(Generic[*Ts]):
+    def __init__(self, *args: *Ts) -> None: ...
+
+def check(value: Never) -> None:
+    reveal_type(Factory(1, value))  # revealed: Factory[int, Never]
+    reveal_type(Factory(value, 1))  # revealed: Factory[Never, int]
+```
+
+### Inherited variadic constructors
+
+A legacy variadic subclass can use its base class's constructor without treating their type variable
+tuples as incompatible.
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Base(Generic[*Ts]):
+    def __init__(self, *args: *Ts) -> None: ...
+
+class Child(Base[*Ts], Generic[*Ts]): ...
+
+Child(1, "hello")
+```
+
 ### Unspecified type arguments
 
 When a generic class parameterized by a type variable tuple is used without any type parameters and
@@ -465,6 +500,31 @@ class WithDefault(Generic[*Ts]):
 
 reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
 reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
+```
+
+### Default type arguments containing `Never`
+
+A legacy variadic parameter retains a required `Never` element in its unpacked default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, Never, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, Never]])
+OneNever = TypeVarTuple("OneNever", default=Unpack[tuple[Never]])
+QuotedNever = TypeVarTuple("QuotedNever", default=Unpack["tuple[int, Never]"])
+
+class WithNeverDefault(Generic[*Ts]): ...
+class WithOneNeverDefault(Generic[*OneNever]): ...
+class WithQuotedNeverDefault(Generic[*QuotedNever]): ...
+
+reveal_type(WithNeverDefault())  # revealed: WithNeverDefault[int, Never]
+reveal_type(WithOneNeverDefault())  # revealed: WithOneNeverDefault[Never]
+reveal_type(WithQuotedNeverDefault())  # revealed: WithQuotedNeverDefault[int, Never]
 ```
 
 ### Backported default type arguments

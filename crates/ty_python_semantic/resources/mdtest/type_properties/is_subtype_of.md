@@ -557,6 +557,20 @@ static_assert(not is_subtype_of(int, ~Literal[3]))
 static_assert(not is_subtype_of(Literal[1], int & ~Literal[1]))
 ```
 
+## Complements of uninhabited tuples
+
+The complement of an uninhabited tuple contains every object, just like the complement of `Never`.
+
+```pyi
+from typing_extensions import Any, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
+
+static_assert(is_equivalent_to(~tuple[Never, int], object))
+static_assert(is_subtype_of(Any, ~tuple[Never, int]))
+static_assert(is_subtype_of(object, ~tuple[Never, int]))
+```
+
 ## Intersections with non-fully-static negated elements
 
 A type can be a _subtype_ of an intersection containing negated elements only if the _top_
@@ -1460,9 +1474,14 @@ type Bottom = Never
 
 def rejects_keywords(*args: *tuple[*tuple[int, ...], int], **kwargs: Bottom) -> None: ...
 def rejects_named_keyword(*args: *tuple[*tuple[int, ...], int], a: Never = cast(Never, 0)) -> None: ...
+def rejects_impossible_keywords(
+    *args: *tuple[*tuple[int, ...], int],
+    **kwargs: tuple[Never],
+) -> None: ...
 
 static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_keywords]))
 static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_named_keyword]))
+static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_impossible_keywords]))
 ```
 
 Variadic target keywords must be compatible with optional source keyword-only parameters unless an

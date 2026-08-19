@@ -238,7 +238,10 @@ impl<'db> Type<'db> {
                 if td.items(db).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
                 } else if td.openness(db).is_closed()
-                    && td.items(db).values().all(|field| !field.may_be_present(db))
+                    && td
+                        .items(db)
+                        .values()
+                        .all(|field| !field.may_be_present(db, env))
                 {
                     Truthiness::AlwaysFalse
                 } else {

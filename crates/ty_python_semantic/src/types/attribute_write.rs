@@ -680,8 +680,8 @@ pub(super) fn property_setter_returns_never<'db>(
     property_ty.as_property_instance().is_some_and(|property| {
         property.setter(db).is_some_and(|setter| {
             match setter.try_call(db, env, &CallArguments::positional([object_ty, value_ty])) {
-                Ok(result) => result.return_type(db, env).is_never(),
-                Err(error) => error.return_type(db, env).is_never(),
+                Ok(result) => result.return_type(db, env).is_uninhabited(db, env),
+                Err(error) => error.return_type(db, env).is_uninhabited(db, env),
             }
         })
     })

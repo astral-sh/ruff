@@ -249,7 +249,7 @@ impl<'db> PartitionedEnumComparison<'db> {
                     }
                 })
                 .build();
-            if !excluded.is_never() {
+            if excluded != Type::Never {
                 return ComparisonResult::CanNarrow(
                     IntersectionBuilder::new(db, &env)
                         .add_positive(narrowed)

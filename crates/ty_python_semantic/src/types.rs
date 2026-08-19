@@ -392,9 +392,11 @@ fn definition_expression_annotation<'db>(
 
 struct ApplyTypeMappingTag;
 struct ApplyMaterializationEquivalence;
+struct ExpandTypeAlias;
 
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
+type TypeAliasExpansionVisitor<'db> = Rc<TypeTransformer<'db, ExpandTypeAlias>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -411,6 +413,7 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    alias_expansion: OnceCell<TypeAliasExpansionVisitor<'db>>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -425,6 +428,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
+            alias_expansion: OnceCell::default(),
         }
     }
 
@@ -472,14 +476,52 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             })
     }
 
-    fn for_new_materialization_root(&self) -> Self {
+    fn is_uninhabited(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        ty.may_be_uninhabited()
+            && (ty == Type::Never
+                || ty.is_equivalent_to_with_materialization_visitor(db, Type::Never, self))
+    }
+
+    /// Keep alias recursion visible through wrappers such as tuples, unions, and materialization.
+    ///
+    /// The transformer identifies recursive aliases by their definition, so growing
+    /// specializations encounter the same active visit even when their concrete types differ.
+    fn expand_alias(
+        &self,
+        db: &'db dyn Db,
+        alias: TypeAliasType<'db>,
+        expand: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        self.alias_expansion
+            .get_or_init(|| Rc::new(TypeTransformer::default()))
+            .visit_type(db, Type::TypeAlias(alias), expand)
+    }
+
+    /// Starts an independent type mapping without losing the surrounding recursion guards.
+    ///
+    /// Transformation caches are keyed by the input type, not the mapping being applied. Different
+    /// alias specializations or materialization roots therefore need separate caches: otherwise,
+    /// specializing the same `Callable[[], T]` body first with `int` and then with `str` would
+    /// incorrectly reuse the `Callable[[], int]` result for both. Alias-expansion and equivalence
+    /// guards must remain shared so recursive aliases still terminate.
+    fn for_new_mapping_root(&self) -> Self {
         let materialization_equivalence = OnceCell::new();
-        let was_empty =
-            materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
-        debug_assert!(was_empty.is_ok());
+        // Preserve an active equivalence guard, but do not allocate one just to specialize an
+        // ordinary alias that never compares materialized types.
+        if let Some(visitor) = self.materialization_equivalence.get() {
+            let was_empty = materialization_equivalence.set(Rc::clone(visitor));
+            debug_assert!(was_empty.is_ok());
+        }
+
+        let alias_expansion = OnceCell::new();
+        if let Some(visitor) = self.alias_expansion.get() {
+            let was_empty = alias_expansion.set(Rc::clone(visitor));
+            debug_assert!(was_empty.is_ok());
+        }
 
         Self {
             materialization_equivalence,
+            alias_expansion,
             ..Self::new(self.env)
         }
     }
@@ -1832,14 +1874,45 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) const fn is_never(&self) -> bool {
+    /// Returns whether this type has no inhabitants.
+    ///
+    /// A runtime tuple with a required uninhabited element is equivalent to `Never` even though
+    /// its tuple shape is preserved for display. Type aliases do not change inhabitance. Variadic
+    /// type argument packs are not runtime tuples, so their `Never` elements remain meaningful.
+    pub(crate) fn is_uninhabited(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        if *self == Type::Never {
+            return true;
+        }
+
+        if !self.may_be_uninhabited() {
+            return false;
+        }
+
+        if let Type::NominalInstance(instance) = self
+            && (instance.is_typevartuple_pack(db)
+                || instance
+                    .tuple_spec(db, env)
+                    .is_none_or(|tuple| !tuple.fixed_elements().any(Type::may_be_uninhabited)))
+        {
+            return false;
+        }
+
+        self.is_equivalent_to(db, env, Type::Never)
+    }
+
+    /// Avoid relation checks for type variants that always have at least one possible value.
+    const fn may_be_uninhabited(&self) -> bool {
         matches!(
             self,
             Type::Never
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Bottom),
-                    ..
-                })
+                | Type::Divergent(_)
+                | Type::NominalInstance(_)
+                | Type::SubclassOf(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::EnumComplement(_)
+                | Type::TypeVar(_)
+                | Type::TypeAlias(_)
         )
     }
 
@@ -2611,6 +2684,16 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
+            Type::NominalInstance(instance)
+                if instance
+                    .tuple_spec(db, env)
+                    .is_some_and(|tuple| tuple.fixed_elements().any(Type::may_be_uninhabited)) =>
+            {
+                IntersectionBuilder::new(db, env)
+                    .add_negative(*self)
+                    .build()
+            }
+
             Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::KnownBoundMethod(_)
@@ -2624,7 +2707,6 @@ impl<'db> Type<'db> {
             | Type::TypeVar(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_)
-            | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
@@ -2637,6 +2719,7 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::WrapperDescriptor(_)
             | Type::TypeAlias(_)
+            | Type::NominalInstance(_)
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
                 FxOrderSet::default(),
@@ -8000,9 +8083,23 @@ impl<'db> Type<'db> {
                 property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
 
-            Type::Union(union) => union.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            }),
+            Type::Union(union) => {
+                let transform = |element: &Type<'db>| {
+                    element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                };
+                if matches!(
+                    type_mapping,
+                    TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(_))
+                        | TypeMapping::ApplySpecializationWithMaterialization {
+                            specialization: ApplySpecialization::TypeAlias(_),
+                            ..
+                        }
+                ) {
+                    union.map_leave_aliases_during_cycle_recovery(db, visitor.env, transform)
+                } else {
+                    union.map_leave_aliases(db, visitor.env, transform)
+                }
+            }
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db, visitor.env);
                 for positive in intersection.positive(db) {

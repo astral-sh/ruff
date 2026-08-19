@@ -1203,7 +1203,7 @@ impl<'db> GenericContext<'db> {
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
 /// the lexically containing context.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct Specialization<'db> {
     #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
@@ -1253,6 +1253,31 @@ pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Interns a specialization after distinguishing variadic argument packs from runtime tuples.
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        types: impl Into<Box<[Type<'db>]>>,
+        materialization_kind: Option<MaterializationKind>,
+        tuple_inner: Option<TupleType<'db>>,
+    ) -> Self {
+        let mut types = types.into();
+        if tuple_inner.is_none() && types.iter().copied().any(Type::is_exact_tuple_instance) {
+            for (typevar, ty) in generic_context.variables(db).zip(types.iter_mut()) {
+                if typevar.is_typevartuple(db) {
+                    *ty = ty.into_typevartuple_pack(db);
+                }
+            }
+        }
+        Self::new_internal(
+            db,
+            generic_context,
+            types,
+            materialization_kind,
+            tuple_inner,
+        )
+    }
+
     /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
     ///
     /// Known argument mismatches are not merged because doing so would be unsound for invariant
@@ -2917,9 +2942,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn insert_hash_map_type_mapping(
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
-        ty: Type<'db>,
+        mut ty: Type<'db>,
     ) {
         let db = self.db;
+        if bound_typevar.is_typevartuple(db) {
+            ty = ty.into_typevartuple_pack(db);
+        }
         let identity = bound_typevar.identity(db);
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
@@ -2954,9 +2982,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         let unioned = TupleSpecBuilder::from(existing_tuple.as_ref())
                             .union(db, self.env, &new_tuple)
                             .build();
-                        *accumulator = UnionAccumulator::new(Type::tuple(TupleType::new(
-                            db, self.env, &unioned,
-                        )));
+                        *accumulator = UnionAccumulator::new(
+                            Type::tuple(TupleType::new(db, self.env, &unioned))
+                                .into_typevartuple_pack(db),
+                        );
                     }
                     _ => {
                         entry.get_mut().add(db, self.env, ty);
@@ -3604,7 +3633,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
                 let remaining_actual =
                     actual_union.filter(db, |ty| !ty.is_subtype_of(db, self.env, formal));
-                if remaining_actual.is_never() {
+                if remaining_actual == Type::Never {
                     return Ok(());
                 }
                 // Infer through the TypeVar arm so its bound or constraints are still enforced.
@@ -3640,7 +3669,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // ```
                 //
                 // without specializing `T` to `None`.
-                if !actual.is_never() {
+                if actual != Type::Never {
                     let assignable_elements = union_formal.elements(db).iter().filter(|ty| {
                         actual
                             .when_subtype_of(db, self.env, **ty, self.constraints, self.inferable)

@@ -2578,7 +2578,7 @@ impl KnownFunction {
                     return;
                 };
                 let env = context.program_environment();
-                if actual_ty.is_equivalent_to(db, env, Type::Never) {
+                if actual_ty.is_uninhabited(db, env) {
                     return;
                 }
                 if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
