@@ -187,7 +187,7 @@ impl Session {
         &mut self.request_queue
     }
 
-    fn initialization_options(&self) -> &InitializationOptions {
+    pub(crate) fn initialization_options(&self) -> &InitializationOptions {
         &self.initialization_options
     }
 
@@ -595,6 +595,7 @@ impl Session {
         let system = LSPSystem::new(
             self.index.as_ref().unwrap().clone(),
             self.native_system.clone(),
+            self.initialization_options.workspace_trust,
         );
 
         let configuration_file = workspace.settings.configuration_file();
@@ -2010,12 +2011,14 @@ pub(super) fn warn_about_unknown_options(
 
 #[cfg(test)]
 mod tests {
+    use std::io::ErrorKind;
     use std::sync::Arc;
 
-    use ruff_db::system::{CommandExecutor, OsSystem, System as _};
+    use anyhow::Context;
+    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _};
 
     use super::Index;
-    use crate::system::LSPSystem;
+    use crate::system::{LSPSystem, WorkspaceTrust};
 
     /// Mutating the document index requires exclusive ownership after Salsa cancels the current
     /// database snapshots. A background command executor must not retain an `LSPSystem`, because
@@ -2023,7 +2026,11 @@ mod tests {
     #[test]
     fn detached_command_executor_does_not_retain_document_index() {
         let index = Arc::new(Index::new());
-        let system = LSPSystem::new(index.clone(), Arc::new(OsSystem::default()));
+        let system = LSPSystem::new(
+            index.clone(),
+            Arc::new(OsSystem::default()),
+            WorkspaceTrust::default(),
+        );
         let executor = system.command_executor().map(CommandExecutor::dyn_clone);
         assert!(executor.is_some());
         drop(system);
@@ -2031,5 +2038,28 @@ mod tests {
         assert_eq!(Arc::strong_count(&index), 1);
 
         drop(executor);
+    }
+
+    #[test]
+    fn detached_untrusted_executor_rejects_commands() -> anyhow::Result<()> {
+        let system = LSPSystem::new(
+            Arc::new(Index::new()),
+            Arc::new(OsSystem::default()),
+            WorkspaceTrust::Untrusted,
+        )
+        .dyn_clone();
+        let executor = system
+            .command_executor()
+            .context("Expected an executor for the untrusted workspace")?
+            .dyn_clone();
+        drop(system);
+
+        let error = executor.execute(Command::new("must-not-run")).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+        assert_eq!(
+            error.to_string(),
+            "external commands are disabled in an untrusted workspace",
+        );
+        Ok(())
     }
 }

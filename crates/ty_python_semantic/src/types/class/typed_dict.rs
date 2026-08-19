@@ -11,7 +11,9 @@ use ty_module_resolver::KnownModule;
 use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::class::{DynamicClassHeaderAnchor, dynamic_class_header_range};
+use crate::types::class::{
+    DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range,
+};
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
 use crate::types::mro::Mro;
@@ -847,12 +849,12 @@ pub enum DynamicTypedDictAnchor<'db> {
 
     /// The `TypedDict()` call is "dangling" (not assigned to a variable).
     ///
-    /// The offset is relative to the enclosing scope's anchor node index. The eagerly
-    /// computed `spec` preserves field types for inline uses like
+    /// The [`DynamicClassScopeOffset`] locates the call relative to the enclosing scope.
+    /// The eagerly computed `spec` preserves field types for inline uses like
     /// `TypedDict("Point", {"x": int})(x=1)`.
     ScopeOffset {
         scope: ScopeId<'db>,
-        offset: u32,
+        offset: DynamicClassScopeOffset,
         schema: TypedDictSchema<'db>,
         openness: TypedDictOpenness<'db>,
     },
@@ -893,9 +895,8 @@ pub struct DynamicTypedDictLiteral<'db> {
     ///
     /// - `Definition`: The call is assigned to a variable. The definition
     ///   uniquely identifies this TypedDict and can be used to find the call.
-    /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
-    ///   is relative to the enclosing scope's anchor node index, and the
-    ///   eagerly computed spec is stored on the anchor.
+    /// - `ScopeOffset`: The call is "dangling" (not assigned). Its location
+    ///   is relative to the enclosing scope, and the eagerly computed spec is stored on the anchor.
     #[returns(ref)]
     pub(crate) anchor: DynamicTypedDictAnchor<'db>,
 

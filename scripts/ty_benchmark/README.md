@@ -5,6 +5,7 @@
     - Windows: `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
 1. Build ty: `cargo build --bin ty --release`
 1. `cd` into the benchmark directory: `cd scripts/ty_benchmark`
+1. Install npm 11.10.0 or newer, which supports the dependency cooldown in `.npmrc`
 1. Install Pyright: `npm ci --ignore-scripts`
 1. Run benchmarks: `uv run benchmark`
 

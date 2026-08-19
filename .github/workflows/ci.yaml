@@ -390,6 +390,13 @@ jobs:
         run: uv run --quiet --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer --color=always
       - name: Dogfood ty on ty_benchmark
         run: uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark --color=always
+      - name: Dogfood ty on scripts
+        run: |
+          for script in scripts/*.py; do
+            echo "Checking $script"
+            uv sync --quiet --locked --script "$script"
+            cargo run --quiet -p ty check "$script" --python "$(uv python find --script "$script")" --color=always
+          done
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -1032,29 +1039,22 @@ jobs:
           repository: "astral-sh/ruff-lsp"
           path: ruff-lsp
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          # installation fails on 3.13 and newer
+          # ruff-lsp's archived CI only tested through Python 3.12.
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
       - name: Install ruff-lsp dependencies
-        run: |
-          cd ruff-lsp
-          uv venv
-          uv pip install --no-deps -r requirements.txt
-          uv pip install --no-deps -r requirements-dev.txt
+        run: uv sync --locked --only-group ruff-lsp-test --python 3.12
 
       - name: Run ruff-lsp tests
         run: |
           # Setup development binary
-          export PATH="${PWD}/target/debug:${PATH}"
+          export PATH="${PWD}/target/debug:${PWD}/.venv/bin:${PATH}"
           ruff version
 
           cd ruff-lsp
-          uv pip uninstall ruff
-          uv run --no-sync pytest
+          pytest
 
   check-playground:
     name: "check playground"
@@ -1074,7 +1074,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
@@ -1082,7 +1082,7 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: playground
       - name: "Build playgrounds"
-        run: npm run dev:wasm
+        run: npm run dev:build
         working-directory: playground
       - name: "Run TypeScript checks"
         run: npm run check
