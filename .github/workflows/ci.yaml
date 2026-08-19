@@ -1142,6 +1142,16 @@ jobs:
       - name: "Build benchmarks"
         run: cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
+      - name: "Configure apt mirror fallback"
+        run: |
+          # Let CodSpeed's dependency installation move past unhealthy mirrors quickly.
+          cat /etc/apt/apt-mirrors.txt
+          printf '%s\n' \
+            'Acquire::Retries "0";' \
+            'Acquire::http::Timeout "10";' \
+            'Acquire::https::Timeout "10";' \
+            | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
+
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         with:
@@ -1253,6 +1263,17 @@ jobs:
       - name: "Restore binary permissions"
         # codspeed keeps changing the paths to the executable, so we have to be a bit more flexible
         run: find target/codspeed -type f -exec chmod +x {} +
+
+      - name: "Configure apt mirror fallback"
+        if: matrix.mode == 'simulation'
+        run: |
+          # Let CodSpeed's dependency installation move past unhealthy mirrors quickly.
+          cat /etc/apt/apt-mirrors.txt
+          printf '%s\n' \
+            'Acquire::Retries "0";' \
+            'Acquire::http::Timeout "10";' \
+            'Acquire::https::Timeout "10";' \
+            | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
