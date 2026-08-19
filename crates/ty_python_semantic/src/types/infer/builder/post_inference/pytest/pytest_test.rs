@@ -19,6 +19,7 @@ use ruff_python_ast::{self as ast, AtomicNodeIndex};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use std::debug_assert_matches;
+use thin_vec::ThinVec;
 
 /// Representation of a pytest test.
 /// It is only used when the argnames and argvalues should be checked, and for that purpose only.
@@ -187,7 +188,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: argvalue.range(),
             node_index: AtomicNodeIndex::default(),
             args: Box::new([argvalue.to_owned()]),
-            keywords: Default::default(),
+            keywords: ThinVec::default(),
         }
     }
 
@@ -198,7 +199,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: argvalues.range(),
             node_index: AtomicNodeIndex::default(),
             args: argvalues.elts.clone().into_boxed_slice(),
-            keywords: Default::default(),
+            keywords: ThinVec::default(),
         }
     }
 
