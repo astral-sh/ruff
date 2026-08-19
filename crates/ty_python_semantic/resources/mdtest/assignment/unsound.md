@@ -1,0 +1,541 @@
+# Unsound assignments
+
+In addition to `invalid-assignment`, we also offer a disabled-by-default stricter rule
+`unsound-assignment`. This rule forbids assigning a value of type `A` to a fully static declared
+type `B` unless `A` is a *subtype* of `B`.
+
+```toml
+[rules]
+unsound-assignment = "error"
+```
+
+## Basics
+
+An assignment that is valid according to the usual assignability rules can still be unsound.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+# snapshot: unsound-assignment
+value: int = returns_any()
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:14
+  |
+7 | value: int = returns_any()
+  |        ---   ^^^^^^^^^^^^^ Inferred as `Any`
+  |        |
+  |        Expected a subtype of `int` because of this annotation
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+A nested dynamic type causes the same problem, while genuinely incompatible values cause us to emit
+only `invalid-assignment`.
+
+```py
+# snapshot: unsound-assignment
+nested_value: tuple[tuple[int, int]] = ((42, returns_any()),)
+
+invalid_value: int = "not an integer"  # error: [invalid-assignment]
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:9:40
+  |
+9 | nested_value: tuple[tuple[int, int]] = ((42, returns_any()),)
+  |               ----------------------   ^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[tuple[Literal[42], Any]]`
+  |               |
+  |               Expected a subtype of `tuple[tuple[int, int]]` because of this annotation
+info: `tuple[tuple[Literal[42], Any]]` is assignable to `tuple[tuple[int, int]]`, but not a subtype of `tuple[tuple[int, int]]`
+info: the first tuple element is not compatible: `tuple[Literal[42], Any]` is not a subtype of `tuple[int, int]`
+info: └── the second tuple element is not compatible: `Any` is not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+Narrowing a dynamic value before assigning it makes the assignment sound.
+
+```py
+dynamic_value = returns_any()
+assert isinstance(dynamic_value, int)
+narrowed_value: int = dynamic_value
+```
+
+## Unsound assignments to gradually typed targets
+
+The rule applies only when the target's declared type is fully static. An explicit `Any`, an alias
+of `Any`, or an `Any` nested inside the annotation disables the strict check.
+
+```py
+from typing import Any
+from typing_extensions import Never, TypeAliasType
+
+AnyAlias = TypeAliasType("AnyAlias", Any)
+
+def returns_any() -> Any:
+    return "not an integer"
+
+dynamic_target: Any = returns_any()  # no `unsound-assignment` error
+aliased_dynamic_target: AnyAlias = returns_any()  # no `unsound-assignment` error
+nested_dynamic_target: tuple[int, Any] = returns_any()  # no `unsound-assignment` error
+
+# error: [missing-type-argument]
+unknown_target: list = returns_any()  # no `unsound-assignment` error
+```
+
+`Never`, on the other hand, is fully static, so assigning `Any` to it is unsound.
+
+```py
+never_target: Never = returns_any()  # error: [unsound-assignment]
+```
+
+## Unsound assignments to an existing annotation
+
+The same check applies when an assignment's target was annotated separately.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+value: int
+
+# snapshot: unsound-assignment
+value = returns_any()
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:9:9
+  |
+6 | value: int
+  |        --- Expected a subtype of `int` because of this annotation
+7 |
+8 | # snapshot: unsound-assignment
+9 | value = returns_any()
+  |         ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+Subsequent reassignments of an annotated variable are also checked for soundness.
+
+```py
+another_value: int = 42
+another_value = returns_any()  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+  --> src/mdtest_snippet.py:11:17
+   |
+10 | another_value: int = 42
+   |                --- Expected a subtype of `int` because of this annotation
+11 | another_value = returns_any()  # snapshot: unsound-assignment
+   |                 ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to annotated parameters
+
+Reassigning an annotated parameter points to its original type annotation.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+def update(value: int) -> None:
+    value = returns_any()  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:13
+  |
+6 | def update(value: int) -> None:
+  |                   --- Expected a subtype of `int` because of this annotation
+7 |     value = returns_any()  # snapshot: unsound-assignment
+  |             ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to variadic positional parameters
+
+A variadic positional parameter's annotation describes its arguments, while the parameter itself is
+a tuple.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not a tuple"
+
+def update(*values: int) -> None:
+    values = returns_any()  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:14
+  |
+6 | def update(*values: int) -> None:
+  |                     --- Variadic parameter annotation declares the type as `tuple[int, ...]`
+7 |     values = returns_any()  # snapshot: unsound-assignment
+  |              ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `tuple[int, ...]`, but not a subtype of `tuple[int, ...]`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments with same-named types
+
+A variadic parameter's annotation uses the same qualified type names as the rest of the diagnostic.
+
+`first.py`:
+
+```py
+class Value: ...
+```
+
+`second.py`:
+
+```py
+class Value: ...
+```
+
+```py
+from typing import Any
+import first
+import second
+
+def returns_any() -> Any:
+    return "not a Value"
+
+def update(*values: first.Value | second.Value) -> None:
+    values = (first.Value(), returns_any())  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:9:14
+  |
+8 | def update(*values: first.Value | second.Value) -> None:
+  |                     -------------------------- Variadic parameter annotation declares the type as `tuple[first.Value | second.Value, ...]`
+9 |     values = (first.Value(), returns_any())  # snapshot: unsound-assignment
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[first.Value, Any]`
+info: `tuple[first.Value, Any]` is assignable to `tuple[first.Value | second.Value, ...]`, but not a subtype of `tuple[first.Value | second.Value, ...]`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to variadic keyword parameters
+
+A variadic keyword parameter's annotation describes its values, while the parameter itself is a
+dictionary.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not a dictionary"
+
+def update(**values: int) -> None:
+    values = returns_any()  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:14
+  |
+6 | def update(**values: int) -> None:
+  |                      --- Keyword-variadic parameter annotation declares the type as `dict[str, int]`
+7 |     values = returns_any()  # snapshot: unsound-assignment
+  |              ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `dict[str, int]`, but not a subtype of `dict[str, int]`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments with conflicting declarations
+
+When conflicting annotations contribute to the declared type, the diagnostic does not identify any
+one annotation as the declared type.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not necessarily an integer or a string"
+
+def update(flag: bool) -> None:
+    if flag:
+        value: int
+    else:
+        value: str
+
+    # error: [conflicting-declarations]
+    value = returns_any()  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+  --> src/mdtest_snippet.py:13:13
+   |
+13 |     value = returns_any()  # snapshot: unsound-assignment
+   |     -----   ^^^^^^^^^^^^^ Inferred as `Any`
+   |     |
+   |     Expected a subtype of `int | str` because of its declared type
+info: `Any` is assignable to `int | str`, but not a subtype of `int | str`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments with equivalent declarations
+
+When distinct branches declare the same type, neither annotation is the unique source of the
+declared type.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+def update(flag: bool) -> None:
+    if flag:
+        value: int
+    else:
+        value: int
+
+    value = returns_any()  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+  --> src/mdtest_snippet.py:12:13
+   |
+12 |     value = returns_any()  # snapshot: unsound-assignment
+   |     -----   ^^^^^^^^^^^^^ Inferred as `Any`
+   |     |
+   |     Expected a subtype of `int` because of its declared type
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound named and unpacked assignments
+
+Assignment expressions are also checked against an existing annotation:
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+named_value: int
+
+if named_value := returns_any():  # snapshot: unsound-assignment
+    pass
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:8:19
+  |
+6 | named_value: int
+  |              --- Expected a subtype of `int` because of this annotation
+7 |
+8 | if named_value := returns_any():  # snapshot: unsound-assignment
+  |                   ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+As do unpacked assignments.
+
+TODO: ideally the annotation would highlight only the call to `returns_any()` here, not the whole
+tuple.
+
+```py
+unpacked_value: int
+unpacked_value, other_value = (returns_any(), "hello")  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+  --> src/mdtest_snippet.py:11:31
+   |
+10 | unpacked_value: int
+   |                 --- Expected a subtype of `int` because of this annotation
+11 | unpacked_value, other_value = (returns_any(), "hello")  # snapshot: unsound-assignment
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to for-loop targets
+
+An unsound loop assignment points to the target's earlier type annotation.
+
+```py
+from typing import Any, cast
+
+value: int
+
+for value in cast(list[Any], []):  # snapshot: unsound-assignment
+    pass
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:5:5
+  |
+3 | value: int
+  |        --- Expected a subtype of `int` because of this annotation
+4 |
+5 | for value in cast(list[Any], []):  # snapshot: unsound-assignment
+  |     ^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to context-manager targets
+
+An unsound context-manager assignment points to the target's earlier type annotation.
+
+```py
+from contextlib import nullcontext
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+value: int
+
+with nullcontext(returns_any()) as value:  # snapshot: unsound-assignment
+    pass
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:9:36
+  |
+7 | value: int
+  |        --- Expected a subtype of `int` because of this annotation
+8 |
+9 | with nullcontext(returns_any()) as value:  # snapshot: unsound-assignment
+  |                                    ^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to global and nonlocal variables
+
+Assignments redirected by `global` or `nonlocal` are checked against the owning scope's declared
+type.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+global_value: int = 42
+
+def update_global() -> None:
+    global global_value
+    global_value = returns_any()  # snapshot: unsound-assignment
+
+def outer() -> None:
+    nonlocal_value: int = 42
+
+    def update_nonlocal() -> None:
+        nonlocal nonlocal_value
+        nonlocal_value = returns_any()  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+  --> src/mdtest_snippet.py:10:20
+   |
+ 6 | global_value: int = 42
+   |               --- Expected a subtype of `int` because of this annotation
+ 7 |
+ 8 | def update_global() -> None:
+ 9 |     global global_value
+10 |     global_value = returns_any()  # snapshot: unsound-assignment
+   |                    ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+
+
+error[unsound-assignment]: Unsound assignment
+  --> src/mdtest_snippet.py:17:26
+   |
+13 |     nonlocal_value: int = 42
+   |                     --- Expected a subtype of `int` because of this annotation
+14 |
+15 |     def update_nonlocal() -> None:
+16 |         nonlocal nonlocal_value
+17 |         nonlocal_value = returns_any()  # snapshot: unsound-assignment
+   |                          ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound augmented assignments
+
+An augmented assignment highlights the dynamic right-hand operand.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+value: int = 42
+value += returns_any()  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:10
+  |
+6 | value: int = 42
+  |        --- Expected a subtype of `int` because of this annotation
+7 | value += returns_any()  # snapshot: unsound-assignment
+  |          ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+When an in-place operator returns `Any`, the diagnostic highlights the full operation instead of
+incorrectly attributing that type to a statically typed operand.
+
+```py
+class Counter:
+    def __iadd__(self, other: int) -> Any:
+        return "not a Counter"
+
+counter: Counter = Counter()
+counter += 1  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+  --> src/mdtest_snippet.py:13:1
+   |
+12 | counter: Counter = Counter()
+   |          ------- Expected a subtype of `Counter` because of this annotation
+13 | counter += 1  # snapshot: unsound-assignment
+   | ^^^^^^^^^^^^ Augmented assignment produces a value of type `Any`
+info: `Any` is assignable to `Counter`, but not a subtype of `Counter`
+help: Consider using an `assert` to narrow the type before assigning it
+```

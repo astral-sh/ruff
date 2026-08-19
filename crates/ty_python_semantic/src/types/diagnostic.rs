@@ -88,6 +88,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&UNSOUND_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
+    registry.register_lint(&UNSOUND_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
@@ -483,6 +484,15 @@ declare_lint! {
         summary: "detects invalid assignments",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/unsound-assignment.md")]
+    pub(crate) static UNSOUND_ASSIGNMENT = {
+        summary: "detects assignments that unsoundly assign a type that is not a subtype of the declared type",
+        status: LintStatus::stable("0.0.73"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1645,6 +1655,98 @@ pub(super) fn add_invariant_generic_hints<'db>(
     );
 }
 
+struct AssignmentDeclarationAnnotation {
+    range: TextRange,
+    variadic_parameter_kind: Option<&'static str>,
+}
+
+impl AssignmentDeclarationAnnotation {
+    fn into_annotation(
+        self,
+        context: &InferContext,
+        target_type_display: impl fmt::Display,
+        ordinary_message: impl fmt::Display,
+    ) -> Annotation {
+        let annotation = context.secondary(self.range);
+
+        if let Some(kind) = self.variadic_parameter_kind {
+            annotation.message(format_args!(
+                "{kind} parameter annotation declares the type as `{target_type_display}`"
+            ))
+        } else {
+            annotation.message(ordinary_message)
+        }
+    }
+}
+
+/// Locate the annotation that uniquely declares an assignment target's type.
+fn assignment_declaration_annotation<'db>(
+    context: &InferContext<'db, '_>,
+    definition_kind: &DefinitionKind<'db>,
+    declaration: Option<Definition<'db>>,
+) -> Option<AssignmentDeclarationAnnotation> {
+    let db = context.db();
+    let (annotation, variadic_parameter_kind) = match definition_kind {
+        DefinitionKind::AnnotatedAssignment(assignment) => {
+            Some((assignment.annotation(context.module()), None))
+        }
+        _ => declaration.and_then(|declaration| match declaration.kind(db) {
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                Some((assignment.annotation(context.module()), None))
+            }
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
+                parameter
+                    .node(context.module())
+                    .parameter
+                    .annotation
+                    .as_deref()
+                    .map(|annotation| (annotation, None))
+            }
+            DefinitionKind::Parameter(
+                ParameterDefinitionNodeKind::VariadicPositionalParameter(parameter),
+            ) => parameter
+                .node(context.module())
+                .annotation
+                .as_deref()
+                .map(|annotation| (annotation, Some("Variadic"))),
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(
+                parameter,
+            )) => parameter
+                .node(context.module())
+                .annotation
+                .as_deref()
+                .map(|annotation| (annotation, Some("Keyword-variadic"))),
+            DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::ImportFromSubmodule(_)
+            | DefinitionKind::StarImport(_)
+            | DefinitionKind::Function(_)
+            | DefinitionKind::Class(_)
+            | DefinitionKind::TypeAlias(_)
+            | DefinitionKind::NamedExpression(_)
+            | DefinitionKind::Assignment(_)
+            | DefinitionKind::AugmentedAssignment(_)
+            | DefinitionKind::DictKeyAssignment(_)
+            | DefinitionKind::For(_)
+            | DefinitionKind::Comprehension(_)
+            | DefinitionKind::LambdaParameter(_)
+            | DefinitionKind::WithItem(_)
+            | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::ExceptHandler(_)
+            | DefinitionKind::TypeVar(_)
+            | DefinitionKind::ParamSpec(_)
+            | DefinitionKind::TypeVarTuple(_)
+            | DefinitionKind::LoopHeader(_)
+            | DefinitionKind::NestedBindings(_) => None,
+        }),
+    }?;
+
+    Some(AssignmentDeclarationAnnotation {
+        range: annotation.range(),
+        variadic_parameter_kind,
+    })
+}
+
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
@@ -1724,71 +1826,14 @@ pub(super) fn report_invalid_assignment<'db>(
         }
     }
 
-    let declaration_annotation = match definition_kind {
-        DefinitionKind::AnnotatedAssignment(assignment) => {
-            Some((assignment.annotation(context.module()), None))
-        }
-        _ => declaration.and_then(|declaration| match declaration.kind(db) {
-            DefinitionKind::AnnotatedAssignment(assignment) => {
-                Some((assignment.annotation(context.module()), None))
-            }
-            DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
-                parameter
-                    .node(context.module())
-                    .parameter
-                    .annotation
-                    .as_deref()
-                    .map(|annotation| (annotation, None))
-            }
-            DefinitionKind::Parameter(
-                ParameterDefinitionNodeKind::VariadicPositionalParameter(parameter),
-            ) => parameter
-                .node(context.module())
-                .annotation
-                .as_deref()
-                .map(|annotation| (annotation, Some("Variadic"))),
-            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(
-                parameter,
-            )) => parameter
-                .node(context.module())
-                .annotation
-                .as_deref()
-                .map(|annotation| (annotation, Some("Keyword-variadic"))),
-            DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::ImportFromSubmodule(_)
-            | DefinitionKind::StarImport(_)
-            | DefinitionKind::Function(_)
-            | DefinitionKind::Class(_)
-            | DefinitionKind::TypeAlias(_)
-            | DefinitionKind::NamedExpression(_)
-            | DefinitionKind::Assignment(_)
-            | DefinitionKind::AugmentedAssignment(_)
-            | DefinitionKind::DictKeyAssignment(_)
-            | DefinitionKind::For(_)
-            | DefinitionKind::Comprehension(_)
-            | DefinitionKind::LambdaParameter(_)
-            | DefinitionKind::WithItem(_)
-            | DefinitionKind::MatchPattern(_)
-            | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::TypeVar(_)
-            | DefinitionKind::ParamSpec(_)
-            | DefinitionKind::TypeVarTuple(_)
-            | DefinitionKind::LoopHeader(_)
-            | DefinitionKind::NestedBindings(_) => None,
-        }),
-    };
-
-    if let Some((annotation, variadic_parameter_kind)) = declaration_annotation {
-        let annotation = context.secondary(annotation);
-        diag.annotate(if let Some(kind) = variadic_parameter_kind {
-            annotation.message(format_args!(
-                "{kind} parameter annotation declares the type as `{}`",
-                target_ty.display_with(db, env, settings.clone())
-            ))
-        } else {
-            annotation.message("Declared type")
-        });
+    if let Some(declaration_annotation) =
+        assignment_declaration_annotation(context, definition_kind, declaration)
+    {
+        diag.annotate(declaration_annotation.into_annotation(
+            context,
+            target_ty.display_with(db, env, settings.clone()),
+            "Declared type",
+        ));
     } else if value_node.is_some() {
         diag.annotate(context.secondary(target_node).message(format_args!(
             "Declared type `{}`",
@@ -1820,6 +1865,69 @@ pub(super) fn report_invalid_assignment<'db>(
     // special case message
     note_numbers_module_not_supported(db, env, &mut diag, target_ty, value_ty);
     add_invariant_generic_hints(db, env, &mut diag, target_ty, value_ty);
+}
+
+/// Report an assignment whose value is not a subtype of its declared type.
+pub(super) fn report_unsound_assignment<'db>(
+    context: &InferContext<'db, '_>,
+    target_node: AnyNodeRef,
+    definition_kind: &DefinitionKind<'db>,
+    declaration: Option<Definition<'db>>,
+    value_node: Option<&ast::Expr>,
+    target_ty: Type<'db>,
+    value_ty: Type<'db>,
+) {
+    let db = context.db();
+    let diagnostic_range = value_node
+        .map(|value| {
+            parentheses_iterator(value.into(), None, context.module().tokens())
+                .last()
+                .unwrap_or(value.range())
+        })
+        .unwrap_or_else(|| target_node.range());
+
+    let Some(builder) = context.report_lint(&UNSOUND_ASSIGNMENT, diagnostic_range) else {
+        return;
+    };
+
+    let env = context.program_environment();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [target_ty, value_ty]);
+    let actual_display = value_ty.display_with(db, env, settings.clone());
+    let expected_display = target_ty.display_with(db, env, settings);
+
+    let mut diagnostic = builder.into_diagnostic("Unsound assignment");
+    diagnostic.set_concise_message(format_args!(
+        "Unsound assignment: `{actual_display}` is not a subtype of `{expected_display}`"
+    ));
+    if value_node.is_none() && matches!(definition_kind, DefinitionKind::AugmentedAssignment(_)) {
+        diagnostic.set_primary_annotation_message(format_args!(
+            "Augmented assignment produces a value of type `{actual_display}`"
+        ));
+    } else {
+        diagnostic.set_primary_annotation_message(format_args!("Inferred as `{actual_display}`"));
+    }
+
+    if let Some(declaration_annotation) =
+        assignment_declaration_annotation(context, definition_kind, declaration)
+    {
+        diagnostic.annotate(declaration_annotation.into_annotation(
+            context,
+            &expected_display,
+            format_args!("Expected a subtype of `{expected_display}` because of this annotation"),
+        ));
+    } else if value_node.is_some() {
+        diagnostic.annotate(context.secondary(target_node).message(format_args!(
+            "Expected a subtype of `{expected_display}` because of its declared type"
+        )));
+    }
+
+    diagnostic.info(format_args!(
+        "`{actual_display}` is assignable to `{expected_display}`, \
+        but not a subtype of `{expected_display}`"
+    ));
+    let error_context = value_ty.pure_redundancy_error_context(db, env, target_ty);
+    error_context.attach_to(db, env, &mut diagnostic);
+    diagnostic.help("Consider using an `assert` to narrow the type before assigning it");
 }
 
 pub(super) fn report_invalid_attribute_assignment(

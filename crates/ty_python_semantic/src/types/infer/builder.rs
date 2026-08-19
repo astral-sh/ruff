@@ -67,9 +67,10 @@ use crate::types::diagnostic::{
     INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     INVALID_TYPE_VARIABLE_DEFAULT, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
     TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_REFERENCE, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
-    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
+    UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR,
+    UNUSED_AWAITABLE, YieldKind, hint_if_stdlib_attribute_exists_on_other_versions,
+    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
+    report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
     report_invalid_assignment, report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -79,8 +80,8 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_too_many_positional_patterns_for_class_pattern, report_unsound_yield,
-    report_unsupported_augmented_assignment, report_unsupported_comparison,
+    report_too_many_positional_patterns_for_class_pattern, report_unsound_assignment,
+    report_unsound_yield, report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
@@ -1758,7 +1759,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let declared_type = declared_ty.inner_type();
-                if inferred_ty.is_assignable_to(db, env, declared_type) {
+                if self.validate_assignment_type(node, definition, None, declared_type, inferred_ty)
+                {
                     // TODO We currently can't distinguish here between "no declared type" and
                     // "declared types is `Unknown` (e.g. due to a bad annotation, missing
                     // import, etc.)". Ideally we would still prefer `Unknown` declared type,
@@ -1773,14 +1775,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 } else {
                     self.discard_dict_key_assignments_for(definition);
-                    report_invalid_assignment(
-                        &self.context,
-                        node,
-                        definition,
-                        None,
-                        declared_type,
-                        inferred_ty,
-                    );
 
                     // if the assignment is invalid, fall back to assuming the annotation is correct
                     (declared_ty, declared_type)
@@ -1790,6 +1784,78 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.declarations.insert(definition, declared_ty);
         self.bindings.insert(definition, inferred_ty);
+    }
+
+    /// Checks an assigned value against its target's declared type and reports any mismatch.
+    ///
+    /// Returns `true` when the value is assignable, even if the stricter `unsound-assignment`
+    /// rule reports that it is not a subtype. Returns `false` when the value is not assignable,
+    /// in which case `invalid-assignment` is reported instead.
+    fn validate_assignment_type(
+        &self,
+        target_node: AnyNodeRef,
+        definition: Definition<'db>,
+        declaration: Option<Definition<'db>>,
+        target_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+
+        if !value_ty.is_assignable_to(db, env, target_ty) {
+            report_invalid_assignment(
+                &self.context,
+                target_node,
+                definition,
+                declaration,
+                target_ty,
+                value_ty,
+            );
+            false
+        } else {
+            // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_RETURN_STATEMENT`;
+            // update those too if updating this!
+            if self.context.is_lint_enabled(&UNSOUND_ASSIGNMENT)
+                && target_ty.is_fully_static(db, env)
+                && !value_ty.is_pure_redundant_with(db, env, target_ty)
+            {
+                let definition_kind = definition.kind(db);
+                let (diagnostic_target_node, value_node) = match definition_kind {
+                    DefinitionKind::Assignment(assignment) => {
+                        (target_node, Some(assignment.value(self.module())))
+                    }
+                    DefinitionKind::AnnotatedAssignment(assignment) => {
+                        (target_node, assignment.value(self.module()))
+                    }
+                    DefinitionKind::AugmentedAssignment(assignment) => {
+                        let assignment = assignment.node(self.module());
+                        if self
+                            .expression_type(&assignment.value)
+                            .is_equivalent_to(db, env, value_ty)
+                        {
+                            (target_node, Some(assignment.value.as_ref()))
+                        } else {
+                            (assignment.into(), None)
+                        }
+                    }
+                    DefinitionKind::NamedExpression(assignment) => {
+                        (target_node, Some(&*assignment.node(self.module()).value))
+                    }
+                    _ => (target_node, None),
+                };
+
+                report_unsound_assignment(
+                    &self.context,
+                    diagnostic_target_node,
+                    definition_kind,
+                    declaration,
+                    value_node,
+                    target_ty,
+                    value_ty,
+                );
+            }
+            true
+        }
     }
 
     fn add_unknown_declaration_with_binding(
@@ -9640,8 +9706,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && expected_yield_ty.is_fully_static(db, env)
             && !yielded_ty.is_pure_redundant_with(db, env, expected_yield_ty)
         {
-            // N.B. the implementation here is the ~same as for `UNSOUND_RETURN_STATEMENT`;
-            // update that too if updating this!
+            // N.B. the implementation here is the ~same as for `UNSOUND_RETURN_STATEMENT` and `UNSOUND_ASSIGNMENT`;
+            // update those too if updating this!
             report_unsound_yield(
                 &self.context,
                 yielded_value,
@@ -12349,16 +12415,14 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if !bound_ty.is_assignable_to(db, env, declared_ty) {
+        if !builder.validate_assignment_type(
+            self.node,
+            self.binding,
+            self.declaration,
+            declared_ty,
+            bound_ty,
+        ) {
             builder.discard_dict_key_assignments_for(self.binding);
-            report_invalid_assignment(
-                &builder.context,
-                self.node,
-                self.binding,
-                self.declaration,
-                declared_ty,
-                bound_ty,
-            );
 
             // Allow declarations to override inference in case of invalid assignment.
             bound_ty = declared_ty;

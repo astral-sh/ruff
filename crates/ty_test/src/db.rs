@@ -334,6 +334,7 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         // The `unsound-*` rules are also exceptions because they are very strict, would
         // result in lots of additional diagnostics in mdtests, and are not the default behaviour
         // we'll show to our users.
+        "unsound-assignment",
         "unsound-return-statement",
         "unsound-yield",
     ];
