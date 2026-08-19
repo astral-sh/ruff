@@ -130,7 +130,7 @@ jobs:
     uses: $/.github/workflows/build-binaries.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   custom-build-docker:
     needs:
@@ -140,7 +140,7 @@ jobs:
     uses: $/.github/workflows/build-docker.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       "attestations": "write"
       "contents": "read"
@@ -154,7 +154,7 @@ jobs:
     uses: $/.github/workflows/build-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   # Build and package all the platform-agnostic(ish) things
   build-global-artifacts:
@@ -277,7 +277,7 @@ jobs:
     uses: $/.github/workflows/publish-pypi.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     # publish jobs get escalated permissions
     permissions:
       "id-token": "write"
@@ -292,7 +292,7 @@ jobs:
     uses: $/.github/workflows/publish-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     # publish jobs get escalated permissions
     permissions:
       "contents": "read"
@@ -310,7 +310,7 @@ jobs:
     uses: $/.github/workflows/publish-crates.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     # publish jobs get escalated permissions
     permissions:
       "contents": "read"
@@ -382,7 +382,7 @@ jobs:
     uses: $/.github/workflows/notify-dependents.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   custom-publish-docs:
     needs:
@@ -391,7 +391,7 @@ jobs:
     uses: $/.github/workflows/publish-docs.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       "contents": "read"
 
@@ -402,7 +402,7 @@ jobs:
     uses: $/.github/workflows/publish-playground.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   custom-publish-versions:
     needs:
@@ -411,7 +411,7 @@ jobs:
     uses: $/.github/workflows/publish-versions.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   custom-publish-mirror:
     needs:
@@ -420,6 +420,6 @@ jobs:
     uses: $/.github/workflows/publish-mirror.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       "contents": "read"
