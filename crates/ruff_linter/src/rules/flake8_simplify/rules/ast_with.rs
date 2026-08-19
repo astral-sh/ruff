@@ -109,10 +109,7 @@ fn explicit_with_items(checker: &Checker, with_items: &[WithItem]) -> bool {
 /// Returns the nested `with` when it is the sole body statement and can be
 /// merged with `outer` (same async/sync, neither side an exempt standalone
 /// manager).
-fn mergeable_child<'a>(
-    checker: &Checker,
-    outer: &'a ast::StmtWith,
-) -> Option<&'a ast::StmtWith> {
+fn mergeable_child<'a>(checker: &Checker, outer: &'a ast::StmtWith) -> Option<&'a ast::StmtWith> {
     let [Stmt::With(inner)] = outer.body.as_slice() else {
         return None;
     };
