@@ -9,7 +9,8 @@ use std::fmt::Formatter;
 
 use ruff_db::diagnostic::SecondaryCode;
 use serde::Serialize;
-use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
+use strum::EnumMessage;
+use strum_macros::{Display, EnumIter, EnumMessage, EnumString, IntoStaticStr};
 
 use crate::registry::Linter;
 use crate::rules;
@@ -83,43 +84,59 @@ impl serde::Serialize for NoqaCode {
 
 /// A semantic category assigned to a lint rule.
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumString, IntoStaticStr, Display, Serialize,
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumIter,
+    EnumString,
+    IntoStaticStr,
+    Display,
+    Serialize,
+    EnumMessage,
 )]
 #[strum(serialize_all = "kebab-case", const_into_str)]
 #[serde(rename_all = "kebab-case")]
 pub enum Category {
+    /// Rules that flag outright wrong or useless code
     Correctness,
+
+    /// Rules that flag likely outright wrong or useless code but that could be intentional
     Suspicious,
+
+    /// Rules that suggest rewriting code in a shorter and more readable way
     Complexity,
+
+    /// Rules that suggest rewriting code in a more efficient way
     Performance,
+
+    /// Rules that suggest rewriting code in a more idiomatic way
     Style,
+
+    /// Rules that flag potential security vulnerabilities but may be prone to false positives
     Security,
+
+    /// Rules that flag formatting issues that do not affect semantics
     Formatting,
+
+    /// Rules that are highly opinionated or prone to false positives
     Pedantic,
+
+    /// Rules that restrict the use of basic language features
     Restriction,
 }
 
 impl Category {
-    pub(crate) fn description(self) -> &'static str {
-        match self {
-            Category::Correctness => "Rules that flag outright wrong or useless code",
-            Category::Suspicious => {
-                "Rules that flag likely outright wrong or useless code but that could be intentional"
-            }
-            Category::Complexity => {
-                "Rules that suggest rewriting code in a shorter and more readable way"
-            }
-            Category::Performance => "Rules that suggest rewriting code in a more efficient way",
-            Category::Style => "Rules that suggest rewriting code in a more idiomatic way",
-            Category::Security => {
-                "Rules that flag potential security vulnerabilities but may be prone to false positives"
-            }
-            Category::Formatting => {
-                "Rules that flag formatting issues that do not affect semantics"
-            }
-            Category::Pedantic => "Rules that are highly opinionated or prone to false positives",
-            Category::Restriction => "Rules that restrict the use of basic language features",
-        }
+    /// Return the description of the category, derived from its documentation.
+    pub(crate) fn description(self) -> Option<&'static str> {
+        let docs = self.get_documentation();
+        let Some(docs) = docs else {
+            debug_assert!(false, "Categories must be documented");
+            return None;
+        };
+        docs.lines().next()
     }
 }
 
