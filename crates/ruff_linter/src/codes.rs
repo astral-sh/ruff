@@ -6,11 +6,12 @@
 /// When [`crate::preview::is_rule_categories_enabled`] returns `true`, rules can also be selected by
 /// their [`Category`].
 use std::fmt::Formatter;
+use std::sync::LazyLock;
 
 use ruff_db::diagnostic::SecondaryCode;
 use serde::Serialize;
-use strum::EnumMessage;
-use strum_macros::{Display, EnumIter, EnumMessage, EnumString, IntoStaticStr};
+use strum::{EnumMessage, IntoEnumIterator, VariantArray as _};
+use strum_macros::{Display, EnumIter, EnumMessage, EnumString, IntoStaticStr, VariantArray};
 
 use crate::registry::Linter;
 use crate::rules;
@@ -96,6 +97,7 @@ impl serde::Serialize for NoqaCode {
     Display,
     Serialize,
     EnumMessage,
+    VariantArray,
 )]
 #[strum(serialize_all = "kebab-case", const_into_str)]
 #[serde(rename_all = "kebab-case")]
@@ -145,6 +147,22 @@ impl Category {
             return None;
         };
         docs.lines().next()
+    }
+
+    /// Return the rules in this category.
+    pub(crate) fn rules(self) -> &'static [Rule] {
+        static RULES_BY_CATEGORY: LazyLock<[Vec<Rule>; Category::VARIANTS.len()]> =
+            LazyLock::new(|| {
+                let mut rules = [const { Vec::new() }; Category::VARIANTS.len()];
+
+                for rule in Rule::iter() {
+                    rules[rule.category() as usize].push(rule);
+                }
+
+                rules
+            });
+
+        &RULES_BY_CATEGORY[self as usize]
     }
 }
 
