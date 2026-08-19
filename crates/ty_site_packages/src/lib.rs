@@ -368,6 +368,14 @@ impl PythonEnvironment {
         }
     }
 
+    /// Returns the canonical, absolute `sys.prefix` of this environment.
+    pub fn sys_prefix(&self) -> &SysPrefixPath {
+        match self {
+            Self::Virtual(env) => &env.root_path,
+            Self::System(env) => env.path.sys_prefix(),
+        }
+    }
+
     /// Returns the Python version that was used to create this environment
     /// (will only be available for virtual environments that specify
     /// the metadata in their `pyvenv.cfg` files).
@@ -2441,6 +2449,7 @@ mod tests {
                 .expect("Expected environment construction to succeed");
 
             let expect_virtual_env = self.virtual_env.is_some();
+            assert_eq!(env.sys_prefix().as_std_path(), env_path.as_std_path());
             match &env {
                 PythonEnvironment::Virtual(venv) if expect_virtual_env => {
                     self.assert_virtual_environment(venv, &env_path);
