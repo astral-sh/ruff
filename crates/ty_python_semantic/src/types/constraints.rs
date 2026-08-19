@@ -3828,33 +3828,48 @@ struct ConstraintBoundsBuilder<'db> {
 }
 
 impl<'db> ConstraintBoundsBuilder<'db> {
-    /// Returns whether mirrored lower and upper evidence require multiple exact types.
+    /// Finds a fixed equality requirement that satisfies every bound on this path.
     ///
     /// A type that occurs in both evidence sets places the target typevar both above and below that
-    /// type. Multiple non-equivalent mirrored types are simultaneous equality requirements, not
-    /// lower-bound alternatives that can be unioned.
-    fn has_incoherent_equality_evidence(
+    /// type. If one such type is fully static relative to the inference domain, it pins the only
+    /// possible solution. Gradual equality requirements can then accept that solution through one
+    /// of their materializations.
+    fn pinned_equality_solution(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
-    ) -> bool {
+    ) -> Option<Type<'db>> {
         let mut fixed_equalities = self
             .evidence_lower
             .iter()
             .filter(|lower| self.upper.evidence.contains(*lower))
             .copied()
+            .filter(|ty| ty.is_static_sequent_eligible(db, env))
             .filter(|ty| {
-                // Equality types containing inferable typevars can become equivalent once the rest
-                // of the path is solved. Fixed typevars are opaque and can be compared immediately.
                 !any_over_type(db, env, *ty, false, |ty| {
                     matches!(ty, Type::TypeVar(typevar) if typevar.is_inferable(db, inferable))
                 })
             });
-        let Some(first) = fixed_equalities.next() else {
-            return false;
-        };
-        fixed_equalities.any(|ty| !first.is_equivalent_to(db, env, ty))
+        let candidate = fixed_equalities.next()?;
+        if fixed_equalities.any(|ty| !candidate.is_equivalent_to(db, env, ty)) {
+            return None;
+        }
+
+        if !self
+            .evidence_lower
+            .iter()
+            .chain(&self.mixed_lower)
+            .chain(&self.validity_lower)
+            .all(|lower| lower.is_constraint_set_assignable_to(db, env, candidate))
+        {
+            return None;
+        }
+
+        self.upper
+            .iter_clauses()
+            .all(|upper| candidate.is_constraint_set_assignable_to(db, env, upper.ty()))
+            .then_some(candidate)
     }
 
     fn classify_evidence(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
@@ -3913,8 +3928,7 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
         inferable: TypeVarSet<'db>,
     ) -> PathBound<'db> {
-        let has_incoherent_equality_evidence =
-            self.has_incoherent_equality_evidence(db, env, inferable);
+        let pinned_equality_solution = self.pinned_equality_solution(db, env, inferable);
         let Self {
             evidence_lower,
             mixed_lower,
@@ -3939,7 +3953,7 @@ impl<'db> ConstraintBoundsBuilder<'db> {
             mixed_lower,
             validity_lower,
             upper,
-            has_incoherent_equality_evidence,
+            pinned_equality_solution,
             has_only_gradual_evidence: has_gradual_evidence && !has_static_evidence,
         }
     }
@@ -3953,8 +3967,8 @@ pub(crate) struct PathBound<'db> {
     mixed_lower: Option<Type<'db>>,
     pub(crate) validity_lower: Type<'db>,
     pub(crate) upper: UpperBound<'db>,
-    /// Whether this path requires the typevar to equal multiple non-equivalent fixed types.
-    has_incoherent_equality_evidence: bool,
+    /// A fixed equality requirement that satisfies every bound on this path.
+    pinned_equality_solution: Option<Type<'db>>,
     /// Whether the path contains gradual evidence and no static evidence.
     has_only_gradual_evidence: bool,
 }
@@ -3967,7 +3981,7 @@ impl<'db> PathBound<'db> {
             mixed_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
-            has_incoherent_equality_evidence: false,
+            pinned_equality_solution: None,
             has_only_gradual_evidence: false,
         }
     }
@@ -4878,10 +4892,10 @@ impl<'db> PathBounds<'db> {
             return Ok(Some(validity));
         }
 
-        // Assignability can keep non-equivalent gradual equality requirements satisfiable, but
-        // their lower bounds are simultaneous obligations rather than alternatives to union.
-        if path_bound.has_incoherent_equality_evidence {
-            return Ok(None);
+        // A fixed exact requirement pins the solution when every gradual equality requirement can
+        // materialize to that type. Prefer it to unioning the simultaneous lower-bound evidence.
+        if let Some(solution) = path_bound.pinned_equality_solution {
+            return Ok(Some(solution));
         }
 
         if has_lower_evidence {
@@ -8027,7 +8041,7 @@ mod tests {
             mixed_lower: None,
             validity_lower: alternative,
             upper,
-            has_incoherent_equality_evidence: false,
+            pinned_equality_solution: None,
             has_only_gradual_evidence: false,
         }
     }
@@ -9522,7 +9536,7 @@ mod tests {
             mixed_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
-            has_incoherent_equality_evidence: false,
+            pinned_equality_solution: None,
             has_only_gradual_evidence: false,
         };
 

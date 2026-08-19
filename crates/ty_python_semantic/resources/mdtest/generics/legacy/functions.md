@@ -554,8 +554,10 @@ reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ## Gradual invariant protocol members
 
 When the same inferred type variable appears in multiple invariant protocol members, the member
-types must agree on one exact specialization. Equivalent gradual types still provide a coherent
-solution.
+types must agree on one exact specialization.
+
+Here, `first` and `second` have identical types. Even though that type is gradual, it's an obviously
+correct solution for `T`.
 
 ```py
 from typing import Any, Generic, Protocol, TypeVar
@@ -579,8 +581,10 @@ def check_matching_pair(value: MatchingGradualPair[U]) -> None:
     reveal_type(infer_pair(value))
 ```
 
-Member types that are not gradually equivalent can't prove a contradiction, but they also should not
-be unioned: they are simultaneous equality requirements rather than inference alternatives.
+Here, `first` and `second` do not have identical types, but the fully static type of `second` is one
+of the valid materializations of the type of `first`. We can choose the fully static type as the
+solution for `T`, since there is _some_ materialization that satisfies
+`DifferingGradualPair ≤ Pair`.
 
 ```py
 class DifferingGradualPair(Generic[U]):
@@ -588,8 +592,7 @@ class DifferingGradualPair(Generic[U]):
     second: tuple[U, int]
 
 def check_differing_pair(value: DifferingGradualPair[U]) -> None:
-    # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
-    # revealed: Unknown
+    # revealed: tuple[U@check_differing_pair, int]
     reveal_type(infer_pair(value))
 ```
 

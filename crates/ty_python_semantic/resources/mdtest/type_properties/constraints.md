@@ -456,15 +456,16 @@ def _[T, U: Any, V]() -> None:
 
     gradual_mismatch = ConstraintSet.equality(T, list[Any]) & ConstraintSet.equality(T, list[int])
     static_assert(not ~gradual_mismatch)
+    # revealed: tuple[Solution[T=list[int]]]
+    reveal_type(gradual_mismatch.solutions_for(T, inferable=tuple[T]))
 
     any_mismatch = ConstraintSet.equality(T, Any) & ConstraintSet.equality(T, int)
     static_assert(not ~any_mismatch)
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(any_mismatch.solutions_for(T, inferable=tuple[T]))
 
     symbolic_gradual_mismatch = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
     static_assert(not ~symbolic_gradual_mismatch)
-    # The constraint path remains satisfiable, but it provides no coherent solution for `T`.
-    # revealed: tuple[Solution[]]
-    reveal_type(symbolic_gradual_mismatch.solutions_for(T, inferable=tuple[T]))
 
     symbolic_gradual_match = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, Any])
     # revealed: tuple[Solution[T=tuple[U@_, Any]]]
@@ -472,6 +473,13 @@ def _[T, U: Any, V]() -> None:
 
     symbolic_match = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(T, list[V])
     static_assert(not ~symbolic_match)
+
+def solve_symbolic[U]() -> None:
+    def inner[T]() -> None:
+        constraints = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
+        # The static equality pins the only materialization that satisfies the gradual equality.
+        # revealed: tuple[Solution[T=tuple[U@solve_symbolic, int]]]
+        reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
 ```
 
 ### Gradual assignability does not imply transitive constraints
