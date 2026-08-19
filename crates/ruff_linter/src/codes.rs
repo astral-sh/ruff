@@ -99,6 +99,30 @@ pub enum Category {
     Restriction,
 }
 
+impl Category {
+    pub(crate) fn description(self) -> &'static str {
+        match self {
+            Category::Correctness => "Rules that flag outright wrong or useless code",
+            Category::Suspicious => {
+                "Rules that flag likely outright wrong or useless code but that could be intentional"
+            }
+            Category::Complexity => {
+                "Rules that suggest rewriting code in a shorter and more readable way"
+            }
+            Category::Performance => "Rules that suggest rewriting code in a more efficient way",
+            Category::Style => "Rules that suggest rewriting code in a more idiomatic way",
+            Category::Security => {
+                "Rules that flag potential security vulnerabilities but may be prone to false positives"
+            }
+            Category::Formatting => {
+                "Rules that flag formatting issues that do not affect semantics"
+            }
+            Category::Pedantic => "Rules that are highly opinionated or prone to false positives",
+            Category::Restriction => "Rules that restrict the use of basic language features",
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Serialize)]
 pub enum RuleStatus {
     /// The rule is stable since the provided Ruff version.
