@@ -37,5 +37,8 @@
     "typescript-eslint": "^8.26.1",
     "vite": "^8.0.0",
     "wasm-pack": "^0.15.0"
+  },
+  "overrides": {
+    "cross-spawn": "7.0.5"
   }
 }

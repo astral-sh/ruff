@@ -16,5 +16,8 @@
     "@miniflare/kv": "^2.14.0",
     "@miniflare/storage-memory": "^2.14.0",
     "uuid": "^14.0.0"
+  },
+  "overrides": {
+    "cross-spawn": "7.0.5"
   }
 }
