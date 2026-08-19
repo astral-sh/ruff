@@ -104,7 +104,7 @@ no-binary-package = [
 ]
 # Pin the isolated build environment for source-build exceptions.
 build-constraint-dependencies = [
-    "editables==0.6",
+    "flit-core==4.0.2",
     "hatch-fancy-pypi-readme==25.1.0",
     "hatch-vcs==0.5.0",
     "hatchling==1.32.0",
