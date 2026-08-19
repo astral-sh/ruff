@@ -469,7 +469,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_status_match_arms }
             }
 
-            pub fn category(&self) -> Option<crate::codes::Category> {
+            pub fn category(&self) -> crate::codes::Category {
                 match self { #rule_category_match_arms }
             }
 

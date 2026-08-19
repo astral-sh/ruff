@@ -39,9 +39,8 @@ pub trait ViolationMetadata {
     /// Returns the rule status for this violation.
     fn status() -> RuleStatus;
 
-    /// Returns the semantic category for this violation, or `None` for removed and internal test
-    /// rules.
-    fn category() -> Option<Category>;
+    /// Returns the category for this violation.
+    fn category() -> Category;
 
     /// Returns the file where the violation is declared.
     fn file() -> &'static str;

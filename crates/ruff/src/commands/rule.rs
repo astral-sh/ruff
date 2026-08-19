@@ -25,7 +25,7 @@ struct Explanation<'a> {
     explanation: Option<&'a str>,
     preview: bool,
     status: RuleStatus,
-    category: Option<Category>,
+    category: Category,
     source_location: SourceLocation,
 }
 
