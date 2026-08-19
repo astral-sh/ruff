@@ -1,6 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use crate::FxIndexSet;
+use crate::definition_resolution::source_backed_definitions;
 use crate::place::implicit_builtins_symbol_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::bind::CheckTypesMode;
@@ -93,7 +94,7 @@ pub fn definitions_for_name<'db>(
         if is_global || is_nonlocal {
             // Assignments in a forwarding scope remain valid navigation targets, including eager
             // walrus bindings exported from comprehensions.
-            all_definitions.extend(user_visible_definitions(
+            all_definitions.extend(source_backed_definitions(
                 db,
                 use_def_map
                     .reachable_symbol_bindings(symbol_id)
@@ -121,7 +122,7 @@ pub fn definitions_for_name<'db>(
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                all_definitions.extend(user_visible_definitions(
+                all_definitions.extend(source_backed_definitions(
                     db,
                     global_use_def_map
                         .reachable_symbol_bindings(global_symbol_id)
@@ -143,7 +144,7 @@ pub fn definitions_for_name<'db>(
         }
 
         // Get all definitions (both bindings and declarations) for this place
-        all_definitions.extend(user_visible_definitions(
+        all_definitions.extend(source_backed_definitions(
             db,
             use_def_map
                 .reachable_symbol_bindings(symbol_id)
@@ -1053,56 +1054,6 @@ fn collect_implementation_root_classes<'db>(
     }
 }
 
-/// Returns the user-visible definitions represented by a use-def binding.
-///
-/// Comprehension walruses are represented in the containing scope by synthetic eager bindings:
-///
-/// ```python
-/// [(last := item) for item in items]
-/// print(last)  # Go to definition should select `last := item` above.
-/// ```
-///
-/// The binding for the use in `print` is synthetic, so follow it into the comprehension's
-/// end-of-scope bindings. Nested comprehensions can produce a chain of these proxies. Only
-/// follow sources that resolve to the same variable, so `global` and `nonlocal` writes do not
-/// become definitions of each other.
-fn user_visible_definitions<'db>(
-    db: &'db dyn Db,
-    definitions: impl IntoIterator<Item = Definition<'db>>,
-) -> FxIndexSet<Definition<'db>> {
-    let mut pending = definitions.into_iter().collect::<VecDeque<_>>();
-    let mut seen = FxHashSet::default();
-    let mut result = FxIndexSet::default();
-
-    while let Some(definition) = pending.pop_front() {
-        if !seen.insert(definition) {
-            continue;
-        }
-
-        match definition.kind(db) {
-            DefinitionKind::NestedBindings(nested) => {
-                let index = semantic_index(db, definition.program_file(db));
-                let sources = nested
-                    .visible_binding_sources(index, definition.file_scope(db))
-                    .flatten()
-                    .filter_map(|binding| binding.binding.definition());
-                // A lazy function proxy can lead to an eager comprehension proxy. Follow that
-                // proxy-only chain without exposing ordinary lazy nested assignments.
-                pending.extend(sources.filter(|source| {
-                    nested.execution == NestedBindingExecution::Eager
-                        || matches!(source.kind(db), DefinitionKind::NestedBindings(_))
-                }));
-            }
-            kind if kind.is_user_visible() => {
-                result.insert(definition);
-            }
-            _ => {}
-        }
-    }
-
-    result
-}
-
 fn reachable_implementation_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
@@ -1164,7 +1115,7 @@ fn resolve_reachable_definitions<'db>(
     symbol_name: &str,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
-    user_visible_definitions(db, definitions)
+    source_backed_definitions(db, definitions)
         .into_iter()
         .flat_map(|definition| {
             resolve_definition(
@@ -2475,7 +2426,7 @@ mod resolve_definition {
             }
         }
 
-        super::user_visible_definitions(db, definitions)
+        super::source_backed_definitions(db, definitions)
             .into_iter()
             .collect()
     }

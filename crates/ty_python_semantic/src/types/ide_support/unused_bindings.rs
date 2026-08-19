@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::definition_resolution::source_backed_definitions;
 use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
@@ -115,7 +116,7 @@ pub fn unused_bindings(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedBinding
             .definitions_with_usage()
             .filter_map(|(_, definition, is_used)| is_used.then_some(definition))
     });
-    let used_user_visible_definitions = super::user_visible_definitions(db, used_definitions);
+    let used_user_visible_definitions = source_backed_definitions(db, used_definitions);
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
