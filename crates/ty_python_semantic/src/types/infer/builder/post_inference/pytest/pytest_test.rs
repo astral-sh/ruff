@@ -18,7 +18,6 @@ use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AtomicNodeIndex};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
-use std::debug_assert_matches;
 use thin_vec::ThinVec;
 
 /// Representation of a pytest test.
@@ -228,7 +227,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeContext::default(),
         );
         if bindings_result.is_err() {
-            debug_assert_matches!(bindings_result, Err(CallErrorKind::BindingError));
+            debug_assert_eq!(bindings_result, Err(CallErrorKind::BindingError));
             bindings.report_diagnostics_with_override(
                 &self.context,
                 arguments.into(),
