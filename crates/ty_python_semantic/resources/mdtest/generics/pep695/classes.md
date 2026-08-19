@@ -1043,7 +1043,7 @@ recovers to `Unknown`.
 ```py
 class NonGeneric: ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'NonGeneric'>`"
+# error: [invalid-type-form] "Non-generic class `NonGeneric` cannot be specialized in a type expression"
 def direct(value: NonGeneric[int]) -> None:
     reveal_type(value)  # revealed: Unknown
 ```
@@ -1051,7 +1051,7 @@ def direct(value: NonGeneric[int]) -> None:
 The same diagnostic applies when the specialization is nested inside `type[...]`.
 
 ```py
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'NonGeneric'>`"
+# error: [invalid-type-form] "Non-generic class `NonGeneric` cannot be specialized in a type expression"
 def nested(value: type[NonGeneric[int]]) -> None:
     reveal_type(value)  # revealed: Unknown
 ```
@@ -1064,12 +1064,88 @@ class Child(NonGeneric): ...
 class Generic[T, U = str]: ...
 class SpecializedChild(Generic[int]): ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
 def child(value: Child[str]) -> None:
     reveal_type(value)  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'SpecializedChild'>`"
+# error: [invalid-type-form] "Non-generic class `SpecializedChild` cannot be specialized in a type expression"
 def specialized_child(value: SpecializedChild[bytes]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+## Custom class subscriptions in type expressions
+
+Defining `__class_getitem__` makes a class subscriptable at runtime, but does not make it generic.
+Its return type is used for value expressions, not for interpreting type expressions.
+
+```py
+class U:
+    def __class_getitem__(cls, value: int) -> "type[U]":
+        return U
+
+reveal_type(U[0])  # revealed: type[U]
+reveal_type(U.__class_getitem__(0))  # revealed: type[U]
+
+# snapshot: invalid-type-form
+def direct(value: U[0]) -> None:
+    reveal_type(value)  # revealed: Unknown
+
+# error: [invalid-type-form] "Non-generic class `U` cannot be specialized in a type expression"
+def nested(value: type[U[0]]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-type-form]: Non-generic class `U` cannot be specialized in a type expression
+ --> src/mdtest_snippet.py:9:19
+  |
+9 | def direct(value: U[0]) -> None:
+  |                   ^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+## Custom class subscriptions with future annotations
+
+Postponing annotation evaluation does not make a non-generic class a valid generic type. The error
+concerns the type expression, not runtime subscription.
+
+```py
+from __future__ import annotations
+
+class U:
+    def __class_getitem__(cls, value: int) -> type[U]:
+        return U
+
+# error: [invalid-type-form]
+def direct(value: U[0]) -> None:
+    reveal_type(value)  # revealed: Unknown
+
+# error: [invalid-type-form]
+def nested(value: type[U[0]]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+## Custom class subscriptions with Python 3.14 annotations
+
+The same type-expression error applies when Python defers annotation evaluation by default.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class U:
+    def __class_getitem__(cls, value: int) -> type[U]:
+        return U
+
+# error: [invalid-type-form]
+def direct(value: U[0]) -> None:
+    reveal_type(value)  # revealed: Unknown
+
+# error: [invalid-type-form]
+def nested(value: type[U[0]]) -> None:
     reveal_type(value)  # revealed: Unknown
 ```
 

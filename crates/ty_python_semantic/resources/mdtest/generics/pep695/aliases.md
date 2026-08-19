@@ -152,7 +152,7 @@ class LegacyDict(TypedDict[T]):
     # error: [unbound-type-variable]
     x: T
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'LegacyDict'>`"
+# error: [invalid-type-form] "Non-generic class `LegacyDict` cannot be specialized in a type expression"
 type LegacyDictInt = LegacyDict[int]
 
 # error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyDictInt`"

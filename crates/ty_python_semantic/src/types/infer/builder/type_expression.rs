@@ -1357,14 +1357,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
                                 None => {
                                     self.infer_expression(parameters, TypeContext::default());
-                                    if let Some(builder) =
-                                        self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Cannot subscript non-generic type `{}`",
-                                            value_ty.display(db, self.program_environment())
-                                        ));
-                                    }
+                                    self.report_invalid_type_expression(
+                                        subscript,
+                                        format_args!(
+                                            "Non-generic class `{}` cannot be specialized in a type expression",
+                                            class_literal.name(db)
+                                        ),
+                                    );
                                     Type::unknown()
                                 }
                             }
@@ -1808,14 +1807,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     _ => {
                         self.infer_expression(slice, TypeContext::default());
-                        if let Some(builder) =
-                            self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Cannot subscript non-generic type `{}`",
-                                value_ty.display(db, self.program_environment())
-                            ));
-                        }
+                        self.report_invalid_type_expression(
+                            subscript,
+                            format_args!(
+                                "Non-generic class `{}` cannot be specialized in a type expression",
+                                class.name(db)
+                            ),
+                        );
                         Type::unknown()
                     }
                 }
