@@ -55,7 +55,7 @@ reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> dict[str, Unknow
 Mixing all of them together:
 
 ```py
-# revealed: (a, b, /, c=True, *args, *, d="default", e=5, **kwargs) -> None
+# revealed: (a, b, /, c=True, *args, d="default", e=5, **kwargs) -> None
 reveal_type(lambda a, b, /, c=True, *args, d="default", e=5, **kwargs: None)
 ```
 

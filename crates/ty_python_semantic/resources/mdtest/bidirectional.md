@@ -1804,7 +1804,7 @@ reveal_type(f8)  # revealed: (int, /) -> None
 # An optional keyword-only parameter does not prevent `*args` from accepting the positional
 # suffix in a `Callable` annotation.
 f9: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f9)  # revealed: (*args, *, x=1) -> None
+reveal_type(f9)  # revealed: (*args, x=1) -> None
 
 f10: Callable[[str, int, str], tuple[str, int, str]] = lambda x, y, z: reveal_type((x, y, z))  # revealed: tuple[str, int, str]
 reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]

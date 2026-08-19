@@ -410,7 +410,7 @@ def collect[*Ts](*values: *Ts) -> tuple[*Ts]:
     return values
 
 bound = partial(collect)
-reveal_type(bound)  # revealed: partial[[*Ts](*values: Ts) -> tuple[*Ts]]
+reveal_type(bound)  # revealed: partial[[*Ts](*values: *Ts) -> tuple[*Ts]]
 reveal_type(bound())  # revealed: tuple[()]
 reveal_type(bound("x", 1))  # revealed: tuple[Literal["x"], Literal[1]]
 ```
@@ -432,7 +432,7 @@ def collect[*Ts](prefix: int, *values: *Ts) -> tuple[*Ts]:
     return values
 
 bound = partial(collect, 1)
-reveal_type(bound)  # revealed: partial[[*Ts](*values: Ts) -> tuple[*Ts]]
+reveal_type(bound)  # revealed: partial[[*Ts](*values: *Ts) -> tuple[*Ts]]
 reveal_type(bound())  # revealed: tuple[()]
 reveal_type(bound("x", 2))  # revealed: tuple[Literal["x"], Literal[2]]
 reveal_type(collect(1))  # revealed: tuple[()]
@@ -455,7 +455,7 @@ def collect[T, *Ts](prefix: T, *values: *Ts) -> tuple[T, *Ts]:
     return (prefix, *values)
 
 bound = partial(collect, 1)
-reveal_type(bound)  # revealed: partial[[*Ts](*values: Ts) -> tuple[Literal[1], *Ts]]
+reveal_type(bound)  # revealed: partial[[*Ts](*values: *Ts) -> tuple[Literal[1], *Ts]]
 reveal_type(bound())  # revealed: tuple[Literal[1]]
 reveal_type(bound("x", True))  # revealed: tuple[Literal[1], Literal["x"], Literal[True]]
 ```
