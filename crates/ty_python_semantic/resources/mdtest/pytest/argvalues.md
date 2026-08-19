@@ -97,6 +97,8 @@ The argvalues must be in a tuple when there are multiple argnames.
 
 ```py
 import pytest
+from collections import namedtuple
+from typing import NamedTuple
 
 # All valid.
 @pytest.mark.parametrize("x, y", [(1, "2"), (3, "4")])
@@ -109,6 +111,28 @@ def _(x: int, y: str) -> None: ...
         [1, "2"],  # error: [pytest-param-mismatched-type]
         {3, "4"},  # error: [pytest-param-mismatched-type]
         None,  # error: [pytest-param-mismatched-type]
+    ],
+)
+def _(x: int, y: str) -> None: ...
+
+# Named tuple are accepted if their tuple-type is correct.
+# `collections.namedtuple` defaults to `Any`.
+
+class ValidTuple(NamedTuple):
+    x: int
+    y: str
+
+class InvalidTuple(NamedTuple):
+    x: int
+    y: int
+
+@pytest.mark.parametrize(
+    "x, y",
+    [
+        namedtuple("Valid Example", ["x", "y"])(1, "2"),
+        namedtuple("Invalid Example", ["x", "y"])(1, 2),
+        ValidTuple(1, "2"),
+        InvalidTuple(1, 2),  # error: [pytest-param-mismatched-type]
     ],
 )
 def _(x: int, y: str) -> None: ...
@@ -277,6 +301,7 @@ def _(x: int, y: str) -> None: ...
 # Interspersed values are checked.
 bool_params = [True, pytest.param(False)]
 
+@pytest.mark.parametrize("z", bool_params)
 @pytest.mark.parametrize(
     "x",
     [
@@ -293,7 +318,6 @@ bool_params = [True, pytest.param(False)]
         ("2", "3"),  # error: [pytest-param-mismatched-type]
     ],
 )
-@pytest.mark.parametrize("z", bool_params)
 def _(x: int, y: str, z: bool) -> None: ...
 
 # Request is a reserved word in Pytest.
@@ -329,4 +353,10 @@ def _(x: int, /, y: int, *, z: int, optional=None, **kwargs) -> None: ...
 # Type variables are ignored, and treated as `object`.
 @pytest.mark.parametrize("x", [[], None])
 def _[T: Iterable[Any]](x: T) -> None: ...
+
+# Unknown types are ignored.
+from pytest import fake_parametrize  # error: [unresolved-import]
+
+@fake_parametrize("x", [[], None])  # error: [dynamic-function-decorator-return]
+def _(x: int, **kwargs) -> None: ...
 ```

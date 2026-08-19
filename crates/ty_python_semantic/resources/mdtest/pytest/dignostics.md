@@ -23,6 +23,8 @@ def test_space_instead_of_comma(x: int, y: bool) -> None: ...
 def test_invalid_name_in_sequence(x: int, y: bool) -> None: ...
 @pytest.mark.parametrize(("x,y",), [])  # snapshot: pytest-invalid-argnames-literal
 def test_invalid_name_in_sequence(x: int, y: bool) -> None: ...
+@pytest.mark.parametrize(argvalues=[], argnames="oops!")  # snapshot: pytest-invalid-argnames-literal
+def test_flipped_argnames_argvalues(x: int, y: bool) -> None: ...
 ```
 
 ```snapshot
@@ -45,6 +47,13 @@ error[pytest-invalid-argnames-literal]: `x,y` is not a valid Python identifier.
   |
 7 | @pytest.mark.parametrize(("x,y",), [])  # snapshot: pytest-invalid-argnames-literal
   |                           ^^^^^
+
+
+error[pytest-invalid-argnames-literal]: `oops!` is not a valid Python identifier.
+ --> src/mdtest_snippet.py:9:49
+  |
+9 | @pytest.mark.parametrize(argvalues=[], argnames="oops!")  # snapshot: pytest-invalid-argnames-literal
+  |                                                 ^^^^^^^
 ```
 
 ## Request Keyword
@@ -94,6 +103,12 @@ def test_duplicate_argnames_csv(x: float, y: int) -> None: ...
 # snapshot: pytest-duplicate-argname
 @pytest.mark.parametrize(("y", "z"), [(3, "3")])
 def test_duplicate_argnames_sequence(x: float, y: int, z: str) -> None: ...
+@pytest.mark.parametrize("x", [])
+# snapshot: pytest-duplicate-argname
+@pytest.mark.parametrize("x", [])
+# snapshot: pytest-duplicate-argname
+@pytest.mark.parametrize("x", [])
+def test_duplicate_argnames_many_repeats(x: Any) -> None: ...
 ```
 
 ```snapshot
@@ -155,11 +170,35 @@ info: `z` already used here
    |
 11 | @pytest.mark.parametrize(("x", "z"), [(2.0, "2")])
    |                                ^^^
+
+
+error[pytest-duplicate-argname]: Duplicate argname `x`
+  --> src/mdtest_snippet.py:18:26
+   |
+18 | @pytest.mark.parametrize("x", [])
+   |                          ^^^
+info: `x` already used here
+  --> src/mdtest_snippet.py:16:26
+   |
+16 | @pytest.mark.parametrize("x", [])
+   |                          ^^^
+
+
+error[pytest-duplicate-argname]: Duplicate argname `x`
+  --> src/mdtest_snippet.py:20:26
+   |
+20 | @pytest.mark.parametrize("x", [])
+   |                          ^^^
+info: `x` already used here
+  --> src/mdtest_snippet.py:18:26
+   |
+18 | @pytest.mark.parametrize("x", [])
+   |                          ^^^
 ```
 
 ## Signature
 
-Pytest ignores optional parameterss and parameters must have the correct type.
+Pytest ignores optional parameters and parameters must have the correct type.
 
 ```py
 import pytest
@@ -298,6 +337,10 @@ def test_multiple_argname_tuple(x: int, y: float, z: str) -> None: ...
 # snapshot: pytest-param-mismatched-type
 @pytest.mark.parametrize(["x", "y", "z"], [(), (1, 2, str(3)), (None, None, None, None)])
 def test_multiple_argname_tuple(x: int, y: float, z: str) -> None: ...
+
+# snapshot: pytest-param-mismatched-type
+@pytest.mark.parametrize(argvalues=[(1, 2, 3)], argnames=["x", "y", "z"])
+def test_multiple_argname_tuple(x: int, y: float, z: str) -> None: ...
 ```
 
 ```snapshot
@@ -402,6 +445,15 @@ error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_
    |
 19 | @pytest.mark.parametrize(["x", "y", "z"], [(), (1, 2, str(3)), (None, None, None, None)])
    |                                                                                   ^^^^ Too many positional arguments: expected 3, got 4
+info: This happens when testing `test_multiple_argname_tuple`.
+
+
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+  --> src/mdtest_snippet.py:23:44
+   |
+23 | @pytest.mark.parametrize(argvalues=[(1, 2, 3)], argnames=["x", "y", "z"])
+   |                                            ^ Expected `str`, found `Literal[3]`
+info: Argument is incorrect
 info: This happens when testing `test_multiple_argname_tuple`.
 ```
 

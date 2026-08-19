@@ -88,7 +88,7 @@ def _(**kwargs) -> None: ...  # error: [pytest-test-parameter-wrong-kind]
 
 # But when there's a different one, only check the parametrization
 @pytest.mark.parametrize("a a", [])  # error: [pytest-invalid-argnames-literal]
-@opaque
+@opaque  # error: [dynamic-function-decorator-return]
 def _(**kwargs) -> None: ...
 
 # Do nothing when it's empty
@@ -100,7 +100,7 @@ def _(**kwargs) -> None: ...
 def _(*args) -> None: ...  # error: [pytest-test-parameter-wrong-kind]
 
 # Except when there's an extra decorator
-@opaque
+@opaque  # error: [dynamic-function-decorator-return]
 @pytest.mark.jump
 @pytest.mark.parametrize("a a", [])  # error: [pytest-invalid-argnames-literal]
 def _(*args) -> None: ...
