@@ -1,5 +1,5 @@
 use crate::types::{
-    CallArguments, InferContext, KnownClass, Type, TypeContext,
+    InferContext, KnownClass, Type, TypeContext,
     call::{CallDiagnosticOverride, CallErrorKind},
     diagnostic::{PYTEST_DUPLICATE_ARGNAME, PYTEST_PARAM_MISMATCHED_TYPE},
     infer::{
@@ -214,7 +214,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         fn_type: Type<'db>,
         arguments: &ast::Arguments,
     ) {
-        let mut call_arguments = CallArguments::from_arguments(arguments, |_, _| unreachable!());
+        let mut call_arguments = self.prepare_call_arguments(arguments);
         let mut bindings = self.bindings_for_call(fn_type).match_parameters(
             self.db(),
             self.program_environment(),
