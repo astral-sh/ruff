@@ -1,4 +1,4 @@
-//! Runs uv commands and manages background script synchronization.
+//! Runs uv commands and coordinates project and script environments.
 
 use ruff_db::system::System;
 use ty_combine::Combine;
