@@ -846,6 +846,9 @@ class B(metaclass=Meta2): ...
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`Bad`) must be a subclass of the metaclasses of all its bases, but `Meta1` (metaclass of base class `<class 'A'>`) and `Meta2` (metaclass of base class `<class 'B'>`) have no subclass relationship"
 Bad = type("Bad", (A, B), {})
+
+# error: [conflicting-metaclass]
+type("InlineBad", (A, B), {})
 ```
 
 ## `__slots__` in namespace dictionary
@@ -1365,18 +1368,18 @@ class MyProtocol(Protocol):
 
 ProtoImpl = type("ProtoImpl", (MyProtocol,), {"method": lambda self: 42})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
-reveal_type(type(ProtoImpl))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(ProtoImpl))  # revealed: <class 'ABCMeta'>
 reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 
 instance = ProtoImpl()
 reveal_type(instance)  # revealed: ProtoImpl
 ```
 
-### Protocol metaclasses from stubs
+### Protocol metaclass fallback from stubs
 
 Stubs can use protocol inheritance to describe an interface without requiring the same inheritance
-at runtime. A dynamic subclass retains the implicit protocol metaclass for attribute access, but a
-later subclass can still choose an unrelated explicit metaclass.
+at runtime. A dynamic subclass retains the `ABCMeta` fallback for attribute access, but a later
+subclass can still choose an unrelated explicit metaclass.
 
 `interface.pyi`:
 
@@ -1392,7 +1395,7 @@ class Interface(Protocol): ...
 from interface import Interface
 
 Dynamic = type("Dynamic", (Interface,), {})
-reveal_type(type(Dynamic))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Dynamic))  # revealed: <class 'ABCMeta'>
 
 class Meta(type): ...
 class Concrete(Dynamic, metaclass=Meta): ...
@@ -1400,10 +1403,10 @@ class Concrete(Dynamic, metaclass=Meta): ...
 reveal_type(type(Concrete))  # revealed: <class 'Meta'>
 ```
 
-### Protocol metaclass conflicts
+### Protocol metaclass fallback from source
 
-A source-defined protocol contributes its actual metaclass, including through a dynamic subclass.
-Combining it with an unrelated metaclass-bearing base is an error in both assigned and inline calls.
+The implicit `ABCMeta` is also only a fallback for source-defined protocols. A custom metaclass
+takes precedence, including when it is inherited through a dynamic subclass.
 
 ```py
 from typing import Protocol
@@ -1413,13 +1416,15 @@ class Meta(type): ...
 class Other(metaclass=Meta): ...
 
 Dynamic = type("Dynamic", (Interface,), {})
-reveal_type(type(Dynamic))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Dynamic))  # revealed: <class 'ABCMeta'>
 
-# error: [conflicting-metaclass]
-Bad = type("Bad", (Dynamic, Other), {})
+class Concrete(Dynamic, metaclass=Meta): ...
 
-# error: [conflicting-metaclass]
-type("InlineBad", (Interface, Other), {})
+reveal_type(type(Concrete))  # revealed: <class 'Meta'>
+
+Combined = type("Combined", (Dynamic, Other), {})
+reveal_type(type(Combined))  # revealed: <class 'Meta'>
+reveal_type(type(type("InlineCombined", (Interface, Other), {})))  # revealed: <class 'Meta'>
 ```
 
 ### TypedDict bases

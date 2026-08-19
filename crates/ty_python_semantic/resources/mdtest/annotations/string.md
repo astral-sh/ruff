@@ -134,6 +134,31 @@ if TYPE_CHECKING:
         def f(x: "int" | "None"): ...
 ```
 
+### Protocol metaclass fallback
+
+An inferred `ABCMeta` does not imply that a protocol has a custom `__or__` method. Partially
+stringified unions with protocol classes and their subclasses still fail at runtime before Python
+3.14.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class P(Protocol): ...
+class Child(P): ...
+
+def f(
+    # error: [unsupported-operator]
+    x: P | "P",
+    # error: [unsupported-operator]
+    y: "Child" | Child,
+): ...
+```
+
 ### Python less than 3.14 in a stub file
 
 This error is never emitted on stub files, because they are never executed at runtime:

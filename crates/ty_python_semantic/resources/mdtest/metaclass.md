@@ -672,8 +672,8 @@ reveal_type(C.__class__)  # revealed: <class 'M'>
 
 ## Protocol metaclass inheritance
 
-A protocol's metaclass is compatible with `ABCMeta`. A more specific explicitly supplied metaclass
-must be preserved, including when its bases are obtained by calling `type`.
+A protocol's implicit `ABCMeta` fallback is compatible with an abstract base class. An explicitly
+supplied metaclass must be preserved, including when its base is obtained by calling `type`.
 
 ```py
 from abc import ABC, ABCMeta
@@ -684,31 +684,83 @@ class Base(ABC): ...
 class Combined(Base, P): ...
 class ExplicitABC(Protocol, metaclass=ABCMeta): ...
 
-reveal_type(type(Combined))  # revealed: <class '_ProtocolMeta'>
-reveal_type(type(ExplicitABC))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Combined))  # revealed: <class 'ABCMeta'>
+reveal_type(type(ExplicitABC))  # revealed: <class 'ABCMeta'>
 
-class Meta(type(P), type(Base)): ...
+class Meta(type(Protocol)): ...
 class Derived(Base, P, metaclass=Meta): ...
 
 reveal_type(type(Derived))  # revealed: <class 'Meta'>
 ```
 
-## Protocol metaclass conflicts
+## Runtime-compatible custom protocol metaclasses
 
-An unrelated metaclass conflicts with the metaclass inherited from `Protocol`, whether the protocol
-base is direct or inherited through another class.
+Libraries can use `ABCMeta` while type checking and the runtime protocol metaclass otherwise. This
+beartype-style pattern is valid at runtime, so the implicit fallback must not conflict with its
+explicitly declared metaclass.
+
+```py
+from abc import ABCMeta
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    ProtocolMeta = ABCMeta
+else:
+    ProtocolMeta = type(Protocol)
+
+class Meta(ProtocolMeta): ...
+class P(Protocol, metaclass=Meta): ...
+class Child(P, Protocol): ...
+
+reveal_type(type(P))  # revealed: <class 'Meta'>
+reveal_type(type(Child))  # revealed: <class 'Meta'>
+```
+
+## Callable class metaclass with a protocol fallback
+
+The fallback also does not conflict with an ordinary class used as an explicit metaclass. Checking
+whether that callable constructs an appropriate class is a separate concern.
 
 ```py
 from typing import Protocol
 
-class Meta(type): ...
-class P(Protocol): ...
+class Factory: ...
+class P(Protocol, metaclass=Factory): ...
 
-# error: [conflicting-metaclass] "`_ProtocolMeta` (metaclass of base class `typing.Protocol`)"
-class Direct(Protocol, metaclass=Meta): ...
+reveal_type(P.__class__)  # revealed: <class 'Factory'>
+```
 
-# error: [conflicting-metaclass] "`_ProtocolMeta` (metaclass of base class `P`)"
-class Indirect(P, metaclass=Meta): ...
+The same applies when the first base supplies only a fallback and a later base supplies the selected
+metaclass, including dynamic class creation.
+
+```py
+class Interface(Protocol): ...
+class FactoryBase(metaclass=Factory): ...
+class Static(Interface, FactoryBase): ...
+
+Dynamic = type("Dynamic", (Interface, FactoryBase), {})
+
+reveal_type(Static.__class__)  # revealed: <class 'Factory'>
+reveal_type(Dynamic.__class__)  # revealed: <class 'Factory'>
+```
+
+## Explicit protocol metaclass conflicts
+
+An explicitly declared protocol metaclass remains a real constraint on subclasses. Two unrelated
+custom protocol metaclasses conflict even when the derived class also includes `Protocol` directly.
+
+```py
+from typing import Protocol
+
+class First(type(Protocol)): ...
+class Second(type(Protocol)): ...
+class P(Protocol, metaclass=First): ...
+
+# error: [conflicting-metaclass] "`First` (metaclass of base class `P`)"
+class Direct(P, Protocol, metaclass=Second): ...
+
+# error: [conflicting-metaclass] "`First` (metaclass of base class `P`)"
+class Indirect(P, metaclass=Second): ...
 ```
 
 ## Protocol metaclass fallback in stubs
@@ -744,7 +796,7 @@ class Explicit(Child, metaclass=Meta): ...
 class Left(Child, Other): ...
 class Right(Other, Child): ...
 
-reveal_type(type(Child))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
 reveal_type(type(Explicit))  # revealed: <class 'Meta'>
 reveal_type(type(Left))  # revealed: <class 'Meta'>
 reveal_type(type(Right))  # revealed: <class 'Meta'>
@@ -754,7 +806,7 @@ static_assert(not is_subtype_of(type[Child], ABCMeta))
 
 ## Explicit stub protocol metaclasses
 
-Explicitly choosing an inferred metaclass makes it a real constraint on later subclasses.
+Explicitly choosing the inferred `ABCMeta` makes it a real constraint on later subclasses.
 
 `interface.pyi`:
 
@@ -772,12 +824,15 @@ from interface import Interface
 class Meta(type): ...
 class Pinned(Interface, metaclass=type(Interface)): ...
 class Invalid(Pinned, metaclass=Meta): ...  # error: [conflicting-metaclass]
+
+reveal_type(type(Pinned))  # revealed: <class 'ABCMeta'>
 ```
 
-## Stub protocol metaclass attributes in the class namespace
+## Protocol metaclass attributes in the class namespace
 
-A metaclass inferred from a stub-only protocol base does not guarantee that the metaclass creates
-attributes in the class namespace, or impose a type on attributes defined there.
+An implicit protocol metaclass does not guarantee that the metaclass creates attributes in the class
+namespace, or impose a type on attributes defined there. This applies to both source and stub
+protocols.
 
 `interface.pyi`:
 
@@ -791,19 +846,23 @@ class Interface(Protocol): ...
 
 ```py
 from interface import Interface
+from typing import Protocol
 
-class Plain(Interface): ...
+class SourceInterface(Protocol): ...
+class StubClass(Interface): ...
+class SourceClass(SourceInterface): ...
 
-def f(value: Plain):
-    value.__abstractmethods__  # error: [unresolved-attribute]
+def f(stub: StubClass, source: SourceClass):
+    stub.__abstractmethods__  # error: [unresolved-attribute]
+    source.__abstractmethods__  # error: [unresolved-attribute]
 
-class OwnAttribute(Interface):
+class OwnAttribute(Interface, SourceInterface):
     __abstractmethods__ = 1
 ```
 
 ## Source protocol metaclasses inherited through stubs
 
-A stub does not weaken a metaclass that is known from an actual source-defined protocol.
+An implicit source protocol metaclass remains a fallback when inherited through a stub.
 
 `source.py`:
 
@@ -827,9 +886,10 @@ class Interface(P): ...
 from interface import Interface
 
 class Meta(type): ...
-class Invalid(Interface, metaclass=Meta): ...  # error: [conflicting-metaclass]
+class Derived(Interface, metaclass=Meta): ...
 
-reveal_type(type(Interface))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Interface))  # revealed: <class 'ABCMeta'>
+reveal_type(type(Derived))  # revealed: <class 'Meta'>
 ```
 
 ## Built-in collection metaclasses

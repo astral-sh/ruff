@@ -10384,7 +10384,7 @@ impl<'db> ModuleLiteralType<'db> {
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: ClassType<'db>,
     /// The base that supplied this candidate, or `None` for the class's own metaclass.
-    base: Option<ClassBase<'db>>,
+    base: Option<ClassType<'db>>,
 }
 
 /// Information about a `@dataclass_transform`-decorated metaclass.

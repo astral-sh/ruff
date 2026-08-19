@@ -276,13 +276,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // we also check for the case where one of the operands is a class-literal type
                             // or generic-alias type and the other is a string literal. The normal dunder lookup
                             // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
+                            // An inferred protocol metaclass does not establish a custom operator either.
                             let should_emit_error = if dunder_fails {
                                 true
                             } else {
                                 let literal = match (left_type_value, right_type_value) {
                                     (Type::ClassLiteral(class), Type::LiteralValue(literal))
                                     | (Type::LiteralValue(literal), Type::ClassLiteral(class))
-                                        if class.metaclass(db)
+                                        if class
+                                            .inferred_metaclass(db)
+                                            .for_inheritance(db, env)
                                             == KnownClass::Type.to_class_literal(db, env) =>
                                     {
                                         Some(literal)

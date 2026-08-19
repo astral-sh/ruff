@@ -361,27 +361,21 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    /// Return the metaclass of this class base.
-    pub(crate) fn metaclass(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        match self {
-            Self::Class(class) => class.metaclass(db),
-            Self::Any => Type::Dynamic(DynamicType::Any),
-            Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            Self::Divergent(divergent) => Type::Divergent(divergent),
-            Self::Protocol => KnownClass::ProtocolMeta.to_class_literal(db, env),
-            Self::Generic | Self::TypedDict(_) => KnownClass::Type.to_instance(db, env),
-        }
-    }
-
+    /// Return this base's selected metaclass or inferred protocol fallback.
     pub(super) fn inferred_metaclass(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> ClassMetaclass<'db> {
-        match self {
-            Self::Class(class) => class.inferred_metaclass(db),
-            _ => ClassMetaclass::Selected(self.metaclass(db, env)),
-        }
+        let metaclass = match self {
+            Self::Class(class) => return class.inferred_metaclass(db),
+            Self::Protocol => return ClassMetaclass::ProtocolFallback,
+            Self::Any => Type::Dynamic(DynamicType::Any),
+            Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            Self::Divergent(divergent) => Type::Divergent(divergent),
+            Self::Generic | Self::TypedDict(_) => KnownClass::Type.to_instance(db, env),
+        };
+        ClassMetaclass::Selected(metaclass)
     }
 
     fn apply_type_mapping_impl<'a>(

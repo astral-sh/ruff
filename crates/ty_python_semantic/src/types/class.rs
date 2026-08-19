@@ -3358,11 +3358,13 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
-/// A selected metaclass, or the default inferred from a stub-only protocol base.
+/// A selected metaclass, or the `ABCMeta` fallback inferred from a protocol base.
 ///
 /// Typeshed sometimes uses protocol inheritance to describe an interface that a runtime class
-/// implements without actually inheriting from it. The fallback exposes protocol metaclass
-/// attributes, such as `register`, but must not conflict with an explicitly declared metaclass.
+/// implements without actually inheriting from it. Source code also uses `ABCMeta` as a
+/// type-checking stand-in for the private metaclass of `typing.Protocol`. Following mypy, the
+/// fallback exposes ABC methods such as `register`, but does not participate in metaclass
+/// selection or conflict with an explicitly declared metaclass.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum ClassMetaclass<'db> {
     Selected(Type<'db>),
@@ -3389,10 +3391,11 @@ impl<'db> ClassMetaclass<'db> {
     pub(super) fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             Self::Selected(metaclass) => metaclass,
-            Self::ProtocolFallback => KnownClass::ProtocolMeta.to_class_literal(db, env),
+            Self::ProtocolFallback => KnownClass::ABCMeta.to_class_literal(db, env),
         }
     }
 
+    /// Return the metaclass guaranteed by explicit declarations, without the protocol fallback.
     pub(super) fn for_inheritance(
         self,
         db: &'db dyn Db,
@@ -3402,10 +3405,6 @@ impl<'db> ClassMetaclass<'db> {
             Self::Selected(metaclass) => metaclass,
             Self::ProtocolFallback => KnownClass::Type.to_class_literal(db, env),
         }
-    }
-
-    const fn is_protocol_fallback(self) -> bool {
-        matches!(self, Self::ProtocolFallback)
     }
 }
 
@@ -3432,7 +3431,7 @@ pub(super) enum MetaclassErrorKind<'db> {
         candidate: MetaclassCandidate<'db>,
         /// The incompatible metaclass of `base`.
         base_metaclass: ClassType<'db>,
-        base: ClassBase<'db>,
+        base: ClassType<'db>,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,

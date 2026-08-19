@@ -311,37 +311,29 @@ impl<'db> DynamicClassLiteral<'db> {
         // Convert Types to ClassBases for metaclass computation.
         // All bases should convert successfully here: `try_mro()` above would have
         // returned `Err(InvalidBases)` if any failed, causing us to return early.
+        let mut has_protocol_fallback = false;
         let mut bases = original_bases
             .iter()
-            .filter_map(|base_type| ClassBase::try_from_type(db, &env, *base_type, None));
+            .filter_map(|base_type| ClassBase::try_from_type(db, &env, *base_type, None))
+            .filter_map(|base| match base.inferred_metaclass(db, &env) {
+                ClassMetaclass::Selected(metaclass) => Some((base, metaclass)),
+                ClassMetaclass::ProtocolFallback => {
+                    has_protocol_fallback = true;
+                    None
+                }
+            });
 
-        // If all bases failed to convert, return type as the metaclass.
-        let Some(mut candidate_base) = bases.next() else {
-            return Ok(ClassMetaclass::Selected(
+        // Start with the first selected metaclass, ignoring protocol fallbacks.
+        let Some((mut candidate_base, mut candidate)) = bases.next() else {
+            return Ok(ClassMetaclass::with_protocol_fallback(
+                db,
                 KnownClass::Type.to_class_literal(db, &env),
+                has_protocol_fallback,
             ));
         };
 
-        let is_stub = self.scope(db).file(db).is_stub(db);
-        let infer_base_metaclass = |base: ClassBase<'db>| {
-            if is_stub && matches!(base, ClassBase::Protocol) {
-                ClassMetaclass::ProtocolFallback
-            } else {
-                base.inferred_metaclass(db, &env)
-            }
-        };
-
-        // Start with the first base's metaclass as the candidate.
-        let first_metaclass = infer_base_metaclass(candidate_base);
-        let mut candidate = first_metaclass.for_inheritance(db, &env);
-        let mut has_protocol_fallback = first_metaclass.is_protocol_fallback();
-
         // Reconcile with other bases' metaclasses.
-        for base in bases {
-            let inferred_metaclass = infer_base_metaclass(base);
-            has_protocol_fallback |= inferred_metaclass.is_protocol_fallback();
-            let base_metaclass = inferred_metaclass.for_inheritance(db, &env);
-
+        for (base, base_metaclass) in bases {
             // Get the ClassType for comparison.
             let Some(candidate_class) = candidate.to_class_type(db) else {
                 // If candidate isn't a class type, keep it as is.

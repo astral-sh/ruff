@@ -130,6 +130,25 @@ class Base: ...
 types.new_class("Dup", (Base, Base))
 ```
 
+### Metaclass conflicts
+
+Unrelated metaclasses supplied by ordinary bases still conflict in assigned and inline calls:
+
+```py
+import types
+
+class Meta1(type): ...
+class Meta2(type): ...
+class A(metaclass=Meta1): ...
+class B(metaclass=Meta2): ...
+
+# error: [conflicting-metaclass]
+Bad = types.new_class("Bad", (A, B))
+
+# error: [conflicting-metaclass]
+types.new_class("InlineBad", (A, B))
+```
+
 ## Special bases
 
 `types.new_class()` properly handles `__mro_entries__` and metaclasses, so it supports bases that
@@ -192,11 +211,11 @@ MyEnum = types.new_class("MyEnum", (Enum,))
 reveal_type(MyEnum)  # revealed: <class 'MyEnum'>
 ```
 
-### Protocol metaclasses from stubs
+### Protocol metaclass fallback from stubs
 
 Stubs can use protocol inheritance to describe an interface without requiring the same inheritance
-at runtime. A dynamic subclass retains the implicit protocol metaclass for attribute access, but a
-later subclass can still choose an unrelated explicit metaclass.
+at runtime. A dynamic subclass retains the `ABCMeta` fallback for attribute access, but a later
+subclass can still choose an unrelated explicit metaclass.
 
 `interface.pyi`:
 
@@ -213,7 +232,7 @@ import types
 from interface import Interface
 
 Dynamic = types.new_class("Dynamic", (Interface,))
-reveal_type(type(Dynamic))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Dynamic))  # revealed: <class 'ABCMeta'>
 
 class Meta(type): ...
 class Concrete(Dynamic, metaclass=Meta): ...
@@ -221,10 +240,10 @@ class Concrete(Dynamic, metaclass=Meta): ...
 reveal_type(type(Concrete))  # revealed: <class 'Meta'>
 ```
 
-### Protocol metaclass conflicts
+### Protocol metaclass fallback from source
 
-A source-defined protocol contributes its actual metaclass, including through a dynamic subclass.
-Combining it with an unrelated metaclass-bearing base is an error in both assigned and inline calls.
+The implicit `ABCMeta` is also only a fallback for source-defined protocols. A custom metaclass
+takes precedence, including when it is inherited through a dynamic subclass.
 
 ```py
 import types
@@ -235,13 +254,15 @@ class Meta(type): ...
 class Other(metaclass=Meta): ...
 
 Dynamic = types.new_class("Dynamic", (Interface,))
-reveal_type(type(Dynamic))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Dynamic))  # revealed: <class 'ABCMeta'>
 
-# error: [conflicting-metaclass]
-Bad = types.new_class("Bad", (Dynamic, Other))
+class Concrete(Dynamic, metaclass=Meta): ...
 
-# error: [conflicting-metaclass]
-types.new_class("InlineBad", (Interface, Other))
+reveal_type(type(Concrete))  # revealed: <class 'Meta'>
+
+Combined = types.new_class("Combined", (Dynamic, Other))
+reveal_type(type(Combined))  # revealed: <class 'Meta'>
+reveal_type(type(types.new_class("InlineCombined", (Interface, Other))))  # revealed: <class 'Meta'>
 ```
 
 ### Generic and TypedDict bases
