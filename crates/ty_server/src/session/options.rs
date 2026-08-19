@@ -100,6 +100,10 @@ impl InitializationOptions {
     }
 
     pub(crate) fn use_uv(&self, system: &dyn System) -> UseUv {
+        if self.workspace_trust == WorkspaceTrust::Untrusted {
+            return UseUv::Off;
+        }
+
         self.options
             .global
             .experimental
@@ -498,6 +502,7 @@ pub struct Experimental {
     /// Controls which uv integrations ty uses.
     ///
     /// This setting is resolved during initialization. Changing it requires restarting the server.
+    /// All uv integrations are disabled in untrusted workspaces.
     pub use_uv: Option<UseUv>,
 }
 

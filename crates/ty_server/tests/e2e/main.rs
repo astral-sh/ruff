@@ -82,6 +82,7 @@ use lsp_types::{
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, SystemVirtualPath, TestSystem};
 use rustc_hash::FxHashMap;
+use serde_json::{Value, json};
 use tempfile::TempDir;
 use ty_project::UseUv;
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
@@ -214,7 +215,7 @@ impl TestServer {
         workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
         test_context: TestContext,
         capabilities: ClientCapabilities,
-        initialization_options: Option<ClientOptions>,
+        initialization_options: Option<Value>,
         env_vars: Vec<(String, Option<String>)>,
     ) -> Self {
         setup_tracing();
@@ -280,26 +281,18 @@ impl TestServer {
     }
 
     /// Perform LSP initialization handshake
-    ///
-    /// # Panics
-    ///
-    /// If the `initialization_options` cannot be serialized to JSON
     fn initialize(
         mut self,
         workspace_folders: Vec<WorkspaceFolder>,
         capabilities: ClientCapabilities,
-        initialization_options: Option<ClientOptions>,
+        initialization_options: Option<Value>,
     ) -> Self {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders_initialize_params: WorkspaceFoldersInitializeParams {
                 workspace_folders: Some(workspace_folders.into()),
             },
-            initialization_options: initialization_options.map(|options| {
-                serde_json::to_value(options)
-                    .context("Failed to serialize initialization options to `ClientOptions`")
-                    .unwrap()
-            }),
+            initialization_options,
             ..Default::default()
         };
 
@@ -1144,6 +1137,12 @@ impl fmt::Debug for TestServer {
 
 impl Drop for TestServer {
     fn drop(&mut self) {
+        // If initialization panicked, there is no running session to shut down. Trying to send
+        // another request could panic again while the test is already unwinding.
+        if self.initialize_response.is_none() {
+            return;
+        }
+
         self.drain_messages();
 
         // Follow the LSP protocol to shutdown the server gracefully.
@@ -1212,7 +1211,7 @@ impl Drop for TestServer {
 pub(crate) struct TestServerBuilder {
     test_context: TestContext,
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
-    initialization_options: Option<ClientOptions>,
+    initialization_options: Option<Value>,
     client_capabilities: ClientCapabilities,
     env_vars: Vec<(String, Option<String>)>,
 }
@@ -1255,20 +1254,21 @@ impl TestServerBuilder {
         })
     }
 
-    /// Set the initial client options for the test server
-    pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
+    /// Set the initial client options for the test server.
+    pub(crate) fn with_initialization_options(self, options: ClientOptions) -> Self {
+        self.with_raw_initialization_options(json!(options))
+    }
+
+    /// Set raw initialization JSON for malformed or startup-only settings.
+    pub(crate) fn with_raw_initialization_options(mut self, options: Value) -> Self {
         self.initialization_options = Some(options);
         self
     }
 
     /// Configure which uv integrations the test server enables.
     pub(crate) fn with_use_uv(mut self, use_uv: UseUv) -> Self {
-        self.initialization_options
-            .get_or_insert_default()
-            .global
-            .experimental
-            .get_or_insert_default()
-            .use_uv = Some(use_uv);
+        self.initialization_options.get_or_insert_with(|| json!({}))["experimental"]["useUv"] =
+            json!(use_uv);
         self
     }
 
