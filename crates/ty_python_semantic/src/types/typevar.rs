@@ -1211,13 +1211,20 @@ impl<'db> BoundTypeVarInstance<'db> {
         specialization: Specialization<'db>,
         env: &ProgramEnvironment<'db>,
     ) -> Self {
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        self.apply_type_mapping_to_bound_or_constraints(db, &mapping, &visitor)
+    }
+
+    fn apply_type_mapping_to_bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
         self.map_bound_or_constraints(db, |original| {
-            let original = original?;
-            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
-                specialization,
-            ));
-            let visitor = ApplyTypeMappingVisitor::new(env);
-            Some(original.apply_type_mapping_impl(db, &mapping, &visitor))
+            original.map(|original| original.apply_type_mapping_impl(db, type_mapping, visitor))
         })
     }
 
@@ -1384,7 +1391,11 @@ impl<'db> BoundTypeVarInstance<'db> {
                         visitor,
                     ))
                 } else {
-                    Type::TypeVar(self)
+                    Type::TypeVar(self.apply_type_mapping_to_bound_or_constraints(
+                        db,
+                        type_mapping,
+                        visitor,
+                    ))
                 }
             }
             TypeMapping::Promote(..)

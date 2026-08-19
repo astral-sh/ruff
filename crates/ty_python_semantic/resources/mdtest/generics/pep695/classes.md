@@ -316,9 +316,8 @@ enclosing class's type variable does not constrain the new instance.
 class C[T]:
     def __init__(self) -> None: ...
     def method(self) -> None:
-        # XXX: The independent occurrence should specialize to `Unknown`, not the enclosing `T`.
-        reveal_type(C())  # revealed: C[T@C]
-        contextual: C[int] = C()  # error: [invalid-assignment]
+        reveal_type(C())  # revealed: C[Unknown]
+        contextual: C[int] = C()
 ```
 
 The same applies when an explicit `__new__` is followed by a downstream `__init__`. Both bound
@@ -333,9 +332,43 @@ class D[T]:
 
     def __init__(self) -> None: ...
     def method(self) -> None:
-        # XXX: The independent occurrence should specialize to `Unknown`, not the enclosing `T`.
-        reveal_type(D())  # revealed: D[T@D]
-        contextual: D[int] = D()  # error: [invalid-assignment]
+        reveal_type(D())  # revealed: D[Unknown]
+        contextual: D[int] = D()
+```
+
+By contrast, calling a class-object value constructs its existing instance type. The constructor
+cannot infer a new specialization for an enclosing type variable through a `type[Self]` receiver. An
+independently generic constructor method still owns and infers its own type variable.
+
+```py
+class Fixed[T]:
+    def __init__[U](self, value: T, extra: U) -> None: ...
+    @classmethod
+    def valid(cls, value: T) -> Self:
+        return cls(value, "extra")
+
+    @classmethod
+    def invalid(cls) -> Self:
+        # error: [invalid-argument-type]
+        return cls(0, "extra")
+```
+
+The same ownership rules apply to `__new__`.
+
+```py
+class FixedNew[T]:
+    def __new__[U](cls, value: T, extra: U) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, *args: object) -> None: ...
+    @classmethod
+    def valid(cls, value: T) -> Self:
+        return cls(value, "extra")
+
+    @classmethod
+    def invalid(cls) -> Self:
+        # error: [invalid-argument-type]
+        return cls(0, "extra")
 ```
 
 ## Inferring generic class parameters from constructors

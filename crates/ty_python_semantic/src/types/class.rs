@@ -2315,7 +2315,8 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        let dunder_new_function_symbol = lookup_type.lookup_dunder_new(db, env);
+        let dunder_new_function_symbol =
+            lookup_type.lookup_dunder_new(db, env, MemberLookupPolicy::default());
 
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
