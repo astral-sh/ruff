@@ -30,7 +30,7 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::{Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
 pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments};
@@ -306,6 +306,60 @@ impl Project {
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),
             IncludeResult::Included { .. }
         )
+    }
+
+    /// Rediscovers this project and applies its metadata and settings.
+    fn rediscover(
+        self,
+        db: &mut dyn Db,
+    ) -> Result<ProjectReloadResult, ProjectMetadataError> {
+        let mut metadata = self.metadata(db).rediscover(db.system())?;
+        if let Err(error) = metadata.apply_configuration_files(db.system()) {
+            let error = anyhow::Error::new(error);
+            tracing::error!(
+                "Failed to apply configuration files, \
+                continuing without applying them: {error:#}"
+            );
+        }
+
+        metadata.try_add_project_root(db);
+        let merged_options = metadata.to_merged_options();
+
+        let program_settings_diagnostics =
+            match merged_options.to_program_settings(db.system(), db.vendored(), &FallibleStrategy)
+            {
+                Ok((program_settings, diagnostics)) => {
+                    self.update_program(db, program_settings);
+                    diagnostics
+                }
+                Err(error) => {
+                    tracing::error!(
+                        "Failed to convert metadata to program settings, \
+                         continuing without applying them: {error}"
+                    );
+                    Vec::new()
+                }
+            };
+
+        let (settings, mut settings_diagnostics) =
+            match merged_options.to_settings(db, &FallibleStrategy) {
+                Ok((settings, diagnostics)) => (Some(settings), diagnostics),
+                Err(error) => {
+                    tracing::warn!(
+                        "Keeping old project configuration because loading the new \
+                         settings failed with: {error}"
+                    );
+                    (None, vec![error.into_diagnostic()])
+                }
+            };
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(db)),
+        );
+
+        tracing::debug!("Reloading project after structural change");
+        Ok(self.reload(db, metadata, settings, settings_diagnostics))
     }
 
     /// Reload the project after its metadata or settings have changed.
