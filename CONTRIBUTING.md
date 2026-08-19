@@ -198,12 +198,177 @@ The bootstrap script reserves the crate name, configures the release workflow as
 publisher, requires trusted publishing for future versions, and adds the crate to `.known-crates`.
 Commit the generated README and `.known-crates` update with the new crate.
 
+### Proposing a new lint rule
+
+A proposal for a new lint rule in Ruff should include the following components:
+
+- A proposed name that follows our [rule naming convention](#rule-naming-convention)
+
+- A proposed category that follows our [rule categorization guidelines](#rule-categorization-guidelines)
+
+- A draft of the rule documentation with the following sections:
+
+    - What it does - a one line description of what the rule checks
+    - Why is this bad? - a longer explanation of the pattern flagged by the rule and why it causes problems in real projects
+    - Example - a code example showing the problematic code, as well as a code block showing the fixed code
+    - (optional) Known problems - any known limitations of the rule, such as false positives or negatives
+    - (optional) Fix availability - if the rule only has an autofix in some cases, explain why
+    - (optional) Fix safety - if the rule’s fix is ever unsafe, explain why
+    - (optional) Options - if the rule depends upon any configuration options, list them
+    - (optional) See also - if there are other similar or synergistic rules, list them
+    - (optional) References - if there are any relevant external references to Python or other documentation, list them
+
+- An example diagnostic including the proposed name, primary message, and fix title (if applicable)
+
+    For example:
+
+    ```markdown
+    my-new-rule: primary diagnostic message
+     --> example.py:1:1
+    1 | import math
+      |        ^^^^
+    help: fix title
+    ```
+
+    When choosing a diagnostic range (marked by `^^^^` above), also consider that the start of the
+    range determines where `noqa` comments will be valid
+
+#### Rule naming convention
+
+Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "allow
+${rule}" or "allow ${rule} items", as in the context of suppression comments.
+
+For example, `AssertFalse` fits this convention: it flags `assert False` statements, and so a
+suppression comment would be framed as "allow `assert False`".
+
+As such, rule names should...
+
+- Highlight the pattern that is being linted against, rather than the preferred alternative.
+    For example, `AssertFalse` guards against `assert False` statements.
+
+- _Not_ contain instructions on how to fix the violation, which instead belong in the rule
+    documentation and the `fix_title`.
+
+- _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
+    convention.
+
+When re-implementing rules from other linters, we prioritize adhering to this convention over
+preserving the original rule name.
+
+#### Rule categorization guidelines
+
+Choosing a category is a crucial part of the rule proposal and acceptance process. To paraphrase the
+[Clippy documentation](https://rust-lang.github.io/rfcs/2476-clippy-uno.html#what-lints-belong-in-clippy),
+if a rule doesn't fit in the categories, it doesn't fit in Ruff. Descriptions of each category can
+be found in the [rule category documentation](https://docs.astral.sh/ruff/linter/#rule-categories),
+but the flow chart below is intended to facilitate category assignment.
+
+```mermaid
+---
+config:
+  flowchart:
+    nodeSpacing: 20
+    rankSpacing: 25
+    padding: 8
+  themeVariables:
+    fontSize: 13px
+---
+flowchart TD
+    A("Formatting, security,<br/>or language restriction?")
+    A -->|Yes| B["Formatting · Security · Restriction"]
+    A -->|No| C("Too noisy or opinionated?")
+
+    C -->|Yes| D["Pedantic"]
+    C -->|No| E("Incorrect, dangerous,<br/>deprecated, or useless?")
+
+    E -->|Yes| F("Definitely wrong<br/>or useless today?")
+    F -->|Yes| G["Correctness"]
+    F -->|No| H["Suspicious"]
+
+    E -->|No| I("Primary improvement?")
+    I -->|Simpler| J["Complexity"]
+    I -->|Faster| K["Performance"]
+    I -->|Idiomatic| L["Style"]
+```
+
+The first question filters out special categories of rules: those that relate to the visual
+presentation of code (`formatting`), those that relate to `security` vulnerabilities, and those that
+impose `restriction`s on language features. "Restriction" here specifically means an arbitrary or
+severe restriction, not the broad way in which any lint rule could be considered to restrict usage.
+Examples of restriction lints are rules like `assert` (`S101`) and `print` (`T201`), which ban basic
+language features across the board.
+
+If none of these special categories is quite right, the next question asks you to judge whether the
+rule is too noisy or opinionated for general use. This is somewhat subjective, but an [ecosystem
+report](#ecosystem-report) can be helpful to see how many diagnostics are emitted in real projects.
+A large number of diagnostics doesn't immediately make a rule `pedantic`, but many false positives
+or diagnostics that reasonable Python users would disagree with do.
+
+If a rule is not overly pedantic, we next consider the intention of the rule. If the main goal is
+detecting code that is obviously incorrect or useless, the options narrow to `correctness` or
+`suspicious`. Rules in the `correctness` category typically cause immediate issues like syntax or
+runtime errors, or silently do something the user didn't intend. Similarly, `suspicious` lints flag
+the same kind of code, but in cases where Ruff can't be sure what the user intended. A perfect
+example of a `suspicious` rule is `mutable-argument-default` (`B006`). This classic footgun is
+almost always a mistake, but in some narrow cases beyond Ruff's understanding, it may be
+intentional, in which case a `noqa` or `ruff: ignore` comment should be used. Such suppression
+comments should essentially never be reasonable for a `correctness` lint but are fine for
+`suspicious` lints.
+
+The final branch of the flow chart deals with stylistic lints, which are again somewhat subjective
+to differentiate between because changes that make code simpler often also make the code faster and
+more idiomatic. Thus, the question prompts you to consider the _primary_ improvement. Rules that
+primarily make code simpler are `complexity` lints, those that primarily make code faster or use
+less memory are `performance` lints, and those that primarily make code more idiomatic are `style`.
+
+#### Other guidelines
+
+Following these steps should generally ensure that a rule is a good fit for Ruff. A couple of
+additional things to watch out for are:
+
+- Rules that conflict with other tools, or especially other rules
+
+    Although we have many existing `formatting` rules that overlap and even conflict with our
+    formatter, we are not eager to add more. Similarly, we should avoid rules that mainly support
+    type checker usage, when type checkers themselves emit similar diagnostics. Most clearly, we
+    should avoid rules that overlap or conflict with other lint rules. This often suggests that the
+    existing rule should instead be made configurable to toggle between the two behaviors.
+
+    Checking both the input and output examples from your rule proposal with `ALL` rules selected in
+    the linter, with the formatter, and with a type checker like ty is a good quick check for
+    conflicts.
+
+- Rules that apply to third-party libraries
+
+    This is another case where we have many existing exceptions for widely-used third-party
+    libraries, but this niche should be filled by plugins in the near future. Most Ruff rules should
+    apply to Python language features or to functionality from the standard library.
+
+- Rules that require additional configuration
+
+    Most rules should function correctly once enabled without requiring additional settings. If this
+    isn’t possible, the rule should typically “fail safe” and avoid emitting diagnostics.
+    `banned-api` (`TID251`) is an example of such a rule that has no effect without configuring
+    `lint.flake8-tidy-imports.banned-api`. Avoid rules that emit a ton of diagnostics until some
+    kind of allowlist is configured.
+
+- Rules that are hard to explain
+
+    This guideline is inspired by ESLint’s “Generic” [rule guideline](https://eslint.org/docs/latest/contribute/propose-new-rule#core-rule-guidelines):
+
+    > Rules cannot be so specific that users will have trouble understanding when to use them. A
+    > rule is typically too specific if describing what it does requires more than two "and"s (if a
+    > and b and c and d, then this rule warns).
+
+    Watch out for this kind of pattern when writing your `Why is this bad?` or `Known problems`
+    section, or if you have a hard time categorizing the rule. The `pedantic` category exists to
+    hold rules that are controversial or niche, but very niche rules may still not be good fits for
+    Ruff.
+
 ### Example: Adding a new lint rule
 
-At a high level, the steps involved in adding a new lint rule are as follows:
-
-1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
-    (e.g., `AssertFalse`, as in, "allow `assert False`").
+Once a rule has been proposed and accepted in line with the guidance above, the steps involved in
+adding a new lint rule are as follows:
 
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
@@ -249,28 +414,6 @@ Finally, submit a pull request, and include the category, rule name, and rule co
 in:
 
 > \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
-
-#### Rule naming convention
-
-Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "allow
-${rule}" or "allow ${rule} items", as in the context of suppression comments.
-
-For example, `AssertFalse` fits this convention: it flags `assert False` statements, and so a
-suppression comment would be framed as "allow `assert False`".
-
-As such, rule names should...
-
-- Highlight the pattern that is being linted against, rather than the preferred alternative.
-    For example, `AssertFalse` guards against `assert False` statements.
-
-- _Not_ contain instructions on how to fix the violation, which instead belong in the rule
-    documentation and the `fix_title`.
-
-- _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
-    convention.
-
-When re-implementing rules from other linters, we prioritize adhering to this convention over
-preserving the original rule name.
 
 #### Rule testing: fixtures and snapshots
 
