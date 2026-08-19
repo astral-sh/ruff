@@ -93,22 +93,26 @@ def _() -> None: ...
 
 ## Multiple Argnames
 
-The argvalues must be in a tuple when there are multiple argnames.
+The argvalues must be in a tuple or list when there are multiple argnames.
 
 ```py
 import pytest
 from collections import namedtuple
 from typing import NamedTuple
 
-# All valid.
-@pytest.mark.parametrize("x, y", [(1, "2"), (3, "4")])
+# All valid (tuple).
+@pytest.mark.parametrize("x, y", ((1, "2"), (3, "4")))
+def _(x: int, y: str) -> None: ...
+
+# All valid (list).
+@pytest.mark.parametrize("x, y", [[1, "2"], [3, "4"]])
 def _(x: int, y: str) -> None: ...
 
 # Even though other sequences may be correct, they are not accepted.
 @pytest.mark.parametrize(
     ["x", "y"],
     [
-        [1, "2"],  # error: [pytest-param-mismatched-type]
+        {1: None, "2": None},  # error: [pytest-param-mismatched-type]
         {3, "4"},  # error: [pytest-param-mismatched-type]
         None,  # error: [pytest-param-mismatched-type]
     ],

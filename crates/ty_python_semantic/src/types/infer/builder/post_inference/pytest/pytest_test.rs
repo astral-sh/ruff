@@ -16,7 +16,7 @@ use crate::types::{
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AtomicNodeIndex};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use thin_vec::ThinVec;
 
@@ -153,14 +153,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // There are two sub-cases to consider here:
         let signature = partial_signature.single_item_fn_type(&self.context);
         for argvalue in argvalues {
+            // - each item is a raw tuple or raw-list (and it is accepted) => call a function with multiple args
             if let Some(args) = argvalue.as_tuple_expr()
                 && let Some(signature) = partial_signature.test_case_fn_type(&self.context)
             {
-                // - each item is a raw tuple (and it is accepted) => call a function with multiple args
                 self.check_pytest_fn_call(
                     partial_signature.test_name(),
                     signature,
-                    &Self::multiple_argvalue_arguments(args),
+                    &Self::multiple_argvalue_arguments(&args.elts, args.range()),
+                );
+            } else if let Some(args) = argvalue.as_list_expr()
+                && let Some(signature) = partial_signature.test_case_fn_type(&self.context)
+            {
+                // - each item is a raw tuple or raw-list (and it is accepted) => call a function with multiple args
+                self.check_pytest_fn_call(
+                    partial_signature.test_name(),
+                    signature,
+                    &Self::multiple_argvalue_arguments(&args.elts, args.range()),
                 );
             } else {
                 // - otherwise => check the entire test case as a tuple
@@ -199,11 +208,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Convert the argvalues into multiple arguments.
     /// This then gives more-specific errors, such as including the name.
-    fn multiple_argvalue_arguments(argvalues: &'ast ast::ExprTuple) -> ast::Arguments {
+    fn multiple_argvalue_arguments(
+        argvalues: &'ast [ast::Expr],
+        range: TextRange,
+    ) -> ast::Arguments {
         ast::Arguments {
-            range: argvalues.range(),
+            range,
             node_index: AtomicNodeIndex::default(),
-            args: argvalues.elts.clone().into_boxed_slice(),
+            args: argvalues.to_vec().into_boxed_slice(),
             keywords: ThinVec::default(),
         }
     }

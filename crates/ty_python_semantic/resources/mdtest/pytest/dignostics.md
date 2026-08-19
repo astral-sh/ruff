@@ -311,156 +311,156 @@ info: Argument is incorrect
 info: This happens when testing `test_single_argname`.
 ```
 
-### Multiple Argvalues as Tuple
+### Multiple Argvalues as Tuple or List
 
-Multiple argnames are passed in a string or sequence and the argvalues are a list or tuple of tuple
-expressions.
+Multiple argnames are passed in a string or sequence and the argvalues are a list or tuple of list
+or tuple expressions.
 
 ```py
 import pytest
 
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
-@pytest.mark.parametrize(("x",), ((1,), (2, 3), (4.0)))
+@pytest.mark.parametrize(("x",), ((1,), (2, 3), (4.0,)))
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
-@pytest.mark.parametrize("y, z", [(), (2.0, 3), (None, "a"), (b"", b"")])
-def test_multiple_argname_tuple(x: int, y: float, z: str) -> None: ...
+@pytest.mark.parametrize("y, z", [[], [2.0, 3], [None, "a"], [b"", b""]])
+def test_multiple_argvalue_mix(x: int, y: float, z: str) -> None: ...
 
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
-@pytest.mark.parametrize(["x", "y", "z"], [(), (1, 2, str(3)), (None, None, None, None)])
-def test_multiple_argname_tuple(x: int, y: float, z: str) -> None: ...
+@pytest.mark.parametrize(["x", "y", "z"], [[], [1, 2, str(3)], [None, None, None, None]])
+def test_multiple_argvalue_lists(x: int, y: float, z: str) -> None: ...
 
 # snapshot: pytest-param-mismatched-type
 @pytest.mark.parametrize(argvalues=[(1, 2, 3)], argnames=["x", "y", "z"])
-def test_multiple_argname_tuple(x: int, y: float, z: str) -> None: ...
+def test_multiple_argnames_strings(x: int, y: float, z: str) -> None: ...
 ```
 
 ```snapshot
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_mix`.
  --> src/mdtest_snippet.py:5:45
   |
-5 | @pytest.mark.parametrize(("x",), ((1,), (2, 3), (4.0)))
+5 | @pytest.mark.parametrize(("x",), ((1,), (2, 3), (4.0,)))
   |                                             ^ Too many positional arguments: expected 1, got 2
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_mix`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_mix`.
  --> src/mdtest_snippet.py:5:50
   |
-5 | @pytest.mark.parametrize(("x",), ((1,), (2, 3), (4.0)))
-  |                                                  ^^^ Expected `tuple[int] | ParameterSet`, found `float*`
+5 | @pytest.mark.parametrize(("x",), ((1,), (2, 3), (4.0,)))
+  |                                                  ^^^ Expected `int`, found `float*`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_mix`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_mix`.
   --> src/mdtest_snippet.py:11:35
    |
-11 | @pytest.mark.parametrize("y, z", [(), (2.0, 3), (None, "a"), (b"", b"")])
+11 | @pytest.mark.parametrize("y, z", [[], [2.0, 3], [None, "a"], [b"", b""]])
    |                                   ^^ No arguments provided for required parameters `y`, `z`
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_mix`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_mix`.
   --> src/mdtest_snippet.py:11:45
    |
-11 | @pytest.mark.parametrize("y, z", [(), (2.0, 3), (None, "a"), (b"", b"")])
+11 | @pytest.mark.parametrize("y, z", [[], [2.0, 3], [None, "a"], [b"", b""]])
    |                                             ^ Expected `str`, found `Literal[3]`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_mix`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_mix`.
   --> src/mdtest_snippet.py:11:50
    |
-11 | @pytest.mark.parametrize("y, z", [(), (2.0, 3), (None, "a"), (b"", b"")])
+11 | @pytest.mark.parametrize("y, z", [[], [2.0, 3], [None, "a"], [b"", b""]])
    |                                                  ^^^^ Expected `float`, found `None`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_mix`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_mix`.
   --> src/mdtest_snippet.py:11:63
    |
-11 | @pytest.mark.parametrize("y, z", [(), (2.0, 3), (None, "a"), (b"", b"")])
+11 | @pytest.mark.parametrize("y, z", [[], [2.0, 3], [None, "a"], [b"", b""]])
    |                                                               ^^^ Expected `float`, found `Literal[b""]`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_mix`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_mix`.
   --> src/mdtest_snippet.py:11:68
    |
-11 | @pytest.mark.parametrize("y, z", [(), (2.0, 3), (None, "a"), (b"", b"")])
+11 | @pytest.mark.parametrize("y, z", [[], [2.0, 3], [None, "a"], [b"", b""]])
    |                                                                    ^^^ Expected `str`, found `Literal[b""]`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_mix`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_lists`.
   --> src/mdtest_snippet.py:19:44
    |
-19 | @pytest.mark.parametrize(["x", "y", "z"], [(), (1, 2, str(3)), (None, None, None, None)])
+19 | @pytest.mark.parametrize(["x", "y", "z"], [[], [1, 2, str(3)], [None, None, None, None]])
    |                                            ^^ No arguments provided for required parameters `x`, `y`, `z`
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_lists`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_lists`.
   --> src/mdtest_snippet.py:19:65
    |
-19 | @pytest.mark.parametrize(["x", "y", "z"], [(), (1, 2, str(3)), (None, None, None, None)])
+19 | @pytest.mark.parametrize(["x", "y", "z"], [[], [1, 2, str(3)], [None, None, None, None]])
    |                                                                 ^^^^ Expected `int`, found `None`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_lists`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_lists`.
   --> src/mdtest_snippet.py:19:71
    |
-19 | @pytest.mark.parametrize(["x", "y", "z"], [(), (1, 2, str(3)), (None, None, None, None)])
+19 | @pytest.mark.parametrize(["x", "y", "z"], [[], [1, 2, str(3)], [None, None, None, None]])
    |                                                                       ^^^^ Expected `float`, found `None`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_lists`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_lists`.
   --> src/mdtest_snippet.py:19:77
    |
-19 | @pytest.mark.parametrize(["x", "y", "z"], [(), (1, 2, str(3)), (None, None, None, None)])
+19 | @pytest.mark.parametrize(["x", "y", "z"], [[], [1, 2, str(3)], [None, None, None, None]])
    |                                                                             ^^^^ Expected `str`, found `None`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_lists`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argvalue_lists`.
   --> src/mdtest_snippet.py:19:83
    |
-19 | @pytest.mark.parametrize(["x", "y", "z"], [(), (1, 2, str(3)), (None, None, None, None)])
+19 | @pytest.mark.parametrize(["x", "y", "z"], [[], [1, 2, str(3)], [None, None, None, None]])
    |                                                                                   ^^^^ Too many positional arguments: expected 3, got 4
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argvalue_lists`.
 
 
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argname_tuple`.
+error[pytest-param-mismatched-type]: Invalid parameter passed to `test_multiple_argnames_strings`.
   --> src/mdtest_snippet.py:23:44
    |
 23 | @pytest.mark.parametrize(argvalues=[(1, 2, 3)], argnames=["x", "y", "z"])
    |                                            ^ Expected `str`, found `Literal[3]`
 info: Argument is incorrect
-info: This happens when testing `test_multiple_argname_tuple`.
+info: This happens when testing `test_multiple_argnames_strings`.
 ```
 
 ### Multiple Argvalues as Non-Tuple
 
 Multiple argnames are passed in a string or sequence and the argvalues are a list or tuple of
-non-tuple expressions. The first case with a single argname is a special case of this.
+non-tuple or non-list expressions. The first case with a single argname is a special case of this.
 
 ```py
 import pytest
@@ -478,8 +478,7 @@ def test_variables(x: int, y: str) -> None: ...
 
 # snapshot: pytest-param-mismatched-type
 # snapshot: pytest-param-mismatched-type
-# snapshot: pytest-param-mismatched-type
-@pytest.mark.parametrize(("x", "y"), [None, [1, "y"], pytest.param(None), {1, "y"}])
+@pytest.mark.parametrize(("x", "y"), [None, pytest.param(None), {1, "y"}])
 def test_non_tuples(x: int, y: Literal["y"]) -> None: ...
 ```
 
@@ -509,28 +508,19 @@ info: └── ... omitted 1 union element without additional context
 
 
 error[pytest-param-mismatched-type]: Invalid parameter passed to `test_non_tuples`.
-  --> src/mdtest_snippet.py:17:39
+  --> src/mdtest_snippet.py:16:39
    |
-17 | @pytest.mark.parametrize(("x", "y"), [None, [1, "y"], pytest.param(None), {1, "y"}])
+16 | @pytest.mark.parametrize(("x", "y"), [None, pytest.param(None), {1, "y"}])
    |                                       ^^^^ Expected `tuple[int, Literal["y"]] | ParameterSet`, found `None`
 info: Argument is incorrect
 info: This happens when testing `test_non_tuples`.
 
 
 error[pytest-param-mismatched-type]: Invalid parameter passed to `test_non_tuples`.
-  --> src/mdtest_snippet.py:17:45
+  --> src/mdtest_snippet.py:16:65
    |
-17 | @pytest.mark.parametrize(("x", "y"), [None, [1, "y"], pytest.param(None), {1, "y"}])
-   |                                             ^^^^^^^^ Expected `tuple[int, Literal["y"]] | ParameterSet`, found `list[int | str]`
-info: Argument is incorrect
-info: This happens when testing `test_non_tuples`.
-
-
-error[pytest-param-mismatched-type]: Invalid parameter passed to `test_non_tuples`.
-  --> src/mdtest_snippet.py:17:75
-   |
-17 | @pytest.mark.parametrize(("x", "y"), [None, [1, "y"], pytest.param(None), {1, "y"}])
-   |                                                                           ^^^^^^^^ Expected `tuple[int, Literal["y"]] | ParameterSet`, found `set[int | str]`
+16 | @pytest.mark.parametrize(("x", "y"), [None, pytest.param(None), {1, "y"}])
+   |                                                                 ^^^^^^^^ Expected `tuple[int, Literal["y"]] | ParameterSet`, found `set[int | str]`
 info: Argument is incorrect
 info: This happens when testing `test_non_tuples`.
 ```
