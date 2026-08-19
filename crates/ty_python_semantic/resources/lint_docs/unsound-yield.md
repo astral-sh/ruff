@@ -30,7 +30,7 @@ def integers() -> Generator[int]:
 sum(integers())
 ```
 
-This rule treats [fully static][fully-static] yield types as "typed boundaries" for your code. With this rule enabled, ty would emit an error on the `yield returns_any()` statement
+This rule treats ["fully static"][fully-static] yield types as "typed boundaries" for your code. With this rule enabled, ty would emit an error on the `yield returns_any()` statement
 in `integers`, since the `returns_any()` call is inferred as having type `Any`, and `Any` is not
 a subtype of `int`. This helps prevent the unsoundness from spreading far from its original source
 (in this case, the return type of the `returns_any` function).
@@ -48,6 +48,7 @@ def returns_any() -> Any:
 
 
 def dynamic_yield_type() -> Generator[Any]:
+    # no error
     yield returns_any()
 
 
@@ -57,11 +58,12 @@ def static_yield_type() -> Generator[int, Any, Any]:
 ```
 
 This rule works especially well when combined with ty's
-`missing-type-argument` rule, and the Ruff rules [`ANN201`][ann201],
-[`ANN202`][ann202], [`ANN204`][ann204], [`ANN205`][ann205], and [`ANN206`][ann206]. Enabling all
-these rules at once effectively makes it much less likely that a `yield` expression can lead to
-unsoundness "leaking" out of a function unless that function has been *explicitly* annotated with
-a dynamic type in some way (`-> Generator[Any]` or `-> Generator[tuple[Any]]`, for example).
+`missing-type-argument` and `unsound-assignment` rules, as well as the Ruff rules
+[`ANN201`][ann201], [`ANN202`][ann202], [`ANN204`][ann204], [`ANN205`][ann205], and
+[`ANN206`][ann206]. Enabling all these rules at once effectively makes it much less likely that a
+`yield` expression can lead to unsoundness "leaking" out of a function unless that function has
+been *explicitly* annotated with a dynamic type in some way
+(`-> Generator[Any]` or `-> Generator[tuple[Any]]`, for example).
 
 ## Examples
 
@@ -116,6 +118,7 @@ generator boundaries.
 ## See also
 
 - `unsound-return-statement` is a similar rule that triggers on unsound `return` statements rather than unsound `yield` expressions
+- `unsound-assignment` is a similar rule that triggers on unsound assignments
 
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
 [ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/
