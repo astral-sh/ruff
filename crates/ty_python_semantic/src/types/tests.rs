@@ -10,6 +10,43 @@ use test_case::test_case;
 use ty_python_core::program::Program;
 use ty_python_core::{ProgramFile, TestProgramDb as _};
 
+#[test]
+fn bounded_intersection_preserves_late_union_elements() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let wide = UnionType::from_elements(db, &env, (1..=6).map(Type::int_literal));
+    let narrow = UnionType::from_elements(db, &env, (5..=7).map(Type::int_literal));
+    let expected = UnionType::from_elements(db, &env, (5..=6).map(Type::int_literal));
+
+    // The first union exceeds the budget, but its last two elements survive the intersection.
+    for elements in [[wide, narrow], [narrow, wide]] {
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(expected)
+        );
+    }
+}
+
+#[test]
+fn bounded_intersection_returns_none_when_budget_exhausted() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let wide = UnionType::from_elements(db, &env, (1..=6).map(Type::int_literal));
+
+    // A single union requires no distribution and is returned exactly, regardless of its size.
+    assert_eq!(
+        IntersectionType::bounded_from_elements(db, &env, [wide]),
+        Some(wide)
+    );
+    // Exceeding the budget must return `None`, not a partial intersection.
+    assert_eq!(
+        IntersectionType::bounded_from_elements(db, &env, [wide, wide]),
+        None
+    );
+}
+
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.
 /// See [`KnownClass::canonical_module`] for more information.
