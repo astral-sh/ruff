@@ -590,8 +590,7 @@ pub mod clap_completion {
                                 .help(rule.noqa_code().to_string())
                         }))
                         .chain(Category::iter().map(|category| {
-                            PossibleValue::new(category.into_str())
-                                .help("all rules in this category")
+                            PossibleValue::new(category.into_str()).help(category.description())
                         })),
                 ),
             ))
