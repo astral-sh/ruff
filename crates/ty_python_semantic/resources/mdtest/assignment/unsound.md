@@ -67,6 +67,45 @@ assert isinstance(dynamic_value, int)
 narrowed_value: int = dynamic_value
 ```
 
+## Dataclass field specifiers
+
+Dataclass field specifiers describe how a field is initialized without assigning a value of its
+declared type.
+
+```py
+from dataclasses import dataclass, field
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+@dataclass
+class Example:
+    required: int = field()
+    without_init: int = field(init=False)
+    with_default: int = field(default=42)
+    with_factory: list[int] = field(default_factory=lambda: [42])
+    with_none: int | None = field(default=None)
+
+    dynamic_value: int = returns_any()  # error: [unsound-assignment]
+    invalid_default: int = field(default="not an integer")  # error: [invalid-assignment]
+```
+
+Field specifiers registered with `dataclass_transform` receive the same treatment.
+
+```py
+from typing_extensions import dataclass_transform
+
+def custom_field() -> Any:
+    return 42
+
+@dataclass_transform(field_specifiers=(custom_field,))
+class Model: ...
+
+class CustomExample(Model):
+    value: int = custom_field()
+```
+
 ## Unsound assignments to gradually typed targets
 
 The rule applies only when the target's declared type is fully static. An explicit `Any`, an alias

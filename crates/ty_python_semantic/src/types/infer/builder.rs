@@ -1818,6 +1818,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // update those too if updating this!
         if self.context.is_lint_enabled(&UNSOUND_ASSIGNMENT)
             && target_ty.is_fully_static(db, env)
+            && !matches!(value_ty, Type::KnownInstance(KnownInstanceType::Field(_)))
             && !value_ty.is_pure_redundant_with(db, env, target_ty)
         {
             report_unsound_assignment(
