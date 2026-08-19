@@ -61,6 +61,117 @@ class DataFrame:
     pass
 ```
 
+## Variadic positional parameter annotations
+
+A variadic positional parameter's annotation uses the same qualified type name as the assignment
+diagnostic.
+
+`first.py`:
+
+```py
+class Value: ...
+```
+
+`second.py`:
+
+```py
+class Value: ...
+```
+
+```py
+import first
+import second
+
+def assign(*values: first.Value) -> None:
+    values = (second.Value(),)  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `tuple[second.Value]` is not assignable to `tuple[first.Value, ...]`
+ --> src/mdtest_snippet.py:5:14
+  |
+4 | def assign(*values: first.Value) -> None:
+  |                     ----------- Variadic parameter annotation declares the type as `tuple[first.Value, ...]`
+5 |     values = (second.Value(),)  # snapshot: invalid-assignment
+  |              ^^^^^^^^^^^^^^^^^ Incompatible value of type `tuple[second.Value]`
+```
+
+## Variadic keyword parameter annotations
+
+A variadic keyword parameter's annotation uses the same qualified type name as the assignment
+diagnostic.
+
+`first.py`:
+
+```py
+class Value: ...
+```
+
+`second.py`:
+
+```py
+class Value: ...
+```
+
+```py
+import first
+import second
+
+def assign(**values: first.Value) -> None:
+    values = {"item": second.Value()}  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `dict[str, first.Value | second.Value]` is not assignable to `dict[str, first.Value]`
+ --> src/mdtest_snippet.py:5:14
+  |
+4 | def assign(**values: first.Value) -> None:
+  |                      ----------- Keyword-variadic parameter annotation declares the type as `dict[str, first.Value]`
+5 |     values = {"item": second.Value()}  # snapshot: invalid-assignment
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `dict[str, first.Value | second.Value]`
+info: element `second.Value` of union `first.Value | second.Value` is not assignable to `first.Value`
+```
+
+## Ambiguous declaration origins
+
+When distinct branches declare the same type, the fallback annotation still distinguishes the
+declared class from a same-named assigned class.
+
+`first.py`:
+
+```py
+class Value: ...
+```
+
+`second.py`:
+
+```py
+class Value: ...
+```
+
+```py
+import first
+import second
+
+def assign(flag: bool) -> None:
+    if flag:
+        value: first.Value
+    else:
+        value: first.Value
+
+    value = second.Value()  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `second.Value` is not assignable to `first.Value`
+  --> src/mdtest_snippet.py:10:13
+   |
+10 |     value = second.Value()  # snapshot: invalid-assignment
+   |     -----   ^^^^^^^^^^^^^^ Incompatible value of type `second.Value`
+   |     |
+   |     Declared type `first.Value`
+```
+
 ## Class from different module with the same qualified name
 
 `package/__init__.py`:
