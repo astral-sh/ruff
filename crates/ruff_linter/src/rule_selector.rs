@@ -339,7 +339,7 @@ impl Iterator for RuleSelectorIter {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
             RuleSelectorIter::Category { iter, category } => {
-                iter.find(|rule| rule.category() == Some(*category))
+                iter.find(|rule| rule.category() == *category)
             }
             RuleSelectorIter::Chain(iter) => iter.next(),
             RuleSelectorIter::Vec(iter) => iter.next(),

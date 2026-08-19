@@ -126,6 +126,14 @@ pub enum Category {
 
     /// Rules that restrict the use of basic language features
     Restriction,
+
+    /// Internal testing rules that shouldn't be exposed to users.
+    #[strum(disabled)]
+    Testing,
+
+    /// Removed rules that shouldn't be exposed to users.
+    #[strum(disabled)]
+    Removed,
 }
 
 impl Category {

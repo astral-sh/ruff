@@ -17,14 +17,12 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
         ));
     };
 
-    if metadata.category.is_none() && !metadata.removed {
+    let Some(category) = metadata.category else {
         return Err(Error::new_spanned(
             &input,
             "Missing required rule category metadata",
         ));
-    }
-
-    let category = metadata.category.unwrap_or_else(|| quote!(None));
+    };
 
     let name = input.ident;
 
@@ -46,7 +44,7 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
                 crate::codes::#status
             }
 
-            fn category() -> Option<crate::codes::Category> {
+            fn category() -> crate::codes::Category {
                 #category
             }
 
@@ -111,21 +109,21 @@ fn get_metadata(attrs: &[Attribute]) -> syn::Result<Metadata> {
                 } else if meta.path.is_ident("removed_since") {
                     let lit: LitStr = parse_version(&meta)?;
                     metadata.status = Some(quote!(RuleStatus::Removed { since: #lit }));
-                    metadata.removed = true;
+                    metadata.category = Some(quote!(crate::codes::Category::Removed));
                     return Ok(());
                 } else if meta.path.is_ident("category") {
                     let lit: LitStr = meta.value()?.parse()?;
                     metadata.category = Some(match lit.value().as_str() {
-                        "correctness" => quote!(Some(crate::codes::Category::Correctness)),
-                        "suspicious" => quote!(Some(crate::codes::Category::Suspicious)),
-                        "complexity" => quote!(Some(crate::codes::Category::Complexity)),
-                        "performance" => quote!(Some(crate::codes::Category::Performance)),
-                        "style" => quote!(Some(crate::codes::Category::Style)),
-                        "security" => quote!(Some(crate::codes::Category::Security)),
-                        "formatting" => quote!(Some(crate::codes::Category::Formatting)),
-                        "pedantic" => quote!(Some(crate::codes::Category::Pedantic)),
-                        "restriction" => quote!(Some(crate::codes::Category::Restriction)),
-                        "test" => quote!(None),
+                        "correctness" => quote!(crate::codes::Category::Correctness),
+                        "suspicious" => quote!(crate::codes::Category::Suspicious),
+                        "complexity" => quote!(crate::codes::Category::Complexity),
+                        "performance" => quote!(crate::codes::Category::Performance),
+                        "style" => quote!(crate::codes::Category::Style),
+                        "security" => quote!(crate::codes::Category::Security),
+                        "formatting" => quote!(crate::codes::Category::Formatting),
+                        "pedantic" => quote!(crate::codes::Category::Pedantic),
+                        "restriction" => quote!(crate::codes::Category::Restriction),
+                        "testing" => quote!(crate::codes::Category::Testing),
                         category => {
                             return Err(Error::new_spanned(
                                 lit,
@@ -149,7 +147,6 @@ fn get_metadata(attrs: &[Attribute]) -> syn::Result<Metadata> {
 struct Metadata {
     status: Option<TokenStream>,
     category: Option<TokenStream>,
-    removed: bool,
 }
 
 fn parse_attr<'a, const LEN: usize>(

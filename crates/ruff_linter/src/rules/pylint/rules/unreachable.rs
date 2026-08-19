@@ -30,7 +30,7 @@ use crate::checkers::ast::Checker;
 ///     return "reachable"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.0.0", category = "test")]
+#[violation_metadata(preview_since = "0.0.0", category = "testing")]
 pub(crate) struct UnreachableCode {
     name: String,
 }
