@@ -6,10 +6,8 @@ use crossbeam::channel::{Receiver, RecvTimeoutError, SendTimeoutError, Sender, T
 use ruff_db::files::File;
 use ruff_db::system::{CommandExecutor, System, SystemPathBuf};
 
-use super::{
-    MetadataTarget, ScriptEnvironmentCacheKey, Uv, unsupported_command_execution,
-    uv_executable_error,
-};
+use super::command::unsupported_command_execution;
+use super::{MetadataTarget, ScriptEnvironmentCacheKey, Uv, uv_executable_error};
 use crate::{Db, ScriptSyncProgress};
 
 /// Synchronizes standalone script environments with uv.
