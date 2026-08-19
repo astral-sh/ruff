@@ -10,7 +10,7 @@ use super::command::unsupported_command_execution;
 use super::{MetadataTarget, ScriptEnvironmentCacheKey, Uv, uv_executable_error};
 use crate::{Db, ScriptSyncProgress};
 
-/// Synchronizes standalone script environments with uv.
+/// Runs workspace and standalone-script metadata requests with uv.
 ///
 /// A project stores one service in its shared `UvEnvironments`, so every database snapshot uses
 /// the same bounded request queue and workers. The queue applies backpressure to producers, while
@@ -47,13 +47,13 @@ impl UvMetadataService {
         }
     }
 
-    /// Synchronizes one script and waits for its result.
+    /// Requests workspace or script metadata and waits for its result.
     ///
     /// Waiting cooperatively yields the current Rayon worker so it can execute other checking work.
     pub(crate) fn run_blocking(
         &self,
         db: &dyn Db,
-        task: ScriptSyncTask,
+        target: MetadataTarget,
     ) -> std::io::Result<Output> {
         let workers = self.worker_pool(db.system())?;
 
@@ -65,7 +65,7 @@ impl UvMetadataService {
         let (result_sender, result_receiver) = crossbeam::channel::bounded(1);
 
         let mut job = UvJob {
-            task,
+            target,
             mode: UvJobMode::Blocking {
                 result_sender,
                 cancellation,
@@ -127,8 +127,9 @@ impl UvMetadataService {
 
         let path = task.request.path().to_path_buf();
         let job = UvJob {
-            task,
+            target: task.request.to_metadata_target(),
             mode: UvJobMode::Background {
+                task,
                 result_sender: self.results_sender.clone(),
                 wake_sender: self.wake_sender.clone(),
                 progress,
@@ -140,21 +141,18 @@ impl UvMetadataService {
         };
         match workers.jobs.send(job) {
             Ok(()) => tracing::debug!("Queued script synchronization for `{path}`"),
-            Err(error) => {
-                let UvJob { task, mode, .. } = error.into_inner();
-                match mode {
-                    UvJobMode::Blocking { result_sender, .. } => {
-                        let _ = result_sender.send(Err(worker_disconnected()));
-                    }
-                    UvJobMode::Background { progress, .. } => {
-                        self.publish_result(ScriptSyncResult {
-                            task,
-                            output: Err(worker_disconnected()),
-                            progress,
-                        });
-                    }
+            Err(error) => match error.into_inner().mode {
+                UvJobMode::Blocking { result_sender, .. } => {
+                    let _ = result_sender.send(Err(worker_disconnected()));
                 }
-            }
+                UvJobMode::Background { task, progress, .. } => {
+                    self.publish_result(ScriptSyncResult {
+                        task,
+                        output: Err(worker_disconnected()),
+                        progress,
+                    });
+                }
+            },
         }
     }
 
@@ -225,9 +223,11 @@ impl ScriptSyncRequest {
         &self.0.path
     }
 
-    /// The `--python` argument
-    pub(crate) fn python(&self) -> Option<&ruff_db::system::SystemPath> {
-        self.0.python.as_deref()
+    pub(crate) fn to_metadata_target(&self) -> MetadataTarget {
+        MetadataTarget::Script {
+            path: self.0.path.clone(),
+            python: self.0.python.clone(),
+        }
     }
 
     pub(crate) fn cache_key(&self) -> ScriptEnvironmentCacheKey {
@@ -256,7 +256,7 @@ const MAX_QUEUED_UV_TASKS: usize = 8;
 /// Maximum time to block before checking cancellation and yielding to Rayon.
 const POLL_TIMEOUT: Duration = Duration::from_millis(1);
 
-/// A bounded worker pool for synchronizing standalone script environments with uv.
+/// A bounded worker pool for workspace and script metadata requests.
 struct UvWorkerPool {
     /// Disconnects when the pool is dropped so workers abandon buffered jobs.
     ///
@@ -336,34 +336,42 @@ impl UvWorker {
             if let UvJobMode::Blocking { cancellation, .. } = &job.mode
                 && cancellation.is_cancelled()
             {
-                tracing::debug!(
-                    "Discarded cancelled script synchronization for `{}`",
-                    job.task.request.path()
-                );
+                match &job.target {
+                    MetadataTarget::Workspace(path) => {
+                        tracing::debug!(
+                            "Discarded cancelled workspace metadata request for `{path}`"
+                        );
+                    }
+                    MetadataTarget::Script { path, .. } => {
+                        tracing::debug!("Discarded cancelled script synchronization for `{path}`");
+                    }
+                }
                 continue;
             }
 
             // Run the job
             let output = {
                 let _span = job.span.enter();
-                tracing::info!("Synchronizing script `{}`", job.task.request.path());
-
-                let target = MetadataTarget::Script {
-                    path: job.task.request.path(),
-                    python: job.task.request.python(),
-                };
-
+                let target = &job.target;
+                match target {
+                    MetadataTarget::Workspace(path) => {
+                        tracing::info!("Reading workspace metadata for `{path}`");
+                    }
+                    MetadataTarget::Script { path, .. } => {
+                        tracing::info!("Synchronizing script `{path}`");
+                    }
+                }
                 self.uv.execute(&*self.executor, target)
             };
 
             // Send the result
-            let UvJob { task, mode, .. } = job;
-            match mode {
+            match job.mode {
                 UvJobMode::Blocking { result_sender, .. } => {
                     // The receiver disappears when the blocking caller is cancelled.
                     let _ = result_sender.send(output);
                 }
                 UvJobMode::Background {
+                    task,
                     result_sender,
                     wake_sender,
                     progress,
@@ -387,7 +395,7 @@ impl UvWorker {
 }
 
 struct UvJob {
-    task: ScriptSyncTask,
+    target: MetadataTarget,
     mode: UvJobMode,
     span: tracing::Span,
 }
@@ -403,6 +411,9 @@ enum UvJobMode {
     /// The job runs as a background task.
     ///
     Background {
+        /// The script identity and request to return with the synchronization result.
+        task: ScriptSyncTask,
+
         /// The sender end of the channel communicating with the sync service.
         result_sender: Sender<ScriptSyncResult>,
 

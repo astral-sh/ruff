@@ -1,4 +1,4 @@
-//! Manages uv environments for standalone Python scripts.
+//! Manages the Python environments used to check projects and standalone scripts.
 //!
 //! A script can declare its Python requirements and dependencies in an inline metadata block.
 //! Synchronizing that metadata with uv produces an environment whose Python version and installed
@@ -53,12 +53,13 @@ use parking_lot::{Condvar, Mutex, MutexGuard};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::FxDashMap;
 use ruff_db::files::{File, Files};
-use ruff_db::system::SystemPathBuf;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use salsa::Setter;
 
 use crate::script::script_tag;
 use crate::uv::{
-    ScriptSyncRequest, ScriptSyncResult, ScriptSyncTask, Uv, UvMetadata, UvMetadataService,
+    MetadataTarget, ScriptSyncRequest, ScriptSyncResult, ScriptSyncTask, Uv, UvMetadata,
+    UvMetadataError, UvMetadataService,
 };
 use crate::{Db, ProgressReporter, ScriptSyncProgress, UseUv};
 
@@ -86,7 +87,7 @@ pub(crate) fn script_environment(db: &dyn Db, file: File) -> Option<ScriptEnviro
     db.uv_environments().environment(db, file)
 }
 
-/// Manages and synchronizes PEP 723 script environments using `uv metadata`.
+/// Coordinates project and PEP 723 script environments using `uv metadata`.
 #[derive(Clone, Default)]
 pub struct UvEnvironments {
     inner: Arc<UvEnvironmentsInner>,
@@ -100,6 +101,20 @@ impl UvEnvironments {
                 ..UvEnvironmentsInner::default()
             }),
         }
+    }
+
+    /// Reads workspace metadata through the same worker pool used by scripts.
+    #[expect(dead_code, reason = "Project reloads will use this in a follow-up")]
+    pub(crate) fn workspace_metadata(
+        &self,
+        db: &dyn Db,
+        path: &SystemPath,
+    ) -> Result<UvMetadata, UvMetadataError> {
+        let output = self
+            .inner
+            .sync_service
+            .run_blocking(db, MetadataTarget::Workspace(path.to_path_buf()));
+        Uv::parse_metadata_output(db.system(), output)
     }
 
     /// Returns a receiver for background synchronization wakeups.
@@ -194,7 +209,9 @@ impl UvEnvironments {
                     // Run uv and show progress until the synchronization finishes.
                     let output = {
                         let _progress = reporter.for_script(db, file);
-                        self.inner.sync_service.run_blocking(db, task)
+                        self.inner
+                            .sync_service
+                            .run_blocking(db, task.request.to_metadata_target())
                     };
 
                     // Create the `ScriptEnvironment` input from uv's output, retaining its cache key
