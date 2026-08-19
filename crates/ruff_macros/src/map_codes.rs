@@ -307,19 +307,19 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             }
 
             pub fn is_preview(&self) -> bool {
-                matches!(self.group(), RuleStatus::Preview { .. })
+                matches!(self.status(), RuleStatus::Preview { .. })
             }
 
             pub(crate) fn is_stable(&self) -> bool {
-                matches!(self.group(), RuleStatus::Stable { .. })
+                matches!(self.status(), RuleStatus::Stable { .. })
             }
 
             pub fn is_deprecated(&self) -> bool {
-                matches!(self.group(), RuleStatus::Deprecated { .. })
+                matches!(self.status(), RuleStatus::Deprecated { .. })
             }
 
             pub fn is_removed(&self) -> bool {
-                matches!(self.group(), RuleStatus::Removed { .. })
+                matches!(self.status(), RuleStatus::Removed { .. })
             }
         }
 
@@ -394,7 +394,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
-    let mut rule_group_match_arms = quote!();
+    let mut rule_status_match_arms = quote!();
     let mut rule_file_match_arms = quote!();
     let mut rule_line_match_arms = quote!();
     let mut rule_parse_match_arms = quote!();
@@ -416,8 +416,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
-        rule_group_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::group(),},
+        rule_status_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::status(),},
         );
         rule_file_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::file(),},
@@ -462,8 +462,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_fixable_match_arms }
             }
 
-            pub fn group(&self) -> crate::codes::RuleStatus {
-                match self { #rule_group_match_arms }
+            pub fn status(&self) -> crate::codes::RuleStatus {
+                match self { #rule_status_match_arms }
             }
 
             pub fn file(&self) -> &'static str {

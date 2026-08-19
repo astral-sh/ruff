@@ -39,7 +39,7 @@ fn generate_table(
     table_out.push_str("| ---- | ---- | ------- | -: |");
     table_out.push('\n');
     for rule in rules {
-        let status_token = match rule.group() {
+        let status_token = match rule.status() {
             RuleStatus::Removed { since } => {
                 format!(
                     "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule was removed in {since}'>{REMOVED_SYMBOL}</span><span class='sr-only'>Rule was removed in {since}</span>"

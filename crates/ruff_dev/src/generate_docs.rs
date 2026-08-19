@@ -32,7 +32,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 
             let _ = writeln!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
 
-            let status_text = match rule.group() {
+            let status_text = match rule.status() {
                 RuleStatus::Stable { since } => {
                     format!(
                         r#"Added in <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>"#

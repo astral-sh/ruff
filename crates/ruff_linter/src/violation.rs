@@ -36,8 +36,8 @@ pub trait ViolationMetadata {
     /// why it's bad, and what users should do instead.
     fn explain() -> Option<&'static str>;
 
-    /// Returns the rule group for this violation.
-    fn group() -> RuleStatus;
+    /// Returns the rule status for this violation.
+    fn status() -> RuleStatus;
 
     /// Returns the file where the violation is declared.
     fn file() -> &'static str;

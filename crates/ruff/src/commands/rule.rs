@@ -43,7 +43,7 @@ impl<'a> Explanation<'a> {
             fix_availability: rule.fixable(),
             explanation: rule.explanation(),
             preview: rule.is_preview(),
-            status: rule.group(),
+            status: rule.status(),
             source_location: SourceLocation {
                 file: rule.file(),
                 line: rule.line(),

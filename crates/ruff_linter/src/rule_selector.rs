@@ -257,7 +257,7 @@ impl RuleSelector {
 }
 
 impl RuleSelector {
-    /// Return all matching rules, regardless of rule group filters like preview and deprecated.
+    /// Return all matching rules, regardless of rule status filters like preview and deprecated.
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + use<> {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
@@ -278,13 +278,13 @@ impl RuleSelector {
         }
     }
 
-    /// Returns rules matching the selector, taking into account rule groups like preview and deprecated.
+    /// Returns rules matching the selector, taking into account rule statuses like preview and deprecated.
     pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + use<'a> {
         let preview_enabled = preview.mode.is_enabled();
         let preview_require_explicit = preview.require_explicit;
 
         self.all_rules().filter(move |rule| {
-            match rule.group() {
+            match rule.status() {
                 // Always include stable rules
                 RuleStatus::Stable { .. } => true,
                 // Enabling preview includes all preview rules unless explicit selection is turned on
