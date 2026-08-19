@@ -37,7 +37,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: 24.19.0
           package-manager-cache: false
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
       - name: "Install Node dependencies"
@@ -49,11 +49,15 @@ jobs:
       - name: "Build Ruff playground"
         run: npm run build --workspace ruff-playground
         working-directory: playground
+      - name: "Install deployment dependencies"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        run: npm ci --ignore-scripts
+        working-directory: playground/deploy
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
-          command: pages deploy playground/ruff/dist --project-name=ruff-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}
+          DEPLOY_BRANCH: ${{ github.head_ref || 'main' }}
+        run: ./playground/deploy/node_modules/.bin/wrangler pages deploy playground/ruff/dist --project-name=ruff-playground --branch "$DEPLOY_BRANCH" --commit-hash "$GITHUB_SHA"

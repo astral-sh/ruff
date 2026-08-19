@@ -1084,7 +1084,7 @@ parameter following that tuple.
 
 ```py
 from typing import Any, Callable, Never, Unpack, cast
-from ty_extensions import static_assert
+from ty_extensions import Top, static_assert
 from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
 
 def expects_suffix(callback: Callable[[Unpack[tuple[str, ...]], None], None]) -> None: ...
@@ -1194,6 +1194,17 @@ static_assert(is_assignable_to(OneOrMoreIntegers, GradualSuffix))
 static_assert(is_assignable_to(GradualSuffix, OneOrMoreIntegers))
 ```
 
+Gradual and top callable signatures accept a named positional prefix before an unpacked required
+suffix. Their synthetic keyword parameters do not represent concrete keyword arguments that can
+collide with the prefix.
+
+```py
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[named_prefix_and_suffix], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[named_prefix_and_suffix], Top[Callable[..., None]]))
+```
+
 A positional parameter cannot also be filled by a target keyword argument.
 
 ```py
@@ -1223,6 +1234,30 @@ A suffix cannot be extended with elements that the source variadic parameter rej
 ```py
 # error: [invalid-assignment]
 incompatible_suffix: Callable[[*tuple[int, ...], str, str], None] = requires_string_after_integers
+```
+
+### Gradual keyword collisions with unpacked positional parameters
+
+A gradual keyword type can materialize to `Never`, eliminating an otherwise possible collision.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def source(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+def target(x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: Any) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[source], RegularCallableTypeOf[target]))
+```
+
+A gradual source tail does not remove a real named prefix or permit a duplicate argument.
+
+```py
+def gradual_source(a: int, *args: Any, **kwargs: Any) -> None: ...
+def concrete_target(x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[gradual_source], RegularCallableTypeOf[concrete_target]))
 ```
 
 ### Fixed-length unpacked positional parameters

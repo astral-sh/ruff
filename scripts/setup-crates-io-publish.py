@@ -21,7 +21,17 @@
 # requires-python = ">=3.13"
 # dependencies = ["httpx"]
 #
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
 # [tool.uv]
+# no-build = true
 # exclude-newer = "P7D"
 # ///
 
@@ -36,6 +46,7 @@ import sys
 import tempfile
 import time
 import tomllib
+from typing import TypeGuard
 
 import httpx
 
@@ -103,6 +114,11 @@ def save_known_crates(crates: set[str]) -> None:
     KNOWN_CRATES_PATH.write_text("".join(lines))
 
 
+def is_str_keyed_dict(obj: object) -> TypeGuard[dict[str, object]]:
+    """Return True if *obj* is a dict with string keys."""
+    return isinstance(obj, dict) and all(isinstance(k, str) for k in obj)
+
+
 def get_crate_metadata(
     client: httpx.Client, crate_name: str
 ) -> dict[str, object] | None:
@@ -111,14 +127,16 @@ def get_crate_metadata(
     if response.status_code == 404:
         return None
     response.raise_for_status()
-    return response.json()
+    json = response.json()
+    assert is_str_keyed_dict(json)
+    return json
 
 
 def load_workspace_package_metadata() -> dict[str, object]:
     """Load shared package metadata from the workspace manifest."""
     manifest = tomllib.loads(WORKSPACE_MANIFEST_PATH.read_text())
     workspace_package = manifest.get("workspace", {}).get("package")
-    if not isinstance(workspace_package, dict):
+    if not is_str_keyed_dict(workspace_package):
         raise RuntimeError("workspace.package is missing from Cargo.toml")
     return workspace_package
 
@@ -208,6 +226,11 @@ def create_trusted_publisher(client: httpx.Client, crate_name: str) -> None:
     response.raise_for_status()
 
 
+def is_list_of_str_keyed_dicts(obj: object) -> TypeGuard[list[dict[str, object]]]:
+    """Return True if *obj* is a list of dicts with string keys."""
+    return isinstance(obj, list) and all(is_str_keyed_dict(item) for item in obj)
+
+
 def list_trusted_publishers(
     client: httpx.Client, crate_name: str
 ) -> list[dict[str, object]]:
@@ -218,7 +241,9 @@ def list_trusted_publishers(
     )
     response.raise_for_status()
     payload = response.json()
-    return payload.get("github_configs", [])
+    publishers = payload.get("github_configs", [])
+    assert is_list_of_str_keyed_dicts(publishers)
+    return publishers
 
 
 def delete_trusted_publisher(client: httpx.Client, config_id: int) -> None:

@@ -187,7 +187,7 @@ impl Session {
         &mut self.request_queue
     }
 
-    fn initialization_options(&self) -> &InitializationOptions {
+    pub(crate) fn initialization_options(&self) -> &InitializationOptions {
         &self.initialization_options
     }
 
@@ -564,7 +564,18 @@ impl Session {
             }
         };
 
-        let settings = options.into_settings(&root, client, &*self.native_system);
+        // Zed sends a single file as a workspace folder. Preserve that path as the
+        // workspace's identity, but resolve configuration and imports from its parent directory.
+        // https://github.com/zed-industries/zed/issues/40627
+        let workspace_directory = if self.native_system.is_file(&root)
+            && let Some(parent) = root.parent()
+        {
+            parent
+        } else {
+            root.as_path()
+        };
+
+        let settings = options.into_settings(workspace_directory, client, &*self.native_system);
         let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
             tracing::debug!("Ignoring workspace `{uri}` since it was not registered");
             return;
@@ -584,14 +595,19 @@ impl Session {
         let system = LSPSystem::new(
             self.index.as_ref().unwrap().clone(),
             self.native_system.clone(),
+            self.initialization_options.workspace_trust,
         );
 
         let configuration_file = workspace.settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
-            ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
+            ProjectMetadata::from_config_file(
+                configuration_file.clone(),
+                workspace_directory,
+                &system,
+            )
         } else {
-            ProjectMetadata::discover(&root, &system)
+            ProjectMetadata::discover(workspace_directory, &system)
         };
 
         let project = metadata
@@ -612,8 +628,8 @@ impl Session {
                 ProjectDatabase::fallible(metadata, system.clone())
             });
 
-        let (root, db) = match project {
-            Ok(db) => (root, db),
+        let db = match project {
+            Ok(db) => db,
             Err(err) => {
                 tracing::error!(
                     "Failed to create project for workspace `{uri}`: {err:#}. \
@@ -627,17 +643,11 @@ impl Session {
 
                 let Ok(metadata) = ProjectMetadata::from_options(
                     Options::default(),
-                    root,
+                    workspace_directory.to_path_buf(),
                     None,
                     &UseDefaultStrategy,
                 );
-                let db_with_default_settings = ProjectDatabase::use_defaults(metadata, system);
-                let default_root = db_with_default_settings
-                    .project()
-                    .root(&db_with_default_settings)
-                    .to_path_buf();
-
-                (default_root, db_with_default_settings)
+                ProjectDatabase::use_defaults(metadata, system)
             }
         };
 
@@ -2001,12 +2011,14 @@ pub(super) fn warn_about_unknown_options(
 
 #[cfg(test)]
 mod tests {
+    use std::io::ErrorKind;
     use std::sync::Arc;
 
-    use ruff_db::system::{CommandExecutor, OsSystem, System as _};
+    use anyhow::Context;
+    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _};
 
     use super::Index;
-    use crate::system::LSPSystem;
+    use crate::system::{LSPSystem, WorkspaceTrust};
 
     /// Mutating the document index requires exclusive ownership after Salsa cancels the current
     /// database snapshots. A background command executor must not retain an `LSPSystem`, because
@@ -2014,7 +2026,11 @@ mod tests {
     #[test]
     fn detached_command_executor_does_not_retain_document_index() {
         let index = Arc::new(Index::new());
-        let system = LSPSystem::new(index.clone(), Arc::new(OsSystem::default()));
+        let system = LSPSystem::new(
+            index.clone(),
+            Arc::new(OsSystem::default()),
+            WorkspaceTrust::default(),
+        );
         let executor = system.command_executor().map(CommandExecutor::dyn_clone);
         assert!(executor.is_some());
         drop(system);
@@ -2022,5 +2038,28 @@ mod tests {
         assert_eq!(Arc::strong_count(&index), 1);
 
         drop(executor);
+    }
+
+    #[test]
+    fn detached_untrusted_executor_rejects_commands() -> anyhow::Result<()> {
+        let system = LSPSystem::new(
+            Arc::new(Index::new()),
+            Arc::new(OsSystem::default()),
+            WorkspaceTrust::Untrusted,
+        )
+        .dyn_clone();
+        let executor = system
+            .command_executor()
+            .context("Expected an executor for the untrusted workspace")?
+            .dyn_clone();
+        drop(system);
+
+        let error = executor.execute(Command::new("must-not-run")).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+        assert_eq!(
+            error.to_string(),
+            "external commands are disabled in an untrusted workspace",
+        );
+        Ok(())
     }
 }

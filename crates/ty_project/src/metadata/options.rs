@@ -207,27 +207,11 @@ impl Options {
                 default
             });
 
-        let python_environment = if let Some(python_path) = environment.python.as_ref() {
-            let origin = match python_path.source() {
-                ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
-                ValueSource::File(path) => {
-                    SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
-                }
-                ValueSource::ScriptMetadata(_) => SysPrefixPathOrigin::ScriptMetadataSetting,
-                ValueSource::Editor => SysPrefixPathOrigin::Editor,
-                ValueSource::UvWorkspace => SysPrefixPathOrigin::UvWorkspace,
-            };
-
-            PythonEnvironment::new(
-                python_path.absolute(context.configuration_root(), system),
-                origin,
-                system,
-            )
-            .map_err(anyhow::Error::from)
-            .map(Some)
-        } else {
-            PythonEnvironment::discover(context.project_root(), system)
-                .context("Failed to discover local Python environment")
+        let python_environment = match self.python_environment(context.configuration_root(), system)
+        {
+            Ok(None) => PythonEnvironment::discover(context.project_root(), system)
+                .context("Failed to discover local Python environment"),
+            configured => configured,
         };
 
         // If in safe-mode, fallback to None if this fails instead of erroring.
@@ -321,6 +305,36 @@ impl Options {
             },
             diagnostics,
         ))
+    }
+
+    /// Resolve the configured Python environment. Return `None` if no path was configured.
+    pub(crate) fn python_environment(
+        &self,
+        configuration_root: &SystemPath,
+        system: &dyn System,
+    ) -> anyhow::Result<Option<PythonEnvironment>> {
+        let environment = self.environment.or_default();
+        let Some(python_path) = environment.python.as_ref() else {
+            return Ok(None);
+        };
+
+        let origin = match python_path.source() {
+            ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
+            ValueSource::File(path) => {
+                SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
+            }
+            ValueSource::ScriptMetadata(_) => SysPrefixPathOrigin::ScriptMetadataSetting,
+            ValueSource::Editor => SysPrefixPathOrigin::Editor,
+            ValueSource::UvWorkspace => SysPrefixPathOrigin::UvWorkspace,
+        };
+
+        PythonEnvironment::new(
+            python_path.absolute(configuration_root, system),
+            origin,
+            system,
+        )
+        .map_err(anyhow::Error::from)
+        .map(Some)
     }
 
     #[expect(clippy::too_many_arguments)]
