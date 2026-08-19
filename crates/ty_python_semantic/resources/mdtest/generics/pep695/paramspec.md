@@ -633,6 +633,8 @@ def preserve[**P](callback: Callable[P, None]) -> Callable[P, None]:
 
 def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
 
+# TODO: Preserve the unpacked tuple instead of exposing synthetic comparison parameters.
+# Should reveal `(name: int, *args: *tuple[*tuple[int, ...], int]) -> None`.
 reveal_type(preserve(named_prefix_and_suffix))  # revealed: (name: int, *args: int, int, /) -> None
 ```
 

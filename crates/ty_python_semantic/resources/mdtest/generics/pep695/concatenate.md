@@ -583,6 +583,8 @@ def remove_first[**P](callback: Callable[Concatenate[int, P], None]) -> Callable
 
 def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
 
+# TODO: Preserve the unpacked tuple instead of exposing synthetic comparison parameters.
+# Should reveal `(*args: *tuple[*tuple[int, ...], int]) -> None`.
 reveal_type(remove_first(named_prefix_and_suffix))  # revealed: (*args: int, int, /) -> None
 ```
 
