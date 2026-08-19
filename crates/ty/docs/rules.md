@@ -5066,6 +5066,8 @@ This rule is a stricter version of [`invalid-assignment`](#invalid-assignment). 
 assignments to variables (excluding attributes and subscripts), but its scope may be expanded in
 the future.
 
+This rule has no effect on stub files.
+
 **Why is this bad?**
 
 

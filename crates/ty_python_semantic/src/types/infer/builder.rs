@@ -1835,6 +1835,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_RETURN_STATEMENT`;
         // update those too if updating this!
         if self.context.is_lint_enabled(&UNSOUND_ASSIGNMENT)
+            && !self.file().is_stub(db)
             && target_ty.is_fully_static(db, env)
             && !self.is_in_dataclass_like_class_body()
             && !value_ty.is_pure_redundant_with(db, env, target_ty)

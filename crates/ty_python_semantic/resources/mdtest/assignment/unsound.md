@@ -604,3 +604,16 @@ class ModelMetaclass(type): ...
 class MetaclassModel(metaclass=ModelMetaclass):
     value: int = custom_field()
 ```
+
+## Assignments in stub files
+
+In stub files, assigning to an ellipsis (`= ...`) is a syntactic special case that is allowed
+regardless of the declared type. We do not emit `unsound-assignment` for this:
+
+```pyi
+def f(x: int = ...): ...  # no error
+
+x: int = ...  # no error
+y: str
+y = ...  # no error
+```
