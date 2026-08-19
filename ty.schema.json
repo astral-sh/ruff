@@ -1324,6 +1324,66 @@
             }
           ]
         },
+        "pytest-duplicate-argname": {
+          "title": "Same argname used multiple times in `pytest.mark.parametrize`",
+          "description": "## What it does\n\nChecks that there are no duplicate argnames in `pytest.mark.parametrize`.\nIf there are, the tests will not run.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\n\n\n# It must not be repeated within the same parametrization.\n@pytest.mark.parametrize(\"x, x, y\", [(1, 1, 3)])  # error: [pytest-duplicate-argname]\ndef test_x_and_y(x: int, y: int) -> None: ...\n\n\n# Or between different ones.\n@pytest.mark.parametrize(\"a\", [1])\n@pytest.mark.parametrize(\"b\", [2])\n@pytest.mark.parametrize(\"b\", [3])  # error: [pytest-duplicate-argname]\ndef test_a_anb_y(a: int, b: int) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "pytest-invalid-argnames-literal": {
+          "title": "Argnames literal is not a comma separated list of valid identifiers",
+          "description": "## What it does\n\nChecks that the argnames passed to `pytest.mark.parametrize` are valid.\nIf not, the tests will not run.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\n\n\n# Here, you should use `\"x, y\"` instead.\n@pytest.mark.parametrize(\"x y\", [(1, -1)])  # error: [pytest-invalid-argnames-literal]\ndef test_x_and_y(x: int, y: int) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "pytest-param-mismatched-type": {
+          "title": "`pytest.mark.parametrize` contains arvalue with wrong type.",
+          "description": "## What it does\n\nChecks that the types of arguments to `pytest` tests.\nThis is currently not exhaustive, but can spot errors in `pytest.mark.parametrize` calls.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\n\n\n# In this test case, the third value of `y` should be a `str`, not `None`.\n@pytest.mark.parametrize(\n    (\"x\", \"y\"),\n    [\n        (1, \"3\"),\n        (3, \"4\"),\n        (5, None),  # error: [pytest-param-mismatched-type]\n    ],\n)\ndef test_int_and_string(x: int, y: str) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "pytest-request-keyword": {
+          "title": "`request` is reserved by `pytest` as a special argument",
+          "description": "## What it does\n\nEnforces that the `request` keyword is not used during parameterization.\n`pytest` passes the `request` argname to all functions, and raises an error on parameters of\nfixtures.\n\n## Extra Information\n\nFor more information, see the relevant Pytest documentation:\n<https://docs.pytest.org/en/stable/how-to/fixtures.html#fixture-parametrize>.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\nfrom _pytest.fixtures import TopRequest\n\n\n@pytest.mark.parametrize(\"foo, request\", [(1, 2)])  # error: [pytest-request-keyword]\ndef test_foo(foo: int, request: Request) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "pytest-test-optional-parameter": {
+          "title": "Pytest ignores optional arguments",
+          "description": "## What it does\n\nCheck for duplicated argnames when using `pytest.mark.parametrize`.\nThis will cause `pytest` to crash when executing the test.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\n\n\n# In the same parametrization.\n@pytest.mark.parametrize(\"x, y, x\", [(1, -1, 1)])  # error: [pytest-duplicate-argnames]\ndef test_duplicate(x: int, y: int) -> None: ...\n\n\n# Or in separate ones.\n@pytest.mark.parametrize(\"x, y\", [(1, 2)])\n@pytest.mark.parametrize(\"z, y\", [(3, 4)])  # error: [pytest-duplicate-argnames]\ndef test_duplicate(x: int, y: int, z: int) -> None: ...\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "pytest-test-parameter-wrong-kind": {
+          "title": "Pytest tests only use keyword arguments",
+          "description": "## What it does\n\nEnforces that `pytest` tests accept keyword arguments.\nOther kinds of arguments may cause errors.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\n\n\n# All good\n@pytest.mark.parametrize(\"named, keyword_only\", [(1, \"2\")])\ndef test_valid(named, *, keyword_only): ...\n\n\n# Causes an error\n@pytest.mark.parametrize(\"\", [])\ndef test_invalid(\n    pos_only, /, *args, **kwargs\n): ...  # error: [pytest-test-argument-wrong-kind]\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "raw-string-type-annotation": {
           "title": "detects raw strings in type annotation positions",
           "description": "## What it does\n\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\n\nStatic analysis tools like ty can't analyze type annotations that use raw-string notation.\n\n## Examples\n\n```python\ndef test() -> r\"int\":  # error\n    return 1\n```\n\nUse instead:\n\n```python\ndef test() -> \"int\":\n    return 1\n```",

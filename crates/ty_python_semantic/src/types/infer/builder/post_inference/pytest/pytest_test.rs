@@ -1,0 +1,265 @@
+use crate::types::{
+    CallArguments, InferContext, KnownClass, Type, TypeContext,
+    call::{CallDiagnosticOverride, CallErrorKind},
+    diagnostic::{PYTEST_DUPLICATE_ARGNAME, PYTEST_PARAM_MISMATCHED_TYPE},
+    infer::{
+        TypeInferenceBuilder,
+        builder::{
+            ArgumentsIter,
+            post_inference::pytest::{
+                parametrization::Parametrization, partial_signature::PartialSignature,
+                request::Request,
+            },
+        },
+    },
+};
+use itertools::Itertools;
+use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_python_ast::{self as ast, AtomicNodeIndex};
+use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashMap;
+use thin_vec::ThinVec;
+
+/// Representation of a pytest test.
+/// It is only used when the argnames and argvalues should be checked, and for that purpose only.
+pub(crate) struct CheckablePytestTest<'db, 'ast> {
+    name: &'ast ast::Identifier,
+    requests: Vec<Request<'db, 'ast>>,
+    parametrizations: Vec<Parametrization<'ast>>,
+}
+
+impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
+    pub(crate) fn name(&self) -> &'ast ast::Identifier {
+        self.name
+    }
+
+    pub(crate) fn requests(&self) -> &[Request<'db, 'ast>] {
+        &self.requests
+    }
+
+    pub(crate) fn check_duplicate_argnames(&self, context: &InferContext<'db, 'ast>) {
+        let mut argname_locations = FxHashMap::default();
+        for parametrization in &self.parametrizations {
+            for argname in parametrization.argnames() {
+                // Refer to the first location, so do not insert unless a use unless it is new.
+                if let Some(previous_range) = argname_locations.get(argname.name()) {
+                    if let Some(builder) =
+                        context.report_lint(&PYTEST_DUPLICATE_ARGNAME, argname.range())
+                    {
+                        let mut diagnostic = builder
+                            .into_diagnostic(format!("Duplicate argname `{}`", argname.name()));
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!("`{}` already used here", argname.name()),
+                        );
+                        sub.annotate(Annotation::primary(context.span(previous_range)));
+                        diagnostic.sub(sub);
+                    }
+                } else {
+                    argname_locations.insert(argname.name(), argname.range());
+                }
+            }
+        }
+    }
+}
+
+impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
+    pub(crate) fn build_pytest_test(
+        &self,
+        fn_def: &'ast ast::StmtFunctionDef,
+        ty: Type<'db>,
+    ) -> Option<CheckablePytestTest<'db, 'ast>> {
+        // Check parameterize decorators (argnames) unconditionally.
+        let parametrizations = self.build_parametrizations(&fn_def.decorator_list);
+        if self.has_only_non_skipping_pytest_decorators(fn_def)
+            // Do not build the requests unless all the decorators are Pytest marks.
+            // Otherwise, there may be false positives with transformation decorators.
+            && let Some(requests) = self.build_requests(fn_def, &ty)
+        {
+            Some(CheckablePytestTest {
+                name: &fn_def.name,
+                requests,
+                parametrizations,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Checks that there are only `pytest.mark...` decorators and there is at least one and none
+    /// of them are `pytest.mark.skip`.
+    fn has_only_non_skipping_pytest_decorators(&self, fn_def: &ast::StmtFunctionDef) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+        !fn_def.decorator_list.is_empty()
+            && fn_def.decorator_list.iter().all(|decorator| {
+                self.expression_type(&decorator.expression).is_subtype_of(
+                    db,
+                    env,
+                    KnownClass::PytestMarkDecorator.to_instance(db, env),
+                ) && !self.expression_type(&decorator.expression).is_subtype_of(
+                    db,
+                    env,
+                    KnownClass::PytestSkipMarkDecorator.to_instance(db, env),
+                )
+            })
+    }
+
+    /// Check that the argvalues all have the correct types.
+    ///
+    /// This is done by creating partial-signatures for the function being checked.
+    /// Then, each set of parameters is checked against this signature
+    /// with a synthetic function call.
+    pub(crate) fn check_pytest_argvalues(&mut self, test: &CheckablePytestTest<'db, 'ast>) {
+        for parametrization in &test.parametrizations {
+            self.check_parametrization(parametrization, test);
+        }
+    }
+
+    fn check_parametrization(
+        &mut self,
+        parametrization: &Parametrization<'ast>,
+        test: &CheckablePytestTest<'db, 'ast>,
+    ) {
+        if let Some(partial_signature) =
+            test.partial_signature(self.db(), parametrization.argnames())
+        {
+            self.check_argvalues_against(&partial_signature, parametrization.argvalues());
+        }
+    }
+
+    fn check_argvalues_against(
+        &mut self,
+        partial_signature: &PartialSignature<'db, 'ast>,
+        argvalues: &'ast ast::Expr,
+    ) {
+        // There are two cases to consider here:
+        // - the argvalues are a sequence => check each item individually
+        if let Some(list) = argvalues.as_list_expr() {
+            self.check_argvalue_items(partial_signature, &list.elts);
+        } else if let Some(tuple) = argvalues.as_tuple_expr() {
+            self.check_argvalue_items(partial_signature, &tuple.elts);
+        } else {
+            // - otherwise => check all the test cases together
+            self.check_argvalue_test_cases(partial_signature, argvalues);
+        }
+    }
+
+    fn check_argvalue_items(
+        &mut self,
+        partial_signature: &PartialSignature<'db, 'ast>,
+        argvalues: &'ast [ast::Expr],
+    ) {
+        // There are two sub-cases to consider here:
+        let signature = partial_signature.single_item_fn_type(&self.context);
+        for argvalue in argvalues {
+            // - each item is a raw tuple or raw-list (and it is accepted) => call a function with multiple args
+            if let Some(args) = argvalue.as_tuple_expr()
+                && let Some(signature) = partial_signature.test_case_fn_type(&self.context)
+            {
+                self.check_pytest_fn_call(
+                    partial_signature.test_name(),
+                    signature,
+                    &Self::multiple_argvalue_arguments(&args.elts, args.range()),
+                );
+            } else if let Some(args) = argvalue.as_list_expr()
+                && let Some(signature) = partial_signature.test_case_fn_type(&self.context)
+            {
+                // - each item is a raw tuple or raw-list (and it is accepted) => call a function with multiple args
+                self.check_pytest_fn_call(
+                    partial_signature.test_name(),
+                    signature,
+                    &Self::multiple_argvalue_arguments(&args.elts, args.range()),
+                );
+            } else {
+                // - otherwise => check the entire test case as a tuple
+                self.check_pytest_fn_call(
+                    partial_signature.test_name(),
+                    signature,
+                    &Self::single_argvalue_argument(argvalue),
+                );
+            }
+        }
+    }
+
+    fn check_argvalue_test_cases(
+        &mut self,
+        partial_signature: &PartialSignature<'db, 'ast>,
+        argvalues: &'ast ast::Expr,
+    ) {
+        let signature = partial_signature.test_cases_fn_type(&self.context);
+        self.check_pytest_fn_call(
+            partial_signature.test_name(),
+            signature,
+            &Self::single_argvalue_argument(argvalues),
+        );
+    }
+
+    /// Convert a single argvalue into an argument.
+    /// This then calls the partial-signature with one argument.
+    fn single_argvalue_argument(argvalue: &'ast ast::Expr) -> ast::Arguments {
+        ast::Arguments {
+            range: argvalue.range(),
+            node_index: AtomicNodeIndex::default(),
+            args: Box::new([argvalue.to_owned()]),
+            keywords: ThinVec::default(),
+        }
+    }
+
+    /// Convert the argvalues into multiple arguments.
+    /// This then gives more-specific errors, such as including the name.
+    fn multiple_argvalue_arguments(
+        argvalues: &'ast [ast::Expr],
+        range: TextRange,
+    ) -> ast::Arguments {
+        ast::Arguments {
+            range,
+            node_index: AtomicNodeIndex::default(),
+            args: argvalues.to_vec().into_boxed_slice(),
+            keywords: ThinVec::default(),
+        }
+    }
+
+    /// Check the synthetic function call with the default type-checking machinery.
+    /// The diagnostic contains relevant information, as well as type errors.
+    /// Type variables are included in the context, but they are bound to the original definition.
+    /// As a result, they always default to `object`, so are effectively ignored.
+    fn check_pytest_fn_call(
+        &mut self,
+        test_name: &ast::Identifier,
+        fn_type: Type<'db>,
+        arguments: &ast::Arguments,
+    ) {
+        let mut call_arguments = CallArguments::from_arguments(arguments, |_, splatted_value| {
+            self.expression_type(splatted_value)
+        });
+        let mut bindings = self.bindings_for_call(fn_type).match_parameters(
+            self.db(),
+            self.program_environment(),
+            &call_arguments,
+        );
+        let bindings_result = self.infer_and_check_argument_types(
+            ArgumentsIter::from_ast(arguments),
+            &mut call_arguments,
+            &mut |builder, (_, expr, _tcx)| builder.expression_type(expr),
+            &mut bindings,
+            TypeContext::default(),
+        );
+        if bindings_result.is_err() {
+            debug_assert_eq!(bindings_result, Err(CallErrorKind::BindingError));
+            bindings.report_diagnostics_with_override(
+                &self.context,
+                arguments.into(),
+                &CallDiagnosticOverride {
+                    lint: &PYTEST_PARAM_MISMATCHED_TYPE,
+                    message: format!("Invalid parameter passed to `{test_name}`."),
+                    info: &format!("This happens when testing `{test_name}`."),
+                    argument_ranges: &arguments
+                        .iter_source_order()
+                        .map(|arg| arg.range())
+                        .collect_vec(),
+                },
+            );
+        }
+    }
+}
