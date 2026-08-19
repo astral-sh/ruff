@@ -1539,6 +1539,40 @@ def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]
     reveal_type(unknown_result[0])  # revealed: int & Unknown
 ```
 
+## Redundant upper bounds preserve large gradual unions
+
+The invariant list fixes `T` to the entire union, while the callback adds the redundant upper bound
+`object`. Restricting the inferred gradual type by these bounds must preserve all five union
+members.
+
+```py
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
+
+Bound = None | int | set[int] | Sequence[Any] | Mapping[str, Any]
+
+def first[T: Bound](values: list[T], sink: Callable[[T], None]) -> T:
+    return values[0]
+
+def _(values: list[Bound], sink: Callable[[object], None]) -> None:
+    # revealed: None | int | set[int] | Sequence[Any] | Mapping[str, Any]
+    reveal_type(first(values, sink))
+```
+
+The same holds for recursive aliases, whose recursive positions currently fall back to `Divergent`.
+This is a reduced regression test for [ty#4335](https://github.com/astral-sh/ty/issues/4335).
+
+```py
+Recursive = None | int | set[int] | Sequence["Recursive"] | Mapping[str, "Recursive"]
+
+def first_recursive[T: Recursive](values: list[T], sink: Callable[[T], None]) -> T:
+    return values[0]
+
+def _(values: list[Recursive], sink: Callable[[object], None]) -> None:
+    # revealed: None | int | set[int] | Sequence[Divergent] | Mapping[str, Divergent]
+    reveal_type(first_recursive(values, sink))
+```
+
 ## Typevars in a union
 
 ```py

@@ -899,7 +899,10 @@ impl<'db> IntersectionType<'db> {
 
         let non_union_elements = elements.clone().filter(|element| !element.is_union());
         let initial = Self::from_elements(db, env, non_union_elements);
-        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
+        let insert_candidate = |candidates: &mut Vec<Type<'db>>,
+                                new_ty: Type<'db>,
+                                check_budget: bool|
+         -> Option<()> {
             if new_ty.is_never()
                 || candidates
                     .iter()
@@ -909,7 +912,7 @@ impl<'db> IntersectionType<'db> {
             }
 
             candidates.retain(|old| !old.is_redundant_with(db, env, new_ty));
-            if candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
+            if check_budget && candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
                 return None;
             }
             candidates.push(new_ty);
@@ -918,7 +921,7 @@ impl<'db> IntersectionType<'db> {
 
         let mut frontier = Vec::new();
         let mut next = Vec::new();
-        insert_candidate(&mut frontier, initial)?;
+        insert_candidate(&mut frontier, initial, true)?;
 
         for (idx, clause) in elements.filter_map(Type::as_union).enumerate() {
             // Don't check the budget for the first union clause. That ensures that we have a
@@ -926,13 +929,13 @@ impl<'db> IntersectionType<'db> {
             // result. For instance, this allows us to return the precise result for
             // `(A | B | C | D | E) & (A | B | F | G | H)` (in which each class is final), since
             // most of the pairs are disjoint.
-            let skip_budget_check = (idx == 0).then_some(());
+            let check_budget = idx > 0;
 
             next.clear();
             for candidate in &frontier {
                 for alternative in clause.elements(db) {
                     let refined = Self::from_two_elements(db, env, *candidate, *alternative);
-                    insert_candidate(&mut next, refined).or(skip_budget_check)?;
+                    insert_candidate(&mut next, refined, check_budget)?;
                 }
             }
 
