@@ -1,9 +1,16 @@
 # Rule selector precedence
 
-Semantic categories and linter selectors can be combined in the same configuration. More specific
-selectors take precedence over broader selectors; when selectors have the same specificity, ignores win.
+Categories (e.g. `correctness`, `suspicious`), linter groups (e.g. `RUF`, `UP`), linter prefixes
+(e.g. `RUF1`), and rules (e.g. `F401`, `unused-import`) can be combined in the same configuration.
+More specific selectors take precedence over broader selectors. When selectors have the same
+specificity, `ignore` takes precedence over `select`. In short, the current precedence relationship
+is:
 
-## Semantic categories and linter selectors can be combined
+```ignore
+ALL < category = linter group < linter prefix < rule
+```
+
+## Categories and linter groups can be combined
 
 ```toml
 [lint]
@@ -16,7 +23,7 @@ import os  # error: [unused-import]
 assert True  # error: [assert]
 ```
 
-## Semantic categories take precedence over `ALL`
+## Categories take precedence over `ALL`
 
 ```toml
 [lint]
@@ -29,7 +36,7 @@ ignore = ["ALL"]
 import os  # error: [unused-import]
 ```
 
-## Semantic category ignores take precedence over linter selectors
+## Category ignores take precedence over linter groups
 
 ```toml
 [lint]
@@ -42,7 +49,7 @@ ignore = ["correctness"]
 import os
 ```
 
-## Linter ignores take precedence over semantic category selectors
+## Linter group ignores take precedence over category selectors
 
 ```toml
 [lint]
@@ -55,7 +62,7 @@ ignore = ["F"]
 import os
 ```
 
-## Rule prefixes take precedence over semantic categories
+## Linter prefixes take precedence over categories
 
 ```toml
 [lint]
@@ -68,7 +75,7 @@ ignore = ["correctness"]
 import os  # error: [unused-import]
 ```
 
-## Rule codes take precedence over semantic categories
+## Rule codes take precedence over categories
 
 ```toml
 [lint]
@@ -81,7 +88,7 @@ ignore = ["correctness"]
 import os  # error: [unused-import]
 ```
 
-## Rule names take precedence over semantic categories
+## Rule names take precedence over categories
 
 ```toml
 [lint]
