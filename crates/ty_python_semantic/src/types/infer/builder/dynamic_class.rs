@@ -56,8 +56,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 - anchor_u32
         };
 
-        if let Some(enclosing_node_key) = self.string_annotation {
-            let enclosing_index = enclosing_node_key.index();
+        if let Some(context) = self.string_annotation {
+            let enclosing_index = context.anchor.index();
             let string: &ast::ExprStringLiteral = self
                 .module()
                 .get_by_index(enclosing_index)

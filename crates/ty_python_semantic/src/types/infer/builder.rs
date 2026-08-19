@@ -361,7 +361,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     ///
     /// AST provenance is independent of name-lookup deferredness: temporarily changing lookup
     /// modes must never make a parsed annotation's nodes appear to belong to the semantic index.
-    string_annotation: Option<NodeKey>,
+    string_annotation: Option<StringAnnotationContext>,
 
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
@@ -917,7 +917,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// literal, if the node originates from inside a stringified annotation.
     fn enclosing_node_key(&self, node: AnyNodeRef<'_>) -> NodeKey {
         self.string_annotation
-            .unwrap_or_else(|| NodeKey::from_node(node))
+            .map_or_else(|| NodeKey::from_node(node), |context| context.anchor)
     }
 
     fn in_stub(&self) -> bool {
@@ -935,10 +935,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn with_string_annotation<T>(
         &mut self,
         string: &ast::ExprStringLiteral,
+        expression: &ast::Expr,
         infer: impl FnOnce(&mut Self) -> T,
     ) -> T {
         let anchor = self.enclosing_node_key(string.into());
-        let previous = self.string_annotation.replace(anchor);
+        let opaque_metadata = self
+            .string_annotation
+            .is_some_and(|context| context.opaque_metadata)
+            || crate::types::string_annotation::contains_assignment_expression(expression);
+        let previous = self.string_annotation.replace(StringAnnotationContext {
+            anchor,
+            opaque_metadata,
+        });
         let result = infer(self);
         self.string_annotation = previous;
         result
@@ -12087,6 +12095,15 @@ impl<'a> Iterator for ArgumentsIter<'a> {
             ArgumentsIter::Synthesized(args) => args.next().copied(),
         }
     }
+}
+
+/// Provenance and metadata policy for the parsed annotation currently being inferred.
+#[derive(Debug, Clone, Copy)]
+struct StringAnnotationContext {
+    /// The outermost string expression in the module AST.
+    anchor: NodeKey,
+    /// Assignment-bearing metadata needs a use-def model, not ordinary module inference.
+    opaque_metadata: bool,
 }
 
 /// The deferred state of a specific expression in an inference region.

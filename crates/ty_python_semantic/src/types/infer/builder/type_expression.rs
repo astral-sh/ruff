@@ -1031,7 +1031,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .context
                     .inference_flags
                     .replace(InferenceFlags::IN_NESTED_TYPE_EXPRESSION, string_was_nested);
-                let ty = self.with_string_annotation(string, |builder| {
+                let ty = self.with_string_annotation(string, parsed_expr, |builder| {
                     builder.infer_type_expression(parsed_expr)
                 });
                 self.context.inference_flags.set(
@@ -2892,7 +2892,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     self.string_annotations
                         .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
-                    let result = self.with_string_annotation(string, |builder| {
+                    let result = self.with_string_annotation(string, parsed.expr(), |builder| {
                         matches!(
                             parsed.expr(),
                             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
@@ -3045,7 +3045,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return None;
                 }
 
-                self.with_string_annotation(string, |builder| {
+                self.with_string_annotation(string, parsed.expr(), |builder| {
                     builder.infer_concatenate_tail(parsed.expr())
                 })
             }

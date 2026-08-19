@@ -379,7 +379,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Some(parsed) => {
                 self.string_annotations
                     .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
-                self.with_string_annotation(string, |builder| {
+                self.with_string_annotation(string, parsed.expr(), |builder| {
                     builder.infer_annotation_expression(
                         parsed.expr(),
                         DeferredExpressionState::Deferred,
