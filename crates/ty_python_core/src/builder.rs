@@ -19,7 +19,9 @@ use ruff_python_parser::semantic_errors::{
 };
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
-use ty_module_resolver::{ImportingFile, ModuleName, ResolverEnvironment, resolve_module};
+use ty_module_resolver::{
+    ImportingFile, ModuleName, ResolverEnvironment, resolve_module_for_import_from,
+};
 
 use crate::HasTrackedScope;
 use crate::ProgramFile;
@@ -3721,18 +3723,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        let Ok(module_name) = ModuleName::from_import_statement(
+                        let Some(module) = resolve_module_for_import_from(
                             self.db,
                             ImportingFile::File(source_file, resolver_environment),
                             node,
-                        ) else {
-                            continue;
-                        };
-
-                        let Some(module) = resolve_module(
-                            self.db,
-                            ImportingFile::File(source_file, resolver_environment),
-                            &module_name,
                         ) else {
                             continue;
                         };
