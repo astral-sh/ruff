@@ -202,6 +202,40 @@ annotation:
 x: "[[foo]]"
 ```
 
+## Invalid subscript operands in string annotations
+
+Invalid subscript operands in string annotations must not be evaluated. In particular, lambda
+defaults and functional `TypedDict` arguments should not produce cascading unresolved-reference
+diagnostics, and assignment expressions should not cause a panic.
+
+`runtime.py`:
+
+```py
+from typing_extensions import TypedDict
+
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+a: "(lambda value=missing: None)[int]"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+b: "(lambda value=(name := int): None)[int]"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+c: "TypedDict('T', {}, extra_items=missing)[int]"
+```
+
+The same error-recovery behavior applies to annotations in stub files:
+
+`stub.pyi`:
+
+```pyi
+from typing_extensions import TypedDict
+
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+a: "(lambda value=missing: None)[int]"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+b: "(lambda value=(name := int): None)[int]"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+c: "TypedDict('T', {}, extra_items=missing)[int]"
+```
+
 ## Multiple starred expressions in a `tuple` specialization
 
 <!-- snapshot-diagnostics -->
