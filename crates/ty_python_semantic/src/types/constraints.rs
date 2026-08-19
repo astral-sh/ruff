@@ -3821,6 +3821,7 @@ struct ConstraintBoundsBuilder<'db> {
     mixed_lower: FxIndexSet<Type<'db>>,
     validity_lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
+    explicit_evidence_equalities: FxIndexSet<Type<'db>>,
     // Classify each evidence bound before aggregation: a union can otherwise make gradual and
     // static argument evidence indistinguishable from a single gradual union.
     has_gradual_evidence: bool,
@@ -3828,22 +3829,38 @@ struct ConstraintBoundsBuilder<'db> {
 }
 
 impl<'db> ConstraintBoundsBuilder<'db> {
-    /// Finds a fixed equality requirement that satisfies every bound on this path.
+    fn iter_lower(&self) -> impl Iterator<Item = Type<'db>> {
+        self.evidence_lower
+            .iter()
+            .chain(&self.mixed_lower)
+            .chain(&self.validity_lower)
+            .copied()
+    }
+
+    /// Finds a fully static equality requirement that satisfies every bound on this path, if there
+    /// is one.
     ///
-    /// A type that occurs in both evidence sets places the target typevar both above and below that
-    /// type. If one such type is fully static relative to the inference domain, it pins the only
-    /// possible solution. Gradual equality requirements can then accept that solution through one
-    /// of their materializations.
+    /// When any of the evidence constraints on this path are equality constraints (`C ≤ T ≤ C`),
+    /// that will usually pin the solution for this typevar to exactly `T := C`. If all of the
+    /// equality constraints are fully static, and equivalent, then this is exactly what happens.
+    /// (If they are all fully static, but _not_ equivalent, then the path is not satisfiable.)
+    ///
+    /// However, if any of the equality constraints are dynamic, then we only need _some_
+    /// materialization of each dynamic constraint to satisfy whatever solution we choose. We
+    /// can't use equivalence here, since dynamic types don't participate in equivalence; and we
+    /// can't use gradual equivalence, since that requires _all_ materializations to satisfy. So
+    /// instead, we look for a single solution that is _mutually assignable_ with every equality
+    /// constraint.
     fn pinned_equality_solution(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Option<Type<'db>> {
+        // Find all of the fully static equality constraints on this path.
         let mut fixed_equalities = self
-            .evidence_lower
+            .explicit_evidence_equalities
             .iter()
-            .filter(|lower| self.upper.evidence.contains(*lower))
             .copied()
             .filter(|ty| ty.is_static_sequent_eligible(db, env))
             .filter(|ty| {
@@ -3851,25 +3868,47 @@ impl<'db> ConstraintBoundsBuilder<'db> {
                     matches!(ty, Type::TypeVar(typevar) if typevar.is_inferable(db, inferable))
                 })
             });
+
+        // Then verify that there is _exactly one_ fully static solution.
         let candidate = fixed_equalities.next()?;
         if fixed_equalities.any(|ty| !candidate.is_equivalent_to(db, env, ty)) {
             return None;
         }
 
+        // Verify that the solution we've chosen satisfies all of the lower and upper bounds for
+        // this path — even the ones that aren't evidence constraints, and even the ones that are
+        // gradual.
         if !self
-            .evidence_lower
-            .iter()
-            .chain(&self.mixed_lower)
-            .chain(&self.validity_lower)
+            .iter_lower()
             .all(|lower| lower.is_constraint_set_assignable_to(db, env, candidate))
         {
             return None;
         }
-
-        self.upper
+        if !self
+            .upper
             .iter_clauses()
             .all(|upper| candidate.is_constraint_set_assignable_to(db, env, upper.ty()))
-            .then_some(candidate)
+        {
+            return None;
+        }
+
+        Some(candidate)
+    }
+
+    fn add_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bounds: ConstraintBounds<'db>,
+    ) {
+        if let (ConstraintBound::Evidence(lower), ConstraintBound::Evidence(upper)) =
+            (bounds.lower, bounds.upper)
+            && lower == upper
+        {
+            self.explicit_evidence_equalities.insert(lower);
+        }
+        self.add_lower(db, env, bounds.lower);
+        self.add_upper(db, env, bounds.upper);
     }
 
     fn classify_evidence(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
@@ -3934,6 +3973,7 @@ impl<'db> ConstraintBoundsBuilder<'db> {
             mixed_lower,
             validity_lower,
             mut upper,
+            explicit_evidence_equalities: _,
             has_gradual_evidence,
             has_static_evidence,
         } = self;
@@ -4390,11 +4430,11 @@ impl<'db> PathBounds<'db> {
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
                 let typevar = constraint.typevar;
+                let bounds = mappings.entry(typevar).or_default();
+                bounds.add_constraint(db, env, constraint.bounds);
+
                 let lower = constraint.bounds.lower;
                 if lower != ConstraintBound::missing_lower() {
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_lower(db, env, lower);
-
                     if let Type::TypeVar(lower_bound_typevar) = lower.ty() {
                         let bounds = mappings.entry(lower_bound_typevar).or_default();
                         bounds.add_upper(db, env, lower.with_type(Type::TypeVar(typevar)));
@@ -4403,9 +4443,6 @@ impl<'db> PathBounds<'db> {
 
                 let upper = constraint.bounds.upper;
                 if upper != ConstraintBound::missing_upper() {
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_upper(db, env, upper);
-
                     if let Type::TypeVar(upper_bound_typevar) = upper.ty() {
                         let bounds = mappings.entry(upper_bound_typevar).or_default();
                         bounds.add_lower(db, env, upper.with_type(Type::TypeVar(typevar)));
@@ -4598,8 +4635,7 @@ impl<'db> PathBounds<'db> {
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, constraint, _) in constraints {
             let bounds = mappings.entry(typevar).or_default();
-            bounds.add_lower(db, env, constraint.lower);
-            bounds.add_upper(db, env, constraint.upper);
+            bounds.add_constraint(db, env, constraint);
         }
 
         let path = mappings
