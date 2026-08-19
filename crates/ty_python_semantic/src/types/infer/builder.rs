@@ -1811,26 +1811,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 target_ty,
                 value_ty,
             );
-            false
-        } else {
-            // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_RETURN_STATEMENT`;
-            // update those too if updating this!
-            if self.context.is_lint_enabled(&UNSOUND_ASSIGNMENT)
-                && target_ty.is_fully_static(db, env)
-                && !value_ty.is_pure_redundant_with(db, env, target_ty)
-            {
-                report_unsound_assignment(
-                    &self.context,
-                    target_node,
-                    definition,
-                    declaration,
-                    target_ty,
-                    value_ty,
-                    |expression| self.expression_type(expression),
-                );
-            }
-            true
+            return false;
         }
+
+        // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_RETURN_STATEMENT`;
+        // update those too if updating this!
+        if self.context.is_lint_enabled(&UNSOUND_ASSIGNMENT)
+            && target_ty.is_fully_static(db, env)
+            && !value_ty.is_pure_redundant_with(db, env, target_ty)
+        {
+            report_unsound_assignment(
+                &self.context,
+                target_node,
+                definition,
+                declaration,
+                target_ty,
+                value_ty,
+                |expression| self.expression_type(expression),
+            );
+        }
+
+        true
     }
 
     fn add_unknown_declaration_with_binding(

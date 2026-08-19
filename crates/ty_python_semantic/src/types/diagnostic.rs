@@ -1697,61 +1697,60 @@ fn assignment_declaration_annotation<'db>(
     declaration: Option<Definition<'db>>,
 ) -> Option<AssignmentDeclarationAnnotation> {
     let db = context.db();
-    let (annotation, declaration_kind) = match definition_kind {
+    let declaration_definition_kind =
+        if matches!(definition_kind, DefinitionKind::AnnotatedAssignment(_)) {
+            definition_kind
+        } else {
+            declaration?.kind(db)
+        };
+
+    let (annotation, declaration_kind) = match declaration_definition_kind {
         DefinitionKind::AnnotatedAssignment(assignment) => Some((
             assignment.annotation(context.module()),
             DeclarationKind::Regular,
         )),
-        _ => declaration.and_then(|declaration| match declaration.kind(db) {
-            DefinitionKind::AnnotatedAssignment(assignment) => Some((
-                assignment.annotation(context.module()),
-                DeclarationKind::Regular,
-            )),
-            DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
-                parameter
-                    .node(context.module())
-                    .parameter
-                    .annotation
-                    .as_deref()
-                    .map(|annotation| (annotation, DeclarationKind::Regular))
-            }
-            DefinitionKind::Parameter(
-                ParameterDefinitionNodeKind::VariadicPositionalParameter(parameter),
-            ) => parameter
-                .node(context.module())
-                .annotation
-                .as_deref()
-                .map(|annotation| (annotation, DeclarationKind::VariadicParameter)),
-            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(
-                parameter,
-            )) => parameter
-                .node(context.module())
-                .annotation
-                .as_deref()
-                .map(|annotation| (annotation, DeclarationKind::KeywordVariadicParameter)),
-            DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::ImportFromSubmodule(_)
-            | DefinitionKind::StarImport(_)
-            | DefinitionKind::Function(_)
-            | DefinitionKind::Class(_)
-            | DefinitionKind::TypeAlias(_)
-            | DefinitionKind::NamedExpression(_)
-            | DefinitionKind::Assignment(_)
-            | DefinitionKind::AugmentedAssignment(_)
-            | DefinitionKind::DictKeyAssignment(_)
-            | DefinitionKind::For(_)
-            | DefinitionKind::Comprehension(_)
-            | DefinitionKind::LambdaParameter(_)
-            | DefinitionKind::WithItem(_)
-            | DefinitionKind::MatchPattern(_)
-            | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::TypeVar(_)
-            | DefinitionKind::ParamSpec(_)
-            | DefinitionKind::TypeVarTuple(_)
-            | DefinitionKind::LoopHeader(_)
-            | DefinitionKind::NestedBindings(_) => None,
-        }),
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => parameter
+            .node(context.module())
+            .parameter
+            .annotation
+            .as_deref()
+            .map(|annotation| (annotation, DeclarationKind::Regular)),
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicPositionalParameter(
+            parameter,
+        )) => parameter
+            .node(context.module())
+            .annotation
+            .as_deref()
+            .map(|annotation| (annotation, DeclarationKind::VariadicParameter)),
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(
+            parameter,
+        )) => parameter
+            .node(context.module())
+            .annotation
+            .as_deref()
+            .map(|annotation| (annotation, DeclarationKind::KeywordVariadicParameter)),
+        DefinitionKind::Import(_)
+        | DefinitionKind::ImportFrom(_)
+        | DefinitionKind::ImportFromSubmodule(_)
+        | DefinitionKind::StarImport(_)
+        | DefinitionKind::Function(_)
+        | DefinitionKind::Class(_)
+        | DefinitionKind::TypeAlias(_)
+        | DefinitionKind::NamedExpression(_)
+        | DefinitionKind::Assignment(_)
+        | DefinitionKind::AugmentedAssignment(_)
+        | DefinitionKind::DictKeyAssignment(_)
+        | DefinitionKind::For(_)
+        | DefinitionKind::Comprehension(_)
+        | DefinitionKind::LambdaParameter(_)
+        | DefinitionKind::WithItem(_)
+        | DefinitionKind::MatchPattern(_)
+        | DefinitionKind::ExceptHandler(_)
+        | DefinitionKind::TypeVar(_)
+        | DefinitionKind::ParamSpec(_)
+        | DefinitionKind::TypeVarTuple(_)
+        | DefinitionKind::LoopHeader(_)
+        | DefinitionKind::NestedBindings(_) => None,
     }?;
 
     Some(AssignmentDeclarationAnnotation {
@@ -1772,8 +1771,9 @@ fn assignment_value_node<'db, 'ast>(
     definition_kind: &DefinitionKind<'db>,
 ) -> Option<&'ast ast::Expr> {
     match definition_kind {
-        DefinitionKind::Assignment(assignment) => Some(assignment.value(context.module())),
-        DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(context.module()),
+        DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_) => {
+            definition_kind.value(context.module())
+        }
         DefinitionKind::NamedExpression(assignment) => {
             Some(&*assignment.node(context.module()).value)
         }
@@ -1799,6 +1799,28 @@ fn assignment_value_node<'db, 'ast>(
         | DefinitionKind::LoopHeader(_)
         | DefinitionKind::NestedBindings(_) => None,
     }
+}
+
+/// Return the range of an assignment's value, including any surrounding parentheses.
+fn assignment_diagnostic_range(
+    context: &InferContext,
+    target_node: AnyNodeRef,
+    value_node: Option<&ast::Expr>,
+) -> TextRange {
+    value_node
+        .map(|value_node| {
+            // Expand the range to include parentheses around the value, if any. This allows
+            // assignment diagnostics to be suppressed on the opening or closing parenthesis:
+            // ```py
+            // x: str = ( # ty: ignore <- here
+            //     1 + 2 + 3
+            // )  # ty: ignore <- or here
+            // ```
+            parentheses_iterator(value_node.into(), None, context.module().tokens())
+                .last()
+                .unwrap_or(value_node.range())
+        })
+        .unwrap_or_else(|| target_node.range())
 }
 
 /// Set an assignment's primary message and return whether a message was added.
@@ -1857,21 +1879,7 @@ pub(super) fn report_invalid_assignment<'db>(
     let env = &context.program_environment();
     let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [target_ty, value_ty]);
 
-    let diagnostic_range = if let Some(value_node) = value_node {
-        // Expand the range to include parentheses around the value, if any. This allows
-        // invalid-assignment diagnostics to be suppressed on the opening or closing parenthesis:
-        // ```py
-        // x: str = ( # ty: ignore <- here
-        //     1 + 2 + 3
-        // )  # ty: ignore <- or here
-        // ```
-
-        parentheses_iterator(value_node.into(), None, context.module().tokens())
-            .last()
-            .unwrap_or(value_node.range())
-    } else {
-        target_node.range()
-    };
+    let diagnostic_range = assignment_diagnostic_range(context, target_node, value_node);
 
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
@@ -1970,13 +1978,7 @@ pub(super) fn report_unsound_assignment<'db>(
             (target_node, assignment_value_node(context, definition_kind))
         };
 
-    let diagnostic_range = value_node
-        .map(|value| {
-            parentheses_iterator(value.into(), None, context.module().tokens())
-                .last()
-                .unwrap_or(value.range())
-        })
-        .unwrap_or_else(|| target_node.range());
+    let diagnostic_range = assignment_diagnostic_range(context, target_node, value_node);
 
     let Some(builder) = context.report_lint(&UNSOUND_ASSIGNMENT, diagnostic_range) else {
         return;

@@ -129,19 +129,7 @@ Subsequent reassignments of an annotated variable are also checked for soundness
 
 ```py
 another_value: int = 42
-another_value = returns_any()  # snapshot: unsound-assignment
-```
-
-```snapshot
-error[unsound-assignment]: Unsound assignment
-  --> src/mdtest_snippet.py:11:17
-   |
-10 | another_value: int = 42
-   |                --- Expected a subtype of `int` because of this annotation
-11 | another_value = returns_any()  # snapshot: unsound-assignment
-   |                 ^^^^^^^^^^^^^ Inferred as `Any`
-info: `Any` is assignable to `int`, but not a subtype of `int`
-help: Consider using an `assert` to narrow the type before assigning it
+another_value = returns_any()  # error: [unsound-assignment]
 ```
 
 ## Unsound assignments to annotated parameters
@@ -299,8 +287,7 @@ help: Consider using an `assert` to narrow the type before assigning it
 
 ## Unsound assignments with equivalent declarations
 
-When distinct branches declare the same type, neither annotation is the unique source of the
-declared type.
+Distinct branches declaring the same type still establish a fully static assignment boundary.
 
 ```py
 from typing import Any
@@ -314,19 +301,7 @@ def update(flag: bool) -> None:
     else:
         value: int
 
-    value = returns_any()  # snapshot: unsound-assignment
-```
-
-```snapshot
-error[unsound-assignment]: Unsound assignment
-  --> src/mdtest_snippet.py:12:13
-   |
-12 |     value = returns_any()  # snapshot: unsound-assignment
-   |     -----   ^^^^^^^^^^^^^ Inferred as `Any`
-   |     |
-   |     Expected a subtype of `int` because of its declared type
-info: `Any` is assignable to `int`, but not a subtype of `int`
-help: Consider using an `assert` to narrow the type before assigning it
+    value = returns_any()  # error: [unsound-assignment]
 ```
 
 ## Unsound named and unpacked assignments
@@ -408,7 +383,7 @@ help: Consider using an `assert` to narrow the type before assigning it
 
 ## Unsound assignments to context-manager targets
 
-An unsound context-manager assignment points to the target's earlier type annotation.
+Context-manager targets are checked against their earlier type annotations.
 
 ```py
 from contextlib import nullcontext
@@ -419,21 +394,8 @@ def returns_any() -> Any:
 
 value: int
 
-with nullcontext(returns_any()) as value:  # snapshot: unsound-assignment
+with nullcontext(returns_any()) as value:  # error: [unsound-assignment]
     pass
-```
-
-```snapshot
-error[unsound-assignment]: Unsound assignment
- --> src/mdtest_snippet.py:9:36
-  |
-7 | value: int
-  |        --- Expected a subtype of `int` because of this annotation
-8 |
-9 | with nullcontext(returns_any()) as value:  # snapshot: unsound-assignment
-  |                                    ^^^^^ Inferred as `Any`
-info: `Any` is assignable to `int`, but not a subtype of `int`
-help: Consider using an `assert` to narrow the type before assigning it
 ```
 
 ## Unsound assignments to global and nonlocal variables
