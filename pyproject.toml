@@ -70,6 +70,15 @@ docs = [
     "mkdocs-redirects>=1.2.3",
     "pyyaml>=6.0.3",
 ]
+ty-ecosystem = [
+    "ecosystem-analyzer",
+]
+typeshed-docstrings = [
+    "docstring-adder",
+]
+typeshed-formatting = [
+    "black",
+]
 
 [tool.uv]
 exclude-newer = "P7D"
@@ -78,6 +87,18 @@ exclude-newer = "P7D"
 dev = { requires-python = ">=3.12" }
 release = { requires-python = ">=3.12" }
 docs = { requires-python = ">=3.12" }
+ty-ecosystem = { requires-python = ">=3.13" }
+typeshed-docstrings = { requires-python = ">=3.10" }
+typeshed-formatting = { requires-python = ">=3.10" }
+
+[tool.uv.sources]
+docstring-adder = { git = "https://github.com/astral-sh/docstring-adder.git" }
+# Switch to a released version once it includes
+# https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
+black = { git = "https://github.com/psf/black.git" }
+# Keep scripts/setup_primer_project.py and its lockfile synchronized with
+# ecosystem-analyzer's mypy-primer pin when updating its locked revision.
+ecosystem-analyzer = { git = "https://github.com/astral-sh/ecosystem-analyzer" }
 
 [tool.ruff]
 target-version = "py38"

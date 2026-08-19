@@ -60,17 +60,24 @@ def payloads(log: str) -> list[str]:
     return result
 
 
-def unique_value(log: str, pattern: str, label: str) -> str:
+def optional_value(log: str, pattern: str, label: str) -> str | None:
     regex = re.compile(pattern)
     values = {
         match.group(1) for line in payloads(log) if (match := regex.fullmatch(line))
     }
     if not values:
-        raise MetadataError(f"could not find {label} in the Actions log")
+        return None
     if len(values) > 1:
         rendered = ", ".join(sorted(values))
         raise MetadataError(f"found conflicting {label} values: {rendered}")
     return values.pop()
+
+
+def unique_value(log: str, pattern: str, label: str) -> str:
+    value = optional_value(log, pattern, label)
+    if value is None:
+        raise MetadataError(f"could not find {label} in the Actions log")
+    return value
 
 
 def parse_build_log(log: str) -> tuple[str, str]:
@@ -79,19 +86,38 @@ def parse_build_log(log: str) -> tuple[str, str]:
     return merge_base, pr_revision
 
 
-def parse_shard_log(log: str) -> tuple[str, str, str]:
+def parse_shard_log(log: str) -> tuple[str, str | None, str]:
     exclude_newer = unique_value(
         log,
         r"EXCLUDE_NEWER: (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)",
         "EXCLUDE_NEWER",
     )
-    analyzer_revision = unique_value(
+    analyzer_revision = optional_value(
         log,
         rf"ECOSYSTEM_ANALYZER_COMMIT: ({SHA})",
         "ecosystem-analyzer revision",
     )
     merge_base = unique_value(log, rf"MERGE_BASE: ({SHA})", "shard merge base")
     return exclude_newer, analyzer_revision, merge_base
+
+
+def parse_ecosystem_analyzer_revision(lockfile: str) -> str:
+    try:
+        packages = tomllib.loads(lockfile)["package"]
+        package = next(
+            package for package in packages if package["name"] == "ecosystem-analyzer"
+        )
+        source = package["source"]["git"]
+        revision = source.rsplit("#", maxsplit=1)[1]
+    except (IndexError, KeyError, StopIteration, TypeError) as error:
+        raise MetadataError(
+            "could not find ecosystem-analyzer revision in uv.lock"
+        ) from error
+
+    if not isinstance(revision, str) or re.fullmatch(SHA, revision) is None:
+        raise MetadataError("ecosystem-analyzer revision is not a 40-character Git SHA")
+
+    return revision
 
 
 def parse_minimum_python(source: str) -> tuple[int, int]:
@@ -286,6 +312,11 @@ def collect_metadata(
                 "-H",
                 "Accept: application/vnd.github.raw+json",
             ]
+        )
+
+    if analyzer_revision is None:
+        analyzer_revision = parse_ecosystem_analyzer_revision(
+            repository_file(repo, "uv.lock", pr_revision)
         )
 
     analyzer_pyproject = repository_file(
