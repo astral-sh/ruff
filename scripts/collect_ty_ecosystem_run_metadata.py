@@ -4,6 +4,15 @@
 # requires-python = ">=3.11"
 # dependencies = []
 #
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
 # [tool.uv]
 # exclude-newer = "P7D"
 # ///
@@ -70,7 +79,9 @@ def optional_value(log: str, pattern: str, label: str) -> str | None:
     if len(values) > 1:
         rendered = ", ".join(sorted(values))
         raise MetadataError(f"found conflicting {label} values: {rendered}")
-    return values.pop()
+    ret = values.pop()
+    assert isinstance(ret, str)
+    return ret
 
 
 def unique_value(log: str, pattern: str, label: str) -> str:
@@ -131,12 +142,10 @@ def parse_minimum_python(source: str) -> tuple[int, int]:
         ):
             continue
         value = ast.literal_eval(node.value)
-        if (
-            isinstance(value, tuple)
-            and len(value) == 2
-            and all(isinstance(part, int) for part in value)
-        ):
-            return value
+        if isinstance(value, tuple) and len(value) == 2:
+            major, minor = value
+            if isinstance(major, int) and isinstance(minor, int):
+                return (major, minor)
         break
     raise MetadataError("could not parse ecosystem-analyzer MINIMUM_PYTHON_VERSION")
 

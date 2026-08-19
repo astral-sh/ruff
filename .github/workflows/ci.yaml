@@ -390,6 +390,13 @@ jobs:
         run: uv run --quiet --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer --color=always
       - name: Dogfood ty on ty_benchmark
         run: uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark --color=always
+      - name: Dogfood ty on scripts
+        run: |
+          for script in scripts/*.py; do
+            echo "Checking $script"
+            uv sync --quiet --locked --script "$script"
+            cargo run --quiet -p ty check "$script" --python "$(uv python find --script "$script")" --color=always
+          done
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:

@@ -2,6 +2,15 @@
 # requires-python = ">=3.12"
 # dependencies = ["tqdm"]
 #
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
 # [tool.uv]
 # exclude-newer = "P7D"
 # ///

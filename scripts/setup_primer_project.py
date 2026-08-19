@@ -4,6 +4,15 @@
 # requires-python = ">=3.11"
 # dependencies = ["mypy-primer"]
 #
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
 # [tool.uv]
 # # This is the default for ad hoc use. Historical ecosystem reproduction must
 # # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
