@@ -1143,7 +1143,7 @@ jobs:
         run: cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
+        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
         with:
           mode: "simulation,memory"
           run: cargo codspeed run
@@ -1255,7 +1255,7 @@ jobs:
         run: find target/codspeed -type f -exec chmod +x {} +
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
+        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
         with:
           mode: ${{ matrix.mode }}
           cycle-estimation: false
@@ -1360,7 +1360,7 @@ jobs:
         run: find target/codspeed -type f -exec chmod +x {} +
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
+        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
         env:
           # enabling walltime flamegraphs adds ~6 minutes to the CI time, and they don't
           # appear to provide much useful insight for our walltime benchmarks right now
