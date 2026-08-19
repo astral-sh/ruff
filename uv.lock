@@ -13,6 +13,26 @@ resolution-markers = [
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
+[manifest]
+build-constraints = [
+    { name = "editables", specifier = "==0.6" },
+    { name = "hatch-fancy-pypi-readme", specifier = "==25.1.0" },
+    { name = "hatch-vcs", specifier = "==0.5.0" },
+    { name = "hatchling", specifier = "==1.32.0" },
+    { name = "packaging", specifier = "==26.3" },
+    { name = "pathspec", specifier = "==1.1.1" },
+    { name = "pluggy", specifier = "==1.6.0" },
+    { name = "setuptools", specifier = "==84.0.0" },
+    { name = "setuptools-scm", specifier = "==10.2.1" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = "==2.4.1" },
+    { name = "tomlkit", specifier = "==0.15.1" },
+    { name = "trove-classifiers", specifier = "==2026.6.1.19" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'", specifier = "==4.16.0" },
+    { name = "uv-build", specifier = "==0.12.3" },
+    { name = "vcs-versioning", specifier = "==2.2.4" },
+    { name = "wheel", specifier = "==0.47.0" },
+]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"

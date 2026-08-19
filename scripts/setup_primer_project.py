@@ -5,6 +5,9 @@
 # dependencies = ["mypy-primer"]
 #
 # [tool.uv]
+# no-build = true
+# no-binary-package = ["mypy-primer"]
+# build-constraint-dependencies = ["setuptools==84.0.0"]
 # # This is the default for ad hoc use. Historical ecosystem reproduction must
 # # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
 # # revision and project Python version, as shown in the module docstring.
