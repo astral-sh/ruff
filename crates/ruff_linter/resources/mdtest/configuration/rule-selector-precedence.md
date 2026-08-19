@@ -16,25 +16,6 @@ import os  # error: [unused-import]
 assert True  # error: [assert]
 ```
 
-## Semantic categories exclude internal test rules
-
-Internal test rules do not belong to user-facing categories and must not be enabled when selecting
-one.
-
-```toml
-[lint]
-preview = true
-select = ["pedantic"]
-```
-
-`panic.py`:
-
-```py
-# Copyright 2026 Astral Software Inc.
-"""A documented module."""
-x = 1
-```
-
 ## Semantic categories override `ALL`
 
 ```toml
