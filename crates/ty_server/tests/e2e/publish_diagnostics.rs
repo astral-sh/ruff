@@ -963,9 +963,44 @@ mod uv_metadata {
     use anyhow::Result;
     use lsp_types::{Code, PublishDiagnosticsNotification};
     use ruff_db::system::SystemPath;
+    use serde_json::json;
     use ty_project::UseUv;
 
     use crate::TestServerBuilder;
+
+    #[test]
+    fn untrusted_workspace_keeps_semantic_diagnostics() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_raw_initialization_options(json!({"untrustedWorkspace": true}))
+            .with_use_uv(UseUv::On)
+            .with_env_var("TY_UV", "true")
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_pull_diagnostics(false)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+
+        // An attempted synchronization would replace this with a `uv-metadata` error.
+        let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+        assert_eq!(diagnostics.uri, server.file_uri(script));
+        assert_eq!(
+            diagnostics
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code.as_ref())
+                .collect::<Vec<_>>(),
+            [Some(&Code::String("unresolved-reference".to_string()))],
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn pushed_diagnostics_wait_for_the_initial_environment() -> Result<()> {

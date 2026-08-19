@@ -1,11 +1,58 @@
 use anyhow::Result;
-use lsp_types::ShowMessageNotification;
-use lsp_types::{Position, RegistrationRequest};
+use lsp_types::{
+    Code, Position, PublishDiagnosticsNotification, RegistrationRequest, ShowMessageNotification,
+};
 use ruff_db::system::SystemPath;
-use serde_json::Value;
+use serde_json::{Value, json};
 use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
+
+#[test]
+#[should_panic(expected = "Invalid initialization options: Invalid `untrustedWorkspace` setting")]
+fn malformed_trust_rejects_initialization() {
+    TestServerBuilder::new()
+        .expect("Failed to create test server builder")
+        .with_raw_initialization_options(json!({
+            "untrustedWorkspace": "true",
+            "logLevel": "invalid",
+        }))
+        .build();
+}
+
+#[test]
+fn malformed_initialization_options_preserve_workspace_trust() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(script, source)?
+        .with_raw_initialization_options(json!({
+            "untrustedWorkspace": true,
+            "diagnosticMode": "invalid",
+        }))
+        .with_env_var("TY_UV", "true")
+        .with_env_var("UV", "missing-ty-script-uv-executable")
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, source, 1);
+
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    assert_eq!(diagnostics.uri, server.file_uri(script));
+    assert_eq!(
+        diagnostics
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_ref())
+            .collect::<Vec<_>>(),
+        [Some(&Code::String("unresolved-reference".to_string()))],
+    );
+    Ok(())
+}
 
 #[test]
 fn empty_workspace_folders() -> Result<()> {
