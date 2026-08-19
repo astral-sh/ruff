@@ -1076,8 +1076,18 @@ jobs:
         with:
           node-version: 24.19.0
           cache: "npm"
-          cache-dependency-path: playground/package-lock.json
+          cache-dependency-path: |
+            playground/package-lock.json
+            playground/deploy/package-lock.json
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
+      - name: "Check deployment dependencies"
+        env:
+          WRANGLER_SEND_METRICS: "false"
+          WRANGLER_SEND_ERROR_REPORTS: "false"
+        run: |
+          npm ci --ignore-scripts
+          ./node_modules/.bin/wrangler --version
+        working-directory: playground/deploy
       - name: "Install Node dependencies"
         run: npm ci --ignore-scripts
         working-directory: playground
