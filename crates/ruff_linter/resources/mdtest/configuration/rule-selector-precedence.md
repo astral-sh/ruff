@@ -1,7 +1,7 @@
 # Rule selector precedence
 
 Semantic categories and linter selectors can be combined in the same configuration. More specific
-selectors override broader selectors; when selectors have the same specificity, ignores win.
+selectors take precedence over broader selectors; when selectors have the same specificity, ignores win.
 
 ## Semantic categories and linter selectors can be combined
 
@@ -16,7 +16,7 @@ import os  # error: [unused-import]
 assert True  # error: [assert]
 ```
 
-## Semantic categories override `ALL`
+## Semantic categories take precedence over `ALL`
 
 ```toml
 [lint]
@@ -29,7 +29,7 @@ ignore = ["ALL"]
 import os  # error: [unused-import]
 ```
 
-## Semantic category ignores override linter selectors
+## Semantic category ignores take precedence over linter selectors
 
 ```toml
 [lint]
@@ -42,7 +42,7 @@ ignore = ["correctness"]
 import os
 ```
 
-## Linter ignores override semantic category selectors
+## Linter ignores take precedence over semantic category selectors
 
 ```toml
 [lint]
@@ -55,7 +55,7 @@ ignore = ["F"]
 import os
 ```
 
-## Rule prefixes override semantic categories
+## Rule prefixes take precedence over semantic categories
 
 ```toml
 [lint]
@@ -68,7 +68,7 @@ ignore = ["correctness"]
 import os  # error: [unused-import]
 ```
 
-## Rule codes override semantic categories
+## Rule codes take precedence over semantic categories
 
 ```toml
 [lint]
@@ -81,7 +81,7 @@ ignore = ["correctness"]
 import os  # error: [unused-import]
 ```
 
-## Rule names override semantic categories
+## Rule names take precedence over semantic categories
 
 ```toml
 [lint]
