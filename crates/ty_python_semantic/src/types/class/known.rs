@@ -166,6 +166,7 @@ pub enum KnownClass {
     // Pytest
     PytestMarkDecorator,
     PytestParametrizeMarkDecorator,
+    PytestSkipMarkDecorator,
     PytestParameterSet,
 }
 
@@ -302,6 +303,7 @@ impl KnownClass {
             | Self::PydanticStrict
             | Self::PytestMarkDecorator
             | Self::PytestParametrizeMarkDecorator
+            | Self::PytestSkipMarkDecorator
             | Self::PytestParameterSet => Some(Truthiness::Ambiguous),
 
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
@@ -427,6 +429,7 @@ impl KnownClass {
             | KnownClass::PydanticStrict
             | KnownClass::PytestMarkDecorator
             | KnownClass::PytestParameterSet
+            | KnownClass::PytestSkipMarkDecorator
             | KnownClass::PytestParametrizeMarkDecorator => false,
         }
     }
@@ -544,6 +547,7 @@ impl KnownClass {
             | KnownClass::PydanticStrict
             | KnownClass::PytestMarkDecorator
             | KnownClass::PytestParameterSet
+            | KnownClass::PytestSkipMarkDecorator
             | KnownClass::PytestParametrizeMarkDecorator => false,
 
             KnownClass::PydanticConfigDict => true,
@@ -663,6 +667,7 @@ impl KnownClass {
             | KnownClass::PydanticStrict
             | KnownClass::PytestMarkDecorator
             | KnownClass::PytestParameterSet
+            | KnownClass::PytestSkipMarkDecorator
             | KnownClass::PytestParametrizeMarkDecorator => false,
         }
     }
@@ -793,6 +798,7 @@ impl KnownClass {
             | Self::PydanticStrict
             | Self::PytestMarkDecorator
             | Self::PytestParameterSet
+            | Self::PytestSkipMarkDecorator
             | Self::PytestParametrizeMarkDecorator => false,
         }
     }
@@ -912,6 +918,7 @@ impl KnownClass {
             | KnownClass::PydanticStrict
             | KnownClass::PytestMarkDecorator
             | KnownClass::PytestParameterSet
+            | KnownClass::PytestSkipMarkDecorator
             | KnownClass::PytestParametrizeMarkDecorator => false,
             KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback
@@ -1043,6 +1050,7 @@ impl KnownClass {
             Self::PydanticStrict => "Strict",
             Self::PytestMarkDecorator => "MarkDecorator",
             Self::PytestParameterSet => "ParameterSet",
+            Self::PytestSkipMarkDecorator => "_SkipMarkDecorator",
             Self::PytestParametrizeMarkDecorator => "_ParametrizeMarkDecorator",
         }
     }
@@ -1471,6 +1479,7 @@ impl KnownClass {
             Self::PydanticStrict => KnownModule::PydanticTypes,
             Self::PytestMarkDecorator
             | Self::PytestParameterSet
+            | Self::PytestSkipMarkDecorator
             | Self::PytestParametrizeMarkDecorator => KnownModule::PytestMarkStructures,
         }
     }
@@ -1592,6 +1601,7 @@ impl KnownClass {
             | Self::PydanticStrict
             | Self::PytestMarkDecorator
             | Self::PytestParameterSet
+            | Self::PytestSkipMarkDecorator
             | Self::PytestParametrizeMarkDecorator => false,
         }
     }
@@ -1710,6 +1720,7 @@ impl KnownClass {
             "Strict" => &[Self::PydanticStrict],
             "MarkDecorator" => &[Self::PytestMarkDecorator],
             "ParameterSet" => &[Self::PytestParameterSet],
+            "_SkipMarkDecorator" => &[Self::PytestSkipMarkDecorator],
             "_ParametrizeMarkDecorator" => &[Self::PytestParametrizeMarkDecorator],
             _ => return None,
         };
@@ -1819,6 +1830,7 @@ impl KnownClass {
             | Self::PydanticStrict
             | Self::PytestMarkDecorator
             | Self::PytestParameterSet
+            | Self::PytestSkipMarkDecorator
             | Self::PytestParametrizeMarkDecorator => {
                 module == self.canonical_module(python_version)
             }

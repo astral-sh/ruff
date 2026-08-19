@@ -204,11 +204,11 @@ Pytest ignores optional parameters and parameters must have the correct type.
 import pytest
 from typing import Any
 
-@pytest.mark.parametrize("", [])
+@pytest.mark.please_check
 # snapshot: pytest-test-parameter-wrong-kind
 # snapshot: pytest-test-parameter-wrong-kind
 def test_invalid_variadic_parameters(*args, **kwargs) -> None: ...
-@pytest.mark.parametrize("", [])
+@pytest.mark.please_check
 # snapshot: pytest-test-parameter-wrong-kind
 # snapshot: pytest-test-parameter-wrong-kind
 def test_invalid_positional_only_parameters(x: int, y: float, /) -> None: ...

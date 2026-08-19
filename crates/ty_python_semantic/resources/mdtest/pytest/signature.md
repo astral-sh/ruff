@@ -82,9 +82,18 @@ from typing import Any
 def opaque(f: Any) -> Any:
     return f
 
-# Other decorator should still be checked
+# Skipped items are not checked.
+# They are usually not meant to be tested.
 @pytest.mark.skip
-def _(**kwargs) -> None: ...  # error: [pytest-test-parameter-wrong-kind]
+def _(x: int, /, y: int, *, z: int, optional=None, **kwargs) -> None: ...
+@pytest.mark.skip
+@pytest.mark.parametrize("x", ["todo"])
+def _(x: int) -> None: ...
+
+# Other marks are checked.
+@pytest.mark.slow
+@pytest.mark.parametrize("x", ["todo"])  # error: [pytest-param-mismatched-type]
+def _(x: int) -> None: ...
 
 # But when there's a different one, only check the parametrization
 @pytest.mark.parametrize("a a", [])  # error: [pytest-invalid-argnames-literal]
