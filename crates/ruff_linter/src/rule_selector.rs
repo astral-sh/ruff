@@ -276,7 +276,9 @@ impl RuleSelector {
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + use<> {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-            RuleSelector::Category(category) => RuleSelectorIter::Category(category.rules().iter()),
+            RuleSelector::Category(category) => {
+                RuleSelectorIter::Slice(category.rules().iter().copied())
+            }
 
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
@@ -288,8 +290,8 @@ impl RuleSelector {
                     .rules()
                     .chain(Linter::Flake8Print.rules()),
             ),
-            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.clone().rules()),
+            RuleSelector::Linter(linter) => RuleSelectorIter::Slice(linter.rules()),
+            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Slice(prefix.rules()),
             RuleSelector::Rule { rule, .. } => RuleSelectorIter::Once(std::iter::once(*rule)),
         }
     }
@@ -321,11 +323,12 @@ impl RuleSelector {
     }
 }
 
+type RuleSliceIter = std::iter::Copied<std::slice::Iter<'static, Rule>>;
+
 pub enum RuleSelectorIter {
     All(RuleIter),
-    Category(std::slice::Iter<'static, Rule>),
-    Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
-    Vec(std::vec::IntoIter<Rule>),
+    Chain(std::iter::Chain<RuleSliceIter, RuleSliceIter>),
+    Slice(RuleSliceIter),
     Once(std::iter::Once<Rule>),
 }
 
@@ -335,9 +338,8 @@ impl Iterator for RuleSelectorIter {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Category(iter) => iter.next().copied(),
             RuleSelectorIter::Chain(iter) => iter.next(),
-            RuleSelectorIter::Vec(iter) => iter.next(),
+            RuleSelectorIter::Slice(iter) => iter.next(),
             RuleSelectorIter::Once(iter) => iter.next(),
         }
     }
