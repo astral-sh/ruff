@@ -1478,6 +1478,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers,
         } = place_and_quals;
 
+        let declaration = match resolved_place {
+            Place::Defined(DefinedPlace { provenance, .. }) => provenance
+                .definition()
+                .filter(|declaration| declaration.file(db) == self.context.file()),
+            Place::Undefined => None,
+        };
+
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
             self.fallback_member_declared_type(node)
         } else {
@@ -1487,6 +1494,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         AddBinding {
             declared_ty,
+            declaration,
             binding,
             node,
             qualifiers,
@@ -1769,6 +1777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &self.context,
                         node,
                         definition,
+                        None,
                         declared_type,
                         inferred_ty,
                     );
@@ -4304,6 +4313,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let node = target.into();
             let add = AddBinding {
                 declared_ty: self.fallback_member_declared_type(node),
+                declaration: None,
                 binding: definition,
                 node,
                 qualifiers: TypeQualifiers::empty(),
@@ -12260,6 +12270,7 @@ impl<V> IntoIterator for VecSet<V> {
 #[must_use]
 struct AddBinding<'db, 'ast> {
     declared_ty: Option<Type<'db>>,
+    declaration: Option<Definition<'db>>,
     binding: Definition<'db>,
     node: AnyNodeRef<'ast>,
     qualifiers: TypeQualifiers,
@@ -12344,6 +12355,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 &builder.context,
                 self.node,
                 self.binding,
+                self.declaration,
                 declared_ty,
                 bound_ty,
             );

@@ -49,7 +49,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{KnownModule, Module, ModuleName, SearchPath, file_to_module};
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
 use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
 
@@ -1649,6 +1649,7 @@ pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
     definition: Definition<'db>,
+    declaration: Option<Definition<'db>>,
     target_ty: Type,
     value_ty: Type<'db>,
 ) {
@@ -1697,7 +1698,7 @@ pub(super) fn report_invalid_assignment<'db>(
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
             value_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings)
+            target_ty.display_with(db, env, settings.clone())
         ),
     ) else {
         return;
@@ -1723,33 +1724,94 @@ pub(super) fn report_invalid_assignment<'db>(
         }
     }
 
-    if value_node.is_some() {
-        match definition_kind {
-            DefinitionKind::AnnotatedAssignment(assignment) => {
-                // For annotated assignments, just point to the annotation in the source code.
-                diag.annotate(
-                    context
-                        .secondary(assignment.annotation(context.module()))
-                        .message("Declared type"),
-                );
-            }
-            _ => {
-                // Otherwise, annotate the target with its declared type.
-                diag.annotate(context.secondary(target_node).message(format_args!(
-                    "Declared type `{}`",
-                    target_ty.display(db, env)
-                )));
-            }
+    let declaration_annotation = match definition_kind {
+        DefinitionKind::AnnotatedAssignment(assignment) => {
+            Some((assignment.annotation(context.module()), None))
         }
+        _ => declaration.and_then(|declaration| match declaration.kind(db) {
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                Some((assignment.annotation(context.module()), None))
+            }
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
+                parameter
+                    .node(context.module())
+                    .parameter
+                    .annotation
+                    .as_deref()
+                    .map(|annotation| (annotation, None))
+            }
+            DefinitionKind::Parameter(
+                ParameterDefinitionNodeKind::VariadicPositionalParameter(parameter),
+            ) => parameter
+                .node(context.module())
+                .annotation
+                .as_deref()
+                .map(|annotation| (annotation, Some("Variadic"))),
+            DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(
+                parameter,
+            )) => parameter
+                .node(context.module())
+                .annotation
+                .as_deref()
+                .map(|annotation| (annotation, Some("Keyword-variadic"))),
+            DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::ImportFromSubmodule(_)
+            | DefinitionKind::StarImport(_)
+            | DefinitionKind::Function(_)
+            | DefinitionKind::Class(_)
+            | DefinitionKind::TypeAlias(_)
+            | DefinitionKind::NamedExpression(_)
+            | DefinitionKind::Assignment(_)
+            | DefinitionKind::AugmentedAssignment(_)
+            | DefinitionKind::DictKeyAssignment(_)
+            | DefinitionKind::For(_)
+            | DefinitionKind::Comprehension(_)
+            | DefinitionKind::LambdaParameter(_)
+            | DefinitionKind::WithItem(_)
+            | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::ExceptHandler(_)
+            | DefinitionKind::TypeVar(_)
+            | DefinitionKind::ParamSpec(_)
+            | DefinitionKind::TypeVarTuple(_)
+            | DefinitionKind::LoopHeader(_)
+            | DefinitionKind::NestedBindings(_) => None,
+        }),
+    };
 
+    if let Some((annotation, variadic_parameter_kind)) = declaration_annotation {
+        let annotation = context.secondary(annotation);
+        diag.annotate(if let Some(kind) = variadic_parameter_kind {
+            annotation.message(format_args!(
+                "{kind} parameter annotation declares the type as `{}`",
+                target_ty.display_with(db, env, settings.clone())
+            ))
+        } else {
+            annotation.message("Declared type")
+        });
+    } else if value_node.is_some() {
+        diag.annotate(context.secondary(target_node).message(format_args!(
+            "Declared type `{}`",
+            target_ty.display_with(db, env, settings.clone())
+        )));
+    }
+
+    if value_node.is_some() {
         diag.set_primary_annotation_message(format_args!(
             "Incompatible value of type `{}`",
-            value_ty.display(db, env),
+            value_ty.display_with(db, env, settings),
         ));
 
         let error_context = value_ty.assignability_error_context(db, env, target_ty);
         error_context.attach_to(db, env, &mut diag);
+    } else if matches!(definition_kind, DefinitionKind::AugmentedAssignment(_)) {
+        diag.set_primary_annotation_message(format_args!(
+            "Augmented assignment produces a value of type `{}`",
+            value_ty.display_with(db, env, settings),
+        ));
+    }
 
+    if value_node.is_some() || matches!(definition_kind, DefinitionKind::AugmentedAssignment(_)) {
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.headline_message().to_string();
         diag.set_concise_message(message);
