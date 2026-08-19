@@ -665,7 +665,7 @@ impl<'db> GenericContext<'db> {
             param
                 .annotated_type()
                 .find_legacy_typevars(db, &env, Some(definition), &mut variables);
-            if let Some(ty) = param.default_type() {
+            if let Some(ty) = param.eager_default_type() {
                 ty.find_legacy_typevars(db, &env, Some(definition), &mut variables);
             }
         }

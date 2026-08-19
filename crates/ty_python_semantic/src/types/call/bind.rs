@@ -153,7 +153,7 @@ fn generic_contexts_mentioned_in_type<'db>(
             }
             for parameter in signature.parameters() {
                 self.visit_type(db, parameter.annotated_type());
-                if let Some(default_ty) = parameter.default_type() {
+                if let Some(default_ty) = parameter.eager_default_type() {
                     self.visit_type(db, default_ty);
                 }
             }
@@ -1947,7 +1947,7 @@ impl<'db> Bindings<'db> {
                         // instead of specifying `init`, `default` etc. explicitly).
                         let get_argument_type = |name, fallback_to_default| -> Option<Type<'db>> {
                             if let Ok(ty) =
-                                overload.parameter_type_by_name(name, fallback_to_default)
+                                overload.parameter_type_by_name(db, name, fallback_to_default)
                             {
                                 return ty;
                             }
@@ -2617,19 +2617,19 @@ impl<'db> Bindings<'db> {
                             let mut flags = DataclassTransformerFlags::empty();
 
                             let eq_default = overload
-                                .parameter_type_by_name("eq_default", false)
+                                .parameter_type_by_name(db, "eq_default", false)
                                 .ok()
                                 .flatten();
                             let order_default = overload
-                                .parameter_type_by_name("order_default", false)
+                                .parameter_type_by_name(db, "order_default", false)
                                 .ok()
                                 .flatten();
                             let kw_only_default = overload
-                                .parameter_type_by_name("kw_only_default", false)
+                                .parameter_type_by_name(db, "kw_only_default", false)
                                 .ok()
                                 .flatten();
                             let frozen_default = overload
-                                .parameter_type_by_name("frozen_default", false)
+                                .parameter_type_by_name(db, "frozen_default", false)
                                 .ok()
                                 .flatten();
 
@@ -2649,12 +2649,12 @@ impl<'db> Bindings<'db> {
                             // Accept both `field_specifiers` (current name) and
                             // `field_descriptors` (legacy name).
                             let field_specifiers_param = overload
-                                .parameter_type_by_name("field_specifiers", false)
+                                .parameter_type_by_name(db, "field_specifiers", false)
                                 .ok()
                                 .flatten()
                                 .or_else(|| {
                                     overload
-                                        .parameter_type_by_name("field_descriptors", false)
+                                        .parameter_type_by_name(db, "field_descriptors", false)
                                         .ok()
                                         .flatten()
                                 });
@@ -5078,7 +5078,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 let Some(argument_type) = argument_types.next() else {
                     break;
                 };
-                if parameter.default_type().is_none() {
+                if !parameter.has_default() {
                     return Err(());
                 }
                 self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
@@ -5405,7 +5405,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 }
                 let param = &self.parameters[index];
                 if paramspec.is_none() && (param.is_variadic() || param.is_keyword_variadic())
-                    || param.default_type().is_some()
+                    || param.has_default()
                 {
                     // variadic/keywords and defaulted arguments are not required
                     // (unless the parameters represent a ParamSpec)
@@ -8065,6 +8065,7 @@ impl<'db> Binding<'db> {
     /// Returns an error if the parameter name is not found.
     fn parameter_type_by_name(
         &self,
+        db: &'db dyn Db,
         parameter_name: &str,
         fallback_to_default: bool,
     ) -> Result<Option<Type<'db>>, UnknownParameterNameError> {
@@ -8080,7 +8081,7 @@ impl<'db> Binding<'db> {
         if parameter_ty.is_some() {
             Ok(parameter_ty)
         } else if fallback_to_default {
-            Ok(parameters[index].default_type())
+            Ok(parameters[index].default_type(db))
         } else {
             Ok(None)
         }

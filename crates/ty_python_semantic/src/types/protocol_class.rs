@@ -2339,7 +2339,7 @@ fn descriptor_setter_signature_domain<'db>(
         return missing_required_parameter();
     };
     if !trailing_parameters.iter().all(|parameter| {
-        parameter.default_type().is_some()
+        parameter.has_default()
             || ((parameters.is_standard() || parameters.is_gradual())
                 && (parameter.is_variadic() || parameter.is_keyword_variadic()))
     }) {

@@ -2753,7 +2753,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
-            if let Some(default_type) = self.param.default_type() {
+            if let Some(default_type) = self.param.default_type(db) {
                 if self.param.should_annotation_be_displayed() {
                     f.write_str(" = ")?;
                 } else {

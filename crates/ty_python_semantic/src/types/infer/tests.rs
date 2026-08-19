@@ -787,6 +787,187 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 }
 
 #[test]
+fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        def f(x: int = 1) -> int: return x
+        def annotated(x: int) -> int: return x
+        def defaulted(x=1): return x
+        "#,
+    )?;
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, file, "f"),
+        &events,
+    );
+    assert_function_query_was_not_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, file, "annotated"),
+        &events,
+    );
+    assert_function_query_was_not_run(
+        &db,
+        infer_deferred_types,
+        first_public_binding(&db, file, "defaulted"),
+        &events,
+    );
+
+    let definition = first_public_binding(&db, file, "f");
+    let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
+    let DefinitionKind::Function(function) = definition.kind(&db) else {
+        anyhow::bail!("expected a function definition");
+    };
+    let Some(parameter) = function.node(&module).parameters.find("x") else {
+        anyhow::bail!("expected parameter x");
+    };
+    let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default()) else {
+        anyhow::bail!("expected an annotated parameter with a default");
+    };
+
+    let annotations = infer_deferred_types(&db, definition);
+    assert!(annotations.try_expression_type(annotation).is_some());
+    assert!(annotations.try_expression_type(default).is_none());
+    let defaults = infer_function_default_types(&db, definition);
+    assert!(defaults.try_expression_type(default).is_some());
+    assert!(defaults.try_expression_type(annotation).is_none());
+    assert_eq!(
+        crate::types::definition_expression_type(&db, definition, default),
+        defaults.expression_type(default)
+    );
+    Ok(())
+}
+
+#[test]
+fn lazy_parameter_defaults() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        ("/src/defaults.py", "def f(x: int = 1) -> int: return x"),
+        ("/src/main.py", "from defaults import f\nresult = f()"),
+    ])?;
+    let source = system_path_to_file(&db, "/src/defaults.py")?;
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    db.clear_salsa_events();
+    let result = global_symbol(&db, main, "result").place.expect_type();
+    assert_eq!(
+        result.display(&db, &db.program_environment()).to_string(),
+        "int"
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, source, "f"),
+        &events,
+    );
+
+    // Display needs the actual default, unlike call checking.
+    let function = global_symbol(&db, source, "f").place.expect_type();
+    assert_eq!(
+        function.display(&db, &db.program_environment()).to_string(),
+        "def f(x: int = 1) -> int"
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, source, "f"),
+        &events,
+    );
+
+    db.write_file("/src/defaults.py", "def f(x: int = 2) -> int: return x")?;
+    db.clear_salsa_events();
+    let result = global_symbol(&db, main, "result").place.expect_type();
+    assert_eq!(
+        result.display(&db, &db.program_environment()).to_string(),
+        "int"
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(
+        &db,
+        infer_definition_types,
+        first_public_binding(&db, main, "result"),
+        &events,
+    );
+    let function = global_symbol(&db, source, "f").place.expect_type();
+    assert_eq!(
+        function.display(&db, &db.program_environment()).to_string(),
+        "def f(x: int = 2) -> int"
+    );
+    Ok(())
+}
+
+#[test]
+fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let with_default = "def f(x: int = 1) -> int: return x";
+    db.write_files([
+        ("/src/defaults.py", with_default),
+        ("/src/main.py", "from defaults import f\nf()"),
+    ])?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    db.write_file("/src/defaults.py", "def f(x: int) -> int: return x")?;
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["No argument provided for required parameter `x` of function `f`"],
+    );
+
+    db.write_file("/src/defaults.py", with_default)?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
+fn field_specifier_default_value_invalidates_caller() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let field_source = r#"from typing import Any
+
+def field(*, init: bool = False) -> Any: ...
+"#;
+    db.write_files([
+        ("/src/fields.py", field_source),
+        (
+            "/src/model.py",
+            r#"from typing_extensions import dataclass_transform
+from fields import field
+
+@dataclass_transform(field_specifiers=(field,))
+class ModelBase: ...
+
+class Model(ModelBase):
+    value: int = field()
+"#,
+        ),
+        ("/src/main.py", "from model import Model\nModel()"),
+    ])?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    // This changes a default's value, not the field specifier's callable signature.
+    db.write_file(
+        "/src/fields.py",
+        field_source.replace("init: bool = False", "init: bool = True"),
+    )?;
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["No argument provided for required parameter `value`"],
+    );
+
+    db.write_file("/src/fields.py", field_source)?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
 fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 

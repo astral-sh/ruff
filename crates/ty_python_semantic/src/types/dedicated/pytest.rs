@@ -192,7 +192,7 @@ impl<'db> FixtureRequest<'db> {
         // parameters and by keyword:
         // https://docs.pytest.org/en/9.0.x/how-to/fixtures.html#requesting-fixtures
         // https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/compat.py#L145-L153
-        if parameter.default_type().is_some() {
+        if parameter.has_default() {
             return None;
         }
 
@@ -321,9 +321,7 @@ fn is_mock_patch_parameter<'db>(
 
     parameters
         .iter()
-        .filter(|parameter| {
-            is_source_keyword_parameter(parameter) && parameter.default_type().is_none()
-        })
+        .filter(|parameter| is_source_keyword_parameter(parameter) && !parameter.has_default())
         .skip(usize::from(skips_receiver))
         .take(patch_count)
         .any(|candidate| candidate.definition() == Some(parameter_definition))

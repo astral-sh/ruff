@@ -32,6 +32,7 @@ pub use self::dedicated::pytest::{FixtureBinding, fixture_bindings_for_parameter
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
+use self::infer::infer_function_default_types;
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
@@ -53,8 +54,8 @@ pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
 pub use self::set_theoretic::{IntersectionType, UnionType};
-pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
+pub use self::signatures::{ParameterDefault, ParameterKind};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub(crate) use self::type_expansion::expand_type;
 pub(crate) use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
@@ -351,8 +352,14 @@ fn definition_expression_type<'db>(
         let inference = infer_definition_types(db, definition);
         if let Some(ty) = inference.try_expression_type(expression) {
             ty
+        } else if let Some(ty) =
+            infer_deferred_types(db, definition).try_expression_type(expression)
+        {
+            ty
+        } else if matches!(definition.kind(db), DefinitionKind::Function(_)) {
+            infer_function_default_types(db, definition).expression_type(expression)
         } else {
-            infer_deferred_types(db, definition).expression_type(expression)
+            Type::unknown()
         }
     } else {
         // expression is in a type-params sub-scope

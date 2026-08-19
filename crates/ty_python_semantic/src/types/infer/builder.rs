@@ -527,9 +527,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
         self.typevar_binding_context.or(match self.region {
-            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                Some(definition)
-            }
+            InferenceRegion::Definition(definition)
+            | InferenceRegion::FunctionDefaults(definition)
+            | InferenceRegion::Deferred(definition) => Some(definition),
             InferenceRegion::Statement(_)
             | InferenceRegion::Expression(_, _)
             | InferenceRegion::FunctionDecorators(_)
@@ -1020,6 +1020,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::FunctionDecorators(definition) => {
                 self.infer_region_function_decorators(definition);
             }
+            InferenceRegion::FunctionDefaults(definition) => {
+                if let DefinitionKind::Function(function) = definition.kind(self.db()) {
+                    self.infer_function_defaults(definition, function.node(self.module()));
+                }
+            }
             InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
             InferenceRegion::Expression(expression, tcx) => {
                 self.infer_region_expression(expression, tcx);
@@ -1078,7 +1083,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer deferred types for all definitions.
         let deferred_definitions: Vec<_> = std::mem::take(&mut self.deferred).into_iter().collect();
         for definition in &deferred_definitions {
-            self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
+            if let DefinitionKind::Function(function) = definition.kind(self.db()) {
+                self.extend_function_deferred(*definition, function.node(self.module()));
+            } else {
+                self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
+            }
         }
 
         assert!(
@@ -1353,7 +1362,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
-                self.infer_function_deferred(definition, function.node(self.module()));
+                self.infer_function_annotations(definition, function.node(self.module()));
             }
             DefinitionKind::Class(class) => {
                 self.infer_class_deferred(definition, class.node(self.module()));

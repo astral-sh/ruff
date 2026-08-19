@@ -251,6 +251,109 @@ class C:
         reveal_type(self.d)
 ```
 
+### Self-referential decorated functions
+
+Resolving a decorated function's callable signature must not eagerly infer its default values.
+Otherwise, a default that refers back to the decorated name can re-enter the reachability check for
+an earlier assertion and prevent inference from converging. This is a regression test for
+<https://github.com/astral-sh/ty/issues/4308>.
+
+```py
+f = lambda: f
+assert f
+
+@property
+def f(x=lambda: f): ...
+```
+
+The same cycle must converge when the parameter and return type are annotated:
+
+```py
+g = lambda: g
+assert g
+
+@property
+def g(x: object = lambda: g) -> None: ...
+```
+
+### Self-referential property construction
+
+Constructing a property explicitly has the same behavior as decorator syntax:
+
+```py
+f = lambda: f
+assert f
+
+def getter(x=lambda: f): ...
+
+f = property(getter)
+```
+
+### Self-referential callable decorators
+
+The cycle is not specific to properties. A decorator that returns a callable with a fixed signature
+must also terminate:
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def decorator(fn: Callable[[Any], Any]) -> Callable[[Any], Any]:
+    return fn
+
+f = lambda: f
+assert f
+
+@decorator
+def f(x=lambda: f): ...
+```
+
+### Self-referential ParamSpec decorators
+
+A decorator can capture a function's parameters and return a callable with a different signature.
+Capturing those parameters must not evaluate a self-referential default.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+def decorator[**P](fn: Callable[P, None]) -> Callable[[], None]:
+    return lambda: None
+
+f = lambda: f
+assert f
+
+@decorator
+def f(x=lambda: f) -> None: ...
+
+reveal_type(f)  # revealed: () -> None
+```
+
+### Self-referential generic properties
+
+A generic getter's annotations are inferred in its type-parameter scope. Constructing the property
+must not pull its self-referential default into that inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+f = lambda: f
+assert f
+
+@property
+def f[T](value: T, callback=lambda: f) -> T:
+    return value
+
+reveal_type(f)  # revealed: property
+```
+
 ## Self-referential implicit attributes
 
 ```py
