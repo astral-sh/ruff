@@ -1315,6 +1315,8 @@ pub enum FromNameError {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+    use itertools::Itertools;
     use strum::IntoEnumIterator;
 
     use super::{Category, Rule};
@@ -1327,5 +1329,28 @@ mod tests {
                 "category {category} conflicts with a rule name"
             );
         }
+    }
+
+    #[test]
+    fn category_descriptions() {
+        let snapshot = Category::iter().format_with("\n", |category, f| {
+            f(&format_args!(
+                "{name}: {description}",
+                name = category.into_str(),
+                description = category.description().unwrap(),
+            ))
+        });
+
+        assert_snapshot!(snapshot, @"
+        correctness: Rules that flag outright wrong or useless code
+        suspicious: Rules that flag likely outright wrong or useless code but that could be intentional
+        complexity: Rules that suggest rewriting code in a shorter and more readable way
+        performance: Rules that suggest rewriting code in a more efficient way
+        style: Rules that suggest rewriting code in a more idiomatic way
+        security: Rules that flag potential security vulnerabilities but may be prone to false positives
+        formatting: Rules that flag formatting issues that do not affect semantics
+        pedantic: Rules that are highly opinionated or prone to false positives
+        restriction: Rules that restrict the use of basic language features
+        ");
     }
 }
