@@ -276,10 +276,7 @@ impl RuleSelector {
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + use<> {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-            RuleSelector::Category(category) => RuleSelectorIter::Category {
-                iter: Rule::iter(),
-                category: *category,
-            },
+            RuleSelector::Category(category) => RuleSelectorIter::Category(category.rules().iter()),
 
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
@@ -326,7 +323,7 @@ impl RuleSelector {
 
 pub enum RuleSelectorIter {
     All(RuleIter),
-    Category { iter: RuleIter, category: Category },
+    Category(std::slice::Iter<'static, Rule>),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
     Once(std::iter::Once<Rule>),
@@ -338,9 +335,7 @@ impl Iterator for RuleSelectorIter {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Category { iter, category } => {
-                iter.find(|rule| rule.category() == *category)
-            }
+            RuleSelectorIter::Category(iter) => iter.next().copied(),
             RuleSelectorIter::Chain(iter) => iter.next(),
             RuleSelectorIter::Vec(iter) => iter.next(),
             RuleSelectorIter::Once(iter) => iter.next(),
