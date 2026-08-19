@@ -25,6 +25,86 @@ struct NotebookChange {
 }
 
 #[test]
+fn pull_diagnostics_for_notebook_cells() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "pyproject.toml",
+            "[tool.ruff.lint]\nselect = [\"F401\", \"F811\"]\n",
+        )?
+        .build();
+
+    let notebook_path = server.file_path("test.ipynb");
+    let cell_uris = [
+        make_cell_uri(&notebook_path, 0),
+        make_cell_uri(&notebook_path, 1),
+        make_cell_uri(&notebook_path, 2),
+    ];
+    let cells = cell_uris
+        .iter()
+        .cloned()
+        .map(|uri| lsp_types::NotebookCell {
+            kind: lsp_types::NotebookCellKind::Code,
+            document: uri,
+            metadata: None,
+            execution_summary: None,
+        })
+        .collect();
+    let cell_text_documents = cell_uris
+        .iter()
+        .cloned()
+        .zip(["import sys\n", "import os\nimport os\n", "os.getcwd()\n"])
+        .map(|(uri, source)| {
+            TextDocumentItem::new(uri, lsp_types::LanguageKind::Python, 0, source.to_string())
+        })
+        .collect();
+
+    server.send_notification::<DidOpenNotebookDocumentNotification>(
+        DidOpenNotebookDocumentParams {
+            notebook_document: NotebookDocument {
+                uri: server.file_uri("test.ipynb"),
+                notebook_type: "jupyter-notebook".to_string(),
+                version: 0,
+                metadata: None,
+                cells,
+            },
+            cell_text_documents,
+        },
+    );
+
+    let expected_diagnostics = server.collect_publish_diagnostic_notifications(cell_uris.len());
+    assert_eq!(expected_diagnostics[&cell_uris[0]].len(), 1);
+    assert_eq!(expected_diagnostics[&cell_uris[1]].len(), 1);
+    assert!(expected_diagnostics[&cell_uris[2]].is_empty());
+
+    for uri in cell_uris {
+        let request_id = server.send_request::<lsp_types::DocumentDiagnosticRequest>(
+            lsp_types::DocumentDiagnosticParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                identifier: Some("ruff".to_string()),
+                previous_result_id: None,
+                work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+                partial_result_params: lsp_types::PartialResultParams::default(),
+            },
+        );
+        let report = server.await_response::<lsp_types::DocumentDiagnosticRequest>(&request_id);
+
+        let lsp_types::DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+            report
+        else {
+            panic!("Expected a full diagnostic report for {uri}");
+        };
+
+        assert_eq!(
+            report.full_document_diagnostic_report.items, expected_diagnostics[&uri],
+            "Pull diagnostics do not match published diagnostics for {uri}"
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
 fn related_information() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(".")?
