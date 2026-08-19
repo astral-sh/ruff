@@ -553,9 +553,9 @@ reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 
 ## Gradual invariant protocol members
 
-When the same inferred type variable appears in multiple invariant protocol members, fully static
-member types must agree on one exact specialization. Gradual members remain conservative
-alternatives because their equality cannot justify a transitive sequent proof.
+When the same inferred type variable appears in multiple invariant protocol members, the member
+types must agree on one exact specialization. Equivalent gradual types still provide a coherent
+solution.
 
 ```py
 from typing import Any, Generic, Protocol, TypeVar
@@ -567,18 +567,30 @@ class Pair(Protocol[T]):
     first: T
     second: T
 
-class GradualPair(Generic[U]):
+class MatchingGradualPair(Generic[U]):
     first: tuple[U, Any]
-    second: tuple[U, int]
+    second: tuple[U, Any]
 
 def infer_pair(value: Pair[T]) -> T:
     raise NotImplementedError
 
-def check_pair(value: GradualPair[U]) -> None:
+def check_matching_pair(value: MatchingGradualPair[U]) -> None:
+    # revealed: tuple[U@check_matching_pair, Any]
+    reveal_type(infer_pair(value))
+```
+
+Member types that are not gradually equivalent can't prove a contradiction, but they also should not
+be unioned: they are simultaneous equality requirements rather than inference alternatives.
+
+```py
+class DifferingGradualPair(Generic[U]):
+    first: tuple[U, Any]
+    second: tuple[U, int]
+
+def check_differing_pair(value: DifferingGradualPair[U]) -> None:
     # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
-    # XXX: Restore `Unknown` now that domain solving exposes the incompatible exact member types
-    # to the equality-intersection check.
-    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
+    # revealed: Unknown
+    reveal_type(infer_pair(value))
 ```
 
 ## Prefer specific compatible constraints over gradual constraints
