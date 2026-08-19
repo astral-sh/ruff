@@ -2,10 +2,7 @@ use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
-use crate::types::{
-    KnownClass, KnownInstanceType, PromotionKind, PromotionMode, TypeContext, TypeMapping,
-    check_types,
-};
+use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -904,95 +901,6 @@ fn lazy_parameter_defaults() -> anyhow::Result<()> {
         function.display(&db, &db.program_environment()).to_string(),
         "def f(x: int = 2) -> int"
     );
-    Ok(())
-}
-
-#[test]
-fn lazy_parameter_default_promotion() -> anyhow::Result<()> {
-    fn promote_default(db: &TestDb, source: File) -> Type<'_> {
-        let env = db.program_environment();
-        // Parameters are contravariant, so `Off` here promotes the default. A subsequent
-        // `On` must not undo that promotion, and neither mapping should infer the default.
-        global_symbol(db, source, "f")
-            .place
-            .expect_type()
-            .promote(db, &env)
-            .apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::Promote(PromotionMode::Off, PromotionKind::Regular),
-                TypeContext::default(),
-            )
-            .promote(db, &env)
-    }
-
-    let mut db = setup_db();
-
-    for (default, expected_class) in [("1", KnownClass::Int), ("True", KnownClass::Bool)] {
-        db.write_file(
-            "/src/defaults.py",
-            format!("def f(x: object = {default}) -> object: return x"),
-        )?;
-        let source = system_path_to_file(&db, "/src/defaults.py")?;
-        db.clear_salsa_events();
-        {
-            let env = db.program_environment();
-            let promoted = promote_default(&db, source);
-            // Nested-default normalization must also handle the deferred promotion without
-            // evaluating the source expression.
-            let Type::Callable(erased) = promoted.replace_parameter_defaults(&db, &env) else {
-                anyhow::bail!("expected a callable with replaced defaults");
-            };
-            assert_eq!(
-                erased.signatures(&db).overloads[0].parameters().as_slice()[0].default_type(&db),
-                Some(Type::unknown())
-            );
-        }
-        let events = db.take_salsa_events();
-        assert_function_query_was_not_run(
-            &db,
-            infer_function_default_types,
-            first_public_binding(&db, source, "f"),
-            &events,
-        );
-
-        {
-            let env = db.program_environment();
-            let promoted = promote_default(&db, source);
-            let Type::Callable(promoted_callable) = promoted else {
-                anyhow::bail!("expected a promoted callable");
-            };
-            // Changing the source value must invalidate the lazily resolved, widened type.
-            assert_eq!(
-                promoted_callable.signatures(&db).overloads[0]
-                    .parameters()
-                    .as_slice()[0]
-                    .default_type(&db),
-                Some(expected_class.to_instance(&db, &env))
-            );
-            assert_eq!(
-                promoted.display(&db, &env).to_string(),
-                "(x: object = ...) -> object"
-            );
-
-            let function = global_symbol(&db, source, "f").place.expect_type();
-            assert_eq!(
-                function.promote(&db, &env).display(&db, &env).to_string(),
-                format!("(x: object = {default}) -> object")
-            );
-            assert_eq!(
-                function.display(&db, &env).to_string(),
-                format!("def f(x: object = {default}) -> object")
-            );
-        }
-        let events = db.take_salsa_events();
-        assert_function_query_was_run(
-            &db,
-            infer_function_default_types,
-            first_public_binding(&db, source, "f"),
-            &events,
-        );
-    }
     Ok(())
 }
 

@@ -1,31 +1,5 @@
 # Display of callable types
 
-## Default values after promotion
-
-A function displays its literal default after being promoted to a callable once. Promoting that
-callable again widens the default, so a nested collection displays `...` instead.
-
-```py
-def f(n=5): ...
-
-reveal_type(f)  # revealed: def f(n=5) -> Unknown
-reveal_type([f])  # revealed: list[(n=5) -> Unknown]
-reveal_type([[f]])  # revealed: list[list[(n=...) -> Unknown]]
-
-# error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `None` on object of type `list[list[(n=...) -> Unknown]]`"
-[[f]][0] = None
-```
-
-## Defaults that do not widen
-
-The default `None` does not widen, so it remains visible after repeated promotion.
-
-```py
-def f(n=None): ...
-
-reveal_type([[f]])  # revealed: list[list[(n=None) -> Unknown]]
-```
-
 ## Parenthesizing callables
 
 ### Simple

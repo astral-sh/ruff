@@ -5655,9 +5655,9 @@ impl<'db> Parameter<'db> {
         self.default().map(|default| default.ty(db))
     }
 
-    /// Types stored directly in synthesized signatures can mention their generic parameters.
-    /// Source defaults do not bind type variables in a callable's signature, and visiting them
-    /// here would defeat their laziness.
+    /// Returns a default type stored directly in the signature, without running inference.
+    /// Deferred source defaults return `None`, even if their type is already cached. Use
+    /// [`Self::default_type`] when the actual default type is needed.
     pub(crate) fn eager_default_type(&self) -> Option<Type<'db>> {
         self.default().and_then(ParameterDefault::eager_type)
     }
