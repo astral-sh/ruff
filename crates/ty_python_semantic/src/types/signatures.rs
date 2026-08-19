@@ -45,9 +45,9 @@ use crate::types::typevar::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
-    MaterializationKind, ParamSpecAttrKind, ParameterDescription, PromotionKind, PromotionMode,
-    SelfBinding, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType,
-    UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
+    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -5685,8 +5685,6 @@ pub enum ParameterDefault<'db> {
     Inferred(Type<'db>),
     /// A source parameter whose default is inferred on demand.
     Deferred(Definition<'db>),
-    /// A source default whose promotable literals are widened when its type is requested.
-    DeferredPromoted(Definition<'db>),
 }
 
 impl<'db> ParameterDefault<'db> {
@@ -5694,15 +5692,13 @@ impl<'db> ParameterDefault<'db> {
         match self {
             Self::Inferred(ty) => ty,
             Self::Deferred(parameter) => parameter_default_type(db, parameter),
-            Self::DeferredPromoted(parameter) => parameter_default_type(db, parameter)
-                .promote(db, &ProgramEnvironment::from_definition(parameter)),
         }
     }
 
     fn eager_type(self) -> Option<Type<'db>> {
         match self {
             Self::Inferred(ty) => Some(ty),
-            Self::Deferred(_) | Self::DeferredPromoted(_) => None,
+            Self::Deferred(_) => None,
         }
     }
 
@@ -5711,7 +5707,7 @@ impl<'db> ParameterDefault<'db> {
             Self::Inferred(ty) => Self::Inferred(f(ty)),
             // A source default is a runtime value, not part of the callable's type parameters.
             // Specializing or otherwise transforming the signature must not evaluate it.
-            Self::Deferred(_) | Self::DeferredPromoted(_) => self,
+            Self::Deferred(_) => self,
         }
     }
 }
@@ -5873,20 +5869,14 @@ impl<'db> ParameterKind<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let apply_to_default_type = |default_type: &Option<ParameterDefault<'db>>| {
-            default_type.map(|default| match (default, type_mapping) {
-                (_, TypeMapping::ReplaceParameterDefaults) => {
+            default_type.map(|default| match type_mapping {
+                TypeMapping::ReplaceParameterDefaults => {
                     ParameterDefault::Inferred(Type::unknown())
                 }
-                (
-                    ParameterDefault::Deferred(parameter),
-                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
-                ) => {
-                    // Preserve the old literal widening without evaluating the default here.
-                    // The mapping already accounts for the parameter's contravariance, and a
-                    // later promotion in the opposite direction must not restore the literal.
-                    ParameterDefault::DeferredPromoted(parameter)
-                }
-                (default, _) => default
+                // Defaults describe values, not the set of accepted arguments. Promoting the
+                // enclosing callable must not widen those values.
+                TypeMapping::Promote(..) => default,
+                _ => default
                     .map_type(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             })
         };
