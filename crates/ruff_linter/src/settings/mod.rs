@@ -951,9 +951,6 @@ impl Display for TargetVersion {
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-    use similar::{ChangeTag, TextDiff};
-
     use crate::registry::RuleSet;
     use crate::rule_selector::PreviewOptions;
     use crate::settings::types::PreviewMode;
@@ -965,8 +962,7 @@ mod tests {
         let stable_defaults = DEFAULT_SELECTORS
             .iter()
             .flat_map(|selector| selector.rules(&PreviewOptions::default()))
-            .collect::<RuleSet>()
-            .to_string();
+            .collect::<RuleSet>();
 
         let preview_options = PreviewOptions {
             mode: PreviewMode::Enabled,
@@ -975,15 +971,19 @@ mod tests {
         let preview_defaults = PREVIEW_DEFAULT_SELECTORS
             .iter()
             .flat_map(|selector| selector.rules(&preview_options))
-            .collect::<RuleSet>()
-            .to_string();
+            .collect::<RuleSet>();
 
-        let diff = TextDiff::from_lines(&stable_defaults, &preview_defaults)
-            .iter_all_changes()
-            .filter(|change| change.tag() != ChangeTag::Equal)
-            .format_with("", |change, f| f(&format_args!("{}{change}", change.tag())))
-            .to_string();
+        let added = preview_defaults.clone().subtract(&stable_defaults);
+        let removed = stable_defaults.subtract(&preview_defaults);
 
-        insta::assert_snapshot!(diff, @"");
+        let snapshot = format!("Added in preview:\n{added}\n\nRemoved in preview:\n{removed}");
+
+        insta::assert_snapshot!(snapshot, @"
+        Added in preview:
+        []
+
+        Removed in preview:
+        []
+        ");
     }
 }
