@@ -4,12 +4,13 @@ use ruff_python_ast::{
     self as ast, Expr, Stmt,
     visitor::{self, Visitor},
 };
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, OpenArgument, OpenMode, find_file_opens};
 use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
@@ -35,7 +36,12 @@ use crate::{FixAvailability, Locator, Violation};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the
+/// original expression, or if the type of the value passed to `write` isn't statically known to
+/// match the file's open mode (`str` for text mode, `bytes` for binary mode). In the latter case,
+/// `open(...)` truncates the file before `write` is ever called, so a call that raises `TypeError`
+/// because of a type mismatch still leaves the file empty; `Path.write_text`/`write_bytes` checks
+/// the type first, so the same mismatch leaves the file's original contents untouched instead.
 ///
 /// ## References
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
@@ -153,7 +159,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                     );
 
                     if let Some(fix) =
-                        generate_fix(self.checker, &open, self.with_stmt, &suggestion)
+                        generate_fix(self.checker, &open, self.with_stmt, &suggestion, content)
                     {
                         diagnostic.set_fix(fix);
                     }
@@ -205,6 +211,7 @@ fn generate_fix(
     open: &FileOpen,
     with_stmt: &ast::StmtWith,
     suggestion: &str,
+    content: &Expr,
 ) -> Option<Fix> {
     if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)])) {
         return None;
@@ -231,7 +238,21 @@ fn generate_fix(
 
     let replacement = format!("{target}.{suggestion}");
 
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+    // `open(..., "w")` truncates the file immediately, before `write()` is ever called. If
+    // `write()`'s argument turns out to be the wrong type for the mode, the original code raises
+    // a `TypeError` without writing anything, leaving the file's prior contents intact. The
+    // rewritten `Path.write_text`/`write_bytes` call performs the type check *before* opening
+    // (and thus truncating) the file, so the same mismatch leaves the file untouched instead.
+    // Only offer the fix as safe when the argument's type is statically known to match the mode.
+    let type_matches_mode = matches!(
+        (open.mode, ResolvedPythonType::from(content)),
+        (OpenMode::WriteText, ResolvedPythonType::Atom(PythonType::String))
+            | (OpenMode::WriteBytes, ResolvedPythonType::Atom(PythonType::Bytes))
+    );
+
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range())
+        || !type_matches_mode
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe
