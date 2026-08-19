@@ -12,6 +12,9 @@ ALL < category = linter group < linter prefix < rule
 
 ## Categories and linter groups can be combined
 
+Select `unused-import` (`F401`) from the `F` group and `assert` (`S101`) from the `restriction`
+category:
+
 ```toml
 [lint]
 preview = true
@@ -24,6 +27,8 @@ assert True  # error: [assert]
 ```
 
 ## Categories take precedence over `ALL`
+
+`unused-import` (`F401`) is a `correctness` rule:
 
 ```toml
 [lint]
