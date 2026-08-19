@@ -331,19 +331,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let anchor = match definition {
             Some(definition) => DynamicTypedDictAnchor::Definition(definition),
             None => {
-                let call_node_index = call_expr.node_index.load();
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("scope anchor should not be NodeIndex::NONE");
-                let call_u32 = call_node_index
-                    .as_u32()
-                    .expect("call node should not be NodeIndex::NONE");
                 let schema = self.infer_dangling_typeddict_spec(fields_arg, total);
 
                 DynamicTypedDictAnchor::ScopeOffset {
                     scope,
-                    offset: call_u32 - anchor_u32,
+                    offset: self.dynamic_class_scope_offset(call_expr),
                     schema,
                     openness: extra_items.unwrap_or(if closed {
                         TypedDictOpenness::Closed
