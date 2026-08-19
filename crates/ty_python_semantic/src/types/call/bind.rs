@@ -3060,7 +3060,7 @@ impl<'db> Bindings<'db> {
                             Solutions::Constrained(paths) => Type::heterogeneous_tuple(
                                 db,
                                 env,
-                                paths.into_iter().map(|path| {
+                                paths.into_vec().into_iter().map(|path| {
                                     let path: Box<[_]> = path
                                         .into_iter()
                                         .filter(|binding| binding.bound_typevar == typevar)
@@ -3097,7 +3097,7 @@ impl<'db> Bindings<'db> {
                             Solutions::Constrained(paths) => Type::heterogeneous_tuple(
                                 db,
                                 env,
-                                paths.into_iter().map(|path| {
+                                paths.into_vec().into_iter().map(|path| {
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
                                         InternedConstraintSetSolution::new(
                                             db,
@@ -5876,7 +5876,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
                     FxHashMap::default();
 
-                for solution in &solutions {
+                for solution in solutions.as_slice() {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(db);
 
@@ -5936,7 +5936,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 // Add preferred types to the builder so they serve as the base mapping
                 // when argument inference adds more types.
-                for solution in &solutions {
+                for solution in solutions.as_slice() {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(db);
                         if let Some(&ty) = preferred.get(&identity) {
@@ -6017,10 +6017,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             // The promotion override must not select an unsatisfiable solution.
-            let Ok(Some(solution)) = PathBounds::default_solve(db, self.env, constraints, bounds)
-            else {
-                return None;
-            };
+            let solution =
+                PathBounds::default_solve(db, self.env, constraints, bounds).as_type()?;
             let promoted = solution.promote(db, self.env);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
@@ -7692,7 +7690,7 @@ impl<'db> Binding<'db> {
                 PathBounds::preliminary_solve(db, env, constraints, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {
-                for solution in solutions {
+                for solution in solutions.into_vec() {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(db);
                         return_type_solutions
