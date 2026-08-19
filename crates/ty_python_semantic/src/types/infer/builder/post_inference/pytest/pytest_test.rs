@@ -42,9 +42,8 @@ impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
         let mut argname_locations = FxHashMap::default();
         for parametrization in &self.parametrizations {
             for argname in parametrization.argnames() {
-                if let Some(previous_range) =
-                    argname_locations.insert(argname.name(), argname.range())
-                {
+                // Refer to the first location, so do not insert unless a use unless it is new.
+                if let Some(previous_range) = argname_locations.get(argname.name()) {
                     if let Some(builder) =
                         context.report_lint(&PYTEST_DUPLICATE_ARGNAME, argname.range())
                     {
@@ -57,6 +56,8 @@ impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
                         sub.annotate(Annotation::primary(context.span(previous_range)));
                         diagnostic.sub(sub);
                     }
+                } else {
+                    argname_locations.insert(argname.name(), argname.range());
                 }
             }
         }

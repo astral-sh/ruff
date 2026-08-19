@@ -190,9 +190,9 @@ error[pytest-duplicate-argname]: Duplicate argname `x`
 20 | @pytest.mark.parametrize("x", [])
    |                          ^^^
 info: `x` already used here
-  --> src/mdtest_snippet.py:18:26
+  --> src/mdtest_snippet.py:16:26
    |
-18 | @pytest.mark.parametrize("x", [])
+16 | @pytest.mark.parametrize("x", [])
    |                          ^^^
 ```
 
