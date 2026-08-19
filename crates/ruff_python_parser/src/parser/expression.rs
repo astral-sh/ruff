@@ -1454,78 +1454,71 @@ impl<'src> Parser<'src> {
                 StringType::Str(_) => {}
             }
         }
+        let has_bytes = byte_literal_count > 0;
+        let has_tstring = tstring_count > 0;
 
-        let all_bytes = byte_literal_count == strings.len();
-        let all_tstrings = tstring_count == strings.len();
-        let is_mixed =
-            (byte_literal_count > 0 && !all_bytes) || (tstring_count > 0 && !all_tstrings);
+        if has_bytes {
+            if byte_literal_count < strings.len() {
+                // TODO(dhruvmanila): This is not an ideal recovery because the parser
+                // replaces the byte literals with an invalid string literal node. Any
+                // downstream tools can extract the raw bytes from the range.
+                //
+                // We could convert the node into a string and mark it as invalid
+                // and would be clever to mark the type which is fewer in quantity.
 
-        // CPython reports the first incompatible pair. A t-string mismatch takes
-        // precedence over a bytes mismatch within that pair.
-        if is_mixed
-            && let Some(message) = strings.windows(2).find_map(|pair| match pair {
-                [StringType::TString(_), StringType::TString(_)]
-                | [StringType::Bytes(_), StringType::Bytes(_)] => None,
-                [StringType::TString(_), _] | [_, StringType::TString(_)] => {
-                    Some("Cannot mix t-string literals with string or bytes literals")
+                // test_err mixed_tstring_and_bytes_literals
+                // t'first' b'second'
+                // b'first' t'second'
+                // t'first' br'second'
+                // 'first' b'second' t'third'
+                // b'first' 'second' t'third'
+                // 'first' t'second' 'third' b'fourth'
+                // b'first' t'second' f'third'
+
+                // test_err mixed_bytes_and_non_bytes_literals
+                // 'first' b'second'
+                // f'first' b'second'
+                // 'first' f'second' b'third'
+                self.report_mixed_string_literal_error(&strings, range);
+            }
+            // Only construct a byte expression if all the literals are bytes
+            // otherwise, we'll try either string, t-string, or f-string. This is to retain
+            // as much information as possible.
+            else {
+                let mut values = Vec::with_capacity(strings.len());
+                for string in strings {
+                    values.push(match string {
+                        StringType::Bytes(value) => value,
+                        _ => unreachable!("Expected `StringType::Bytes`"),
+                    });
                 }
-                [StringType::Bytes(_), _] | [_, StringType::Bytes(_)] => {
-                    Some("Bytes literal cannot be mixed with non-bytes literals")
-                }
-                _ => None,
-            })
-        {
-            // TODO(dhruvmanila): This is not an ideal recovery because the parser
-            // replaces the byte/t-string literals with an invalid string literal
-            // node. Any downstream tools can extract the raw bytes from the range.
-            //
-            // We could convert the node into a string and mark it as invalid
-            // and would be clever to mark the type which is fewer in quantity.
-
-            // test_err mixed_tstring_and_bytes_literals
-            // t'first' b'second'
-            // b'first' t'second'
-            // t'first' br'second'
-            // 'first' b'second' t'third'
-            // b'first' 'second' t'third'
-            // 'first' t'second' 'third' b'fourth'
-            // b'first' t'second' f'third'
-
-            // test_err mixed_bytes_and_non_bytes_literals
-            // 'first' b'second'
-            // f'first' b'second'
-            // 'first' f'second' b'third'
-            self.add_error(ParseErrorType::OtherError(message.to_string()), range);
-        }
-
-        if all_tstrings {
-            let mut values = Vec::with_capacity(strings.len());
-            for string in strings {
-                values.push(match string {
-                    StringType::TString(value) => value,
-                    _ => unreachable!("Expected `StringType::TString`"),
+                return Expr::from(ast::ExprBytesLiteral {
+                    value: ast::BytesLiteralValue::concatenated(values),
+                    range,
+                    node_index: AtomicNodeIndex::NONE,
                 });
             }
-            return Expr::from(ast::ExprTString {
-                value: ast::TStringValue::concatenated(values),
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            });
-        }
-
-        if all_bytes {
-            let mut values = Vec::with_capacity(strings.len());
-            for string in strings {
-                values.push(match string {
-                    StringType::Bytes(value) => value,
-                    _ => unreachable!("Expected `StringType::Bytes`"),
+        } else if has_tstring {
+            if tstring_count < strings.len() {
+                self.report_mixed_string_literal_error(&strings, range);
+            }
+            // Only construct a t-string expression if all the literals are t-strings
+            // otherwise, we'll try either string or f-string. This is to retain
+            // as much information as possible.
+            else {
+                let mut values = Vec::with_capacity(strings.len());
+                for string in strings {
+                    values.push(match string {
+                        StringType::TString(value) => value,
+                        _ => unreachable!("Expected `StringType::TString`"),
+                    });
+                }
+                return Expr::from(ast::ExprTString {
+                    value: ast::TStringValue::concatenated(values),
+                    range,
+                    node_index: AtomicNodeIndex::NONE,
                 });
             }
-            return Expr::from(ast::ExprBytesLiteral {
-                value: ast::BytesLiteralValue::concatenated(values),
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            });
         }
 
         // TODO(dhruvmanila): Parser drops unterminated strings here as well
@@ -1550,7 +1543,7 @@ impl<'src> Parser<'src> {
         // )
         // 2 + 2
 
-        if !has_fstring && tstring_count == 0 {
+        if !has_fstring && !has_tstring {
             let mut values = Vec::with_capacity(strings.len());
             for string in strings {
                 values.push(match string {
@@ -1587,6 +1580,26 @@ impl<'src> Parser<'src> {
             range,
             node_index: AtomicNodeIndex::NONE,
         })
+    }
+
+    fn report_mixed_string_literal_error(&mut self, strings: &[StringType], range: TextRange) {
+        // CPython reports the first incompatible pair. A t-string mismatch takes
+        // precedence over a bytes mismatch within that pair.
+        for pair in strings.windows(2) {
+            let message = match pair {
+                [StringType::TString(_), StringType::TString(_)]
+                | [StringType::Bytes(_), StringType::Bytes(_)] => continue,
+                [StringType::TString(_), _] | [_, StringType::TString(_)] => {
+                    "Cannot mix t-string literals with string or bytes literals"
+                }
+                [StringType::Bytes(_), _] | [_, StringType::Bytes(_)] => {
+                    "Bytes literal cannot be mixed with non-bytes literals"
+                }
+                _ => continue,
+            };
+            self.add_error(ParseErrorType::OtherError(message.to_string()), range);
+            break;
+        }
     }
 
     /// Parses a single string or byte literal.
