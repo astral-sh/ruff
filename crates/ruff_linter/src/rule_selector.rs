@@ -8,7 +8,7 @@ use strum_macros::EnumIter;
 use ruff_ranged_value::{RangedValue, ValueSource};
 
 use crate::codes::RuleIter;
-use crate::codes::{RuleCodePrefix, RuleGroup};
+use crate::codes::{RuleCodePrefix, RuleStatus};
 use crate::preview::is_human_readable_names_enabled;
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
@@ -286,15 +286,15 @@ impl RuleSelector {
         self.all_rules().filter(move |rule| {
             match rule.group() {
                 // Always include stable rules
-                RuleGroup::Stable { .. } => true,
+                RuleStatus::Stable { .. } => true,
                 // Enabling preview includes all preview rules unless explicit selection is turned on
-                RuleGroup::Preview { .. } => {
+                RuleStatus::Preview { .. } => {
                     preview_enabled && (self.is_exact() || !preview_require_explicit)
                 }
                 // Deprecated rules are excluded by default unless explicitly selected
-                RuleGroup::Deprecated { .. } => !preview_enabled && self.is_exact(),
+                RuleStatus::Deprecated { .. } => !preview_enabled && self.is_exact(),
                 // Removed rules are included if explicitly selected but will error downstream
-                RuleGroup::Removed { .. } => self.is_exact(),
+                RuleStatus::Removed { .. } => self.is_exact(),
             }
         })
     }

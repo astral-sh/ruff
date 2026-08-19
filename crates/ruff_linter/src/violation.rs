@@ -7,7 +7,7 @@ use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 use crate::{
-    codes::{Rule, RuleGroup},
+    codes::{Rule, RuleStatus},
     message::create_lint_diagnostic,
 };
 
@@ -37,7 +37,7 @@ pub trait ViolationMetadata {
     fn explain() -> Option<&'static str>;
 
     /// Returns the rule group for this violation.
-    fn group() -> RuleGroup;
+    fn group() -> RuleStatus;
 
     /// Returns the file where the violation is declared.
     fn file() -> &'static str;

@@ -7,7 +7,7 @@ use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
-use ruff_linter::codes::RuleGroup;
+use ruff_linter::codes::RuleStatus;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
@@ -24,7 +24,7 @@ struct Explanation<'a> {
     #[expect(clippy::struct_field_names)]
     explanation: Option<&'a str>,
     preview: bool,
-    status: RuleGroup,
+    status: RuleStatus,
     source_location: SourceLocation,
 }
 

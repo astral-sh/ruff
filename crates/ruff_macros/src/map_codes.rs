@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// A rule entry in the big match statement such a
-/// `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+/// `(Pycodestyle, "E112") => (RuleStatus::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
 #[derive(Clone)]
 struct Rule {
     /// The actual name of the rule, e.g., `NoIndentedBlock`.
@@ -59,7 +59,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     };
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
-    // `(Rule::UnaryPrefixIncrement, RuleGroup::Stable, vec![])`).
+    // `(Rule::UnaryPrefixIncrement, RuleStatus::Stable, vec![])`).
     let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
     for arm in arms {
@@ -307,19 +307,19 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             }
 
             pub fn is_preview(&self) -> bool {
-                matches!(self.group(), RuleGroup::Preview { .. })
+                matches!(self.group(), RuleStatus::Preview { .. })
             }
 
             pub(crate) fn is_stable(&self) -> bool {
-                matches!(self.group(), RuleGroup::Stable { .. })
+                matches!(self.group(), RuleStatus::Stable { .. })
             }
 
             pub fn is_deprecated(&self) -> bool {
-                matches!(self.group(), RuleGroup::Deprecated { .. })
+                matches!(self.group(), RuleStatus::Deprecated { .. })
             }
 
             pub fn is_removed(&self) -> bool {
-                matches!(self.group(), RuleGroup::Removed { .. })
+                matches!(self.group(), RuleStatus::Removed { .. })
             }
         }
 
@@ -462,7 +462,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_fixable_match_arms }
             }
 
-            pub fn group(&self) -> crate::codes::RuleGroup {
+            pub fn group(&self) -> crate::codes::RuleStatus {
                 match self { #rule_group_match_arms }
             }
 

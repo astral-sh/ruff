@@ -31,7 +31,7 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
                 Some(#docs)
             }
 
-            fn group() -> crate::codes::RuleGroup {
+            fn group() -> crate::codes::RuleStatus {
                 crate::codes::#group
             }
 
@@ -75,7 +75,7 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 /// ```
 ///
 /// The result is returned as a `TokenStream` so that the version string literal can be combined
-/// with the proper `RuleGroup` variant, e.g. `RuleGroup::Stable` for `stable_since` above.
+/// with the proper `RuleStatus` variant, e.g. `RuleStatus::Stable` for `stable_since` above.
 fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
     let mut group = None;
     for attr in attrs {
@@ -83,19 +83,19 @@ fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("stable_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Stable { since: #lit }));
+                    group = Some(quote!(RuleStatus::Stable { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("preview_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Preview { since: #lit }));
+                    group = Some(quote!(RuleStatus::Preview { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("deprecated_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Deprecated { since: #lit }));
+                    group = Some(quote!(RuleStatus::Deprecated { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("removed_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Removed { since: #lit }));
+                    group = Some(quote!(RuleStatus::Removed { since: #lit }));
                     return Ok(());
                 }
                 Err(Error::new_spanned(
