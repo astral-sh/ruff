@@ -4,7 +4,9 @@ mod partial_signature;
 mod pytest_test;
 mod request;
 
+use crate::db::Db;
 use ruff_python_ast::{self as ast};
+use ty_module_resolver::{ModuleName, ResolverEnvironment, resolve_module_confident};
 
 use crate::types::{Type, infer::TypeInferenceBuilder};
 
@@ -22,4 +24,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.check_pytest_argvalues(&test);
         }
     }
+}
+
+pub(crate) fn is_pytest_available<'db>(
+    db: &'db dyn Db,
+    importing_file: ResolverEnvironment<'db>,
+) -> bool {
+    resolve_module_confident(
+        db,
+        importing_file,
+        &ModuleName::new_static("pytest").unwrap(),
+    )
+    .is_some()
 }

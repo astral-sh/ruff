@@ -360,3 +360,18 @@ from pytest import fake_parametrize  # error: [unresolved-import]
 @fake_parametrize("x", [[], None])  # error: [dynamic-function-decorator-return]
 def _(x: int, **kwargs) -> None: ...
 ```
+
+## Other Imports
+
+```py
+# No import `pytest` import.
+from pytest import mark
+
+@mark.parametrize("x", [None])  # error: [pytest-param-mismatched-type]
+def _(x: int) -> None: ...
+
+hidden_parametrize = mark.parametrize
+
+@hidden_parametrize("x", [None])  # error: [pytest-param-mismatched-type]
+def _(x: int) -> None: ...
+```
