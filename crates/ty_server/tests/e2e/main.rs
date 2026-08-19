@@ -1266,6 +1266,7 @@ impl TestServerBuilder {
     }
 
     /// Add a workspace to the test server with the given root path and options.
+    /// An existing file can also be used to model clients that send file-valued workspace roots.
     ///
     /// This option will be used to respond to the `workspace/configuration` request that the
     /// server will send to the client.
@@ -1278,7 +1279,9 @@ impl TestServerBuilder {
         options: Option<ClientOptions>,
     ) -> Result<Self> {
         let workspace_path = self.test_context.root().join(workspace_root);
-        fs::create_dir_all(workspace_path.as_std_path())?;
+        if !workspace_path.as_std_path().is_file() {
+            fs::create_dir_all(workspace_path.as_std_path())?;
+        }
 
         self.workspaces.push((
             WorkspaceFolder {
