@@ -197,8 +197,8 @@ parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` ca
 
 ### Decorated generic bases
 
-A decorator that ty cannot fully understand can obscure the generic context of a base class. A
-subclass that forwards type variables to that base remains possibly generic.
+A decorator that returns its class argument preserves the generic context of a base class. A
+subclass can forward type variables to the decorated base.
 
 ```py
 import collections.abc
@@ -208,17 +208,13 @@ from ty_extensions._internal import generic_context
 K = TypeVar("K")
 V = TypeVar("V")
 
-# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
 @collections.abc.Mapping.register
 class Mapping(Generic[K, V]): ...
 
-# TODO: Invalid decorator causes us to lose the generic context from the class...
-reveal_type(generic_context(Mapping))  # revealed: None
+reveal_type(generic_context(Mapping))  # revealed: ty_extensions._internal.GenericContext[K@Mapping, V@Mapping]
 
 class FrozenDict(Mapping[K, V]): ...
 
-# TODO: ...which then causes us to emit this
-# error: [invalid-type-form] "Non-generic class `FrozenDict` cannot be specialized in a type expression"
 mapping: FrozenDict[str, int]
 ```
 

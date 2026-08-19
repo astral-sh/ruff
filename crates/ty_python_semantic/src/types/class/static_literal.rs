@@ -31,7 +31,7 @@ use crate::{
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
-            ClassInstanceFlags, ClassMemberResult, CodeGeneratorKind, DisjointBase,
+            ClassInstanceFlags, ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
             DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassError,
             MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField, SlotsKind,
             synthesize_namedtuple_class_member,
@@ -661,17 +661,16 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Iterate over this class's explicit bases, resolving them in the same way as MRO
-    /// construction, filtering out any bases that are not fully static class objects.
-    fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
+    /// Iterate over the explicit bases that contribute to metaclass selection.
+    fn metaclass_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         let env = ProgramEnvironment::from_scope(self.body_scope(db));
         self.explicit_bases(db)
             .iter()
             .copied()
             .filter_map(move |ty| {
                 ClassBase::try_from_type(db, &env, ty, Some(ClassLiteral::Static(self)))
-                    .and_then(ClassBase::into_class)
             })
+            .filter(|base| matches!(base, ClassBase::Class(_) | ClassBase::Protocol))
     }
 
     /// Determine if this class is a protocol.
@@ -1154,11 +1153,27 @@ impl<'db> StaticClassLiteral<'db> {
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
+    pub(in crate::types) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
+        self.infer_metaclass(db)
+            .map(|(metaclass, _)| metaclass)
+            .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
+    }
+
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     pub(in crate::types) fn try_metaclass(
         self,
         db: &'db dyn Db,
     ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
+        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+        self.infer_metaclass(db)
+            .map(|(metaclass, info)| (metaclass.to_type(db, &env), info))
+    }
+
+    fn infer_metaclass(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<(ClassMetaclass<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>>
+    {
         #[salsa::tracked(
             returns(clone),
             cycle_initial=|_, _, _| Err(MetaclassError {
@@ -1169,28 +1184,43 @@ impl<'db> StaticClassLiteral<'db> {
         fn try_metaclass_inner<'db>(
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
-        ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
+        ) -> Result<(ClassMetaclass<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>>
+        {
             let program_file = class.program_file(db);
             let python_file = program_file.python_file(db);
             let env = ProgramEnvironment::from_file(program_file);
             tracing::trace!("StaticClassLiteral::try_metaclass: {}", class.name(db));
 
             // Identify the class's own metaclass (or take the first base class's metaclass).
-            let mut base_classes = class.fully_static_explicit_bases(db).peekable();
+            let mut base_classes = class.metaclass_bases(db).peekable();
 
             if base_classes.peek().is_some() && class.inheritance_cycle(db).is_some() {
                 // We emit diagnostics for cyclic class definitions elsewhere.
                 // Avoid attempting to infer the metaclass if the class is cyclically defined.
-                return Ok((SubclassOfType::subclass_of_unknown(), None));
+                return Ok((
+                    ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
+                    None,
+                ));
             }
 
             if class.try_mro(db, None).is_err_and(StaticMroError::is_cycle) {
-                return Ok((SubclassOfType::subclass_of_unknown(), None));
+                return Ok((
+                    ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
+                    None,
+                ));
             }
 
             let module = parsed_module(db, python_file).load(db);
 
             let explicit_metaclass = class.explicit_metaclass(db, &module);
+            let is_stub = class.file(db).is_stub(db);
+            let infer_base_metaclass = |base: ClassBase<'db>| {
+                if is_stub && matches!(base, ClassBase::Protocol) {
+                    ClassMetaclass::ProtocolFallback
+                } else {
+                    base.inferred_metaclass(db, &env)
+                }
+            };
 
             // Generic metaclasses parameterized by type variables are not supported.
             // `metaclass=Meta[int]` is fine, but `metaclass=Meta[T]` is not.
@@ -1208,25 +1238,24 @@ impl<'db> StaticClassLiteral<'db> {
                 }
             }
 
-            let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass
-            {
-                (metaclass, class)
-            } else if let Some(base_class) = base_classes.next() {
-                // For dynamic classes, we can't get a StaticClassLiteral, so use this class for
-                // tracking.
-                let base_class_literal = base_class
-                    .static_class_literal(db)
-                    .map(|(lit, _)| lit)
-                    .unwrap_or(class);
-                (base_class.metaclass(db), base_class_literal)
-            } else {
-                (KnownClass::Type.to_class_literal(db, &env), class)
-            };
+            let (metaclass, base, mut has_protocol_fallback) =
+                if let Some(metaclass) = explicit_metaclass {
+                    (metaclass, None, false)
+                } else if let Some(base_class) = base_classes.next() {
+                    let metaclass = infer_base_metaclass(base_class);
+                    (
+                        metaclass.for_inheritance(db, &env),
+                        Some(base_class),
+                        metaclass.is_protocol_fallback(),
+                    )
+                } else {
+                    (KnownClass::Type.to_class_literal(db, &env), None, false)
+                };
 
             let mut candidate = if let Some(metaclass_ty) = metaclass.to_class_type(db) {
                 MetaclassCandidate {
                     metaclass: metaclass_ty,
-                    explicit_metaclass_of: class_metaclass_was_from,
+                    base,
                 }
             } else {
                 let name = Type::string_literal(db, class.name(db));
@@ -1258,7 +1287,8 @@ impl<'db> StaticClassLiteral<'db> {
                     }),
                 };
 
-                return return_ty_result.map(|ty| (ty.to_meta_type(db, &env), None));
+                return return_ty_result
+                    .map(|ty| (ClassMetaclass::Selected(ty.to_meta_type(db, &env)), None));
             };
 
             // Reconcile all base classes' metaclasses with the candidate metaclass.
@@ -1267,34 +1297,27 @@ impl<'db> StaticClassLiteral<'db> {
             // - https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass
             // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
             for base_class in base_classes {
-                let metaclass = base_class.metaclass(db);
+                let metaclass = infer_base_metaclass(base_class);
+                has_protocol_fallback |= metaclass.is_protocol_fallback();
+                let metaclass = metaclass.for_inheritance(db, &env);
                 let Some(metaclass) = metaclass.to_class_type(db) else {
                     continue;
                 };
-                // For dynamic classes, we can't get a StaticClassLiteral, so use this class for
-                // tracking.
-                let base_class_literal = base_class
-                    .static_class_literal(db)
-                    .map(|(lit, _)| lit)
-                    .unwrap_or(class);
+                if candidate.metaclass.is_subclass_of(db, &env, metaclass) {
+                    continue;
+                }
                 if metaclass.is_subclass_of(db, &env, candidate.metaclass) {
                     candidate = MetaclassCandidate {
                         metaclass,
-                        explicit_metaclass_of: base_class_literal,
+                        base: Some(base_class),
                     };
-                    continue;
-                }
-                if candidate.metaclass.is_subclass_of(db, &env, metaclass) {
                     continue;
                 }
                 return Err(MetaclassError {
                     kind: MetaclassErrorKind::Conflict {
-                        candidate1: candidate,
-                        candidate2: MetaclassCandidate {
-                            metaclass,
-                            explicit_metaclass_of: base_class_literal,
-                        },
-                        candidate1_is_base_class: explicit_metaclass.is_none(),
+                        candidate,
+                        base_metaclass: metaclass,
+                        base: base_class,
                     },
                 });
             }
@@ -1307,14 +1330,30 @@ impl<'db> StaticClassLiteral<'db> {
                 })
                 .map(|params| MetaclassTransformInfo {
                     params,
-                    from_explicit_metaclass: candidate.explicit_metaclass_of == class,
+                    from_explicit_metaclass: candidate.base.is_none(),
                 });
-            Ok((candidate.metaclass.into(), transform_info))
+            let metaclass = if class
+                .known(db)
+                .and_then(|known| known.known_metaclass(env.python_version(db)))
+                == Some(KnownClass::Type)
+            {
+                ClassMetaclass::Selected(candidate.metaclass.into())
+            } else {
+                ClassMetaclass::with_protocol_fallback(
+                    db,
+                    candidate.metaclass.into(),
+                    has_protocol_fallback,
+                )
+            };
+            Ok((metaclass, transform_info))
         }
 
         if !self.has_explicit_bases(db) && !self.has_explicit_metaclass(db) {
             let env = ProgramEnvironment::from_scope(self.body_scope(db));
-            return Ok((KnownClass::Type.to_class_literal(db, &env), None));
+            return Ok((
+                ClassMetaclass::Selected(KnownClass::Type.to_class_literal(db, &env)),
+                None,
+            ));
         }
         try_metaclass_inner(db, self)
     }

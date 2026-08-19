@@ -192,6 +192,58 @@ MyEnum = types.new_class("MyEnum", (Enum,))
 reveal_type(MyEnum)  # revealed: <class 'MyEnum'>
 ```
 
+### Protocol metaclasses from stubs
+
+Stubs can use protocol inheritance to describe an interface without requiring the same inheritance
+at runtime. A dynamic subclass retains the implicit protocol metaclass for attribute access, but a
+later subclass can still choose an unrelated explicit metaclass.
+
+`interface.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Interface(Protocol): ...
+```
+
+`main.py`:
+
+```py
+import types
+from interface import Interface
+
+Dynamic = types.new_class("Dynamic", (Interface,))
+reveal_type(type(Dynamic))  # revealed: <class '_ProtocolMeta'>
+
+class Meta(type): ...
+class Concrete(Dynamic, metaclass=Meta): ...
+
+reveal_type(type(Concrete))  # revealed: <class 'Meta'>
+```
+
+### Protocol metaclass conflicts
+
+A source-defined protocol contributes its actual metaclass, including through a dynamic subclass.
+Combining it with an unrelated metaclass-bearing base is an error in both assigned and inline calls.
+
+```py
+import types
+from typing import Protocol
+
+class Interface(Protocol): ...
+class Meta(type): ...
+class Other(metaclass=Meta): ...
+
+Dynamic = types.new_class("Dynamic", (Interface,))
+reveal_type(type(Dynamic))  # revealed: <class '_ProtocolMeta'>
+
+# error: [conflicting-metaclass]
+Bad = types.new_class("Bad", (Dynamic, Other))
+
+# error: [conflicting-metaclass]
+types.new_class("InlineBad", (Interface, Other))
+```
+
 ### Generic and TypedDict bases
 
 Even though `types.new_class()` handles `__mro_entries__` at runtime, ty does not yet model the full

@@ -670,6 +670,193 @@ class C(A, B): ...
 reveal_type(C.__class__)  # revealed: <class 'M'>
 ```
 
+## Protocol metaclass inheritance
+
+A protocol's metaclass is compatible with `ABCMeta`. A more specific explicitly supplied metaclass
+must be preserved, including when its bases are obtained by calling `type`.
+
+```py
+from abc import ABC, ABCMeta
+from typing import Protocol
+
+class P(Protocol): ...
+class Base(ABC): ...
+class Combined(Base, P): ...
+class ExplicitABC(Protocol, metaclass=ABCMeta): ...
+
+reveal_type(type(Combined))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(ExplicitABC))  # revealed: <class '_ProtocolMeta'>
+
+class Meta(type(P), type(Base)): ...
+class Derived(Base, P, metaclass=Meta): ...
+
+reveal_type(type(Derived))  # revealed: <class 'Meta'>
+```
+
+## Protocol metaclass conflicts
+
+An unrelated metaclass conflicts with the metaclass inherited from `Protocol`, whether the protocol
+base is direct or inherited through another class.
+
+```py
+from typing import Protocol
+
+class Meta(type): ...
+class P(Protocol): ...
+
+# error: [conflicting-metaclass] "`_ProtocolMeta` (metaclass of base class `typing.Protocol`)"
+class Direct(Protocol, metaclass=Meta): ...
+
+# error: [conflicting-metaclass] "`_ProtocolMeta` (metaclass of base class `P`)"
+class Indirect(P, metaclass=Meta): ...
+```
+
+## Protocol metaclass fallback in stubs
+
+A stub can describe a runtime class's interface using `Protocol` without guaranteeing that the
+runtime class inherits from it. Its inferred protocol metaclass therefore acts as a fallback: a
+declared custom metaclass takes precedence, including through another source-defined subclass.
+
+`interface.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Interface(Protocol): ...
+```
+
+`main.py`:
+
+```py
+from abc import ABCMeta
+from interface import Interface
+from typing import final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+class Child(Interface): ...
+
+@final
+class Meta(type): ...
+
+class Other(metaclass=Meta): ...
+class Explicit(Child, metaclass=Meta): ...
+class Left(Child, Other): ...
+class Right(Other, Child): ...
+
+reveal_type(type(Child))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Explicit))  # revealed: <class 'Meta'>
+reveal_type(type(Left))  # revealed: <class 'Meta'>
+reveal_type(type(Right))  # revealed: <class 'Meta'>
+static_assert(not is_disjoint_from(Child, Other))
+static_assert(not is_subtype_of(type[Child], ABCMeta))
+```
+
+## Explicit stub protocol metaclasses
+
+Explicitly choosing an inferred metaclass makes it a real constraint on later subclasses.
+
+`interface.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Interface(Protocol): ...
+```
+
+`main.py`:
+
+```py
+from interface import Interface
+
+class Meta(type): ...
+class Pinned(Interface, metaclass=type(Interface)): ...
+class Invalid(Pinned, metaclass=Meta): ...  # error: [conflicting-metaclass]
+```
+
+## Stub protocol metaclass attributes in the class namespace
+
+A metaclass inferred from a stub-only protocol base does not guarantee that the metaclass creates
+attributes in the class namespace, or impose a type on attributes defined there.
+
+`interface.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Interface(Protocol): ...
+```
+
+`main.py`:
+
+```py
+from interface import Interface
+
+class Plain(Interface): ...
+
+def f(value: Plain):
+    value.__abstractmethods__  # error: [unresolved-attribute]
+
+class OwnAttribute(Interface):
+    __abstractmethods__ = 1
+```
+
+## Source protocol metaclasses inherited through stubs
+
+A stub does not weaken a metaclass that is known from an actual source-defined protocol.
+
+`source.py`:
+
+```py
+from typing import Protocol
+
+class P(Protocol): ...
+```
+
+`interface.pyi`:
+
+```pyi
+from source import P
+
+class Interface(P): ...
+```
+
+`main.py`:
+
+```py
+from interface import Interface
+
+class Meta(type): ...
+class Invalid(Interface, metaclass=Meta): ...  # error: [conflicting-metaclass]
+
+reveal_type(type(Interface))  # revealed: <class '_ProtocolMeta'>
+```
+
+## Built-in collection metaclasses
+
+Typeshed includes collection ABCs in some built-in classes' bases to describe their interfaces.
+Those stub-only bases must not change the built-ins' runtime metaclasses or introduce conflicts when
+they are subclassed.
+
+```py
+from collections import deque
+from types import GeneratorType
+
+reveal_type(type(str))  # revealed: <class 'type'>
+reveal_type(type(tuple))  # revealed: <class 'type'>
+reveal_type(type(list))  # revealed: <class 'type'>
+reveal_type(type(dict))  # revealed: <class 'type'>
+reveal_type(type(deque))  # revealed: <class 'type'>
+reveal_type(type(GeneratorType))  # revealed: <class 'type'>
+
+class Meta(type): ...
+class CustomList(list[int], metaclass=Meta): ...
+class OrdinaryList(list[int]): ...
+
+reveal_type(type(CustomList))  # revealed: <class 'Meta'>
+reveal_type(type(OrdinaryList))  # revealed: <class 'type'>
+```
+
 ## Metaclass metaclass
 
 A class has an explicit base with a custom metaclass. That metaclass itself has a custom metaclass.

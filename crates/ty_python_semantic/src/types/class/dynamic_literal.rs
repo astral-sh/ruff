@@ -10,9 +10,9 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
         SubclassOfType, Type,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicClassHeaderAnchor,
-            DynamicClassScopeOffset, InstanceMemberResult, MroLookup, dynamic_class_header_range,
-            typed_dict::typed_dict_fallback_class_member,
+            ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
+            DynamicClassHeaderAnchor, DynamicClassScopeOffset, InstanceMemberResult, MroLookup,
+            dynamic_class_header_range, typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
         member::Member,
@@ -265,6 +265,11 @@ impl<'db> DynamicClassLiteral<'db> {
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
+    pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
+        self.try_infer_metaclass(db)
+            .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
+    }
+
     /// Try to get the metaclass of this dynamic class.
     ///
     /// Returns `Err(DynamicMetaclassConflict)` if there's a metaclass conflict
@@ -275,6 +280,15 @@ impl<'db> DynamicClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
+        let env = ProgramEnvironment::from_scope(self.scope(db));
+        self.try_infer_metaclass(db)
+            .map(|metaclass| metaclass.to_type(db, &env))
+    }
+
+    fn try_infer_metaclass(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<ClassMetaclass<'db>, DynamicMetaclassConflict<'db>> {
         let original_bases = self.explicit_bases(db);
         let env = ProgramEnvironment::from_scope(self.scope(db));
 
@@ -282,36 +296,51 @@ impl<'db> DynamicClassLiteral<'db> {
         // To dynamically create a class with no bases that has a custom metaclass,
         // you have to invoke that metaclass rather than `type()`.
         if original_bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db, &env));
+            return Ok(ClassMetaclass::Selected(
+                KnownClass::Type.to_class_literal(db, &env),
+            ));
         }
 
         // If there's an MRO error, return unknown to avoid cascading errors.
         if self.try_mro(db).is_err() {
-            return Ok(SubclassOfType::subclass_of_unknown());
+            return Ok(ClassMetaclass::Selected(
+                SubclassOfType::subclass_of_unknown(),
+            ));
         }
 
         // Convert Types to ClassBases for metaclass computation.
         // All bases should convert successfully here: `try_mro()` above would have
         // returned `Err(InvalidBases)` if any failed, causing us to return early.
-        let bases: Vec<ClassBase<'db>> = original_bases
+        let mut bases = original_bases
             .iter()
-            .filter_map(|base_type| ClassBase::try_from_type(db, &env, *base_type, None))
-            .collect();
+            .filter_map(|base_type| ClassBase::try_from_type(db, &env, *base_type, None));
 
         // If all bases failed to convert, return type as the metaclass.
-        if bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db, &env));
-        }
+        let Some(mut candidate_base) = bases.next() else {
+            return Ok(ClassMetaclass::Selected(
+                KnownClass::Type.to_class_literal(db, &env),
+            ));
+        };
+
+        let is_stub = self.scope(db).file(db).is_stub(db);
+        let infer_base_metaclass = |base: ClassBase<'db>| {
+            if is_stub && matches!(base, ClassBase::Protocol) {
+                ClassMetaclass::ProtocolFallback
+            } else {
+                base.inferred_metaclass(db, &env)
+            }
+        };
 
         // Start with the first base's metaclass as the candidate.
-        let mut candidate = bases[0].metaclass(db, &env);
-
-        // Track which base the candidate metaclass came from.
-        let (mut candidate_base, rest) = bases.split_first().unwrap();
+        let first_metaclass = infer_base_metaclass(candidate_base);
+        let mut candidate = first_metaclass.for_inheritance(db, &env);
+        let mut has_protocol_fallback = first_metaclass.is_protocol_fallback();
 
         // Reconcile with other bases' metaclasses.
-        for base in rest {
-            let base_metaclass = base.metaclass(db, &env);
+        for base in bases {
+            let inferred_metaclass = infer_base_metaclass(base);
+            has_protocol_fallback |= inferred_metaclass.is_protocol_fallback();
+            let base_metaclass = inferred_metaclass.for_inheritance(db, &env);
 
             // Get the ClassType for comparison.
             let Some(candidate_class) = candidate.to_class_type(db) else {
@@ -322,6 +351,11 @@ impl<'db> DynamicClassLiteral<'db> {
                 continue;
             };
 
+            // Keep the incumbent when both metaclasses are equal.
+            if candidate_class.is_subclass_of(db, &env, base_metaclass_class) {
+                continue;
+            }
+
             // If base's metaclass is more derived, use it.
             if base_metaclass_class.is_subclass_of(db, &env, candidate_class) {
                 candidate = base_metaclass;
@@ -329,22 +363,21 @@ impl<'db> DynamicClassLiteral<'db> {
                 continue;
             }
 
-            // If candidate is already more derived, keep it.
-            if candidate_class.is_subclass_of(db, &env, base_metaclass_class) {
-                continue;
-            }
-
             // Conflict: neither metaclass is a subclass of the other.
             // Python raises `TypeError: metaclass conflict` at runtime.
             return Err(DynamicMetaclassConflict {
                 metaclass1: candidate_class,
-                base1: *candidate_base,
+                base1: candidate_base,
                 metaclass2: base_metaclass_class,
-                base2: *base,
+                base2: base,
             });
         }
 
-        Ok(candidate)
+        Ok(ClassMetaclass::with_protocol_fallback(
+            db,
+            candidate,
+            has_protocol_fallback,
+        ))
     }
 
     /// Iterate over the MRO of this class using C3 linearization.

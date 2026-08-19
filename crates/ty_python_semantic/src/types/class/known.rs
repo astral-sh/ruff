@@ -166,6 +166,22 @@ pub enum KnownClass {
 }
 
 impl KnownClass {
+    /// Return a runtime metaclass that is known independently of typeshed's inheritance graph.
+    ///
+    /// Built-in and extension types can inherit from collection ABCs only in their stubs. Those
+    /// bases must not give the runtime class an inferred protocol metaclass.
+    pub(super) fn known_metaclass(self, python_version: PythonVersion) -> Option<Self> {
+        if matches!(
+            self.canonical_module(python_version),
+            KnownModule::Builtins | KnownModule::Types
+        ) || matches!(self, Self::Deque)
+        {
+            Some(Self::Type)
+        } else {
+            None
+        }
+    }
+
     pub(crate) const fn is_bool(self) -> bool {
         matches!(self, Self::Bool)
     }

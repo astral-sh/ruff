@@ -688,6 +688,16 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
+        match self {
+            Self::Static(class) => class.inferred_metaclass(db),
+            Self::Dynamic(class) => class.inferred_metaclass(db),
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => {
+                ClassMetaclass::Selected(self.metaclass(db))
+            }
+        }
+    }
+
     /// Look up a class-level member by iterating through the MRO.
     pub(crate) fn class_member(
         self,
@@ -1542,6 +1552,18 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
+        match self {
+            Self::NonGeneric(class) => class.inferred_metaclass(db),
+            Self::Generic(generic) => match generic.origin(db).inferred_metaclass(db) {
+                ClassMetaclass::Selected(metaclass) => ClassMetaclass::Selected(
+                    metaclass.apply_optional_specialization(db, Some(generic.specialization(db))),
+                ),
+                ClassMetaclass::ProtocolFallback => ClassMetaclass::ProtocolFallback,
+            },
+        }
+    }
+
     /// Return the [`DisjointBase`] that appears first in the MRO of this class.
     ///
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
@@ -1740,11 +1762,11 @@ impl<'db> ClassType<'db> {
         // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
         // with any other arbitrary class, anyway).
         let type_class = KnownClass::Type.to_class_literal(db, env);
-        let self_metaclass = self.metaclass(db);
+        let self_metaclass = self.inferred_metaclass(db).for_inheritance(db, env);
         if self_metaclass == type_class {
             return true;
         }
-        let other_metaclass = other.metaclass(db);
+        let other_metaclass = other.inferred_metaclass(db).for_inheritance(db, env);
         if other_metaclass == type_class {
             return true;
         }
@@ -3336,6 +3358,57 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
+/// A selected metaclass, or the default inferred from a stub-only protocol base.
+///
+/// Typeshed sometimes uses protocol inheritance to describe an interface that a runtime class
+/// implements without actually inheriting from it. The fallback exposes protocol metaclass
+/// attributes, such as `register`, but must not conflict with an explicitly declared metaclass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum ClassMetaclass<'db> {
+    Selected(Type<'db>),
+    ProtocolFallback,
+}
+
+impl<'db> ClassMetaclass<'db> {
+    fn with_protocol_fallback(
+        db: &'db dyn Db,
+        selected: Type<'db>,
+        has_protocol_fallback: bool,
+    ) -> Self {
+        if has_protocol_fallback
+            && selected
+                .to_class_type(db)
+                .is_some_and(|class| class.is_known(db, KnownClass::Type))
+        {
+            Self::ProtocolFallback
+        } else {
+            Self::Selected(selected)
+        }
+    }
+
+    pub(super) fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self {
+            Self::Selected(metaclass) => metaclass,
+            Self::ProtocolFallback => KnownClass::ProtocolMeta.to_class_literal(db, env),
+        }
+    }
+
+    pub(super) fn for_inheritance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        match self {
+            Self::Selected(metaclass) => metaclass,
+            Self::ProtocolFallback => KnownClass::Type.to_class_literal(db, env),
+        }
+    }
+
+    const fn is_protocol_fallback(self) -> bool {
+        matches!(self, Self::ProtocolFallback)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,
@@ -3355,16 +3428,11 @@ pub(super) enum MetaclassErrorKind<'db> {
     /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
     /// its bases.
     Conflict {
-        /// `candidate1` will either be the explicit `metaclass=` keyword in the class definition,
-        /// or the inferred metaclass of a base class
-        candidate1: MetaclassCandidate<'db>,
-
-        /// `candidate2` will always be the inferred metaclass of a base class
-        candidate2: MetaclassCandidate<'db>,
-
-        /// Flag to indicate whether `candidate1` is the explicit `metaclass=` keyword or the
-        /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
-        candidate1_is_base_class: bool,
+        /// The explicit `metaclass=` keyword or a previously visited base's metaclass.
+        candidate: MetaclassCandidate<'db>,
+        /// The incompatible metaclass of `base`.
+        base_metaclass: ClassType<'db>,
+        base: ClassBase<'db>,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,

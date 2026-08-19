@@ -334,10 +334,12 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Dynamic(dynamic) => {
                 SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
             }
-            SubclassOfInner::Class(class) => {
-                SubclassOfType::try_from_type(db, env, class.metaclass(db))
-                    .unwrap_or(SubclassOfType::subclass_of_unknown())
-            }
+            SubclassOfInner::Class(class) => SubclassOfType::try_from_type(
+                db,
+                env,
+                class.inferred_metaclass(db).for_inheritance(db, env),
+            )
+            .unwrap_or(SubclassOfType::subclass_of_unknown()),
             // Structural implementations of a protocol can have arbitrary metaclasses. The only
             // guaranteed upper bound is therefore `type`, not the protocol origin's metaclass.
             SubclassOfInner::Protocol(_) => KnownClass::Type.to_subclass_of(db, env),

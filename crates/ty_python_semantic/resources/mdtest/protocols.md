@@ -289,6 +289,86 @@ static_assert(is_subtype_of(TypeOf[Protocol], typing._ProtocolMeta))
 reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```
 
+## Protocol metaclasses
+
+Protocols and their nominal subclasses inherit the metaclass of `Protocol`, even when they do not
+declare a metaclass explicitly.
+
+```py
+from typing import Protocol
+
+class Parent(Protocol): ...
+class Child(Parent, Protocol): ...
+class Concrete(Child): ...
+
+reveal_type(type(Parent))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Child))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Concrete))  # revealed: <class '_ProtocolMeta'>
+```
+
+The same applies to generic protocols and the `typing_extensions` backport.
+
+```py
+from typing import TypeVar
+from typing_extensions import Protocol as ExtensionsProtocol
+
+T = TypeVar("T")
+
+class GenericProtocol(Protocol[T]): ...
+class BackportedProtocol(ExtensionsProtocol): ...
+
+reveal_type(type(GenericProtocol))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(BackportedProtocol))  # revealed: <class '_ProtocolMeta'>
+```
+
+## Protocol metaclasses in stubs
+
+Protocols defined in stubs also contribute their metaclass when imported and subclassed.
+
+`interface.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Interface(Protocol): ...
+```
+
+`main.py`:
+
+```py
+from interface import Interface
+from typing import Protocol
+
+class Meta(type(Protocol)): ...
+class Concrete(Interface, metaclass=Meta): ...
+
+reveal_type(type(Interface))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Concrete))  # revealed: <class 'Meta'>
+```
+
+## Virtual subclass registration
+
+Protocol classes inherit `ABCMeta.register`. Its return type preserves the registered instance type.
+
+```py
+from typing import Protocol
+
+class Parent(Protocol): ...
+class Concrete: ...
+
+reveal_type(Parent.register(Concrete))  # revealed: type[Concrete]
+```
+
+The method is also available on collection ABCs that typeshed models using protocols. This is a
+regression test for <https://github.com/astral-sh/ty/issues/1204>.
+
+```py
+from collections.abc import Container, Mapping
+
+reveal_type(Container.register(Concrete))  # revealed: type[Concrete]
+reveal_type(Mapping.register(Concrete))  # revealed: type[Concrete]
+```
+
 ## Diagnostics and autofixes for `Protocol` classes defined in invalid ways
 
 <!-- snapshot-diagnostics -->

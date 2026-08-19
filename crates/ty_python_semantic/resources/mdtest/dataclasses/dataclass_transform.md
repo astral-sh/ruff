@@ -714,6 +714,28 @@ class InvalidNonFrozenChild(FrozenParent, frozen=False):
     y: int
 ```
 
+#### Repeated explicit metaclasses
+
+Explicitly supplying the same transformer metaclass as a base class still makes the new class
+neither frozen nor non-frozen. This also applies when the base was created dynamically.
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class FrozenMeta(type):
+    def __new__(cls, name, bases, namespace, *, frozen: bool = True): ...
+
+class Root(metaclass=FrozenMeta): ...
+class StaticRoot(Root, metaclass=FrozenMeta): ...
+class StaticMutable(StaticRoot, frozen=False): ...
+
+Dynamic = type("Dynamic", (Root,), {})
+
+class DynamicRoot(Dynamic, metaclass=FrozenMeta): ...
+class DynamicMutable(DynamicRoot, frozen=False): ...
+```
+
 #### Using base-class-based transformers
 
 Similarly, for base-class-based transformers, the class that is decorated with

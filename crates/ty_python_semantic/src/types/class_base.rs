@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::ProgramEnvironment;
-use crate::types::class::CodeGeneratorKind;
+use crate::types::class::{ClassMetaclass, CodeGeneratorKind};
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
@@ -368,10 +368,19 @@ impl<'db> ClassBase<'db> {
             Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),
-            // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
-            Self::Protocol | Self::Generic | Self::TypedDict(_) => {
-                KnownClass::Type.to_instance(db, env)
-            }
+            Self::Protocol => KnownClass::ProtocolMeta.to_class_literal(db, env),
+            Self::Generic | Self::TypedDict(_) => KnownClass::Type.to_instance(db, env),
+        }
+    }
+
+    pub(super) fn inferred_metaclass(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> ClassMetaclass<'db> {
+        match self {
+            Self::Class(class) => class.inferred_metaclass(db),
+            _ => ClassMetaclass::Selected(self.metaclass(db, env)),
         }
     }
 

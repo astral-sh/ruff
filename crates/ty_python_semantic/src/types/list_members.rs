@@ -314,7 +314,7 @@ impl<'db> AllMembers<'db> {
                             db,
                             env,
                             ty,
-                            class_literal.metaclass(db),
+                            class_type.inferred_metaclass(db).for_inheritance(db, env),
                         );
                     }
                 }
