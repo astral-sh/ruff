@@ -539,6 +539,10 @@ fn accumulate_constraint<'db>(
 
 const NON_TERMINAL_CALL_CHUNK_SIZE: usize = 16;
 const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
+const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
+const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
+// Longer paths fall back to iterative projection and the existing projected-graph evaluator.
+const MAX_NARROWING_EVALUATION_DEPTH: usize = 64;
 
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
@@ -738,19 +742,36 @@ fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthines
     }
 }
 
+/// Selects sparse, stable checkpoints without adding a second scope-wide predicate index.
+///
+/// Statement calls retain their existing checkpoint spacing. Other control-flow predicates become
+/// checkpoints only after a sufficiently long path has demonstrated that reuse is worthwhile.
 fn is_reachability_checkpoint(
-    call_predicates: &[ScopedPredicateId],
+    call_predicates: Option<&[ScopedPredicateId]>,
     predicate: ScopedPredicateId,
+    visited: usize,
 ) -> bool {
-    call_predicates
-        .binary_search(&predicate)
-        .is_ok_and(|index| (index + 1) % REACHABILITY_EVALUATION_CHUNK_SIZE == 0)
+    if let Some(call_index) = call_predicates.and_then(|calls| calls.binary_search(&predicate).ok())
+    {
+        return (call_index + 1).is_multiple_of(REACHABILITY_EVALUATION_CHUNK_SIZE);
+    }
+
+    // Folding the adjacent bucket prevents regularly interleaved predicate kinds from always
+    // missing the same checkpoint positions.
+    let index = predicate.index();
+    let checkpoint_position = index ^ (index / CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL);
+    visited >= CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL
+        && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
 /// Walks a reachability decision diagram until it reaches a terminal or reusable checkpoint.
 ///
 /// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
 /// node is evaluated directly to prevent the query from immediately calling itself again.
+///
+/// General checkpoints are created only after traversing a genuinely long path. Their positions
+/// depend on stable predicate IDs, so adjacent roots reuse the same suffix without requiring an
+/// additional retained scope-wide index or allocating tracked queries for short, ordinary paths.
 fn evaluate_reachability_path<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -761,6 +782,7 @@ fn evaluate_reachability_path<'db>(
     mut use_checkpoint: bool,
 ) -> Truthiness {
     let env = ProgramEnvironment::from_scope(scope);
+    let mut visited = 0;
 
     loop {
         if let Some(reachability) = terminal_reachability(id) {
@@ -768,11 +790,7 @@ fn evaluate_reachability_path<'db>(
         }
 
         let node = constraints.get_interior_node(id);
-        if use_checkpoint
-            && call_predicates.is_some_and(|call_predicates| {
-                is_reachability_checkpoint(call_predicates, node.atom())
-            })
-        {
+        if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
             return evaluate_reachability_checkpoint(db, scope, id);
         }
 
@@ -782,14 +800,16 @@ fn evaluate_reachability_path<'db>(
             Truthiness::AlwaysFalse => node.if_false(),
         };
         use_checkpoint = true;
+        visited += 1;
     }
 }
 
 /// Evaluates a canonical suffix of a reachability decision diagram.
 ///
-/// Only every [`REACHABILITY_EVALUATION_CHUNK_SIZE`]th non-terminal-call predicate is a checkpoint.
-/// This lets later statements reuse the constraints accumulated by earlier statements without
-/// retaining a Salsa query key and memo for every reachability constraint in the scope.
+/// Statement calls retain their existing sparse checkpoints; other predicates become checkpoints
+/// only after a long path demonstrates that reuse is worthwhile. This lets later statements reuse
+/// constraints accumulated by earlier statements without retaining an additional scope-wide index
+/// or a Salsa query key and memo for every constraint.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
@@ -801,12 +821,19 @@ fn evaluate_reachability_checkpoint<'db>(
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     let use_def = use_def_map(db, scope);
+    let predicates = use_def.predicates();
+    let has_many_calls = predicates
+        .iter()
+        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
+        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
+        .is_some();
+    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
     evaluate_reachability_path(
         db,
         scope,
         use_def.reachability_constraints(),
-        use_def.predicates(),
-        Some(non_terminal_call_predicates(db, scope)),
+        predicates,
+        call_predicates,
         id,
         false,
     )
@@ -863,17 +890,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         _ => {}
     }
 
-    let mut projector = NarrowingProjector::new(db, env, constraints, predicates, place);
-    let projected_root = projector.project(id);
-    let mut context = ProjectedNarrowingContext {
-        db,
-        env,
-        base_ty,
-        graph: &projector.graph,
-        joins: projector.graph.joins(projected_root),
-        join_cache: FxHashMap::default(),
-    };
-    context.narrow(projected_root, None)
+    NarrowingProjector::new(db, env, constraints, predicates, place).narrow(id, base_ty)
 }
 
 fn apply_accumulated_narrowing<'db>(
@@ -914,10 +931,20 @@ struct ProjectedNarrowingNode {
     if_false: ProjectedNarrowingNodeId,
 }
 
+/// Whether a projected path only intersects the original type or can replace it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NarrowingEffect {
+    PreservesSubject,
+    MayReplaceSubject,
+}
+
 /// Narrowing graph containing only predicates that can narrow one place.
 #[derive(Default)]
 struct ProjectedNarrowingGraph<'db> {
     nodes: Vec<ProjectedNarrowingNode>,
+    referenced: Vec<bool>,
+    joins: Vec<bool>,
+    effects: Vec<NarrowingEffect>,
     node_cache: FxHashMap<ProjectedNarrowingNode, ProjectedNarrowingNodeId>,
     or_cache:
         FxHashMap<(ProjectedNarrowingNodeId, ProjectedNarrowingNodeId), ProjectedNarrowingNodeId>,
@@ -934,6 +961,11 @@ impl ProjectedNarrowingGraph<'_> {
     /// Returns an interior projected node by ID.
     fn node(&self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingNode {
         self.nodes[id.0]
+    }
+
+    /// Returns whether any reachable path through this canonical subtree can replace its subject.
+    fn may_replace_subject(&self, id: ProjectedNarrowingNodeId) -> bool {
+        !id.is_terminal() && self.effects[id.0] == NarrowingEffect::MayReplaceSubject
     }
 
     /// Interns a projected node, collapsing nodes with identical branches.
@@ -982,39 +1014,46 @@ impl ProjectedNarrowingGraph<'_> {
             return *cached;
         }
 
+        let may_replace = self
+            .predicate_constraints_cache
+            .get(&node.atom)
+            .is_some_and(|(positive, negative)| {
+                (node.if_true != ProjectedNarrowingNodeId::ALWAYS_FALSE
+                    && positive
+                        .as_ref()
+                        .is_some_and(NarrowingConstraint::can_replace_subject_type))
+                    || (node.if_false != ProjectedNarrowingNodeId::ALWAYS_FALSE
+                        && negative
+                            .as_ref()
+                            .is_some_and(NarrowingConstraint::can_replace_subject_type))
+            })
+            || [node.if_true, node.if_uncertain, node.if_false]
+                .into_iter()
+                .any(|child| self.may_replace_subject(child));
+
         let id = ProjectedNarrowingNodeId(self.nodes.len());
         self.nodes.push(node);
+        self.referenced.push(false);
+        self.joins.push(false);
+        self.effects.push(if may_replace {
+            NarrowingEffect::MayReplaceSubject
+        } else {
+            NarrowingEffect::PreservesSubject
+        });
         self.node_cache.insert(node, id);
+
+        for next in [node.if_true, node.if_uncertain, node.if_false] {
+            self.record_reference(next);
+        }
+
         id
     }
 
-    /// Returns the projected nodes that join multiple incoming paths.
-    ///
-    /// Projection interns equivalent subgraphs into a DAG. Caching each join lets narrowing
-    /// evaluate a shared suffix once and apply each incoming prefix constraint afterward.
-    fn joins(&self, root: ProjectedNarrowingNodeId) -> Vec<bool> {
-        let mut referenced = vec![false; self.nodes.len()];
-        let mut joins = vec![false; self.nodes.len()];
-        let mut visited = vec![false; self.nodes.len()];
-        let mut pending = vec![root];
-
-        while let Some(id) = pending.pop() {
-            if id.is_terminal() || std::mem::replace(&mut visited[id.0], true) {
-                continue;
-            }
-
-            let node = self.node(id);
-            for next in [node.if_true, node.if_uncertain, node.if_false] {
-                if !next.is_terminal() {
-                    if std::mem::replace(&mut referenced[next.0], true) {
-                        joins[next.0] = true;
-                    }
-                    pending.push(next);
-                }
-            }
+    /// Marks a projected node as shared once multiple paths or binding roots reach it.
+    fn record_reference(&mut self, id: ProjectedNarrowingNodeId) {
+        if !id.is_terminal() && std::mem::replace(&mut self.referenced[id.0], true) {
+            self.joins[id.0] = true;
         }
-
-        joins
     }
 
     /// Combines two paths without copying one path into both outcomes of the other's predicate.
@@ -1084,8 +1123,89 @@ impl ProjectedNarrowingGraph<'_> {
     }
 }
 
-/// Removes predicates that cannot narrow one place from a narrowing constraint.
-struct NarrowingProjector<'a, 'db> {
+/// A narrowed type together with the semantic effect of the path that produced it.
+///
+/// Most predicates only remove possibilities from the original subject type. A `TypeGuard`,
+/// however, can introduce a type that the original subject did not contain:
+///
+/// ```python
+/// from typing import TypeGuard
+///
+/// def is_str(value: object) -> TypeGuard[str]: ...
+///
+/// value: int
+/// if is_str(value):
+///     reveal_type(value)  # str
+/// ```
+///
+/// Joins containing replacement narrowing must be normalized in the projected graph. Ordinary
+/// narrowing avoids projection when one path already preserves the original type; other joins
+/// still need projection because complementary paths, such as `(Base & ~Child) | Child`, do not
+/// always simplify back to their original type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum NarrowingOutcome<'db> {
+    /// Only intersects the subject with types it could already contain.
+    PreservesSubject(Type<'db>),
+    /// May introduce a type outside the subject, requiring canonical join evaluation.
+    MayReplaceSubject(Type<'db>),
+}
+
+impl<'db> NarrowingOutcome<'db> {
+    fn ty(self) -> Type<'db> {
+        match self {
+            Self::PreservesSubject(ty) | Self::MayReplaceSubject(ty) => ty,
+        }
+    }
+
+    fn may_replace_subject(self) -> bool {
+        matches!(self, Self::MayReplaceSubject(_))
+    }
+}
+
+/// Returns the complete narrowing outcome for a stable constraint suffix.
+///
+/// Adjacent binding histories and inference regions share many suffixes. Sparse checkpoints cache
+/// their actual narrowed types and effects by scope, place, constraint, and original type without
+/// retaining a Salsa query for every graph node. Cycle recovery conservatively preserves possible
+/// replacement narrowing, and the initial node bypasses checkpoints to avoid querying itself.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, id, _, _, _, _| NarrowingOutcome::MayReplaceSubject(Type::divergent(id)),
+    cycle_fn = |db: &'db dyn Db, cycle, previous: &NarrowingOutcome<'db>, result: NarrowingOutcome<'db>, scope: ScopeId<'db>, _, _, _| {
+        let ty = result.ty().cycle_normalized(db, &ProgramEnvironment::from_scope(scope), previous.ty(), cycle);
+        if previous.may_replace_subject() || result.may_replace_subject() {
+            NarrowingOutcome::MayReplaceSubject(ty)
+        } else {
+            NarrowingOutcome::PreservesSubject(ty)
+        }
+    },
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn evaluate_narrowing_checkpoint<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    place: ScopedPlaceId,
+    constraint: ScopedNarrowingConstraint,
+    base_ty: Type<'db>,
+) -> NarrowingOutcome<'db> {
+    let env = ProgramEnvironment::from_scope(scope);
+    let use_def = use_def_map(db, scope);
+    let evaluator = use_def.narrowing_evaluator(constraint);
+    NarrowingProjector::new(
+        db,
+        &env,
+        evaluator.narrowing_constraints(),
+        use_def.predicates(),
+        place,
+    )
+    .narrow_cached(constraint, base_ty, false, 0)
+}
+
+/// Narrows bindings of one place while reusing their shared constraint suffixes.
+///
+/// Straightforward paths are evaluated directly. Replacement-sensitive joins, complementary
+/// predicates, and deeply nested constraints fall back to the canonical projected graph.
+pub(crate) struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     constraints: &'a NarrowingConstraints,
@@ -1093,11 +1213,13 @@ struct NarrowingProjector<'a, 'db> {
     place: ScopedPlaceId,
     project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
+    narrowed_cache: FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
+    outcome_cache: FxHashMap<(ScopedNarrowingConstraint, Type<'db>), NarrowingOutcome<'db>>,
 }
 
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
     /// Creates a projector for narrowing `place`.
-    fn new(
+    pub(crate) fn new(
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
         constraints: &'a NarrowingConstraints,
@@ -1112,7 +1234,235 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             place,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
+            narrowed_cache: FxHashMap::default(),
+            outcome_cache: FxHashMap::default(),
         }
+    }
+
+    /// Narrows a binding while reusing projections and shared suffixes from earlier bindings.
+    pub(crate) fn narrow(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        base_ty: Type<'db>,
+    ) -> Type<'db> {
+        self.narrow_cached(constraint, base_ty, true, 0).ty()
+    }
+
+    /// Evaluates a constraint suffix while sharing complete outcomes at stable checkpoints.
+    ///
+    /// `use_checkpoint` is false only for the first node of a checkpoint query. Long paths fall
+    /// back to iterative projection before continuing through the existing graph evaluator.
+    fn narrow_cached(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        base_ty: Type<'db>,
+        use_checkpoint: bool,
+        depth: usize,
+    ) -> NarrowingOutcome<'db> {
+        if constraint == ScopedNarrowingConstraint::ALWAYS_FALSE {
+            return NarrowingOutcome::PreservesSubject(Type::Never);
+        }
+        if constraint == ScopedNarrowingConstraint::ALWAYS_TRUE {
+            return NarrowingOutcome::PreservesSubject(base_ty);
+        }
+
+        let key = (constraint, base_ty);
+        if let Some(cached) = self.outcome_cache.get(&key) {
+            return *cached;
+        }
+
+        if depth >= MAX_NARROWING_EVALUATION_DEPTH {
+            let result = self.narrow_projected_outcome(constraint, base_ty);
+            self.outcome_cache.insert(key, result);
+            return result;
+        }
+
+        let node = self.constraints.get_interior_node(constraint);
+        let predicate = self.predicates[node.atom];
+        let is_static = matches!(
+            predicate.node,
+            PredicateNode::IsNonTerminalCall(_)
+                | PredicateNode::ContextManagerSuppresses { .. }
+                | PredicateNode::FinallyNormalPathImpossible { .. }
+        );
+        // Mix the neighboring bucket so regularly interleaved predicates cannot miss every
+        // checkpoint, matching the placement used for control-flow reachability.
+        let index = node.atom.index();
+        let checkpoint_position = index ^ (index / NARROWING_EVALUATION_CHECKPOINT_INTERVAL);
+        if use_checkpoint
+            && matches!(
+                predicate.node,
+                PredicateNode::ContextManagerSuppresses { .. }
+                    | PredicateNode::FinallyNormalPathImpossible { .. }
+            )
+            && (checkpoint_position + 1).is_multiple_of(NARROWING_EVALUATION_CHECKPOINT_INTERVAL)
+        {
+            let scope = predicate_scope(self.db, &predicate);
+            let result =
+                evaluate_narrowing_checkpoint(self.db, scope, self.place, constraint, base_ty);
+            self.outcome_cache.insert(key, result);
+            return result;
+        }
+
+        let result = if is_static {
+            let branch = match analyze_single(self.db, self.env, &predicate) {
+                Truthiness::AlwaysTrue => node.if_true,
+                Truthiness::AlwaysFalse => node.if_false,
+                Truthiness::Ambiguous => {
+                    unreachable!("statically decidable predicates should never be Ambiguous")
+                }
+            };
+            if branch == ScopedNarrowingConstraint::ALWAYS_TRUE
+                || node.if_uncertain == ScopedNarrowingConstraint::ALWAYS_TRUE
+            {
+                NarrowingOutcome::PreservesSubject(base_ty)
+            } else if node.if_uncertain == ScopedNarrowingConstraint::ALWAYS_FALSE {
+                self.narrow_cached(branch, base_ty, true, depth + 1)
+            } else if branch == ScopedNarrowingConstraint::ALWAYS_FALSE
+                || branch == node.if_uncertain
+            {
+                self.narrow_cached(node.if_uncertain, base_ty, true, depth + 1)
+            } else {
+                let when_selected = self.narrow_cached(branch, base_ty, true, depth + 1);
+                let when_uncertain =
+                    self.narrow_cached(node.if_uncertain, base_ty, true, depth + 1);
+                self.merge_narrowing_outcomes(constraint, base_ty, &[when_selected, when_uncertain])
+            }
+        } else {
+            let (positive, negative) = self.predicate_constraints(node.atom);
+            if positive.is_none()
+                && negative.is_none()
+                && [node.if_true, node.if_uncertain, node.if_false]
+                    .contains(&ScopedNarrowingConstraint::ALWAYS_TRUE)
+            {
+                NarrowingOutcome::PreservesSubject(base_ty)
+            } else if use_checkpoint
+                && (positive.is_some() || negative.is_some())
+                && (checkpoint_position + 1)
+                    .is_multiple_of(NARROWING_EVALUATION_CHECKPOINT_INTERVAL)
+            {
+                let scope = predicate_scope(self.db, &predicate);
+                evaluate_narrowing_checkpoint(self.db, scope, self.place, constraint, base_ty)
+            } else if node.if_false == ScopedNarrowingConstraint::ALWAYS_FALSE
+                && node.if_uncertain == ScopedNarrowingConstraint::ALWAYS_FALSE
+            {
+                self.narrow_cached_branch(node.if_true, base_ty, positive, depth)
+            } else if node.if_true == ScopedNarrowingConstraint::ALWAYS_FALSE
+                && node.if_uncertain == ScopedNarrowingConstraint::ALWAYS_FALSE
+            {
+                self.narrow_cached_branch(node.if_false, base_ty, negative, depth)
+            } else {
+                let when_true = self.narrow_cached_branch(node.if_true, base_ty, positive, depth);
+                let when_uncertain =
+                    self.narrow_cached(node.if_uncertain, base_ty, true, depth + 1);
+                let when_false = self.narrow_cached_branch(node.if_false, base_ty, negative, depth);
+                self.merge_narrowing_outcomes(
+                    constraint,
+                    base_ty,
+                    &[when_true, when_uncertain, when_false],
+                )
+            }
+        };
+        self.outcome_cache.insert(key, result);
+        result
+    }
+
+    /// Applies the newer predicate after evaluating its older constraint suffix.
+    ///
+    /// This ordering matters because replacement narrowing discards earlier subject types.
+    fn narrow_cached_branch(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        base_ty: Type<'db>,
+        narrowing: Option<NarrowingConstraint<'db>>,
+        depth: usize,
+    ) -> NarrowingOutcome<'db> {
+        if constraint == ScopedNarrowingConstraint::ALWAYS_FALSE {
+            return NarrowingOutcome::PreservesSubject(Type::Never);
+        }
+
+        let outcome = self.narrow_cached(constraint, base_ty, true, depth + 1);
+        let may_replace = outcome.may_replace_subject()
+            || narrowing
+                .as_ref()
+                .is_some_and(NarrowingConstraint::can_replace_subject_type);
+        let narrowed = apply_accumulated_narrowing(self.db, self.env, outcome.ty(), narrowing);
+        if may_replace {
+            NarrowingOutcome::MayReplaceSubject(narrowed)
+        } else {
+            NarrowingOutcome::PreservesSubject(narrowed)
+        }
+    }
+
+    /// Combines paths directly only when one already preserves the original type.
+    ///
+    /// The type union `(Base & ~Child) | Child` does not always simplify back to `Base`. The
+    /// projected graph performs that cancellation on predicates before evaluating types, and it
+    /// also keeps replacement narrowing from leaking past a control-flow join.
+    fn merge_narrowing_outcomes(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        base_ty: Type<'db>,
+        outcomes: &[NarrowingOutcome<'db>],
+    ) -> NarrowingOutcome<'db> {
+        if outcomes
+            .iter()
+            .all(|outcome| !outcome.may_replace_subject())
+            && outcomes.iter().any(|outcome| outcome.ty() == base_ty)
+        {
+            NarrowingOutcome::PreservesSubject(base_ty)
+        } else {
+            self.narrow_projected_outcome(constraint, base_ty)
+        }
+    }
+
+    /// Uses canonical projection for replacement-sensitive joins, complementary paths, and deep
+    /// constraint histories.
+    fn narrow_projected_outcome(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        base_ty: Type<'db>,
+    ) -> NarrowingOutcome<'db> {
+        let root = self.project(constraint);
+        let narrowed = self.narrow_projected(root, base_ty);
+        if self.graph.may_replace_subject(root) {
+            NarrowingOutcome::MayReplaceSubject(narrowed)
+        } else {
+            NarrowingOutcome::PreservesSubject(narrowed)
+        }
+    }
+
+    /// Narrows a projected constraint while reusing suffix results for its original binding type.
+    ///
+    /// Registering each root lets the graph recognize shared joins incrementally.
+    fn narrow_projected(
+        &mut self,
+        root: ProjectedNarrowingNodeId,
+        base_ty: Type<'db>,
+    ) -> Type<'db> {
+        if root == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            return base_ty;
+        }
+        if root == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return Type::Never;
+        }
+        self.graph.record_reference(root);
+
+        let key = (root, base_ty);
+        if let Some(cached) = self.narrowed_cache.get(&key) {
+            return *cached;
+        }
+
+        let mut context = ProjectedNarrowingContext {
+            db: self.db,
+            env: self.env,
+            base_ty,
+            graph: &self.graph,
+            join_cache: &mut self.narrowed_cache,
+        };
+        let narrowed = context.narrow(root, None);
+        self.narrowed_cache.insert(key, narrowed);
+        narrowed
     }
 
     /// Returns the cached positive and negative narrowing constraints for a predicate.
@@ -1239,25 +1589,24 @@ struct ProjectedNarrowingContext<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
-    /// Marks join boundaries in the projected DAG.
-    joins: Vec<bool>,
-    /// Caches each join's narrowed suffix type from its boundary.
-    join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
+    /// Caches each shared suffix for the binding type being narrowed.
+    join_cache: &'a mut FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
     fn is_join(&self, id: ProjectedNarrowingNodeId) -> bool {
-        !id.is_terminal() && self.joins[id.0]
+        !id.is_terminal() && self.graph.joins[id.0]
     }
 
     /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
     fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
-        if let Some(cached) = self.join_cache.get(&id) {
+        let key = (id, self.base_ty);
+        if let Some(cached) = self.join_cache.get(&key) {
             return *cached;
         }
 
         let result = self.narrow_uncached(id, None);
-        self.join_cache.insert(id, result);
+        self.join_cache.insert(key, result);
         result
     }
 
