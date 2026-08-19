@@ -70,6 +70,17 @@ docs = [
     "mkdocs-redirects>=1.2.3",
     "pyyaml>=6.0.3",
 ]
+# The compatibility tests use the Ruff binary built from this checkout.
+ruff-lsp-test = [
+    "lsprotocol>=2023.0.0",
+    "packaging>=23.1",
+    # ruff-lsp uses the pygls 1.x server API.
+    "pygls>=1.1.0,<2",
+    "pytest>=7.3.1,<8",
+    "pytest-asyncio>=0.21.2",
+    "python-lsp-jsonrpc>=1.0.0",
+    "typing-extensions>=4.7.1",
+]
 ty-ecosystem = [
     "ecosystem-analyzer",
 ]
@@ -87,6 +98,7 @@ exclude-newer = "P7D"
 dev = { requires-python = ">=3.12" }
 release = { requires-python = ">=3.12" }
 docs = { requires-python = ">=3.12" }
+ruff-lsp-test = { requires-python = ">=3.12" }
 ty-ecosystem = { requires-python = ">=3.13" }
 typeshed-docstrings = { requires-python = ">=3.10" }
 typeshed-formatting = { requires-python = ">=3.10" }
