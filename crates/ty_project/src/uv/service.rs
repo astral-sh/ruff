@@ -6,13 +6,15 @@ use crossbeam::channel::{Receiver, RecvTimeoutError, SendTimeoutError, Sender, T
 use ruff_db::files::File;
 use ruff_db::system::{CommandExecutor, System, SystemPathBuf};
 
-use super::{MetadataTarget, Uv, unsupported_command_execution, uv_executable_error};
-use crate::script::ScriptEnvironmentCacheKey;
+use super::{
+    MetadataTarget, ScriptEnvironmentCacheKey, Uv, unsupported_command_execution,
+    uv_executable_error,
+};
 use crate::{Db, ScriptSyncProgress};
 
 /// Synchronizes standalone script environments with uv.
 ///
-/// A project stores one service in its shared `ScriptEnvironments`, so every database snapshot uses
+/// A project stores one service in its shared `UvEnvironments`, so every database snapshot uses
 /// the same bounded request queue and workers. The queue applies backpressure to producers, while
 /// the number of workers limits concurrent uv processes.
 ///
@@ -22,9 +24,9 @@ use crate::{Db, ScriptSyncProgress};
 /// retain only the configured uv executable and a detached command executor.
 ///
 /// The service only owns scheduling of `uv metadata` calls.
-/// [`ScriptEnvironments`](crate::ScriptEnvironments) is the higher level abstraction that
+/// [`UvEnvironments`](crate::UvEnvironments) is the higher level abstraction that
 /// application code should use.
-pub(crate) struct UvSyncService {
+pub(crate) struct UvMetadataService {
     workers: OnceLock<std::io::Result<UvWorkerPool>>,
 
     /// Channel, where to send the background results to.
@@ -34,11 +36,11 @@ pub(crate) struct UvSyncService {
     ///
     /// This overlaps with `results_sender`, but the main difference is that it doesn't expose the
     /// sync result. The LSP and CLI use it as a wake up signal for when to call
-    /// [`ScriptEnvironments::poll_sync`](crate::ScriptEnvironments::poll_sync).
+    /// [`UvEnvironments::poll_sync`](crate::UvEnvironments::poll_sync).
     wake_sender: Sender<()>,
 }
 
-impl UvSyncService {
+impl UvMetadataService {
     pub(crate) fn new(results_sender: Sender<ScriptSyncResult>, wake_sender: Sender<()>) -> Self {
         Self {
             workers: OnceLock::new(),
@@ -185,7 +187,7 @@ impl UvSyncService {
     }
 }
 
-impl std::panic::RefUnwindSafe for UvSyncService {}
+impl std::panic::RefUnwindSafe for UvMetadataService {}
 
 /// A standalone script environment that should be synchronized by uv.
 #[derive(Debug)]

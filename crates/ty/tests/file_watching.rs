@@ -2635,7 +2635,7 @@ mod uv_metadata {
         case.apply_changes(&changes);
 
         let file = system_path_to_file(case.db(), case.project_path("script.py"))?;
-        let environments = case.db().script_environments().clone();
+        let environments = case.db().uv_environments().clone();
         if !environments.files().contains(&file) {
             return Ok(false);
         }

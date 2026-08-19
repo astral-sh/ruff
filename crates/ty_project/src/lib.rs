@@ -23,7 +23,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
-pub use script::{ScriptEnvironmentAvailability, ScriptEnvironments, script_tag};
+pub use script::script_tag;
 use std::backtrace::BacktraceStatus;
 use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
@@ -33,7 +33,7 @@ use ty_python_core::ProgramFile;
 use ty_python_core::program::{Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
-pub use uv::UseUv;
+pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments};
 
 mod db;
 mod files;
@@ -404,9 +404,7 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
-                let initialization = db
-                    .script_environments()
-                    .initialize_blocking(db, file, reporter);
+                let initialization = db.uv_environments().initialize_blocking(db, file, reporter);
                 if initialization.is_pending() {
                     // The CLI watch loop or language server already scheduled this script's first
                     // synchronization in the background. Until it completes, there is no
@@ -706,7 +704,7 @@ pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
         return true;
     };
 
-    script.has_valid_settings(db) && !db.script_environments().is_initialization_pending(db, file)
+    script.has_valid_settings(db) && !db.uv_environments().is_initialization_pending(db, file)
 }
 
 /// Returns `true` if the file should be checked.
