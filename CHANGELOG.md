@@ -35,7 +35,6 @@ Released on 2026-08-20.
 
 ### Other changes
 
-- Align Renovate config with preset ([#27762](https://github.com/astral-sh/ruff/pull/27762))
 - Fix s390x stacker assembly in release builds ([#27776](https://github.com/astral-sh/ruff/pull/27776))
 - Guarantee minimum stack size when parsing a module, standalone expression, and suites ([#25464](https://github.com/astral-sh/ruff/pull/25464))
 - Reduce configuration deserialization code size ([#27924](https://github.com/astral-sh/ruff/pull/27924))
