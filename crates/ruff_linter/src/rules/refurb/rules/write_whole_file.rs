@@ -4,7 +4,8 @@ use ruff_python_ast::{
     self as ast, Expr, Stmt,
     visitor::{self, Visitor},
 };
-use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -37,11 +38,10 @@ use crate::{FixAvailability, Locator, Violation};
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the
-/// original expression, or if the type of the value passed to `write` isn't statically known to
-/// match the file's open mode (`str` for text mode, `bytes` for binary mode). In the latter case,
-/// `open(...)` truncates the file before `write` is ever called, so a call that raises `TypeError`
-/// because of a type mismatch still leaves the file empty; `Path.write_text`/`write_bytes` checks
-/// the type first, so the same mismatch leaves the file's original contents untouched instead.
+/// original expression, or if the value passed to `write` isn't statically known to be of the
+/// type required by the file's open mode (`str` for text mode, `bytes` for binary mode). Since
+/// `open(...)` truncates the file before `write` runs, a type mismatch behaves differently before
+/// and after the rewrite.
 ///
 /// ## References
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
@@ -238,29 +238,57 @@ fn generate_fix(
 
     let replacement = format!("{target}.{suggestion}");
 
-    // `open(..., "w")` truncates the file immediately, before `write()` is ever called. If
-    // `write()`'s argument turns out to be the wrong type for the mode, the original code raises
-    // a `TypeError` without writing anything, leaving the file's prior contents intact. The
-    // rewritten `Path.write_text`/`write_bytes` call performs the type check *before* opening
-    // (and thus truncating) the file, so the same mismatch leaves the file untouched instead.
-    // Only offer the fix as safe when the argument's type is statically known to match the mode.
-    let type_matches_mode = matches!(
-        (open.mode, ResolvedPythonType::from(content)),
-        (OpenMode::WriteText, ResolvedPythonType::Atom(PythonType::String))
-            | (OpenMode::WriteBytes, ResolvedPythonType::Atom(PythonType::Bytes))
-    );
+    // `open(..., "w")` truncates the file before `write()` runs, so a type mismatch leaves the
+    // original untouched under the rewritten form but empty under the original. Only safe when
+    // the argument's type is known to match the mode.
+    let type_matches_mode = content_type_matches_mode(content, open.mode, checker.semantic());
 
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range())
-        || !type_matches_mode
-    {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    let applicability =
+        if checker.comment_ranges().intersects(with_stmt.range()) || !type_matches_mode {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
     Some(Fix::applicable_edits(
         Edit::range_replacement(replacement, with_stmt.range()),
         [import_edit],
         applicability,
     ))
+}
+
+/// Returns `true` if `content` is known to be a `str` for [`OpenMode::WriteText`], or `bytes`
+/// for [`OpenMode::WriteBytes`]. Uses the same annotation-based binding inference as other rules
+/// (e.g. `bad_str_strip_call`), not simple literal-expression evaluation, so it also recognizes
+/// e.g. a function parameter annotated `x: str`.
+fn content_type_matches_mode(content: &Expr, mode: OpenMode, semantic: &SemanticModel) -> bool {
+    let is_str_or_bytes = |is_str: bool, is_bytes: bool| match mode {
+        OpenMode::WriteText => is_str,
+        OpenMode::WriteBytes => is_bytes,
+        OpenMode::ReadText | OpenMode::ReadBytes => false,
+    };
+
+    match content {
+        Expr::StringLiteral(_) | Expr::FString(_) => is_str_or_bytes(true, false),
+        Expr::BytesLiteral(_) => is_str_or_bytes(false, true),
+        Expr::Name(name) => {
+            let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+                return false;
+            };
+            is_str_or_bytes(
+                typing::is_string(binding, semantic),
+                typing::is_bytes(binding, semantic),
+            )
+        }
+        _ => {
+            let Some(binding_id) = semantic.lookup_attribute(content) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            is_str_or_bytes(
+                typing::is_string(binding, semantic),
+                typing::is_bytes(binding, semantic),
+            )
+        }
+    }
 }

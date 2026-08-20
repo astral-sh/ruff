@@ -167,3 +167,32 @@ with open("tmp_path/pyproject.toml", "w") as f:
 # `open` accepts a file descriptor, but `Path` does not
 with open(3, "w") as f:
     f.write("test")
+
+
+# Annotation-based inference: `x` is known to be `str` from its parameter annotation,
+# even though it's not a literal.
+def annotated_str_arg(x: str):
+    # FURB103 (safe fix: `x` is known to be `str`)
+    with open("file.txt", "w") as f:
+        f.write(x)
+
+
+def annotated_bytes_arg(x: bytes):
+    # FURB103 (safe fix: `x` is known to be `bytes`)
+    with open("file.txt", "wb") as f:
+        f.write(x)
+
+
+def annotated_int_arg(x: int):
+    # FURB103 (unsafe fix: `x` is not a `str`)
+    with open("file.txt", "w") as f:
+        f.write(x)
+
+
+# The fix is still offered as safe here: `f"{1 / 0}"` is unambiguously a `str`. If it
+# raises before producing a value, it does so identically whether written via `write()`
+# on an already-open (and thus already-truncated) file, or as an argument being
+# constructed before `Path.write_text` is ever called, so this doesn't introduce the
+# truncation-ordering hazard the safety check above exists to catch.
+with open("file.txt", "w") as f:
+    f.write(f"{1 / 0}")
