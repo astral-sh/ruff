@@ -7,3 +7,69 @@ x = y = 1
 reveal_type(x)  # revealed: Literal[1]
 reveal_type(y)  # revealed: Literal[1]
 ```
+
+## Assignment expressions in shared values
+
+A value assigned to multiple targets can contain an assignment expression whose value is a lambda.
+The shared assignment expression should bind its name once and give every target the same callable
+type.
+
+```py
+first = second = (named := lambda: 0)
+
+reveal_type(first)  # revealed: () -> Literal[0]
+reveal_type(second)  # revealed: () -> Literal[0]
+reveal_type(named)  # revealed: () -> Literal[0]
+```
+
+The same applies when the assignment expression and lambda are separate parts of the shared value.
+
+```py
+first = second = ((named := 0), lambda: 1)
+
+reveal_type(first)  # revealed: tuple[Literal[0], () -> Literal[1]]
+reveal_type(second)  # revealed: tuple[Literal[0], () -> Literal[1]]
+reveal_type(named)  # revealed: Literal[0]
+```
+
+## Assignment expressions with unpacking targets
+
+An unpacking target and a simple target share both the value and any assignment expressions inside
+it.
+
+```py
+(first, second) = pair = ((named := 0), lambda: 1)
+
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(second)  # revealed: () -> Literal[1]
+reveal_type(pair)  # revealed: tuple[Literal[0], () -> Literal[1]]
+reveal_type(named)  # revealed: Literal[0]
+```
+
+## Assignment expressions with subscript targets
+
+Subscript targets infer the shared value separately from name targets, but its nested binding still
+belongs to the same assignment.
+
+```py
+callbacks = [lambda: 0]
+first = callbacks[0] = (named := lambda: 0)
+
+reveal_type(first)  # revealed: () -> Literal[0]
+reveal_type(named)  # revealed: () -> Literal[0]
+```
+
+## Contextual inference in assignment expressions
+
+A declared type on the assignment-expression target still supplies context to its lambda.
+
+```py
+from collections.abc import Callable
+
+named: Callable[[int], int]
+first = second = (named := lambda value: value.bit_length())
+
+reveal_type(first)  # revealed: (value: int) -> int
+reveal_type(second)  # revealed: (value: int) -> int
+reveal_type(named)  # revealed: (value: int) -> int
+```

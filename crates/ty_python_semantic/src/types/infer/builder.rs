@@ -8,7 +8,7 @@ use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -676,6 +676,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
+        self.extend_expression_without_bindings(inference);
+
+        if let Some(extra) = &inference.extra
+            && !matches!(self.region, InferenceRegion::Scope(..))
+        {
+            self.bindings.extend(extra.bindings.iter().copied());
+        }
+    }
+
+    /// Merges expression results without claiming bindings owned by their enclosing statement.
+    fn extend_expression_without_bindings(&mut self, inference: &ExpressionInference<'db>) {
         self.expressions
             .extend(inference.expressions.iter().copied());
 
@@ -700,10 +711,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .entry(*collection_def)
                     .and_modify(|this| this.extend(constraints))
                     .or_insert(constraints.clone());
-            }
-
-            if !matches!(self.region, InferenceRegion::Scope(..)) {
-                self.bindings.extend(extra.bindings.iter().copied());
             }
         }
     }
@@ -2870,17 +2877,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = assignment;
 
+        if let [ast::Expr::Name(name)] = targets.as_slice() {
+            self.infer_definition(name);
+            return;
+        }
+
+        let shared_value = self.index.expression(value.as_ref());
+
+        if !matches!(self.region, InferenceRegion::Scope(..))
+            && any_over_expr(value, ast::Expr::is_named_expr)
+        {
+            let inference = infer_expression_types(self.db(), shared_value, TypeContext::default());
+            if let Some(extra) = &inference.extra {
+                self.bindings.extend(extra.bindings.iter().copied());
+            }
+        }
+
         for target in targets {
             if let Some(unpack) = self.index.try_unpack(target) {
-                // Infer the standalone expression here to include its diagnostics in this region.
-                self.infer_standalone_expression(value, TypeContext::default());
+                let inference =
+                    infer_expression_types(self.db(), shared_value, TypeContext::default());
+                self.extend_expression_without_bindings(inference);
 
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 self.context.extend(unpacked.diagnostics());
                 self.infer_unpacked_assignment_target(target, value, unpacked);
             } else {
                 self.infer_target(target, value, &|builder, tcx| {
-                    builder.infer_standalone_expression(value, tcx)
+                    let inference = infer_expression_types(builder.db(), shared_value, tcx);
+                    builder.extend_expression_without_bindings(inference);
+                    inference.expression_type(value.as_ref())
                 });
             }
         }
@@ -3376,7 +3402,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
-                    self.infer_standalone_expression_impl(value, standalone_expression, tcx)
+                    if standalone_expression
+                        .assigned_to(self.db())
+                        .is_some_and(|assignment| {
+                            !matches!(
+                                assignment.node(self.module()).targets.as_slice(),
+                                [ast::Expr::Name(_)]
+                            )
+                        })
+                    {
+                        let inference =
+                            infer_expression_types(self.db(), standalone_expression, tcx);
+                        self.extend_expression_without_bindings(inference);
+                        inference.expression_type(value)
+                    } else {
+                        self.infer_standalone_expression_impl(value, standalone_expression, tcx)
+                    }
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
