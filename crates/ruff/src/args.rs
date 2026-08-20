@@ -1015,7 +1015,7 @@ impl TypedValueParser for ConfigArgumentParser {
         let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
 
         let config_parse_error = match toml::Table::from_str(value) {
-            Ok(table) => match table.try_into::<Options>() {
+            Ok(table) => match Options::from_toml_table(table) {
                 Ok(option) => {
                     if option.extend.is_none() {
                         return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option)));
