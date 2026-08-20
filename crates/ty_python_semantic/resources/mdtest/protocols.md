@@ -5065,7 +5065,7 @@ element type to generic inference.
 from typing import Any
 
 def collect(cls: type[Any], enabled: bool) -> None:
-    reveal_type(list(cls if enabled else (1,)))  # revealed: list[int]
+    reveal_type(list(cls if enabled else (1,)))  # revealed: list[Any | int]
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
@@ -7639,10 +7639,9 @@ class A2(Protocol[T2]):
 class B1(A1[T3], Protocol[T3]): ...
 class B2(A2[T4], Protocol[T4]): ...
 
-# TODO should just be `B2[Any]`
-reveal_type(T3.__bound__)  # revealed: B2[Any] | Unknown
+reveal_type(T3.__bound__)  # revealed: B2[Any]
 
-# TODO error: [invalid-type-arguments]
+# error: [invalid-type-arguments]
 def f(x: B1[int]):
     pass
 

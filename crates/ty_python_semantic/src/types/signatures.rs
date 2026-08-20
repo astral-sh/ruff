@@ -1169,7 +1169,7 @@ impl<'db> Signature<'db> {
         };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
-        let receiver_constraint = explicit_receiver.map(|parameter| {
+        let receiver_constraint = explicit_receiver.and_then(|parameter| {
             let receiver = receiver_type.unwrap_or_else(|| {
                 Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                     db,
@@ -1193,6 +1193,15 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
+            // A receiver annotation that can materialize to `object` cannot restrict which
+            // instances can bind the method.
+            if annotation
+                .resolve_type_alias(db)
+                .top_materialization(db, env)
+                .is_object()
+            {
+                return None;
+            }
             // TODO: Also intersect nested receiver type variables, such as the `T` in
             // `self: list[T]`, with their valid specializations when constructing or solving the
             // receiver constraint set.
@@ -1204,9 +1213,9 @@ impl<'db> Signature<'db> {
             if receiver_typevar.is_some_and(|typevar| {
                 Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
             }) {
-                return std::borrow::Cow::Owned(OwnedConstraintSet::default());
+                return Some(std::borrow::Cow::Owned(OwnedConstraintSet::default()));
             }
-            receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
+            Some(receiver.when_constraint_set_assignable_to_owned(db, env, annotation))
         });
         let receiver_constraints = merge_receiver_constraints(
             db,
@@ -1459,7 +1468,7 @@ impl<'db> Signature<'db> {
                 &constraints,
                 self.inferable_typevars(db),
             )
-            .is_always_satisfied(db, env)
+            .is_gradually_satisfied(db, env)
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
@@ -1849,7 +1858,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db, env);
+            .is_gradually_satisfied(db, env);
 
         if is_consistent {
             ParameterConsistency::Consistent
@@ -1885,7 +1894,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db, env);
+            .is_gradually_satisfied(db, env);
 
         if is_consistent {
             ReturnTypeConsistency::Consistent
@@ -5325,7 +5334,7 @@ impl ParameterNamePrefix {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Parameter<'db> {
-    /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
+    /// Declared or inferred type of the parameter. Without either, this is `Unknown`.
     annotated_type: Type<'db>,
 
     /// The source definition represented by this parameter, if any.
@@ -5443,6 +5452,12 @@ impl<'db> Parameter<'db> {
     pub(crate) fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
         self.annotated_type = annotated_type;
         self.inferred_annotation = false;
+        self
+    }
+
+    /// Set an inferred type without marking the parameter as explicitly annotated.
+    pub(crate) fn with_inferred_type(mut self, inferred_type: Type<'db>) -> Self {
+        self.annotated_type = inferred_type;
         self
     }
 

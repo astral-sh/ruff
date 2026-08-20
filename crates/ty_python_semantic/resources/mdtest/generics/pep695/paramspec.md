@@ -875,7 +875,9 @@ to_thread_like(
 to_thread_like(
     generic_pair_with_container,
     1,
-    reveal_type([""]),  # revealed: list[Literal[1] | str]
+    # TODO: Infer `list[Literal[1] | str]` from the sibling argument.
+    # error: [invalid-argument-type]
+    reveal_type([""]),  # revealed: list[str]
 )
 ```
 

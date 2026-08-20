@@ -641,6 +641,30 @@ def callback(value: A | Any) -> None: ...
 reveal_type(infer(callback))  # revealed: A | Any
 ```
 
+## Combining gradual and static inferred upper bounds
+
+A gradual upper bound and a static upper bound should both be preserved, regardless of the order of
+the callable arguments.
+
+```py
+from typing import Any, Callable, final
+
+def infer[T](
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+def accepts_any(value: Any) -> None: ...
+def accepts_a(value: A) -> None: ...
+
+reveal_type(infer(accepts_any, accepts_a))  # revealed: Any & A
+reveal_type(infer(accepts_a, accepts_any))  # revealed: A & Any
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
