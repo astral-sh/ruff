@@ -27,6 +27,58 @@ def accepts_any(value: Any): ...
 reveal_type(takes_callable(accepts_any))  # revealed: Any
 ```
 
+## Gradual parameter alternatives
+
+A gradual union or intersection must not hide a type variable that can be inferred from a
+non-gradual argument.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown
+
+def union_any[T](value: T | Any) -> T:
+    raise NotImplementedError
+
+def union_unknown[T](value: T | Unknown) -> T:
+    raise NotImplementedError
+
+def tuple_any[T](value: tuple[T] | Any) -> T:
+    raise NotImplementedError
+
+def tuple_unknown[T](value: tuple[T] | Unknown) -> T:
+    raise NotImplementedError
+
+def intersection_any[T](value: Intersection[T, Any]) -> T:
+    raise NotImplementedError
+
+def intersection_unknown[T](value: Intersection[T, Unknown]) -> T:
+    raise NotImplementedError
+
+def outer[S](value: S, values: tuple[S]):
+    reveal_type(union_any(value))  # revealed: S@outer
+    reveal_type(union_unknown(value))  # revealed: S@outer
+    reveal_type(tuple_any(values))  # revealed: S@outer
+    reveal_type(tuple_unknown(values))  # revealed: S@outer
+    reveal_type(intersection_any(value))  # revealed: S@outer
+    reveal_type(intersection_unknown(value))  # revealed: S@outer
+```
+
+The receiver of a generic method is also an argument, even when its annotation has a gradual
+alternative.
+
+```py
+class Receiver:
+    def any[T](self: T | Any) -> T:
+        raise NotImplementedError
+
+    def unknown[T](self: T | Unknown) -> T:
+        raise NotImplementedError
+
+reveal_type(Receiver().any())  # revealed: Receiver
+reveal_type(Receiver().unknown())  # revealed: Receiver
+```
+
 ## Bounded gradual constraints
 
 When a gradual type is assigned to an inferable type variable `T` in covariant position, the
