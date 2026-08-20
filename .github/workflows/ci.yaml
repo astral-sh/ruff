@@ -1321,7 +1321,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime
+        run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1343,6 +1343,8 @@ jobs:
     strategy:
       matrix:
         benchmark:
+          - name: script
+            target: ty_script
           - name: sympy
             target: ty_walltime
             filter: sympy
