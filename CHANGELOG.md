@@ -6,22 +6,22 @@ Released on 2026-08-20.
 
 ### Preview features
 
-- \[`flake8-use-pathlib`\] Add autofixes for `PTH116` ([#26460](https://github.com/astral-sh/ruff/pull/26460))
+- \[`flake8-use-pathlib`\] Add autofix for `PTH116` ([#26460](https://github.com/astral-sh/ruff/pull/26460))
 - \[`refurb`\] Restrict `delete-full-slice` to lists (`FURB131`) ([#27711](https://github.com/astral-sh/ruff/pull/27711))
 - \[`refurb`\] Skip `FURB101` and `FURB103` when the `open` argument is a file descriptor ([#27643](https://github.com/astral-sh/ruff/pull/27643))
 
 ### Bug fixes
 
-- Fix `InvalidInstruction` on windows CPUs that do not support `POPCNT` ([#27803](https://github.com/astral-sh/ruff/pull/27803))
+- Fix `InvalidInstruction` on Windows CPUs that do not support `POPCNT` ([#27803](https://github.com/astral-sh/ruff/pull/27803))
 - \[`pyflakes`\] Emit semantic syntax errors in string type definitions as `F722` ([#27835](https://github.com/astral-sh/ruff/pull/27835))
 - \[`pylint`\] Allow `os._exit` imports in `import-private-name` (`PLC2701`) ([#27738](https://github.com/astral-sh/ruff/pull/27738))
 
 ### Rule changes
 
-- Align t-string/bytes mix error with CPython 3.14 ([#27766](https://github.com/astral-sh/ruff/pull/27766))
-- \[`ruff`\] Add `ctypes.LittleEndianStructure` and others alike to existing exception (`RUF012`) ([#27753](https://github.com/astral-sh/ruff/pull/27753))
+- Align mixed t-string/bytes error message with CPython 3.14 ([#27766](https://github.com/astral-sh/ruff/pull/27766))
+- \[`ruff`\] Add `ctypes.LittleEndianStructure` and related types to existing exception (`RUF012`) ([#27753](https://github.com/astral-sh/ruff/pull/27753))
 - [syntax-errors] Detect duplicate keyword arguments ([#17804](https://github.com/astral-sh/ruff/pull/17804))
-- [syntax-errors] Name is parameter and nonlocal ([#27628](https://github.com/astral-sh/ruff/pull/27628))
+- [syntax-errors] Detect parameters declared `nonlocal` ([#27628](https://github.com/astral-sh/ruff/pull/27628))
 
 ### Server
 
@@ -36,14 +36,10 @@ Released on 2026-08-20.
 ### Other changes
 
 - Align Renovate config with preset ([#27762](https://github.com/astral-sh/ruff/pull/27762))
-- Export `UV_DEFAULT_INDEX` in `release.sh` ([#27934](https://github.com/astral-sh/ruff/pull/27934))
 - Fix s390x stacker assembly in release builds ([#27776](https://github.com/astral-sh/ruff/pull/27776))
 - Guarantee minimum stack size when parsing a module, standalone expression, and suites ([#25464](https://github.com/astral-sh/ruff/pull/25464))
 - Reduce configuration deserialization code size ([#27924](https://github.com/astral-sh/ruff/pull/27924))
-- Use an explicit PyPI index during release preparation ([#27901](https://github.com/astral-sh/ruff/pull/27901))
-- Use the versions bot's ruleset bypass when merging ([#27879](https://github.com/astral-sh/ruff/pull/27879))
-- [ty] Check packed AST index bounds ([#27849](https://github.com/astral-sh/ruff/pull/27849))
-- [ty] Optimize inherited recursive protocol comparisons ([#27922](https://github.com/astral-sh/ruff/pull/27922))
+- Check packed AST index bounds ([#27849](https://github.com/astral-sh/ruff/pull/27849))
 
 ### Contributors
 
