@@ -125,13 +125,14 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub(crate) fn has_unspecialized_type_var(
+    pub(crate) fn has_provisional_marker(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
         any_over_type(db, env, self, false, |ty| {
-            matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+            ty.as_dynamic()
+                .is_some_and(DynamicType::is_provisional_marker)
         })
     }
 }
@@ -713,6 +714,7 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
+                    | DynamicType::UnknownLambdaParameter
                     | DynamicType::InvalidConcatenateUnknown
                     | DynamicType::AmbiguousOverload => Parameters::unknown(),
                 },
@@ -1390,6 +1392,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::MaterializeOnce { .. }
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
