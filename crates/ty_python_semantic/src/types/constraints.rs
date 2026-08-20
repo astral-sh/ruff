@@ -3460,6 +3460,7 @@ impl<'db> CandidateSolutions<'db> {
             return ControlFlow::Continue(path_bounds);
         }
 
+        let node_support = storage.node_support(node).cloned();
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
@@ -3481,7 +3482,15 @@ impl<'db> CandidateSolutions<'db> {
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
         let mut path = interior.path_assignments(db, env, storage, path_source_order);
-        walker.visit_node(db, env, storage, &mut path, node, limits)?;
+        walker.visit_node(
+            db,
+            env,
+            storage,
+            limits,
+            &mut path,
+            node_support.as_ref(),
+            node,
+        )?;
         ControlFlow::Continue(walker.finish(db, env, storage))
     }
 
