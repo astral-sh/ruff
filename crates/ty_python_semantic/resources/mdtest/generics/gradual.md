@@ -7,8 +7,7 @@ python-version = "3.14"
 
 ## Gradual constraints
 
-Generic calls that involve gradual argument types preserve gradual constraints, rather than
-collapsing them to `true`.
+Generic calls preserve constraints involving gradual argument types.
 
 ```py
 from typing import Any, Callable
@@ -111,7 +110,7 @@ Conversely, when an inferable type variable `T` is assigned to a gradual type in
 position, the complete gradual type contributes an upper-bound constraint on `T`.
 
 ```py
-from typing import Any, Callable, final
+from typing import Callable
 
 def takes_callable[T](callable: Callable[[T], None]) -> T:
     raise NotImplementedError
@@ -184,6 +183,8 @@ def _(value: Any):
     reveal_type(takes_tuple(value))  # revealed: Any
 ```
 
+## Gradual constraints in optional unions
+
 When a union has only one arm that can contribute to inference, a gradual materialization through
 another arm must not erase the informative arm's constraints.
 
@@ -204,11 +205,13 @@ def _(any_value: Any, unknown_value: Unknown):
     reveal_type(takes_optional_tuple(unknown_value))  # revealed: Unknown
 ```
 
+## Contravariant complex gradual constraints
+
 Conversely, when assigning `tuple[T]` to `Any`, `Any` may materialize to any tuple type, and so we
 have a gradual upper bound on `T`.
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 def takes_tuple_callable[T](callable: Callable[[tuple[T]], None]) -> T:
     raise NotImplementedError
@@ -218,10 +221,13 @@ def accepts_any(value: Any): ...
 reveal_type(takes_tuple_callable(accepts_any))  # revealed: Any
 ```
 
-The same applies to any target type containing an inferable type variable.
+## Gradual constraints with declared bounds and defaults
+
+A gradual argument remains gradual when inferred through a bounded or defaulted type variable.
+Declared upper bounds are not yet preserved across generic calls or for defaulted type variables.
 
 ```py
-from typing import Any, Callable, Iterable, TypeVar, Protocol
+from typing import Any, TypeVar
 from ty_extensions._internal import Unknown
 
 DefaultFloat = TypeVar("DefaultFloat", bound=float, default=float)
@@ -235,14 +241,47 @@ def takes_bounded[T: int](value: T) -> T:
 def takes_bounded_tuple[T: tuple[int]](value: T) -> T:
     return value
 
+def takes_default(x: DefaultFloat | tuple[DefaultFloat]) -> DefaultFloat:
+    raise NotImplementedError
+
+def takes_optional_default(x: DefaultFloat | None) -> DefaultFloat:
+    raise NotImplementedError
+
+def _(x: Any):
+    reveal_type(takes_tuple(x))  # revealed: Any
+    # TODO: This should reveal `Any & int`.
+    reveal_type(takes_bounded(takes_tuple(x)))  # revealed: Any
+    # TODO: This should reveal `Any & tuple[int]`.
+    reveal_type(takes_bounded_tuple(takes_tuple(x)))  # revealed: Any
+    # TODO: This should reveal `Any & float`.
+    reveal_type(takes_default(x))  # revealed: Any
+    # TODO: This should reveal `Any & float`.
+    reveal_type(takes_optional_default(x))  # revealed: Any
+
+def _(x: Unknown):
+    reveal_type(takes_tuple(x))  # revealed: Unknown
+    # TODO: This should reveal `Unknown & int`.
+    reveal_type(takes_bounded(takes_tuple(x)))  # revealed: Unknown
+    # TODO: This should reveal `Unknown & tuple[int]`.
+    reveal_type(takes_bounded_tuple(takes_tuple(x)))  # revealed: Unknown
+    # TODO: This should reveal `Unknown & float`.
+    reveal_type(takes_default(x))  # revealed: Unknown
+    # TODO: This should reveal `Unknown & float`.
+    reveal_type(takes_optional_default(x))  # revealed: Unknown
+```
+
+## Gradual constraints in unions
+
+Gradual arguments contribute constraints to each inferable union arm while preserving independent
+concrete lower bounds.
+
+```py
+from collections.abc import Iterable
+from typing import Any
+from ty_extensions._internal import Unknown
+
 def takes_tuple_with_fallback[T](value: tuple[T], fallback: T) -> T:
     return fallback
-
-def takes_tuple_with_upper[T](
-    value: tuple[T],
-    upper: Callable[[T], None],
-) -> T:
-    raise NotImplementedError
 
 def takes_union_element[T, U](value: tuple[T | U]) -> tuple[T, U]:
     raise NotImplementedError
@@ -250,20 +289,51 @@ def takes_union_element[T, U](value: tuple[T | U]) -> tuple[T, U]:
 def takes_union_arms[T, U](value: T | tuple[U]) -> tuple[T, U]:
     raise NotImplementedError
 
-def takes_default(x: DefaultFloat | tuple[DefaultFloat]) -> DefaultFloat:
-    raise NotImplementedError
-
-def takes_optional_default(x: DefaultFloat | None) -> DefaultFloat:
-    raise NotImplementedError
-
 def takes_iterable_union[T](x: T | Iterable[T]) -> T:
     raise NotImplementedError
+
+def _(x: Any):
+    reveal_type(takes_tuple_with_fallback(x, 1))  # revealed: Any | Literal[1]
+    reveal_type(takes_union_element(x))  # revealed: tuple[Any, Any]
+    reveal_type(takes_union_arms(x))  # revealed: tuple[Any, Any]
+    reveal_type(takes_iterable_union(x))  # revealed: Any
+
+def _(x: Unknown):
+    reveal_type(takes_tuple_with_fallback(x, 1))  # revealed: Unknown | Literal[1]
+    reveal_type(takes_union_element(x))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(takes_union_arms(x))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(takes_iterable_union(x))  # revealed: Unknown
+```
+
+## Gradual constraints in recursive protocols
+
+Recursive protocol expansion may still fall back to `Unknown` when projecting a gradual argument.
+
+```py
+from typing import Any, Protocol
+from ty_extensions._internal import Unknown
 
 class RecursiveProtocol[T](Protocol):
     def item(self) -> T | "RecursiveProtocol[T]": ...
 
 def takes_recursive_protocol[T](value: RecursiveProtocol[T]) -> T:
     raise NotImplementedError
+
+def _(x: Any):
+    # TODO: This should reveal `Any`.
+    reveal_type(takes_recursive_protocol(x))  # revealed: Unknown
+
+def _(x: Unknown):
+    reveal_type(takes_recursive_protocol(x))  # revealed: Unknown
+```
+
+## Gradual constraints in structural and invariant types
+
+Structural members and invariant generic parameters preserve their gradual argument types.
+
+```py
+from typing import Any, Protocol
+from ty_extensions._internal import Unknown
 
 class Box[T](Protocol):
     @property
@@ -281,6 +351,23 @@ class Invariant[T]:
 def takes_invariant[T](value: Invariant[T]) -> T:
     raise NotImplementedError
 
+def _(x: Any):
+    reveal_type(unbox(AnyBox()))  # revealed: Any
+    reveal_type(takes_invariant(x))  # revealed: Any
+
+def _(x: Unknown):
+    reveal_type(takes_invariant(x))  # revealed: Unknown
+```
+
+## Gradual constraints in callable variance
+
+Callable parameter and return positions contribute opposite bounds when combined with a concrete
+argument.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
 def consume[T](callback: Callable[[T], int], value: T) -> T:
     return value
 
@@ -288,53 +375,38 @@ def produce[T](callback: Callable[[], T], fallback: T) -> T:
     return fallback
 
 def _(x: Any):
-    reveal_type(takes_tuple(x))  # revealed: Any
-    # TODO: This should reveal `Any & int`.
-    reveal_type(takes_bounded(takes_tuple(x)))  # revealed: Any
-    # TODO: This should reveal `Any & tuple[int]`.
-    reveal_type(takes_bounded_tuple(takes_tuple(x)))  # revealed: Any
-    reveal_type(takes_tuple_with_fallback(x, 1))  # revealed: Any | Literal[1]
-    reveal_type(takes_union_element(x))  # revealed: tuple[Any, Any]
-    reveal_type(takes_union_arms(x))  # revealed: tuple[Any, Any]
-    # TODO: This should reveal `Any & float`.
-    reveal_type(takes_default(x))  # revealed: Any
-    # TODO: This should reveal `Any & float`.
-    reveal_type(takes_optional_default(x))  # revealed: Any
-    reveal_type(takes_iterable_union(x))  # revealed: Any
-
-    # Recursive protocol expansion may still fall back to `Unknown`.
-    # TODO: This should reveal `Any`.
-    reveal_type(takes_recursive_protocol(x))  # revealed: Unknown
-
-    reveal_type(unbox(AnyBox()))  # revealed: Any
-    reveal_type(takes_invariant(x))  # revealed: Any
     reveal_type(consume(x, 1))  # revealed: Literal[1]
     reveal_type(produce(x, 1))  # revealed: Any | Literal[1]
 
 def _(x: Unknown):
-    reveal_type(takes_tuple(x))  # revealed: Unknown
-    # TODO: This should reveal `Unknown & int`.
-    reveal_type(takes_bounded(takes_tuple(x)))  # revealed: Unknown
-    # TODO: This should reveal `Unknown & tuple[int]`.
-    reveal_type(takes_bounded_tuple(takes_tuple(x)))  # revealed: Unknown
-    reveal_type(takes_tuple_with_fallback(x, 1))  # revealed: Unknown | Literal[1]
-    reveal_type(takes_union_element(x))  # revealed: tuple[Unknown, Unknown]
-    reveal_type(takes_union_arms(x))  # revealed: tuple[Unknown, Unknown]
-    # TODO: This should reveal `Unknown & float`.
-    reveal_type(takes_default(x))  # revealed: Unknown
-    # TODO: This should reveal `Unknown & float`.
-    reveal_type(takes_optional_default(x))  # revealed: Unknown
-    reveal_type(takes_iterable_union(x))  # revealed: Unknown
-    reveal_type(takes_recursive_protocol(x))  # revealed: Unknown
-    reveal_type(takes_invariant(x))  # revealed: Unknown
     reveal_type(consume(x, 1))  # revealed: Literal[1]
     reveal_type(produce(x, 1))  # revealed: Unknown | Literal[1]
+```
+
+## Gradual constraints with inferred upper bounds
+
+A concrete upper bound inferred from a callback restricts a gradual lower bound.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def takes_tuple_with_upper[T](value: tuple[T], upper: Callable[[T], None]) -> T:
+    raise NotImplementedError
 
 def _(x: Any, upper: Callable[[int], None]):
     reveal_type(takes_tuple_with_upper(x, upper))  # revealed: int & Any
 
 def _(x: Unknown, upper: Callable[[int], None]):
     reveal_type(takes_tuple_with_upper(x, upper))  # revealed: int & Unknown
+```
+
+## Gradual constraints with outer type variables
+
+A gradual callback must not erase a concrete argument's relationship to an enclosing type variable.
+
+```py
+from typing import Any, Callable
 
 def _[S](callback: Any, value: S):
     def inner[T](callback: Callable[[T], S], value: T) -> tuple[T, S]:
@@ -343,12 +415,13 @@ def _[S](callback: Any, value: S):
     reveal_type(inner(callback, value))  # revealed: tuple[Any | S@_, S@_]
 ```
 
-The same applies in the opposite direction when a type containing inferable type variables is
-assigned to a gradual type.
+## Contravariant gradual constraints with bounds and defaults
+
+Declared bounds and defaults are preserved when an inferable callable parameter is assigned to a
+gradual type.
 
 ```py
-from collections.abc import Iterable
-from typing import Any, Callable, Protocol, TypeVar
+from typing import Any, Callable, TypeVar
 from ty_extensions._internal import Unknown
 
 DefaultStr = TypeVar("DefaultStr", bound=str, default=str)
@@ -360,6 +433,39 @@ def takes_bounded_tuple_callable[T: tuple[int]](
     callable: Callable[[T], None],
 ) -> T:
     raise NotImplementedError
+
+def takes_default_callable(
+    callable: Callable[[DefaultStr | tuple[DefaultStr]], None],
+) -> DefaultStr:
+    raise NotImplementedError
+
+def takes_optional_default_callable(
+    callable: Callable[[DefaultStr | None], None],
+) -> DefaultStr:
+    raise NotImplementedError
+
+def accepts_any(value: Any): ...
+def accepts_unknown(value: Unknown): ...
+def _():
+    reveal_type(takes_bounded_callable(accepts_any))  # revealed: Any & int
+    reveal_type(takes_bounded_tuple_callable(accepts_any))  # revealed: Any & tuple[int]
+    reveal_type(takes_default_callable(accepts_any))  # revealed: Any & str
+    reveal_type(takes_optional_default_callable(accepts_any))  # revealed: Any & str
+
+    reveal_type(takes_bounded_callable(accepts_unknown))  # revealed: Unknown & int
+    reveal_type(takes_bounded_tuple_callable(accepts_unknown))  # revealed: Unknown & tuple[int]
+    reveal_type(takes_default_callable(accepts_unknown))  # revealed: Unknown & str
+    reveal_type(takes_optional_default_callable(accepts_unknown))  # revealed: Unknown & str
+```
+
+## Contravariant gradual constraints in unions
+
+A gradual callable parameter contributes upper bounds to each inferable union arm.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
 
 def takes_union_element_callable[T, U](
     callable: Callable[[tuple[T | U]], None],
@@ -376,15 +482,26 @@ def takes_iterable_union_callable[T](
 ) -> T:
     raise NotImplementedError
 
-def takes_default_callable(
-    callable: Callable[[DefaultStr | tuple[DefaultStr]], None],
-) -> DefaultStr:
-    raise NotImplementedError
+def accepts_any(value: Any): ...
+def accepts_unknown(value: Unknown): ...
+def _():
+    reveal_type(takes_union_element_callable(accepts_any))  # revealed: tuple[Any, Any]
+    reveal_type(takes_union_arms_callable(accepts_any))  # revealed: tuple[Any, Any]
+    reveal_type(takes_iterable_union_callable(accepts_any))  # revealed: Any
 
-def takes_optional_default_callable(
-    callable: Callable[[DefaultStr | None], None],
-) -> DefaultStr:
-    raise NotImplementedError
+    reveal_type(takes_union_element_callable(accepts_unknown))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(takes_union_arms_callable(accepts_unknown))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(takes_iterable_union_callable(accepts_unknown))  # revealed: Unknown
+```
+
+## Contravariant gradual constraints in recursive protocols
+
+A recursive protocol can still fall back to `Unknown` when it appears in a gradual callable
+parameter.
+
+```py
+from typing import Any, Callable, Protocol
+from ty_extensions._internal import Unknown
 
 class RecursiveProtocol[T](Protocol):
     def item(self) -> T | "RecursiveProtocol[T]": ...
@@ -393,6 +510,22 @@ def takes_recursive_protocol_callable[T](
     callable: Callable[[RecursiveProtocol[T]], None],
 ) -> T:
     raise NotImplementedError
+
+def accepts_any(value: Any): ...
+def accepts_unknown(value: Unknown): ...
+def _():
+    # TODO: This should reveal `Any`.
+    reveal_type(takes_recursive_protocol_callable(accepts_any))  # revealed: Unknown
+    reveal_type(takes_recursive_protocol_callable(accepts_unknown))  # revealed: Unknown
+```
+
+## Contravariant gradual constraints in structural and invariant types
+
+Structural and invariant callable parameters retain gradual upper bounds.
+
+```py
+from typing import Any, Callable, Protocol
+from ty_extensions._internal import Unknown
 
 class Box[T](Protocol):
     @property
@@ -407,6 +540,23 @@ class Invariant[T]:
 def takes_invariant_callable[T](callable: Callable[[Invariant[T]], None]) -> T:
     raise NotImplementedError
 
+def accepts_any(value: Any): ...
+def accepts_unknown(value: Unknown): ...
+def _():
+    reveal_type(takes_box_callable(accepts_any))  # revealed: Any
+    reveal_type(takes_invariant_callable(accepts_any))  # revealed: Any
+    reveal_type(takes_box_callable(accepts_unknown))  # revealed: Unknown
+    reveal_type(takes_invariant_callable(accepts_unknown))  # revealed: Unknown
+```
+
+## Nested callable gradual variance
+
+Nesting a callable reverses parameter variance without discarding gradual constraints.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
 def takes_consumer_callable[T](
     callable: Callable[[Callable[[T], int]], None],
 ) -> T:
@@ -420,33 +570,8 @@ def takes_producer_callable[T](
 def accepts_any(value: Any): ...
 def accepts_unknown(value: Unknown): ...
 def _():
-    reveal_type(takes_bounded_callable(accepts_any))  # revealed: Any & int
-    reveal_type(takes_bounded_tuple_callable(accepts_any))  # revealed: Any & tuple[int]
-    reveal_type(takes_union_element_callable(accepts_any))  # revealed: tuple[Any, Any]
-    reveal_type(takes_union_arms_callable(accepts_any))  # revealed: tuple[Any, Any]
-    reveal_type(takes_iterable_union_callable(accepts_any))  # revealed: Any
-    reveal_type(takes_default_callable(accepts_any))  # revealed: Any & str
-    reveal_type(takes_optional_default_callable(accepts_any))  # revealed: Any & str
-
-    # Recursive protocol expansion may still fall back to `Unknown`.
-    # TODO: This should reveal `Any`.
-    reveal_type(takes_recursive_protocol_callable(accepts_any))  # revealed: Unknown
-
-    reveal_type(takes_box_callable(accepts_any))  # revealed: Any
-    reveal_type(takes_invariant_callable(accepts_any))  # revealed: Any
     reveal_type(takes_consumer_callable(accepts_any))  # revealed: Any
     reveal_type(takes_producer_callable(accepts_any))  # revealed: Any
-
-    reveal_type(takes_bounded_callable(accepts_unknown))  # revealed: Unknown & int
-    reveal_type(takes_bounded_tuple_callable(accepts_unknown))  # revealed: Unknown & tuple[int]
-    reveal_type(takes_union_element_callable(accepts_unknown))  # revealed: tuple[Unknown, Unknown]
-    reveal_type(takes_union_arms_callable(accepts_unknown))  # revealed: tuple[Unknown, Unknown]
-    reveal_type(takes_iterable_union_callable(accepts_unknown))  # revealed: Unknown
-    reveal_type(takes_default_callable(accepts_unknown))  # revealed: Unknown & str
-    reveal_type(takes_optional_default_callable(accepts_unknown))  # revealed: Unknown & str
-    reveal_type(takes_recursive_protocol_callable(accepts_unknown))  # revealed: Unknown
-    reveal_type(takes_box_callable(accepts_unknown))  # revealed: Unknown
-    reveal_type(takes_invariant_callable(accepts_unknown))  # revealed: Unknown
     reveal_type(takes_consumer_callable(accepts_unknown))  # revealed: Unknown
     reveal_type(takes_producer_callable(accepts_unknown))  # revealed: Unknown
 ```
@@ -811,77 +936,51 @@ def _(lower: int):
     reveal_type(nested(accepts_unknown_callback, lower))  # revealed: Unknown | int
 ```
 
-## Bounded complex gradual constraints
+## Bounded gradual constraints in covariant types
 
-We respect the upper and lower bounds when choosing a materialization of the gradual type. For
-example, an assignment of `bool | (int & Any)` to `tuple[T]` will form the constraints
-`tuple[bool | (int & Any)] <: tuple[T]`, allowing the upper or lower bounds to be preserved based on
-variance.
+A gradual iterable preserves its lower and upper element bounds when assigned to `Iterable[T]`.
 
 ```py
 from collections.abc import Iterable
 from typing import Any, Callable
-from ty_extensions import Top
-from ty_extensions._internal import Unknown
 
 def takes_iterable[T](value: Iterable[T]) -> T:
     raise NotImplementedError
 
-def takes_iterable_callable[T](callable: Callable[[Iterable[T]], None]) -> T:
-    raise NotImplementedError
-
-def takes_callable[T](callable: Callable[[T], None]) -> T:
-    raise NotImplementedError
-
-def takes_consumer_callable[T](
-    callable: Callable[[Callable[[T], None]], None],
-) -> T:
-    raise NotImplementedError
-
-def takes_stable_source[T](value: tuple[T, object]) -> T:
-    raise NotImplementedError
-
-def takes_stable_target[T](callable: Callable[[tuple[T, str]], None]) -> T:
-    raise NotImplementedError
-
-def takes_list[T](value: list[T]) -> T:
-    raise NotImplementedError
-
-def accepts_lower_bounded_iterable(value: Iterable[str] | Any): ...
-def accepts_upper_bounded_iterable(
-    value: Any & Iterable[int],
-): ...
-def accepts_bounded_iterable(
-    value: Iterable[bool] | (Any & Iterable[int]),
-): ...
-def accepts_lower_bounded_callable(
-    value: Callable[[str], None] | Any,
-): ...
-def accepts_upper_bounded_callable(
-    value: Any & Callable[[int], None],
-): ...
-def accepts_bounded_callable(
-    value: Callable[[int], None] | (Any & Callable[[bool], None]),
-): ...
-def accepts_stable_target(
-    value: tuple[int, str] | (Any & tuple[int, object]),
-): ...
 def _(
     lower_bounded: Iterable[str] | Any,
     upper_bounded: Any & Iterable[int],
     bounded: Iterable[bool] | (Any & Iterable[int]),
-    stable: tuple[int, str] | (Any & tuple[int, object]),
 ):
     reveal_type(takes_iterable(lower_bounded))  # revealed: str | Any
     reveal_type(takes_iterable(upper_bounded))  # revealed: Any & int
     reveal_type(takes_iterable(bounded))  # revealed: bool | (Any & int)
+```
 
+The same bounds are preserved when the iterable appears in a callable parameter:
+
+```py
+def takes_iterable_callable[T](callable: Callable[[Iterable[T]], None]) -> T:
+    raise NotImplementedError
+
+def accepts_lower_bounded_iterable(value: Iterable[str] | Any): ...
+def accepts_upper_bounded_iterable(value: Any & Iterable[int]): ...
+def accepts_bounded_iterable(value: Iterable[bool] | (Any & Iterable[int])): ...
+def _():
     reveal_type(takes_iterable_callable(accepts_lower_bounded_iterable))  # revealed: str | Any
     reveal_type(takes_iterable_callable(accepts_upper_bounded_iterable))  # revealed: Any & int
     reveal_type(takes_iterable_callable(accepts_bounded_iterable))  # revealed: bool | (Any & int)
+```
 
-    reveal_type(takes_stable_source(stable))  # revealed: int
-    reveal_type(takes_stable_target(accepts_stable_target))  # revealed: int
+## Bounded gradual constraints in contravariant types
+
+Callable parameters reverse the lower and upper bounds contributed by a gradual type.
+
+```py
+from typing import Any, Callable
+
+def takes_callable[T](callable: Callable[[T], None]) -> T:
+    raise NotImplementedError
 
 def _(
     lower_bounded: Callable[[str], None] | Any,
@@ -891,14 +990,55 @@ def _(
     reveal_type(takes_callable(lower_bounded))  # revealed: Any & str
     reveal_type(takes_callable(upper_bounded))  # revealed: int | Any
     reveal_type(takes_callable(bounded))  # revealed: bool | (Any & int)
+```
 
+Nesting the callable preserves the same variance reversal:
+
+```py
+def takes_consumer_callable[T](callable: Callable[[Callable[[T], None]], None]) -> T:
+    raise NotImplementedError
+
+def accepts_lower_bounded_callable(value: Callable[[str], None] | Any): ...
+def accepts_upper_bounded_callable(value: Any & Callable[[int], None]): ...
+def accepts_bounded_callable(value: Callable[[int], None] | (Any & Callable[[bool], None])): ...
+def _():
     reveal_type(takes_consumer_callable(accepts_lower_bounded_callable))  # revealed: Any & str
     reveal_type(takes_consumer_callable(accepts_upper_bounded_callable))  # revealed: int | Any
     reveal_type(takes_consumer_callable(accepts_bounded_callable))  # revealed: bool | (Any & int)
+```
 
-def _(
-    value: Any & Top[list[Unknown]],
-):
+## Fixed gradual projection bounds
+
+A type parameter shared by both endpoints of a gradual range retains its concrete value.
+
+```py
+from typing import Any, Callable
+
+def takes_stable_source[T](value: tuple[T, object]) -> T:
+    raise NotImplementedError
+
+def takes_stable_target[T](callable: Callable[[tuple[T, str]], None]) -> T:
+    raise NotImplementedError
+
+def accepts_stable_target(value: tuple[int, str] | (Any & tuple[int, object])): ...
+def _(stable: tuple[int, str] | (Any & tuple[int, object])):
+    reveal_type(takes_stable_source(stable))  # revealed: int
+    reveal_type(takes_stable_target(accepts_stable_target))  # revealed: int
+```
+
+## Gradual projection with nested unknown types
+
+Projecting an outer `Any` preserves its identity when the projected type contains `Unknown`.
+
+```py
+from typing import Any
+from ty_extensions import Top
+from ty_extensions._internal import Unknown
+
+def takes_list[T](value: list[T]) -> T:
+    raise NotImplementedError
+
+def _(value: Any & Top[list[Unknown]]):
     reveal_type(takes_list(value))  # revealed: Any
 ```
 
@@ -935,12 +1075,12 @@ def _(
     reveal_type(takes_consumer(consumer_upper))  # revealed: str & Any
 ```
 
-## Union and intersection gradual constraints
+## Gradual constraints in tuple unions
 
-Gradual constraints are distributed across unions and intersections.
+A gradual tuple preserves each element bound when projected through a union or optional union.
 
 ```py
-from typing import Any, Callable
+from typing import Any
 from ty_extensions._internal import Unknown
 
 def takes_pair[T, U](value: tuple[T, U]) -> tuple[T, U]:
@@ -948,6 +1088,27 @@ def takes_pair[T, U](value: tuple[T, U]) -> tuple[T, U]:
 
 def takes_optional_pair[T, U](value: tuple[T, U] | None) -> tuple[T, U]:
     raise NotImplementedError
+
+def _(
+    pair: tuple[str, int] | Any,
+    bounded_pair: tuple[str, bool] | (Any & tuple[str, int]),
+    optional_bounded_pair: tuple[str, bool] | (Any & tuple[str, int]) | None,
+    unknown_bounded_pair: tuple[str, bool] | (Unknown & tuple[str, int]) | None,
+):
+    reveal_type(takes_pair(pair))  # revealed: tuple[str | Any, int | Any]
+    reveal_type(takes_pair(bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
+    reveal_type(takes_optional_pair(bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
+    reveal_type(takes_optional_pair(optional_bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
+    reveal_type(takes_optional_pair(unknown_bounded_pair))  # revealed: tuple[str, bool | (Unknown & int)]
+```
+
+## Gradual constraints in union arms
+
+Gradual constraints are distributed across union arms without losing independent lower bounds.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
 
 def takes_union[T](value: T | int) -> T:
     raise NotImplementedError
@@ -966,34 +1127,15 @@ def takes_union_arms_callable[T, U](
 ) -> tuple[T, U]:
     raise NotImplementedError
 
-def takes_intersection_arms[T, U](value: T & tuple[U]) -> tuple[T, U]:
-    raise NotImplementedError
-
-def takes_intersection_arms_callable[T, U](
-    callable: Callable[[T & tuple[U]], None],
-) -> tuple[T, U]:
-    raise NotImplementedError
-
-def accepts_lower_bounded(value: int | Any):
-    pass
-
+def accepts_lower_bounded(value: int | Any): ...
 def _(
-    pair: tuple[str, int] | Any,
     fixed_point: str | Any,
     nested: tuple[str | Any] | Any,
     recursive: Any & list[int],
     lower_bounded: int | Any,
     unknown_lower_bounded: int | Unknown,
     upper_bounded: int & Any,
-    bounded_pair: tuple[str, bool] | (Any & tuple[str, int]),
-    optional_bounded_pair: tuple[str, bool] | (Any & tuple[str, int]) | None,
-    unknown_bounded_pair: tuple[str, bool] | (Unknown & tuple[str, int]) | None,
 ):
-    reveal_type(takes_pair(pair))  # revealed: tuple[str | Any, int | Any]
-    reveal_type(takes_pair(bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
-    reveal_type(takes_optional_pair(bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
-    reveal_type(takes_optional_pair(optional_bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
-    reveal_type(takes_optional_pair(unknown_bounded_pair))  # revealed: tuple[str, bool | (Unknown & int)]
     reveal_type(takes_union(fixed_point))  # revealed: str | Any
     reveal_type(takes_union(lower_bounded))  # revealed: Any
     reveal_type(takes_union(unknown_lower_bounded))  # revealed: Unknown
@@ -1002,12 +1144,34 @@ def _(
     reveal_type(takes_union_arms(lower_bounded))  # revealed: tuple[int | Any, Any]
     reveal_type(takes_union_arms(upper_bounded))  # revealed: tuple[int & Any, Unknown]
     reveal_type(takes_union_arms_callable(accepts_lower_bounded))  # revealed: tuple[int | Any, Any]
+```
+
+## Gradual constraints in intersection arms
+
+An intersection distributes gradual constraints to each inferable arm.
+
+```py
+from typing import Any, Callable
+
+def takes_intersection_arms[T, U](value: T & tuple[U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def takes_intersection_arms_callable[T, U](
+    callable: Callable[[T & tuple[U]], None],
+) -> tuple[T, U]:
+    raise NotImplementedError
+
+def accepts_lower_bounded(value: int | Any): ...
+def _(upper_bounded: int & Any):
     reveal_type(takes_intersection_arms(upper_bounded))  # revealed: tuple[int & Any, Unknown]
     reveal_type(takes_intersection_arms_callable(accepts_lower_bounded))  # revealed: tuple[int | Any, Any]
 ```
 
+The same distribution preserves constraints from independent structural members:
+
 ```py
-from typing import Collection, Iterable, Sequence, Protocol
+from typing import Protocol
+from ty_extensions._internal import Unknown
 
 class Left[T](Protocol):
     @property
@@ -1022,8 +1186,7 @@ def takes_intersection[T, U](
 ) -> tuple[T, U]:
     raise NotImplementedError
 
-def accepts_intersection(value: Any & Left[int] & Right[str]) -> None:
-    pass
+def accepts_intersection(value: Any & Left[int] & Right[str]) -> None: ...
 
 reveal_type(takes_intersection(accepts_intersection))  # revealed: tuple[int, str]
 
@@ -1038,6 +1201,23 @@ def accepts_reversed_intersection(value: Right[str] & Left[int] & Any) -> None: 
 reveal_type(takes_intersection(accepts_unknown_intersection))  # revealed: tuple[int, str]
 reveal_type(takes_intersection(accepts_reversed_intersection))  # revealed: tuple[int, str]
 reveal_type(takes_reversed_intersection(accepts_intersection))  # revealed: tuple[int, str]
+```
+
+## Ambiguous structural gradual constraints
+
+Multiple structural materializations contribute separate gradual solutions.
+
+```py
+from collections.abc import Iterable, Sequence
+from typing import Any, Callable, Protocol
+
+class Left[T](Protocol):
+    @property
+    def left(self) -> T: ...
+
+class Right[T](Protocol):
+    @property
+    def right(self) -> T: ...
 
 def takes_ambiguous_source[T](value: Left[T] | Right[T]) -> T:
     raise NotImplementedError
@@ -1050,10 +1230,18 @@ def takes_ambiguous_invariant[T](callback: Callable[[list[T]], None]) -> T:
 
 def accepts_ambiguous_invariant(
     value: Any & (Iterable[int] | Sequence[str]),
-):
-    pass
+): ...
 
 reveal_type(takes_ambiguous_invariant(accepts_ambiguous_invariant))  # revealed: (int & Any) | (str & Any)
+```
+
+## Ambiguous gradual endpoint solutions
+
+Ambiguous gradual endpoints currently lose the upper bound on their inferred type variables.
+
+```py
+from collections.abc import Collection, Iterable, Sequence
+from typing import Any
 
 def takes_ambiguous_union[T, U](
     value: tuple[Iterable[T] | Collection[U]],
@@ -1097,8 +1285,6 @@ def _(
 Partial constraints from unsatisfiable upper and lower bounds should be preserved.
 
 ```py
-from typing import Any, Callable
-
 def takes_gradual_source[T](value: tuple[T, str]) -> T:
     raise NotImplementedError
 
