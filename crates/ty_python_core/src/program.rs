@@ -3,7 +3,7 @@ use crate::{Db, platform::PythonPlatform};
 use std::fmt;
 
 use ruff_db::files::File;
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{ResolverEnvironment, SearchPaths};
@@ -21,6 +21,10 @@ pub struct Program<'db> {
 
     #[returns(copy)]
     pub resolver_environment: ResolverEnvironment<'db>,
+
+    /// The path to the Python executable for the resolved environment, if known.
+    #[returns(ref)]
+    pub python_executable: Option<SystemPathBuf>,
 }
 
 impl get_size2::GetSize for Program<'_> {}
@@ -32,12 +36,13 @@ impl<'db> Program<'db> {
             python_version,
             python_platform,
             search_paths,
+            python_executable,
             python_environment: _,
         } = settings;
 
         let resolver_environment =
             ResolverEnvironment::new(db, python_version.version, search_paths);
-        Program::new(db, python_platform, resolver_environment)
+        Program::new(db, python_platform, resolver_environment, python_executable)
     }
 
     pub fn python_version(self, db: &'db dyn Db) -> PythonVersion {
@@ -61,6 +66,7 @@ impl<'db> Program<'db> {
 pub struct ProgramSettings {
     pub python_version: PythonVersionWithSource,
     pub python_platform: PythonPlatform,
+    pub python_executable: Option<SystemPathBuf>,
     pub search_paths: SearchPaths,
     /// The resolved Python environment. Queries must use this instead of resolving the environment
     /// again, so that changes invalidate their cached results.
@@ -73,6 +79,7 @@ impl ProgramSettings {
             python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPaths::empty(vendored),
+            python_executable: None,
             python_environment: Ok(None),
         }
     }
