@@ -47,7 +47,9 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
 
         let items = code_lens(db, file);
         let cwd = root.to_string();
-        let python_executable = Program::get(db).python_executable(db);
+        let Some(python_executable) = Program::get(db).python_executable(db) else {
+            return Ok(None);
+        };
 
         let lenses: Vec<CodeLens> = items
             .into_iter()
@@ -57,7 +59,7 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
                 let args = match &item.command {
                     CodeLensCommand::RunTest { test } => {
                         let run_test_args =
-                            RunTestArgs::new(&cwd, &file_path, test, python_executable.as_deref());
+                            RunTestArgs::new(&cwd, file_path.clone(), test, python_executable);
                         serde_json::to_value(&run_test_args).ok()?
                     }
                 };
