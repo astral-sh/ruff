@@ -33,7 +33,7 @@ use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
-pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments};
+pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges};
 
 mod db;
 mod files;
@@ -143,7 +143,7 @@ pub trait ProgressReporter: Send + Sync {
     /// Creates an owned progress guard for synchronizing `file`'s standalone-script environment.
     ///
     /// Returns `None` when synchronization progress should not be displayed.
-    fn for_script(&self, _db: &dyn Db, _file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+    fn for_script(&self, _db: &dyn Db, _file: File) -> Option<Box<dyn UvSyncProgress>> {
         None
     }
 
@@ -156,13 +156,17 @@ pub trait ProgressReporter: Send + Sync {
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>);
 }
 
-/// An owned progress guard for synchronizing a standalone script's environment.
+/// An owned progress guard for a project or standalone-script uv metadata request.
 ///
 /// Creating the guard starts progress reporting and dropping it finishes progress reporting. A
 /// background synchronization may move the guard between threads and outlive the operation that
 /// scheduled it. Implementations must not retain a database because doing so could keep a cancelled
 /// database snapshot alive until synchronization finishes.
-pub trait ScriptSyncProgress: Send {}
+pub trait UvSyncProgress: Send {}
+
+/// Creates progress reporting when a project metadata refresh is scheduled.
+pub type ProjectSyncProgressFactory<'a> =
+    dyn Fn(&dyn Db, Project) -> Option<Box<dyn UvSyncProgress>> + 'a;
 
 /// Reporter that collects all diagnostics into a `Vec`.
 #[derive(Default)]

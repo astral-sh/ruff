@@ -1,7 +1,7 @@
 use crate::document::DocumentKey;
 use crate::server::Result;
 use crate::server::api::diagnostics::{
-    publish_diagnostics_if_needed, publish_settings_diagnostics,
+    publish_all_document_diagnostics, publish_settings_diagnostics,
 };
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
@@ -9,7 +9,6 @@ use crate::session::client::Client;
 use crate::system::AnySystemPath;
 use lsp_types::FileChangeType;
 use lsp_types::{self as types, DidChangeWatchedFilesNotification};
-use ty_project::Db as _;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind, ExistingPathKind};
 
 pub(crate) struct DidChangeWatchedFiles;
@@ -71,8 +70,9 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         }
 
         let roots: Vec<_> = session
-            .project_dbs()
-            .map(|db| db.project().root(db).to_owned())
+            .workspaces()
+            .into_iter()
+            .map(|(root, _)| root.clone())
             .collect();
 
         for root in roots {
@@ -89,9 +89,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         if client_capabilities.supports_workspace_diagnostic_refresh() {
             client.send_request::<types::DiagnosticRefreshRequest>(session, (), |_, ()| {});
         } else {
-            for document in session.file_document_handles() {
-                publish_diagnostics_if_needed(&document, session, client);
-            }
+            publish_all_document_diagnostics(session, client);
         }
 
         if client_capabilities.supports_inlay_hint_refresh() {

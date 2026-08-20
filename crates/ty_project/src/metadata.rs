@@ -498,10 +498,6 @@ impl ProjectMetadata {
         }
     }
 
-    pub fn has_uv_workspace(&self) -> bool {
-        self.environment.metadata.is_some()
-    }
-
     pub(crate) fn environment(&self) -> &ProjectEnvironment {
         &self.environment
     }

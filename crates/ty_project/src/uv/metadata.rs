@@ -11,6 +11,7 @@ use crate::metadata::python_version::SupportedPythonVersion;
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct UvMetadata {
     workspace_root: SystemPathBuf,
+    members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
     python_version: Option<RangedValue<SupportedPythonVersion>>,
 }
@@ -18,6 +19,12 @@ pub(crate) struct UvMetadata {
 impl UvMetadata {
     pub(crate) fn workspace_root(&self) -> &SystemPath {
         &self.workspace_root
+    }
+
+    /// Workspace members returned by uv. Empty for standalone scripts.
+    #[cfg(test)]
+    pub(crate) fn members(&self) -> &[WorkspaceMember] {
+        &self.members
     }
 
     pub(crate) fn environment(&self) -> Option<&SystemPath> {
@@ -51,10 +58,18 @@ impl UvMetadata {
 
         Ok(Self {
             workspace_root,
+            members: metadata.members,
             environment,
             python_version,
         })
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+pub(crate) struct WorkspaceMember {
+    pub(crate) name: Box<str>,
+    /// Directory containing the member's `pyproject.toml`.
+    pub(crate) path: SystemPathBuf,
 }
 
 #[derive(Debug, Error)]
@@ -119,6 +134,8 @@ fn resolve_python_version(
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
     workspace_root: PathBuf,
+    #[serde(default)]
+    members: Box<[WorkspaceMember]>,
     environment: Option<WorkspaceEnvironment>,
 }
 
@@ -163,6 +180,7 @@ mod tests {
 
         assert!(workspace.environment().is_none());
         assert!(workspace.python_version().is_none());
+        assert!(workspace.members().is_empty());
 
         Ok(())
     }

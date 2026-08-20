@@ -27,7 +27,7 @@ use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{
     ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability,
-    SemanticDb as _, UseUv,
+    SemanticDb as _, UseUv, UvSyncChanges,
 };
 
 use index::DocumentError;
@@ -40,7 +40,8 @@ use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options}
 use crate::db::Db as _;
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
 use crate::server::{
-    Action, LazyWorkDoneProgress, publish_diagnostics_if_needed, publish_settings_diagnostics,
+    Action, LazyWorkDoneProgress, publish_all_document_diagnostics, publish_diagnostics_if_needed,
+    publish_settings_diagnostics,
 };
 use crate::session::client::Client;
 use crate::session::index::Document;
@@ -255,10 +256,8 @@ impl Session {
             });
     }
 
-    /// Returns each project's background script synchronization wakeups.
-    pub(crate) fn script_sync_wakeups(
-        &self,
-    ) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
+    /// Returns each project's background uv synchronization wakeups.
+    pub(crate) fn uv_sync_wakeups(&self) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
         self.projects
             .iter()
             .map(|(root, state)| (root.clone(), state.db.uv_environments().sync_wakeups()))
@@ -288,29 +287,32 @@ impl Session {
         }
     }
 
-    /// Gives one project's script environments an opportunity to make progress.
-    pub(crate) fn poll_script_sync(&mut self, client: &Client, project_root: &SystemPath) {
+    /// Gives one project's uv environments an opportunity to make progress.
+    pub(crate) fn poll_uv_sync(&mut self, client: &Client, project_root: &SystemPath) {
         let Some(project) = self.projects.get_mut(project_root) else {
             tracing::debug!(
-                "Ignored script synchronization wakeup for removed project `{project_root}`"
+                "Ignored uv synchronization wakeup for removed project `{project_root}`"
             );
             return;
         };
         let db = &mut project.db;
         let environments = db.uv_environments().clone();
-        let changed_files = environments.poll_sync(db);
-
-        self.uv_environments_changed(client, project_root, changed_files);
+        let changes = environments.poll_sync(db);
+        self.uv_environments_changed(client, project_root, changes);
     }
 
     fn uv_environments_changed(
         &mut self,
         client: &Client,
         project_root: &SystemPath,
-        changed_files: Vec<File>,
+        changes: UvSyncChanges,
     ) {
-        if changed_files.is_empty() {
+        if changes.is_empty() {
             return;
+        }
+
+        if changes.project.is_some() {
+            publish_settings_diagnostics(self, client, project_root.to_path_buf());
         }
 
         self.bump_revision();
@@ -320,8 +322,10 @@ impl Session {
         let capabilities = self.client_capabilities();
         if capabilities.supports_workspace_diagnostic_refresh() {
             client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
+        } else if changes.project.is_some() {
+            publish_all_document_diagnostics(self, client);
         } else if let Some(project) = self.projects.get(project_root) {
-            for file in changed_files {
+            for file in changes.scripts {
                 if let Some(document) = project.db.document(file) {
                     let document = DocumentHandle::from_document(document);
                     publish_diagnostics_if_needed(&document, self, client);

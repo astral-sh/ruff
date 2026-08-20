@@ -2,7 +2,7 @@ use lsp_types::{DidSaveTextDocumentNotification, DidSaveTextDocumentParams};
 use ty_project::ScriptEnvironmentAvailability;
 
 use crate::server::Result;
-use crate::server::api::diagnostics::publish_diagnostics_if_needed;
+use crate::server::api::diagnostics::publish_all_document_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -24,9 +24,7 @@ impl SyncNotificationHandler for DidSaveTextDocumentHandler {
             document.synchronize_script(session, client, ScriptEnvironmentAvailability::Available);
         }
 
-        for document in session.file_document_handles() {
-            publish_diagnostics_if_needed(&document, session, client);
-        }
+        publish_all_document_diagnostics(session, client);
 
         Ok(())
     }

@@ -208,6 +208,13 @@ impl LspDiagnostics {
     }
 }
 
+/// Publishes diagnostics for all open files that need push diagnostics.
+pub(crate) fn publish_all_document_diagnostics(session: &Session, client: &Client) {
+    for document in session.file_document_handles() {
+        publish_diagnostics_if_needed(&document, session, client);
+    }
+}
+
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification] .
 ///

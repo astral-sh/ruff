@@ -190,7 +190,7 @@ enum ProgressCreation {
     TryQueue,
 }
 
-impl ty_project::ScriptSyncProgress for LazyWorkDoneProgress {}
+impl ty_project::UvSyncProgress for LazyWorkDoneProgress {}
 
 struct Inner {
     token: std::sync::OnceLock<ProgressToken>,
