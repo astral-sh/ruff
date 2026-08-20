@@ -391,12 +391,11 @@ jobs:
       - name: Dogfood ty on ty_benchmark
         run: uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark --color=always
       - name: Dogfood ty on scripts
-        run: |
-          for script in scripts/*.py; do
-            echo "Checking $script"
-            uv sync --quiet --locked --script "$script"
-            cargo run --quiet -p ty check "$script" --python "$(uv python find --script "$script")" --color=always
-          done
+        env:
+          # Enable experimental support for installing PEP 723 script dependencies.
+          TY_UV: scripts
+          UV_LOCKED: "true"
+        run: cargo run --quiet -p ty check scripts/*.py --color=always
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
