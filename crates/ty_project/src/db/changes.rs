@@ -1,4 +1,5 @@
 use crate::db::{Db, ProjectDatabase};
+use crate::uv::ProjectEnvironment;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
@@ -247,23 +248,26 @@ impl ProjectDatabase {
                 .find(|path| self.system().is_directory(path))
                 .unwrap_or(&project_root);
             let metadata = project.metadata(self);
-            let uv_workspace = if metadata.use_uv().workspace_discovery_enabled()
+            let environment = if metadata.use_uv().workspace_discovery_enabled()
                 && metadata.config_file_override().is_none()
             {
                 match self.uv_environments().workspace_metadata(self, path) {
-                    Ok(metadata) => Some(metadata),
-                    Err(error) => {
-                        // A failed refresh must not discard the last working uv metadata.
-                        tracing::warn!("{error}");
-                        metadata.uv_workspace().cloned()
-                    }
+                    Ok(metadata) => ProjectEnvironment {
+                        metadata: Some(metadata),
+                        error: None,
+                    },
+                    // Keep the last working uv metadata so a failed refresh does not change
+                    // the environment used for checking. Report the new error instead.
+                    Err(error) => ProjectEnvironment {
+                        error: Some(error.to_string().into_boxed_str()),
+                        ..metadata.environment().clone()
+                    },
                 }
             } else {
-                // No uv refresh is needed, so preserve the applied environment while
-                // rediscovering the project configuration.
-                metadata.uv_workspace().cloned()
+                // We're not refreshing uv metadata, so use the existing environment.
+                metadata.environment().clone()
             };
-            match project.rediscover(self, path, uv_workspace) {
+            match project.rediscover(self, path, environment) {
                 Ok(ProjectReloadResult::Unchanged) => {}
                 Ok(ProjectReloadResult::Changed { files_changed }) => {
                     result.project_changed = true;

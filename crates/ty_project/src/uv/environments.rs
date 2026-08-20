@@ -494,6 +494,14 @@ impl UvEnvironments {
 
 impl std::panic::RefUnwindSafe for UvEnvironments {}
 
+/// Applied workspace metadata and the error from its latest request.
+/// Both fields are absent when no workspace metadata has been requested.
+#[derive(Debug, Default, Clone, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct ProjectEnvironment {
+    pub(crate) metadata: Option<UvMetadata>,
+    pub(crate) error: Option<Box<str>>,
+}
+
 /// Whether a script environment is suitable for operations that depend on its dependencies.
 ///
 /// When opening a script, the initial environment lacks its declared dependencies and can produce
