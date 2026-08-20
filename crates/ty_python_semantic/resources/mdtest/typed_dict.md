@@ -4748,6 +4748,19 @@ class TD12(TypedDict("TD12", {}, extra_items=InitVar[int])): ...  # error: [inva
 class TD13(TypedDict("TD13", {}, extra_items=Final[int])): ...  # error: [invalid-type-form]
 ```
 
+## Function syntax inside string annotations
+
+A functional `TypedDict` can appear in `Annotated` metadata. Inferring `extra_items` in a stub must
+retain the enclosing string's identity rather than looking up its parsed nodes in the module's
+semantic index.
+
+```pyi
+from typing_extensions import Annotated, TypedDict
+
+value: "Annotated[int, TypedDict('T', {}, extra_items=int)]"
+reveal_type(value)  # revealed: int
+```
+
 ## Function syntax with forward references
 
 Functional TypedDict supports forward references (string annotations):

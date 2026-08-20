@@ -708,8 +708,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
         // In stub files, default values may reference names that are defined later in the file.
-        let in_stub = self.in_stub();
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
+        let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
         // Borrow annotation types from their own inference result instead of copying that result
         // into this query. Scope inference merges both regions when checking the whole function.

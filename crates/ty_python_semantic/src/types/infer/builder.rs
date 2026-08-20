@@ -923,6 +923,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred_state.in_string_annotation()
     }
 
+    /// Temporarily changes lookup behavior without discarding the current string annotation.
+    ///
+    /// Parsed string nodes do not belong to the module's semantic index, so their enclosing
+    /// annotation must remain available even when nested expressions request another lookup mode.
+    fn replace_deferred_state(
+        &mut self,
+        state: DeferredExpressionState,
+    ) -> DeferredExpressionState {
+        let previous = self.deferred_state;
+        if !previous.in_string_annotation() {
+            self.deferred_state = state;
+        }
+        previous
+    }
+
     /// Returns `true` if `expr` is a call to a known diagnostic function
     /// (e.g., `reveal_type` or `assert_type`) whose return value should not
     /// trigger the `unused-awaitable` lint.
@@ -4615,7 +4630,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if is_pep_613_type_alias {
                 self.context.inference_flags |= InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS;
                 if self.in_stub() {
-                    self.deferred_state = DeferredExpressionState::Deferred;
+                    self.replace_deferred_state(DeferredExpressionState::Deferred);
                 }
             }
 
@@ -6280,7 +6295,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
         state: DeferredExpressionState,
     ) -> Type<'db> {
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let previous_deferred_state = self.replace_deferred_state(state);
         let ty = self.infer_expression(expression, tcx);
         self.deferred_state = previous_deferred_state;
         ty
@@ -8474,8 +8489,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = lambda_expression;
 
         // In stub files, default values may reference names that are defined later in the file.
-        let in_stub = self.in_stub();
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
+        let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
         // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
         // in the union/intersection.
