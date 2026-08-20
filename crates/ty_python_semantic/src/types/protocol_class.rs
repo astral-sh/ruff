@@ -1773,7 +1773,7 @@ pub(super) struct ProtocolMember<'a, 'db> {
 /// The declaration order is significant because the derived ordering is used when comparing
 /// protocol interfaces.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
-enum StructuralMemberPriority {
+pub(super) enum StructuralMemberPriority {
     /// A non-recursive member with at most one callable signature.
     Simple,
     /// A non-recursive callable member with multiple overloads.
@@ -1881,11 +1881,26 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
     }
 
+    /// Returns whether an instance method has an explicit positional receiver annotation.
+    pub(super) fn has_explicit_receiver_annotation(&self, db: &'db dyn Db) -> bool {
+        match self.data.kind {
+            ProtocolMemberKind::Method(member, ProtocolMethodKind::Instance)
+                if let Type::Callable(callable) = member.ty() =>
+            {
+                callable
+                    .signatures(db)
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+            }
+            _ => false,
+        }
+    }
+
     /// Returns the priority for structurally comparing this member.
     ///
     /// Simple finite members are cheapest, followed by finite overloads. Recursive members and
     /// aliases that contain a protocol or are themselves recursive are compared last.
-    fn structural_member_priority(
+    pub(super) fn structural_member_priority(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

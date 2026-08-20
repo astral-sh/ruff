@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
-use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView};
+use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
     MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
@@ -31,7 +31,9 @@ use crate::types::relation::{
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::TypeVarSet;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -646,6 +648,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 source_protocol.interface(db),
                 protocol.interface(db),
             )
+        } else if let Some(structurally_satisfied) =
+            self.try_check_nominal_recursive_protocol_members(db, ty, protocol, result)
+        {
+            structurally_satisfied
         } else {
             protocol
                 .interface(db)
@@ -663,6 +669,88 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
         result.or(db, self.constraints, || structurally_satisfied)
+    }
+
+    /// Avoid recursive requirements that cannot add solutions beyond explicit inheritance.
+    fn try_check_nominal_recursive_protocol_members(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        protocol: ProtocolInstanceType<'db>,
+        nominally_satisfied: ConstraintSet<'db, 'c>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        if self.typevar_evaluation != TypeVarEvaluation::Lazy
+            || self.is_context_collection_enabled()
+            || nominally_satisfied.is_trivially_never_satisfied()
+        {
+            return None;
+        }
+
+        let env = self.env;
+        let source = ty.as_nominal_instance()?;
+        let source_class = source.class(db, env);
+        let source_alias = source_class.into_generic_alias()?;
+
+        let source_arguments = source_alias.specialization(db).types(db);
+        if !source_arguments.iter().all(|argument| match argument {
+            Type::TypeVar(typevar) => nominally_satisfied.mentions_typevar(typevar.identity(db)),
+            argument => !any_over_type_expanding_aliases(db, env, *argument, Type::is_type_var),
+        }) {
+            return None;
+        }
+
+        let interface = protocol.interface(db);
+
+        // A concrete source normally contributes useful structural inference beyond its nominal
+        // specialization; for example, `()` infers `Iterable[Never]`. Recursive receiver
+        // binding is the exception: same-origin protocol sources and protocols with explicitly
+        // constrained receivers can otherwise repeatedly expand the same interface.
+        if !source_arguments
+            .iter()
+            .any(|argument| argument.is_type_var())
+            && !protocol.class_origin(db).is_some_and(|target_origin| {
+                source_class.class_literal(db) == target_origin.class_literal(db)
+            })
+            && !interface
+                .members(db)
+                .any(|member| member.has_explicit_receiver_annotation(db))
+        {
+            return None;
+        }
+
+        let mut members: Vec<_> = interface
+            .members(db)
+            .map(|member| (member.structural_member_priority(db, env), member))
+            .collect();
+        members.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+        let first_recursive = members.partition_point(|(priority, _)| {
+            !matches!(priority, StructuralMemberPriority::Recursive)
+        });
+        let (finite_members, recursive_members) = members.split_at(first_recursive);
+        if recursive_members.is_empty() {
+            return None;
+        }
+
+        let mut structurally_satisfied =
+            finite_members
+                .iter()
+                .when_all(db, self.constraints, |(_, member)| {
+                    self.type_satisfies_protocol_member(db, ty, member)
+                });
+        for (_, member) in recursive_members {
+            if structurally_satisfied
+                .implies(db, self.constraints, || nominally_satisfied)
+                .is_always_satisfied(db, env)
+            {
+                break;
+            }
+            structurally_satisfied = structurally_satisfied.and(db, self.constraints, || {
+                self.type_satisfies_protocol_member(db, ty, member)
+            });
+        }
+
+        Some(structurally_satisfied)
     }
 
     /// Tries to relate the finite members of two specializations of the same protocol.
