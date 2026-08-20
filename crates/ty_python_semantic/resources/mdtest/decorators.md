@@ -815,6 +815,39 @@ info[dynamic-function-decorator-return]: Decorator returns `Any`
   |     --------------------------------------------------- `returns_any` defined here
 ```
 
+### Self-referential defaults
+
+Reporting a dynamic return must not eagerly infer a self-referential default. Even after an earlier
+assertion on the same name, the diagnostic identifies the function's signature.
+
+```py
+def dynamic(function: object):
+    return function
+
+f = lambda: f
+assert f
+
+# snapshot: dynamic-function-decorator-return
+@dynamic
+def f(x=lambda: f): ...
+```
+
+```snapshot
+info[dynamic-function-decorator-return]: Decorator returns `Unknown`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | @dynamic
+  | ^^^^^^^^
+9 | def f(x=lambda: f): ...
+  |     - Signature of `f` will be obscured by the decorator
+  |
+ ::: src/mdtest_snippet.py:1:5
+  |
+1 | def dynamic(function: object):
+  |     ------------------------- `dynamic` defined here
+help: Add a return type annotation to `dynamic`
+```
+
 ### Dynamic decorators implemented by callable instances
 
 A callable-instance decorator points to its `__call__` method and suggests adding a return

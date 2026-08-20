@@ -70,14 +70,76 @@ docs = [
     "mkdocs-redirects>=1.2.3",
     "pyyaml>=6.0.3",
 ]
+# The compatibility tests use the Ruff binary built from this checkout.
+ruff-lsp-test = [
+    "lsprotocol>=2023.0.0",
+    "packaging>=23.1",
+    # ruff-lsp uses the pygls 1.x server API.
+    "pygls>=1.1.0,<2",
+    "pytest>=9.0.3,<10",
+    "pytest-asyncio>=0.21.2",
+    "python-lsp-jsonrpc>=1.0.0",
+    "typing-extensions>=4.7.1",
+]
+ty-ecosystem = [
+    "ecosystem-analyzer",
+]
+typeshed-docstrings = [
+    "docstring-adder",
+]
+typeshed-formatting = [
+    "black",
+]
 
 [tool.uv]
+no-build = true
+# CI installs the local ecosystem runner and tools pinned to Git revisions.
+no-binary-package = [
+    "black",
+    "docstring-adder",
+    "ecosystem-analyzer",
+    "mypy-primer",
+    "ruff-ecosystem",
+    "typeshed-client",
+]
+# Pin the isolated build environment for source-build exceptions.
+build-constraint-dependencies = [
+    "flit-core==4.0.2",
+    "hatch-fancy-pypi-readme==25.1.0",
+    "hatch-vcs==0.5.0",
+    "hatchling==1.32.0",
+    "packaging==26.3",
+    "pathspec==1.1.1",
+    "pluggy==1.6.0",
+    "setuptools==84.0.0",
+    "setuptools-scm==10.2.1",
+    "tomli==2.4.1; python_version < '3.11'",
+    "tomlkit==0.15.1",
+    "trove-classifiers==2026.6.1.19",
+    "typing-extensions==4.16.0; python_version < '3.11'",
+    "uv-build==0.12.3",
+    "vcs-versioning==2.2.4",
+    "wheel==0.47.0",
+]
 exclude-newer = "P7D"
 
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
 release = { requires-python = ">=3.12" }
 docs = { requires-python = ">=3.12" }
+ruff-lsp-test = { requires-python = ">=3.12" }
+ty-ecosystem = { requires-python = ">=3.13" }
+typeshed-docstrings = { requires-python = ">=3.10" }
+typeshed-formatting = { requires-python = ">=3.10" }
+
+[tool.uv.sources]
+docstring-adder = { git = "https://github.com/astral-sh/docstring-adder.git" }
+# Switch to a released version once it includes
+# https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
+black = { git = "https://github.com/psf/black.git" }
+# Keep scripts/setup_primer_project.py and its lockfile synchronized with
+# ecosystem-analyzer's mypy-primer pin when updating its locked revision.
+ecosystem-analyzer = { git = "https://github.com/astral-sh/ecosystem-analyzer" }
 
 [tool.ruff]
 target-version = "py38"

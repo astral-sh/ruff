@@ -15,7 +15,7 @@ use crate::types::{
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
     class::walk_generic_alias,
-    cyclic::ActiveRecursionDetector,
+    cyclic::{ActiveRecursionDetector, TypeIdentity},
     function::{FunctionType, walk_function_type},
     generics::walk_specialization_types,
     instance::{walk_nominal_instance_type, walk_protocol_instance_type},
@@ -652,6 +652,37 @@ pub(super) fn any_over_type<'db>(
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
     any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, query)
+}
+
+/// Searches through type aliases without forcing other lazily inferred type attributes.
+///
+/// Revisiting a recursive alias counts as a match because its specialization can grow on each
+/// visit. Distinct specializations of a nonrecursive alias remain separate, so nested uses such as
+/// `Identity[Identity[int]]` are still considered finite.
+pub(super) fn any_over_type_expanding_aliases<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    fn search<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        query: &impl Fn(Type<'db>) -> bool,
+        active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
+    ) -> bool {
+        any_over_type(db, env, ty, false, |nested| {
+            query(nested)
+                || matches!(nested, Type::TypeAlias(alias) if active_aliases.visit(
+                    &Type::TypeAlias(alias).to_type_identity(db),
+                    || true,
+                    || search(db, env, alias.value_type(db), query, active_aliases),
+                ))
+        })
+    }
+
+    search(db, env, ty, &query, &ActiveRecursionDetector::default())
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type

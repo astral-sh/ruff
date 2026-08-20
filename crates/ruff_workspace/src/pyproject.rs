@@ -33,9 +33,7 @@ pub struct Pyproject {
     project: Option<Project>,
 }
 
-fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
-    let path = path.as_ref();
-
+fn parse_toml<T: DeserializeOwned>(path: &Path, table_path: &[&str]) -> Result<T> {
     let _guard = ValueSourceGuard::new(
         ValueSource::File(Arc::new(SystemPathBuf::from_path_buf_lossy(
             path.to_path_buf(),
@@ -66,18 +64,18 @@ fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str])
 }
 
 /// Parse a `ruff.toml` file.
-fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
+fn parse_ruff_toml(path: &Path) -> Result<Options> {
     parse_toml(path, &[])
 }
 
 /// Parse a `pyproject.toml` file.
-fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
+fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     parse_toml(path, &["tool", "ruff"])
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
 fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
-    let pyproject = parse_pyproject_toml(path)?;
+    let pyproject = parse_pyproject_toml(path.as_ref())?;
     Ok(pyproject.tool.and_then(|tool| tool.ruff).is_some())
 }
 
@@ -547,7 +545,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
 
         let pyproject =
             find_settings_toml(tempdir.path())?.context("Failed to find pyproject.toml")?;
-        let pyproject = parse_pyproject_toml(pyproject)?;
+        let pyproject = parse_pyproject_toml(&pyproject)?;
         let config = pyproject
             .tool
             .context("Expected to find [tool] field")?

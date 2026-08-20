@@ -1272,6 +1272,51 @@ info: └── protocol member `check` is incompatible
 info:     └── parameter `y` has an incompatible type: `str` is not assignable to `bytes`
 ```
 
+## Recursive protocol diagnostic context
+
+A value-constrained type parameter makes the recursive `child` override valid for each permitted
+specialization. The explicit receiver on `Outer.expose` preserves unresolved type variables while
+diagnostic context is collected, including the incompatible recursive member and its return type.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def child(self) -> Chain[T]: ...
+    def value(self) -> T: ...
+
+class Outer[T](Protocol):
+    def expose(self: Outer[T]) -> Chain[T]: ...
+
+class Concrete[T: (str, object)](Chain[T], Outer[T]):
+    def child(self) -> Concrete[str]:
+        raise NotImplementedError
+
+    def expose(self: Outer[T]) -> Concrete[T]:
+        raise NotImplementedError
+
+def diagnose[T: (str, object)](value: Concrete[T]) -> None:
+    invalid: Outer[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@diagnose]` is not assignable to `Outer[int]`
+  --> src/mdtest_snippet.py:20:27
+   |
+20 |     invalid: Outer[int] = value  # snapshot: invalid-assignment
+   |              ----------   ^^^^^ Incompatible value of type `Concrete[T@diagnose]`
+   |              |
+   |              Declared type
+info: type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `child` is incompatible
+info:     └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
+info:         └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
+info:             └── protocol member `value` is incompatible
+info:                 └── incompatible return types: `str` is not assignable to `int`
+```
+
 ## Protocol method parameter names
 
 Assignability errors against protocols are often caused because a method in the protocol class

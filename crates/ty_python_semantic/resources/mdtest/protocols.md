@@ -6579,6 +6579,242 @@ def infer[T](outer: T, recursive: C[int]) -> None:
     accept(outer, recursive)
 ```
 
+### Nested protocol source members with finite targets
+
+A source specialization can contain its own protocol even when the target has no recursive
+requirements. This must not activate a recursive matching shortcut or discard the source member.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+class Consumer[T](Protocol):
+    def consume(self, value: T | int) -> None: ...
+
+static_assert(is_constraint_set_assignable_to(Consumer[Consumer[int]], Consumer[int]))
+```
+
+### Recursive members in the source specialization
+
+A protocol member can contain the same protocol in the source specialization but remain finite in
+the target specialization. Its structural requirements must still contribute all valid solutions,
+even when nominal inheritance alone would infer a narrower type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Consumer[T](Protocol):
+    def consume(self, value: T | int) -> None: ...
+    @property
+    def child(self) -> Consumer[T]: ...
+
+def extract[T](consumer: Consumer[T]) -> T:
+    raise NotImplementedError
+
+def check(value: Consumer[Consumer[int]]) -> None:
+    reveal_type(extract(value))  # revealed: Consumer[int] | int
+```
+
+### Repeated applications of a nonrecursive alias
+
+Nested applications of the same finite alias do not create an alias cycle. Their protocol
+requirement must still contribute its type-variable constraints.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+type Identity[T] = T
+
+class Recursive[T](Protocol):
+    @property
+    def value(self) -> Identity[Identity[T]]: ...
+    @property
+    def child(self) -> Recursive[T]: ...
+
+def inspect[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Recursive[int], Recursive[T])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=int]]
+```
+
+### Growing aliases in recursive protocol requirements
+
+A recursive alias can change its specialization every time its definition is expanded. Finite
+protocol matching must detect the repeated alias definition instead of following the growing
+specializations indefinitely.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+type GrowingAlias[T] = T | GrowingAlias[list[T]]
+
+class Recursive[T](Protocol):
+    def consume(self, value: T) -> None: ...
+    def growing(self) -> GrowingAlias[T]: ...
+    def child(self) -> Recursive[T]: ...
+
+def check(value: Recursive[int]) -> None:
+    rejected: Recursive[str] = value  # error: [invalid-assignment]
+```
+
+### Generic constructors inheriting recursive protocols
+
+A generic constructor can infer its specialization from an expected recursive protocol even when the
+protocol includes a method with an explicitly constrained receiver. Invalid constructor arguments
+are rejected. Without an expected type, the empty tuple is an `Iterable[Never]`, so the constructor
+infers `T = Never` regardless of the protocol's variance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]: ...
+
+class Concrete[T](Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+contextual: Chain[int] = Concrete(())
+reveal_type(contextual)  # revealed: Concrete[int]
+wrong: Chain[int] = Concrete(("wrong",))  # error: [invalid-assignment]
+reveal_type(Concrete(()))  # revealed: Concrete[Never]
+
+def make() -> Chain[int]:
+    return Concrete(())
+```
+
+### Specialized sources with constrained protocol receivers
+
+A concrete class can inherit recursive methods with explicitly constrained receivers. Concrete,
+symbolic, and unknown specializations bind those receivers and preserve the corresponding return
+types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def accumulate[S](self: Chain[S]) -> Chain[S]: ...
+
+class Concrete[T](Chain[T]): ...
+
+def check[T](concrete: Concrete[int], symbolic: Concrete[T]) -> None:
+    reveal_type(concrete.accumulate())  # revealed: Chain[int]
+    reveal_type(symbolic.accumulate())  # revealed: Chain[T@check]
+    reveal_type(Concrete().accumulate())  # revealed: Chain[Unknown]
+```
+
+### Structural inference from recursive protocol requirements
+
+An inherited protocol specialization can erase a class type parameter. A recursive member can still
+recover that parameter structurally, so satisfying the nominal relation is not enough to stop
+collecting protocol constraints.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol
+
+class Recursive[A, B](Protocol):
+    first: A
+    def value(self, child: Recursive[Any, Any]) -> B: ...
+
+class Erased[T, U](Recursive[T, Any]):
+    def value(self, child: Recursive[Any, Any]) -> U:
+        raise NotImplementedError
+
+    def __init__(self, callback: Callable[[U], object]) -> None: ...
+
+pair: Recursive[int, str] = Erased(lambda value: reveal_type(value))  # revealed: str
+```
+
+### Overridden recursive protocol requirements
+
+Recursive requirements remain significant when a concrete class overrides them. Their constraints
+reject incompatible assignments and preserve generic inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Node[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> Node[T]: ...
+
+class Mismatched[T](Node[object]):
+    def __init__(self, value: T) -> None: ...
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+    @property
+    def child(self) -> Node[str]:
+        raise NotImplementedError
+
+bad_assignment: Node[int] = Mismatched(1)  # error: [invalid-assignment]
+
+def extract[U](node: Node[U]) -> U:
+    raise NotImplementedError
+
+reveal_type(extract(Mismatched(1)))  # revealed: object
+```
+
 ### Recursive legacy generic protocol
 
 ```py

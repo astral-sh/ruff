@@ -35,7 +35,7 @@ pub(crate) enum Command {
     Check(CheckCommand),
 
     /// Start the language server
-    Server,
+    Server(ServerCommand),
 
     /// Display ty's version
     Version {
@@ -308,6 +308,19 @@ impl CheckCommand {
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())
     }
+}
+
+#[derive(Debug, Parser)]
+pub(crate) struct ServerCommand {
+    /// Print the absolute path to the ty executable to use for the current folder.
+    ///
+    /// Discover the project from the current working directory. Use `environment.python` if it
+    /// is configured; otherwise, discover the Python environment in the normal order.
+    /// Print the path to ty if it is installed there.
+    /// If project discovery fails, use the current working directory as the discovery root.
+    /// Exit with status 0 if ty is found, 1 if discovery fails, or 2 on an unexpected error.
+    #[arg(long, hide = true)]
+    pub(crate) find_executable: bool,
 }
 
 /// A list of rules to enable or disable with a given severity.

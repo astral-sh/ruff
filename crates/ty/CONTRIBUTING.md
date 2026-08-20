@@ -28,7 +28,7 @@ ty is written in Rust. You'll need to install the
 You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 
 ```shell
-cargo install cargo-insta
+cargo install --locked cargo-insta
 ```
 
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
@@ -45,7 +45,7 @@ We recommend [nextest](https://nexte.st/) to run ty's test suite (via `cargo nex
 though it's not strictly necessary:
 
 ```shell
-cargo install cargo-nextest --locked
+cargo install --locked cargo-nextest
 ```
 
 Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,

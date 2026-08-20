@@ -171,7 +171,7 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTyp
 ## Specializing classes with unavailable generic context
 
 When an earlier error prevents ty from determining a class's generic context, specializing the class
-can emit a cascading `not-subscriptable` diagnostic.
+can emit a cascading `invalid-type-form` diagnostic.
 
 ### Conditional typing compatibility imports
 
@@ -192,7 +192,7 @@ T = typing.TypeVar("T")
 class Parser(typing.Generic[T]): ...
 
 # TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
-parser: Parser[int]  # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Parser'>`"
+parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` cannot be specialized in a type expression"
 ```
 
 ### Decorated generic bases
@@ -218,7 +218,7 @@ reveal_type(generic_context(Mapping))  # revealed: None
 class FrozenDict(Mapping[K, V]): ...
 
 # TODO: ...which then causes us to emit this
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'FrozenDict'>`"
+# error: [invalid-type-form] "Non-generic class `FrozenDict` cannot be specialized in a type expression"
 mapping: FrozenDict[str, int]
 ```
 
@@ -235,7 +235,7 @@ T = TypeVar("T")
 
 class Child(Base[T]): ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
 child: Child[int]
 ```
 
@@ -274,7 +274,7 @@ T = TypeVar("T")
 # error: [unsupported-base]
 class Child(Base[T]): ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
 child: Child[int]
 ```
 

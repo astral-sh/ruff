@@ -2610,6 +2610,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
 
                 after_synthetic_unpack |= is_synthetic_unpack;
+                star_added |= parameter.is_variadic();
                 first = false;
             }
 
@@ -2744,12 +2745,15 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             if self.param.should_annotation_be_displayed() {
                 let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
+                if self.param.is_variadic() && self.param.has_starred_annotation() {
+                    f.write_char('*')?;
+                }
                 annotated_type
                     .display_with(db, self.env, self.settings.clone())
                     .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
-            if let Some(default_type) = self.param.default_type() {
+            if let Some(default_type) = self.param.default_type(db) {
                 if self.param.should_annotation_be_displayed() {
                     f.write_str(" = ")?;
                 } else {
@@ -4090,7 +4094,7 @@ mod tests {
                 ],
                 Some(KnownClass::Bytes.to_instance(db, &env))
             ),
-            @"(a, b: int, c=1, d: int = 2, /, e=3, f: int = 4, *args: object, *, g=5, h: int = 6, **kwargs: str) -> bytes"
+            @"(a, b: int, c=1, d: int = 2, /, e=3, f: int = 4, *args: object, g=5, h: int = 6, **kwargs: str) -> bytes"
         );
     }
 
@@ -4256,7 +4260,6 @@ mod tests {
             e=3,
             f: int = 4,
             *args: object,
-            *,
             g=5,
             h: int = 6,
             **kwargs: str

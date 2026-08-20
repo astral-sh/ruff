@@ -72,6 +72,18 @@ pub fn resolve_module<'db>(
         .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
+/// Resolves the module referenced by a `from` import statement.
+///
+/// Returns `None` if the statement does not name a valid module or the module cannot be resolved.
+pub fn resolve_module_for_import_from<'db>(
+    db: &'db dyn Db,
+    importing_file: ImportingFile<'db>,
+    import: &ast::StmtImportFrom,
+) -> Option<Module<'db>> {
+    let module_name = ModuleName::from_import_statement(db, importing_file, import).ok()?;
+    resolve_module(db, importing_file, &module_name)
+}
+
 /// Resolves a module name to a module, without desperate resolution available.
 ///
 /// This is appropriate for resolving a `KnownModule`, or cases where for whatever reason

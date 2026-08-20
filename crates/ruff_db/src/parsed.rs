@@ -497,6 +497,14 @@ mod indexed {
             let chunk_index = index / Self::CHUNK_LEN;
             let entry_index = index % Self::CHUNK_LEN;
             let chunk = &self.chunks[chunk_index];
+
+            // A partial chunk's trailing bits are padding, not indexed nodes.
+            assert!(
+                entry_index < usize::from(chunk.entry_count),
+                "index out of bounds: the len is {} but the index is {index}",
+                chunk_index * Self::CHUNK_LEN + usize::from(chunk.entry_count),
+            );
+
             let words = &self.words[chunk.word_start as usize..];
 
             match chunk.layout {
@@ -804,6 +812,56 @@ mod indexed {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        #[should_panic(expected = "index out of bounds: the len is 1 but the index is 1")]
+        fn indexed_nodes_relative_tail_bounds() {
+            let index = IndexedNodes {
+                chunks: vec![IndexChunk {
+                    base: 0x1000,
+                    word_start: 0,
+                    entry_bits: IndexedNodes::KIND_BITS,
+                    entry_count: 1,
+                    layout: IndexChunkLayout::Relative,
+                }]
+                .into_boxed_slice(),
+                words: vec![u64::from(RootNodeKind::Stmt as u8)].into_boxed_slice(),
+            };
+
+            assert_eq!(index.get(0), (0x1000, RootNodeKind::Stmt));
+            index.get(1);
+        }
+
+        #[test]
+        #[should_panic(expected = "index out of bounds: the len is 1 but the index is 1")]
+        fn indexed_nodes_wide_tail_bounds() {
+            let index = IndexedNodes {
+                chunks: vec![IndexChunk {
+                    base: 0,
+                    word_start: 0,
+                    entry_bits: IndexedNodes::KIND_BITS,
+                    entry_count: 1,
+                    layout: IndexChunkLayout::Wide,
+                }]
+                .into_boxed_slice(),
+                words: vec![0x1000, u64::from(RootNodeKind::Stmt as u8)].into_boxed_slice(),
+            };
+
+            assert_eq!(index.get(0), (0x1000, RootNodeKind::Stmt));
+            index.get(1);
+        }
+
+        #[test]
+        #[should_panic(expected = "index out of bounds: the len is 65 but the index is 65")]
+        fn indexed_nodes_chunk_boundary() {
+            let parsed = ruff_python_parser::parse_module(&"pass\n".repeat(65)).unwrap();
+            let indexed = IndexedModule::new(parsed);
+
+            assert_eq!(indexed.index.len(), 65);
+            assert_eq!(indexed.index.get(63).1, RootNodeKind::Stmt);
+            assert_eq!(indexed.index.get(64).1, RootNodeKind::Stmt);
+            indexed.index.get(65);
+        }
 
         #[test]
         fn indexed_nodes_round_trip() {

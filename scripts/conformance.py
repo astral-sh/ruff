@@ -2,7 +2,17 @@
 # requires-python = ">=3.12"
 # dependencies = []
 #
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
 # [tool.uv]
+# no-build = true
 # exclude-newer = "P7D"
 # ///
 
@@ -255,7 +265,7 @@ class ExpectedError:
 def diagnostics_are_equivalent(a: list[TyDiagnostic], b: list[TyDiagnostic]) -> bool:
     """Compare two diagnostic lists for equality, ignoring the ``source`` field."""
 
-    def fingerprint(d: TyDiagnostic) -> tuple:
+    def fingerprint(d: TyDiagnostic) -> tuple[str, str, str, str, int, int]:
         return (
             d.check_name,
             d.description,

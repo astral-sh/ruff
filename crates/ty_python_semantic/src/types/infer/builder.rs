@@ -67,9 +67,10 @@ use crate::types::diagnostic::{
     INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     INVALID_TYPE_VARIABLE_DEFAULT, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
     TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_REFERENCE, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
-    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
+    UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR,
+    UNUSED_AWAITABLE, YieldKind, hint_if_stdlib_attribute_exists_on_other_versions,
+    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
+    report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
     report_invalid_assignment, report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -79,8 +80,8 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_too_many_positional_patterns_for_class_pattern, report_unsound_yield,
-    report_unsupported_augmented_assignment, report_unsupported_comparison,
+    report_too_many_positional_patterns_for_class_pattern, report_unsound_assignment,
+    report_unsound_yield, report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
@@ -527,9 +528,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
         self.typevar_binding_context.or(match self.region {
-            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                Some(definition)
-            }
+            InferenceRegion::Definition(definition)
+            | InferenceRegion::FunctionDefaults(definition)
+            | InferenceRegion::Deferred(definition) => Some(definition),
             InferenceRegion::Statement(_)
             | InferenceRegion::Expression(_, _)
             | InferenceRegion::FunctionDecorators(_)
@@ -823,6 +824,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .is_in_type_checking_block(scope.file_scope_id(self.db()), node.range())
     }
 
+    /// Returns whether the current scope is the body of a dataclass or dataclass-transform class.
+    ///
+    /// Methods and nested functions have separate scopes and are not considered class bodies.
+    fn is_in_dataclass_like_class_body(&self) -> bool {
+        let db = self.db();
+        let scope = self.scope();
+
+        self.index.scope(scope.file_scope_id(db)).kind() == ScopeKind::Class
+            && nearest_enclosing_class(db, self.index, scope)
+                .and_then(|class| CodeGeneratorKind::from_class(db, class.into()))
+                .is_some_and(|kind| {
+                    matches!(
+                        kind,
+                        CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_)
+                    )
+                })
+    }
+
     /// If the current scope is a class body scope of a dataclass-like class, populate
     /// `self.dataclass_field_specifiers` with the field specifiers from the class's
     /// `dataclass_params` or `dataclass_transform` parameters. This is needed so that
@@ -902,6 +921,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn in_string_annotation(&self) -> bool {
         self.deferred_state.in_string_annotation()
+    }
+
+    /// Temporarily changes lookup behavior without discarding the current string annotation.
+    ///
+    /// Parsed string nodes do not belong to the module's semantic index, so their enclosing
+    /// annotation must remain available even when nested expressions request another lookup mode.
+    fn replace_deferred_state(
+        &mut self,
+        state: DeferredExpressionState,
+    ) -> DeferredExpressionState {
+        let previous = self.deferred_state;
+        if !previous.in_string_annotation() {
+            self.deferred_state = state;
+        }
+        previous
     }
 
     /// Returns `true` if `expr` is a call to a known diagnostic function
@@ -1020,6 +1054,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::FunctionDecorators(definition) => {
                 self.infer_region_function_decorators(definition);
             }
+            InferenceRegion::FunctionDefaults(definition) => {
+                if let DefinitionKind::Function(function) = definition.kind(self.db()) {
+                    self.infer_function_defaults(definition, function.node(self.module()));
+                }
+            }
             InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
             InferenceRegion::Expression(expression, tcx) => {
                 self.infer_region_expression(expression, tcx);
@@ -1078,7 +1117,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer deferred types for all definitions.
         let deferred_definitions: Vec<_> = std::mem::take(&mut self.deferred).into_iter().collect();
         for definition in &deferred_definitions {
-            self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
+            if let DefinitionKind::Function(function) = definition.kind(self.db()) {
+                self.extend_function_deferred(*definition, function.node(self.module()));
+            } else {
+                self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
+            }
         }
 
         assert!(
@@ -1353,7 +1396,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
-                self.infer_function_deferred(definition, function.node(self.module()));
+                self.infer_function_annotations(definition, function.node(self.module()));
             }
             DefinitionKind::Class(class) => {
                 self.infer_class_deferred(definition, class.node(self.module()));
@@ -1469,6 +1512,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers,
         } = place_and_quals;
 
+        let declaration = match resolved_place {
+            Place::Defined(DefinedPlace { provenance, .. }) => provenance
+                .definition()
+                .filter(|declaration| declaration.file(db) == self.context.file()),
+            Place::Undefined => None,
+        };
+
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
             self.fallback_member_declared_type(node)
         } else {
@@ -1478,6 +1528,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         AddBinding {
             declared_ty,
+            declaration,
             binding,
             node,
             qualifiers,
@@ -1741,7 +1792,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let declared_type = declared_ty.inner_type();
-                if inferred_ty.is_assignable_to(db, env, declared_type) {
+                if self.validate_assignment_type(node, definition, None, declared_type, inferred_ty)
+                {
                     // TODO We currently can't distinguish here between "no declared type" and
                     // "declared types is `Unknown` (e.g. due to a bad annotation, missing
                     // import, etc.)". Ideally we would still prefer `Unknown` declared type,
@@ -1756,13 +1808,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 } else {
                     self.discard_dict_key_assignments_for(definition);
-                    report_invalid_assignment(
-                        &self.context,
-                        node,
-                        definition,
-                        declared_type,
-                        inferred_ty,
-                    );
 
                     // if the assignment is invalid, fall back to assuming the annotation is correct
                     (declared_ty, declared_type)
@@ -1772,6 +1817,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.declarations.insert(definition, declared_ty);
         self.bindings.insert(definition, inferred_ty);
+    }
+
+    /// Checks an assigned value against its target's declared type and reports any mismatch.
+    ///
+    /// Returns `true` when the value is assignable, even if the stricter `unsound-assignment`
+    /// rule reports that it is not a subtype. Returns `false` when the value is not assignable,
+    /// in which case `invalid-assignment` is reported instead.
+    fn validate_assignment_type(
+        &self,
+        target_node: AnyNodeRef,
+        definition: Definition<'db>,
+        declaration: Option<Definition<'db>>,
+        target_ty: Type<'db>,
+        value_ty: Type<'db>,
+    ) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+
+        if !value_ty.is_assignable_to(db, env, target_ty) {
+            report_invalid_assignment(
+                &self.context,
+                target_node,
+                definition,
+                declaration,
+                target_ty,
+                value_ty,
+            );
+            return false;
+        }
+
+        // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_RETURN_STATEMENT`;
+        // update those too if updating this!
+        if self.context.is_lint_enabled(&UNSOUND_ASSIGNMENT)
+            && !self.file().is_stub(db)
+            && target_ty.is_fully_static(db, env)
+            && !self.is_in_dataclass_like_class_body()
+            && !value_ty.is_pure_redundant_with(db, env, target_ty)
+        {
+            report_unsound_assignment(
+                &self.context,
+                target_node,
+                definition,
+                declaration,
+                target_ty,
+                value_ty,
+                |expression| self.expression_type(expression),
+            );
+        }
+
+        true
     }
 
     fn add_unknown_declaration_with_binding(
@@ -2476,7 +2571,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         nested_bindings_kind: &NestedBindingsDefinitionKind,
         definition: Definition<'db>,
     ) {
-        const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 2048;
+        const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 4096;
 
         let db = self.db();
         let scope_id = definition.file_scope(db);
@@ -4295,6 +4390,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let node = target.into();
             let add = AddBinding {
                 declared_ty: self.fallback_member_declared_type(node),
+                declaration: None,
                 binding: definition,
                 node,
                 qualifiers: TypeQualifiers::empty(),
@@ -4534,7 +4630,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if is_pep_613_type_alias {
                 self.context.inference_flags |= InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS;
                 if self.in_stub() {
-                    self.deferred_state = DeferredExpressionState::Deferred;
+                    self.replace_deferred_state(DeferredExpressionState::Deferred);
                 }
             }
 
@@ -6199,7 +6295,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
         state: DeferredExpressionState,
     ) -> Type<'db> {
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let previous_deferred_state = self.replace_deferred_state(state);
         let ty = self.infer_expression(expression, tcx);
         self.deferred_state = previous_deferred_state;
         ty
@@ -8296,13 +8392,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
-        if named.target.is_name_expr() {
+        if named.target.is_name_expr() && !self.in_string_annotation() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
             result.binding_type(definition)
         } else {
-            // For syntactically invalid targets, we still need to run type inference:
+            // String annotations have no indexed definitions, and syntactically invalid targets
+            // cannot define a name. Both sides still need inference to preserve their diagnostics.
             self.infer_expression(&named.target, TypeContext::default());
             self.infer_expression(&named.value, TypeContext::default());
             Type::unknown()
@@ -8393,8 +8490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = lambda_expression;
 
         // In stub files, default values may reference names that are defined later in the file.
-        let in_stub = self.in_stub();
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
+        let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
         // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
         // in the union/intersection.
@@ -9621,8 +9717,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && expected_yield_ty.is_fully_static(db, env)
             && !yielded_ty.is_pure_redundant_with(db, env, expected_yield_ty)
         {
-            // N.B. the implementation here is the ~same as for `UNSOUND_RETURN_STATEMENT`;
-            // update that too if updating this!
+            // N.B. the implementation here is the ~same as for `UNSOUND_RETURN_STATEMENT` and `UNSOUND_ASSIGNMENT`;
+            // update those too if updating this!
             report_unsound_yield(
                 &self.context,
                 yielded_value,
@@ -12251,6 +12347,7 @@ impl<V> IntoIterator for VecSet<V> {
 #[must_use]
 struct AddBinding<'db, 'ast> {
     declared_ty: Option<Type<'db>>,
+    declaration: Option<Definition<'db>>,
     binding: Definition<'db>,
     node: AnyNodeRef<'ast>,
     qualifiers: TypeQualifiers,
@@ -12329,15 +12426,14 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if !bound_ty.is_assignable_to(db, env, declared_ty) {
+        if !builder.validate_assignment_type(
+            self.node,
+            self.binding,
+            self.declaration,
+            declared_ty,
+            bound_ty,
+        ) {
             builder.discard_dict_key_assignments_for(self.binding);
-            report_invalid_assignment(
-                &builder.context,
-                self.node,
-                self.binding,
-                declared_ty,
-                bound_ty,
-            );
 
             // Allow declarations to override inference in case of invalid assignment.
             bound_ty = declared_ty;

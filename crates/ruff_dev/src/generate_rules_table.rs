@@ -3,7 +3,7 @@
 //! Used for <https://docs.astral.sh/ruff/rules/>.
 
 use itertools::Itertools;
-use ruff_linter::codes::RuleGroup;
+use ruff_linter::codes::RuleStatus;
 use std::borrow::Cow;
 use std::fmt::Write;
 use strum::IntoEnumIterator;
@@ -39,23 +39,23 @@ fn generate_table(
     table_out.push_str("| ---- | ---- | ------- | -: |");
     table_out.push('\n');
     for rule in rules {
-        let status_token = match rule.group() {
-            RuleGroup::Removed { since } => {
+        let status_token = match rule.status() {
+            RuleStatus::Removed { since } => {
                 format!(
                     "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule was removed in {since}'>{REMOVED_SYMBOL}</span><span class='sr-only'>Rule was removed in {since}</span>"
                 )
             }
-            RuleGroup::Deprecated { since } => {
+            RuleStatus::Deprecated { since } => {
                 format!(
                     "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been deprecated since {since}'>{WARNING_SYMBOL}</span><span class='sr-only'>Rule has been deprecated since {since}</span>"
                 )
             }
-            RuleGroup::Preview { since } => {
+            RuleStatus::Preview { since } => {
                 format!(
                     "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been in preview since {since}'>{PREVIEW_SYMBOL}</span><span class='sr-only'>Rule has been in preview since {since}</span>"
                 )
             }
-            RuleGroup::Stable { since } => {
+            RuleStatus::Stable { since } => {
                 format!(
                     "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been stable since {since}'></span><span class='sr-only'>Rule has been stable since {since}</span>"
                 )
