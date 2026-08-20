@@ -4,7 +4,7 @@ use lsp_types::request::CodeLensRequest;
 use lsp_types::{CodeLens, CodeLensParams, Url};
 use ty_ide::{CodeLensCommand, code_lens};
 use ty_project::{Db as _, ProjectDatabase};
-use ty_python_semantic::Program;
+use ty_python_core::program::Program;
 
 use crate::capabilities::SupportedCommand;
 use crate::document::ToRangeExt;
