@@ -7889,6 +7889,46 @@ Source with applied edits:
         }
     }
 
+    #[test]
+    fn test_auto_import_prefers_public_module() {
+        let mut test = inlay_hint_test(
+            "
+            import foo
+
+            def get_document():
+                return foo.get_document()
+            
+            a = get_document()
+            ",
+        );
+
+        test.with_extra_file(
+            "foo/__init__.py",
+            "
+            from foo._internal import Document as Document
+            def get_document() -> Document: ...
+            ",
+        );
+
+        test.with_extra_file(
+            "foo/_internal.py",
+            "
+            class Document: ...
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r###"
+
+        from foo import Document
+        import foo
+
+        def get_document():
+            return foo.get_document()
+        
+        a[: Document] = get_document()
+        "###);
+    }
+
     impl InlayHintTextEdit {
         fn to_fix_edit(&self) -> Edit {
             if self.range.is_empty() {
