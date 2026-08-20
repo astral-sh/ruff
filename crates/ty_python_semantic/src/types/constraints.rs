@@ -4173,18 +4173,26 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> PathBound<'db> {
         let Self { lower, upper } = self;
+        let lower_origins: Box<[_]> = lower
+            .iter()
+            .filter_map(|(_, origin)| *origin)
+            .unique()
+            .collect();
+        let upper_origins: Box<[_]> = upper
+            .iter()
+            .filter_map(|(_, origin)| *origin)
+            .unique()
+            .collect();
+        let gradual = (!lower_origins.is_empty() || !upper_origins.is_empty()).then(|| {
+            Box::new(GradualSolutionProvenance {
+                lower_origins,
+                upper_origins,
+                ..GradualSolutionProvenance::default()
+            })
+        });
         let mut provenance = SolutionProvenance {
-            lower_origins: lower
-                .iter()
-                .filter_map(|(_, origin)| *origin)
-                .unique()
-                .collect(),
-            upper_origins: upper
-                .iter()
-                .filter_map(|(_, origin)| *origin)
-                .unique()
-                .collect(),
-            ..SolutionProvenance::default()
+            concrete_lower: None,
+            gradual,
         };
 
         let mut has_gradual_evidence = false;
@@ -4258,8 +4266,12 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         } else {
             concrete_lower.map(|accumulator| accumulator.into_type(db, env))
         };
-        provenance.unconditional_gradual_lower =
-            unconditional_gradual_lower.map(|accumulator| accumulator.into_type(db, env));
+        if let Some(lower) = unconditional_gradual_lower {
+            provenance
+                .gradual
+                .get_or_insert_default()
+                .unconditional_gradual_lower = Some(lower.into_type(db, env));
+        }
 
         let mut upper = UpperBound {
             clauses: if has_gradual_evidence {
@@ -4293,40 +4305,93 @@ impl<'db> ConstraintBoundsBuilder<'db> {
     }
 }
 
-/// Distinguishes independent bounds from gradual materializations.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct SolutionProvenance<'db> {
+struct GradualSolutionProvenance<'db> {
     /// Gradual occurrences that contributed a lower bound.
     lower_origins: Box<[GradualOrigin<'db>]>,
     /// Gradual occurrences that contributed an upper bound.
     upper_origins: Box<[GradualOrigin<'db>]>,
-    /// Independently established static lower bounds.
-    concrete_lower: Option<Type<'db>>,
     /// Gradual lower bounds established without choosing a materialization.
     unconditional_gradual_lower: Option<Type<'db>>,
     /// Gradual materializations required by the solution's constraint path.
     materialization_origins: Box<[GradualOrigin<'db>]>,
 }
 
+/// Distinguishes independent bounds from gradual materializations.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct SolutionProvenance<'db> {
+    /// Independently established static lower bounds.
+    concrete_lower: Option<Type<'db>>,
+    /// Additional evidence that is absent for entirely static solutions.
+    gradual: Option<Box<GradualSolutionProvenance<'db>>>,
+}
+
 impl<'db> SolutionProvenance<'db> {
+    fn lower_origins(&self) -> &[GradualOrigin<'db>] {
+        self.gradual
+            .as_deref()
+            .map_or(&[], |gradual| &gradual.lower_origins)
+    }
+
+    fn upper_origins(&self) -> &[GradualOrigin<'db>] {
+        self.gradual
+            .as_deref()
+            .map_or(&[], |gradual| &gradual.upper_origins)
+    }
+
+    fn materialization_origins(&self) -> &[GradualOrigin<'db>] {
+        self.gradual
+            .as_deref()
+            .map_or(&[], |gradual| &gradual.materialization_origins)
+    }
+
+    fn unconditional_gradual_lower(&self) -> Option<Type<'db>> {
+        self.gradual
+            .as_deref()
+            .and_then(|gradual| gradual.unconditional_gradual_lower)
+    }
+
+    fn set_materialization_origins(&mut self, origins: impl Iterator<Item = GradualOrigin<'db>>) {
+        let origins: Box<[_]> = origins.collect();
+        if !origins.is_empty() {
+            self.gradual.get_or_insert_default().materialization_origins = origins;
+        }
+    }
+
     fn contains_origin(&self, origin: GradualOrigin<'db>) -> bool {
-        self.lower_origins.contains(&origin) || self.upper_origins.contains(&origin)
+        self.lower_origins().contains(&origin) || self.upper_origins().contains(&origin)
     }
 
     fn has_explicit_any(&self) -> bool {
-        self.lower_origins
+        self.lower_origins()
             .iter()
-            .chain(&self.upper_origins)
+            .chain(self.upper_origins())
             .any(|origin| origin.ty == DynamicType::Any)
     }
 
     fn merge(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: &Self) {
+        if let Some(additional) = other.concrete_lower
+            && self.concrete_lower != Some(additional)
+        {
+            self.concrete_lower = Some(self.concrete_lower.map_or(additional, |bound| {
+                UnionType::from_two_elements(db, env, bound, additional)
+            }));
+        }
+
+        let Some(additional) = other.gradual.as_deref() else {
+            return;
+        };
+        let Some(gradual) = self.gradual.as_deref_mut() else {
+            self.gradual = other.gradual.clone();
+            return;
+        };
+
         for (origins, additional) in [
-            (&mut self.lower_origins, &other.lower_origins),
-            (&mut self.upper_origins, &other.upper_origins),
+            (&mut gradual.lower_origins, &additional.lower_origins),
+            (&mut gradual.upper_origins, &additional.upper_origins),
             (
-                &mut self.materialization_origins,
-                &other.materialization_origins,
+                &mut gradual.materialization_origins,
+                &additional.materialization_origins,
             ),
         ] {
             if additional.is_empty() || origins.as_ref() == additional.as_ref() {
@@ -4340,30 +4405,38 @@ impl<'db> SolutionProvenance<'db> {
             }
         }
 
-        for (bound, additional) in [
-            (&mut self.concrete_lower, other.concrete_lower),
-            (
-                &mut self.unconditional_gradual_lower,
-                other.unconditional_gradual_lower,
-            ),
-        ] {
-            if let Some(additional) = additional
-                && *bound != Some(additional)
-            {
-                *bound = Some(bound.map_or(additional, |bound| {
-                    UnionType::from_two_elements(db, env, bound, additional)
-                }));
-            }
+        if let Some(additional) = additional.unconditional_gradual_lower
+            && gradual.unconditional_gradual_lower != Some(additional)
+        {
+            gradual.unconditional_gradual_lower = Some(
+                gradual
+                    .unconditional_gradual_lower
+                    .map_or(additional, |bound| {
+                        UnionType::from_two_elements(db, env, bound, additional)
+                    }),
+            );
         }
     }
 
     fn retain_gradual_type(&mut self, ty: DynamicType<'db>) {
-        for origins in [&mut self.lower_origins, &mut self.upper_origins] {
+        let Some(gradual) = self.gradual.as_deref_mut() else {
+            return;
+        };
+
+        for origins in [&mut gradual.lower_origins, &mut gradual.upper_origins] {
             *origins = origins
                 .iter()
                 .copied()
                 .filter(|origin| origin.ty == ty)
                 .collect();
+        }
+
+        if gradual.lower_origins.is_empty()
+            && gradual.upper_origins.is_empty()
+            && gradual.materialization_origins.is_empty()
+            && gradual.unconditional_gradual_lower.is_none()
+        {
+            self.gradual = None;
         }
     }
 }
@@ -4745,10 +4818,11 @@ impl<'db> PathBounds<'db> {
             .drain(..)
             .map(|(bound_typevar, bounds)| {
                 let mut bound = bounds.finish(db, env, bound_typevar);
-                bound.provenance.materialization_origins = materialization_origins
-                    .iter()
-                    .map(|&origin| storage.gradual_origin(origin))
-                    .collect();
+                bound.provenance.set_materialization_origins(
+                    materialization_origins
+                        .iter()
+                        .map(|&origin| storage.gradual_origin(origin)),
+                );
                 bound
             })
             .collect();
@@ -5675,9 +5749,9 @@ impl<'db> TypeVarSolution<'db> {
         let provenance = &self.provenance;
         let other_provenance = &other.provenance;
         if !other_provenance
-            .lower_origins
+            .lower_origins()
             .iter()
-            .all(|origin| provenance.lower_origins.contains(origin))
+            .all(|origin| provenance.lower_origins().contains(origin))
         {
             return false;
         }
@@ -5695,15 +5769,15 @@ impl<'db> TypeVarSolution<'db> {
 
         // An unconditional gradual lower bound covers its individual materializations.
         if provenance.concrete_lower.is_none()
-            && provenance.unconditional_gradual_lower == Some(self.solution)
-            && provenance.unconditional_gradual_lower
-                == other_provenance.unconditional_gradual_lower
+            && provenance.unconditional_gradual_lower() == Some(self.solution)
+            && provenance.unconditional_gradual_lower()
+                == other_provenance.unconditional_gradual_lower()
         {
             return true;
         }
 
-        provenance.lower_origins.iter().any(|&origin| {
-            other_provenance.materialization_origins.contains(&origin)
+        provenance.lower_origins().iter().any(|&origin| {
+            other_provenance.materialization_origins().contains(&origin)
                 && (provenance.concrete_lower.is_none()
                     && self.solution == Type::Dynamic(origin.ty)
                     || !other_provenance.contains_origin(origin))
@@ -8881,6 +8955,15 @@ mod tests {
 
         assert_eq!(suppliers, 1);
         assert_eq!(origins.len(), 3);
+    }
+
+    #[test]
+    fn static_solution_provenance_stays_compact() {
+        assert!(
+            std::mem::size_of::<SolutionProvenance>()
+                <= std::mem::size_of::<Option<Type>>() + std::mem::size_of::<usize>()
+        );
+        assert!(SolutionProvenance::default().gradual.is_none());
     }
 
     #[test]

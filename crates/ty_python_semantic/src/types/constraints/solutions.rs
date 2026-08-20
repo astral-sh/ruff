@@ -531,11 +531,11 @@ impl<'db> SolutionWalker<'db> {
                 .drain(..)
                 .map(|(bound_typevar, bounds)| {
                     let mut bound = bounds.finish(db, env, bound_typevar);
-                    bound.provenance.materialization_origins = path
-                        .materialization_origins
-                        .iter()
-                        .map(|&origin| storage.gradual_origin(origin))
-                        .collect();
+                    bound.provenance.set_materialization_origins(
+                        path.materialization_origins
+                            .iter()
+                            .map(|&origin| storage.gradual_origin(origin)),
+                    );
                     bound
                 })
                 .collect();
