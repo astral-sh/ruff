@@ -41,19 +41,24 @@ use itertools::Either;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, name::Name};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{KnownModule, file_to_module};
+use ty_module_resolver::{
+    ImportingFile, KnownModule, Module, file_to_module, resolve_module_for_import_from,
+    stub_file_to_real_module,
+};
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::scope::{FileScopeId, ScopeId, ScopeKind};
 use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use_def_map};
 
-use crate::Db;
+use crate::definition_resolution::{DefinitionResolution, definitions_for_module_global};
 use crate::types::function::{FunctionType, KnownFunction};
+use crate::types::ide_support::{ResolvedDefinition, map_stub_definition};
 use crate::types::infer::{function_known_decorators, infer_definition_types, original_class_type};
 use crate::types::signatures::Parameter as SignatureParameter;
 use crate::types::{
     ClassBase, ClassLiteral, ProgramEnvironment, Type, definition_expression_type,
-    extract_fixed_length_iterable_element_types,
+    exists_at_runtime, extract_fixed_length_iterable_element_types,
 };
+use crate::{Db, FxIndexSet};
 
 /// Resolves pytest fixtures requested by `parameter`.
 ///
@@ -328,7 +333,7 @@ fn is_mock_patch_parameter<'db>(
 }
 
 /// A decorated fixture function.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct FixtureDeclaration<'db> {
     // The definition for the fixture function.
     definition: Definition<'db>,
@@ -340,18 +345,21 @@ struct FixtureDeclaration<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct FixtureExposure<'db> {
     name: Name,
-    declaration: FixtureDeclaration<'db>,
+    definition: Definition<'db>,
 }
 
 impl<'db> FixtureExposure<'db> {
     /// Exposes a declaration under its explicit fixture name or local Python binding name.
-    fn new(symbol_name: &Name, declaration: FixtureDeclaration<'db>) -> Option<Self> {
+    fn new(symbol_name: &Name, declaration: &FixtureDeclaration<'db>) -> Option<Self> {
         let name = match &declaration.name {
             FixtureName::Default => symbol_name.clone(),
             FixtureName::Explicit(name) => name.clone(),
             FixtureName::Unknown => return None,
         };
-        Some(Self { name, declaration })
+        Some(Self {
+            name,
+            definition: declaration.definition,
+        })
     }
 }
 
@@ -366,7 +374,7 @@ struct FixtureProviderName<'db> {
 }
 
 /// How a fixture decorator determines the fixture's public name.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum FixtureName {
     /// Uses the Python binding name at the exposure site.
     Default,
@@ -397,25 +405,53 @@ fn fixture_provider_names<'db>(
 ) -> Box<[FixtureProviderName<'db>]> {
     let is_class_scope = scope.node(db).scope_kind() == ScopeKind::Class;
     let table = place_table(db, scope);
-    use_def_map(db, scope)
-        .all_end_of_scope_symbol_bindings()
-        .filter_map(|(symbol_id, definitions)| {
-            let symbol = table.symbol(symbol_id);
-            let name = symbol.name().clone();
-            let is_bound_class_attribute = is_class_scope && symbol.is_bound();
-            let exposures: Box<[_]> = definitions
-                .filter_map(|binding| binding.binding.definition())
-                .filter_map(|definition| fixture_declaration(db, definition).clone())
-                .filter_map(|declaration| FixtureExposure::new(&name, declaration))
-                .collect();
-            // Reject names that neither expose a fixture nor bind a class attribute that can
-            // shadow an inherited fixture.
-            if exposures.is_empty() && !is_bound_class_attribute {
-                return None;
+    let mut provider_names = Vec::new();
+
+    for (symbol_id, bindings) in use_def_map(db, scope).all_end_of_scope_symbol_bindings() {
+        let symbol = table.symbol(symbol_id);
+        let name = symbol.name();
+        let is_bound_class_attribute = is_class_scope && symbol.is_bound();
+        let mut exposures = Vec::new();
+        let resolution = DefinitionResolution::from_bindings(db, bindings);
+
+        for definition in resolution.definitions().iter().copied() {
+            let fixture_definitions: &[Definition<'db>] = if definition.file(db).is_stub(db) {
+                fixture_definitions_for_definition(db, definition, name.clone())
+            } else {
+                match definition.kind(db) {
+                    DefinitionKind::Function(_) => &[definition],
+                    DefinitionKind::ImportFrom(_) | DefinitionKind::StarImport(_)
+                        if exists_at_runtime(db, definition) =>
+                    {
+                        fixture_definitions_for_definition(db, definition, name.clone())
+                    }
+                    _ => continue,
+                }
+            };
+
+            for fixture_definition in fixture_definitions {
+                let Some(declaration) = fixture_declaration(db, *fixture_definition) else {
+                    continue;
+                };
+                let Some(exposure) = FixtureExposure::new(name, declaration) else {
+                    continue;
+                };
+                exposures.push(exposure);
             }
-            Some(FixtureProviderName { name, exposures })
-        })
-        .collect()
+        }
+
+        // Reject names that neither expose a fixture nor bind a class attribute that can
+        // shadow an inherited fixture.
+        if exposures.is_empty() && !is_bound_class_attribute {
+            continue;
+        }
+        provider_names.push(FixtureProviderName {
+            name: name.clone(),
+            exposures: exposures.into_boxed_slice(),
+        });
+    }
+
+    provider_names.into_boxed_slice()
 }
 
 /// Resolves a request against the fixture exposures in `provider`.
@@ -437,14 +473,14 @@ fn bindings_in_provider<'db>(
     };
 
     let mut seen_names = FxHashSet::default();
-    let mut winning_name: Option<Name> = None;
-    let mut bindings = Vec::new();
+    let mut winning_name: Option<&Name> = None;
+    let mut fixtures = FxIndexSet::default();
 
     for provider_scope in provider_scopes {
         for provider_name in fixture_provider_names(db, provider_scope) {
             let symbol_name = &provider_name.name;
             // A name supplied by an earlier scope shadows the same name here.
-            if !seen_names.insert(symbol_name.clone()) {
+            if !seen_names.insert(symbol_name) {
                 continue;
             }
 
@@ -452,7 +488,7 @@ fn bindings_in_provider<'db>(
                 // Request must match public name of the fixture
                 if request.name != exposure.name
                     // A fixture definition cannot fulfill a request for itself
-                    || request.function_definition == exposure.declaration.definition
+                    || request.function_definition == exposure.definition
                 {
                     continue;
                 }
@@ -466,23 +502,26 @@ fn bindings_in_provider<'db>(
                 // Fixture discovery: https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/fixtures.py#L1852-L1880
                 // Registration order: https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/fixtures.py#L1788-L1797
                 // Fixture selection: https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/fixtures.py#L583-L599
-                match winning_name.as_ref().map(|winner| winner.cmp(symbol_name)) {
+                match winning_name.map(|winner| winner.cmp(symbol_name)) {
                     Some(Ordering::Greater) => continue,
                     Some(Ordering::Less) | None => {
-                        winning_name = Some(symbol_name.clone());
-                        bindings.clear();
+                        winning_name = Some(symbol_name);
+                        fixtures.clear();
                     }
                     Some(Ordering::Equal) => {}
                 }
-                bindings.push(FixtureBinding {
-                    request: request.parameter_definition,
-                    fixture: exposure.declaration.definition,
-                });
+                fixtures.insert(exposure.definition);
             }
         }
     }
 
-    bindings.into_boxed_slice()
+    fixtures
+        .into_iter()
+        .map(|fixture| FixtureBinding {
+            request: request.parameter_definition,
+            fixture,
+        })
+        .collect()
 }
 
 /// Returns a fixture declaration for a function with a canonical pytest fixture decorator.
@@ -518,6 +557,121 @@ fn fixture_declaration<'db>(
         })
     });
     Some(FixtureDeclaration { definition, name })
+}
+
+/// Returns fixture function candidates reachable from a provider definition.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Salsa query arguments are owned cache keys"
+)]
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial=|_, _, _, _| Box::default(),
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn fixture_definitions_for_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    provider_name: Name,
+) -> Box<[Definition<'db>]> {
+    if definition.file(db).is_stub(db) {
+        let Some(source_module) =
+            stub_file_to_real_module(db, definition.program_file(db).resolver_file(db))
+        else {
+            return Box::default();
+        };
+
+        if definition.scope(db).node(db).scope_kind() == ScopeKind::Class {
+            return map_stub_definition(db, &ResolvedDefinition::Definition(definition), None)
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|definition| definition.definition())
+                .filter(|definition| exists_at_runtime(db, *definition))
+                .collect();
+        }
+
+        return fixture_definitions_for_module_global(
+            db,
+            definition,
+            source_module,
+            &provider_name,
+        );
+    }
+
+    match definition.kind(db) {
+        DefinitionKind::ImportFrom(import) => {
+            let parsed = parsed_module(db, definition.python_file(db)).load(db);
+            fixture_definitions_for_import(
+                db,
+                definition,
+                import.import(&parsed),
+                import.alias(&parsed).name.id(),
+            )
+        }
+        DefinitionKind::StarImport(import) => {
+            let parsed = parsed_module(db, definition.python_file(db)).load(db);
+            fixture_definitions_for_import(db, definition, import.import(&parsed), &provider_name)
+        }
+        _ => Box::default(),
+    }
+}
+
+/// Follows an import to fixture function candidates exposed by its target.
+fn fixture_definitions_for_import<'db>(
+    db: &'db dyn Db,
+    importing_definition: Definition<'db>,
+    import: &ast::StmtImportFrom,
+    name: &Name,
+) -> Box<[Definition<'db>]> {
+    let program_file = importing_definition.program_file(db);
+    let importing_file =
+        ImportingFile::File(program_file.file(db), program_file.resolver_environment(db));
+    let Some(imported_module) = resolve_module_for_import_from(db, importing_file, import) else {
+        return Box::default();
+    };
+
+    fixture_definitions_for_module_global(db, importing_definition, imported_module, name)
+}
+
+/// Returns fixture function candidates supplied by one module global.
+fn fixture_definitions_for_module_global<'db>(
+    db: &'db dyn Db,
+    importing_definition: Definition<'db>,
+    module: Module<'db>,
+    name: &Name,
+) -> Box<[Definition<'db>]> {
+    let environment = ProgramEnvironment::from_definition(importing_definition);
+    let Some(resolution) =
+        definitions_for_module_global(db, environment.program(db), module, name.as_str())
+    else {
+        return Box::default();
+    };
+
+    let mut seen = FxHashSet::default();
+    let mut fixture_definitions = Vec::new();
+    for definition in resolution.definitions().iter().copied() {
+        if !definition.file(db).is_stub(db) {
+            match definition.kind(db) {
+                DefinitionKind::Function(_) if exists_at_runtime(db, definition) => {
+                    if seen.insert(definition) {
+                        fixture_definitions.push(definition);
+                    }
+                    continue;
+                }
+                DefinitionKind::ImportFrom(_) | DefinitionKind::StarImport(_)
+                    if exists_at_runtime(db, definition) => {}
+                _ => continue,
+            }
+        }
+
+        for fixture_definition in fixture_definitions_for_definition(db, definition, name.clone()) {
+            if seen.insert(*fixture_definition) {
+                fixture_definitions.push(*fixture_definition);
+            }
+        }
+    }
+
+    fixture_definitions.into_boxed_slice()
 }
 
 /// Classifies the `name` argument to a fixture decorator.
@@ -1483,6 +1637,336 @@ def test_use(value): ...
         assert_snapshot!(test_use.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
     }
 
+    #[test]
+    fn resolves_imported_fixture_exposures() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/fixtures.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+
+@pytest.fixture(name="public_name")
+def implementation(): ...
+"#,
+                ),
+                (
+                    "/src/reexports.py",
+                    r#"
+from fixtures import resource as middle
+"#,
+                ),
+                (
+                    "/src/star_fixtures.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def star_fixture(): ...
+"#,
+                ),
+                // Import the same explicitly named fixture twice to verify that its exposures are
+                // deduplicated.
+                (
+                    "/src/test_example.py",
+                    r#"
+from fixtures import implementation, implementation as second_exposure
+from reexports import middle as chained
+from star_fixtures import *
+
+def test_use(
+    chained,
+    public_name,
+    resource,
+    star_fixture,
+): ...
+"#,
+                ),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+
+        assert_snapshot!(test_use.fixture_resolution("chained"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/test_example.py:7:5
+          |
+        7 |     chained,
+          |     ^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/fixtures.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+        ");
+
+        assert_snapshot!(test_use.fixture_resolution("public_name"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/test_example.py:8:5
+          |
+        8 |     public_name,
+          |     ^^^^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/fixtures.py:8:5
+          |
+        8 | def implementation(): ...
+          |     --------------
+        ");
+
+        assert_snapshot!(test_use.fixture_resolution("star_fixture"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+          --> src/test_example.py:10:5
+           |
+        10 |     star_fixture,
+           |     ^^^^^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/star_fixtures.py:5:5
+          |
+        5 | def star_fixture(): ...
+          |     ------------
+        ");
+
+        assert_snapshot!(test_use.fixture_resolution("resource"), @"No fixture resolved for parameter `resource`");
+    }
+
+    #[test]
+    fn resolves_imported_fixture_declarations_from_source_when_available() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                // Use the same symbol and fixture name at module and class scope so
+                // stub mapping must preserve the class path.
+                (
+                    "/src/fixtures.py",
+                    r#"
+import pytest
+
+@pytest.fixture(name="public_name")
+def implementation(): ...
+
+class Base:
+    @pytest.fixture(name="public_name")
+    def implementation(self): ...
+"#,
+                ),
+                // Expose `implementation` only through a synthetic lazy binding in the stub.
+                // The binding must survive long enough for fixture discovery to inspect the source.
+                (
+                    "/src/fixtures.pyi",
+                    r#"
+def initialize() -> None:
+    global implementation
+    implementation = ...
+
+class Base:
+    def implementation(self): ...
+"#,
+                ),
+                (
+                    "/src/test_example.py",
+                    r#"
+from fixtures import Base, implementation
+
+def test_use(public_name): ...
+
+class TestExample(Base):
+    def test_inherited(self, public_name): ...
+"#,
+                ),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+
+        assert_snapshot!(test_use.fixture_resolution("public_name"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/test_example.py:4:14
+          |
+        4 | def test_use(public_name): ...
+          |              ^^^^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/fixtures.py:5:5
+          |
+        5 | def implementation(): ...
+          |     --------------
+        ");
+
+        let test_inherited = test.function("TestExample.test_inherited");
+
+        assert_snapshot!(test_inherited.fixture_resolution("public_name"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/test_example.py:7:30
+          |
+        7 |     def test_inherited(self, public_name): ...
+          |                              ^^^^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/fixtures.py:9:9
+          |
+        9 |     def implementation(self): ...
+          |         --------------
+        ");
+    }
+
+    #[test]
+    fn ignores_overwritten_imported_fixtures() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/origin.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+"#,
+                ),
+                (
+                    "/src/provider.py",
+                    r#"
+from origin import resource
+
+resource = object()
+"#,
+                ),
+                (
+                    "/src/test_example.py",
+                    r#"
+from origin import resource as local_resource
+from provider import resource
+
+local_resource = object()
+
+def test_use(local_resource, resource): ...
+"#,
+                ),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+
+        assert_snapshot!(test_use.fixture_resolution("local_resource"), @"No fixture resolved for parameter `local_resource`");
+        assert_snapshot!(test_use.fixture_resolution("resource"), @"No fixture resolved for parameter `resource`");
+    }
+
+    #[test]
+    fn preserves_conditional_imported_fixture_definitions() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/first.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def first(): ...
+"#,
+                ),
+                (
+                    "/src/second.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def second(): ...
+"#,
+                ),
+                (
+                    "/src/test_example.py",
+                    r#"
+flag: bool
+
+if flag:
+    from first import first as resource
+else:
+    from second import second as resource
+
+def test_use(resource): ...
+"#,
+                ),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+
+        assert_snapshot!(test_use.fixture_resolution("resource"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/test_example.py:9:14
+          |
+        9 | def test_use(resource): ...
+          |              ^^^^^^^^ fixture requested here
+        info: Found 2 fixtures
+         --> src/first.py:5:5
+          |
+        5 | def first(): ...
+          |     -----
+          |
+         ::: src/second.py:5:5
+          |
+        5 | def second(): ...
+          |     ------
+        ");
+    }
+
+    #[test]
+    fn ignores_imported_fixture_exposures_unavailable_at_runtime() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/fixtures.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+"#,
+                ),
+                (
+                    "/src/provider.py",
+                    r#"
+from typing import TYPE_CHECKING
+import pytest
+
+if TYPE_CHECKING:
+    from fixtures import resource as typing_only_reexport
+
+    @pytest.fixture
+    def typing_only_declaration(): ...
+"#,
+                ),
+                (
+                    "/src/test_example.py",
+                    r#"
+from typing import TYPE_CHECKING
+
+from provider import *
+
+if False:
+    from fixtures import resource as unreachable
+
+if TYPE_CHECKING:
+    from fixtures import resource as typing_only
+
+def test_use(unreachable, typing_only, typing_only_declaration, typing_only_reexport): ...
+"#,
+                ),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+
+        assert_snapshot!(test_use.fixture_resolution("unreachable"), @"No fixture resolved for parameter `unreachable`");
+        assert_snapshot!(test_use.fixture_resolution("typing_only"), @"No fixture resolved for parameter `typing_only`");
+        assert_snapshot!(test_use.fixture_resolution("typing_only_declaration"), @"No fixture resolved for parameter `typing_only_declaration`");
+        assert_snapshot!(test_use.fixture_resolution("typing_only_reexport"), @"No fixture resolved for parameter `typing_only_reexport`");
+    }
+
     struct PytestTestCase {
         db: TestDb,
         path: &'static str,
@@ -1492,6 +1976,13 @@ def test_use(value): ...
         fn new(path: &'static str, source: &'static str) -> Self {
             Self {
                 db: pytest_db(path, source),
+                path,
+            }
+        }
+
+        fn with_files(path: &'static str, files: &[(&'static str, &'static str)]) -> Self {
+            Self {
+                db: pytest_db_with_files(files),
                 path,
             }
         }
@@ -1599,7 +2090,11 @@ def test_use(value): ...
     }
 
     fn pytest_db(path: &'static str, source: &'static str) -> TestDb {
-        TestDbBuilder::new()
+        pytest_db_with_files(&[(path, source)])
+    }
+
+    fn pytest_db_with_files(files: &[(&'static str, &'static str)]) -> TestDb {
+        let mut builder = TestDbBuilder::new()
             .with_third_party_packages()
             .with_file(
                 "/.venv/lib/python3.13/site-packages/_pytest/__init__.pyi",
@@ -1645,9 +2140,10 @@ from _pytest.mark.structures import MarkGenerator
 
 mark: MarkGenerator
 "#,
-            )
-            .with_file(path, source)
-            .build()
-            .expect("valid pytest test database")
+            );
+        for (path, source) in files {
+            builder = builder.with_file(*path, source);
+        }
+        builder.build().expect("valid pytest test database")
     }
 }

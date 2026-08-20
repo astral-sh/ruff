@@ -13,7 +13,7 @@ pub use path::{SearchPath, SearchPathError};
 pub use resolve::{
     SearchPaths, file_to_module, resolve_module, resolve_module_confident,
     resolve_module_for_import_from, resolve_real_module, resolve_real_module_confident,
-    resolve_real_shadowable_module,
+    resolve_real_shadowable_module, stub_file_to_real_module,
 };
 pub use settings::{SearchPathSettings, SearchPathSettingsError};
 pub use strategy::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
