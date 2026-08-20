@@ -46,9 +46,10 @@ pub(crate) struct Script<'db> {
     #[returns(copy)]
     pub(crate) has_valid_settings: bool,
 
+    /// Diagnostics generated while parsing the script metadata and resolving its settings.
     #[tracked]
     #[returns(deref)]
-    pub(crate) diagnostics: Box<[Diagnostic]>,
+    pub(crate) settings_diagnostics: Box<[Diagnostic]>,
 }
 
 impl<'db> Script<'db> {
@@ -326,4 +327,88 @@ fn invalid_script_metadata_diagnostic(
         Span::from(file).with_optional_range(range),
     ));
     diagnostic
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
+    use ruff_db::testing::assert_function_query_was_not_run;
+    use ty_python_semantic::Db as _;
+
+    use crate::db::testing::TestDb;
+    use crate::{Db as _, ProjectMetadata};
+
+    use super::{Script, script};
+
+    #[test]
+    fn ordinary_files_do_not_depend_on_open_files() -> anyhow::Result<()> {
+        let mut db = TestDb::new(ProjectMetadata::new(
+            "test",
+            SystemPathBuf::from("/project"),
+        ));
+        db.write_files([
+            ("/project/ordinary.py", "value = 1\n"),
+            ("/project/opened.py", "value = 2\n"),
+        ])?;
+        let ordinary = system_path_to_file(&db, SystemPath::new("/project/ordinary.py"))?;
+        let opened = system_path_to_file(&db, SystemPath::new("/project/opened.py"))?;
+
+        assert!(Script::for_file(&db, ordinary).is_none());
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(&db, script, ordinary, &events);
+
+        assert!(script(&db, ordinary).is_none());
+        db.take_salsa_events();
+
+        db.project().open_file(&mut db, opened);
+        db.take_salsa_events();
+
+        assert!(script(&db, ordinary).is_none());
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(&db, crate::should_check_file, ordinary, &events);
+        assert_function_query_was_not_run(&db, script, ordinary, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn equivalent_script_settings_share_programs() -> anyhow::Result<()> {
+        let mut db = TestDb::new(ProjectMetadata::new(
+            "test",
+            SystemPathBuf::from("/project"),
+        ));
+        db.write_dedented(
+            "/project/requirement.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # ///
+            "#,
+        )?;
+        db.write_dedented(
+            "/project/nested/configured.py",
+            r#"
+            # /// script
+            # [tool.ty.environment]
+            # python-version = "3.12"
+            # ///
+            "#,
+        )?;
+
+        let requirement = system_path_to_file(&db, SystemPath::new("/project/requirement.py"))?;
+        let configured =
+            system_path_to_file(&db, SystemPath::new("/project/nested/configured.py"))?;
+
+        assert_eq!(
+            db.program_file(requirement).program(&db),
+            db.program_file(configured).program(&db)
+        );
+        assert_ne!(
+            db.python_version_with_source(requirement),
+            db.python_version_with_source(configured)
+        );
+
+        Ok(())
+    }
 }

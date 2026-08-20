@@ -761,7 +761,7 @@ pub(crate) fn check_file_impl(
             if let Some(script) = script
                 && !script.has_valid_settings(*db)
             {
-                return Ok(script.diagnostics(*db).to_vec().into_boxed_slice());
+                return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
             }
 
             let diagnostics = ty_python_semantic::check_file(*db, file)?;
@@ -769,13 +769,13 @@ pub(crate) fn check_file_impl(
                 return Ok(diagnostics);
             };
 
-            let script_diagnostics = script.diagnostics(*db);
-            if script_diagnostics.is_empty() {
+            let settings_diagnostics = script.settings_diagnostics(*db);
+            if settings_diagnostics.is_empty() {
                 return Ok(diagnostics);
             }
 
             let mut diagnostics = diagnostics.into_vec();
-            diagnostics.extend(script_diagnostics.iter().cloned());
+            diagnostics.extend(settings_diagnostics.iter().cloned());
             Ok(diagnostics.into_boxed_slice())
         }) {
             Ok(result) => result,
