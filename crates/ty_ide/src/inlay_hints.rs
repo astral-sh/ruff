@@ -110,13 +110,32 @@ impl InlayHint {
                             return None;
                         }
 
-                        let module_name = module.name(db).as_str();
+                        let mut best_module_name = module.name(db).as_str().to_string();
+                        let importing_file = ty_module_resolver::ImportingFile::ResolverFile(file.resolver_file(db));
+                        
+                        // Try to find the highest public ancestor module that exports this definition.
+                        for ancestor in module.name(db).ancestors().skip(1) {
+                            if let Some(ancestor_module) = ty_module_resolver::resolve_module(db, importing_file, &ancestor) {
+                                if ancestor_module.name(db).is_private() {
+                                    continue;
+                                }
+
+                                if let Some(ancestor_file) = ancestor_module.file(db) {
+                                    let ancestor_program_file = ty_python_core::ProgramFile::new(db, ancestor_file, file.program(db));
+                                    let symbols = crate::symbols::symbols_for_file_global_only(db, ancestor_program_file);
+                                    
+                                    if symbols.search(&crate::symbols::QueryPattern::exactly(definition_name)).next().is_some() {
+                                        best_module_name = ancestor_module.name(db).as_str().to_string();
+                                    }
+                                }
+                            }
+                        }
 
                         dynamic_importer.import_symbol(
                             db,
                             &env,
                             ty,
-                            module_name,
+                            &best_module_name,
                             definition_name,
                             &details.label[start..end],
                         )
