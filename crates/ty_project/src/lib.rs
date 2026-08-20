@@ -314,11 +314,11 @@ impl Project {
         self,
         db: &mut dyn Db,
         path: &SystemPath,
-        uv_workspace: Option<uv::UvMetadata>,
+        environment: uv::ProjectEnvironment,
     ) -> Result<ProjectReloadResult, ProjectMetadataError> {
         let mut metadata = self
             .metadata(db)
-            .rediscover(db.system(), path, uv_workspace)?;
+            .rediscover(db.system(), path, environment)?;
         if let Err(error) = metadata.apply_configuration_files(db.system()) {
             let error = anyhow::Error::new(error);
             tracing::error!(
@@ -436,11 +436,7 @@ impl Project {
             name = self.name(db)
         );
 
-        let mut diagnostics: Vec<Diagnostic> = self
-            .settings_diagnostics(db)
-            .iter()
-            .map(OptionDiagnostic::to_diagnostic)
-            .collect();
+        let mut diagnostics = self.check_settings(db);
 
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
@@ -735,6 +731,7 @@ impl Project {
         self.settings_diagnostics(db)
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
+            .chain(self.metadata(db).uv_diagnostic(db))
             .collect()
     }
 }
