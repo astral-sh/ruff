@@ -342,6 +342,120 @@ def _(
     reveal_type(bottom_aiu)  # revealed: Bottom[list[tuple[Any, int, Unknown]]]
 ```
 
+## Gradual tuple length in invariant positions
+
+An unrestricted variable-length tuple with dynamic elements can materialize to an empty tuple. The
+top materialization of an enclosing invariant generic includes that specialization, and its bottom
+materialization is a subtype of it.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Any, Generic, TypeVar, TypeVarTuple
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class Box(Generic[T]): ...
+
+static_assert(is_subtype_of(Box[tuple[()]], Top[Box[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(Box[tuple[()]], Top[Box[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(Top[Box[tuple[Any, ...]]], Box[tuple[()]]))
+static_assert(is_subtype_of(Bottom[Box[tuple[Any, ...]]], Box[tuple[()]]))
+static_assert(not is_subtype_of(Box[tuple[()]], Bottom[Box[tuple[Any, ...]]]))
+```
+
+The same gradual-length choice also includes nonempty, fixed-length tuple specializations.
+
+```py
+static_assert(is_subtype_of(Box[tuple[int]], Top[Box[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(Box[tuple[int]], Top[Box[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(Top[Box[tuple[Any, ...]]], Box[tuple[int]]))
+static_assert(is_subtype_of(Bottom[Box[tuple[Any, ...]]], Box[tuple[int]]))
+static_assert(not is_subtype_of(Box[tuple[int]], Bottom[Box[tuple[Any, ...]]]))
+```
+
+An exact tuple remains a valid materialization when its element is spelled through a type alias.
+
+```py
+from typing_extensions import TypeAliasType
+
+ItemAlias = TypeAliasType("ItemAlias", int)
+
+static_assert(is_subtype_of(Box[tuple[ItemAlias]], Top[Box[tuple[Any, ...]]]))
+```
+
+Aliases around the entire tuple still need to be resolved before comparing the materialization
+families.
+
+```py
+FixedTupleAlias = TypeAliasType("FixedTupleAlias", tuple[int])
+
+# TODO: Resolve aliases around the entire tuple in invariant subtyping.
+static_assert(is_subtype_of(Box[FixedTupleAlias], Top[Box[tuple[Any, ...]]]))  # error: [static-assert-error]
+```
+
+A gradual fixed-length tuple has a narrower materialization range than an unrestricted gradual
+tuple. Their top bounds preserve that containment, while their bottom bounds reverse it.
+
+```py
+static_assert(is_subtype_of(Top[Box[tuple[Any]]], Top[Box[tuple[Any, ...]]]))
+static_assert(not is_subtype_of(Top[Box[tuple[Any, ...]]], Top[Box[tuple[Any]]]))
+static_assert(is_subtype_of(Bottom[Box[tuple[Any, ...]]], Bottom[Box[tuple[Any]]]))
+static_assert(not is_subtype_of(Bottom[Box[tuple[Any]]], Bottom[Box[tuple[Any, ...]]]))
+static_assert(not is_subtype_of(Top[Box[tuple[Any, ...]]], Bottom[Box[tuple[Any, ...]]]))
+```
+
+An unpacked type variable tuple is another valid exact-tuple specialization, even though its length
+is not known.
+
+```py
+def symbolic(value: Box[tuple[*Ts]]) -> None:
+    static_assert(is_subtype_of(Box[tuple[*Ts]], Top[Box[tuple[Any, ...]]]))
+    static_assert(not is_disjoint_from(Box[tuple[*Ts]], Top[Box[tuple[Any, ...]]]))
+    static_assert(not is_disjoint_from(Top[Box[tuple[Any, ...]]], Box[tuple[*Ts]]))
+    static_assert(is_subtype_of(Bottom[Box[tuple[Any, ...]]], Box[tuple[*Ts]]))
+    static_assert(not is_subtype_of(Box[tuple[*Ts]], Bottom[Box[tuple[Any, ...]]]))
+```
+
+A tuple subclass is not itself a materialization of the exact built-in `tuple[Any, ...]` type. The
+surrounding invariant generic must therefore keep the subclass distinct.
+
+```py
+class IntTuple(tuple[int]): ...
+
+static_assert(is_subtype_of(IntTuple, tuple[object, ...]))
+static_assert(not is_subtype_of(Box[IntTuple], Top[Box[tuple[Any, ...]]]))
+static_assert(is_disjoint_from(Box[IntTuple], Top[Box[tuple[Any, ...]]]))
+static_assert(is_disjoint_from(Top[Box[tuple[Any, ...]]], Box[IntTuple]))
+static_assert(not is_subtype_of(Bottom[Box[tuple[Any, ...]]], Box[IntTuple]))
+```
+
+A static homogeneous tuple does not make a gradual choice of length, even though every `int` is an
+`object`.
+
+```py
+static_assert(not is_subtype_of(Box[tuple[int]], Top[Box[tuple[object, ...]]]))
+static_assert(is_disjoint_from(Box[tuple[int]], Top[Box[tuple[object, ...]]]))
+```
+
+Fixed elements in a mixed tuple must also retain their invariant identity. In particular, a `bool`
+prefix cannot replace the required `int` prefix simply because `bool` is a subtype of `int`.
+
+```py
+static_assert(not is_subtype_of(Box[tuple[bool, str]], Top[Box[tuple[int, *tuple[Any, ...]]]]))
+static_assert(is_disjoint_from(Box[tuple[bool, str]], Top[Box[tuple[int, *tuple[Any, ...]]]]))
+```
+
+TODO: Handle valid mixed gradual-length tuples without losing their required prefix and suffix
+elements. For example, `Box[tuple[int, str]]` should be a subtype of
+`Top[Box[tuple[int, *tuple[Any, ...]]]]`.
+
 ## Union
 
 All positions in a union are covariant.
