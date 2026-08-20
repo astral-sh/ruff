@@ -104,7 +104,6 @@ impl UvEnvironments {
     }
 
     /// Reads workspace metadata through the same worker pool used by scripts.
-    #[expect(dead_code, reason = "Project reloads will use this in a follow-up")]
     pub(crate) fn workspace_metadata(
         &self,
         db: &dyn Db,

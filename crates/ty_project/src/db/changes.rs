@@ -240,7 +240,30 @@ impl ProjectDatabase {
         Files::sync_all_recursive(self, sync_recursively);
 
         if reload_project {
-            match project.rediscover(self) {
+            // The active project root may have been deleted. Start rediscovery from the closest
+            // existing ancestor so ty can fall back to an enclosing project.
+            let path = project_root
+                .ancestors()
+                .find(|path| self.system().is_directory(path))
+                .unwrap_or(&project_root);
+            let metadata = project.metadata(self);
+            let uv_workspace = if metadata.use_uv().workspace_discovery_enabled()
+                && metadata.config_file_override().is_none()
+            {
+                match self.uv_environments().workspace_metadata(self, path) {
+                    Ok(metadata) => Some(metadata),
+                    Err(error) => {
+                        // A failed refresh must not discard the last working uv metadata.
+                        tracing::warn!("{error}");
+                        metadata.uv_workspace().cloned()
+                    }
+                }
+            } else {
+                // No uv refresh is needed, so preserve the applied environment while
+                // rediscovering the project configuration.
+                metadata.uv_workspace().cloned()
+            };
+            match project.rediscover(self, path, uv_workspace) {
                 Ok(ProjectReloadResult::Unchanged) => {}
                 Ok(ProjectReloadResult::Changed { files_changed }) => {
                     result.project_changed = true;
