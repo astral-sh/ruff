@@ -79,7 +79,7 @@ impl serde::Serialize for NoqaCode {
 }
 
 #[derive(Debug, Copy, Clone, Serialize)]
-pub enum RuleGroup {
+pub enum RuleStatus {
     /// The rule is stable since the provided Ruff version.
     Stable { since: &'static str },
     /// The rule has been unstable since the provided Ruff version, and preview mode must be enabled
@@ -93,7 +93,7 @@ pub enum RuleGroup {
 }
 
 #[ruff_macros::map_codes]
-pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
+pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
     #[expect(clippy::enum_glob_use)]
     use Linter::*;
 
