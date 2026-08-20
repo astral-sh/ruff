@@ -410,8 +410,13 @@ impl ProjectMetadata {
         self
     }
 
-    /// Rediscovers the project, while preserving applied options.
-    pub(crate) fn rediscover(&self, system: &dyn System) -> Result<Self, ProjectMetadataError> {
+    /// Rediscovers the project from `path`, while preserving applied options.
+    pub(crate) fn rediscover(
+        &self,
+        system: &dyn System,
+        path: &SystemPath,
+        uv_workspace: Option<uv::UvMetadata>,
+    ) -> Result<Self, ProjectMetadataError> {
         let mut metadata = if let Some(config_file) = self.config_file_override() {
             Self::from_config_file_with_uv(
                 config_file.to_path_buf(),
@@ -419,15 +424,9 @@ impl ProjectMetadata {
                 system,
                 self.use_uv,
             )?
+            .with_uv_workspace(uv_workspace)
         } else {
-            // The active project root may have been deleted. Start rediscovery from the closest
-            // existing ancestor so ty can fall back to an enclosing project.
-            let rediscovery_path = self
-                .root()
-                .ancestors()
-                .find(|path| system.is_directory(path))
-                .unwrap_or_else(|| self.root());
-            Self::discover_with_uv(rediscovery_path, system, self.use_uv)?
+            Self::discover_with_uv_workspace(path, system, uv_workspace)?.with_use_uv(self.use_uv)
         };
 
         metadata.override_options.clone_from(&self.override_options);
@@ -493,6 +492,10 @@ impl ProjectMetadata {
 
     pub fn has_uv_workspace(&self) -> bool {
         self.uv_workspace.is_some()
+    }
+
+    pub(crate) fn uv_workspace(&self) -> Option<&uv::UvMetadata> {
+        self.uv_workspace.as_ref()
     }
 
     /// Applies lower-precedence options to this project.

@@ -308,12 +308,17 @@ impl Project {
         )
     }
 
-    /// Rediscovers this project and applies its metadata and settings.
+    /// Rediscovers this project from `path` and applies its metadata and settings.
+    /// If discovery fails, the project is left unchanged.
     pub(crate) fn rediscover(
         self,
         db: &mut dyn Db,
+        path: &SystemPath,
+        uv_workspace: Option<uv::UvMetadata>,
     ) -> Result<ProjectReloadResult, ProjectMetadataError> {
-        let mut metadata = self.metadata(db).rediscover(db.system())?;
+        let mut metadata = self
+            .metadata(db)
+            .rediscover(db.system(), path, uv_workspace)?;
         if let Err(error) = metadata.apply_configuration_files(db.system()) {
             let error = anyhow::Error::new(error);
             tracing::error!(
