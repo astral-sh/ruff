@@ -3466,7 +3466,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty)) => {
                 nontrivial_check(self, || match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => {
+                    SubclassOfInner::Dynamic(_) | SubclassOfInner::Protocol(_) => {
                         self.check_type_pair(db, KnownClass::Type.to_instance(db, env), other)
                     }
                     SubclassOfInner::Class(_) => self.check_type_pair(
@@ -3474,9 +3474,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         subclass_of_ty.to_metaclass_instance(db, env),
                         other,
                     ),
-                    SubclassOfInner::Protocol(_) => {
-                        self.check_type_pair(db, KnownClass::Type.to_instance(db, env), other)
-                    }
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 })
             }

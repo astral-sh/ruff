@@ -171,24 +171,23 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTyp
 ## Class-preserving decorators
 
 A decorator that returns its class argument preserves the generic context of a base class. A
-subclass can forward type variables to the decorated base.
+subclass can forward a type variable to the decorated base.
 
 ```py
 import collections.abc
 from typing import Generic, TypeVar
 from ty_extensions._internal import generic_context
 
-K = TypeVar("K")
-V = TypeVar("V")
+T = TypeVar("T")
 
 @collections.abc.Mapping.register
-class Mapping(Generic[K, V]): ...
+class Base(Generic[T]): ...
 
-reveal_type(generic_context(Mapping))  # revealed: ty_extensions._internal.GenericContext[K@Mapping, V@Mapping]
+reveal_type(generic_context(Base))  # revealed: ty_extensions._internal.GenericContext[T@Base]
 
-class FrozenDict(Mapping[K, V]): ...
+class Child(Base[T]): ...
 
-mapping: FrozenDict[str, int]
+child: Child[int]
 ```
 
 ## Specializing classes with unavailable generic context

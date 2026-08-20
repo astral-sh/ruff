@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use ruff_db::files::FilePath;
+
 use crate::ProgramEnvironment;
 use crate::types::class::{ClassMetaclass, CodeGeneratorKind};
 use crate::types::generics::{ApplySpecialization, Specialization};
@@ -363,9 +365,9 @@ impl<'db> ClassBase<'db> {
 
     /// Return this base's selected metaclass or inferred protocol fallback.
     ///
-    /// `subclass` is the class whose declaration names this base. Only a direct `Protocol`
-    /// base depends on whether that declaration is in a stub; named bases retain their own
-    /// metaclass constraints or fallback regardless of where they are inherited.
+    /// `subclass` is the class whose declaration names this base. Only a direct `Protocol` base
+    /// depends on whether its declaration is in the bundled or configured typeshed stdlib;
+    /// named bases retain their own metaclass constraints or fallback wherever they are inherited.
     pub(super) fn inferred_metaclass(
         self,
         db: &'db dyn Db,
@@ -374,10 +376,25 @@ impl<'db> ClassBase<'db> {
     ) -> ClassMetaclass<'db> {
         let metaclass = match self {
             Self::Class(class) => return class.inferred_metaclass(db),
-            Self::Protocol if subclass.file(db).is_stub(db) => {
-                return ClassMetaclass::ProtocolFallback;
+            Self::Protocol => {
+                let file = subclass.file(db);
+                // Use the file's location rather than its resolved module: a custom typeshed
+                // directory can also be inside a first-party search path.
+                let is_typeshed_stub = file.is_stub(db)
+                    && match file.path(db) {
+                        FilePath::Vendored(path) => path.strip_prefix("stdlib").is_ok(),
+                        FilePath::System(path) => subclass
+                            .program_file(db)
+                            .program(db)
+                            .custom_stdlib_search_path(db)
+                            .is_some_and(|stdlib| path.starts_with(stdlib)),
+                        FilePath::SystemVirtual(_) => false,
+                    };
+                if is_typeshed_stub {
+                    return ClassMetaclass::ProtocolFallback;
+                }
+                KnownClass::ProtocolMeta.to_class_literal(db, env)
             }
-            Self::Protocol => KnownClass::ProtocolMeta.to_class_literal(db, env),
             Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),

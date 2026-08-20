@@ -291,8 +291,8 @@ reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 
 ## Protocol metaclasses
 
-A protocol declared in Python source uses `typing._ProtocolMeta`. Nominal subclasses inherit this
-metaclass and the abstract base class methods it provides through `ABCMeta`.
+By default, a protocol declared outside typeshed uses `typing._ProtocolMeta`. Nominal subclasses
+inherit this metaclass and the abstract base class methods it provides through `ABCMeta`.
 
 ```py
 from typing import Protocol, _ProtocolMeta

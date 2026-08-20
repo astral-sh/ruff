@@ -668,9 +668,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                         metaclass_of_class = metaclass1
                             .class_literal(db)
                             .display_with(db, settings.clone()),
-                        metaclass_of_base = metaclass2
-                            .class_literal(db)
-                            .display_with(db, settings.clone()),
+                        metaclass_of_base = metaclass2.class_literal(db).display_with(db, settings),
                     ));
                 }
             }

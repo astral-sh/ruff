@@ -3351,19 +3351,19 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
-/// A selected metaclass, or the `ABCMeta` fallback inferred from a stub-only protocol base.
+/// A selected metaclass, or the `ABCMeta` fallback inferred from a typeshed stdlib protocol base.
 ///
-/// Stub files can list `Protocol` as a base even when the runtime class does not inherit from it;
-/// typeshed does this for collection ABCs. Inferring a metaclass constraint from those bases would
-/// therefore produce false conflicts. The fallback exposes ABC methods such as `register`, but
-/// does not participate in metaclass selection.
+/// Typeshed lists `Protocol` as a base for some classes, such as collection ABCs, that do not
+/// inherit from it at runtime. Inferring a metaclass constraint from those bases would therefore
+/// produce false conflicts. The fallback exposes ABC methods such as `register`, but does not
+/// participate in metaclass selection.
 ///
-/// A `Protocol` base declared in source instead selects its actual `_ProtocolMeta` metaclass,
-/// which participates in metaclass selection and constrains subclasses in the usual way.
+/// Outside those stubs, a `Protocol` base selects its actual `_ProtocolMeta` metaclass, even in a
+/// stub file. It participates in metaclass selection and constrains subclasses in the usual way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum ClassMetaclass<'db> {
     Selected(Type<'db>),
-    /// A lookup-only fallback originating in a stub. Inheritance preserves this provenance.
+    /// A lookup-only fallback originating in typeshed. Inheritance preserves this provenance.
     ProtocolFallback,
 }
 
@@ -3391,7 +3391,7 @@ impl<'db> ClassMetaclass<'db> {
         }
     }
 
-    /// Return the metaclass guaranteed by class declarations, without the stub-only fallback.
+    /// Return the metaclass guaranteed by class declarations, without the typeshed fallback.
     pub(super) fn for_inheritance(
         self,
         db: &'db dyn Db,
