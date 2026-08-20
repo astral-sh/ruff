@@ -20,7 +20,6 @@ pub struct Program<'db> {
     #[returns(copy)]
     pub resolver_environment: ResolverEnvironment<'db>,
 
-    /// The path to the Python executable for the resolved environment, if known.
     #[returns(ref)]
     pub python_executable: Option<SystemPathBuf>,
 }
