@@ -336,6 +336,41 @@ class D[T]:
         contextual: D[int] = D()
 ```
 
+By contrast, calling a class-object value constructs its existing instance type. The constructor
+cannot infer a new specialization for an enclosing type variable through a `type[Self]` receiver. An
+independently generic constructor method still owns and infers its own type variable.
+
+```py
+class Fixed[T]:
+    def __init__[U](self, value: T, extra: U) -> None: ...
+    @classmethod
+    def valid(cls, value: T) -> Self:
+        return cls(value, "extra")
+
+    @classmethod
+    def invalid(cls) -> Self:
+        # error: [invalid-argument-type]
+        return cls(0, "extra")
+```
+
+The same ownership rules apply to `__new__`.
+
+```py
+class FixedNew[T]:
+    def __new__[U](cls, value: T, extra: U) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, *args: object) -> None: ...
+    @classmethod
+    def valid(cls, value: T) -> Self:
+        return cls(value, "extra")
+
+    @classmethod
+    def invalid(cls) -> Self:
+        # error: [invalid-argument-type]
+        return cls(0, "extra")
+```
+
 ## Inferring generic class parameters from constructors
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type
@@ -519,6 +554,39 @@ reveal_type(generic_context(into_regular_callable(D)))
 
 # Because `C[T, U]` is not an instance of `D`, we never hit `D.__init__` at all.
 reveal_type(D(1))  # revealed: C[Unknown, int]
+```
+
+### Explicit access to constructors of bare generic classes
+
+Bare `__new__` and `__init__` members retain the class type variables in their generic contexts.
+Each call can infer an owner specialization, while an explicit class specialization remains
+authoritative.
+
+```py
+from typing import Self
+from ty_extensions._internal import generic_context
+
+class C[T = int]:
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, value: T) -> None: ...
+
+# revealed: ty_extensions._internal.GenericContext[Self@__new__, T@C]
+reveal_type(generic_context(C.__new__))
+# revealed: ty_extensions._internal.GenericContext[Self@__init__, T@C]
+reveal_type(generic_context(C.__init__))
+
+reveal_type(C.__new__(C[str], "value"))  # revealed: C[str]
+
+def calls(c_str: C[str], c_int: C[int]) -> None:
+    C.__init__(c_str, "value")
+    C.__init__(c_int, 1)
+
+    C[int].__init__(c_int, 1)
+
+    # error: [invalid-argument-type]
+    C[int].__init__(c_str, 1)
 ```
 
 ### Generic class inherits `__init__` from generic base class
@@ -818,6 +886,23 @@ reveal_type(generic_context(c))
 reveal_type(generic_context(c.method))
 # revealed: ty_extensions._internal.GenericContext[Self@generic_method, U@generic_method]
 reveal_type(generic_context(c.generic_method))
+```
+
+A class TypeVar remains fixed when a method is called from an enclosing generic function. The call
+cannot specialize that enclosing occurrence merely because it also appears in synthetic `Self`'s
+upper bound.
+
+```py
+class Container[T]:
+    def replace(self, value: T) -> T:
+        return value
+
+def preserve[T](container: Container[T], value: T) -> T:
+    return container.replace(value)
+
+def cannot_choose_outer[T](container: Container[T]) -> T:
+    # error: [invalid-argument-type]
+    return container.replace(1)
 ```
 
 ## Specializations propagate

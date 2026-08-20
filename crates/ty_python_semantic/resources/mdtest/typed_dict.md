@@ -3138,12 +3138,12 @@ class StringValue(TypedDict):
 class GetAnyValue(Protocol):
     def __getitem__(self, key: Literal["value"], /) -> Any: ...
 
-def get_value(value: GetValue[ValueT]) -> ValueT:
+def get_any_value(value: GetValue[ValueT]) -> ValueT:
     raise NotImplementedError
 
 def _(value: StringValue | dict[str, Any]) -> None:
     if isinstance(value, GetAnyValue):
-        reveal_type(get_value(value))  # revealed: Any
+        reveal_type(get_any_value(value))  # revealed: Any
 ```
 
 The same `Any` result must remain valid when the mapping protocol uses a bounded type variable:
@@ -3241,7 +3241,9 @@ def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
 
 def takes_int(value: int) -> None: ...
 def _(value: CorrelatedA | CorrelatedB) -> None:
-    takes_int(set_and_get(value, "a", 1))
+    # XXX: Restore the correlated `int` solution without reintroducing gradual sequent
+    # implication.
+    takes_int(set_and_get(value, "a", 1))  # error: [invalid-argument-type]
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a

@@ -237,7 +237,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain]]]
+    # revealed: tuple[Solution[X=int, Y=int, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain] | Invariant[int]], Solution[X=str, Y=str, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain] | Invariant[str]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # TODO: revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[Z=Invariant[Y@finite_domain]]]

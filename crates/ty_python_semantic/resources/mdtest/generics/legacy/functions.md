@@ -553,9 +553,11 @@ reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 
 ## Gradual invariant protocol members
 
-When the same inferred type variable appears in multiple invariant protocol members, fully static
-member types must agree on one exact specialization. Gradual members remain conservative
-alternatives because their equality cannot justify a transitive sequent proof.
+When the same inferred type variable appears in multiple invariant protocol members, the member
+types must agree on one exact specialization.
+
+Here, `first` and `second` have identical types. Even though that type is gradual, it's an obviously
+correct solution for `T`.
 
 ```py
 from typing import Any, Generic, Protocol, TypeVar
@@ -567,16 +569,31 @@ class Pair(Protocol[T]):
     first: T
     second: T
 
-class GradualPair(Generic[U]):
+class MatchingGradualPair(Generic[U]):
     first: tuple[U, Any]
-    second: tuple[U, int]
+    second: tuple[U, Any]
 
 def infer_pair(value: Pair[T]) -> T:
     raise NotImplementedError
 
-def check_pair(value: GradualPair[U]) -> None:
-    # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
-    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
+def check_matching_pair(value: MatchingGradualPair[U]) -> None:
+    # revealed: tuple[U@check_matching_pair, Any]
+    reveal_type(infer_pair(value))
+```
+
+Here, `first` and `second` do not have identical types, but the fully static type of `second` is one
+of the valid materializations of the type of `first`. We can choose the fully static type as the
+solution for `T`, since there is _some_ materialization that satisfies
+`DifferingGradualPair ≤ Pair`.
+
+```py
+class DifferingGradualPair(Generic[U]):
+    first: tuple[U, Any]
+    second: tuple[U, int]
+
+def check_differing_pair(value: DifferingGradualPair[U]) -> None:
+    # revealed: tuple[U@check_differing_pair, int]
+    reveal_type(infer_pair(value))
 ```
 
 ## Prefer specific compatible constraints over gradual constraints
@@ -618,6 +635,27 @@ specific.asDict()
 
 reveal_type(any_first(1))  # revealed: int
 reveal_type(int_first(1))  # revealed: int
+reveal_type(any_first("x"))  # revealed: Any
+reveal_type(int_first("x"))  # revealed: Any
+```
+
+## Preserve gradual container constraints
+
+A gradual container constraint remains available when the argument does not satisfy a more specific
+constraint. Arguments satisfying both constraints prefer the specific one.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", list[Any], list[int])
+
+def identity(value: T) -> T:
+    return value
+
+# XXX: revealed: list[int]
+reveal_type(identity([1]))  # revealed: list[Any] | list[int]
+# XXX: revealed: list[Any]
+reveal_type(identity(["x"]))  # revealed: list[Any] | list[int]
 ```
 
 ## Typevar inference is a unification problem
@@ -1271,8 +1309,8 @@ reveal_type(broad_first(accepts_object))  # revealed: object
 ## Ambiguous constrained TypeVar inference from `Any`
 
 A gradual argument alone provides no evidence for choosing between multiple compatible constraints.
-We currently fall back to `Unknown` rather than choosing an arbitrary concrete constraint. Ideally,
-we would preserve `Any` instead.
+
+XXX: Domain-aware solving currently unions all compatible alternatives. Preserve `Any` instead.
 
 ```py
 from typing import Any, TypeVar
@@ -1286,7 +1324,7 @@ def choose(left: T, right: T) -> T:
     return left
 
 def caller(value: Any) -> None:
-    reveal_type(identity(value))  # revealed: Any
+    reveal_type(identity(value))  # revealed: int | list[int]
     # TODO: revealed: Any
     reveal_type(choose(value, 1))  # revealed: int
 
@@ -1298,8 +1336,8 @@ def list_caller(value: list[Any]) -> None:
 
 ## Ambiguous constrained TypeVar inference from a gradual callable return
 
-Constraint-set-native inference also preserves gradual evidence nested inside a callable. As above,
-we currently fall back to `Unknown` when that evidence matches multiple constraints.
+Constraint-set-native inference should also preserve gradual evidence nested inside a callable.
+Domain-aware solving currently has the same limitation here as for a direct `Any` argument.
 
 ```py
 from typing import Any, Callable, TypeVar
@@ -1312,7 +1350,8 @@ def call(callback: Callable[[], T]) -> T:
 def callback() -> Any:
     return 1
 
-reveal_type(call(callback))  # revealed: Any
+# XXX: This should reveal `Any` rather than unioning the compatible alternatives.
+reveal_type(call(callback))  # revealed: int | list[int]
 ```
 
 ## Bounded TypeVar with callable parameter
@@ -1422,7 +1461,9 @@ def value(items: Container[T]) -> T:
     raise NotImplementedError
 
 items: list[str] = []
-reveal_type(value(items))  # revealed: Any
+# XXX: Restore `Any` without reintroducing gradual sequent implication or locally unioning
+# gradual solutions.
+reveal_type(value(items))  # revealed: object
 ```
 
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
@@ -1471,7 +1512,7 @@ reveal_type(narrow("hello"))  # revealed: str
 ## Redundant callback bounds preserve constrained type-variable relationships
 
 A contravariant callback can contribute both another constrained type variable and a redundant
-`object` upper bound. The inferred result must retain the other type variable in either callback
+`object` upper bound. The inferred result should retain the other type variable in either callback
 order.
 
 ```py

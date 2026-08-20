@@ -87,6 +87,88 @@ c.m2(1)
 c.m2("string")
 ```
 
+## Passing bounded class typevars to broader parameters
+
+A class typevar is fixed by the receiver. Passing it to an `object` parameter must not infer a new
+specialization of the class typevar from that parameter's annotation.
+
+```py
+class G[T: int]:
+    def takes_object(self, value: object) -> None: ...
+    def echo(self, value: T) -> T:
+        return value
+
+    def caller(self, value: T, other: "G[int]") -> None:
+        self.takes_object(value)
+        other.takes_object(value)
+        reveal_type(self.echo(value))  # revealed: T@G
+        # error: [invalid-argument-type] "Expected `int`"
+        other.echo("bad")
+
+    def explicit_receiver(self: "G[T]", value: T) -> None:
+        self.takes_object(value)
+```
+
+The same applies to classmethods and to membership tests, which call `__contains__`.
+
+```py
+class Container[T: int]:
+    @classmethod
+    def takes_object(cls, value: object) -> None: ...
+    def __contains__(self, value: object) -> bool:
+        return False
+
+    def caller(self, value: T) -> None:
+        self.takes_object(value)
+        self.__contains__(value)
+        reveal_type(value in self)  # revealed: bool
+```
+
+## Passing class typevars to a superclass of their bound
+
+The parameter need not be `object`: any superclass of the typevar's bound accepts its values.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+class G[T: Child]:
+    def takes_base(self, value: Base) -> None: ...
+    def caller(self, value: T) -> None:
+        self.takes_base(value)
+```
+
+## Passing constrained class typevars to broader parameters
+
+Every allowed specialization is assignable to `object`, without selecting one of the constraints
+again at the method call.
+
+```py
+class G[T: (int, str)]:
+    def takes_object(self, value: object) -> None: ...
+    def echo(self, value: T) -> T:
+        return value
+
+    def caller(self, value: T) -> None:
+        self.takes_object(value)
+        reveal_type(self.echo(value))  # revealed: T@G
+```
+
+## Passing legacy class typevars to broader parameters
+
+Legacy class typevars follow the same rule.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class G(Generic[T]):
+    def takes_object(self, value: object) -> None: ...
+    def caller(self, value: T) -> None:
+        self.takes_object(value)
+```
+
 ## Functions on generic classes are descriptors
 
 This repeats the tests in the [Functions as descriptors](./call/methods.md) test suite, but on a
@@ -116,7 +198,7 @@ reveal_type(bound_method.__func__)  # revealed: def f(self, x: int) -> str
 reveal_type(C[int]().f(1))  # revealed: str
 reveal_type(bound_method(1))  # revealed: str
 
-# error: [invalid-argument-type] "Argument to function `C.f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C[T@C]` of type variable `Self`"
+# error: [invalid-argument-type] "Argument to function `C.f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C[int]` of type variable `Self`"
 C[int].f(1)  # error: [missing-argument]
 reveal_type(C[int].f(C[int](), 1))  # revealed: str
 

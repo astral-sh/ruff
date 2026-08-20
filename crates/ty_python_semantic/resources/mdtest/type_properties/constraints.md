@@ -95,25 +95,31 @@ def _[T]() -> None:
     ConstraintSet.equality(T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
+The static-sequent boundary keeps gradual range atoms distinct from ranges over their fully static
+materializations instead of using gradual assignability to prove them equivalent.
 
 ```py
 def _[T]() -> None:
+    # TODO(ibraheem/gradual-constraints): Rewrite these as direct inequality assertions once
+    # lazy gradual constraints make preserving the distinct atoms the intended behavior.
     constraints = ConstraintSet.range(Base, T, Any)
-    expected = ConstraintSet.lower_bound(Base, T)
+    expected = ConstraintSet.range(Base, T, object)
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sequence[Base], T, Sequence[Any])
     expected = ConstraintSet.range(Sequence[Base], T, Sequence[object])
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Any, T, Base)
-    expected = ConstraintSet.upper_bound(T, Base)
+    expected = ConstraintSet.range(Never, T, Base)
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ConstraintSet.range(Sequence[Never], T, Sequence[Base])
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 ```
 
@@ -131,6 +137,17 @@ def _[T]() -> None:
     static_assert(ConstraintSet.lower_bound(int, T) == expected)
 ```
 
+An explicit `Never` lower bound still provides inference evidence, even though it is the logical
+minimum of every type variable's domain.
+
+```py
+from typing import Never
+
+def explicit_bottom[T]() -> None:
+    # revealed: tuple[Solution[T=Never]]
+    reveal_type(ConstraintSet.lower_bound(Never, T).solutions_for(T, inferable=tuple[T]))
+```
+
 ### Upper bound
 
 An upper-bound constraint requires the type variable to be a subtype of its bound without providing
@@ -143,6 +160,15 @@ from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_
 def _[T]() -> None:
     expected = is_constraint_set_assignable_to(T, int)
     static_assert(ConstraintSet.upper_bound(T, int) == expected)
+```
+
+An explicit `object` upper bound likewise remains inference evidence instead of becoming an absent
+upper bound.
+
+```py
+def explicit_top[T]() -> None:
+    # revealed: tuple[Solution[T=object]]
+    reveal_type(ConstraintSet.upper_bound(T, object).solutions_for(T, inferable=tuple[T]))
 ```
 
 Unlike an explicit two-sided range, an upper-bound constraint does not supply `Never` as lower-bound
@@ -242,25 +268,31 @@ def _[T]() -> None:
     ~ConstraintSet.equality(T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
+Negating the ranges preserves the same distinction between gradual atoms and fully static
+materialization ranges.
 
 ```pyi
 def _[T]() -> None:
+    # TODO(ibraheem/gradual-constraints): Rewrite these as direct inequality assertions once
+    # lazy gradual constraints make preserving the distinct atoms the intended behavior.
     constraints = ~ConstraintSet.range(Base, T, Any)
-    expected = ~ConstraintSet.lower_bound(Base, T)
+    expected = ~ConstraintSet.range(Base, T, object)
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sequence[Base], T, Sequence[Any])
     expected = ~ConstraintSet.range(Sequence[Base], T, Sequence[object])
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Any, T, Base)
-    expected = ~ConstraintSet.upper_bound(T, Base)
+    expected = ~ConstraintSet.range(Never, T, Base)
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ~ConstraintSet.range(Sequence[Never], T, Sequence[Base])
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 ```
 
@@ -296,6 +328,21 @@ def _[T, U]() -> None:
     ConstraintSet.range(Sub, T, Base) & ConstraintSet.range(Sub, U, Base)
     # ¬(Sub ≤ T@_ ≤ Base) ∧ ¬(Sub ≤ U@_ ≤ Base)
     ~ConstraintSet.range(Sub, T, Base) & ~ConstraintSet.range(Sub, U, Base)
+```
+
+### Declared bounds on nested typevars
+
+A type variable nested in another variable's bound must satisfy its own declared upper bound. Here,
+the intersection requires `U` to be `int`, contradicting its declared `str` bound.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def invalid_nested[T, U: str]() -> None:
+    constraints = ConstraintSet.upper_bound(T, list[U]) & ConstraintSet.lower_bound(list[int], T)
+
+    # revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
 ```
 
 ### Intersection of two ranges
@@ -409,15 +456,53 @@ def _[T, U: Any, V]() -> None:
 
     gradual_mismatch = ConstraintSet.equality(T, list[Any]) & ConstraintSet.equality(T, list[int])
     static_assert(not ~gradual_mismatch)
+    # revealed: tuple[Solution[T=list[int]]]
+    reveal_type(gradual_mismatch.solutions_for(T, inferable=tuple[T]))
 
     any_mismatch = ConstraintSet.equality(T, Any) & ConstraintSet.equality(T, int)
     static_assert(not ~any_mismatch)
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(any_mismatch.solutions_for(T, inferable=tuple[T]))
 
     symbolic_gradual_mismatch = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
     static_assert(not ~symbolic_gradual_mismatch)
 
+    symbolic_gradual_match = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, Any])
+    # revealed: tuple[Solution[T=tuple[U@_, Any]]]
+    reveal_type(symbolic_gradual_match.solutions_for(T, inferable=tuple[T]))
+
     symbolic_match = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(T, list[V])
     static_assert(not ~symbolic_match)
+
+def solve_symbolic[U]() -> None:
+    def inner[T]() -> None:
+        constraints = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
+        # The static equality pins the only materialization that satisfies the gradual equality.
+        # revealed: tuple[Solution[T=tuple[U@solve_symbolic, int]]]
+        reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+### Gradual assignability does not imply transitive constraints
+
+The sequent map closes a constraint path transitively, but gradual assignability is not transitive.
+In particular, `int` is assignable to `Any` and `Any` is assignable to `str`, but `int` is not
+assignable to `str`. The middle constraint must not make the first and third constraints imply each
+other.
+
+```py
+from typing import Any, reveal_type
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def _[T]() -> None:
+    exact_int = ConstraintSet.equality(T, int)
+    upper_any = ConstraintSet.upper_bound(T, Any)
+    upper_str = ConstraintSet.upper_bound(T, str)
+    constraints = exact_int & upper_any & ~upper_str
+
+    # `T = int` satisfies both positive constraints while not satisfying `T ≤ str`.
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
 ```
 
 ### Intersection of a range and a negated range

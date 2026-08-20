@@ -36,7 +36,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::call::CallArguments;
-use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
+use super::constraints::{ConstraintSetBuilder, Solutions};
 use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
     evaluate_type_equality, evaluate_type_inequality,
@@ -2382,8 +2382,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 Type::instance(db, &self.env, subject_class),
                 generic_context.inferable_typevars(db),
             )
-            .solve_with(|variance, path_bound| {
-                let Some(lower) = path_bound.lower else {
+            .solve_with(|path_bounds, variance, path_bound| {
+                let Some(lower) = path_bound.inference_lower(db, &self.env) else {
                     return Ok(None);
                 };
                 if variance != TypeVarVariance::Invariant
@@ -2391,7 +2391,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 {
                     return Ok(None);
                 }
-                PathBounds::default_solve(db, &self.env, &constraints, path_bound)
+                path_bounds.default_solve(db, &self.env, &constraints, path_bound)
             });
         let Solutions::Constrained(solutions) = solutions else {
             return None;

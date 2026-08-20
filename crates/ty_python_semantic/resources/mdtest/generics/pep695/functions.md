@@ -1175,8 +1175,8 @@ reveal_type(invoke(lift_invariant, 1))
 
 ## Passing unbound generic methods to generic functions
 
-An unbound method of a generic class can be passed to a generic higher-order function. The class
-type parameter must still be inferred from the concrete receiver expected by that function.
+An unbound method accessed through a bare generic class uses the class's default specialization. The
+higher-order function can still infer its own type parameter from its other arguments.
 
 ```py
 from __future__ import annotations
@@ -1187,6 +1187,9 @@ class Box[T]:
     def merge(self, other: Box[T]) -> Box[T]:
         return self
 
+reveal_type(Box.merge)  # revealed: def merge(self, other: Box[Unknown]) -> Box[Unknown]
+reveal_type(Box[str].merge)  # revealed: def merge(self, other: Box[str]) -> Box[str]
+
 def fold[T](function: Callable[[T, T], T], values: list[T]) -> T:
     return values[0]
 
@@ -1194,7 +1197,8 @@ def merge_boxes(values: list[Box[str]]) -> Box[str]:
     return fold(Box.merge, values)
 ```
 
-The same applies to the standard-library `set.union` method passed to `functools.reduce`.
+The same applies to the standard-library `set.union` method passed to `functools.reduce`: `reduce`
+infers its result from the iterable rather than reopening `set`'s default specialization.
 
 ```py
 from functools import reduce
@@ -2098,7 +2102,9 @@ def value[T](items: Container[T]) -> T:
     raise NotImplementedError
 
 items: list[str] = []
-reveal_type(value(items))  # revealed: Any
+# XXX: Restore `Any` without reintroducing gradual sequent implication or locally unioning
+# gradual solutions.
+reveal_type(value(items))  # revealed: object
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times
@@ -2228,7 +2234,7 @@ def g[S: (bool, str)](x: S) -> S:
 ## Redundant callback bounds preserve constrained type-variable relationships
 
 A contravariant callback can contribute both another constrained type variable and a redundant
-`object` upper bound. The inferred result must retain the other type variable in either callback
+`object` upper bound. The inferred result should retain the other type variable in either callback
 order.
 
 ```py

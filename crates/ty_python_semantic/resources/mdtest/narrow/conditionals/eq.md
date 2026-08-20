@@ -1493,6 +1493,8 @@ class Holder(Generic[HolderT]):
     def __init__(self, value: HolderT) -> None:
         self.value = value
 
+# TODO: The match should remain exhaustive across the constrained TypeVar's materializations.
+# error: [invalid-return-type]
 def correlated_materialized_pattern(left: Top[MaterializedT], right: MaterializedT) -> int:
     holder = Holder(right)
     match left:
