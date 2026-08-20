@@ -343,7 +343,7 @@ additional things to watch out for are:
     existing rule should instead be made configurable to toggle between the two behaviors.
 
     Checking both the input and output examples from your rule proposal with `ALL` rules selected in
-    the linter, with the formatter, and with a type checker like ty is a good quick check for
+    the [linter], with the [formatter], and with a [type checker] like ty is a good quick check for
     conflicts.
 
 - Rules that apply to third-party libraries
@@ -1278,3 +1278,7 @@ There are three ways in which an import can be categorized as "first-party":
 
 By default, `src` is set to the project root, along with `"src"` subdirectory in the project root.
 This ensures that Ruff supports both flat and "src" layouts out of the box.
+
+[formatter]: https://play.ruff.rs/1265904d-f03c-4d22-aa87-1e6ca16708c2?secondary=Format
+[linter]: https://play.ruff.rs/1265904d-f03c-4d22-aa87-1e6ca16708c2
+[type checker]: https://play.ty.dev/b2d4212e-1243-4d75-a340-ae6ff2e2a6ca
