@@ -1301,7 +1301,7 @@ impl<'db> Signature<'db> {
             Solutions::Unconstrained => return Some(self.clone()),
             // Each receiver path can leave a different type variable unconstrained. Preserve the
             // original relation instead of combining those independent solutions.
-            Solutions::Constrained(solutions) if solutions.len() > 1 => {
+            Solutions::Constrained(solutions) if solutions.as_slice().len() > 1 => {
                 return Some(self.clone());
             }
             Solutions::Constrained(_) => {}
@@ -1320,7 +1320,8 @@ impl<'db> Signature<'db> {
                 && let Some(lower) = bounds.lower
                 && let Some(upper) = bounds.upper.as_single_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
-                && let Ok(Some(solution)) = PathBounds::default_solve(db, env, &constraints, bounds)
+                && let Some(solution) =
+                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
             {
                 return Some(solution);
             }
@@ -1331,7 +1332,8 @@ impl<'db> Signature<'db> {
                     .variance_of(db, env, typevar.identity(db))
                     .is_covariant()
                 && bounds.lower.is_some_and(|lower| !lower.is_never())
-                && let Ok(Some(solution)) = PathBounds::default_solve(db, env, &constraints, bounds)
+                && let Some(solution) =
+                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
             {
                 return Some(solution);
             }

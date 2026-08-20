@@ -13,7 +13,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBounds, Solution, Solutions,
+    PathBoundSolution, PathBounds, SolutionPaths, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -2392,14 +2392,15 @@ impl<'db> TypeVarInference<'db> {
     }
 }
 
-/// The valid specializations of a constraint set, or evidence for why it is unsatisfiable.
+/// The available solutions of a constraint set, or evidence for why it is unsatisfiable.
 ///
 /// Failed paths can occur alongside valid paths, but their declaration failures matter only when
 /// every path is rejected. Preserve that evidence exclusively for unsatisfiable constraint sets.
+/// Budget-exhausted paths retain their fallback bindings and completeness information.
 enum ConstraintSetAnalysis<'db> {
     Unsatisfiable(SmallVec<[ConstraintFailure<'db>; 1]>),
     Unconstrained,
-    Constrained(Vec<Solution<'db>>),
+    Constrained(SolutionPaths<'db>),
 }
 
 impl<'db> ConstraintSetAnalysis<'db> {
@@ -2615,6 +2616,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         TypeVarInference::new(db, generic_context, inferred)
     }
 
+    /// Produces the merged mapping used by existing inference consumers.
+    ///
+    /// Preference and promotion overrides can themselves return fallback types, so this legacy
+    /// projection deliberately discards completeness. A path-preserving consumer must retain
+    /// `PathBoundSolution` through its overrides instead.
     fn solve_pending_with(
         &mut self,
         generic_context: GenericContext<'db>,
@@ -2650,7 +2656,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             |_variance, path_bound| {
                 let typevar = path_bound.bound_typevar;
                 if let Some(ty) = choose(typevar, Some(path_bound)) {
-                    return Ok(Some(ty));
+                    return PathBoundSolution::Solved(ty);
                 }
 
                 PathBounds::default_solve(db, self.env, self.constraints, path_bound)
@@ -2660,7 +2666,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Solutions::Unconstrained => {
                 return Ok(self.solve_hash_map_with(generic_context, choose));
             }
-            Solutions::Constrained(solutions) => solutions,
+            Solutions::Constrained(solutions) => solutions.into_vec(),
         };
 
         let mut types = FxHashMap::default();
@@ -2999,7 +3005,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             |_variance, path_bound| {
                 let solution =
                     PathBounds::preliminary_solve(db, self.env, self.constraints, path_bound);
-                if solution.is_err()
+                if matches!(solution, PathBoundSolution::Unsatisfiable)
                     && let Some(failure) = self.constraint_failure_from_failed_bounds(path_bound)
                 {
                     failures.push(failure);
@@ -3015,7 +3021,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Adds valid solutions to the compatibility mapping used by legacy inference consumers.
+    /// Adds available solutions, including fallback bindings, to the legacy inference mapping.
     ///
     /// This projection loses correlations between alternatives, so callers must only request it
     /// after they have accepted the corresponding relation.
@@ -3027,7 +3033,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return;
         };
 
-        for solution in solutions {
+        for solution in solutions.as_slice() {
             for binding in solution {
                 let solution = self.remove_inferable_typevar_artifacts_from_solution(
                     binding.bound_typevar,
