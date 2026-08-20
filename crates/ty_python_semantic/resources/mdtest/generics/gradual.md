@@ -131,6 +131,43 @@ def _():
     reveal_type(takes_callable(accepts_unknown_bounded))  # revealed: bool | (Unknown & int)
 ```
 
+## Declared bounds on gradual projections
+
+A gradual argument projected into a generic parameter must respect the declared upper bound of its
+inferred type variable. A gradual value assigned directly to that variable remains unrestricted.
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown
+
+def direct[T: int](value: T) -> T:
+    raise NotImplementedError
+
+def covariant[T: int](value: tuple[T]) -> T:
+    raise NotImplementedError
+
+def invariant[T: int](value: list[T]) -> T:
+    raise NotImplementedError
+
+def fallback[T: int](value: tuple[T], lower: T) -> T:
+    return lower
+
+def constrained[T: (int, str)](value: tuple[T]) -> T:
+    raise NotImplementedError
+
+def _(any_value: Any, unknown_value: Unknown, lower: int):
+    reveal_type(direct(any_value))  # revealed: Any
+    reveal_type(direct(unknown_value))  # revealed: Unknown
+    reveal_type(covariant(any_value))  # revealed: int & Any
+    reveal_type(covariant(unknown_value))  # revealed: int & Unknown
+    reveal_type(invariant(any_value))  # revealed: int & Any
+    reveal_type(invariant(unknown_value))  # revealed: int & Unknown
+    reveal_type(fallback(any_value, lower))  # revealed: int
+    reveal_type(fallback(unknown_value, lower))  # revealed: int
+    reveal_type(constrained(any_value))  # revealed: Any
+    reveal_type(constrained(unknown_value))  # revealed: Unknown
+```
+
 ## Complex gradual constraints
 
 When checking an assignment of `Any` to `tuple[T]`, we assume that the gradual type materializes to

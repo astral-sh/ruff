@@ -4514,7 +4514,7 @@ impl<'db> PathBound<'db> {
         self.has_only_gradual_evidence
     }
 
-    /// Restricts the range of a gradual solution by the upper bounds inferred for this constraint.
+    /// Restricts a gradual solution by its inferred and projected declared upper bounds.
     /// Returns `None` if constructing an intersection exceeds the solution budget.
     fn restrict_gradual_solution(
         &self,
@@ -4522,8 +4522,9 @@ impl<'db> PathBound<'db> {
         env: &ProgramEnvironment<'db>,
         solution: Type<'db>,
     ) -> Option<Type<'db>> {
+        let projected = !self.provenance.lower_origins().is_empty();
         if self.lower != Some(solution)
-            || !self.has_upper()
+            || (!self.has_upper() && !projected)
             || solution.bottom_materialization(db, env) == solution.top_materialization(db, env)
         {
             return Some(solution);
@@ -4535,7 +4536,7 @@ impl<'db> PathBound<'db> {
         }
 
         // `Divergent` is not safely reflexive, so we cannot intersect identical bounds.
-        if self.upper.clauses.len() == 1 && self.upper.clauses.contains(&solution) {
+        if !projected && self.upper.clauses.len() == 1 && self.upper.clauses.contains(&solution) {
             return Some(solution);
         }
 
@@ -4553,12 +4554,23 @@ impl<'db> PathBound<'db> {
             _ => None,
         };
 
-        let mut upper_bounds = self
+        let mut inferred_upper_bounds = self
             .upper
             .clauses
             .iter()
             .copied()
+            .filter(|bound| !projected || *bound != solution)
             .filter_map(materialize_upper);
+
+        let first_inferred_upper = inferred_upper_bounds.next();
+        if first_inferred_upper.is_none() && !projected {
+            return Some(solution);
+        }
+
+        let mut upper_bounds = first_inferred_upper
+            .into_iter()
+            .chain(inferred_upper_bounds)
+            .chain(declared_upper);
         let Some(first_upper) = upper_bounds.next() else {
             return Some(solution);
         };
@@ -4566,9 +4578,7 @@ impl<'db> PathBound<'db> {
         let upper_bound = IntersectionType::bounded_from_elements(
             db,
             env,
-            iter::once(first_upper)
-                .chain(upper_bounds)
-                .chain(declared_upper),
+            iter::once(first_upper).chain(upper_bounds),
         )?;
 
         // Restrict the range of each gradual solution by the upper bound of this constraint.
