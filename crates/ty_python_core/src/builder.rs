@@ -2163,6 +2163,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ..
                 }) => Some(*n != 0),
                 ast::Expr::EllipsisLiteral(_) => Some(true),
+                ast::Expr::Lambda(_) | ast::Expr::Generator(_) => Some(true),
                 ast::Expr::NoneLiteral(_) => Some(false),
                 ast::Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
