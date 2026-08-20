@@ -8,12 +8,13 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
+use ty_python_semantic::PythonEnvironment;
 use ty_static::EnvVars;
 
 use crate::Db;
 use crate::metadata::options::{
     EnvironmentOptions, OptionDiagnostic, OptionsContext, ProgramSettingsDiagnostic,
-    ToSettingsError,
+    ToProgramSettingsError, ToSettingsError,
 };
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
@@ -392,7 +393,7 @@ impl ProjectMetadata {
         Ok(metadata)
     }
 
-    pub(crate) fn root(&self) -> &SystemPath {
+    pub fn root(&self) -> &SystemPath {
         &self.root
     }
 
@@ -572,8 +573,10 @@ impl MergedOptions<'_> {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
-    {
+    ) -> Result<
+        (ProgramSettings, Vec<ProgramSettingsDiagnostic>),
+        Strategy::Error<ToProgramSettingsError>,
+    > {
         self.options.to_program_settings(
             OptionsContext::Project(self.metadata.root()),
             self.metadata.name(),
@@ -581,6 +584,16 @@ impl MergedOptions<'_> {
             vendored,
             strategy,
         )
+    }
+
+    /// Resolve the configured Python environment. Return `None` if no path was configured.
+    pub fn python_environment(
+        &self,
+        system: &dyn System,
+    ) -> anyhow::Result<Option<PythonEnvironment>> {
+        self.options
+            .python_environment(self.metadata.root(), system)
+            .map_err(anyhow::Error::from)
     }
 
     pub fn to_settings<Strategy: MisconfigurationStrategy>(

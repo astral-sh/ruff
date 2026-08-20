@@ -222,6 +222,8 @@ pub(crate) mod tests {
         python_platform: PythonPlatform,
         /// Path and content pairs for files that should be present
         files: Vec<(&'a str, &'a str)>,
+        /// Whether module resolution should include packages from the synthetic virtual environment.
+        third_party_packages: bool,
     }
 
     impl<'a> TestDbBuilder<'a> {
@@ -230,6 +232,7 @@ pub(crate) mod tests {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
                 files: vec![],
+                third_party_packages: false,
             }
         }
 
@@ -252,14 +255,39 @@ pub(crate) mod tests {
             self
         }
 
+        /// Makes packages installed in the synthetic virtual environment available for imports.
+        ///
+        /// Files under `/.venv/lib/python3.13/site-packages` are treated as third-party modules,
+        /// mirroring the import roots discovered from a project's configured Python environment.
+        pub(crate) fn with_third_party_packages(mut self) -> Self {
+            self.third_party_packages = true;
+            self
+        }
+
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
             let mut db = TestDb::new();
 
             let src_root = SystemPathBuf::from("/src");
             db.memory_file_system().create_directory_all(&src_root)?;
 
+            let site_packages = SystemPathBuf::from("/.venv/lib/python3.13/site-packages");
+            if self.third_party_packages {
+                db.memory_file_system()
+                    .create_directory_all(&site_packages)?;
+            }
+
             db.write_files(self.files)
                 .context("Failed to write test files")?;
+
+            let search_path_settings = if self.third_party_packages {
+                SearchPathSettings {
+                    src_roots: vec![src_root],
+                    site_packages_paths: vec![site_packages],
+                    ..SearchPathSettings::empty()
+                }
+            } else {
+                SearchPathSettings::new(vec![src_root])
+            };
 
             let program_settings = ProgramSettings {
                 python_version: PythonVersionWithSource {
@@ -267,7 +295,7 @@ pub(crate) mod tests {
                     source: PythonVersionSource::default(),
                 },
                 python_platform: self.python_platform,
-                search_paths: SearchPathSettings::new(vec![src_root])
+                search_paths: search_path_settings
                     .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                     .context("Invalid search path settings")?,
             };

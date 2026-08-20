@@ -197,16 +197,12 @@ pub(super) enum LspDiagnostics {
 }
 
 impl LspDiagnostics {
-    /// Returns the diagnostics for a text document.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the diagnostics are for a notebook document.
-    pub(super) fn expect_text_document(self) -> Vec<Diagnostic> {
+    /// Returns the diagnostics for the text document or notebook cell at `uri`.
+    pub(super) fn into_document_diagnostics(self, uri: &Uri) -> Vec<Diagnostic> {
         match self {
             LspDiagnostics::TextDocument(diagnostics) => diagnostics,
-            LspDiagnostics::NotebookDocument(_) => {
-                panic!("Expected a text document diagnostics, but got notebook diagnostics")
+            LspDiagnostics::NotebookDocument(mut diagnostics) => {
+                diagnostics.remove(uri).unwrap_or_default()
             }
         }
     }

@@ -1426,6 +1426,21 @@ static_assert(is_subtype_of(StringSuffix, Callable[[*tuple[object, ...], int, st
 static_assert(is_subtype_of(IntegerStringSuffix, Callable[[*tuple[int, ...], int, str], None]))
 ```
 
+A named positional prefix cannot make a callback with a required unpacked suffix compatible with a
+target that accepts no positional arguments.
+
+```py
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+def accepts_no_positional_arguments() -> None: ...
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[named_prefix_and_suffix],
+        RegularCallableTypeOf[accepts_no_positional_arguments],
+    )
+)
+```
+
 A positional parameter cannot also be filled by a target keyword argument.
 
 ```py
@@ -1448,6 +1463,71 @@ def rejects_named_keyword(*args: *tuple[*tuple[int, ...], int], a: Never = cast(
 
 static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_keywords]))
 static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_named_keyword]))
+```
+
+Variadic target keywords must be compatible with optional source keyword-only parameters unless an
+occupied target prefix prevents the corresponding name from being passed.
+
+```py
+def optional_keyword_source(*args: object, flag: int = 0, **kwargs: str) -> None: ...
+def unprotected_keyword_target(*args: *tuple[*tuple[int, ...], int], **kwargs: str) -> None: ...
+def protected_keyword_target(flag: int, *args: *tuple[*tuple[int, ...], int], **kwargs: str) -> None: ...
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[optional_keyword_source],
+        RegularCallableTypeOf[unprotected_keyword_target],
+    )
+)
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[optional_keyword_source],
+        RegularCallableTypeOf[protected_keyword_target],
+    )
+)
+```
+
+Passing a target argument positionally cannot satisfy a required source keyword-only parameter. A
+required target keyword-only parameter with the same name does satisfy it.
+
+```py
+def requires_named_keyword(*args: int, a: int) -> None: ...
+def positional_keyword_target(a: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+def required_keyword_target(*args: *tuple[*tuple[int, ...], int], a: int) -> None: ...
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[requires_named_keyword],
+        RegularCallableTypeOf[positional_keyword_target],
+    )
+)
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[requires_named_keyword],
+        RegularCallableTypeOf[required_keyword_target],
+    )
+)
+```
+
+The same mismatch produces an assignment diagnostic when the target signature is used as an
+annotation.
+
+```py
+type PositionalKeywordTarget = RegularCallableTypeOf[positional_keyword_target]
+
+# error: [invalid-assignment]
+callback: PositionalKeywordTarget = requires_named_keyword
+```
+
+A positional-only target prefix cannot prevent variadic keywords from colliding with an occupied
+source parameter. A matching positional-or-keyword target prefix does prevent that collision.
+
+```py
+def unprotected_positional_prefix(a: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+def protected_positional_prefix(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+static_assert(not is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[unprotected_positional_prefix]))
+static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[protected_positional_prefix]))
 ```
 
 Equivalent empty or fixed-length unpacked parameters are compatible, but cannot be reused for

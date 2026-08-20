@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 use regex::{Captures, Regex};
-use ruff_linter::codes::RuleGroup;
+use ruff_linter::codes::RuleStatus;
 use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
@@ -32,23 +32,23 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 
             let _ = writeln!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
 
-            let status_text = match rule.group() {
-                RuleGroup::Stable { since } => {
+            let status_text = match rule.status() {
+                RuleStatus::Stable { since } => {
                     format!(
                         r#"Added in <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>"#
                     )
                 }
-                RuleGroup::Preview { since } => {
+                RuleStatus::Preview { since } => {
                     format!(
                         r#"Preview (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
                     )
                 }
-                RuleGroup::Deprecated { since } => {
+                RuleStatus::Deprecated { since } => {
                     format!(
                         r#"Deprecated (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
                     )
                 }
-                RuleGroup::Removed { since } => {
+                RuleStatus::Removed { since } => {
                     format!(
                         r#"Removed (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
                     )

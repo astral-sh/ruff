@@ -47,6 +47,8 @@ pub(crate) struct AssociatedDiagnosticData {
     code: String,
     /// Possible edit to add a suppression comment which will disable this diagnostic.
     noqa_edit: Option<lsp_types::TextEdit>,
+    /// Whether this fix corresponds to a preferred action that can be used by auto fix commands.
+    is_preferred: Option<bool>,
 }
 
 /// Describes a fix for `fixed_diagnostic` that may have quick fix
@@ -64,6 +66,8 @@ pub(crate) struct DiagnosticFix {
     pub(crate) edits: Vec<lsp_types::TextEdit>,
     /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
+    /// Whether this fix corresponds to a preferred action that can be used by auto fix commands.
+    pub(crate) is_preferred: Option<bool>,
 }
 
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
@@ -306,6 +310,7 @@ pub(crate) fn fixes_for_diagnostics(
                 title: associated_data.title,
                 noqa_edit: associated_data.noqa_edit,
                 edits: associated_data.edits,
+                is_preferred: associated_data.is_preferred,
             }))
         })
         .filter_map(crate::Result::transpose)
@@ -372,7 +377,6 @@ fn to_lsp_diagnostic(
     let name = diagnostic.name();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.first_help_text();
-    let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 
     let (severity, code) = if let Some(code) = diagnostic.secondary_code() {
         let severity = severity(code);
@@ -398,6 +402,10 @@ fn to_lsp_diagnostic(
 
     let data = (fix.is_some() || noqa_edit.is_some())
         .then(|| {
+            let mut title = suggestion.unwrap_or(name).to_string();
+            if fix.is_some_and(|fix| fix.applicability() == Applicability::DisplayOnly) {
+                title.push_str(" (suggestion)");
+            }
             let edits = fix
                 .into_iter()
                 .flat_map(Fix::edits)
@@ -411,10 +419,11 @@ fn to_lsp_diagnostic(
                 new_text: noqa_edit.into_content().unwrap_or_default().into_string(),
             });
             serde_json::to_value(AssociatedDiagnosticData {
-                title: suggestion.unwrap_or(name).to_string(),
+                title,
                 noqa_edit,
                 edits,
                 code: code.clone(),
+                is_preferred: fix.map(|fix| fix.applicability().is_safe()),
             })
             .ok()
         })

@@ -36,9 +36,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.infer_type_parameters(type_params);
 
         if class.arguments.is_some() {
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
             // PEP 695 class headers are inferred in the type-parameter scope, before the completed
             // class type is available. Infer the bases first because `extra_items=T` is an
@@ -388,9 +386,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // and we don't need to run inference here
         if type_params.is_none() {
             // In stub files, keyword values may reference names that are defined later in the file.
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
             for keyword in class_node.keywords() {
                 if keyword.arg.as_deref() != Some("extra_items") {
                     self.infer_expression(&keyword.value, TypeContext::default());

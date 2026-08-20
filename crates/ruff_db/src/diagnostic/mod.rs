@@ -1009,6 +1009,9 @@ pub enum DiagnosticId {
     /// A glob pattern doesn't follow the expected syntax.
     InvalidGlob,
 
+    /// A PEP 723 script contains invalid metadata or configuration.
+    InvalidScriptMetadata,
+
     /// An `include` glob without any patterns.
     ///
     /// ## Why is this bad?
@@ -1137,6 +1140,7 @@ impl DiagnosticId {
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
             DiagnosticId::InvalidGlob => "invalid-glob",
+            DiagnosticId::InvalidScriptMetadata => "invalid-script-metadata",
             DiagnosticId::EmptyInclude => "empty-include",
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",

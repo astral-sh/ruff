@@ -236,6 +236,80 @@ def foo() -> str:
 }
 
 #[test]
+fn on_did_open_invalid_script_reports_only_configuration_diagnostics() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let content = r#"# /// script
+# requires-python =
+# ///
+
+def function():
+    unused = 1
+    return missing
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(script, content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, content, 1);
+
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change_invalid_script_metadata_restores_semantic_diagnostics() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let invalid = r#"# /// script
+# requires-python =
+# ///
+
+missing
+"#;
+    let valid = r#"# /// script
+# requires-python = ">=3.12"
+# ///
+
+missing
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(script, invalid)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, invalid, 1);
+    let initial = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(initial);
+
+    server.change_text_document(
+        script,
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: valid.to_string(),
+                },
+            ),
+        ],
+        2,
+    );
+
+    let updated = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(updated);
+
+    Ok(())
+}
+
+#[test]
 fn on_did_change_script_python_requirement() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let script = SystemPath::new("src/script.py");
@@ -295,6 +369,31 @@ PythonFinalizationError
         diagnostics: [],
     }
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_open_virtual_script_reports_invalid_metadata() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemVirtualPath::new("untitled:script.py");
+    let content = r#"# /// script
+# requires-python =
+# ///
+
+missing
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_virtual_text_document(script, content, 1)?;
+
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(diagnostics);
 
     Ok(())
 }

@@ -1274,6 +1274,7 @@ def opaque_decorator(f: Any) -> Any:
 def transparent_decorator[F: Callable[..., Any]](f: F) -> F:
     return f
 
+# error: [dynamic-function-decorator-return]
 @opaque_decorator
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]
@@ -1536,6 +1537,40 @@ def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]
     reveal_type(any_result[0])  # revealed: int & Any
     reveal_type(unknown_result)  # revealed: list[int] & Unknown
     reveal_type(unknown_result[0])  # revealed: int & Unknown
+```
+
+## Redundant upper bounds preserve large gradual unions
+
+The invariant list fixes `T` to the entire union, while the callback adds the redundant upper bound
+`object`. Restricting the inferred gradual type by these bounds must preserve all five union
+members.
+
+```py
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
+
+Bound = None | int | set[int] | Sequence[Any] | Mapping[str, Any]
+
+def first[T: Bound](values: list[T], sink: Callable[[T], None]) -> T:
+    return values[0]
+
+def _(values: list[Bound], sink: Callable[[object], None]) -> None:
+    # revealed: None | int | set[int] | Sequence[Any] | Mapping[str, Any]
+    reveal_type(first(values, sink))
+```
+
+The same holds for recursive aliases, whose recursive positions currently fall back to `Divergent`.
+This is a reduced regression test for [ty#4335](https://github.com/astral-sh/ty/issues/4335).
+
+```py
+Recursive = None | int | set[int] | Sequence["Recursive"] | Mapping[str, "Recursive"]
+
+def first_recursive[T: Recursive](values: list[T], sink: Callable[[T], None]) -> T:
+    return values[0]
+
+def _(values: list[Recursive], sink: Callable[[object], None]) -> None:
+    # revealed: None | int | set[int] | Sequence[Divergent] | Mapping[str, Divergent]
+    reveal_type(first_recursive(values, sink))
 ```
 
 ## Typevars in a union
@@ -1802,6 +1837,27 @@ def needs_str(value: str, *args: object, **kwargs: object) -> int:
 reveal_type(invoke(accepts_int))  # revealed: int
 # error: [invalid-argument-type]
 reveal_type(invoke(needs_str))  # revealed: int
+```
+
+### Inferring uninhabited keyword types
+
+Inferring a keyword type as `Never` can eliminate a collision with an occupied positional parameter.
+
+The callback's return type must still contribute its own inference constraint.
+
+```py
+from typing import Protocol
+
+class Callback[T, R](Protocol):
+    def __call__(self, x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: T) -> R: ...
+
+def infer[T, R](callback: Callback[T, R]) -> tuple[list[T], R]:
+    raise NotImplementedError
+
+def source(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> str:
+    return ""
+
+reveal_type(infer(source))  # revealed: tuple[list[Never], str]
 ```
 
 ### Class constructors

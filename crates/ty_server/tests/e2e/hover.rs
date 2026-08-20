@@ -41,6 +41,109 @@ fn supports_only_plain_text() -> Result<()> {
 }
 
 #[test]
+fn invalid_script_environment_retains_configured_platform_for_hover() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let content = r#"# /// script
+# [tool.ty.environment]
+# python = "./missing-environment"
+# python-version = "3.12"
+# python-platform = "win32"
+# ///
+
+import sys
+sys.platform
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(
+            "src/pyproject.toml",
+            r#"[tool.ty.environment]
+python-platform = "linux"
+"#,
+        )?
+        .with_file(script, content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, content, 1);
+
+    let hover = server.hover_request(script, Position::new(8, 5));
+    insta::assert_json_snapshot!(hover, @r#"
+    {
+      "contents": {
+        "kind": "plaintext",
+        "value": "Literal[\"win32\"]"
+      },
+      "range": {
+        "start": {
+          "line": 8,
+          "character": 4
+        },
+        "end": {
+          "line": 8,
+          "character": 12
+        }
+      }
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_script_retains_valid_environment_settings_for_hover() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let content = r#"# /// script
+# requires-python = "<3.12"
+# [tool.ty.environment]
+# python-platform = "win32"
+# ///
+
+import sys
+sys.platform
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(
+            "src/pyproject.toml",
+            r#"[tool.ty.environment]
+python-platform = "linux"
+"#,
+        )?
+        .with_file(script, content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, content, 1);
+
+    let hover = server.hover_request(script, Position::new(7, 5));
+    insta::assert_json_snapshot!(hover, @r#"
+    {
+      "contents": {
+        "kind": "plaintext",
+        "value": "Literal[\"win32\"]"
+      },
+      "range": {
+        "start": {
+          "line": 7,
+          "character": 4
+        },
+        "end": {
+          "line": 7,
+          "character": 12
+        }
+      }
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn shared_import_hover_uses_each_script_python_version() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let shared = SystemPath::new("src/shared.py");

@@ -148,9 +148,6 @@ pub enum ParseErrorType {
     /// A default value was found for a `*` or `**` parameter.
     VarParameterWithDefault,
 
-    /// A keyword argument was repeated.
-    DuplicateKeywordArgumentError(String),
-
     /// An invalid expression was found in the assignment target.
     InvalidAssignmentTarget,
     /// An invalid expression was found in the named assignment target.
@@ -321,9 +318,6 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Invalid augmented assignment target")
             }
             ParseErrorType::InvalidDeleteTarget => f.write_str("Invalid delete target"),
-            ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
-                write!(f, "Duplicate keyword argument {arg_name:?}")
-            }
             ParseErrorType::UnexpectedIpythonEscapeCommand => {
                 f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }

@@ -2305,6 +2305,13 @@ pub enum KnownFunction {
     #[strum(serialize = "field_validator")]
     PydanticFieldValidator,
 
+    /// `_pytest.fixtures.fixture`
+    #[strum(serialize = "fixture")]
+    PytestFixture,
+    /// `_pytest.fixtures.yield_fixture`
+    #[strum(serialize = "yield_fixture")]
+    PytestYieldFixture,
+
     /// `functools.total_ordering`
     TotalOrdering,
 
@@ -2426,6 +2433,9 @@ impl KnownFunction {
             Self::PydanticField => matches!(module, KnownModule::PydanticFields),
             Self::PydanticFieldValidator => {
                 matches!(module, KnownModule::PydanticFunctionalValidators)
+            }
+            Self::PytestFixture | Self::PytestYieldFixture => {
+                matches!(module, KnownModule::PytestFixtures)
             }
             Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
@@ -3002,6 +3012,9 @@ pub(crate) mod tests {
 
                 KnownFunction::PydanticField => KnownModule::PydanticFields,
                 KnownFunction::PydanticFieldValidator => KnownModule::PydanticFunctionalValidators,
+                KnownFunction::PytestFixture | KnownFunction::PytestYieldFixture => {
+                    KnownModule::PytestFixtures
+                }
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 

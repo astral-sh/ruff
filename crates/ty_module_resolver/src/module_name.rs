@@ -312,7 +312,7 @@ impl ModuleName {
     pub fn from_import_statement<'db>(
         db: &'db dyn Db,
         importing_file: ImportingFile<'db>,
-        node: &'db ast::StmtImportFrom,
+        node: &ast::StmtImportFrom,
     ) -> Result<Self, ModuleNameResolutionError> {
         let ast::StmtImportFrom {
             module,

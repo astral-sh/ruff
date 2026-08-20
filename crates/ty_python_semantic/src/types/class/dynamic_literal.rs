@@ -11,7 +11,7 @@ use crate::{
         SubclassOfType, Type,
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicClassHeaderAnchor,
-            InstanceMemberResult, MroLookup, dynamic_class_header_range,
+            DynamicClassScopeOffset, InstanceMemberResult, MroLookup, dynamic_class_header_range,
             typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
@@ -49,7 +49,7 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 ///
 /// The `anchor` field provides stable identity:
 /// - For assigned calls, the `Definition` uniquely identifies the class.
-/// - For dangling calls, a relative node offset anchored to the enclosing scope
+/// - For dangling calls, a call location anchored to the enclosing scope
 ///   provides stable identity that only changes when the scope itself changes.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicClassLiteral<'db> {
@@ -61,8 +61,8 @@ pub struct DynamicClassLiteral<'db> {
     ///
     /// - `Definition`: The call is assigned to a variable. The definition
     ///   uniquely identifies this class and can be used to find the call expression.
-    /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
-    ///   is relative to the enclosing scope's anchor node index.
+    /// - `ScopeOffset`: The call is "dangling" (not assigned). Its location
+    ///   is relative to the enclosing scope.
     #[returns(ref)]
     pub anchor: DynamicClassAnchor<'db>,
 
@@ -98,14 +98,14 @@ pub enum DynamicClassAnchor<'db> {
 
     /// The call is "dangling" (not assigned to a variable).
     ///
-    /// The offset is relative to the enclosing scope's anchor node index.
-    /// For module scope, this is equivalent to an absolute index (anchor is 0).
+    /// The [`DynamicClassScopeOffset`] locates the call relative to the enclosing scope,
+    /// including when the call is inside a string annotation.
     ///
     /// The `explicit_bases` are computed eagerly at creation time since dangling
     /// calls cannot recursively reference the class being defined.
     ScopeOffset {
         scope: ScopeId<'db>,
-        offset: u32,
+        offset: DynamicClassScopeOffset,
         explicit_bases: Box<[Type<'db>]>,
     },
 }

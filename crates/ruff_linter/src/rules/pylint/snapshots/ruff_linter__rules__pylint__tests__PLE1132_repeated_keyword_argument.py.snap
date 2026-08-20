@@ -74,6 +74,7 @@ PLE1132 Repeated keyword argument: `c`
 19 | func(a=11, b=21, **{"c": 31}, **{"c": 32})
    |                                  ^^^
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
+21 | func(**{"a": 11}, a=21)
    |
 
 PLE1132 Repeated keyword argument: `c`
@@ -83,3 +84,16 @@ PLE1132 Repeated keyword argument: `c`
 19 | func(a=11, b=21, **{"c": 31}, **{"c": 32})
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
    |                              ^^^
+21 | func(**{"a": 11}, a=21)
+   |
+
+PLE1132 Repeated keyword argument: `a`
+  --> repeated_keyword_argument.py:21:9
+   |
+19 | func(a=11, b=21, **{"c": 31}, **{"c": 32})
+20 | func(a=11, b=21, **{"c": 31, "c": 32})
+21 | func(**{"a": 11}, a=21)
+   |         ^^^
+22 |
+23 | # Duplicate explicit keywords are syntax errors, not PLE1132 diagnostics.
+   |

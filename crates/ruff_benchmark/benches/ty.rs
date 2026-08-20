@@ -863,6 +863,60 @@ fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmarks for ty#4269: recursive protocol inference and assignment diagnostics.
+///
+/// Explicit receiver annotations can repeatedly expand inherited recursive protocol members
+/// during constructor inference or diagnostic collection.
+fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
+    const NUM_METHODS: usize = 8;
+
+    setup_rayon();
+
+    let mut code = "\
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+"
+    .to_string();
+
+    for i in 0..NUM_METHODS {
+        writeln!(
+            &mut code,
+            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ..."
+        )
+        .ok();
+    }
+
+    code.push_str("\nclass Concrete[T](Chain[T]):\n");
+    code.push_str("    def __init__(self, values: Iterable[T]) -> None: ...\n");
+
+    for (name, scenario, expected_diagnostics) in [
+        (
+            "ty_micro[inherited_recursive_protocol_constructor]",
+            "\nvalue: Chain[int] = Concrete(())\n",
+            0,
+        ),
+        (
+            "ty_micro[inherited_recursive_protocol_diagnostic]",
+            "\ndef diagnose[T](value: Concrete[T]) -> None:\n    invalid: Chain[int] = value\n",
+            1,
+        ),
+    ] {
+        let code = format!("{code}{scenario}");
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| assert_eq!(case.db.check().len(), expected_diagnostics),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -1621,6 +1675,7 @@ criterion_group!(
     benchmark_mixed_str_enum_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
+    benchmark_inherited_recursive_protocol,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,

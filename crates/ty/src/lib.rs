@@ -3,6 +3,7 @@ mod logging;
 mod printer;
 mod python_version;
 mod rule;
+mod server;
 mod version;
 
 use std::io::{BufWriter, Write};
@@ -29,7 +30,6 @@ use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
-use ty_server::run_server;
 use ty_static::EnvVars;
 
 use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
@@ -47,8 +47,8 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     let args = Cli::parse_from(args);
 
     match args.command {
-        Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
+        Command::Server(server_args) => server::run(&server_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;
@@ -102,16 +102,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     tracing::debug!("Version: {}", version::version());
 
     // The base path to which all CLI arguments are relative to.
-    let cwd = {
-        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
-        SystemPathBuf::from_path_buf(cwd).map_err(|path| {
-            anyhow!(
-                "The current working directory `{}` contains non-Unicode characters. \
-                ty only supports Unicode paths.",
-                path.display()
-            )
-        })?
-    };
+    let cwd = current_directory()?;
 
     let project_path = args
         .project
@@ -248,13 +239,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
-    /// Checking was successful and there were no errors.
+    /// The command completed successfully.
     Success = 0,
 
-    /// Checking was successful but there were errors.
+    /// Checking was successful but there were errors, or executable discovery found no match.
     Failure = 1,
 
-    /// Checking failed due to an invocation error (e.g. the current directory no longer exists, incorrect CLI arguments, ...)
+    /// The command failed due to an invocation error (e.g. the current directory no longer exists, incorrect CLI arguments, ...)
     Error = 2,
 
     /// Internal ty error (panic, or any other error that isn't due to the user using the
@@ -705,6 +696,17 @@ enum MainLoopMessage {
     },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
+}
+
+fn current_directory() -> Result<SystemPathBuf> {
+    let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+    SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+        anyhow!(
+            "The current working directory `{}` contains non-Unicode characters. \
+             ty only supports Unicode paths.",
+            path.display()
+        )
+    })
 }
 
 fn set_colored_override(color: Option<TerminalColor>) {

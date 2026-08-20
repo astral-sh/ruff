@@ -181,6 +181,30 @@ dynamic: Any = []
 reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
 ```
 
+## Generic overloaded callable constraints in constructors
+
+An overloaded callback can have a type variable of its own. An overload rejected by the constructor
+must not leave a mapping for that variable that causes the accepted overload to be rejected.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T", str, bytes)
+
+class Result(Generic[T]): ...
+
+@overload
+def convert(value: T) -> Result[T]: ...
+@overload
+def convert(value: Result[T]) -> Result[T]: ...
+def convert(value: T | Result[T]) -> Result[T]:
+    raise NotImplementedError
+
+# TODO: Preserve correlated overloaded-callback solutions (astral-sh/ty#2799) to infer
+# `map[Result[str]]`.
+reveal_type(map(convert, ["a"]))  # revealed: map[Unknown]
+```
+
 ## Decorated
 
 ```py
