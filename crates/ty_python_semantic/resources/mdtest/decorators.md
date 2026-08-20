@@ -589,14 +589,24 @@ class RegularCallableReplacementDecorated: ...
 reveal_type(RegularCallableReplacementDecorated)  # revealed: Unknown
 ```
 
-An unknown class decorator still makes the class binding unknown:
+An unknown class decorator preserves the original class binding, so instances and their operations
+remain checked even though the decorator itself is unresolved:
 
 ```py
 # error: [unresolved-reference] "Name `unknown_class_decorator` used when not defined"
 @unknown_class_decorator
-class UnknownDecorated: ...
+class UnknownDecorated:
+    def get(self, key: str) -> int:
+        return 1
 
-reveal_type(UnknownDecorated)  # revealed: Unknown
+reveal_type(UnknownDecorated)  # revealed: <class 'UnknownDecorated'>
+
+instance = UnknownDecorated()
+reveal_type(instance)  # revealed: UnknownDecorated
+reveal_type(instance.get("key"))  # revealed: int
+
+instance.get(1)  # error: [invalid-argument-type]
+instance + 1  # error: [unsupported-operator]
 ```
 
 An unannotated class decorator preserves the result of earlier decorators:
