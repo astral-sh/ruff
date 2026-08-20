@@ -69,7 +69,6 @@ impl<'db> SolutionWalker<'db> {
         }
 
         let mut origin_uses = FxHashMap::default();
-        let mut connected_typevars = Support::default();
         let mut has_incomplete_support = false;
         for &constraint_id in &walker.source_orders {
             let Some(constraint) = storage.constraint_data(constraint_id).as_typevar() else {
@@ -78,9 +77,6 @@ impl<'db> SolutionWalker<'db> {
 
             let support = storage.constraint_support(constraint_id);
             has_incomplete_support |= !support.is_complete();
-            if support.iter().nth(1).is_some() {
-                connected_typevars |= support;
-            }
 
             for origin in [constraint.provenance.lower, constraint.provenance.upper]
                 .into_iter()
@@ -93,24 +89,20 @@ impl<'db> SolutionWalker<'db> {
             return walker;
         }
 
-        // Consecutive occurrences that supply the same isolated bound are interchangeable.
+        // Consecutive occurrences that supply the same bound are interchangeable.
         // Crossing another bound would change source order.
         let mut representative = None;
         for &constraint_id in &walker.source_orders {
             let Some(constraint) = storage.constraint_data(constraint_id).as_typevar() else {
                 continue;
             };
-            let Some(origin) = constraint.provenance.lower else {
+            let Some(origin) = constraint.provenance.lower.xor(constraint.provenance.upper) else {
                 representative = None;
                 continue;
             };
 
             let support = storage.constraint_support(constraint_id);
-            if constraint.provenance.upper.is_some()
-                || origin_uses.get(&origin).copied() != Some(1)
-                || support.iter().nth(1).is_some()
-                || support.overlaps_with(&connected_typevars)
-            {
+            if origin_uses.get(&origin).copied() != Some(1) || support.iter().nth(1).is_some() {
                 representative = None;
                 continue;
             }
@@ -118,6 +110,7 @@ impl<'db> SolutionWalker<'db> {
             let key = (
                 constraint.typevar,
                 constraint.bounds,
+                constraint.provenance.lower.is_some(),
                 storage.gradual_origin(origin).ty,
             );
             if let Some((previous, representative_constraint, representative_origin)) =

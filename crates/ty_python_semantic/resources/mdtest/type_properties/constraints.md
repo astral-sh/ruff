@@ -1084,6 +1084,51 @@ def _[T]() -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
 ```
 
+Gradual upper bounds must not enumerate equivalent materializations either.
+
+```py
+from collections.abc import Callable
+
+def _[T]() -> None:
+    constraints = ConstraintSet.lower_bound(int, T)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    constraints &= is_constraint_set_assignable_to(Any, Callable[[T], None] | None)
+    # revealed: Solution[T=int]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T])[0])
+```
+
+A relationship with another type variable does not distinguish identical gradual bounds.
+
+```py
+def _[T, U]() -> None:
+    constraints = ConstraintSet.lower_bound(int, T)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= ConstraintSet.lower_bound(U, T)
+    # revealed: Solution[T=int | Any | U@_]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U])[0])
+```
+
 ### Symbolic relationships and fixed non-inferable bindings
 
 A bare relationship must have the same meaning regardless of which type variable the TDD chooses as
