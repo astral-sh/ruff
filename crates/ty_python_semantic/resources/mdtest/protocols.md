@@ -4044,6 +4044,36 @@ class Incompatible(SupportsMethod[T_co]):
         raise NotImplementedError
 ```
 
+## Recursive protocol receiver binding during constructor inference
+
+Inferring a constructor's type argument from a protocol can recursively compare an explicitly typed
+receiver with the same protocol. Constraints from another generic method must not make this cycle
+alternate between equivalent representations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Container[T](Protocol):
+    value: T
+
+    def replace[U](self, value: U) -> None:
+        pass
+
+    def flatten[U](self: "Container[Container[U]]") -> None:
+        pass
+
+class Implementation[T](Container[T]):
+    pass
+
+value: Container[int] = Implementation()
+reveal_type(value)  # revealed: Implementation[int]
+```
+
 ## Recursive protocol receiver binding with an overloaded class method
 
 Accessing an overloaded class method on a generic protocol can recursively bind the protocol's

@@ -1152,7 +1152,8 @@ impl<'db> ConstraintSetBuilder<'db> {
                 // solutions. An unrelated constraint cannot, and keeping its fresh type variables
                 // in a cached value can prevent recursive Salsa queries from reaching a fixed
                 // point. Incomplete supports may hide a relationship, so preserve those entries.
-                let constraint_support = storage.constraint_support(source_constraint);
+                let constraint_support_id = storage.constraint_support_id(source_constraint);
+                let constraint_support = storage.support_data(constraint_support_id);
                 if !used_constraints[source_constraint.index()]
                     && let Some(live_support) = live_support
                     && live_support.is_complete()
@@ -1162,6 +1163,8 @@ impl<'db> ConstraintSetBuilder<'db> {
                     return left;
                 }
                 used_constraints.set(source_constraint.index(), true);
+                // Source-order-only constraints are reloaded too, so retain their supports.
+                used_supports.set(constraint_support_id.index(), true);
                 let right = source_orders.push(SourceOrder::Constraint(source_constraint));
 
                 Some(match left {
@@ -1256,7 +1259,10 @@ impl<'db> ConstraintSetBuilder<'db> {
 impl<'db> ConstraintSetStorage<'db> {
     /// Interns a single typevar, giving it a stable order in this builder
     fn intern_typevar(&mut self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
-        let identity = typevar.identity(db);
+        self.intern_typevar_identity(typevar.identity(db))
+    }
+
+    fn intern_typevar_identity(&mut self, identity: BoundTypeVarIdentity<'db>) -> TypeVarId {
         self.ensure_overlay_identity_caches();
         if let Some(id) = self.typevar_cache.get(&identity) {
             return *id;
@@ -1682,10 +1688,20 @@ impl<'db> ConstraintSetStorage<'db> {
             .as_ref()
             .expect("storage-free owned constraint sets must have terminal roots");
 
-        // Load all of the constraints into the this storage first, to maximize the chance that the
-        // constraints and typevars will appear in the same order. (This is important because many
-        // of our mdtests try to force a particular ordering, to test that our algorithms are all
-        // order-independent.)
+        // Restore the saved order of referenced typevars before rebuilding constraints. A stored
+        // `T <= U` can have `U` as its subject and `T` as its lower bound. Interning that subject
+        // first would reverse the original typevar order, causing successive loads to alternate
+        // between equivalent representations and preventing recursive Salsa queries from converging.
+        // Keep existing destination IDs, and omit typevars used only by discarded constraints.
+        let mut referenced_typevars = Support::default();
+        for support in &inner.constraint_supports {
+            referenced_typevars |= &inner.supports[inner.retained_support_index(*support)];
+        }
+        for typevar in referenced_typevars.iter() {
+            self.intern_typevar_identity(inner.typevars[typevar]);
+        }
+
+        // Rebuild constraints in their saved order, using the destination's typevar ordering.
         let constraints: Box<[_]> = inner
             .constraints
             .iter()
@@ -9092,6 +9108,92 @@ class E: ...
         }
     }
 
+    #[test]
+    fn owned_constraint_set_typevar_order_survives_round_trip() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = Type::TypeVar(create_typevar(db, "U"));
+
+        for (lower, upper) in [(Some(u), None), (None, Some(u)), (Some(u), Some(u))] {
+            let original = ConstraintSetBuilder::new().into_owned(|builder| {
+                ConstraintSet::constrain_typevar_with_bounds(db, &env, builder, t, lower, upper)
+            });
+            let mut reloaded = original.clone();
+
+            for _ in 0..3 {
+                reloaded = ConstraintSetBuilder::new()
+                    .into_owned(|builder| builder.load(db, &env, &reloaded));
+                assert_eq!(original, reloaded);
+            }
+        }
+    }
+
+    #[test]
+    fn owned_constraint_set_load_discards_unreferenced_typevars() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let unused = create_typevar(db, "Unused");
+        let u = create_typevar(db, "U");
+
+        let original = ConstraintSetBuilder::new().into_owned(|builder| {
+            let _unused_t_int = create_constraint(db, builder, t, KnownClass::Int);
+            let _unused_str = create_constraint(db, builder, unused, KnownClass::Str);
+            ConstraintSet::constrain_typevar_upper_bound(db, &env, builder, t, Type::TypeVar(u))
+        });
+        let reloaded =
+            ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &original));
+
+        assert_eq!(
+            reloaded
+                .inner
+                .as_ref()
+                .map(|inner| inner.typevars.iter().copied().collect::<Vec<_>>()),
+            Some(vec![t.identity(db), u.identity(db)]),
+        );
+        let reloaded_again =
+            ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &reloaded));
+        assert_eq!(reloaded, reloaded_again);
+    }
+
+    #[test]
+    fn owned_constraint_set_load_preserves_overlay_typevar_ids() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let source = ConstraintSetBuilder::new().into_owned(|builder| {
+            ConstraintSet::constrain_typevar_upper_bound(db, &env, builder, t, Type::TypeVar(u))
+        });
+        let destination = ConstraintSetBuilder::new()
+            .into_owned(|builder| create_constraint(db, builder, u, KnownClass::Int));
+
+        destination.query(|builder, _| {
+            let original_u_id = builder.storage.borrow_mut().typevar_id(db, u);
+            let loaded = builder.load(db, &env, &source);
+            let direct = ConstraintSet::constrain_typevar_upper_bound(
+                db,
+                &env,
+                builder,
+                t,
+                Type::TypeVar(u),
+            );
+            assert!(
+                loaded
+                    .iff(db, builder, direct)
+                    .is_always_satisfied(db, &env)
+            );
+
+            let mut storage = builder.storage.borrow_mut();
+            assert_eq!(storage.typevar_id(db, u), original_u_id);
+            assert_eq!(storage.typevar_id(db, t).index(), 1);
+        });
+    }
+
     fn create_compacted_owned_set(db: &TestDb) -> OwnedConstraintSet<'_> {
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
@@ -9200,6 +9302,12 @@ class E: ...
             owned.inner.as_ref().map(|inner| inner.source_orders.len()),
             Some(5),
         );
+
+        let reloaded =
+            ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &owned));
+        let reloaded_again =
+            ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &reloaded));
+        assert_eq!(reloaded, reloaded_again);
     }
 
     #[test]
