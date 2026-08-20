@@ -1316,7 +1316,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)
     }
 
-    const fn is_lazy_gradual_assignability(&self) -> bool {
+    pub(super) const fn is_lazy_gradual_assignability(&self) -> bool {
         self.relation.is_assignability()
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Lazy)
             && matches!(self.gradual_evaluation, GradualEvaluation::Lazy)

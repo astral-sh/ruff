@@ -2692,7 +2692,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
+        let return_type_constraints = if self.is_lazy_gradual_assignability()
+            && target.return_ty.is_dynamic()
+            && target_parameters.as_paramspec_with_prefix().is_some()
+        {
+            // A bare gradual return type should not widen the inferred type of the `ParamSpec`.
+            //
+            // TODO: Remove this special case once callable-local type variables are correctly
+            // handled during `ParamSpec` inference.
+            self.always()
+        } else {
+            self.check_type_pair(db, source.return_ty, target.return_ty)
+        };
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db, env);
