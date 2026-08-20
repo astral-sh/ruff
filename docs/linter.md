@@ -219,7 +219,7 @@ each other. In general, you can think of this precedence as increasing from the 
 (`ALL`) to the narrowest single-rule selectors (e.g. `F401` or `unused-import`):
 
 ```text
-ALL < category = linter group < linter prefix < rule
+ALL < category < linter group < linter prefix < rule
 ```
 
 As shown above, this means that configuration like:
