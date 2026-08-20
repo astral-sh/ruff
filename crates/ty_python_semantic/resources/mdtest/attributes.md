@@ -3811,7 +3811,7 @@ date.year = 2025
 date.month = "May"  # snapshot: invalid-assignment
 # snapshot: invalid-assignment
 # snapshot: invalid-assignment
-date.tz = "UTC"
+date.tz, other = ("UTC", 0)
 ```
 
 ```snapshot
@@ -3832,7 +3832,7 @@ info: Method defined here
 error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
   --> src/mdtest_snippet.py:16:1
    |
-16 | date.tz = "UTC"
+16 | date.tz, other = ("UTC", 0)
    | ^^^^^^^ Expected `Literal["day", "month", "year"]`, found `Literal["tz"]`
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
@@ -3844,10 +3844,12 @@ info: Method defined here
 
 
 error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
-  --> src/mdtest_snippet.py:16:11
+  --> src/mdtest_snippet.py:16:19
    |
-16 | date.tz = "UTC"
-   |           ^^^^^ Expected `int`, found `Literal["UTC"]`
+16 | date.tz, other = ("UTC", 0)
+   | -------           ^^^^^ Expected `int`, found `Literal["UTC"]`
+   | |
+   | Assigned to this target
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
@@ -4181,9 +4183,9 @@ mod.global_symbol = 1
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
 _, mod.global_symbol = (..., 1)
 
-# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `global_symbol` of type `str`"
 [_, mod.global_symbol] = [
     1,
+    # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `global_symbol` of type `str`"
     2,
 ]
 

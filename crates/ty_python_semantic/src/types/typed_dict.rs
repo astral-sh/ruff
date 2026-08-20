@@ -1436,30 +1436,30 @@ pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> Typ
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) enum TypedDictAssignmentKind {
+pub(super) enum TypedDictAssignmentKind<'ast> {
     /// For subscript assignments like `d["key"] = value`
-    Subscript,
+    Subscript(&'ast ast::ExprSubscript),
     /// For constructor arguments like `MyTypedDict(key=value)`
     Constructor,
 }
 
-impl TypedDictAssignmentKind {
+impl TypedDictAssignmentKind<'_> {
     fn diagnostic_name(self) -> &'static str {
         match self {
-            Self::Subscript => "assignment",
+            Self::Subscript(_) => "assignment",
             Self::Constructor => "argument",
         }
     }
 
     fn diagnostic_type(self) -> &'static crate::lint::LintMetadata {
         match self {
-            Self::Subscript => &INVALID_ASSIGNMENT,
+            Self::Subscript(_) => &INVALID_ASSIGNMENT,
             Self::Constructor => &INVALID_ARGUMENT_TYPE,
         }
     }
 
     const fn is_subscript(self) -> bool {
-        matches!(self, Self::Subscript)
+        matches!(self, Self::Subscript(_))
     }
 }
 
@@ -1473,7 +1473,7 @@ pub(super) struct TypedDictKeyAssignment<'a, 'db, 'ast> {
     pub(super) typed_dict_node: AnyNodeRef<'ast>,
     pub(super) key_node: AnyNodeRef<'ast>,
     pub(super) value_node: AnyNodeRef<'ast>,
-    pub(super) assignment_kind: TypedDictAssignmentKind,
+    pub(super) assignment_kind: TypedDictAssignmentKind<'ast>,
     pub(super) emit_diagnostic: bool,
 }
 
@@ -1533,7 +1533,16 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
             return true;
         }
 
-        if diagnostic::is_invalid_typed_dict_literal(db, env, item.declared_ty, self.value_node) {
+        // Unpacked dictionary literals are inferred without the field's TypedDict context, so
+        // they have not already produced a more specific validation diagnostic.
+        let is_unpacked_assignment = matches!(
+            self.assignment_kind,
+            TypedDictAssignmentKind::Subscript(target)
+                if self.context.is_unpacked_assignment_target(target)
+        );
+        if !is_unpacked_assignment
+            && diagnostic::is_invalid_typed_dict_literal(db, env, item.declared_ty, self.value_node)
+        {
             return false;
         }
 

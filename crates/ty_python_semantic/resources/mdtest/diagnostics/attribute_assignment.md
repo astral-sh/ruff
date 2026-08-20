@@ -45,6 +45,29 @@ error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable t
   | ^^^^^^
 ```
 
+## Unpacked assignments to ordinary attributes
+
+When an ordinary attribute is assigned through unpacking, the diagnostic identifies both the
+incompatible value and the attribute that receives it.
+
+```py
+class C:
+    attr: int
+
+instance = C()
+instance.attr, other = ("wrong", 1)  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+ --> src/mdtest_snippet.py:5:25
+  |
+5 | instance.attr, other = ("wrong", 1)  # snapshot: invalid-assignment
+  | -------------           ^^^^^^^ Expected `int`, found `Literal["wrong"]`
+  | |
+  | Assigned to this target
+```
+
 ## Pure instance attributes
 
 These can only be set on instances.
@@ -331,14 +354,14 @@ class C:
 
 instance = C()
 
-instance.attr = 1  # snapshot: invalid-assignment
+instance.attr, other = (1, 0)  # snapshot: invalid-assignment
 ```
 
 ```snapshot
 error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
   --> src/mdtest_snippet.py:10:1
    |
-10 | instance.attr = 1  # snapshot: invalid-assignment
+10 | instance.attr, other = (1, 0)  # snapshot: invalid-assignment
    | ^^^^^^^^^^^^^ No argument provided for required parameter `extra` of function `WrongDescriptor.__set__`
 info: This assignment implicitly calls `__set__` on a descriptor of type `WrongDescriptor`
 info: Parameter declared here

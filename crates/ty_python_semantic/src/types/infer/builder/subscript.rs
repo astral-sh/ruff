@@ -1894,7 +1894,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         typed_dict_node: target.value.as_ref().into(),
                         key_node: target.slice.as_ref().into(),
                         value_node: rhs_value_node.into(),
-                        assignment_kind: TypedDictAssignmentKind::Subscript,
+                        assignment_kind: TypedDictAssignmentKind::Subscript(target),
                         emit_diagnostic,
                     }
                     .validate();
@@ -1987,42 +1987,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             typed_dict_node: target.value.as_ref().into(),
                                             key_node: target.slice.as_ref().into(),
                                             value_node: rhs_value_node.into(),
-                                            assignment_kind: TypedDictAssignmentKind::Subscript,
+                                            assignment_kind: TypedDictAssignmentKind::Subscript(
+                                                target,
+                                            ),
                                             emit_diagnostic: true,
                                         }
                                         .validate();
                                     }
                                 } else {
-                                    let expected_value_ty = if self
+                                    let invalid_value_ty = self
                                         .context
                                         .is_unpacked_assignment_target(target)
-                                    {
-                                        object_ty
-                                            .known_specialization(db, env, KnownClass::Dict)
-                                            .and_then(|specialization| {
-                                                match specialization.types(db) {
-                                                    [_, value] => Some(*value),
-                                                    _ => None,
-                                                }
-                                            })
-                                            .or_else(|| {
-                                                object_ty
-                                                    .known_specialization(db, env, KnownClass::List)
-                                                    .and_then(|specialization| match specialization
+                                        .then(|| {
+                                            [KnownClass::Dict, KnownClass::List]
+                                                .into_iter()
+                                                .find_map(|class| {
+                                                    object_ty
+                                                        .known_specialization(db, env, class)?
                                                         .types(db)
-                                                    {
-                                                        [element] => Some(*element),
-                                                        _ => None,
-                                                    })
-                                            })
-                                    } else {
-                                        None
-                                    };
-                                    let precise_value_annotation =
-                                        expected_value_ty.is_some_and(|expected| {
-                                            !rhs_value_ty.is_assignable_to(db, env, expected)
+                                                        .last()
+                                                        .copied()
+                                                })
+                                        })
+                                        .flatten()
+                                        .filter(|expected| {
+                                            !rhs_value_ty.is_assignable_to(db, env, *expected)
                                         });
-                                    let diagnostic_range = if precise_value_annotation {
+                                    let diagnostic_range = if invalid_value_ty.is_some() {
                                         rhs_value_node.range()
                                     } else {
                                         target.range.cover(rhs_value_node.range())
@@ -2048,25 +2039,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             "Invalid subscript assignment with key of type `{}` \
                                             and value of type `{assigned_d}` \
                                             on object of type `{object_d}`",
-                                            slice_ty.display_with(db, env, settings),
+                                            slice_ty.display_with(db, env, settings.clone()),
                                         ));
 
-                                        if precise_value_annotation {
+                                        if let Some(expected) = invalid_value_ty {
                                             diagnostic.annotate(
                                                 self.context
                                                     .secondary(target)
                                                     .message("Assigned to this target"),
                                             );
 
-                                            if let Some(expected) = expected_value_ty {
-                                                diagnostic.set_primary_annotation_message(
-                                                    format_args!(
-                                                        "Expected value of type `{}`, got `{}`",
-                                                        expected.display(db, env),
-                                                        rhs_value_ty.display(db, env),
+                                            diagnostic.set_primary_annotation_message(
+                                                format_args!(
+                                                    "Expected value of type `{}`, got `{}`",
+                                                    expected.display_with(
+                                                        db,
+                                                        env,
+                                                        settings.clone()
                                                     ),
-                                                );
-                                            }
+                                                    rhs_value_ty.display_with(db, env, settings),
+                                                ),
+                                            );
                                         }
 
                                         // Special diagnostic for dictionaries
@@ -2088,7 +2081,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 );
                                             }
 
-                                            if !precise_value_annotation
+                                            if invalid_value_ty.is_none()
                                                 && !rhs_value_ty.is_assignable_to(
                                                     db,
                                                     env,
