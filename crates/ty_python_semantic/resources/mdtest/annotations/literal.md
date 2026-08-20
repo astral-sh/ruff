@@ -359,3 +359,49 @@ from typing import Literal
 def _(x: Literal):
     reveal_type(x)  # revealed: Unknown
 ```
+
+## Invalid expressions in string annotations
+
+Invalid `Literal` arguments in string annotations are rejected without evaluating their children.
+This includes invalid nested subscripts and attribute expressions whose operands contain
+assignments.
+
+`runtime.py`:
+
+```py
+from typing import Literal
+
+a: "Literal[int[(name := missing)]]"  # error: [invalid-type-form]
+b: "Literal[(name := int)[0]]"  # error: [invalid-type-form]
+c: "Literal[(name := 0).real]"  # error: [invalid-type-form]
+
+def valid(value: "Literal[Literal[1], None]"):
+    reveal_type(value)  # revealed: Literal[1] | None
+```
+
+The same error recovery applies in stub files.
+
+`stub.pyi`:
+
+```pyi
+from typing import Literal
+
+a: "Literal[int[(name := missing)]]"  # error: [invalid-type-form]
+```
+
+## Invalid expressions in evaluated annotations
+
+When an annotation is evaluated, errors in its invalid arguments are still reported.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Literal
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: Literal[int[(name := missing)]]
+```

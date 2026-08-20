@@ -2601,21 +2601,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
             SpecialFormType::LiteralString => {
-                let arguments = self.infer_expression(arguments_slice, TypeContext::default());
+                let argument_elements = if self.in_string_annotation() {
+                    // The outer form is already invalid. Check only whether its arguments could
+                    // belong to `Literal`, without evaluating arbitrary unindexed expressions or
+                    // reporting diagnostics that would distract from the original error.
+                    let arguments = match arguments_slice {
+                        ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
+                        _ => std::slice::from_ref(arguments_slice),
+                    };
+                    let mut builder = self.speculate_without_diagnostics();
+                    arguments
+                        .iter()
+                        .map(|argument| {
+                            builder
+                                .infer_literal_parameter_type(argument)
+                                .unwrap_or(Type::unknown())
+                        })
+                        .collect::<Vec<_>>()
+                } else {
+                    let arguments = self.infer_expression(arguments_slice, TypeContext::default());
+                    let arguments_as_tuple = arguments.exact_tuple_instance_spec(db);
+                    arguments_as_tuple.as_ref().map_or_else(
+                        || vec![arguments],
+                        |tuple| tuple.iter_element_types(db).collect(),
+                    )
+                };
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag =
                         builder.into_diagnostic("`LiteralString` expects no type parameter");
 
-                    let arguments_as_tuple = arguments.exact_tuple_instance_spec(db);
-
-                    let argument_elements = arguments_as_tuple.as_ref().map_or_else(
-                        || vec![arguments],
-                        |tuple| tuple.iter_element_types(db).collect(),
-                    );
-                    let mut argument_elements = argument_elements.into_iter();
-
-                    let probably_meant_literal = argument_elements.all(|ty| match ty {
+                    let probably_meant_literal = argument_elements.into_iter().all(|ty| match ty {
                         Type::LiteralValue(literal)
                             if matches!(
                                 literal.kind(),
@@ -2670,7 +2686,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
         let ty = match parameters {
-            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. })
+                if !self.in_string_annotation() || is_dotted_name(value) =>
+            {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
                     let ty = self.infer_literal_parameter_type(slice)?;
@@ -2680,7 +2698,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(parameters, ty);
                     ty
                 } else {
-                    self.infer_expression(slice, TypeContext::default());
+                    if !self.in_string_annotation() {
+                        self.infer_expression(slice, TypeContext::default());
+                    }
                     self.store_expression_type(parameters, Type::unknown());
 
                     return Err(vec![parameters]);
@@ -2738,7 +2758,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ty
             }
             // enum members and aliases to literal types
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_)
+                if !self.in_string_annotation() || is_dotted_name(parameters) =>
+            {
                 let subscript_ty = self.infer_expression(parameters, TypeContext::default());
                 match subscript_ty {
                     // type aliases to literal types

@@ -63,6 +63,71 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |    Did you mean `Literal`?
 ```
 
+### Parameterized string annotations
+
+Since `LiteralString` cannot be parameterized, invalid arguments in string annotations are not
+evaluated. They should neither panic nor produce distracting errors about their contents.
+
+`runtime.py`:
+
+```py
+from typing_extensions import LiteralString
+
+a: "LiteralString[(name := missing)]"  # error: [invalid-type-form]
+b: "LiteralString[int[(name := missing)]]"  # error: [invalid-type-form]
+c: "LiteralString[(name := 0).real]"  # error: [invalid-type-form]
+d: "LiteralString[lambda default=missing: None]"  # error: [invalid-type-form]
+```
+
+The same error recovery applies in stub files.
+
+`stub.pyi`:
+
+```pyi
+from typing_extensions import LiteralString
+
+value: "LiteralString[(name := missing)]"  # error: [invalid-type-form]
+```
+
+### Literal suggestion in string annotations
+
+For valid literal arguments, we still suggest `Literal` in a string annotation. Each argument is
+checked separately, so the combination of `True` and `False` does not lose the suggestion.
+
+```py
+from typing_extensions import LiteralString
+
+# snapshot: invalid-type-form
+value: "LiteralString['foo', True, False]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:4:9
+  |
+4 | value: "LiteralString['foo', True, False]"
+  |         -------------^^^^^^^^^^^^^^^^^^^^
+  |         |
+  |         Did you mean `Literal`?
+```
+
+### Parameterized evaluated annotations
+
+Evaluated annotations still report errors in their arguments.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing_extensions import LiteralString
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: LiteralString[(name := missing)]
+```
+
 ### As a base class
 
 Subclassing `LiteralString` leads to a runtime error.
