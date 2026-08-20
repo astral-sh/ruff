@@ -55,13 +55,13 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
 
                 let args = match &item.command {
                     CodeLensCommand::RunTest {
-                        class_names,
+                        class_name,
                         function_name,
                     } => {
                         let run_test_args = RunTestArgs::new(
                             &cwd,
                             Some(&file_path),
-                            class_names,
+                            class_name.as_ref(),
                             function_name.as_deref(),
                         );
                         serde_json::to_value(&run_test_args).ok()?
