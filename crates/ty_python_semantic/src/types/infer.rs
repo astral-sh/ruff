@@ -46,6 +46,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -1411,7 +1412,33 @@ impl<'db> DefinitionInference<'db> {
         cycle_recovery: Type<'db>,
     ) -> Self {
         let env = ProgramEnvironment::from_definition(definition);
-        if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
+        let mut types = DefinitionTypes::Empty;
+
+        // Eagerly store more precise types for collection literals to avoid an extra
+        // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
+        if let DefinitionKind::Assignment(assignment) = definition.kind(db) {
+            let program_file = definition.program_file(db);
+            let python_file = program_file.python_file(db);
+            let module = parsed_module(db, python_file).load(db);
+            let known_collection = match assignment.value(&module) {
+                ast::Expr::Set(_) => Some(KnownClass::Set),
+                ast::Expr::List(_) => Some(KnownClass::List),
+                ast::Expr::Dict(_) => Some(KnownClass::Dict),
+                _ => None,
+            };
+
+            if let Some(known_collection) = known_collection {
+                if let Some(collection_class) = known_collection.try_to_class_literal(db, &env) {
+                    let divergent_collection = collection_class
+                        .apply_specialization(db, |generic_context| {
+                            generic_context.repeat_specialization(db, cycle_recovery)
+                        });
+
+                    types =
+                        DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
+                }
+            }
+        } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
             let module = parsed_module(db, python_file).load(db);
@@ -1448,7 +1475,7 @@ impl<'db> DefinitionInference<'db> {
 
         Self {
             expressions: FrozenMap::default(),
-            types: DefinitionTypes::Empty,
+            types,
             #[cfg(debug_assertions)]
             scope: definition.scope(db),
             extra: Some(Box::new(DefinitionInferenceExtra::Other(Box::new(

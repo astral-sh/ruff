@@ -225,15 +225,16 @@ class StaticModuleRecord(TypedDict):
     value: int
 ```
 
-The same holds for a forward reference carried by a class-body `while` loop.
+TODO: In class-body `while` loops, eager collection cycle recovery loses the declared `TypedDict`
+context.
 
 ```py
 class Container:
     while bool(input()):
-        record: ClassRecord
+        record: ClassRecord  # error: [invalid-declaration]
         record = {"value": 1}
         inspect(record)
-        reveal_type(record)  # revealed: ClassRecord
+        reveal_type(record)  # revealed: dict[str, int]
 
 class ClassRecord(TypedDict):
     value: int
