@@ -30,6 +30,7 @@
 mod call_hierarchy;
 mod closed_documents;
 mod code_actions;
+mod code_lens;
 mod commands;
 mod completions;
 mod configuration;
