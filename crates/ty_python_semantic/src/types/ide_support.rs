@@ -25,6 +25,7 @@ use ty_module_resolver::{ImportingFile, Module, ResolverFile};
 use ty_python_core::definition::{Definition, DefinitionKind, NestedBindingExecution};
 use ty_python_core::{ProgramFile, attribute_scopes, global_scope, semantic_index, use_def_map};
 
+mod name_resolution;
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
@@ -93,7 +94,7 @@ pub fn definitions_for_name<'db>(
         if is_global || is_nonlocal {
             // Assignments in a forwarding scope remain valid navigation targets, including eager
             // walrus bindings exported from comprehensions.
-            all_definitions.extend(user_visible_definitions(
+            all_definitions.extend(source_backed_definitions(
                 db,
                 use_def_map
                     .reachable_symbol_bindings(symbol_id)
@@ -121,7 +122,7 @@ pub fn definitions_for_name<'db>(
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                all_definitions.extend(user_visible_definitions(
+                all_definitions.extend(source_backed_definitions(
                     db,
                     global_use_def_map
                         .reachable_symbol_bindings(global_symbol_id)
@@ -143,7 +144,7 @@ pub fn definitions_for_name<'db>(
         }
 
         // Get all definitions (both bindings and declarations) for this place
-        all_definitions.extend(user_visible_definitions(
+        all_definitions.extend(source_backed_definitions(
             db,
             use_def_map
                 .reachable_symbol_bindings(symbol_id)
@@ -1053,9 +1054,13 @@ fn collect_implementation_root_classes<'db>(
     }
 }
 
-/// Returns the user-visible definitions represented by a use-def binding.
+/// Returns definitions that correspond to concrete locations in source code.
 ///
-/// Comprehension walruses are represented in the containing scope by synthetic eager bindings:
+/// This result excludes synthetic definitions such as loop headers and nested
+/// bindings.
+///
+/// For an eager synthetic definition like a comprehension walrus, the concrete
+/// definition it represents is returned instead:
 ///
 /// ```python
 /// [(last := item) for item in items]
@@ -1066,7 +1071,7 @@ fn collect_implementation_root_classes<'db>(
 /// end-of-scope bindings. Nested comprehensions can produce a chain of these proxies. Only
 /// follow sources that resolve to the same variable, so `global` and `nonlocal` writes do not
 /// become definitions of each other.
-fn user_visible_definitions<'db>(
+fn source_backed_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> FxIndexSet<Definition<'db>> {
@@ -1164,7 +1169,7 @@ fn resolve_reachable_definitions<'db>(
     symbol_name: &str,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
-    user_visible_definitions(db, definitions)
+    source_backed_definitions(db, definitions)
         .into_iter()
         .flat_map(|definition| {
             resolve_definition(
@@ -2471,7 +2476,7 @@ mod resolve_definition {
             }
         }
 
-        super::user_visible_definitions(db, definitions)
+        super::source_backed_definitions(db, definitions)
             .into_iter()
             .collect()
     }

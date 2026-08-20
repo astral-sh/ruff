@@ -81,6 +81,10 @@ impl<'db> SemanticModel<'db> {
         ProgramEnvironment::from_file(self.program_file())
     }
 
+    pub(crate) fn is_in_string_annotation(&self) -> bool {
+        self.in_string_annotation_expr.is_some()
+    }
+
     pub fn file_path(&self) -> &FilePath {
         self.file().path(self.db)
     }
