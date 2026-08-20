@@ -1349,7 +1349,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     )
                                 }
                                 None => {
-                                    self.infer_expression(parameters, TypeContext::default());
+                                    if !self.in_string_annotation() {
+                                        self.infer_expression(parameters, TypeContext::default());
+                                    }
                                     self.report_invalid_type_expression(
                                         subscript,
                                         format_args!(
@@ -1372,27 +1374,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
                         invalid_type_argument(self, slice)
                     }
-                    value_ty @ (Type::SpecialForm(
-                        SpecialFormType::Top | SpecialFormType::Bottom | SpecialFormType::Annotated,
-                    )
-                    | Type::KnownInstance(_)
-                    | Type::GenericAlias(_)
-                    | Type::Callable(_)) => {
+                    value_ty => {
                         let slice_ty = self.infer_subscript_type_expression(subscript, value_ty);
                         subclass_of_type_argument(self, slice, slice_ty)
-                    }
-                    _ => {
-                        self.infer_expression(parameters, TypeContext::default());
-                        todo_type!("unsupported nested subscript in type[X]")
                     }
                 };
                 self.store_expression_type(slice, parameters_ty);
                 parameters_ty
             }
-            _ => {
-                self.infer_expression(slice, TypeContext::default());
-                todo_type!("unsupported type[X] special form")
-            }
+            _ => infer_type_argument(self, slice),
         }
     }
 
@@ -1799,7 +1789,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .unwrap_or(Type::unknown())
                     }
                     _ => {
-                        self.infer_expression(slice, TypeContext::default());
+                        if !self.in_string_annotation() {
+                            self.infer_expression(slice, TypeContext::default());
+                        }
                         self.report_invalid_type_expression(
                             subscript,
                             format_args!(

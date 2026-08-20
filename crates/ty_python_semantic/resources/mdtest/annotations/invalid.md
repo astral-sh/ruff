@@ -236,6 +236,63 @@ b: "(lambda value=(name := int): None)[int]"
 c: "TypedDict('T', {}, extra_items=missing)[int]"
 ```
 
+## Invalid subscript arguments in string annotations
+
+Even when a subscript's operand is a valid name, it might not be a generic type. We reject such
+specializations without evaluating their arguments in string annotations. This also applies inside
+`type[...]`, whose argument must itself be a valid type expression.
+
+`runtime.py`:
+
+```py
+from typing import Any
+
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+a: "int[(name := missing)]"
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+b: "type[int[(name := missing)]]"
+# error: [invalid-type-form] "Named expressions are not allowed"
+c: "type[(name := missing)]"
+# error: [invalid-type-form] "Special form `typing.Any` expected no type parameter"
+d: "type[Any[(name := missing)]]"
+```
+
+Stub files use the same error recovery.
+
+`stub.pyi`:
+
+```pyi
+from typing import Any
+
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+a: "int[(name := missing)]"
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+b: "type[int[(name := missing)]]"
+# error: [invalid-type-form] "Named expressions are not allowed"
+c: "type[(name := missing)]"
+# error: [invalid-type-form] "Special form `typing.Any` expected no type parameter"
+d: "type[Any[(name := missing)]]"
+```
+
+## Invalid subscript arguments in evaluated annotations
+
+For annotations that are evaluated, we still report errors in the invalid argument.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+# error: [unresolved-reference] "Name `missing` used when not defined"
+a: int[(name := missing)]
+
+# error: [invalid-type-form] "Named expressions are not allowed"
+# error: [unresolved-reference] "Name `other_missing` used when not defined"
+b: type[(other := other_missing)]
+```
+
 ## Multiple starred expressions in a `tuple` specialization
 
 <!-- snapshot-diagnostics -->
