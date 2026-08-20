@@ -2676,7 +2676,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
+        let return_type_constraints = if let Some(dynamic) = target.return_ty.as_dynamic()
+            && target_parameters.as_paramspec_with_prefix().is_some()
+        {
+            // A gradual return type constrains its materialization, not the inferred parameter list.
+            ConstraintSet::constrain_gradual(
+                db,
+                env,
+                self.constraints,
+                self.constraints.next_gradual_variable(dynamic),
+            )
+        } else {
+            self.check_type_pair(db, source.return_ty, target.return_ty)
+        };
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db, env);

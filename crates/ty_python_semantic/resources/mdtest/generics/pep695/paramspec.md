@@ -1522,6 +1522,30 @@ reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ```
 
+### Generic decorators with gradual return types
+
+A gradual callable return type must not introduce alternative parameter-list specializations when
+inferring a `ParamSpec` from a generic decorated function.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+class Wrapper[**P]:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
+        raise NotImplementedError
+
+class Decorator:
+    def __call__[**P](self, fn: Callable[P, Any]) -> Wrapper[P]:
+        raise NotImplementedError
+
+@Decorator()
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(identity(1))  # revealed: Any
+```
+
 ## Callable protocols with `ParamSpec` and class constructors
 
 When a class is passed to a function expecting a callable protocol with `ParamSpec`, the `ParamSpec`
