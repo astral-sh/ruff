@@ -4,7 +4,6 @@
 # All additional options are passed to `rooster release`
 set -eu
 
-export UV_PREVIEW=1
 export UV_DEFAULT_INDEX='https://pypi.org/simple'
 
 script_root="$(realpath "$(dirname "$0")")"
