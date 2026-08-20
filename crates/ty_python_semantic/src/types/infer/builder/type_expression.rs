@@ -1349,7 +1349,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     )
                                 }
                                 None => {
-                                    self.infer_expression(parameters, TypeContext::default());
+                                    if !self.in_string_annotation() {
+                                        self.infer_expression(parameters, TypeContext::default());
+                                    }
                                     self.report_invalid_type_expression(
                                         subscript,
                                         format_args!(
@@ -1382,7 +1384,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         subclass_of_type_argument(self, slice, slice_ty)
                     }
                     _ => {
-                        self.infer_expression(parameters, TypeContext::default());
+                        self.infer_type_expression(parameters);
                         todo_type!("unsupported nested subscript in type[X]")
                     }
                 };
@@ -1390,7 +1392,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 parameters_ty
             }
             _ => {
-                self.infer_expression(slice, TypeContext::default());
+                self.infer_type_expression(slice);
                 todo_type!("unsupported type[X] special form")
             }
         }
@@ -1799,7 +1801,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .unwrap_or(Type::unknown())
                     }
                     _ => {
-                        self.infer_expression(slice, TypeContext::default());
+                        if !self.in_string_annotation() {
+                            self.infer_expression(slice, TypeContext::default());
+                        }
                         self.report_invalid_type_expression(
                             subscript,
                             format_args!(
