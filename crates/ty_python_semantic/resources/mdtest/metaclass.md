@@ -705,102 +705,23 @@ class InvalidDirect(Protocol, metaclass=Unrelated): ...
 class InvalidSubclass(P, metaclass=Unrelated): ...  # error: [conflicting-metaclass]
 ```
 
-## Obsolete protocol-metaclass workaround
-
-An older beartype workaround, written before typeshed exposed `_ProtocolMeta`, substitutes `ABCMeta`
-while type checking and uses the actual protocol metaclass at runtime. Although this can work at
-runtime, its type-checking branch hides the required `_ProtocolMeta` base and is rejected.
+Deriving an otherwise unrelated metaclass from `ABCMeta` does not make it compatible with
+`_ProtocolMeta`.
 
 ```py
-from abc import ABCMeta
-from typing import TYPE_CHECKING, Protocol
-
-if TYPE_CHECKING:
-    ProtocolMeta = ABCMeta
-else:
-    ProtocolMeta = type(Protocol)
-
-class Meta(ProtocolMeta): ...
-class P(Protocol, metaclass=Meta): ...  # error: [conflicting-metaclass]
-```
-
-Deriving the custom metaclass directly from `type(Protocol)` exposes the correct relationship to the
-type checker and works at runtime.
-
-```py
-class SupportedMeta(type(Protocol)): ...
-class Supported(Protocol, metaclass=SupportedMeta): ...
-
-reveal_type(type(Supported))  # revealed: <class 'SupportedMeta'>
-```
-
-## Callable class metaclass with a stub protocol fallback
-
-An ordinary class can be used as an explicit metaclass when the base supplies only a stub-origin
-`ABCMeta` fallback. Checking whether that callable constructs an appropriate class is a separate
-concern.
-
-`interface.pyi`:
-
-```pyi
-from typing import Protocol
-
-class Interface(Protocol): ...
-```
-
-`factory.py`:
-
-```py
-from interface import Interface
-
-class Factory: ...
-class Explicit(Interface, metaclass=Factory): ...
-
-reveal_type(Explicit.__class__)  # revealed: <class 'Factory'>
-```
-
-A metaclass inherited from a later base takes precedence over an earlier base's implicit protocol
-fallback, in both static and dynamic class definitions.
-
-`main.py`:
-
-```py
-from factory import Factory
-from interface import Interface
-
-class FactoryBase(metaclass=Factory): ...
-class Static(Interface, FactoryBase): ...
-
-Dynamic = type("Dynamic", (Interface, FactoryBase), {})
-
-reveal_type(Static.__class__)  # revealed: <class 'Factory'>
-reveal_type(Dynamic.__class__)  # revealed: <class 'Factory'>
-```
-
-## Explicit protocol metaclass conflicts
-
-An explicitly declared protocol metaclass constrains the metaclasses of subclasses. Two unrelated
-custom protocol metaclasses conflict even when the derived class includes `Protocol` directly.
-
-```py
-from typing import Protocol
-
-class First(type(Protocol)): ...
-class Second(type(Protocol)): ...
-class P(Protocol, metaclass=First): ...
-
-# error: [conflicting-metaclass] "`First` (metaclass of base class `P`)"
-class Direct(P, Protocol, metaclass=Second): ...
-
-# error: [conflicting-metaclass] "`First` (metaclass of base class `P`)"
-class Indirect(P, metaclass=Second): ...
+class UnrelatedABC(ABCMeta): ...
+class InvalidABC(P, metaclass=UnrelatedABC): ...  # error: [conflicting-metaclass]
 ```
 
 ## Protocol metaclass fallback in stubs
 
-A stub may model a runtime class with `Protocol` even if its implementation does not inherit from
-`typing.Protocol`. Typeshed uses this technique for some collection interfaces. If no custom
-metaclass is selected, ty infers `ABCMeta` to expose methods such as `register`.
+A stub can list `Protocol` as a base even when the runtime class does not inherit from
+`typing.Protocol`. Typeshed does this for collection interfaces such as `collections.abc.Iterable`,
+which is an ordinary abstract base class at runtime. Unlike a source-defined protocol, the stub
+therefore does not establish that the class has `_ProtocolMeta` as its metaclass.
+
+When no custom metaclass is selected, ty uses `ABCMeta` instead of `type` for class attribute
+lookup. This fallback makes ABC methods such as `register` available:
 
 `interface.pyi`:
 
@@ -810,9 +731,46 @@ from typing import Protocol
 class Interface(Protocol): ...
 ```
 
-This fallback does not constrain direct or indirect subclasses, including dynamically created
-classes. `Child` can therefore share a subclass with `Other`, despite `Other`'s final metaclass, and
-`type[Child]` is not a subtype of `ABCMeta`.
+`main.py`:
+
+```py
+from interface import Interface
+
+class Registered: ...
+
+reveal_type(type(Interface))  # revealed: <class 'ABCMeta'>
+reveal_type(Interface.register(Registered))  # revealed: type[Registered]
+```
+
+The inferred `ABCMeta` is not a claim about the exact runtime metaclass. It does not constrain
+subclasses, so a subclass can choose a metaclass unrelated to `ABCMeta` without a conflict.
+
+`custom.py`:
+
+```py
+from interface import Interface
+
+class Meta(type): ...
+class Direct(Interface, metaclass=Meta): ...
+
+reveal_type(type(Direct))  # revealed: <class 'Meta'>
+```
+
+## Inheritance of a stub protocol metaclass fallback
+
+A source-defined subclass inherits the same non-constraining fallback from a stub-defined protocol.
+
+`interface.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Interface(Protocol): ...
+```
+
+An indirect or dynamically created subclass can choose an unrelated metaclass. `Child` can also
+share a subclass with `Other`, despite `Other`'s final metaclass, and `type[Child]` is not a subtype
+of `ABCMeta`.
 
 `main.py`:
 
@@ -829,20 +787,20 @@ class Child(Interface): ...
 class Meta(type): ...
 
 class Other(metaclass=Meta): ...
-class Direct(Interface, metaclass=Meta): ...
 class Explicit(Child, metaclass=Meta): ...
 class Left(Child, Other): ...
 class Right(Other, Child): ...
 
 Dynamic = type("Dynamic", (Interface,), {})
+Combined = type("Combined", (Child, Other), {})
 
 class ViaDynamic(Dynamic, metaclass=Meta): ...
 
 reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
-reveal_type(type(Direct))  # revealed: <class 'Meta'>
 reveal_type(type(Explicit))  # revealed: <class 'Meta'>
 reveal_type(type(Left))  # revealed: <class 'Meta'>
 reveal_type(type(Right))  # revealed: <class 'Meta'>
+reveal_type(type(Combined))  # revealed: <class 'Meta'>
 reveal_type(type(ViaDynamic))  # revealed: <class 'Meta'>
 static_assert(not is_disjoint_from(Child, Other))
 static_assert(not is_subtype_of(type[Child], ABCMeta))
