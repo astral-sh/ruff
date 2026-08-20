@@ -77,9 +77,7 @@ def narrowing_after_non_empty_range(value: int | None) -> None:
     reveal_type(value)  # revealed: int
 ```
 
-This narrowing is not yet preserved for module- and class-scope loops. We currently avoid combining
-reachability and narrowing in these loops because doing so can introduce cycles through deferred
-annotations.
+The same narrowing is preserved at module scope.
 
 ```py
 def get_value() -> int | None:
@@ -91,11 +89,10 @@ for _ in range(1):
     if module_value is None:
         raise RuntimeError
 
-# TODO: This should be `int`, since the loop always runs.
-reveal_type(module_value)  # revealed: int | None
+reveal_type(module_value)  # revealed: int
 ```
 
-The same limitation applies to a loop in a class body.
+It also works in a class body.
 
 ```py
 class Example:
@@ -105,8 +102,7 @@ class Example:
         if value is None:
             raise RuntimeError
 
-    # TODO: This should be `int`, since the loop always runs.
-    reveal_type(value)  # revealed: int | None
+    reveal_type(value)  # revealed: int
 ```
 
 The emptiness refinement is independent of the order in which range values are assigned:
@@ -1972,7 +1968,7 @@ for _ in range(1_000_000):
         break
     node = node.next
 reveal_type(node)  # revealed: Node
-reveal_type(node.next)  # revealed: Node | None
+reveal_type(node.next)  # revealed: None | Node
 ```
 
 ### Nested collection cycles do not panic

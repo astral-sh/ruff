@@ -397,6 +397,36 @@ def _(x: int | None):
     reveal_type(x)  # revealed: int
 ```
 
+## Statically known branches inside module and class loops
+
+Narrowing also propagates through a statically known branch inside a module-level loop.
+
+```py
+def get_value() -> int | None:
+    return None
+
+while bool(input()):
+    value = get_value()
+    if 1 + 1 == 2:
+        if value is None:
+            raise RuntimeError
+
+    reveal_type(value)  # revealed: int
+```
+
+The same condition narrows a value inside a class-body loop.
+
+```py
+class Example:
+    while bool(input()):
+        value = get_value()
+        if 1 + 1 == 2:
+            if value is None:
+                raise RuntimeError
+
+        reveal_type(value)  # revealed: int
+```
+
 ## Narrowing from `assert` should not affect reassigned variables
 
 When a variable is reassigned after an `assert`, the narrowing from the assert should not apply to
