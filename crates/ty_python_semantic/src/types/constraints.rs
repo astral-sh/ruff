@@ -4597,11 +4597,11 @@ impl<'db> PathBounds<'db> {
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> Self {
-        let interior = match node.node() {
+        match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
-            Node::Interior(interior) => interior,
-        };
+            Node::Interior(_) => {}
+        }
 
         let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
@@ -4616,6 +4616,12 @@ impl<'db> PathBounds<'db> {
         }
 
         let mut walker = SolutionWalker::new(db, storage, inferable, source_orders);
+        let node = walker.canonicalize_node(storage, node);
+        let interior = match node.node() {
+            Node::AlwaysTrue => return PathBounds::Unconstrained,
+            Node::AlwaysFalse => return PathBounds::Unsatisfiable,
+            Node::Interior(interior) => interior,
+        };
         let mut path = interior.path_assignments(db, env, storage, source_order);
         walker.visit_node(db, env, storage, &mut path, node);
         walker.finish(db, env, storage)
@@ -8828,6 +8834,53 @@ mod tests {
                 right
             ));
         }
+    }
+
+    #[test]
+    fn repeated_gradual_bounds_preserve_independent_decisions() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let mut set = ConstraintSet::always(&builder);
+
+        for _ in 0..3 {
+            let variable = builder.next_gradual_variable(DynamicType::Any);
+            let bound = builder.with_gradual_origin(variable.origin, || {
+                ConstraintSet::constrain_typevar_lower_bound(
+                    db,
+                    &env,
+                    &builder,
+                    t,
+                    Type::Dynamic(DynamicType::Any),
+                )
+            });
+            let occurrence = bound.and(db, &builder, || {
+                ConstraintSet::constrain_gradual(db, &env, &builder, variable)
+            });
+            set = set.and(db, &builder, || occurrence);
+        }
+
+        let mut storage = builder.storage.borrow_mut();
+        let source_orders = storage.calculate_source_orders(set.source_order);
+        let inferable = TypeVarSet::from_typevars(db, [t]);
+        let walker = SolutionWalker::new(db, &mut storage, inferable, source_orders);
+        let node = walker.canonicalize_node(&mut storage, set.node);
+
+        let mut suppliers = 0;
+        let mut origins = FxHashSet::default();
+        node.for_each_unique_constraint(&storage, &mut |constraint| match storage
+            .constraint_data(constraint)
+        {
+            ConstraintData::TypeVar(_) => suppliers += 1,
+            ConstraintData::Gradual(variable) => {
+                origins.insert(variable.origin);
+            }
+        });
+
+        assert_eq!(suppliers, 1);
+        assert_eq!(origins.len(), 3);
     }
 
     #[test]

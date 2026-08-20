@@ -4,8 +4,8 @@ use smallvec::SmallVec;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::{
     ALWAYS_FALSE, ConstraintAssignment, ConstraintBoundsBuilder, ConstraintId,
-    ConstraintProvenance, ConstraintSetStorage, GradualVariableId, Node, NodeId, PathAssignments,
-    PathBounds,
+    ConstraintProvenance, ConstraintSet, ConstraintSetStorage, GradualVariableId, Node, NodeId,
+    PathAssignments, PathBounds,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
@@ -129,6 +129,25 @@ impl<'db> SolutionWalker<'db> {
         }
 
         walker
+    }
+
+    pub(super) fn canonicalize_node(
+        &self,
+        storage: &mut ConstraintSetStorage<'db>,
+        node: NodeId,
+    ) -> NodeId {
+        if self.canonical_gradual_constraints.is_empty() {
+            return node;
+        }
+
+        let constraints = self
+            .canonical_gradual_constraints
+            .iter()
+            .map(|(&constraint, &representative)| {
+                (constraint, Node::new_constraint(storage, representative))
+            })
+            .collect();
+        ConstraintSet::remap_nodes(storage, node, &constraints, &mut FxHashMap::default())
     }
 
     /// Returns an iterator of the positive and negative constraints on the current path
