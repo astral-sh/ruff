@@ -1718,10 +1718,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target,
                 )
             }
+            // A fixed tuple cannot satisfy every specialization of a non-inferable TypeVarTuple.
+            // Let it reach the ordinary rejection below; expanding the target would repeat the
+            // same tuple comparison and cause the recursion guard to accept it.
             (source, Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_typevartuple(db)
-                    && source.exact_tuple_instance_spec(db).is_some() =>
+                    && source
+                        .exact_tuple_instance_spec(db)
+                        .is_some_and(|spec| spec.is_variadic()) =>
             {
                 self.check_type_pair(
                     db,
