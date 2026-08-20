@@ -68,14 +68,14 @@ def helper():
               "command": "ty.runTest",
               "arguments": [
                 {
-                  "args": [
+                  "arguments": [
                     "run",
                     "pytest",
                     "test_example.py::test_add"
                   ],
                   "cwd": "[CWD]",
                   "program": "uv",
-                  "test_target": "test_example.py::test_add"
+                  "testTarget": "test_example.py::test_add"
                 }
               ]
             }
@@ -133,14 +133,14 @@ class TestFoo:
               "command": "ty.runTest",
               "arguments": [
                 {
-                  "args": [
+                  "arguments": [
                     "run",
                     "pytest",
                     "test_classes.py::TestFoo"
                   ],
                   "cwd": "[CWD]",
                   "program": "uv",
-                  "test_target": "test_classes.py::TestFoo"
+                  "testTarget": "test_classes.py::TestFoo"
                 }
               ]
             }
@@ -161,14 +161,14 @@ class TestFoo:
               "command": "ty.runTest",
               "arguments": [
                 {
-                  "args": [
+                  "arguments": [
                     "run",
                     "pytest",
                     "test_classes.py::TestFoo::test_bar"
                   ],
                   "cwd": "[CWD]",
                   "program": "uv",
-                  "test_target": "test_classes.py::TestFoo::test_bar"
+                  "testTarget": "test_classes.py::TestFoo::test_bar"
                 }
               ]
             }

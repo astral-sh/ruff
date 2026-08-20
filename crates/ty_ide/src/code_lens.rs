@@ -1,6 +1,5 @@
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_semantic::types::Type;
@@ -10,10 +9,8 @@ use crate::Db;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CodeLensCommand {
-    RunTest {
-        class_name: Option<Name>,
-        function_name: Option<Name>,
-    },
+    /// fully qualified name of the test function
+    RunTest { test: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,8 +52,7 @@ pub fn code_lens(db: &dyn Db, file: File) -> Vec<CodeLensItem> {
                     range: class.name.range(),
                     title: String::from("Run tests"),
                     command: CodeLensCommand::RunTest {
-                        class_name: Some(class.name.id.clone()),
-                        function_name: None,
+                        test: class.name.to_string(),
                     },
                 });
 
@@ -83,13 +79,15 @@ fn test_func_codelens(
     if !func.name.as_str().starts_with("test") {
         return None;
     }
+    let test = if let Some(class) = class {
+        format!("{}::{}", class.name, func.name)
+    } else {
+        func.name.to_string()
+    };
     Some(CodeLensItem {
         range: func.name.range(),
         title: String::from("Run test"),
-        command: CodeLensCommand::RunTest {
-            class_name: class.map(|c| c.name.id.clone()),
-            function_name: Some(func.name.id.clone()),
-        },
+        command: CodeLensCommand::RunTest { test },
     })
 }
 
@@ -116,15 +114,7 @@ mod tests {
     impl IntoDiagnostic for CodeLensDiagnostic {
         fn into_diagnostic(self) -> Diagnostic {
             let label = match &self.item.command {
-                CodeLensCommand::RunTest {
-                    class_name,
-                    function_name,
-                } => match (class_name, function_name) {
-                    (Some(c), Some(f)) => format!("{c}::{f}"),
-                    (Some(c), None) => c.to_string(),
-                    (None, Some(f)) => f.to_string(),
-                    (None, None) => String::new(),
-                },
+                CodeLensCommand::RunTest { test } => test.clone(),
             };
             let mut diagnostic = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("code-lens")),

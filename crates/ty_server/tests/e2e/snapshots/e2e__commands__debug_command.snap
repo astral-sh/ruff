@@ -27,7 +27,7 @@ Settings: WorkspaceSettings {
     configuration_file: None,
     override_options: None,
     fallback_options: None,
-    python_executable: None,
+    sys_prefix: None,
 }
 
 Project at XXX
