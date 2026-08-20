@@ -13,7 +13,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBoundSolution, PathBounds, SolutionPaths, Solutions,
+    PathBoundSolution, PathBounds, SolutionPaths, Solutions, TypeVarSolution,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -2673,19 +2673,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Solutions::Constrained(solutions) => solutions.into_vec(),
         };
 
-        let mut types = FxHashMap::default();
-        for solution in solutions {
-            for binding in solution {
-                let identity = binding.bound_typevar.identity(db);
-                types
-                    .entry(identity)
-                    .and_modify(|existing| {
-                        *existing =
-                            UnionType::from_two_elements(db, self.env, *existing, binding.solution);
-                    })
-                    .or_insert(binding.solution);
-            }
+        let mut bindings: FxHashMap<_, TypeVarSolution<'db>> = FxHashMap::default();
+        for binding in solutions.into_iter().flatten() {
+            let identity = binding.bound_typevar.identity(db);
+            bindings
+                .entry(identity)
+                .and_modify(|existing| existing.merge(db, self.env, &binding))
+                .or_insert(binding);
         }
+        let mut types: FxHashMap<_, _> = bindings
+            .into_iter()
+            .map(|(identity, binding)| (identity, binding.solution))
+            .collect();
 
         // Sequent-map transitivity can add relationships between inferable typevars to path
         // bounds. Those relationships are important while solving, but should not become recursive

@@ -88,7 +88,7 @@ from typing import Any
 
 def _(value: list[str] | Any) -> None:
     if isinstance(value, list):
-        reveal_type(value)  # revealed: list[str] | (Any & Top[list[Unknown]])
+        reveal_type(value)  # revealed: list[str] | (Any & list[Unknown])
         reveal_type(list(value))  # revealed: list[str | Any]
 
 def _(
@@ -426,15 +426,14 @@ def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [i
 ## Generic builtins preserve gradual callback constraints
 
 These examples are minimized from ecosystem regressions involving explicit `Never` and `object`
-bounds. The constraint solver should preserve gradual `Any` and `Unknown` types instead of falling
-back to the upper bounds of `Sized` or `object`.
+bounds. The inferred type preserves `Any` or `Unknown` alongside any concrete upper bounds.
 
 ```py
 from typing import Any
 from ty_extensions._internal import Unknown
 
 def _(xs: Unknown, values: list[tuple[Any, ...]]):
-    reveal_type(sorted(xs, key=len))  # revealed: list[Unknown]
+    reveal_type(sorted(xs, key=len))  # revealed: list[Sized & Unknown]
 
     # TODO: should be `map[str]`
     reveal_type(map("{}".format, xs))  # revealed: map[str | Unknown]

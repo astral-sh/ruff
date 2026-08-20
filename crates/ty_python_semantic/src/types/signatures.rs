@@ -1603,8 +1603,13 @@ impl<'db> Signature<'db> {
             tcx,
             visitor,
         );
-        (!constraints
-            .query(|_builder, constraints| constraints.is_always_satisfied(db, visitor.env)))
+        (!constraints.query(|_builder, set| {
+            if set.has_typevar_constraints() {
+                set.is_always_satisfied(db, visitor.env)
+            } else {
+                set.is_gradually_satisfied(db, visitor.env)
+            }
+        }))
         .then_some(constraints)
     }
 

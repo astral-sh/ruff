@@ -118,8 +118,9 @@ use crate::types::visitor::{
     walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -265,7 +266,7 @@ struct OwnedConstraintSetInner<'db> {
     constraint_supports: Box<[SupportId]>,
     constraint_indices: RankBitBox,
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
-    gradual_variable_count: usize,
+    gradual_variables: Box<[DynamicType<'db>]>,
     nodes: Box<[InteriorNodeData]>,
     node_supports: Box<[SupportId]>,
     node_indices: RankBitBox,
@@ -488,7 +489,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
-        variable: GradualVariableId,
+        variable: GradualVariable,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
         let (node, source_order) = variable.new_node(db, env, &mut storage);
@@ -556,6 +557,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let mut storage = self.builder.storage.borrow_mut();
         self.node
             .is_gradually_satisfied(db, env, &mut storage, self.source_order)
+    }
+
+    /// Returns whether the decision diagram constrains any type variables.
+    pub(crate) fn has_typevar_constraints(self) -> bool {
+        self.builder
+            .storage
+            .borrow()
+            .node_support(self.node)
+            .is_some_and(|support| support.iter().next().is_some())
     }
 
     pub(super) fn for_all_gradual(
@@ -727,6 +737,32 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
+    fn remap_nodes(
+        storage: &mut ConstraintSetStorage<'_>,
+        node: NodeId,
+        constraints: &FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
+        mapped: &mut FxHashMap<NodeId, NodeId>,
+    ) -> NodeId {
+        if node.is_terminal() {
+            return node;
+        }
+        if let Some(&node) = mapped.get(&node) {
+            return node;
+        }
+
+        let interior = storage.interior_node_data(node);
+        let if_true = Self::remap_nodes(storage, interior.if_true, constraints, mapped);
+        let if_uncertain = Self::remap_nodes(storage, interior.if_uncertain, constraints, mapped);
+        let if_false = Self::remap_nodes(storage, interior.if_false, constraints, mapped);
+        let (condition, _) = constraints
+            .get(&interior.constraint)
+            .copied()
+            .unwrap_or_else(|| Node::new_constraint(storage, interior.constraint));
+        let result = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
+        mapped.insert(node, result);
+        result
+    }
+
     /// Applies a type mapping to every constraint in this constraint set.
     pub(crate) fn apply_type_mapping_impl(
         self,
@@ -735,44 +771,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        fn rebuild_node(
-            storage: &mut ConstraintSetStorage<'_>,
-            old_node: NodeId,
-            mapped_constraints: &FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
-            mapped_nodes: &mut FxHashMap<NodeId, NodeId>,
-        ) -> NodeId {
-            if old_node.is_terminal() {
-                return old_node;
-            }
-            if let Some(mapped) = mapped_nodes.get(&old_node) {
-                return *mapped;
-            }
-
-            let old_interior = storage.interior_node_data(old_node);
-            let (condition, _) = mapped_constraints[&old_interior.constraint];
-            let if_true = rebuild_node(
-                storage,
-                old_interior.if_true,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_uncertain = rebuild_node(
-                storage,
-                old_interior.if_uncertain,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_false = rebuild_node(
-                storage,
-                old_interior.if_false,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let mapped = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
-            mapped_nodes.insert(old_node, mapped);
-            mapped
-        }
-
         // We have to collect this into a temporary vec since we can't hold an open borrow on the
         // storage during the apply_type_mapping calls below, since they also need to borrow the
         // storage.
@@ -791,17 +789,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 continue;
             }
 
-            if constraint.as_gradual().is_some() {
-                let mut storage = self.builder.storage.borrow_mut();
-                mapped_constraints.insert(
-                    constraint_id,
-                    Node::new_constraint(&mut storage, constraint_id),
-                );
-                continue;
-            }
-
-            let Some(constraint) = constraint.as_typevar() else {
-                continue;
+            let constraint = match constraint {
+                ConstraintData::TypeVar(constraint) => constraint,
+                ConstraintData::Gradual(_) => {
+                    let mut storage = self.builder.storage.borrow_mut();
+                    mapped_constraints.insert(
+                        constraint_id,
+                        Node::new_constraint(&mut storage, constraint_id),
+                    );
+                    continue;
+                }
             };
             let subject = Type::TypeVar(constraint.typevar).apply_type_mapping_impl(
                 db,
@@ -821,21 +818,39 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             let env = visitor.env;
             let mut storage = self.builder.storage.borrow_mut();
             let mapped = if let Type::TypeVar(typevar) = subject {
-                Constraint::new_node_with_bounds(db, env, &mut storage, typevar, lower, upper)
+                Constraint::new_node_with_provenance(
+                    db,
+                    env,
+                    &mut storage,
+                    typevar,
+                    lower,
+                    upper,
+                    constraint.provenance,
+                )
             } else {
+                let mut load_with_origin =
+                    |constraints: &OwnedConstraintSet<'db>, origin: Option<GradualVariableId>| {
+                        let Some(origin) = origin else {
+                            return storage.load(db, env, constraints);
+                        };
+
+                        let previous = storage.active_gradual_origin.replace(origin);
+                        let loaded = storage.load(db, env, constraints);
+                        storage.active_gradual_origin = previous;
+                        loaded
+                    };
+
                 let (lower_holds, lower_holds_source_order) = match lower {
-                    Some(lower) => storage.load(
-                        db,
-                        env,
+                    Some(lower) => load_with_origin(
                         &lower.when_constraint_set_assignable_to_owned(db, env, subject),
+                        constraint.provenance.lower,
                     ),
                     None => (ALWAYS_TRUE, None),
                 };
                 let (upper_holds, upper_holds_source_order) = match upper {
-                    Some(upper) => storage.load(
-                        db,
-                        env,
+                    Some(upper) => load_with_origin(
                         &subject.when_constraint_set_assignable_to_owned(db, env, upper),
+                        constraint.provenance.upper,
                     ),
                     None => (ALWAYS_TRUE, None),
                 };
@@ -862,7 +877,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             });
         Self::from_node(
             self.builder,
-            rebuild_node(
+            Self::remap_nodes(
                 &mut storage,
                 self.node,
                 &mapped_constraints,
@@ -882,85 +897,76 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Self {
-        fn rebuild_node(
-            storage: &mut ConstraintSetStorage<'_>,
-            old_node: NodeId,
-            mapped_constraints: &FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
-            mapped_nodes: &mut FxHashMap<NodeId, NodeId>,
-        ) -> NodeId {
-            if old_node.is_terminal() {
-                return old_node;
-            }
-            if let Some(mapped) = mapped_nodes.get(&old_node) {
-                return *mapped;
-            }
-
-            let old_interior = storage.interior_node_data(old_node);
-            let if_true = rebuild_node(
-                storage,
-                old_interior.if_true,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_uncertain = rebuild_node(
-                storage,
-                old_interior.if_uncertain,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_false = rebuild_node(
-                storage,
-                old_interior.if_false,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let mapped =
-                if let Some((condition, _)) = mapped_constraints.get(&old_interior.constraint) {
-                    condition.ite_uncertain(storage, if_true, if_uncertain, if_false)
-                } else {
-                    let (condition, _) = Node::new_constraint(storage, old_interior.constraint);
-                    condition.ite_uncertain(storage, if_true, if_uncertain, if_false)
-                };
-            mapped_nodes.insert(old_node, mapped);
-            mapped
-        }
-
         self.verify_builder(builder);
         if self.node.is_terminal() {
             return self;
         }
 
+        let mut storage = builder.storage.borrow_mut();
+        if !storage.has_gradual_variables() {
+            return self;
+        }
+
         let mut variables = FxHashMap::default();
         let mut mapped_constraints = FxHashMap::default();
-        let mut storage = builder.storage.borrow_mut();
+        let mut constraints = storage.calculate_source_orders(self.source_order);
+        let source_len = constraints.len();
         self.node
-            .for_each_unique_constraint_mut(&mut storage, &mut |storage, constraint_id| {
-                let Some(gradual) = storage.constraint_data(constraint_id).as_gradual() else {
-                    return;
-                };
-                let variable = *variables
-                    .entry(gradual)
-                    .or_insert_with(|| storage.next_gradual_variable());
-                mapped_constraints.insert(constraint_id, variable.new_node(db, env, storage));
+            .for_each_unique_constraint(&storage, &mut |constraint_id| {
+                constraints.insert(constraint_id);
             });
+
+        let mut map_variable = |storage: &mut ConstraintSetStorage<'db>, id: GradualVariableId| {
+            if storage.active_gradual_origin == Some(id) {
+                return id;
+            }
+
+            *variables.entry(id).or_insert_with(|| {
+                let origin = storage.gradual_origin(id);
+                storage.next_gradual_variable_id(origin.ty)
+            })
+        };
+
+        for &constraint_id in &constraints {
+            match storage.constraint_data(constraint_id) {
+                ConstraintData::Gradual(gradual) => {
+                    let variable = gradual.map(|id| map_variable(&mut storage, id));
+                    mapped_constraints
+                        .insert(constraint_id, variable.new_node(db, env, &mut storage));
+                }
+                ConstraintData::TypeVar(mut constraint)
+                    if constraint.provenance != ConstraintProvenance::default() =>
+                {
+                    constraint.provenance = constraint
+                        .provenance
+                        .map(|origin| map_variable(&mut storage, origin));
+                    let mapped =
+                        storage.intern_constraint(db, env, ConstraintData::TypeVar(constraint));
+                    mapped_constraints
+                        .insert(constraint_id, Node::new_constraint(&mut storage, mapped));
+                }
+                ConstraintData::TypeVar(_) => {}
+            }
+        }
 
         if mapped_constraints.is_empty() {
             return self;
         }
 
-        let source_order = storage
-            .calculate_source_orders(self.source_order)
-            .into_iter()
-            .fold(None, |source_order, constraint| {
-                let mapped_source_order = mapped_constraints.get(&constraint).map_or_else(
-                    || Some(storage.constraint_source_order(constraint)),
-                    |(_, source_order)| *source_order,
-                );
-                storage.ordered_source_order(source_order, mapped_source_order)
-            });
+        let source_order =
+            constraints
+                .into_iter()
+                .take(source_len)
+                .fold(None, |source_order, constraint| {
+                    let mapped_source_order = mapped_constraints.get(&constraint).map_or_else(
+                        || Some(storage.constraint_source_order(constraint)),
+                        |(_, source_order)| *source_order,
+                    );
+                    storage.ordered_source_order(source_order, mapped_source_order)
+                });
         Self::from_node(
             builder,
-            rebuild_node(
+            Self::remap_nodes(
                 &mut storage,
                 self.node,
                 &mapped_constraints,
@@ -1141,8 +1147,11 @@ struct ConstraintSetStorage<'db> {
     /// bounds of another (e.g., whether we encode `T ≤ U` as `Never ≤ T ≤ U` or `T ≤ U ≤ object`).
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
 
-    /// The number of opaque gradual decisions allocated in this builder.
-    gradual_variable_count: usize,
+    /// The gradual type associated with each opaque decision or occurrence.
+    gradual_variables: IndexVec<GradualVariableId, DynamicType<'db>>,
+
+    /// The materialization responsible for bounds created by the current projected relation.
+    active_gradual_origin: Option<GradualVariableId>,
 
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
     nodes: IndexVec<NodeId, InteriorNodeData>,
@@ -1187,6 +1196,14 @@ struct ConstraintSetStorage<'db> {
 }
 
 impl ConstraintSetStorage<'_> {
+    fn has_gradual_variables(&self) -> bool {
+        !self.gradual_variables.is_empty()
+            || self
+                .compacted
+                .as_ref()
+                .is_some_and(|compacted| !compacted.gradual_variables.is_empty())
+    }
+
     fn ensure_overlay_identity_caches(&mut self) {
         let Some(compacted) = &self.compacted else {
             return;
@@ -1262,7 +1279,7 @@ impl ConstraintSetStorage<'_> {
 
     fn adjusted_gradual_variable_id(&self, id: GradualVariableId) -> GradualVariableId {
         if let Some(compacted) = &self.compacted {
-            return id + compacted.gradual_variable_count;
+            return id + compacted.gradual_variables.len();
         }
         id
     }
@@ -1377,8 +1394,25 @@ impl<'db> ConstraintSetBuilder<'db> {
             .collect();
         let node_indices = RankBitBox::from_bits(used_nodes);
 
-        let mut gradual_variables = FxHashMap::default();
-        let mut gradual_variable_count = 0;
+        let mut gradual_variables = Vec::new();
+        let mut mapped_variables = FxHashMap::default();
+        let old_gradual_variables = storage.gradual_variables;
+        let mut map_variable = |id: GradualVariableId| {
+            *mapped_variables.entry(id).or_insert_with(|| {
+                let ty = old_gradual_variables[id];
+                let id = GradualVariableId::from_usize(gradual_variables.len());
+                gradual_variables.push(ty);
+                id
+            })
+        };
+        if !old_gradual_variables.is_empty() {
+            // Assign visible variables before origins that no longer appear in the diagram.
+            for (constraint, used) in storage.constraints.iter().zip(&used_constraints) {
+                if *used && let ConstraintData::Gradual(variable) = *constraint {
+                    map_variable(variable.id);
+                }
+            }
+        }
         let constraints = storage
             .constraints
             .into_iter()
@@ -1386,14 +1420,12 @@ impl<'db> ConstraintSetBuilder<'db> {
             .filter_map(|(constraint, used)| {
                 used.then(|| match constraint {
                     ConstraintData::Gradual(variable) => {
-                        let variable = *gradual_variables.entry(variable).or_insert_with(|| {
-                            let variable = GradualVariableId::from_usize(gradual_variable_count);
-                            gradual_variable_count += 1;
-                            variable
-                        });
-                        ConstraintData::Gradual(variable)
+                        ConstraintData::Gradual(variable.map(&mut map_variable))
                     }
-                    ConstraintData::TypeVar(_) => constraint,
+                    ConstraintData::TypeVar(mut constraint) => {
+                        constraint.provenance = constraint.provenance.map(&mut map_variable);
+                        ConstraintData::TypeVar(constraint)
+                    }
                 })
             })
             .collect();
@@ -1423,7 +1455,7 @@ impl<'db> ConstraintSetBuilder<'db> {
                 constraint_supports,
                 constraint_indices,
                 typevars: storage.typevars,
-                gradual_variable_count,
+                gradual_variables: gradual_variables.into_boxed_slice(),
                 nodes,
                 node_supports,
                 node_indices,
@@ -1458,8 +1490,36 @@ impl<'db> ConstraintSetBuilder<'db> {
         ConstraintSet::from_node(self, node, source_order)
     }
 
-    pub(super) fn next_gradual_variable(&self) -> GradualVariableId {
-        self.storage.borrow_mut().next_gradual_variable()
+    pub(super) fn next_gradual_variable(&self, dynamic: DynamicType<'db>) -> GradualVariable {
+        self.storage.borrow_mut().next_gradual_variable(dynamic)
+    }
+
+    pub(super) fn next_gradual_variable_for_origin(
+        &self,
+        origin: GradualVariableId,
+    ) -> GradualVariable {
+        self.storage
+            .borrow_mut()
+            .next_gradual_variable_for_origin(origin)
+    }
+
+    pub(super) fn active_gradual_origin(&self) -> Option<GradualVariableId> {
+        self.storage.borrow().active_gradual_origin
+    }
+
+    pub(super) fn with_gradual_origin<R>(
+        &self,
+        origin: GradualVariableId,
+        f: impl FnOnce() -> R,
+    ) -> R {
+        let previous = self
+            .storage
+            .borrow_mut()
+            .active_gradual_origin
+            .replace(origin);
+        let result = f();
+        self.storage.borrow_mut().active_gradual_origin = previous;
+        result
     }
 }
 
@@ -1581,10 +1641,37 @@ impl<'db> ConstraintSetStorage<'db> {
         id
     }
 
-    fn next_gradual_variable(&mut self) -> GradualVariableId {
-        let id = GradualVariableId::from_usize(self.gradual_variable_count);
-        self.gradual_variable_count += 1;
+    fn next_gradual_variable(&mut self, ty: DynamicType<'db>) -> GradualVariable {
+        let id = self.next_gradual_variable_id(ty);
+        GradualVariable { id, origin: id }
+    }
+
+    fn next_gradual_variable_id(&mut self, ty: DynamicType<'db>) -> GradualVariableId {
+        let id = self.gradual_variables.push(ty);
         self.adjusted_gradual_variable_id(id)
+    }
+
+    fn gradual_origin(&self, id: GradualVariableId) -> GradualOrigin<'db> {
+        let ty = if let Some(compacted) = &self.compacted {
+            let index = id.index();
+            let split = compacted.gradual_variables.len();
+            if index < split {
+                compacted.gradual_variables[index]
+            } else {
+                self.gradual_variables[GradualVariableId::from_usize(index - split)]
+            }
+        } else {
+            self.gradual_variables[id]
+        };
+        GradualOrigin { id, ty }
+    }
+
+    fn next_gradual_variable_for_origin(&mut self, origin: GradualVariableId) -> GradualVariable {
+        let ty = self.gradual_origin(origin).ty;
+        GradualVariable {
+            id: self.next_gradual_variable_id(ty),
+            origin,
+        }
     }
 
     fn intern_interior_node(&mut self, data: InteriorNodeData) -> NodeId {
@@ -1915,27 +2002,43 @@ impl<'db> ConstraintSetStorage<'db> {
             self.intern_typevar_identity(inner.typevars[typevar]);
         }
 
-        let gradual_variables: IndexVec<GradualVariableId, GradualVariableId> = (0..inner
-            .gradual_variable_count)
-            .map(|_| self.next_gradual_variable())
-            .collect();
+        // Owned gradual variables are densely numbered, so they can be remapped by offset.
+        let gradual_offset = self
+            .adjusted_gradual_variable_id(GradualVariableId::from_usize(
+                self.gradual_variables.len(),
+            ))
+            .index();
+        self.gradual_variables
+            .extend(inner.gradual_variables.iter().copied());
 
         // Rebuild constraints in their saved order, using the destination's typevar ordering.
         let constraints: Box<[_]> = inner
             .constraints
             .iter()
             .map(|old_constraint| match old_constraint {
-                ConstraintData::TypeVar(old_constraint) => Constraint::new_node_with_bounds(
-                    db,
-                    env,
-                    self,
-                    old_constraint.typevar,
-                    old_constraint.bounds.lower,
-                    old_constraint.bounds.upper,
-                ),
-                ConstraintData::Gradual(variable) => {
-                    gradual_variables[*variable].new_node(db, env, self)
+                ConstraintData::TypeVar(old_constraint) => {
+                    let mut provenance = old_constraint
+                        .provenance
+                        .map(|origin| origin + gradual_offset);
+                    provenance.lower = provenance
+                        .lower
+                        .or(old_constraint.bounds.lower.and(self.active_gradual_origin));
+                    provenance.upper = provenance
+                        .upper
+                        .or(old_constraint.bounds.upper.and(self.active_gradual_origin));
+                    Constraint::new_node_with_provenance(
+                        db,
+                        env,
+                        self,
+                        old_constraint.typevar,
+                        old_constraint.bounds.lower,
+                        old_constraint.bounds.upper,
+                        provenance,
+                    )
                 }
+                ConstraintData::Gradual(variable) => variable
+                    .map(|id| id + gradual_offset)
+                    .new_node(db, env, self),
             })
             .collect();
 
@@ -2041,6 +2144,40 @@ pub struct TypeVarId;
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub(super) struct GradualVariableId;
 
+/// A gradual occurrence shared by its distinct materialization decisions.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct GradualOrigin<'db> {
+    pub(super) id: GradualVariableId,
+    pub(super) ty: DynamicType<'db>,
+}
+
+/// A gradual materialization constraint and the occurrence it originated from.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct GradualVariable {
+    id: GradualVariableId,
+    pub(super) origin: GradualVariableId,
+}
+
+impl GradualVariable {
+    fn map(self, mut f: impl FnMut(GradualVariableId) -> GradualVariableId) -> Self {
+        let origin = f(self.origin);
+        Self {
+            id: f(self.id),
+            origin,
+        }
+    }
+
+    fn new_node<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+    ) -> (NodeId, Option<SourceOrderId>) {
+        let constraint = storage.intern_constraint(db, env, ConstraintData::Gradual(self));
+        Node::new_constraint(storage, constraint)
+    }
+}
+
 /// The index of an individual constraint (i.e. a BDD variable) within a [`ConstraintSetStorage`].
 #[newtype_index]
 #[derive(get_size2::GetSize)]
@@ -2063,6 +2200,80 @@ enum SourceOrder {
 pub(crate) struct Constraint<'db> {
     typevar: BoundTypeVarInstance<'db>,
     bounds: ConstraintBounds<'db>,
+    provenance: ConstraintProvenance,
+}
+
+/// The gradual occurrence that supplied each type-variable bound.
+///
+/// Materializations required to establish the relationship are recorded on the solution path.
+#[derive(
+    Clone, Copy, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub(super) struct ConstraintProvenance {
+    pub(super) lower: Option<GradualVariableId>,
+    pub(super) upper: Option<GradualVariableId>,
+}
+
+impl ConstraintProvenance {
+    pub(super) fn lower(origin: Option<GradualVariableId>) -> Self {
+        Self {
+            lower: origin,
+            upper: None,
+        }
+    }
+
+    pub(super) fn upper(origin: Option<GradualVariableId>) -> Self {
+        Self {
+            lower: None,
+            upper: origin,
+        }
+    }
+
+    fn map(self, mut f: impl FnMut(GradualVariableId) -> GradualVariableId) -> Self {
+        Self {
+            lower: self.lower.map(&mut f),
+            upper: self.upper.map(f),
+        }
+    }
+
+    /// An independent proof supersedes a gradual proof; either gradual proof can supply the bound.
+    fn merge(self, other: Self) -> Self {
+        Self {
+            lower: self.lower.filter(|_| other.lower.is_some()),
+            upper: self.upper.filter(|_| other.upper.is_some()),
+        }
+    }
+
+    fn for_intersection<'db>(
+        left: Constraint<'db>,
+        right: Constraint<'db>,
+        lower: Option<Type<'db>>,
+        upper: Option<Type<'db>>,
+    ) -> Self {
+        let origin = |bound: Option<Type<'db>>,
+                      left: (Option<Type<'db>>, Option<GradualVariableId>),
+                      right: (Option<Type<'db>>, Option<GradualVariableId>)| {
+            let bound = bound?;
+            match (left.0 == Some(bound), right.0 == Some(bound)) {
+                (true, true) => left.1.filter(|_| right.1.is_some()),
+                (true, false) => left.1,
+                (false, true) => right.1,
+                (false, false) => None,
+            }
+        };
+        Self {
+            lower: origin(
+                lower,
+                (left.bounds.lower, left.provenance.lower),
+                (right.bounds.lower, right.provenance.lower),
+            ),
+            upper: origin(
+                upper,
+                (left.bounds.upper, left.provenance.upper),
+                (right.bounds.upper, right.provenance.upper),
+            ),
+        }
+    }
 }
 
 /// The kind of decision represented by a constraint-set variable.
@@ -2070,7 +2281,7 @@ pub(crate) struct Constraint<'db> {
 enum ConstraintData<'db> {
     TypeVar(Constraint<'db>),
     /// An opaque decision node for one gradual materialization condition.
-    Gradual(GradualVariableId),
+    Gradual(GradualVariable),
 }
 
 impl<'db> ConstraintData<'db> {
@@ -2081,7 +2292,7 @@ impl<'db> ConstraintData<'db> {
         }
     }
 
-    fn as_gradual(self) -> Option<GradualVariableId> {
+    fn as_gradual(self) -> Option<GradualVariable> {
         match self {
             Self::TypeVar(_) => None,
             Self::Gradual(variable) => Some(variable),
@@ -2221,7 +2432,7 @@ impl<'db> ConstraintBounds<'db> {
     fn is_concrete(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         iter::chain(self.lower, self.upper).all(|bound| {
             !bound.has_typevar(db, env)
-                && !bound.has_unspecialized_type_var(db, env)
+                && !bound.has_provisional_marker(db, env)
                 && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
         })
     }
@@ -2393,12 +2604,33 @@ impl ConstraintId {
         lower: Option<Type<'db>>,
         upper: Option<Type<'db>>,
     ) -> ConstraintId {
+        Self::new_with_provenance(
+            db,
+            env,
+            storage,
+            typevar,
+            lower,
+            upper,
+            ConstraintProvenance::default(),
+        )
+    }
+
+    fn new_with_provenance<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Option<Type<'db>>,
+        upper: Option<Type<'db>>,
+        provenance: ConstraintProvenance,
+    ) -> ConstraintId {
         storage.intern_constraint(
             db,
             env,
             ConstraintData::TypeVar(Constraint {
                 typevar,
                 bounds: ConstraintBounds::new(lower, upper),
+                provenance,
             }),
         )
     }
@@ -2486,8 +2718,24 @@ impl<'db> Constraint<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         typevar: BoundTypeVarInstance<'db>,
+        lower: Option<Type<'db>>,
+        upper: Option<Type<'db>>,
+    ) -> (NodeId, Option<SourceOrderId>) {
+        let provenance = ConstraintProvenance {
+            lower: lower.and(storage.active_gradual_origin),
+            upper: upper.and(storage.active_gradual_origin),
+        };
+        Self::new_node_with_provenance(db, env, storage, typevar, lower, upper, provenance)
+    }
+
+    fn new_node_with_provenance(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        typevar: BoundTypeVarInstance<'db>,
         mut lower: Option<Type<'db>>,
         mut upper: Option<Type<'db>>,
+        provenance: ConstraintProvenance,
     ) -> (NodeId, Option<SourceOrderId>) {
         if lower.is_none() && upper.is_none() {
             return (ALWAYS_TRUE, None);
@@ -2505,13 +2753,14 @@ impl<'db> Constraint<'db> {
             let mut result = ALWAYS_TRUE;
             let mut source_order = None;
             for lower_element in lower_union.elements(db) {
-                let (element_node, element_source_order) = Constraint::new_node_with_bounds(
+                let (element_node, element_source_order) = Constraint::new_node_with_provenance(
                     db,
                     env,
                     storage,
                     typevar,
                     Some(*lower_element),
                     upper,
+                    provenance,
                 );
                 result = result.and(storage, element_node);
                 source_order = storage.ordered_source_order(source_order, element_source_order);
@@ -2527,25 +2776,27 @@ impl<'db> Constraint<'db> {
             let mut result = ALWAYS_TRUE;
             let mut source_order = None;
             for upper_element in upper_intersection.iter_positive(db) {
-                let (element_node, element_source_order) = Constraint::new_node_with_bounds(
+                let (element_node, element_source_order) = Constraint::new_node_with_provenance(
                     db,
                     env,
                     storage,
                     typevar,
                     lower,
                     Some(upper_element),
+                    provenance,
                 );
                 result = result.and(storage, element_node);
                 source_order = storage.ordered_source_order(source_order, element_source_order);
             }
             for upper_element in upper_intersection.iter_negative(db) {
-                let (element_node, element_source_order) = Constraint::new_node_with_bounds(
+                let (element_node, element_source_order) = Constraint::new_node_with_provenance(
                     db,
                     env,
                     storage,
                     typevar,
                     lower,
                     Some(upper_element.negate(db, env)),
+                    provenance,
                 );
                 result = result.and(storage, element_node);
                 source_order = storage.ordered_source_order(source_order, element_source_order);
@@ -2609,6 +2860,7 @@ impl<'db> Constraint<'db> {
             ConstraintData::TypeVar(Constraint {
                 typevar,
                 bounds: ConstraintBounds::new(lower, upper),
+                provenance,
             }),
         );
 
@@ -2635,18 +2887,26 @@ impl<'db> Constraint<'db> {
         match (effective_lower, effective_upper) {
             // L ≤ T ≤ L == (T ≤ [L] ≤ T)
             (Type::TypeVar(lower), Type::TypeVar(upper)) if lower.is_same_typevar_as(db, upper) => {
-                let (bound, typevar) = if lower.can_be_bound_for(db, storage, typevar) {
-                    (lower, typevar)
+                let (bound, typevar, provenance) = if lower.can_be_bound_for(db, storage, typevar) {
+                    (lower, typevar, provenance)
                 } else {
-                    (typevar, lower)
+                    (
+                        typevar,
+                        lower,
+                        ConstraintProvenance {
+                            lower: provenance.upper,
+                            upper: provenance.lower,
+                        },
+                    )
                 };
-                let constraint = ConstraintId::new(
+                let constraint = ConstraintId::new_with_provenance(
                     db,
                     env,
                     storage,
                     typevar,
-                    Type::TypeVar(bound),
-                    Type::TypeVar(bound),
+                    Some(Type::TypeVar(bound)),
+                    Some(Type::TypeVar(bound)),
+                    provenance,
                 );
                 Node::new_constraint(storage, constraint)
             }
@@ -2656,23 +2916,25 @@ impl<'db> Constraint<'db> {
                 if typevar.can_be_bound_for(db, storage, lower)
                     && typevar.can_be_bound_for(db, storage, upper) =>
             {
-                let lower_constraint = ConstraintId::new_with_bounds(
+                let lower_constraint = ConstraintId::new_with_provenance(
                     db,
                     env,
                     storage,
                     lower,
                     None,
                     Some(Type::TypeVar(typevar)),
+                    ConstraintProvenance::upper(provenance.lower),
                 );
                 let (lower_node, lower_source_order) =
                     Node::new_constraint(storage, lower_constraint);
-                let upper_constraint = ConstraintId::new_with_bounds(
+                let upper_constraint = ConstraintId::new_with_provenance(
                     db,
                     env,
                     storage,
                     upper,
                     Some(Type::TypeVar(typevar)),
                     None,
+                    ConstraintProvenance::lower(provenance.upper),
                 );
                 let (upper_node, upper_source_order) =
                     Node::new_constraint(storage, upper_constraint);
@@ -2684,20 +2946,29 @@ impl<'db> Constraint<'db> {
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, storage, lower) => {
-                let lower_constraint = ConstraintId::new_with_bounds(
+                let lower_constraint = ConstraintId::new_with_provenance(
                     db,
                     env,
                     storage,
                     lower,
                     None,
                     Some(Type::TypeVar(typevar)),
+                    ConstraintProvenance::upper(provenance.lower),
                 );
                 let (lower_node, lower_source_order) =
                     Node::new_constraint(storage, lower_constraint);
                 let (upper_node, upper_source_order) = if upper.is_none() {
                     (ALWAYS_TRUE, None)
                 } else {
-                    Constraint::new_node_with_bounds(db, env, storage, typevar, None, upper)
+                    Constraint::new_node_with_provenance(
+                        db,
+                        env,
+                        storage,
+                        typevar,
+                        None,
+                        upper,
+                        ConstraintProvenance::upper(provenance.upper),
+                    )
                 };
                 let node = lower_node.and(storage, upper_node);
                 let source_order =
@@ -2710,15 +2981,24 @@ impl<'db> Constraint<'db> {
                 let (lower_node, lower_source_order) = if lower.is_none() {
                     (ALWAYS_TRUE, None)
                 } else {
-                    Constraint::new_node_with_bounds(db, env, storage, typevar, lower, None)
+                    Constraint::new_node_with_provenance(
+                        db,
+                        env,
+                        storage,
+                        typevar,
+                        lower,
+                        None,
+                        ConstraintProvenance::lower(provenance.lower),
+                    )
                 };
-                let upper_constraint = ConstraintId::new_with_bounds(
+                let upper_constraint = ConstraintId::new_with_provenance(
                     db,
                     env,
                     storage,
                     upper,
                     Some(Type::TypeVar(typevar)),
                     None,
+                    ConstraintProvenance::lower(provenance.upper),
                 );
                 let (upper_node, upper_source_order) =
                     Node::new_constraint(storage, upper_constraint);
@@ -2729,23 +3009,12 @@ impl<'db> Constraint<'db> {
             }
 
             _ => {
-                let constraint =
-                    ConstraintId::new_with_bounds(db, env, storage, typevar, lower, upper);
+                let constraint = ConstraintId::new_with_provenance(
+                    db, env, storage, typevar, lower, upper, provenance,
+                );
                 Node::new_constraint(storage, constraint)
             }
         }
-    }
-}
-
-impl GradualVariableId {
-    fn new_node<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let constraint = storage.intern_constraint(db, env, ConstraintData::Gradual(self));
-        Node::new_constraint(storage, constraint)
     }
 }
 
@@ -2911,6 +3180,12 @@ impl ConstraintId {
         IntersectionResult::Simplified(ConstraintData::TypeVar(Constraint {
             typevar: self_constraint.typevar,
             bounds: ConstraintBounds::new(lower, upper),
+            provenance: ConstraintProvenance::for_intersection(
+                self_constraint,
+                other_constraint,
+                lower,
+                upper,
+            ),
         }))
     }
 
@@ -3808,38 +4083,87 @@ struct InteriorNodeData {
 /// accumulated bounds are stored in a [`PathBound`].
 #[derive(Default)]
 struct ConstraintBoundsBuilder<'db> {
-    lower: FxIndexSet<Type<'db>>,
-    upper: UpperBound<'db>,
-    // Classify each bound before aggregation: unioning lower bounds can otherwise make separate
-    // gradual and static evidence indistinguishable from a single gradual union.
-    has_gradual_evidence: bool,
-    has_static_evidence: bool,
+    lower: FxIndexSet<(Type<'db>, Option<GradualOrigin<'db>>)>,
+    upper: FxIndexSet<(Type<'db>, Option<GradualOrigin<'db>>)>,
 }
 
 impl<'db> ConstraintBoundsBuilder<'db> {
-    fn classify_evidence(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
-        if ty.has_provisional_marker(db, env) {
-            return;
+    fn normalize_gradual_bound(ty: Type<'db>, origin: Option<GradualOrigin<'db>>) -> Type<'db> {
+        if let (Type::Dynamic(dynamic), Some(origin)) = (ty, origin)
+            && matches!(
+                (dynamic, origin.ty),
+                (DynamicType::Any, DynamicType::Unknown) | (DynamicType::Unknown, DynamicType::Any)
+            )
+        {
+            return Type::Dynamic(origin.ty);
         }
-        if ty.bottom_materialization(db, env) == ty.top_materialization(db, env) {
-            self.has_static_evidence = true;
-        } else {
-            self.has_gradual_evidence = true;
-        }
+        ty
     }
 
-    fn add_lower(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
+    fn preferred_gradual_bound(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bounds: &FxIndexSet<(Type<'db>, Option<GradualOrigin<'db>>)>,
+        (ty, origin): (Type<'db>, Option<GradualOrigin<'db>>),
+        compatible: impl Fn((Type<'db>, Type<'db>), (Type<'db>, Type<'db>)) -> bool,
+    ) -> Type<'db> {
+        let Some(range) = ty.materialize_once(db, env) else {
+            return ty;
+        };
+        if origin.map_or(range.dynamic, |origin| origin.ty) != DynamicType::Unknown {
+            return ty;
+        }
+
+        let current = (range.bottom, range.top);
+        let Some((preferred, preferred_range)) = bounds.iter().find_map(|&(candidate, origin)| {
+            let range = candidate.materialize_once(db, env)?;
+            let candidate_range = (range.bottom, range.top);
+            (origin.map_or(range.dynamic, |origin| origin.ty) == DynamicType::Any
+                && compatible(candidate_range, current))
+            .then_some((candidate, candidate_range))
+        }) else {
+            return ty;
+        };
+
+        if preferred_range == current {
+            return preferred;
+        }
+
+        UnionType::from_two_elements(
+            db,
+            env,
+            range.bottom,
+            IntersectionType::from_two_elements(
+                db,
+                env,
+                Type::Dynamic(DynamicType::Any),
+                range.top,
+            ),
+        )
+    }
+
+    fn add_lower(&mut self, ty: Type<'db>, origin: Option<GradualOrigin<'db>>) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
-        self.classify_evidence(db, env, ty);
-        self.lower.insert(ty);
+        let ty = Self::normalize_gradual_bound(ty, origin);
+        self.lower.insert((ty, origin));
     }
 
-    fn add_upper(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
-        self.classify_evidence(db, env, ty);
-        self.upper.add_clause(ty);
+    fn add_upper(&mut self, ty: Type<'db>, origin: Option<GradualOrigin<'db>>) {
+        let ty = Self::normalize_gradual_bound(ty, origin);
+        if self
+            .upper
+            .first()
+            .is_some_and(|(bound, _)| bound.is_never())
+        {
+            return;
+        }
+        if ty.is_never() {
+            self.upper.clear();
+        }
+        self.upper.insert((ty, origin));
     }
 
     fn finish(
@@ -3848,19 +4172,198 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> PathBound<'db> {
-        let Self {
-            lower,
-            mut upper,
-            has_gradual_evidence,
-            has_static_evidence,
-        } = self;
-        let lower = (!lower.is_empty()).then(|| UnionType::from_elements(db, env, lower));
+        let Self { lower, upper } = self;
+        let mut provenance = SolutionProvenance {
+            lower_origins: lower
+                .iter()
+                .filter_map(|(_, origin)| *origin)
+                .unique()
+                .collect(),
+            upper_origins: upper
+                .iter()
+                .filter_map(|(_, origin)| *origin)
+                .unique()
+                .collect(),
+            ..SolutionProvenance::default()
+        };
+
+        let mut has_gradual_evidence = false;
+        let mut has_static_evidence = false;
+        let mut concrete_lower: Option<UnionAccumulator<'db>> = None;
+        let mut unconditional_gradual_lower: Option<UnionAccumulator<'db>> = None;
+        let mut concrete_lower_count = 0;
+        for &(ty, origin) in &lower {
+            let is_static = ty.bottom_materialization(db, env) == ty.top_materialization(db, env);
+            if is_static {
+                has_static_evidence = true;
+            } else if ty.has_provisional_marker(db, env) {
+                continue;
+            } else {
+                has_gradual_evidence = true;
+            }
+
+            if origin.is_some() {
+                continue;
+            }
+
+            let bound = if is_static {
+                if ty.has_typevar(db, env) || ty.has_provisional_marker(db, env) {
+                    continue;
+                }
+                concrete_lower_count += 1;
+                &mut concrete_lower
+            } else {
+                &mut unconditional_gradual_lower
+            };
+            match bound {
+                Some(accumulator) => accumulator.add(db, env, ty),
+                None => *bound = Some(UnionAccumulator::new(ty)),
+            }
+        }
+
+        for &(ty, _) in &upper {
+            if has_gradual_evidence && has_static_evidence {
+                break;
+            }
+            if ty.bottom_materialization(db, env) == ty.top_materialization(db, env) {
+                has_static_evidence = true;
+            } else if !ty.has_provisional_marker(db, env) {
+                has_gradual_evidence = true;
+            }
+        }
+
+        let lower_bound = if concrete_lower_count == lower.len() {
+            concrete_lower
+                .take()
+                .map(|accumulator| accumulator.into_type(db, env))
+        } else if has_gradual_evidence {
+            Some(UnionType::from_elements(
+                db,
+                env,
+                lower.iter().map(|&bound| {
+                    Self::preferred_gradual_bound(db, env, &lower, bound, |candidate, current| {
+                        candidate == current
+                    })
+                }),
+            ))
+        } else {
+            Some(UnionType::from_elements(
+                db,
+                env,
+                lower.iter().map(|&(ty, _)| ty),
+            ))
+        };
+        provenance.concrete_lower = if concrete_lower_count == lower.len() {
+            lower_bound
+        } else {
+            concrete_lower.map(|accumulator| accumulator.into_type(db, env))
+        };
+        provenance.unconditional_gradual_lower =
+            unconditional_gradual_lower.map(|accumulator| accumulator.into_type(db, env));
+
+        let mut upper = UpperBound {
+            clauses: if has_gradual_evidence {
+                upper
+                    .iter()
+                    .map(|&bound| {
+                        Self::preferred_gradual_bound(
+                            db,
+                            env,
+                            &upper,
+                            bound,
+                            |(candidate_lower, candidate_upper), (lower, upper)| {
+                                candidate_lower.is_subtype_of(db, env, lower)
+                                    && upper.is_subtype_of(db, env, candidate_upper)
+                            },
+                        )
+                    })
+                    .collect()
+            } else {
+                upper.iter().map(|&(ty, _)| ty).collect()
+            },
+        };
         upper.shrink_to_fit();
         PathBound {
             bound_typevar,
-            lower,
+            lower: lower_bound,
             upper,
             has_only_gradual_evidence: has_gradual_evidence && !has_static_evidence,
+            provenance,
+        }
+    }
+}
+
+/// Distinguishes independent bounds from gradual materializations.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct SolutionProvenance<'db> {
+    /// Gradual occurrences that contributed a lower bound.
+    lower_origins: Box<[GradualOrigin<'db>]>,
+    /// Gradual occurrences that contributed an upper bound.
+    upper_origins: Box<[GradualOrigin<'db>]>,
+    /// Independently established static lower bounds.
+    concrete_lower: Option<Type<'db>>,
+    /// Gradual lower bounds established without choosing a materialization.
+    unconditional_gradual_lower: Option<Type<'db>>,
+    /// Gradual materializations required by the solution's constraint path.
+    materialization_origins: Box<[GradualOrigin<'db>]>,
+}
+
+impl<'db> SolutionProvenance<'db> {
+    fn contains_origin(&self, origin: GradualOrigin<'db>) -> bool {
+        self.lower_origins.contains(&origin) || self.upper_origins.contains(&origin)
+    }
+
+    fn has_explicit_any(&self) -> bool {
+        self.lower_origins
+            .iter()
+            .chain(&self.upper_origins)
+            .any(|origin| origin.ty == DynamicType::Any)
+    }
+
+    fn merge(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: &Self) {
+        for (origins, additional) in [
+            (&mut self.lower_origins, &other.lower_origins),
+            (&mut self.upper_origins, &other.upper_origins),
+            (
+                &mut self.materialization_origins,
+                &other.materialization_origins,
+            ),
+        ] {
+            if additional.is_empty() || origins.as_ref() == additional.as_ref() {
+                continue;
+            }
+
+            if origins.is_empty() {
+                origins.clone_from(additional);
+            } else {
+                *origins = origins.iter().chain(additional).copied().unique().collect();
+            }
+        }
+
+        for (bound, additional) in [
+            (&mut self.concrete_lower, other.concrete_lower),
+            (
+                &mut self.unconditional_gradual_lower,
+                other.unconditional_gradual_lower,
+            ),
+        ] {
+            if let Some(additional) = additional
+                && *bound != Some(additional)
+            {
+                *bound = Some(bound.map_or(additional, |bound| {
+                    UnionType::from_two_elements(db, env, bound, additional)
+                }));
+            }
+        }
+    }
+
+    fn retain_gradual_type(&mut self, ty: DynamicType<'db>) {
+        for origins in [&mut self.lower_origins, &mut self.upper_origins] {
+            *origins = origins
+                .iter()
+                .copied()
+                .filter(|origin| origin.ty == ty)
+                .collect();
         }
     }
 }
@@ -3900,6 +4403,7 @@ pub(crate) struct PathBound<'db> {
     pub(crate) upper: UpperBound<'db>,
     /// Whether the path contains gradual evidence and no static evidence.
     has_only_gradual_evidence: bool,
+    provenance: SolutionProvenance<'db>,
 }
 
 impl<'db> PathBound<'db> {
@@ -3909,6 +4413,10 @@ impl<'db> PathBound<'db> {
             lower: Some(ty),
             upper: UpperBound::from_clause(ty),
             has_only_gradual_evidence: false,
+            provenance: SolutionProvenance {
+                concrete_lower: Some(ty),
+                ..SolutionProvenance::default()
+            },
         }
     }
 
@@ -3949,7 +4457,7 @@ impl<'db> PathBound<'db> {
         }
 
         // Unresolved type-variable relationships must not escape into the specialization.
-        if solution.has_typevar(db, env) || solution.has_unspecialized_type_var(db, env) {
+        if solution.has_typevar(db, env) || solution.has_provisional_marker(db, env) {
             return Some(solution);
         }
 
@@ -3960,7 +4468,7 @@ impl<'db> PathBound<'db> {
 
         // Gradual upper bounds are top-materialized, as the lower bound is already gradual.
         let materialize_upper = |bound: Type<'db>| {
-            (!bound.has_typevar(db, env) && !bound.has_unspecialized_type_var(db, env))
+            (!bound.has_typevar(db, env) && !bound.has_provisional_marker(db, env))
                 .then(|| bound.top_materialization(db, env))
                 .filter(|bound| !bound.is_object())
         };
@@ -4152,6 +4660,7 @@ impl<'db> PathBounds<'db> {
         }
 
         let mut constraints = Vec::default();
+        let mut materialization_origins = FxIndexSet::default();
         let mut current = node;
         loop {
             match current.node() {
@@ -4168,6 +4677,11 @@ impl<'db> PathBounds<'db> {
                     else {
                         // Opaque gradual decisions are independently satisfiable and do not
                         // constrain any inferred type variables.
+                        if let Some(variable) =
+                            storage.constraint_data(interior.constraint).as_gradual()
+                        {
+                            materialization_origins.insert(variable.origin);
+                        }
                         current = interior.if_true;
                         continue;
                     };
@@ -4185,6 +4699,7 @@ impl<'db> PathBounds<'db> {
                     constraints.push((
                         constraint.typevar,
                         constraint.bounds,
+                        constraint.provenance,
                         source_orders
                             .get_index_of(&interior.constraint)
                             .expect("every TDD constraint should have a source order"),
@@ -4199,20 +4714,37 @@ impl<'db> PathBounds<'db> {
 
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
-        constraints.sort_by_key(|(_, _, source_order)| *source_order);
-        for (typevar, constraint, _) in constraints {
+        constraints.sort_by_key(|(_, _, _, source_order)| *source_order);
+        for (typevar, constraint, provenance, _) in constraints {
             let bounds = mappings.entry(typevar).or_default();
             if let Some(lower) = constraint.lower {
-                bounds.add_lower(db, env, lower);
+                bounds.add_lower(
+                    lower,
+                    provenance
+                        .lower
+                        .map(|origin| storage.gradual_origin(origin)),
+                );
             }
             if let Some(upper) = constraint.upper {
-                bounds.add_upper(db, env, upper);
+                bounds.add_upper(
+                    upper,
+                    provenance
+                        .upper
+                        .map(|origin| storage.gradual_origin(origin)),
+                );
             }
         }
 
         let path = mappings
             .drain(..)
-            .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
+            .map(|(bound_typevar, bounds)| {
+                let mut bound = bounds.finish(db, env, bound_typevar);
+                bound.provenance.materialization_origins = materialization_origins
+                    .iter()
+                    .map(|&origin| storage.gradual_origin(origin))
+                    .collect();
+                bound
+            })
             .collect();
         Some(PathBounds::Constrained(Box::new([path])))
     }
@@ -4263,6 +4795,7 @@ impl<'db> PathBounds<'db> {
                     solution.push(TypeVarSolution {
                         bound_typevar: path_bound.bound_typevar,
                         solution: ty,
+                        provenance: path_bound.provenance.clone(),
                     });
                 }
             }
@@ -4303,9 +4836,12 @@ impl<'db> PathBounds<'db> {
             let mut path_solution = FxIndexMap::default();
             for path_bound in path {
                 let candidate = match Self::default_solve(db, env, builder, path_bound) {
-                    Ok(Some(candidate)) => candidate,
-                    Ok(None) => continue,
-                    Err(()) => continue 'paths,
+                    PathBoundSolution::Solved(candidate) => candidate,
+                    PathBoundSolution::Unsolved => continue,
+                    PathBoundSolution::Unsatisfiable => continue 'paths,
+                    PathBoundSolution::BudgetExceeded { .. } => {
+                        return Err(UniqueSolutionError::Ambiguous);
+                    }
                 };
                 if path_solution
                     .insert(
@@ -4313,6 +4849,7 @@ impl<'db> PathBounds<'db> {
                         TypeVarSolution {
                             bound_typevar: path_bound.bound_typevar,
                             solution: candidate,
+                            provenance: path_bound.provenance.clone(),
                         },
                     )
                     .is_some()
@@ -4852,7 +5389,7 @@ impl InteriorNode {
 
             fn visit_edge<'db>(
                 &mut self,
-                _db: &'db dyn Db,
+                db: &'db dyn Db,
                 storage: &mut ConstraintSetStorage<'db>,
                 interior: &Self::Interior,
                 subtree: Self::Result,
@@ -4876,8 +5413,33 @@ impl InteriorNode {
                             if (self.should_remove)(storage, assignment.constraint()) {
                                 continue;
                             }
+
+                            let mut assignment = *assignment;
+                            if assignment.is_positive()
+                                && let Some(provenance) = storage
+                                    .has_gradual_variables()
+                                    .then(|| path.constraint_provenance(assignment))
+                                && let Some(constraint) = storage
+                                    .constraint_data(assignment.constraint())
+                                    .as_typevar()
+                                && constraint.provenance != provenance
+                            {
+                                let env = ProgramEnvironment::from_program(
+                                    constraint.typevar.binding_context(db).program(db),
+                                );
+                                assignment = ConstraintId::new_with_provenance(
+                                    db,
+                                    &env,
+                                    storage,
+                                    constraint.typevar,
+                                    constraint.bounds.lower,
+                                    constraint.bounds.upper,
+                                    provenance,
+                                )
+                                .when_true();
+                            }
                             let (assignment, assignment_source_order) =
-                                Node::new_satisfied_constraint(storage, *assignment);
+                                Node::new_satisfied_constraint(storage, assignment);
                             result = result.and(storage, assignment);
                             result_source_order = storage
                                 .ordered_source_order(result_source_order, assignment_source_order);
@@ -5050,6 +5612,97 @@ pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
 pub struct TypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) solution: Type<'db>,
+    provenance: SolutionProvenance<'db>,
+}
+
+impl<'db> TypeVarSolution<'db> {
+    /// Merges an alternative solution without widening independent materializations.
+    pub(crate) fn merge(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: &Self) {
+        if self.solution == other.solution {
+            self.provenance.merge(db, env, &other.provenance);
+            return;
+        }
+
+        // TODO: Structural `object` alternatives should be handled by intersection solving.
+        let gradual_solution = if self.solution == Type::object() {
+            Some(other.solution)
+        } else if other.solution == Type::object() {
+            Some(self.solution)
+        } else {
+            None
+        };
+        if let Some(solution) = gradual_solution
+            && let Some(gradual) = solution.as_dynamic().or_else(|| {
+                solution
+                    .as_union()?
+                    .elements(db)
+                    .iter()
+                    .find_map(|element| element.as_dynamic())
+            })
+        {
+            self.solution = solution;
+            self.provenance.merge(db, env, &other.provenance);
+            self.provenance.retain_gradual_type(gradual);
+            return;
+        }
+
+        if self.absorbs(db, env, other) {
+            return;
+        }
+        if other.absorbs(db, env, self) {
+            self.clone_from(other);
+            return;
+        }
+
+        let (first, second) =
+            if other.provenance.has_explicit_any() && !self.provenance.has_explicit_any() {
+                (other.solution, self.solution)
+            } else {
+                (self.solution, other.solution)
+            };
+        self.solution = UnionType::from_two_elements(db, env, first, second);
+        self.provenance.merge(db, env, &other.provenance);
+    }
+
+    /// Returns whether this solution covers an alternative's independent lower bounds.
+    fn absorbs(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: &Self) -> bool {
+        let provenance = &self.provenance;
+        let other_provenance = &other.provenance;
+        if !other_provenance
+            .lower_origins
+            .iter()
+            .all(|origin| provenance.lower_origins.contains(origin))
+        {
+            return false;
+        }
+
+        // Unresolved candidates cannot establish independent concrete bounds before substitution.
+        if let Some(lower) = other_provenance.concrete_lower
+            && !other.solution.has_typevar(db, env)
+            && !other.solution.has_provisional_marker(db, env)
+            && !provenance
+                .concrete_lower
+                .is_some_and(|retained| lower.is_subtype_of(db, env, retained))
+        {
+            return false;
+        }
+
+        // An unconditional gradual lower bound covers its individual materializations.
+        if provenance.concrete_lower.is_none()
+            && provenance.unconditional_gradual_lower == Some(self.solution)
+            && provenance.unconditional_gradual_lower
+                == other_provenance.unconditional_gradual_lower
+        {
+            return true;
+        }
+
+        provenance.lower_origins.iter().any(|&origin| {
+            other_provenance.materialization_origins.contains(&origin)
+                && (provenance.concrete_lower.is_none()
+                    && self.solution == Type::Dynamic(origin.ty)
+                    || !other_provenance.contains_origin(origin))
+        })
+    }
 }
 
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
@@ -5112,7 +5765,7 @@ impl ConstraintAssignment {
         std::fmt::from_fn(move |f| {
             let constraint_data = storage.constraint_data(self.constraint());
             if let Some(gradual) = constraint_data.as_gradual() {
-                return write!(f, "{range_prefix}(gradual@{})", gradual.index());
+                return write!(f, "{range_prefix}(gradual@{})", gradual.id.index());
             }
 
             let Some(constraint) = constraint_data.as_typevar() else {
@@ -6726,6 +7379,10 @@ pub(crate) struct PathAssignments {
     /// Each assignment's source constraint and the first per-path fuel value with which it was
     /// derived.
     assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
+    /// The strongest available proof for each assignment. Allocated lazily for gradual paths.
+    assignment_provenances: Vec<ConstraintProvenance>,
+    /// Previous proofs for existing assignments, allowing branch-local changes to be rolled back.
+    provenance_history: Vec<(usize, ConstraintProvenance)>,
     /// Additional per-path fuel values that can derive an assignment, keyed by its index in
     /// `assignments`. These are stored separately so that branch-local additions can be rolled
     /// back by truncating the set. Only the greatest fuel value participates in further
@@ -6745,13 +7402,13 @@ pub(crate) struct PathAssignments {
     independent_typevars: FxHashSet<TypeVarId>,
 
     /// Derived assignments that have been queued up to be added to the current path.
-    assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
+    assignment_queue: VecDeque<(ConstraintAssignment, QueuedAssignment)>,
 
     /// The next chunk of derived assignments that have been queued up to add to the current path.
     /// If we derive the same assignment multiple times, we keep the derivation that lets us make
     /// the most additional progress (more remaining fuel for this derivation chain, less overall
     /// fuel consumed).
-    new_assignments: FxIndexMap<ConstraintAssignment, AssignmentFuel>,
+    new_assignments: FxIndexMap<ConstraintAssignment, QueuedAssignment>,
 }
 
 /// The total amount of fuel that we are willing to spend for this path traversal. This was
@@ -6807,6 +7464,12 @@ impl Ord for AssignmentFuel {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct QueuedAssignment {
+    fuel: AssignmentFuel,
+    provenance: ConstraintProvenance,
+}
+
 impl PathAssignments {
     fn new(
         constraints: impl IntoIterator<Item = ConstraintId>,
@@ -6819,6 +7482,8 @@ impl PathAssignments {
         Self {
             sequents: Vec::default(),
             assignments: FxIndexMap::default(),
+            assignment_provenances: Vec::default(),
+            provenance_history: Vec::default(),
             additional_fuels: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
@@ -7024,6 +7689,8 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
+        let assignment_provenances_start = self.assignment_provenances.len();
+        let provenance_history_start = self.provenance_history.len();
         let additional_fuels_start = self.additional_fuels.len();
         let previous_remaining_overall_fuel = self.remaining_overall_fuel;
 
@@ -7040,8 +7707,18 @@ impl PathAssignments {
             "walk edge",
         );
         debug_assert!(self.assignment_queue.is_empty());
-        self.assignment_queue
-            .push_back((assignment, AssignmentFuel::origin()));
+        let provenance = storage
+            .constraint_data(assignment.constraint())
+            .as_typevar()
+            .map(|constraint| constraint.provenance)
+            .unwrap_or_default();
+        self.assignment_queue.push_back((
+            assignment,
+            QueuedAssignment {
+                fuel: AssignmentFuel::origin(),
+                provenance,
+            },
+        ));
         let source_constraint = assignment.constraint();
         let found_conflict = self
             .drain_assignment_queue(db, env, storage, source_constraint)
@@ -7070,6 +7747,15 @@ impl PathAssignments {
         // single instance for the entire BDD traversal.
         self.assignment_queue.clear();
         self.assignments.truncate(start);
+        for &(index, provenance) in self.provenance_history[provenance_history_start..]
+            .iter()
+            .rev()
+        {
+            self.assignment_provenances[index] = provenance;
+        }
+        self.provenance_history.truncate(provenance_history_start);
+        self.assignment_provenances
+            .truncate(assignment_provenances_start);
         self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
@@ -7083,6 +7769,155 @@ impl PathAssignments {
         self.assignment_holds(constraint.when_true())
             || self.assignment_holds(constraint.when_false())
             || self.assignment_holds(constraint.when_unconstrained())
+    }
+
+    /// Returns the gradual occurrences that hold on the current path.
+    fn gradual_origins<'a>(
+        &'a self,
+        storage: &'a ConstraintSetStorage<'_>,
+    ) -> impl Iterator<Item = GradualVariableId> + 'a {
+        self.assignments
+            .iter()
+            .filter(|(assignment, _)| assignment.is_positive())
+            .filter_map(move |(assignment, _)| {
+                storage
+                    .constraint_data(assignment.constraint())
+                    .as_gradual()
+                    .map(|variable| variable.origin)
+            })
+    }
+
+    /// Returns the strongest available proof for each bound of an assignment.
+    pub(super) fn constraint_provenance(
+        &self,
+        assignment: ConstraintAssignment,
+    ) -> ConstraintProvenance {
+        if self.assignment_provenances.is_empty() {
+            return ConstraintProvenance::default();
+        }
+
+        self.assignments
+            .get_index_of(&assignment)
+            .and_then(|index| self.assignment_provenances.get(index).copied())
+            .unwrap_or_default()
+    }
+
+    /// Propagates the gradual occurrence that supplied each derived bound.
+    fn derived_constraint_provenance<'db>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &ConstraintSetStorage<'db>,
+        post: ConstraintId,
+        first: ConstraintId,
+        second: Option<ConstraintId>,
+    ) -> ConstraintProvenance {
+        if self.assignment_provenances.is_empty() {
+            return ConstraintProvenance::default();
+        }
+
+        let Some(post_constraint) = storage.constraint_data(post).as_typevar() else {
+            return ConstraintProvenance::default();
+        };
+
+        let antecedents: SmallVec<[_; 2]> = iter::once(first)
+            .chain(second)
+            .filter_map(|antecedent| {
+                let constraint = storage.constraint_data(antecedent).as_typevar()?;
+                let provenance = self.constraint_provenance(antecedent.when_true());
+                Some((constraint, provenance))
+            })
+            .collect();
+
+        if antecedents
+            .iter()
+            .all(|(_, provenance)| *provenance == ConstraintProvenance::default())
+        {
+            return ConstraintProvenance::default();
+        }
+
+        let bound_provenance = |post_bound: Option<Type<'db>>, post_is_upper: bool| {
+            let post_bound = post_bound?;
+            antecedents.iter().find_map(|(antecedent, provenance)| {
+                [
+                    (antecedent.bounds.lower, provenance.lower, false),
+                    (antecedent.bounds.upper, provenance.upper, true),
+                ]
+                .into_iter()
+                .find_map(|(bound, origin, is_upper)| {
+                    let bound = bound?;
+                    let origin = origin?;
+                    Self::bound_contributes_to_consequent(
+                        db,
+                        env,
+                        &antecedents,
+                        (*antecedent, bound, is_upper),
+                        (post_constraint, post_bound, post_is_upper),
+                    )
+                    .then_some(origin)
+                })
+            })
+        };
+
+        ConstraintProvenance {
+            lower: bound_provenance(post_constraint.bounds.lower, false),
+            upper: bound_provenance(post_constraint.bounds.upper, true),
+        }
+    }
+
+    fn bound_contributes_to_consequent<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        antecedents: &[(Constraint<'db>, ConstraintProvenance)],
+        antecedent: (Constraint<'db>, Type<'db>, bool),
+        consequent: (Constraint<'db>, Type<'db>, bool),
+    ) -> bool {
+        let (antecedent, bound, bound_is_upper) = antecedent;
+        let (consequent, consequent_bound, consequent_is_upper) = consequent;
+        if antecedent
+            .typevar
+            .is_same_typevar_as(db, consequent.typevar)
+        {
+            return bound_is_upper == consequent_is_upper;
+        }
+
+        if bound == consequent_bound {
+            return true;
+        }
+
+        let matches_variance = |variance, covariant: bool| match variance {
+            TypeVarVariance::Covariant => covariant,
+            TypeVarVariance::Contravariant => !covariant,
+            TypeVarVariance::Invariant => true,
+            TypeVarVariance::Bivariant => false,
+        };
+
+        if matches_variance(
+            bound.variance_of(db, env, consequent.typevar.identity(db)),
+            bound_is_upper != consequent_is_upper,
+        ) {
+            return true;
+        }
+
+        antecedents.iter().any(|(other, _)| {
+            if !other.typevar.is_same_typevar_as(db, consequent.typevar) {
+                return false;
+            }
+
+            let nested = if consequent_is_upper {
+                other.bounds.upper
+            } else {
+                other.bounds.lower
+            };
+            let Some(nested) = nested else {
+                return false;
+            };
+
+            matches_variance(
+                nested.variance_of(db, env, antecedent.typevar.identity(db)),
+                bound_is_upper == consequent_is_upper,
+            )
+        })
     }
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
@@ -7170,8 +8005,8 @@ impl PathAssignments {
         storage: &mut ConstraintSetStorage<'db>,
         source_constraint: ConstraintId,
     ) -> Result<(), PathAssignmentConflict> {
-        while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
-            self.add_assignment(db, env, storage, assignment, source_constraint, fuel)?;
+        while let Some((assignment, queued)) = self.assignment_queue.pop_front() {
+            self.add_assignment(db, env, storage, assignment, source_constraint, queued)?;
         }
         Ok(())
     }
@@ -7186,8 +8021,9 @@ impl PathAssignments {
         storage: &mut ConstraintSetStorage<'db>,
         assignment: ConstraintAssignment,
         source_constraint: ConstraintId,
-        fuel: AssignmentFuel,
+        queued: QueuedAssignment,
     ) -> Result<(), PathAssignmentConflict> {
+        let QueuedAssignment { fuel, provenance } = queued;
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
             // already any assignment for this constraint (positive, negative, or unconstrained),
@@ -7200,8 +8036,14 @@ impl PathAssignments {
             // derive any additional information from the sequent map. We still want to record the
             // assignment, but as an optimization we can return early without actually querying the
             // sequent map.
+            let index = self.assignments.len();
             self.assignments
                 .insert(assignment, (source_constraint, fuel.remaining));
+            if provenance != ConstraintProvenance::default() {
+                self.assignment_provenances
+                    .resize(index + 1, ConstraintProvenance::default());
+                self.assignment_provenances[index] = provenance;
+            }
             return Ok(());
         }
 
@@ -7221,6 +8063,7 @@ impl PathAssignments {
             return Err(PathAssignmentConflict);
         }
 
+        let previous_provenance = self.constraint_provenance(assignment);
         match self.assignments.entry(assignment) {
             Entry::Vacant(entry) => {
                 if let Some(fuel_cost) = fuel.consumed {
@@ -7230,19 +8073,29 @@ impl PathAssignments {
                             None => return Ok(()),
                         };
                 }
+                let index = entry.index();
                 entry.insert((source_constraint, fuel.remaining));
+                if provenance != ConstraintProvenance::default() {
+                    self.assignment_provenances
+                        .resize(index + 1, ConstraintProvenance::default());
+                    self.assignment_provenances[index] = provenance;
+                }
             }
 
             Entry::Occupied(mut entry) => {
                 let index = entry.index();
                 let (existing_source_constraint, existing_fuel) = entry.get_mut();
-
-                // If a constraint appears both as an "origin" constraint (it actually appears in
-                // the BDD structure) and as a "derived" constraint (we infer it from other
-                // constraints), we should prefer the origin source constraint, regardless of which
-                // order we encounter the various constraints in the BDD.
-                if !fuel.is_derived() {
+                let merged_provenance = if fuel.is_derived() {
+                    previous_provenance.merge(provenance)
+                } else {
+                    // A constraint in the BDD takes precedence over an earlier derived proof.
                     *existing_source_constraint = source_constraint;
+                    provenance.merge(previous_provenance)
+                };
+                let has_stronger_proof = merged_provenance != previous_provenance;
+                if has_stronger_proof {
+                    self.provenance_history.push((index, previous_provenance));
+                    self.assignment_provenances[index] = merged_provenance;
                 }
 
                 // We've already seen this assignment, and in theory have already queried the
@@ -7256,20 +8109,22 @@ impl PathAssignments {
                 // There is another derivation of this assignment that already provides at least as
                 // much fuel as this constraint. That means replenishing the fuel won't have any
                 // effect.
-                if *existing_fuel >= fuel.remaining
+                let already_has_fuel = *existing_fuel >= fuel.remaining
                     || self
                         .additional_fuels
                         .iter()
                         .any(|(fuel_index, existing_fuel)| {
                             *fuel_index == index && *existing_fuel >= fuel.remaining
-                        })
-                {
+                        });
+                if already_has_fuel && !has_stronger_proof {
                     return Ok(());
                 }
 
                 // Record the replenished fuel separately so that `walk_edge` can restore the
                 // parent branch by truncating `additional_fuels`.
-                self.additional_fuels.push((index, fuel.remaining));
+                if !already_has_fuel {
+                    self.additional_fuels.push((index, fuel.remaining));
+                }
             }
         }
 
@@ -7294,13 +8149,22 @@ impl PathAssignments {
         Ok(())
     }
 
-    fn enqueue_assignment(&mut self, assignment: ConstraintAssignment, new_fuel: AssignmentFuel) {
+    fn enqueue_assignment(
+        &mut self,
+        assignment: ConstraintAssignment,
+        new_fuel: AssignmentFuel,
+        provenance: ConstraintProvenance,
+    ) {
         self.new_assignments
             .entry(assignment)
-            .and_modify(|existing_fuel| {
-                *existing_fuel = std::cmp::max(*existing_fuel, new_fuel);
+            .and_modify(|queued| {
+                queued.fuel = std::cmp::max(queued.fuel, new_fuel);
+                queued.provenance = queued.provenance.merge(provenance);
             })
-            .or_insert(new_fuel);
+            .or_insert(QueuedAssignment {
+                fuel: new_fuel,
+                provenance,
+            });
     }
 
     fn check_sequent<'db>(
@@ -7405,9 +8269,12 @@ impl PathAssignments {
         let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
         let fuel_cost = storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+            let provenance =
+                self.derived_constraint_provenance(db, env, storage, post, ante1, Some(ante2));
             self.enqueue_assignment(
                 post.when_true(),
                 AssignmentFuel::derived(fuel_cost, post_fuel),
+                provenance,
             );
         }
     }
@@ -7433,9 +8300,11 @@ impl PathAssignments {
             storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth)
         };
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+            let provenance = self.derived_constraint_provenance(db, env, storage, post, ante, None);
             self.enqueue_assignment(
                 post.when_true(),
                 AssignmentFuel::derived(fuel_cost, post_fuel),
+                provenance,
             );
         }
     }
@@ -7633,8 +8502,11 @@ mod tests {
         let support = storage.intern_constraint_typevars(
             db,
             &env,
-            t,
-            ConstraintBounds::new(None, Some(actual_bound)),
+            ConstraintData::TypeVar(Constraint {
+                typevar: t,
+                bounds: ConstraintBounds::new(None, Some(actual_bound)),
+                provenance: ConstraintProvenance::default(),
+            }),
         );
         let mentioned = support
             .iter()
@@ -7688,8 +8560,11 @@ mod tests {
             let support = storage.intern_constraint_typevars(
                 db,
                 &env,
-                t,
-                ConstraintBounds::new(None, Some(Type::TypeVar(u))),
+                ConstraintData::TypeVar(Constraint {
+                    typevar: t,
+                    bounds: ConstraintBounds::new(None, Some(Type::TypeVar(u))),
+                    provenance: ConstraintProvenance::default(),
+                }),
             );
             let mentioned = support
                 .iter()
@@ -7984,6 +8859,10 @@ mod tests {
             Solutions::Constrained(SolutionPaths::Complete(vec![vec![TypeVarSolution {
                 bound_typevar: t,
                 solution: UnionType::from_elements(db, &env, [int, str]),
+                provenance: SolutionProvenance {
+                    concrete_lower: Some(UnionType::from_elements(db, &env, [int, str])),
+                    ..SolutionProvenance::default()
+                },
             }]]))
         );
 
@@ -8024,10 +8903,18 @@ mod tests {
         assert!(solutions[0].contains(&TypeVarSolution {
             bound_typevar: t,
             solution: int,
+            provenance: SolutionProvenance {
+                concrete_lower: Some(int),
+                ..SolutionProvenance::default()
+            },
         }));
         assert!(solutions[0].contains(&TypeVarSolution {
             bound_typevar: u,
             solution: int,
+            provenance: SolutionProvenance {
+                concrete_lower: Some(int),
+                ..SolutionProvenance::default()
+            },
         }));
 
         let storage = builder.storage.borrow();
@@ -8080,6 +8967,7 @@ mod tests {
             lower: None,
             upper: UpperBound::none(),
             has_only_gradual_evidence: false,
+            provenance: SolutionProvenance::default(),
         };
 
         assert_eq!(
@@ -8101,8 +8989,8 @@ mod tests {
         let t = create_typevar(db, "T");
         let builder = ConstraintSetBuilder::new();
         let mut bounds = ConstraintBoundsBuilder::default();
-        bounds.add_lower(db, &env, known_instance(db, KnownClass::Int));
-        bounds.add_upper(db, &env, known_instance(db, KnownClass::Str));
+        bounds.add_lower(known_instance(db, KnownClass::Int), None);
+        bounds.add_upper(known_instance(db, KnownClass::Str), None);
         let invalid = bounds.finish(db, &env, t);
 
         assert_eq!(
@@ -8162,15 +9050,26 @@ class E: ...
         let binding = |bound_typevar, solution| TypeVarSolution {
             bound_typevar,
             solution,
+            provenance: if solution.is_dynamic() {
+                SolutionProvenance {
+                    unconditional_gradual_lower: Some(solution),
+                    ..SolutionProvenance::default()
+                }
+            } else {
+                SolutionProvenance {
+                    concrete_lower: Some(solution),
+                    ..SolutionProvenance::default()
+                }
+            },
         };
 
         for lower in [None, Some(Type::any())] {
             let mut bounds = ConstraintBoundsBuilder::default();
             if let Some(lower) = lower {
-                bounds.add_lower(db, &env, lower);
+                bounds.add_lower(lower, None);
             }
-            bounds.add_upper(db, &env, left);
-            bounds.add_upper(db, &env, right);
+            bounds.add_upper(left, None);
+            bounds.add_upper(right, None);
             let exhausted = bounds.finish(db, &env, t);
             let expected = PathBoundSolution::BudgetExceeded { fallback: lower };
             assert_eq!(
@@ -8206,8 +9105,8 @@ class E: ...
 
             // A later contradiction rejects the entire path, including its exhausted binding.
             let mut invalid = ConstraintBoundsBuilder::default();
-            invalid.add_lower(db, &env, int);
-            invalid.add_upper(db, &env, str);
+            invalid.add_lower(int, None);
+            invalid.add_upper(str, None);
             let invalid = invalid.finish(db, &env, u);
             for invalid_first in [false, true] {
                 let mut rejected = vec![exhausted.clone(), invalid.clone()];
@@ -8237,7 +9136,7 @@ class E: ...
         assert!(IntersectionType::bounded_from_elements(db, &env, gradual_upper).is_none());
         let mut bounds = ConstraintBoundsBuilder::default();
         for upper in gradual_upper {
-            bounds.add_upper(db, &env, upper);
+            bounds.add_upper(upper, None);
         }
         let exhausted = bounds.finish(db, &env, constrained);
         assert!(exhausted.has_only_gradual_evidence());
@@ -8577,6 +9476,7 @@ class E: ...
                     ConstraintData::TypeVar(Constraint {
                         typevar,
                         bounds: ConstraintBounds::new(lower, upper),
+                        provenance: ConstraintProvenance::default(),
                     }),
                 );
             }
@@ -8590,6 +9490,7 @@ class E: ...
                     ConstraintData::TypeVar(Constraint {
                         typevar,
                         bounds: ConstraintBounds::new(lower, upper),
+                        provenance: ConstraintProvenance::default(),
                     }),
                 );
                 let constraint_source_order = storage.constraint_source_order(constraint);
@@ -9691,6 +10592,13 @@ class E: ...
         let reloaded_again =
             ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &reloaded));
         assert_eq!(reloaded, reloaded_again);
+
+        owned.query(|builder, set| {
+            let storage = builder.storage.borrow();
+            for constraint in storage.calculate_source_orders(set.source_order) {
+                let _ = storage.constraint_support(constraint);
+            }
+        });
     }
 
     #[test]

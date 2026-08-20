@@ -1422,8 +1422,7 @@ def value(items: Container[T]) -> T:
     raise NotImplementedError
 
 items: list[str] = []
-# TODO: Solve intersections in the constraint solver.
-reveal_type(value(items))  # revealed: object
+reveal_type(value(items))  # revealed: Any
 ```
 
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar

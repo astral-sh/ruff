@@ -2102,8 +2102,7 @@ def value[T](items: Container[T]) -> T:
     raise NotImplementedError
 
 items: list[str] = []
-# TODO: Solve intersections in the constraint solver.
-reveal_type(value(items))  # revealed: object
+reveal_type(value(items))  # revealed: Any
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times

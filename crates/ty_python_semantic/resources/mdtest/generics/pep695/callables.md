@@ -136,6 +136,34 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Gradual bounds on generic receivers
+
+Specializing a generic receiver preserves gradual lower and upper bounds on its bound methods.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+class Box[T]:
+    def lower[U](self: "Box[U]", value: U) -> U:
+        raise NotImplementedError
+
+    def upper[U](self: "Box[U]", callback: Callable[[U], None]) -> U:
+        raise NotImplementedError
+
+def lower[T](callback: Callable[[T], T], value: T) -> T:
+    raise NotImplementedError
+
+def upper[T](callback: Callable[[Callable[[T], None]], T], value: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def _(gradual: Box[Any], unknown: Box[Unknown], value: int, callback: Callable[[int], None]):
+    reveal_type(lower(gradual.lower, value))  # revealed: Any | int
+    reveal_type(lower(unknown.lower, value))  # revealed: Unknown | int
+    reveal_type(upper(gradual.upper, callback))  # revealed: int & Any
+    reveal_type(upper(unknown.upper, callback))  # revealed: int & Unknown
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:

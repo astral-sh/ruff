@@ -1038,6 +1038,52 @@ def inferable_last[I, N0, N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11]() -> Non
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
+### Repeated gradual alternatives on inferable bounds
+
+Independent gradual materializations can produce the same bound. Solving them must not enumerate
+every combination of materializations.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def _[T]() -> None:
+    constraints = ConstraintSet.lower_bound(int, T)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    # revealed: tuple[Solution[T=int], Solution[T=int | Any]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+A concrete bound between two materializations preserves their source ordering.
+
+```py
+def _[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Any, tuple[T] | None)
+    constraints &= ConstraintSet.lower_bound(int, T)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[T] | None)
+    # revealed: tuple[Solution[T=Any | int], Solution[T=Any | int], Solution[T=int], Solution[T=int | Any]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
 ### Symbolic relationships and fixed non-inferable bindings
 
 A bare relationship must have the same meaning regardless of which type variable the TDD chooses as
@@ -1349,6 +1395,44 @@ second = is_constraint_set_assignable_to(Any, str)
 
 # revealed: ConstraintSet[((gradual@0) ∧ (gradual@1))]
 reveal_type((first & second).with_detailed_display())
+```
+
+Independent materializations remain distinct even when their relations are identical:
+
+```py
+same_target = is_constraint_set_assignable_to(Any, int)
+
+# revealed: ConstraintSet[((gradual@0) ∧ (gradual@1))]
+reveal_type((first & same_target).with_detailed_display())
+```
+
+Gradual alternatives preserve whether their bound originated from `Any` or `Unknown`.
+
+```py
+from ty_extensions._internal import Unknown
+
+def _[T]() -> None:
+    first = is_constraint_set_assignable_to(Any, tuple[T] | None)
+    second = is_constraint_set_assignable_to(Unknown, tuple[T] | None)
+    concrete = ConstraintSet.lower_bound(int, T)
+
+    # revealed: tuple[Solution[T=Any | int], Solution[T=Unknown | int], Solution[T=int]]
+    reveal_type(((first | second) & concrete).solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=int], Solution[T=int | Any], Solution[T=int | Unknown]]
+    reveal_type((concrete & (first | second)).solutions_for(T, inferable=tuple[T]))
+```
+
+An unrelated gradual occurrence must not replace the gradual type inferred for another union arm.
+
+```py
+def choose[T](
+    value: tuple[T, int, object] | tuple[T, object, int] | tuple[object, tuple[T], object],
+) -> T:
+    raise NotImplementedError
+
+def _(first: Any, second: Unknown, lower: int):
+    reveal_type(choose((lower, first, second)))  # revealed: int | Any
+    reveal_type(choose((lower, second, first)))  # revealed: int | Unknown
 ```
 
 Recursive protocol checks retain their gradual variables instead of falling back to `Unknown`.
