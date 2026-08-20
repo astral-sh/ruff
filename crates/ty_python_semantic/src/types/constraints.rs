@@ -3256,16 +3256,32 @@ impl ConstraintId {
         }
 
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower = match (self_bounds.lower, other_bounds.lower) {
+        // Equivalent gradual bounds collapse to the first operand, so prefer an explicit `Any`.
+        let prefer_explicit_gradual = |left: Option<Type<'db>>, right: Option<Type<'db>>| {
+            if matches!(
+                (left, right),
+                (
+                    Some(Type::Dynamic(DynamicType::Unknown)),
+                    Some(Type::Dynamic(DynamicType::Any))
+                )
+            ) {
+                (right, left)
+            } else {
+                (left, right)
+            }
+        };
+        let lower = match prefer_explicit_gradual(self_bounds.lower, other_bounds.lower) {
             (Some(left), Some(right)) => Some(UnionType::from_two_elements(db, env, left, right)),
             (Some(lower), None) | (None, Some(lower)) => Some(lower),
             (None, None) => None,
         };
         let mut merged_upper = UpperBound::none();
-        if let Some(upper) = self_bounds.upper {
+        let (first_upper, second_upper) =
+            prefer_explicit_gradual(self_bounds.upper, other_bounds.upper);
+        if let Some(upper) = first_upper {
             merged_upper.add_clause(upper);
         }
-        if let Some(upper) = other_bounds.upper {
+        if let Some(upper) = second_upper {
             merged_upper.add_clause(upper);
         }
         let effective_lower = lower.unwrap_or(Type::Never);

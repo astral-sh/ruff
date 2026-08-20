@@ -1343,6 +1343,57 @@ def no_typevars_is_identity[T]() -> None:
     static_assert(constraints.exists(tuple[()]) == constraints)
 ```
 
+An explicit `Any` bound propagates through a quantified type variable even when an independent
+`Unknown` bound is introduced in a different order.
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown, is_constraint_set_assignable_to
+
+def _[S, T]() -> None:
+    bridge = ConstraintSet.upper_bound(S, T)
+    any_bound = is_constraint_set_assignable_to(Any, tuple[S])
+    unknown_bound = is_constraint_set_assignable_to(Unknown, tuple[S] | tuple[T])
+
+    # revealed: Solution[T=Any]
+    reveal_type((any_bound & unknown_bound & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T])[0])
+    # revealed: Solution[T=Any]
+    reveal_type((unknown_bound & any_bound & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T])[0])
+    # revealed: Solution[T=Any]
+    reveal_type((bridge & any_bound & unknown_bound).exists(tuple[S]).solutions_for(T, inferable=tuple[T])[0])
+```
+
+When both gradual bounds have alternative suppliers, the explicit `Any` bound is preserved on every
+remaining path, regardless of source order.
+
+```py
+def _[S, T]() -> None:
+    bridge = ConstraintSet.upper_bound(S, T)
+    any_bound = is_constraint_set_assignable_to(Any, tuple[S] | tuple[T])
+    unknown_bound = is_constraint_set_assignable_to(Unknown, tuple[S] | tuple[T])
+
+    # revealed: Solution[T=Any]
+    reveal_type((any_bound & unknown_bound & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T])[-1])
+    # revealed: Solution[T=Any]
+    reveal_type((unknown_bound & any_bound & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T])[-1])
+```
+
+Contravariant bounds preserve the explicit occurrence in the opposite direction.
+
+```py
+from collections.abc import Callable
+
+def _[S, T]() -> None:
+    bridge = ConstraintSet.upper_bound(T, S)
+    any_bound = is_constraint_set_assignable_to(Any, Callable[[S], None] | Callable[[T], None])
+    unknown_bound = is_constraint_set_assignable_to(Unknown, Callable[[S], None] | Callable[[T], None])
+
+    # revealed: Solution[T=Any]
+    reveal_type((any_bound & unknown_bound & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T])[-1])
+    # revealed: Solution[T=Any]
+    reveal_type((unknown_bound & any_bound & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T])[-1])
+```
+
 ## Universal quantification
 
 Universal quantification removes the listed typevars from a constraint set. Any constraints that do
