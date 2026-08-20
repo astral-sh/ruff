@@ -1,16 +1,13 @@
 use anyhow::Result;
 use lsp_types::{
-    CodeLensParams, PartialResultParams, TextDocumentIdentifier, WorkDoneProgressParams,
-    notification::PublishDiagnostics,
+    CodeLensParams, CodeLensRequest, PartialResultParams, PublishDiagnosticsNotification,
+    TextDocumentIdentifier, WorkDoneProgressParams,
 };
 use ruff_db::system::SystemPath;
-use serde_json::json;
-use ty_server::ClientOptions;
 
 use crate::{TestServer, TestServerBuilder};
 
-const CWD_FILTER: (&str, &str) = (r#""cwd": ".+""#, r#""cwd": "[CWD]""#);
-const PROGRAM_FILTER: (&str, &str) = (r#""program": ".+""#, r#""program": "[PYTHON]""#);
+const URI_FILTER: (&str, &str) = (r#""uri": ".+""#, r#""uri": "[URI]""#);
 
 fn code_lens_request(server: &mut TestServer, file: &SystemPath) -> Vec<lsp_types::CodeLens> {
     let params = CodeLensParams {
@@ -20,59 +17,21 @@ fn code_lens_request(server: &mut TestServer, file: &SystemPath) -> Vec<lsp_type
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),
     };
-    let id = server.send_request::<lsp_types::request::CodeLensRequest>(params);
+    let id = server.send_request::<CodeLensRequest>(params);
     server
-        .await_response::<lsp_types::request::CodeLensRequest>(&id)
+        .await_response::<CodeLensRequest>(&id)
         .unwrap_or_default()
 }
 
-fn build_server_with_python_env(
+fn build_server(
     workspace_root: &SystemPath,
     test_file: &SystemPath,
     test_content: &str,
 ) -> Result<TestServer> {
-    let builder = TestServerBuilder::new()?;
-
-    let python_home = builder.file_path("base/bin");
-    let sys_prefix = builder.file_path(".venv");
-    let base_python = if cfg!(target_os = "windows") {
-        "base/bin/python.exe"
-    } else {
-        "base/bin/python"
-    };
-    let venv_python = if cfg!(target_os = "windows") {
-        ".venv/Scripts/python.exe"
-    } else {
-        ".venv/bin/python"
-    };
-    let python_uri = builder.file_uri(venv_python);
-    let site_packages = if cfg!(target_os = "windows") {
-        ".venv/Lib/site-packages/.gitkeep"
-    } else {
-        ".venv/lib/python3.14/site-packages/.gitkeep"
-    };
-
-    let workspace_options: ClientOptions = serde_json::from_value(json!({
-        "pythonExtension": {
-            "activeEnvironment": {
-                "executable": {
-                    "uri": python_uri,
-                    "sysPrefix": sys_prefix,
-                }
-            }
-        }
-    }))?;
-
-    let server = builder
-        .with_workspace(workspace_root, Some(workspace_options))?
-        .with_file(SystemPath::new(base_python), "")?
-        .with_file(SystemPath::new(venv_python), "")?
-        .with_file(
-            SystemPath::new(".venv/pyvenv.cfg"),
-            format!("home = {python_home}\n"),
-        )?
-        .with_file(SystemPath::new(site_packages), "")?
+    let server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
         .with_file(test_file, test_content)?
+        .with_run_tests_support()
         .enable_pull_diagnostics(false)
         .build()
         .wait_until_workspaces_are_initialized();
@@ -92,15 +51,15 @@ def helper():
     pass
 ";
 
-    let mut server = build_server_with_python_env(workspace_root, test_file, test_content)?;
+    let mut server = build_server(workspace_root, test_file, test_content)?;
 
     server.open_text_document(test_file, test_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
+    let _ = server.await_notification::<PublishDiagnosticsNotification>();
 
     let lenses = code_lens_request(&mut server, test_file);
 
     insta::with_settings!({
-        filters => vec![CWD_FILTER, PROGRAM_FILTER]
+        filters => vec![URI_FILTER]
     }, {
         insta::assert_json_snapshot!(lenses, @r#"
         [
@@ -120,15 +79,10 @@ def helper():
               "command": "ty.runTest",
               "arguments": [
                 {
-                  "arguments": [
-                    "-m",
-                    "pytest",
-                    "test_example.py::test_add"
-                  ],
-                  "cwd": "[CWD]",
-                  "filePath": "test_example.py",
-                  "program": "[PYTHON]",
-                  "testTarget": "test_add"
+                  "kind": "function",
+                  "label": "test_add",
+                  "testId": "test_example.py::test_add",
+                  "uri": "[URI]"
                 }
               ]
             }
@@ -153,15 +107,15 @@ class TestFoo:
         pass
 ";
 
-    let mut server = build_server_with_python_env(workspace_root, test_file, test_content)?;
+    let mut server = build_server(workspace_root, test_file, test_content)?;
 
     server.open_text_document(test_file, test_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
+    let _ = server.await_notification::<PublishDiagnosticsNotification>();
 
     let lenses = code_lens_request(&mut server, test_file);
 
     insta::with_settings!({
-        filters => vec![CWD_FILTER, PROGRAM_FILTER]
+        filters => vec![URI_FILTER]
     }, {
         insta::assert_json_snapshot!(lenses, @r#"
         [
@@ -181,15 +135,10 @@ class TestFoo:
               "command": "ty.runTest",
               "arguments": [
                 {
-                  "arguments": [
-                    "-m",
-                    "pytest",
-                    "test_classes.py::TestFoo"
-                  ],
-                  "cwd": "[CWD]",
-                  "filePath": "test_classes.py",
-                  "program": "[PYTHON]",
-                  "testTarget": "TestFoo"
+                  "kind": "class",
+                  "label": "TestFoo",
+                  "testId": "test_classes.py::TestFoo",
+                  "uri": "[URI]"
                 }
               ]
             }
@@ -210,15 +159,10 @@ class TestFoo:
               "command": "ty.runTest",
               "arguments": [
                 {
-                  "arguments": [
-                    "-m",
-                    "pytest",
-                    "test_classes.py::TestFoo::test_bar"
-                  ],
-                  "cwd": "[CWD]",
-                  "filePath": "test_classes.py",
-                  "program": "[PYTHON]",
-                  "testTarget": "TestFoo::test_bar"
+                  "kind": "function",
+                  "label": "test_bar",
+                  "testId": "test_classes.py::TestFoo::test_bar",
+                  "uri": "[URI]"
                 }
               ]
             }
@@ -231,7 +175,7 @@ class TestFoo:
 }
 
 #[test]
-fn code_lens_skipped_without_python_environment() -> Result<()> {
+fn code_lens_skipped_without_run_tests_support() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let test_file = SystemPath::new("src/test_example.py");
     let test_content = "\
@@ -247,13 +191,13 @@ def test_add():
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(test_file, test_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
+    let _ = server.await_notification::<PublishDiagnosticsNotification>();
 
     let lenses = code_lens_request(&mut server, test_file);
 
     assert!(
         lenses.is_empty(),
-        "Expected no code lenses without a Python environment, but got {lenses:?}"
+        "Expected no code lenses for a client that cannot run tests, but got {lenses:?}"
     );
 
     Ok(())

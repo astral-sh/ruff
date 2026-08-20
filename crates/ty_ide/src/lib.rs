@@ -6,7 +6,6 @@ mod all_symbols;
 mod annotation_expression;
 mod call_hierarchy;
 mod code_action;
-mod code_lens;
 mod completion;
 mod doc_highlights;
 mod docstring;
@@ -33,6 +32,7 @@ mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
 mod symbols;
+mod test_discovery;
 mod type_hierarchy;
 mod will_rename;
 mod workspace_symbols;
@@ -42,7 +42,6 @@ pub use call_hierarchy::incoming_calls::{IncomingCall, incoming_calls};
 pub use call_hierarchy::outgoing_calls::{OutgoingCall, outgoing_calls};
 pub use call_hierarchy::{CallHierarchyItem, prepare_call_hierarchy};
 pub use code_action::{QuickFix, code_actions};
-pub use code_lens::{CodeLensCommand, CodeLensItem, code_lens};
 pub use completion::{
     Completion, CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat,
     CompletionKind, CompletionSettings, completion,
@@ -67,6 +66,7 @@ pub use semantic_tokens::{
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
+pub use test_discovery::{DiscoveredTest, TestKind, discover_tests};
 pub use type_hierarchy::{
     TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
 };

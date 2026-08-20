@@ -7,29 +7,34 @@ use ty_python_semantic::{HasType, SemanticModel};
 
 use crate::Db;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CodeLensCommand {
-    /// qualified name of the test function
-    RunTest { test: String },
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestKind {
+    Function,
+    Class,
 }
 
+/// A test discovered in a file.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CodeLensItem {
-    pub title: String,
+pub struct DiscoveredTest {
+    /// The range of the test function or class name.
     pub range: TextRange,
-    pub command: CodeLensCommand,
+    /// Human readable name for the test
+    pub label: String,
+    pub kind: TestKind,
+    /// Qualified name for the test.
+    pub qualified_name: String,
 }
 
-pub fn code_lens(db: &dyn Db, file: File) -> Vec<CodeLensItem> {
+pub fn discover_tests(db: &dyn Db, file: File) -> Vec<DiscoveredTest> {
     let parsed = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
-    let mut items = vec![];
+    let mut tests = vec![];
 
     for stmt in &parsed.syntax().body {
         match stmt {
             Stmt::FunctionDef(func) => {
-                if let Some(lens) = test_func_codelens(func, None) {
-                    items.push(lens);
+                if let Some(test) = test_function(func, None) {
+                    tests.push(test);
                 }
             }
             Stmt::ClassDef(class) => {
@@ -48,19 +53,18 @@ pub fn code_lens(db: &dyn Db, file: File) -> Vec<CodeLensItem> {
                     continue;
                 }
 
-                items.push(CodeLensItem {
+                tests.push(DiscoveredTest {
+                    kind: TestKind::Class,
+                    label: class.name.to_string(),
+                    qualified_name: class.name.to_string(),
                     range: class.name.range(),
-                    title: String::from("Run tests"),
-                    command: CodeLensCommand::RunTest {
-                        test: class.name.to_string(),
-                    },
                 });
 
                 for class_stmt in &class.body {
                     if let Stmt::FunctionDef(func) = class_stmt
-                        && let Some(lens) = test_func_codelens(func, Some(class))
+                        && let Some(test) = test_function(func, Some(class))
                     {
-                        items.push(lens);
+                        tests.push(test);
                     }
                 }
             }
@@ -68,26 +72,24 @@ pub fn code_lens(db: &dyn Db, file: File) -> Vec<CodeLensItem> {
         }
     }
 
-    items
+    tests
 }
 
-fn test_func_codelens(
-    func: &StmtFunctionDef,
-    class: Option<&StmtClassDef>,
-) -> Option<CodeLensItem> {
+fn test_function(func: &StmtFunctionDef, class: Option<&StmtClassDef>) -> Option<DiscoveredTest> {
     // TODO: naming customization https://docs.pytest.org/en/stable/example/pythoncollection.html#changing-naming-conventions
     if !func.name.as_str().starts_with("test") {
         return None;
     }
-    let test = if let Some(class) = class {
+    let qualified_name = if let Some(class) = class {
         format!("{}::{}", class.name, func.name)
     } else {
         func.name.to_string()
     };
-    Some(CodeLensItem {
+    Some(DiscoveredTest {
+        kind: TestKind::Function,
+        label: func.name.to_string(),
+        qualified_name,
         range: func.name.range(),
-        title: String::from("Run test"),
-        command: CodeLensCommand::RunTest { test },
     })
 }
 
@@ -100,45 +102,46 @@ mod tests {
     use super::*;
     use crate::tests::{CursorTest, IntoDiagnostic};
 
-    fn code_lens_test(path: &str, source: &str) -> CursorTest {
+    fn test_discovery_test(path: &str, source: &str) -> CursorTest {
         CursorTest::builder()
             .source(path, format!("{source}\n<CURSOR>"))
             .build()
     }
 
-    struct CodeLensDiagnostic {
+    struct DiscoveredTestDiagnostic {
         file: File,
-        item: CodeLensItem,
+        test: DiscoveredTest,
     }
 
-    impl IntoDiagnostic for CodeLensDiagnostic {
+    impl IntoDiagnostic for DiscoveredTestDiagnostic {
         fn into_diagnostic(self) -> Diagnostic {
-            let label = match &self.item.command {
-                CodeLensCommand::RunTest { test } => test.clone(),
+            let kind = match self.test.kind {
+                TestKind::Function => "function",
+                TestKind::Class => "class",
             };
             let mut diagnostic = Diagnostic::new(
-                DiagnosticId::Lint(LintName::of("code-lens")),
+                DiagnosticId::Lint(LintName::of("test-discovery")),
                 Severity::Info,
-                format!("{}: {label}", self.item.title),
+                format!("{kind}: {}", self.test.qualified_name),
             );
             diagnostic.annotate(Annotation::primary(
-                Span::from(self.file).with_range(self.item.range),
+                Span::from(self.file).with_range(self.test.range),
             ));
             diagnostic
         }
     }
 
     impl CursorTest {
-        fn code_lenses(&self) -> String {
-            let items = code_lens(&self.db, self.cursor.file);
-            if items.is_empty() {
-                return "No code lenses found".to_string();
+        fn discovered_tests(&self) -> String {
+            let tests = discover_tests(&self.db, self.cursor.file);
+            if tests.is_empty() {
+                return "No tests found".to_string();
             }
-            let diagnostics: Vec<CodeLensDiagnostic> = items
+            let diagnostics: Vec<DiscoveredTestDiagnostic> = tests
                 .into_iter()
-                .map(|item| CodeLensDiagnostic {
+                .map(|test| DiscoveredTestDiagnostic {
                     file: self.cursor.file,
-                    item,
+                    test,
                 })
                 .collect();
             self.render_diagnostics(diagnostics)
@@ -146,8 +149,8 @@ mod tests {
     }
 
     #[test]
-    fn test_code_lens_function_tests() {
-        let test = code_lens_test(
+    fn discovers_function_tests() {
+        let test = test_discovery_test(
             "test_a.py",
             r#"
 def test_foo():
@@ -161,30 +164,26 @@ def helper():
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
-        info[code-lens]: Run test: test_foo
+        assert_snapshot!(test.discovered_tests(), @"
+        info[test-discovery]: function: test_foo
          --> test_a.py:2:5
           |
         2 | def test_foo():
           |     ^^^^^^^^
-        3 |     pass
           |
 
-        info[code-lens]: Run test: test_bar
+        info[test-discovery]: function: test_bar
          --> test_a.py:5:5
           |
-        3 |     pass
-        4 |
         5 | def test_bar():
           |     ^^^^^^^^
-        6 |     pass
           |
         ");
     }
 
     #[test]
-    fn test_code_lens_test_class() {
-        let test = code_lens_test(
+    fn discovers_test_class() {
+        let test = test_discovery_test(
             "test_a.py",
             r#"
 class TestFoo:
@@ -199,40 +198,33 @@ class TestFoo:
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
-        info[code-lens]: Run tests: TestFoo
+        assert_snapshot!(test.discovered_tests(), @"
+        info[test-discovery]: class: TestFoo
          --> test_a.py:2:7
           |
         2 | class TestFoo:
           |       ^^^^^^^
-        3 |     def test_bar(self):
-        4 |         pass
           |
 
-        info[code-lens]: Run test: TestFoo::test_bar
+        info[test-discovery]: function: TestFoo::test_bar
          --> test_a.py:3:9
           |
-        2 | class TestFoo:
         3 |     def test_bar(self):
           |         ^^^^^^^^
-        4 |         pass
           |
 
-        info[code-lens]: Run test: TestFoo::test_baz
+        info[test-discovery]: function: TestFoo::test_baz
          --> test_a.py:6:9
           |
-        4 |         pass
-        5 |
         6 |     def test_baz(self):
           |         ^^^^^^^^
-        7 |         pass
           |
         ");
     }
 
     #[test]
-    fn test_code_lens_unittest_testcase() {
-        let test = code_lens_test(
+    fn discovers_unittest_testcase() {
+        let test = test_discovery_test(
             "unittest_example.py",
             r#"
 import unittest
@@ -247,32 +239,26 @@ class TestMath(BaseTest):
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
-        info[code-lens]: Run tests: TestMath
-          --> unittest_example.py:8:7
-           |
-         6 |         pass
-         7 |
-         8 | class TestMath(BaseTest):
-           |       ^^^^^^^^
-         9 |     def test_add(self):
-        10 |         self.assertEqual(1 + 1, 2)
-           |
+        assert_snapshot!(test.discovered_tests(), @"
+        info[test-discovery]: class: TestMath
+         --> unittest_example.py:8:7
+          |
+        8 | class TestMath(BaseTest):
+          |       ^^^^^^^^
+          |
 
-        info[code-lens]: Run test: TestMath::test_add
-          --> unittest_example.py:9:9
-           |
-         8 | class TestMath(BaseTest):
-         9 |     def test_add(self):
-           |         ^^^^^^^^
-        10 |         self.assertEqual(1 + 1, 2)
-           |
+        info[test-discovery]: function: TestMath::test_add
+         --> unittest_example.py:9:9
+          |
+        9 |     def test_add(self):
+          |         ^^^^^^^^
+          |
         ");
     }
 
     #[test]
-    fn test_code_lens_skips_non_test_functions() {
-        let test = code_lens_test(
+    fn skips_non_test_functions() {
+        let test = test_discovery_test(
             "test_a.py",
             r#"
 def helper():
@@ -283,12 +269,12 @@ def setup():
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @"No code lenses found");
+        assert_snapshot!(test.discovered_tests(), @"No tests found");
     }
 
     #[test]
-    fn test_code_lens_skips_class_with_init() {
-        let test = code_lens_test(
+    fn skips_class_with_init() {
+        let test = test_discovery_test(
             "test_a.py",
             r#"
 class TestFoo:
@@ -300,12 +286,12 @@ class TestFoo:
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @"No code lenses found");
+        assert_snapshot!(test.discovered_tests(), @"No tests found");
     }
 
     #[test]
-    fn test_code_lens_skips_non_test_class() {
-        let test = code_lens_test(
+    fn skips_non_test_class() {
+        let test = test_discovery_test(
             "test_a.py",
             r#"
 class MyClass:
@@ -314,12 +300,12 @@ class MyClass:
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @"No code lenses found");
+        assert_snapshot!(test.discovered_tests(), @"No tests found");
     }
 
     #[test]
-    fn test_code_lens_async_test_functions() {
-        let test = code_lens_test(
+    fn discovers_async_test_functions() {
+        let test = test_discovery_test(
             "test_a.py",
             r#"
 async def test_async_foo():
@@ -333,31 +319,27 @@ async def helper():
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
-        info[code-lens]: Run test: test_async_foo
+        assert_snapshot!(test.discovered_tests(), @"
+        info[test-discovery]: function: test_async_foo
          --> test_a.py:2:11
           |
         2 | async def test_async_foo():
           |           ^^^^^^^^^^^^^^
-        3 |     pass
           |
 
-        info[code-lens]: Run test: test_async_bar
+        info[test-discovery]: function: test_async_bar
          --> test_a.py:5:11
           |
-        3 |     pass
-        4 |
         5 | async def test_async_bar():
           |           ^^^^^^^^^^^^^^
-        6 |     pass
           |
         ");
     }
 
     // We intentionally do not support nested test classes because this pattern is uncommon.
     #[test]
-    fn test_code_lens_nested_test_class() {
-        let test = code_lens_test(
+    fn nested_test_class() {
+        let test = test_discovery_test(
             "test_a.py",
             r#"
 class TestOuter:
@@ -370,23 +352,19 @@ class TestOuter:
 "#,
         );
 
-        assert_snapshot!(test.code_lenses(), @r"
-        info[code-lens]: Run tests: TestOuter
+        assert_snapshot!(test.discovered_tests(), @"
+        info[test-discovery]: class: TestOuter
          --> test_a.py:2:7
           |
         2 | class TestOuter:
           |       ^^^^^^^^^
-        3 |     def test_outer(self):
-        4 |         pass
           |
 
-        info[code-lens]: Run test: TestOuter::test_outer
+        info[test-discovery]: function: TestOuter::test_outer
          --> test_a.py:3:9
           |
-        2 | class TestOuter:
         3 |     def test_outer(self):
           |         ^^^^^^^^^^
-        4 |         pass
           |
         ");
     }

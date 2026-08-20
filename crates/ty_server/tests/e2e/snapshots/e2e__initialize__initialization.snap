@@ -54,9 +54,6 @@ expression: initialization_result
       ]
     },
     "workspaceSymbolProvider": true,
-    "codeLensProvider": {
-      "resolveProvider": false
-    },
     "renameProvider": {
       "prepareProvider": true
     },
@@ -64,8 +61,7 @@ expression: initialization_result
     "selectionRangeProvider": true,
     "executeCommandProvider": {
       "commands": [
-        "ty.printDebugInformation",
-        "ty.runTest"
+        "ty.printDebugInformation"
       ],
       "workDoneProgress": false
     },
