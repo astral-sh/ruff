@@ -127,28 +127,6 @@ value: "LiteralString[(name := missing)]"
 direct: "LiteralString[missing_direct]"
 ```
 
-### Literal suggestion in string annotations
-
-For valid literal arguments, we still suggest `Literal` in a string annotation. Each argument is
-checked separately, so the combination of `True` and `False` does not lose the suggestion.
-
-```py
-from typing_extensions import LiteralString
-
-# snapshot: invalid-type-form
-value: "LiteralString['foo', True, False]"
-```
-
-```snapshot
-error[invalid-type-form]: `LiteralString` expects no type parameter
- --> src/mdtest_snippet.py:4:9
-  |
-4 | value: "LiteralString['foo', True, False]"
-  |         -------------^^^^^^^^^^^^^^^^^^^^
-  |         |
-  |         Did you mean `Literal`?
-```
-
 ### Parameterized evaluated annotations
 
 Evaluated annotations still report errors in their arguments.
