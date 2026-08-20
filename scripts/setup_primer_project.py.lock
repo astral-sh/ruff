@@ -7,10 +7,10 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "P7D"
 
 [manifest]
+requirements = [{ name = "mypy-primer", git = "https://github.com/hauntsaninja/mypy_primer" }]
 build-constraints = [{ name = "setuptools", specifier = "==84.0.0" }]
-requirements = [{ name = "mypy-primer", git = "https://github.com/hauntsaninja/mypy_primer?rev=db37f8a384c45c02fc52544fd819f979d66e174a" }]
 
 [[package]]
 name = "mypy-primer"
 version = "0.1.0"
-source = { git = "https://github.com/hauntsaninja/mypy_primer?rev=db37f8a384c45c02fc52544fd819f979d66e174a#db37f8a384c45c02fc52544fd819f979d66e174a" }
+source = { git = "https://github.com/hauntsaninja/mypy_primer#3058720299b812c393ad926bcca96eede20fa683" }
