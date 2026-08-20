@@ -716,8 +716,8 @@ class InvalidNonFrozenChild(FrozenParent, frozen=False):
 
 #### Repeated explicit metaclasses
 
-Explicitly supplying the same transformer metaclass as a base class still makes the new class
-neither frozen nor non-frozen. This also applies when the base was created dynamically.
+A class that explicitly repeats its base's dataclass-transform metaclass is neither frozen nor
+non-frozen. The base can be defined by a class statement or created dynamically.
 
 ```py
 from typing import dataclass_transform

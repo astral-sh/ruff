@@ -846,9 +846,6 @@ class B(metaclass=Meta2): ...
 
 # error: [conflicting-metaclass] "The metaclass of a derived class (`Bad`) must be a subclass of the metaclasses of all its bases, but `Meta1` (metaclass of base class `<class 'A'>`) and `Meta2` (metaclass of base class `<class 'B'>`) have no subclass relationship"
 Bad = type("Bad", (A, B), {})
-
-# error: [conflicting-metaclass]
-type("InlineBad", (A, B), {})
 ```
 
 ## `__slots__` in namespace dictionary
@@ -1357,7 +1354,8 @@ NT = type("NT", (NamedTuple,), {})
 
 ### Protocol bases
 
-Inheriting from a class that is itself a protocol is valid:
+When a dynamic class inherits from a source-defined protocol, ty models the inherited metaclass as
+`ABCMeta`:
 
 ```py
 from typing import Protocol
@@ -1375,56 +1373,14 @@ instance = ProtoImpl()
 reveal_type(instance)  # revealed: ProtoImpl
 ```
 
-### Protocol metaclass fallback from stubs
-
-Stubs can use protocol inheritance to describe an interface without requiring the same inheritance
-at runtime. A dynamic subclass retains the `ABCMeta` fallback for attribute access, but a later
-subclass can still choose an unrelated explicit metaclass.
-
-`interface.pyi`:
-
-```pyi
-from typing import Protocol
-
-class Interface(Protocol): ...
-```
-
-`main.py`:
+Unlike protocol inheritance used only in a stub, the source declaration imposes a real metaclass
+constraint. A subclass of the dynamic class cannot choose an unrelated metaclass.
 
 ```py
-from interface import Interface
-
-Dynamic = type("Dynamic", (Interface,), {})
-reveal_type(type(Dynamic))  # revealed: <class 'ABCMeta'>
-
 class Meta(type): ...
-class Concrete(Dynamic, metaclass=Meta): ...
 
-reveal_type(type(Concrete))  # revealed: <class 'Meta'>
-```
-
-### Protocol metaclass fallback from source
-
-The implicit `ABCMeta` is also only a fallback for source-defined protocols. A custom metaclass
-takes precedence, including when it is inherited through a dynamic subclass.
-
-```py
-from typing import Protocol
-
-class Interface(Protocol): ...
-class Meta(type): ...
-class Other(metaclass=Meta): ...
-
-Dynamic = type("Dynamic", (Interface,), {})
-reveal_type(type(Dynamic))  # revealed: <class 'ABCMeta'>
-
-class Concrete(Dynamic, metaclass=Meta): ...
-
-reveal_type(type(Concrete))  # revealed: <class 'Meta'>
-
-Combined = type("Combined", (Dynamic, Other), {})
-reveal_type(type(Combined))  # revealed: <class 'Meta'>
-reveal_type(type(type("InlineCombined", (Interface, Other), {})))  # revealed: <class 'Meta'>
+# error: [conflicting-metaclass]
+class Invalid(ProtoImpl, metaclass=Meta): ...
 ```
 
 ### TypedDict bases

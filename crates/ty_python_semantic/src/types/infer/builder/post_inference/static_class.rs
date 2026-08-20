@@ -1,5 +1,5 @@
 use crate::Db;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
     source::source_text,
@@ -653,6 +653,11 @@ pub(crate) fn check_static_class_definitions<'db>(
                         Type::from(*base2),
                     ];
                     let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                    let base = if let ClassBase::Class(base) = base2 {
+                        Either::Left(base.class_literal(db).display_with(db, settings.clone()))
+                    } else {
+                        Either::Right(base2.display_with(db, env, settings.clone()))
+                    };
                     builder.into_diagnostic(format_args!(
                         "The metaclass of a derived class (`{class}`) \
                             must be a subclass of the metaclasses of all its bases, \
@@ -666,7 +671,6 @@ pub(crate) fn check_static_class_definitions<'db>(
                         metaclass_of_base = metaclass2
                             .class_literal(db)
                             .display_with(db, settings.clone()),
-                        base = base2.class_literal(db).display_with(db, settings),
                     ));
                 }
             }

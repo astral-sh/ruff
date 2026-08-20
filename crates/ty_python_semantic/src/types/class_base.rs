@@ -362,14 +362,22 @@ impl<'db> ClassBase<'db> {
     }
 
     /// Return this base's selected metaclass or inferred protocol fallback.
+    ///
+    /// `subclass` is the class whose declaration names this base. Only a direct `Protocol`
+    /// base depends on whether that declaration is in a stub; named bases retain their own
+    /// metaclass constraints or fallback regardless of where they are inherited.
     pub(super) fn inferred_metaclass(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        subclass: ClassLiteral<'db>,
     ) -> ClassMetaclass<'db> {
         let metaclass = match self {
             Self::Class(class) => return class.inferred_metaclass(db),
-            Self::Protocol => return ClassMetaclass::ProtocolFallback,
+            Self::Protocol if subclass.file(db).is_stub(db) => {
+                return ClassMetaclass::ProtocolFallback;
+            }
+            Self::Protocol => KnownClass::ABCMeta.to_class_literal(db, env),
             Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),

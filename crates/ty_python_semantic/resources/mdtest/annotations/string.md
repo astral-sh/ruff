@@ -134,11 +134,11 @@ if TYPE_CHECKING:
         def f(x: "int" | "None"): ...
 ```
 
-### Protocol metaclass fallback
+### Protocol metaclasses
 
-An inferred `ABCMeta` does not imply that a protocol has a custom `__or__` method. Partially
-stringified unions with protocol classes and their subclasses still fail at runtime before Python
-3.14.
+Modeling a source protocol's metaclass as `ABCMeta` does not imply that it has a custom `__or__`
+method. Partially stringified unions with protocol classes and their subclasses fail at runtime
+before Python 3.14.
 
 ```toml
 [environment]
@@ -157,6 +157,21 @@ def f(
     # error: [unsupported-operator]
     y: "Child" | Child,
 ): ...
+```
+
+A custom metaclass can accept strings in `__or__`. Deriving it from `type(Protocol)` also makes it
+compatible with the protocol's runtime metaclass.
+
+```py
+from typing import Any
+
+class Meta(type(Protocol)):
+    def __or__(cls, other: str) -> Any:
+        return other
+
+class Custom(P, metaclass=Meta): ...
+
+def g(x: Custom | "Custom"): ...
 ```
 
 ### Python less than 3.14 in a stub file

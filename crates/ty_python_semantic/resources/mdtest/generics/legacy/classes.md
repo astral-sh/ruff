@@ -168,6 +168,29 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Class-preserving decorators
+
+A decorator that returns its class argument preserves the generic context of a base class. A
+subclass can forward type variables to the decorated base.
+
+```py
+import collections.abc
+from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+@collections.abc.Mapping.register
+class Mapping(Generic[K, V]): ...
+
+reveal_type(generic_context(Mapping))  # revealed: ty_extensions._internal.GenericContext[K@Mapping, V@Mapping]
+
+class FrozenDict(Mapping[K, V]): ...
+
+mapping: FrozenDict[str, int]
+```
+
 ## Specializing classes with unavailable generic context
 
 When an earlier error prevents ty from determining a class's generic context, specializing the class
@@ -197,25 +220,26 @@ parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` ca
 
 ### Decorated generic bases
 
-A decorator that returns its class argument preserves the generic context of a base class. A
-subclass can forward type variables to the decorated base.
+An unresolved decorator obscures the generic context of a base class. Specializing a subclass that
+forwards a type variable to that base currently produces a cascading error.
 
 ```py
-import collections.abc
 from typing import Generic, TypeVar
 from ty_extensions._internal import generic_context
 
-K = TypeVar("K")
-V = TypeVar("V")
+T = TypeVar("T")
 
-@collections.abc.Mapping.register
-class Mapping(Generic[K, V]): ...
+# error: [unresolved-reference] "Name `unknown_decorator` used when not defined"
+@unknown_decorator
+class Base(Generic[T]): ...
 
-reveal_type(generic_context(Mapping))  # revealed: ty_extensions._internal.GenericContext[K@Mapping, V@Mapping]
+reveal_type(generic_context(Base))  # revealed: None
 
-class FrozenDict(Mapping[K, V]): ...
+class Child(Base[T]): ...
 
-mapping: FrozenDict[str, int]
+# TODO: Avoid this cascading error when the base's generic context is unavailable.
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
+child: Child[int]
 ```
 
 ### Unresolved generic bases

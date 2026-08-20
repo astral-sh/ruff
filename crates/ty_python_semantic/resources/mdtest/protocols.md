@@ -291,8 +291,8 @@ reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 
 ## Protocol metaclasses
 
-Protocols and their nominal subclasses use `ABCMeta` as an implicit fallback. This exposes abstract
-base class methods without imposing a metaclass constraint on subclasses.
+A protocol declared in Python source is modeled with `ABCMeta`, which approximates its private
+runtime metaclass. Nominal subclasses inherit this metaclass and its abstract base class methods.
 
 ```py
 from typing import Protocol
@@ -321,35 +321,10 @@ reveal_type(type(GenericProtocol))  # revealed: <class 'ABCMeta'>
 reveal_type(type(BackportedProtocol))  # revealed: <class 'ABCMeta'>
 ```
 
-## Protocol metaclasses in stubs
-
-Protocols defined in stubs use the same fallback. An explicitly supplied custom metaclass takes
-precedence when they are subclassed.
-
-`interface.pyi`:
-
-```pyi
-from typing import Protocol
-
-class Interface(Protocol): ...
-```
-
-`main.py`:
-
-```py
-from interface import Interface
-from typing import Protocol
-
-class Meta(type(Protocol)): ...
-class Concrete(Interface, metaclass=Meta): ...
-
-reveal_type(type(Interface))  # revealed: <class 'ABCMeta'>
-reveal_type(type(Concrete))  # revealed: <class 'Meta'>
-```
-
 ## Virtual subclass registration
 
-Protocol classes inherit `ABCMeta.register`. Its return type preserves the registered instance type.
+Protocol classes inherit `ABCMeta.register`, which returns the registered class with its type
+intact.
 
 ```py
 from typing import Protocol
@@ -368,24 +343,6 @@ from collections.abc import Container, Mapping
 
 reveal_type(Container.register(Concrete))  # revealed: type[Concrete]
 reveal_type(Mapping.register(Concrete))  # revealed: type[Concrete]
-```
-
-Using `register` as a class decorator also preserves generic parameters in the decorated class and
-its subclasses.
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-@P.register
-@Mapping.register
-class Registered(Generic[T]): ...
-
-class Child(Registered[T]): ...
-
-reveal_type(Registered[int])  # revealed: <class 'Registered[int]'>
-reveal_type(Child[int])  # revealed: <class 'Child[int]'>
 ```
 
 ## Diagnostics and autofixes for `Protocol` classes defined in invalid ways

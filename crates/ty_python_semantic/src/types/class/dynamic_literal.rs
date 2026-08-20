@@ -261,12 +261,12 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        self.try_metaclass(db)
-            .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
+        let env = ProgramEnvironment::from_scope(self.scope(db));
+        self.inferred_metaclass(db).to_type(db, &env)
     }
 
     pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
-        self.try_infer_metaclass(db)
+        self.try_metaclass(db)
             .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
     }
 
@@ -276,16 +276,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// (i.e., two base classes have metaclasses that are not in a subclass relationship).
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
-    pub(crate) fn try_metaclass(
-        self,
-        db: &'db dyn Db,
-    ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
-        self.try_infer_metaclass(db)
-            .map(|metaclass| metaclass.to_type(db, &env))
-    }
-
-    fn try_infer_metaclass(
+    pub(in crate::types) fn try_metaclass(
         self,
         db: &'db dyn Db,
     ) -> Result<ClassMetaclass<'db>, DynamicMetaclassConflict<'db>> {
@@ -315,11 +306,13 @@ impl<'db> DynamicClassLiteral<'db> {
         let mut bases = original_bases
             .iter()
             .filter_map(|base_type| ClassBase::try_from_type(db, &env, *base_type, None))
-            .filter_map(|base| match base.inferred_metaclass(db, &env) {
-                ClassMetaclass::Selected(metaclass) => Some((base, metaclass)),
-                ClassMetaclass::ProtocolFallback => {
-                    has_protocol_fallback = true;
-                    None
+            .filter_map(|base| {
+                match base.inferred_metaclass(db, &env, ClassLiteral::Dynamic(self)) {
+                    ClassMetaclass::Selected(metaclass) => Some((base, metaclass)),
+                    ClassMetaclass::ProtocolFallback => {
+                        has_protocol_fallback = true;
+                        None
+                    }
                 }
             });
 

@@ -314,8 +314,8 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        // This kind of looks like a no-op, but it's not. For `type[C]` where `C` has metaclass
-        // `M`, `to_meta_type` transforms `type[C]` to `type[M]`, and then `to_instance` makes it
+        // This kind of looks like a no-op, but it's not. For `type[C]` where `C` has guaranteed
+        // metaclass `M`, `to_meta_type` transforms `type[C]` to `type[M]`, and then `to_instance` makes it
         // just `M`. And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
@@ -326,7 +326,8 @@ impl<'db> SubclassOfType<'db> {
 
     /// Compute the metatype of this `type[T]`.
     ///
-    /// For `type[C]` where `C` is a concrete class, this returns `type[metaclass(C)]`.
+    /// For a concrete class `C`, this uses its guaranteed metaclass, excluding the lookup-only
+    /// protocol fallback.
     /// For `type[T]` where `T` is a `TypeVar`, this computes the metatype based on the
     /// `TypeVar`'s bounds or constraints.
     pub(crate) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {

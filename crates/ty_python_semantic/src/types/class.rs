@@ -1543,24 +1543,17 @@ impl<'db> ClassType<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Self::NonGeneric(class) => class.metaclass(db),
-            Self::Generic(generic) => generic
-                .origin(db)
-                .metaclass(db)
-                .apply_optional_specialization(db, Some(generic.specialization(db))),
-        }
+        let env = ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
+        self.inferred_metaclass(db).to_type(db, &env)
     }
 
     pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
-        match self {
-            Self::NonGeneric(class) => class.inferred_metaclass(db),
-            Self::Generic(generic) => match generic.origin(db).inferred_metaclass(db) {
-                ClassMetaclass::Selected(metaclass) => ClassMetaclass::Selected(
-                    metaclass.apply_optional_specialization(db, Some(generic.specialization(db))),
-                ),
-                ClassMetaclass::ProtocolFallback => ClassMetaclass::ProtocolFallback,
-            },
+        let (class, specialization) = self.class_literal_and_specialization(db);
+        match class.inferred_metaclass(db) {
+            ClassMetaclass::Selected(metaclass) => ClassMetaclass::Selected(
+                metaclass.apply_optional_specialization(db, specialization),
+            ),
+            ClassMetaclass::ProtocolFallback => ClassMetaclass::ProtocolFallback,
         }
     }
 
@@ -3358,16 +3351,20 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
-/// A selected metaclass, or the `ABCMeta` fallback inferred from a protocol base.
+/// A selected metaclass, or the `ABCMeta` fallback inferred from a stub-only protocol base.
 ///
-/// Typeshed sometimes uses protocol inheritance to describe an interface that a runtime class
-/// implements without actually inheriting from it. Source code also uses `ABCMeta` as a
-/// type-checking stand-in for the private metaclass of `typing.Protocol`. Following mypy, the
-/// fallback exposes ABC methods such as `register`, but does not participate in metaclass
-/// selection or conflict with an explicitly declared metaclass.
+/// Stub files can list `Protocol` as a base even when the runtime class does not inherit from it;
+/// typeshed does this for collection ABCs. Inferring a metaclass constraint from those bases would
+/// therefore produce false conflicts. The fallback exposes ABC methods such as `register`, but
+/// does not participate in metaclass selection.
+///
+/// A `Protocol` base declared in source instead imposes an `ABCMeta` constraint. We use `ABCMeta`
+/// rather than the private `_ProtocolMeta` because libraries such as beartype use `ABCMeta` as a
+/// type-checking stand-in for `type(Protocol)`, while inheriting the real metaclass at runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum ClassMetaclass<'db> {
     Selected(Type<'db>),
+    /// A lookup-only fallback originating in a stub. Inheritance preserves this provenance.
     ProtocolFallback,
 }
 
@@ -3395,7 +3392,7 @@ impl<'db> ClassMetaclass<'db> {
         }
     }
 
-    /// Return the metaclass guaranteed by explicit declarations, without the protocol fallback.
+    /// Return the metaclass guaranteed by class declarations, without the stub-only fallback.
     pub(super) fn for_inheritance(
         self,
         db: &'db dyn Db,
@@ -3431,7 +3428,7 @@ pub(super) enum MetaclassErrorKind<'db> {
         candidate: MetaclassCandidate<'db>,
         /// The incompatible metaclass of `base`.
         base_metaclass: ClassType<'db>,
-        base: ClassType<'db>,
+        base: ClassBase<'db>,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,
