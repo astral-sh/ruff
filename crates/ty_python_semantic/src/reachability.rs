@@ -865,13 +865,10 @@ pub(crate) fn narrow_type_by_constraint<'db>(
 
     // Reachability gates can mention predicates that do not narrow this place. Evaluating those
     // predicates cannot change its type and can introduce cycles through unrelated expressions.
-    // Scope-wide control-flow gates are an exception: a call returning `Never` can eliminate a
-    // binding even when no ordinary predicate narrows its place.
+    // Terminal calls are also recorded as reachability constraints, so bindings eliminated by
+    // those calls are handled by reachability analysis even when no predicate narrows this place.
     let predicate_narrowing_targets = evaluator.predicate_narrowing_targets();
-    let has_place_specific_narrowing = predicate_narrowing_targets.contains_place(place);
-    if !has_place_specific_narrowing
-        && !predicate_narrowing_targets.contains_scope_wide_control_flow(place)
-    {
+    if !predicate_narrowing_targets.contains_place(place) {
         return base_ty;
     }
 
