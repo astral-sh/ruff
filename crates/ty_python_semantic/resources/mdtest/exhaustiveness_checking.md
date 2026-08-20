@@ -608,6 +608,50 @@ def no_invalid_return_diagnostic_here_either[T](x: A[T]) -> ASub[T]:
         return x
 ```
 
+## Class patterns with variadic generics
+
+A class pattern matches every specialization of its variadic generic class, including a symbolic
+type variable tuple.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Variadic(Generic[*Ts]): ...
+
+def symbolic(value: Variadic[*Ts]) -> int:
+    match value:
+        case Variadic():
+            reveal_type(value)  # revealed: Variadic[*tuple[*Ts@symbolic]]
+            return 1
+```
+
+The same pattern is exhaustive when the type variable tuple has an empty specialization.
+
+```py
+def empty(value: Variadic[()]) -> int:
+    match value:
+        case Variadic():
+            reveal_type(value)  # revealed: Variadic[()]
+            return 1
+```
+
+A nonempty specialization must also remain reachable and exhaustive.
+
+```py
+def nonempty(value: Variadic[int]) -> int:
+    match value:
+        case Variadic():
+            reveal_type(value)  # revealed: Variadic[int]
+            return 1
+```
+
 ## More `match` pattern types
 
 ### `as` patterns

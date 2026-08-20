@@ -2099,6 +2099,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
+        // `tuple[Any, ...]` can materialize to a builtin tuple type of any length. Its current
+        // element-wise bottom, `tuple[Never, ...]`, is not a subtype of every fixed-length
+        // tuple, so the endpoint comparisons below cannot establish that, for example,
+        // `Box[tuple[int]] <: Top[Box[tuple[Any, ...]]]` for an invariant `Box`.
+        // Handle this unrestricted materialization family directly. Tuple subclasses do not
+        // qualify: `Box[MyTuple]` is not a materialization of `Box[tuple[Any, ...]]`.
+        // TODO: Compare gradual tuple-length materialization families generally, including
+        // required prefixes and suffixes, without changing the static shape of `tuple[Never, ...]`.
+        if let (Some(source_tuple), Some(target_tuple)) = (
+            source_type.exact_tuple_instance_spec(db),
+            target_type.exact_tuple_instance_spec(db),
+        ) {
+            let is_unrestricted = |tuple: &TupleSpec<'db>| {
+                matches!(tuple, TupleSpec::Variable(tuple)
+                    if tuple.prefix_elements().is_empty()
+                        && tuple.suffix_elements().is_empty()
+                        && matches!(tuple.variable(), VariableSegment::Homogeneous(Type::Dynamic(_))))
+            };
+            // Top preserves family inclusion, Bottom reverses it, and Bottom-to-Top needs
+            // only an overlap, so either unrestricted family is enough in that case.
+            if (target_materialization == MaterializationKind::Top
+                && is_unrestricted(&target_tuple))
+                || (source_materialization == MaterializationKind::Bottom
+                    && is_unrestricted(&source_tuple))
+            {
+                return self.always();
+            }
+        }
+
         let source_top =
             source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
         let source_bottom = source_type.materialize(
