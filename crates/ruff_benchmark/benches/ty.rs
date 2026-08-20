@@ -863,10 +863,10 @@ fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
     });
 }
 
-/// Regression benchmarks for ty#4269: constructor inference and invalid recursive protocols.
+/// Regression benchmarks for ty#4269: recursive protocol inference and assignment diagnostics.
 ///
-/// Without the constrained-receiver shortcut, each inherited method repeatedly expands the
-/// protocol while inferring the concrete class's specialization or collecting diagnostics.
+/// Explicit receiver annotations can repeatedly expand inherited recursive protocol members
+/// during constructor inference or diagnostic collection.
 fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
     const NUM_METHODS: usize = 8;
 
@@ -891,12 +891,8 @@ class Chain[T](Protocol):
         .ok();
     }
 
-    code.push_str(
-        "\n\
-class Concrete[T](Chain[T]):
-    def __init__(self, values: Iterable[T]) -> None: ...
-",
-    );
+    code.push_str("\nclass Concrete[T](Chain[T]):\n");
+    code.push_str("    def __init__(self, values: Iterable[T]) -> None: ...\n");
 
     for (name, scenario, expected_diagnostics) in [
         (
@@ -914,11 +910,7 @@ class Concrete[T](Chain[T]):
         criterion.bench_function(name, |b| {
             b.iter_batched_ref(
                 || setup_micro_case(&code),
-                |case| {
-                    let Case { db } = case;
-                    let result = db.check();
-                    assert_eq!(result.len(), expected_diagnostics);
-                },
+                |case| assert_eq!(case.db.check().len(), expected_diagnostics),
                 BatchSize::SmallInput,
             );
         });

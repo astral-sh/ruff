@@ -6699,12 +6699,12 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from typing import Protocol
 
 class Chain[T](Protocol):
     def value(self) -> T: ...
-    def map_pairs[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ...
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]: ...
 
 class Concrete[T](Chain[T]):
     def __init__(self, values: Iterable[T]) -> None: ...
@@ -6740,13 +6740,9 @@ class Chain[T](Protocol):
 
 class Concrete[T](Chain[T]): ...
 
-def specialized(value: Concrete[int]) -> None:
-    reveal_type(value.accumulate())  # revealed: Chain[int]
-
-def symbolic[T](value: Concrete[T]) -> None:
-    reveal_type(value.accumulate())  # revealed: Chain[T@symbolic]
-
-def unspecialized() -> None:
+def check[T](concrete: Concrete[int], symbolic: Concrete[T]) -> None:
+    reveal_type(concrete.accumulate())  # revealed: Chain[int]
+    reveal_type(symbolic.accumulate())  # revealed: Chain[T@check]
     reveal_type(Concrete().accumulate())  # revealed: Chain[Unknown]
 ```
 
@@ -6767,20 +6763,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol
 
-class RecursivePair[A, B](Protocol):
+class Recursive[A, B](Protocol):
     first: A
-    def value(self, child: RecursivePair[Any, Any]) -> B: ...
+    def value(self, child: Recursive[Any, Any]) -> B: ...
 
-class PartiallyErased[T, U](RecursivePair[T, Any]):
-    def value(self, child: RecursivePair[Any, Any]) -> U:
+class Erased[T, U](Recursive[T, Any]):
+    def value(self, child: Recursive[Any, Any]) -> U:
         raise NotImplementedError
 
-    def __init__(self, first: T, callback: Callable[[U], object]) -> None: ...
+    def __init__(self, callback: Callable[[U], object]) -> None: ...
 
-contextual: RecursivePair[int, str] = PartiallyErased(
-    1,
-    lambda value: reveal_type(value),  # revealed: str
-)
+pair: Recursive[int, str] = Erased(lambda value: reveal_type(value))  # revealed: str
 ```
 
 ### Overridden recursive protocol requirements

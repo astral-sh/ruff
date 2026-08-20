@@ -687,16 +687,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let env = self.env;
-        let Type::NominalInstance(source) = ty else {
-            return None;
-        };
-        let ClassType::Generic(source_alias) = source.class(db, env) else {
-            return None;
-        };
+        let source = ty.as_nominal_instance()?;
+        let source_class = source.class(db, env);
+        let source_alias = source_class.into_generic_alias()?;
 
         let source_arguments = source_alias.specialization(db).types(db);
         if !source_arguments.iter().all(|argument| match argument {
-            Type::TypeVar(typevar) => nominally_satisfied.mentions_typevar(db, *typevar),
+            Type::TypeVar(typevar) => nominally_satisfied.mentions_typevar(typevar.identity(db)),
             argument => !any_over_type_expanding_aliases(db, env, *argument, Type::is_type_var),
         }) {
             return None;
@@ -705,14 +702,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let interface = protocol.interface(db);
 
         // A concrete source normally contributes useful structural inference beyond its nominal
-        // specialization; for example, `()` must infer `Iterable[Never]`. Recursive receiver
+        // specialization; for example, `()` infers `Iterable[Never]`. Recursive receiver
         // binding is the exception: same-origin protocol sources and protocols with explicitly
         // constrained receivers can otherwise repeatedly expand the same interface.
         if !source_arguments
             .iter()
-            .any(|argument| matches!(argument, Type::TypeVar(_)))
+            .any(|argument| argument.is_type_var())
             && !protocol.class_origin(db).is_some_and(|target_origin| {
-                source.class(db, env).class_literal(db) == target_origin.class_literal(db)
+                source_class.class_literal(db) == target_origin.class_literal(db)
             })
             && !interface
                 .members(db)

@@ -1881,20 +1881,19 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
     }
 
-    /// Returns whether an instance method explicitly constrains its receiver.
+    /// Returns whether an instance method has an explicit positional receiver annotation.
     pub(super) fn has_explicit_receiver_annotation(&self, db: &'db dyn Db) -> bool {
-        let ProtocolMemberKind::Method(member, ProtocolMethodKind::Instance) = self.data.kind
-        else {
-            return false;
-        };
-        let Type::Callable(callable) = member.ty() else {
-            return false;
-        };
-
-        callable
-            .signatures(db)
-            .iter()
-            .any(Signature::has_explicit_positional_receiver_annotation)
+        match self.data.kind {
+            ProtocolMemberKind::Method(member, ProtocolMethodKind::Instance)
+                if let Type::Callable(callable) = member.ty() =>
+            {
+                callable
+                    .signatures(db)
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+            }
+            _ => false,
+        }
     }
 
     /// Returns the priority for structurally comparing this member.

@@ -518,18 +518,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node == ALWAYS_TRUE
     }
 
-    /// Returns whether this constraint set mentions this exact bound type-variable occurrence.
-    pub(super) fn mentions_typevar(
-        self,
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
+    /// Returns whether this constraint set mentions the given type-variable identity.
+    pub(super) fn mentions_typevar(self, typevar: BoundTypeVarIdentity<'db>) -> bool {
         let storage = self.builder.storage.borrow();
-        storage.node_support(self.node).is_some_and(|support| {
-            support
-                .iter()
-                .any(|id| storage.typevar_data(id) == typevar.identity(db))
-        })
+        storage
+            .node_support(self.node)
+            .is_some_and(|support| support.iter().any(|id| storage.typevar_data(id) == typevar))
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -7224,9 +7218,9 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let constraint =
             ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, actual_bound);
-        assert!(constraint.mentions_typevar(db, t));
-        assert!(constraint.mentions_typevar(db, u));
-        assert!(!constraint.mentions_typevar(db, metadata));
+        assert!(constraint.mentions_typevar(t.identity(db)));
+        assert!(constraint.mentions_typevar(u.identity(db)));
+        assert!(!constraint.mentions_typevar(metadata.identity(db)));
     }
 
     #[test]
