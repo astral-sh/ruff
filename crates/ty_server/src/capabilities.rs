@@ -39,7 +39,6 @@ bitflags::bitflags! {
         const IMPLEMENTATION_LINK_SUPPORT = 1 << 21;
         const TRIGGER_SIGNATURE_HELP_COMMAND = 1 << 22;
         const SEMANTIC_TOKENS_REFRESH = 1 << 23;
-        const RUN_TESTS = 1 << 24;
     }
 }
 
@@ -60,7 +59,7 @@ pub(crate) enum SupportedCommand {
 
 impl SupportedCommand {
     /// Returns the identifier of the command.
-    pub(crate) const fn identifier(self) -> &'static str {
+    const fn identifier(self) -> &'static str {
         match self {
             SupportedCommand::Debug => "ty.printDebugInformation",
         }
@@ -214,12 +213,6 @@ impl ResolvedClientCapabilities {
         self.contains(Self::TRIGGER_SIGNATURE_HELP_COMMAND)
     }
 
-    /// Returns `true` if the client can run tests, i.e. it executes the `ty.runTest`
-    /// command attached to test code lenses itself.
-    pub(crate) const fn supports_run_tests(self) -> bool {
-        self.contains(Self::RUN_TESTS)
-    }
-
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
@@ -309,16 +302,6 @@ impl ResolvedClientCapabilities {
             })
         {
             flags |= Self::TRIGGER_SIGNATURE_HELP_COMMAND;
-        }
-
-        if client_capabilities
-            .experimental
-            .as_ref()
-            .and_then(|experimental| experimental.get("runTests"))
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or_default()
-        {
-            flags |= Self::RUN_TESTS;
         }
 
         if text_document
@@ -540,13 +523,6 @@ pub(crate) fn server_capabilities(
         }),
         selection_range_provider: Some(true.into()),
         folding_range_provider: Some(true.into()),
-        // TODO: Not sure if this flag is enough or change it
-        code_lens_provider: resolved_client_capabilities.supports_run_tests().then(|| {
-            types::CodeLensOptions {
-                resolve_provider: Some(false),
-                ..Default::default()
-            }
-        }),
         document_symbol_provider: Some(true.into()),
         workspace_symbol_provider: Some(true.into()),
         notebook_document_sync: Some(

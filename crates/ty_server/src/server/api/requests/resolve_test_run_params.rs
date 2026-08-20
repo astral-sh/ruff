@@ -1,19 +1,17 @@
-use std::borrow::Cow;
-
-use lsp_types::{LspRequestMethod, MessageDirection, Request, TextDocumentIdentifier, Uri};
+use lsp_types::{LspRequestMethod, MessageDirection, Request};
+use ruff_db::system::SystemPath;
 use serde::{Deserialize, Serialize};
-use ty_ide::discover_tests;
-use ty_project::{Db as _, ProjectDatabase};
-use ty_python_core::program::Program;
+use ty_project::Db as _;
 
+use super::discover_tests::project_includes_path;
 use crate::server::api::traits::{
-    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+    BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
-use crate::session::DocumentSnapshot;
+use crate::session::SessionSnapshot;
 use crate::session::client::Client;
 
 /// Custom `ty/resolveTestRunParams` request that resolves how to run a test that was
-/// previously discovered through `ty/discoverTests` or a test code lens.
+/// previously discovered through `ty/discoverTests`.
 ///
 /// The server never runs tests itself; it only describes the command so the client can
 /// execute it with its own process management, cancellation, and output handling.
@@ -29,10 +27,7 @@ impl Request for ResolveTestRunParamsRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResolveTestRunParamsParams {
-    /// The document the test was discovered in.
-    pub(crate) text_document: TextDocumentIdentifier,
-    /// The id of the test, as returned by `ty/discoverTests` or attached to a test code
-    /// lens, e.g. `tests/test_foo.py::TestFoo::test_bar`.
+    /// The id of the test, file, or directory to resolve, as returned by `ty/discoverTests`.
     pub(crate) test_id: String,
 }
 
@@ -43,9 +38,6 @@ pub(crate) struct TestRunParams {
     /// The directory the test should be run from (the project root).
     pub(crate) working_directory: String,
     /// The Python interpreter that ty discovered for the project, if any.
-    ///
-    /// Clients that do their own interpreter discovery can ignore this and only use
-    /// `arguments`.
     pub(crate) program: Option<String>,
     /// The arguments to pass to a Python interpreter to run the test with pytest.
     pub(crate) arguments: Vec<String>,
@@ -57,47 +49,44 @@ impl RequestHandler for ResolveTestRunParamsRequestHandler {
     type RequestType = ResolveTestRunParamsRequest;
 }
 
-impl BackgroundDocumentRequestHandler for ResolveTestRunParamsRequestHandler {
-    fn document_uri(params: &ResolveTestRunParamsParams) -> Cow<'_, Uri> {
-        Cow::Borrowed(&params.text_document.uri)
-    }
-
-    fn run_with_snapshot(
-        db: &ProjectDatabase,
-        snapshot: &DocumentSnapshot,
+impl BackgroundRequestHandler for ResolveTestRunParamsRequestHandler {
+    fn run(
+        snapshot: &SessionSnapshot,
         _client: &Client,
         params: ResolveTestRunParamsParams,
     ) -> crate::server::Result<Option<TestRunParams>> {
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        tracing::debug!("Resolving test run params for `{}`", params.test_id);
+
+        let path = params
+            .test_id
+            .split_once("::")
+            .map_or(params.test_id.as_str(), |(path, _)| path);
+
+        let Some(db) = snapshot
+            .projects()
+            .iter()
+            .find(|db| project_includes_path(db, SystemPath::new(path)))
+        else {
+            tracing::debug!("No open project includes `{path}`; returning null");
             return Ok(None);
         };
 
-        let Some(file_path) = super::discover_tests::test_file_path(db, file) else {
-            return Ok(None);
-        };
-
-        // Only resolve tests that discovery actually reports for this document. A `null`
-        // response tells the client that its test id is unknown or stale (for example
-        // because the document was edited) and that it should discover the tests again.
-        let known_test = discover_tests(db, file).into_iter().any(|test| {
-            super::discover_tests::test_id(&file_path, &test.qualified_name) == params.test_id
-        });
-
-        if !known_test {
-            tracing::debug!(
-                "Cannot resolve run params for unknown test `{}`",
-                params.test_id
-            );
-            return Ok(None);
-        }
-
-        let program = Program::get(db)
+        let program = db
+            .project()
+            .program(db)
             .python_executable(db)
             .as_deref()
             .map(ToString::to_string);
 
+        let working_directory = db.project().root(db).to_string();
+
+        tracing::debug!(
+            "Resolved `{}` to run from `{working_directory}` with interpreter {program:?}",
+            params.test_id
+        );
+
         Ok(Some(TestRunParams {
-            working_directory: db.project().root(db).to_string(),
+            working_directory,
             program,
             arguments: vec!["-m".to_string(), "pytest".to_string(), params.test_id],
         }))

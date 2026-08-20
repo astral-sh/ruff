@@ -30,7 +30,6 @@
 mod call_hierarchy;
 mod closed_documents;
 mod code_actions;
-mod code_lens;
 mod commands;
 mod completions;
 mod configuration;
@@ -46,6 +45,7 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod resolve_test_run_params;
 mod script_preparation;
 mod semantic_tokens;
 mod signature_help;
@@ -1597,15 +1597,6 @@ impl TestServerBuilder {
             .implementation
             .get_or_insert_default()
             .link_support = Some(enabled);
-        self
-    }
-
-    /// Advertise that the client can run tests by executing the `ty.runTest` command
-    /// attached to test code lenses.
-    pub(crate) fn with_run_tests_support(mut self) -> Self {
-        self.client_capabilities
-            .experimental
-            .get_or_insert_with(|| serde_json::json!({}))["runTests"] = serde_json::json!(true);
         self
     }
 
