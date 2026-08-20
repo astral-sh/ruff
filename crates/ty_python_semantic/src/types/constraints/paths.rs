@@ -1362,15 +1362,30 @@ mod tests {
             };
             let mut walker = SolutionWalker::new(source_orders.clone());
             assert_eq!(
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits),
+                walker.visit_node(
+                    db,
+                    &env,
+                    &mut storage,
+                    &mut limits,
+                    &mut path,
+                    None,
+                    set.node
+                ),
                 ControlFlow::Break(error)
             );
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
             let mut walker = SolutionWalker::new(source_orders.clone());
-            let ControlFlow::Continue(()) =
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits);
+            let ControlFlow::Continue(()) = walker.visit_node(
+                db,
+                &env,
+                &mut storage,
+                &mut limits,
+                &mut path,
+                None,
+                set.node,
+            );
             assert_eq!(walker.finish(db, &env, &mut storage), expected);
         }
     }
