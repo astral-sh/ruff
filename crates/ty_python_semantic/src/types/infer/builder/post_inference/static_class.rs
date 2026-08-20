@@ -1251,7 +1251,6 @@ fn check_class_namespace_against_metaclass_members<'db>(
                     report_invalid_attribute_assignment(
                         context,
                         definition_kind.target_range(context.module()),
-                        None,
                         metaclass_member_ty,
                         assigned_ty,
                         name.as_str(),
@@ -1292,7 +1291,6 @@ fn check_class_namespace_against_metaclass_members<'db>(
             report_invalid_attribute_assignment(
                 context,
                 definition_kind.target_range(context.module()),
-                None,
                 class_declared_ty,
                 metaclass_member_ty,
                 name.as_str(),

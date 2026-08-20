@@ -619,10 +619,6 @@ def assign_attribute(owner: Owner, value: second.Model) -> None:
 def assign_union_attribute(owner: first.Model | Other, value: second.Model) -> None:
     # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` on type `first.Model | Other`"
     owner.item = value
-
-def assign_unpacked_attribute(owner: Owner, value: second.Model) -> None:
-    # error: [invalid-assignment] "Object of type `second.Model` is not assignable to attribute `item` of type `first.Model`"
-    owner.item, other = (value, 1)
 ```
 
 ## Subscript assignments
@@ -653,82 +649,6 @@ def assign_value(values: list[first.Model], value: second.Model) -> None:
 def assign_key(values: dict[first.Model, int], key: second.Model) -> None:
     # error: [invalid-assignment] "Invalid subscript assignment with key of type `second.Model` and value of type `Literal[1]` on object of type `dict[first.Model, int]`"
     values[key] = 1
-```
-
-## Unpacked dictionary assignments
-
-An unpacked dictionary assignment distinguishes same-named expected and actual value types in both
-its primary annotation and concise message.
-
-`first.py`:
-
-```py
-class Model: ...
-```
-
-`second.py`:
-
-```py
-class Model: ...
-```
-
-```py
-import first
-import second
-
-values: dict[str, first.Model] = {}
-values["key"], other = (second.Model(), 1)  # snapshot: invalid-assignment
-
-# error: [invalid-assignment] "Expected value of type `first.Model`, got `second.Model`"
-values["another"], other = (second.Model(), 1)
-```
-
-```snapshot
-error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["key"]` and value of type `second.Model` on object of type `dict[str, first.Model]`
- --> src/mdtest_snippet.py:5:25
-  |
-5 | values["key"], other = (second.Model(), 1)  # snapshot: invalid-assignment
-  | -------------           ^^^^^^^^^^^^^^ Expected value of type `first.Model`, got `second.Model`
-  | |
-  | Assigned to this target
-```
-
-## Unpacked list assignments
-
-An unpacked list assignment also distinguishes same-named expected and actual element types in its
-primary annotation and concise message.
-
-`first.py`:
-
-```py
-class Model: ...
-```
-
-`second.py`:
-
-```py
-class Model: ...
-```
-
-```py
-import first
-import second
-
-values: list[first.Model] = []
-values[0], other = (second.Model(), 1)  # snapshot: invalid-assignment
-
-# error: [invalid-assignment] "Expected value of type `first.Model`, got `second.Model`"
-values[1], other = (second.Model(), 1)
-```
-
-```snapshot
-error[invalid-assignment]: Invalid subscript assignment with key of type `Literal[0]` and value of type `second.Model` on object of type `list[first.Model]`
- --> src/mdtest_snippet.py:5:21
-  |
-5 | values[0], other = (second.Model(), 1)  # snapshot: invalid-assignment
-  | ---------           ^^^^^^^^^^^^^^ Expected value of type `first.Model`, got `second.Model`
-  | |
-  | Assigned to this target
 ```
 
 ## Type assertions

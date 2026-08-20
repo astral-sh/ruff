@@ -455,40 +455,6 @@ error[invalid-assignment]: Object of type `dict[str, str]` is not assignable to 
   | Assigned to this variable
 ```
 
-## Unpacked assignments to nested `TypedDict` fields
-
-A dictionary literal assigned to a nested `TypedDict` field through unpacking must also be checked
-against the field's declared type.
-
-```py
-from typing import TypedDict
-
-class Payload(TypedDict):
-    value: int
-
-class Outer(TypedDict):
-    payload: Payload
-
-outer: Outer = {"payload": {"value": 0}}
-outer["payload"], other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
-```
-
-```snapshot
-error[invalid-assignment]: Invalid assignment to key "payload" with declared type `Payload` on TypedDict `Outer`
-  --> src/mdtest_snippet.py:10:28
-   |
-10 | outer["payload"], other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
-   | ----- ---------            ^^^^^^^^^^^^^^^^^^ value of type `dict[str, str]`
-   | |     |
-   | |     key has declared type `Payload`
-   | TypedDict `Outer`
-info: Item declaration
- --> src/mdtest_snippet.py:7:5
-  |
-7 |     payload: Payload
-  |     ---------------- Item declared here
-```
-
 ## Nested `TypedDict`
 
 Nested `TypedDict` fields are also supported.

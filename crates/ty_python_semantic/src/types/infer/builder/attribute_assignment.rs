@@ -317,11 +317,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         if !assignable && emit_diagnostics {
             report_invalid_attribute_assignment(
                 &self.builder.context,
-                self.target,
-                self.builder
-                    .context
-                    .is_unpacked_assignment_target(self.target)
-                    .then_some(self.value),
+                self.target.range(),
                 target_ty,
                 value_ty,
                 self.attribute,
@@ -934,16 +930,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         ),
                         info: "This assignment implicitly calls a custom `__setattr__` method",
                         argument_ranges: &[self.target.range(), self.value.range()],
-                        secondary_annotation: self
-                            .builder
-                            .context
-                            .is_unpacked_assignment_target(self.target)
-                            .then(|| {
-                                self.builder
-                                    .context
-                                    .secondary(self.target)
-                                    .message("Assigned to this target")
-                            }),
                     },
                 );
             }

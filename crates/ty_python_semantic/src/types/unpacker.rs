@@ -453,10 +453,6 @@ fn sequence_value_for_target<'ast>(
     values: &'ast [ast::Expr],
     target_index: usize,
 ) -> Option<&'ast ast::Expr> {
-    if targets.get(target_index)?.is_starred_expr() {
-        return None;
-    }
-
     let target_starred_index = targets.iter().position(ast::Expr::is_starred_expr);
     let first_value_starred_index = values.iter().position(ast::Expr::is_starred_expr);
     let last_value_starred_index = values.iter().rposition(ast::Expr::is_starred_expr);

@@ -3720,37 +3720,6 @@ info: Method defined here
   |         ^^^^^^^^^^^                  ---------------------- Parameter declared here
 ```
 
-### Invalid argument type in an unpacked assignment
-
-An unpacked assignment to a custom attribute setter identifies the incompatible value and the
-attribute receiving it.
-
-```py
-class CustomSetAttr:
-    def __setattr__(self, name: str, value: int) -> None:
-        pass
-
-instance = CustomSetAttr()
-instance.attribute, other = ("wrong", 1)  # snapshot: invalid-assignment
-```
-
-```snapshot
-error[invalid-assignment]: Cannot assign object of type `Literal["wrong"]` to attribute `attribute` on type `CustomSetAttr`
- --> src/mdtest_snippet.py:6:30
-  |
-6 | instance.attribute, other = ("wrong", 1)  # snapshot: invalid-assignment
-  | ------------------           ^^^^^^^ Expected `int`, found `Literal["wrong"]`
-  | |
-  | Assigned to this target
-info: Argument to bound method `CustomSetAttr.__setattr__` is incorrect
-info: This assignment implicitly calls a custom `__setattr__` method
-info: Method defined here
- --> src/mdtest_snippet.py:2:9
-  |
-2 |     def __setattr__(self, name: str, value: int) -> None:
-  |         ^^^^^^^^^^^                  ---------- Parameter declared here
-```
-
 ### Overloaded `__setattr__`
 
 ```py
@@ -3811,7 +3780,7 @@ date.year = 2025
 date.month = "May"  # snapshot: invalid-assignment
 # snapshot: invalid-assignment
 # snapshot: invalid-assignment
-date.tz, other = ("UTC", 0)
+date.tz = "UTC"
 ```
 
 ```snapshot
@@ -3832,7 +3801,7 @@ info: Method defined here
 error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
   --> src/mdtest_snippet.py:16:1
    |
-16 | date.tz, other = ("UTC", 0)
+16 | date.tz = "UTC"
    | ^^^^^^^ Expected `Literal["day", "month", "year"]`, found `Literal["tz"]`
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
@@ -3844,12 +3813,10 @@ info: Method defined here
 
 
 error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
-  --> src/mdtest_snippet.py:16:19
+  --> src/mdtest_snippet.py:16:11
    |
-16 | date.tz, other = ("UTC", 0)
-   | -------           ^^^^^ Expected `int`, found `Literal["UTC"]`
-   | |
-   | Assigned to this target
+16 | date.tz = "UTC"
+   |           ^^^^^ Expected `int`, found `Literal["UTC"]`
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
@@ -4183,9 +4150,9 @@ mod.global_symbol = 1
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
 _, mod.global_symbol = (..., 1)
 
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `global_symbol` of type `str`"
 [_, mod.global_symbol] = [
     1,
-    # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `global_symbol` of type `str`"
     2,
 ]
 

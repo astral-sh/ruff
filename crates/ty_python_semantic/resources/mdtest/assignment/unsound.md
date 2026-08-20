@@ -382,6 +382,63 @@ info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
 
+## Unsound assignments to starred unpacking targets
+
+A starred unpacking target identifies the dynamic expression collected into the assigned list.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+middle: list[int]
+first, *middle, last = (0, returns_any(), 1)  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:28
+  |
+6 | middle: list[int]
+  |         --------- Expected a subtype of `list[int]` because of this annotation
+7 | first, *middle, last = (0, returns_any(), 1)  # snapshot: unsound-assignment
+  |         ------             ^^^^^^^^^^^^^ Inferred iterable element as `Any` (expected a subtype of `int`)
+  |         |
+  |         Assigned to this variable
+info: `list[Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Multiple unsound values assigned to starred unpacking targets
+
+When a starred target collects multiple values, the unsound-assignment diagnostic covers the entire
+collected slice without including the surrounding unpacked values.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+middle: list[int]
+first, *middle, last = (0, 1, returns_any(), 2, 3)  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:28
+  |
+6 | middle: list[int]
+  |         --------- Expected a subtype of `list[int]` because of this annotation
+7 | first, *middle, last = (0, 1, returns_any(), 2, 3)  # snapshot: unsound-assignment
+  |         ------             ^^^^^^^^^^^^^^^^^^^ Inferred iterable element as `Literal[1, 2] | Any` (expected a subtype of `int`)
+  |         |
+  |         Assigned to this variable
+info: `list[Literal[1, 2] | Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
 ## Unsound assignments to for-loop targets
 
 An unsound loop assignment points to the target's earlier type annotation.

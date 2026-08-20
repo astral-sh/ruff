@@ -86,14 +86,12 @@ pub(crate) use self::constructor::ConstructorCallableKind;
 /// The original call-error message is retained on the primary annotation if the call reporter
 /// does not supply its own annotation message, or as an info sub-diagnostic otherwise. `info`
 /// explains why the call happened. `argument_ranges` maps synthetic call arguments back to source
-/// ranges. `secondary_annotation` identifies the source construct responsible for the call when a
-/// diagnostic points to its final argument.
+/// ranges.
 pub(crate) struct CallDiagnosticOverride<'a> {
     pub(crate) lint: &'static LintMetadata,
     pub(crate) message: String,
     pub(crate) info: &'a str,
     pub(crate) argument_ranges: &'a [TextRange],
-    pub(crate) secondary_annotation: Option<Annotation>,
 }
 
 struct CallDiagnosticContext<'context, 'overrides, 'db, 'ast> {
@@ -109,21 +107,9 @@ impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
         ranged: T,
     ) -> Option<LintDiagnosticGuardBuilder<'env, 'db>> {
         let lint = self.overrides.map_or(lint, |overrides| overrides.lint);
-        let primary_range = ranged.range();
         self.context.report_lint(lint, ranged).map(|builder| {
             if let Some(overrides) = self.overrides {
-                let builder =
-                    builder.with_message_override(overrides.message.clone(), overrides.info);
-                if let Some(annotation) = &overrides.secondary_annotation
-                    && overrides
-                        .argument_ranges
-                        .last()
-                        .is_some_and(|argument_range| *argument_range == primary_range)
-                {
-                    builder.with_secondary_annotation(annotation.clone())
-                } else {
-                    builder
-                }
+                builder.with_message_override(overrides.message.clone(), overrides.info)
             } else {
                 builder
             }
