@@ -53,16 +53,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .inference_flags
             .replace(InferenceFlags::IN_TYPE_EXPRESSION, true);
 
-        // `DeferredExpressionState::InStringAnnotation` takes precedence over other states.
-        // However, if it's not a stringified annotation, we must still ensure that annotation expressions
-        // are always deferred in stub files.
-        match previous_deferred_state {
-            DeferredExpressionState::None => {
-                if self.in_stub() {
-                    self.deferred_state = DeferredExpressionState::Deferred;
-                }
-            }
-            DeferredExpressionState::InStringAnnotation(_) | DeferredExpressionState::Deferred => {}
+        // Annotation expressions are always deferred in stub files.
+        if self.in_stub() {
+            self.replace_deferred_state(DeferredExpressionState::Deferred);
         }
 
         let ty = self.infer_type_expression_no_store(expression);
@@ -87,7 +80,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
         deferred_state: DeferredExpressionState,
     ) -> Type<'db> {
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, deferred_state);
+        let previous_deferred_state = self.replace_deferred_state(deferred_state);
         let annotation_ty = self.infer_type_expression(expression);
         self.deferred_state = previous_deferred_state;
         annotation_ty
@@ -2904,8 +2897,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                     let node_key = self.enclosing_node_key(string.into());
 
-                    let previous_deferred_state = std::mem::replace(
-                        &mut self.deferred_state,
+                    let previous_deferred_state = self.replace_deferred_state(
                         DeferredExpressionState::InStringAnnotation(node_key),
                     );
                     let result = matches!(
@@ -3062,10 +3054,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return None;
                 }
 
-                let previous_deferred_state = std::mem::replace(
-                    &mut self.deferred_state,
-                    DeferredExpressionState::InStringAnnotation(node_key),
-                );
+                let previous_deferred_state = self
+                    .replace_deferred_state(DeferredExpressionState::InStringAnnotation(node_key));
                 let result = self.infer_concatenate_tail(parsed.expr());
                 self.deferred_state = previous_deferred_state;
 
