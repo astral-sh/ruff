@@ -394,7 +394,12 @@ impl Project {
 
                         // This is outside `check_file_impl` to avoid that opening or closing
                         // a file invalidates the `check_file_impl` query of every file!
-                        if !open_files.contains(&file) {
+                        // Scripts with invalid settings are never parsed by `check_file_impl`, so
+                        // they have no AST to clear.
+                        if !open_files.contains(&file)
+                            && Script::for_file(db, file)
+                                .is_none_or(|script| script.has_valid_settings(db))
+                        {
                             let python_file = program_file.python_file(db);
                             // The module has already been parsed by `check_file_impl`.
                             // We only retrieve it here so that we can call `clear` on it.
@@ -658,6 +663,15 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
 }
 
+/// Returns whether semantic checking and semantic diagnostics should run for `file`.
+///
+/// Scripts with invalid configuration still produce configuration diagnostics and retain a program
+/// for editor operations, but their semantic diagnostics must not be reported.
+pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
+    db.should_check_file(file)
+        && Script::for_file(db, file).is_none_or(|script| script.has_valid_settings(db))
+}
+
 /// Returns `true` if the file should be checked.
 ///
 /// This depends on the project's check mode:
@@ -743,18 +757,25 @@ pub(crate) fn check_file_impl(
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, source_file, || {
+            let script = Script::for_file(*db, source_file);
+            if let Some(script) = script
+                && !script.has_valid_settings(*db)
+            {
+                return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
+            }
+
             let diagnostics = ty_python_semantic::check_file(*db, file)?;
-            let Some(script) = Script::for_file(*db, source_file) else {
+            let Some(script) = script else {
                 return Ok(diagnostics);
             };
 
-            let script_diagnostics = script.diagnostics(*db);
-            if script_diagnostics.is_empty() {
+            let settings_diagnostics = script.settings_diagnostics(*db);
+            if settings_diagnostics.is_empty() {
                 return Ok(diagnostics);
             }
 
             let mut diagnostics = diagnostics.into_vec();
-            diagnostics.extend(script_diagnostics.iter().cloned());
+            diagnostics.extend(settings_diagnostics.iter().cloned());
             Ok(diagnostics.into_boxed_slice())
         }) {
             Ok(result) => result,

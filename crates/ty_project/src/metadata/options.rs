@@ -6,7 +6,6 @@ use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
 use super::settings::{Override, Settings, TerminalSettings};
 use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
-use anyhow::Context;
 use ordermap::OrderMap;
 use pep440_rs::VersionSpecifiers;
 use ruff_db::RustDoc;
@@ -20,6 +19,7 @@ use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -39,7 +39,7 @@ use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
+    PythonVersionWithSource, SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
     inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
@@ -188,8 +188,10 @@ impl Options {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
-    {
+    ) -> Result<
+        (ProgramSettings, Vec<ProgramSettingsDiagnostic>),
+        Strategy::Error<ToProgramSettingsError>,
+    > {
         let mut diagnostics = Vec::new();
         let environment = self.environment.or_default();
 
@@ -210,8 +212,8 @@ impl Options {
         let python_environment = match self.python_environment(context.configuration_root(), system)
         {
             Ok(None) => PythonEnvironment::discover(context.project_root(), system)
-                .context("Failed to discover local Python environment"),
-            configured => configured,
+                .map_err(ToProgramSettingsError::PythonEnvironmentDiscovery),
+            configured => configured.map_err(ToProgramSettingsError::PythonEnvironment),
         };
 
         // If in safe-mode, fallback to None if this fails instead of erroring.
@@ -232,7 +234,7 @@ impl Options {
         let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
             let site_packages_paths = python_environment
                 .site_packages_paths(system)
-                .context("Failed to discover the site-packages directory");
+                .map_err(ToProgramSettingsError::SitePackagesDiscovery);
             let site_packages_paths = strategy.fallback(site_packages_paths, |_| {
                 tracing::debug!("Default settings failed to discover site-packages directory");
                 SitePackagesPaths::default()
@@ -281,16 +283,18 @@ impl Options {
             .and_then(|resolution| resolution.into_program_version(&mut diagnostics))
             .unwrap_or_default();
 
-        // Safe mode is handled inside this function, so we just assume this can't fail
-        let search_paths = strategy.to_anyhow(self.to_search_paths(
-            context,
-            project_name,
-            site_packages_paths,
-            real_stdlib_path,
-            system,
-            vendored,
-            strategy,
-        ))?;
+        let search_paths = strategy.map_err(
+            self.to_search_paths(
+                context,
+                project_name,
+                site_packages_paths,
+                real_stdlib_path,
+                system,
+                vendored,
+                strategy,
+            ),
+            ToProgramSettingsError::SearchPaths,
+        )?;
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
@@ -312,7 +316,7 @@ impl Options {
         &self,
         configuration_root: &SystemPath,
         system: &dyn System,
-    ) -> anyhow::Result<Option<PythonEnvironment>> {
+    ) -> Result<Option<PythonEnvironment>, SitePackagesDiscoveryError> {
         let environment = self.environment.or_default();
         let Some(python_path) = environment.python.as_ref() else {
             return Ok(None);
@@ -333,7 +337,6 @@ impl Options {
             origin,
             system,
         )
-        .map_err(anyhow::Error::from)
         .map(Some)
     }
 
@@ -2149,6 +2152,66 @@ pub(super) struct InnerOverrideOptions {
     pub(super) rules: Option<Rules>,
 
     pub(super) analysis: Option<AnalysisOptions>,
+}
+
+/// A failure to resolve a project's or standalone script's program settings.
+#[derive(Debug, Error)]
+pub enum ToProgramSettingsError {
+    /// The explicitly configured Python environment could not be resolved.
+    #[error(transparent)]
+    PythonEnvironment(SitePackagesDiscoveryError),
+
+    /// No explicitly configured Python environment was available, and discovery failed.
+    #[error("Failed to discover local Python environment")]
+    PythonEnvironmentDiscovery(#[source] SitePackagesDiscoveryError),
+
+    /// The resolved Python environment did not contain usable site-packages directories.
+    #[error("Failed to discover the site-packages directory")]
+    SitePackagesDiscovery(#[source] SitePackagesDiscoveryError),
+
+    /// One of the configured Python module search paths could not be resolved.
+    #[error(transparent)]
+    SearchPaths(#[from] SearchPathSettingsError),
+}
+
+impl ToProgramSettingsError {
+    /// Returns the program-settings error without its optional diagnostic detail.
+    pub(crate) fn message(&self) -> String {
+        self.to_string()
+    }
+
+    /// Returns details for failures whose message only identifies the failed operation.
+    pub(crate) fn hint(&self) -> Option<String> {
+        match self {
+            Self::PythonEnvironmentDiscovery(error) | Self::SitePackagesDiscovery(error) => {
+                Some(error.to_string())
+            }
+            Self::PythonEnvironment(_) | Self::SearchPaths(_) => None,
+        }
+    }
+
+    pub(crate) fn setting_source<'a>(
+        &self,
+        options: &'a Options,
+    ) -> Option<(&'a ValueSource, Option<TextRange>)> {
+        let environment = options.environment.as_ref()?;
+
+        match self {
+            Self::PythonEnvironment(_) | Self::SitePackagesDiscovery(_) => environment
+                .python
+                .as_ref()
+                .map(|setting| (setting.source(), setting.range())),
+            Self::SearchPaths(
+                SearchPathSettingsError::FailedToReadVersionsFile { .. }
+                | SearchPathSettingsError::VersionsParseError(_),
+            ) => environment
+                .typeshed
+                .as_ref()
+                .map(|setting| (setting.source(), setting.range())),
+            Self::PythonEnvironmentDiscovery(_)
+            | Self::SearchPaths(SearchPathSettingsError::InvalidSearchPath(_)) => None,
+        }
+    }
 }
 
 /// Error returned when the settings can't be resolved because of a hard error.
