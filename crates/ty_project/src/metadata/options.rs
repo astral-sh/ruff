@@ -296,14 +296,9 @@ impl Options {
             ToProgramSettingsError::SearchPaths,
         )?;
 
-        let python_executable = python_environment.as_ref().map(|env| {
-            let sys_prefix = env.sys_prefix();
-            if cfg!(windows) {
-                sys_prefix.join("Scripts/python.exe")
-            } else {
-                sys_prefix.join("bin/python")
-            }
-        });
+        let python_executable = python_environment
+            .as_ref()
+            .and_then(|environment| environment.python_executable(system));
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",

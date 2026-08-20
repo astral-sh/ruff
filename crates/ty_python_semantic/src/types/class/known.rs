@@ -213,8 +213,7 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::CoroutineType
             | Self::BuiltinFunctionType
-            | Self::Template
-            | Self::UnittestTestCase => Some(Truthiness::AlwaysTrue),
+            | Self::Template => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
@@ -292,6 +291,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
             | Self::Path
+            | Self::UnittestTestCase
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
             | Self::PydanticBaseModel

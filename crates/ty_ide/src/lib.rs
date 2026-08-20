@@ -61,7 +61,7 @@ pub use semantic_tokens::{
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
-pub use test_discovery::{DiscoveredTest, TestKind, discover_tests};
+pub use test_discovery::{DiscoveredTest, DiscoveredTestKind, discover_tests};
 pub use type_hierarchy::{
     TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
 };

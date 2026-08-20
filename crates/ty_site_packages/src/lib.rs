@@ -376,6 +376,35 @@ impl PythonEnvironment {
         }
     }
 
+    /// Returns the path to this environment's Python executable.
+    pub fn python_executable(&self, system: &dyn System) -> Option<SystemPathBuf> {
+        let candidates: &[&str] = match self {
+            Self::Virtual(_) => {
+                if cfg!(windows) {
+                    &[r"Scripts\python.exe"]
+                } else {
+                    &["bin/python"]
+                }
+            }
+            Self::System(env) => {
+                if let Some(executable) = env.path.executable() {
+                    return Some(executable.to_path_buf());
+                }
+                if cfg!(windows) {
+                    &["python.exe"]
+                } else {
+                    &["bin/python3", "bin/python"]
+                }
+            }
+        };
+
+        let sys_prefix = self.sys_prefix();
+        candidates
+            .iter()
+            .map(|candidate| sys_prefix.join(candidate))
+            .find(|executable| system.is_file(executable))
+    }
+
     /// Returns the Python version that was used to create this environment
     /// (will only be available for virtual environments that specify
     /// the metadata in their `pyvenv.cfg` files).
@@ -413,14 +442,6 @@ impl PythonEnvironment {
     /// Returns `true` if this is a virtual environment (has a `pyvenv.cfg` file).
     pub fn is_virtual(&self) -> bool {
         matches!(self, Self::Virtual(_))
-    }
-
-    /// Returns the `sys.prefix` path for this environment.
-    pub fn sys_prefix(&self) -> &SystemPath {
-        match self {
-            Self::Virtual(env) => &env.root_path.inner,
-            Self::System(env) => env.path.sys_prefix(),
-        }
     }
 }
 
@@ -2025,6 +2046,15 @@ impl PythonEnvironmentPath {
         }
     }
 
+    /// Returns the Python executable this environment was resolved from,
+    /// or `None` if it was resolved from a `sys.prefix` directory.
+    fn executable(&self) -> Option<&SystemPath> {
+        match self {
+            Self::Executable { path, .. } => Some(path),
+            Self::Prefix(_) => None,
+        }
+    }
+
     fn selected_path(&self) -> &SystemPath {
         match self {
             Self::Prefix(sys_prefix) => sys_prefix,
@@ -2662,6 +2692,95 @@ mod tests {
                 .map(VirtualEnvironmentTestCase::implementation)
                 .unwrap_or(PythonImplementation::CPython)
         }
+    }
+
+    #[test]
+    fn python_executable_of_virtual_environment() {
+        let system = TestSystem::default();
+        let test = PythonEnvironmentTestCase {
+            system: system.clone(),
+            minor_version: 12,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::LocalVenv,
+            virtual_env: Some(VirtualEnvironmentTestCase::default()),
+        };
+        let env = test.run();
+
+        let venv_prefix = SystemPathBuf::from("/.venv");
+        let expected = if cfg!(windows) {
+            venv_prefix.join(r"Scripts\python.exe")
+        } else {
+            venv_prefix.join("bin/python")
+        };
+        assert_eq!(env.python_executable(&system), Some(expected));
+    }
+
+    #[test]
+    fn python_executable_of_system_installation() {
+        let system = TestSystem::default();
+        let test = PythonEnvironmentTestCase {
+            system: system.clone(),
+            minor_version: 12,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::UvWorkspace,
+            virtual_env: None,
+        };
+        let env = test.run();
+
+        let sys_prefix = SystemPathBuf::from("/Python3.12");
+        let expected = if cfg!(windows) {
+            sys_prefix.join("python.exe")
+        } else {
+            sys_prefix.join("bin/python")
+        };
+        assert_eq!(env.python_executable(&system), Some(expected));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn python_executable_of_system_installation_prefers_python3() {
+        let system = TestSystem::default();
+        let test = PythonEnvironmentTestCase {
+            system: system.clone(),
+            minor_version: 12,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::UvWorkspace,
+            virtual_env: None,
+        };
+        system
+            .memory_file_system()
+            .write_file_all(SystemPath::new("/Python3.12/bin/python3"), "")
+            .unwrap();
+        let env = test.run();
+
+        assert_eq!(
+            env.python_executable(&system),
+            Some(SystemPathBuf::from("/Python3.12/bin/python3"))
+        );
+    }
+
+    #[test]
+    fn python_executable_resolved_from_interpreter_path() {
+        let system = TestSystem::default();
+        let test = PythonEnvironmentTestCase {
+            system: system.clone(),
+            minor_version: 12,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::PythonCliFlag,
+            virtual_env: None,
+        };
+        test.build();
+
+        let sys_prefix = SystemPathBuf::from("/Python3.12");
+        let executable = if cfg!(windows) {
+            sys_prefix.join("python.exe")
+        } else {
+            sys_prefix.join("bin/python")
+        };
+        let env = PythonEnvironment::new(&executable, SysPrefixPathOrigin::PythonCliFlag, &system)
+            .expect("Expected environment construction to succeed");
+
+        assert_eq!(env.python_executable(&system), Some(executable));
     }
 
     #[test]
