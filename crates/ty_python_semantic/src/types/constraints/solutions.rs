@@ -1,10 +1,12 @@
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
+use crate::types::constraints::support::Support;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
-    PathAssignments, PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, Constraint, ConstraintBound, ConstraintBoundsBuilder, ConstraintId,
+    ConstraintSetStorage, NodeId, PathAssignments, PathBounds, SolutionLimits,
 };
+use crate::types::typevar::TypeVarBoundOrConstraints;
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
@@ -23,14 +25,49 @@ impl<'db> SolutionWalker<'db> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn visit_node<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        all_typevars: Option<&Support>,
+        node: NodeId,
+    ) -> ControlFlow<L::Break> {
+        self.visit_node_and_then(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            node,
+            &mut |this, storage, limits, path| match all_typevars {
+                Some(all_typevars) => {
+                    this.validate_satisfied_path(db, env, storage, limits, path, all_typevars)
+                }
+                None => this.found_satisfied_path(limits, path),
+            },
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::type_complexity)]
+    fn visit_node_and_then<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
         path: &mut PathAssignments,
         node: NodeId,
-        limits: &mut L,
+        process_satisfied: &mut dyn FnMut(
+            &mut Self,
+            &mut ConstraintSetStorage<'db>,
+            &mut L,
+            &mut PathAssignments,
+        ) -> ControlFlow<L::Break>,
     ) -> ControlFlow<L::Break> {
         limits.visit_node()?;
         if node == ALWAYS_FALSE {
@@ -39,9 +76,7 @@ impl<'db> SolutionWalker<'db> {
 
         // If the current node is ALWAYS_TRUE, we can immediately report the current solution.
         if node == ALWAYS_TRUE {
-            limits.satisfied_path()?;
-            self.found_satisfied_path(path);
-            return ControlFlow::Continue(());
+            return process_satisfied(self, storage, limits, path);
         }
 
         // At this point we actually have to walk the outgoing edges of this node.
@@ -59,7 +94,15 @@ impl<'db> SolutionWalker<'db> {
                 assignment,
                 |storage, path, _new_range, found_conflict| {
                     if !found_conflict {
-                        self.visit_node(db, env, storage, path, child, limits)?;
+                        self.visit_node_and_then(
+                            db,
+                            env,
+                            storage,
+                            limits,
+                            path,
+                            child,
+                            process_satisfied,
+                        )?;
                     }
                     ControlFlow::Continue(())
                 },
@@ -68,7 +111,94 @@ impl<'db> SolutionWalker<'db> {
         ControlFlow::Continue(())
     }
 
-    fn found_satisfied_path(&mut self, path: &PathAssignments) {
+    fn validate_satisfied_path<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        all_typevars: &Support,
+    ) -> ControlFlow<L::Break> {
+        let mut all_typevars = all_typevars.clone();
+        let mut seen_typevars = Support::default();
+        self.validate_upper_bound_typevar(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            &mut all_typevars,
+            &mut seen_typevars,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn validate_upper_bound_typevar<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        all_typevars: &mut Support,
+        seen_typevars: &mut Support,
+    ) -> ControlFlow<L::Break> {
+        while let Some(typevar) = all_typevars.pop() {
+            seen_typevars.insert(typevar);
+            let bound_typevar = storage.typevar_data(typevar);
+            let bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db, env);
+            let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints else {
+                continue;
+            };
+
+            let (constraint, source_order) = Constraint::new_node_with_bounds(
+                db,
+                env,
+                storage,
+                bound_typevar,
+                None,
+                Some(ConstraintBound::Validity(bound)),
+            );
+            self.source_orders
+                .extend(storage.calculate_source_orders(source_order));
+
+            // If any typevars are mentioned in the upper bound, we have to validate them too.
+            if let Some(upper_bound_support) = storage.node_support(constraint) {
+                let new_typevars = upper_bound_support - &*seen_typevars;
+                *all_typevars |= &new_typevars;
+            }
+
+            return self.visit_node_and_then(
+                db,
+                env,
+                storage,
+                limits,
+                path,
+                constraint,
+                &mut move |this, storage, limits, path| {
+                    this.validate_upper_bound_typevar(
+                        db,
+                        env,
+                        storage,
+                        limits,
+                        path,
+                        all_typevars,
+                        seen_typevars,
+                    )
+                },
+            );
+        }
+
+        self.found_satisfied_path(limits, path)
+    }
+
+    fn found_satisfied_path<L: SolutionLimits>(
+        &mut self,
+        limits: &mut L,
+        path: &PathAssignments,
+    ) -> ControlFlow<L::Break> {
+        limits.satisfied_path()?;
         let mut path: Vec<_> = path
             .positive_constraints()
             .map(|(constraint, source_constraint)| {
@@ -86,6 +216,7 @@ impl<'db> SolutionWalker<'db> {
         // retain that stable per-tie ordering.
         path.sort_by_key(|(_, source_order)| *source_order);
         self.sorted_paths.push(path);
+        ControlFlow::Continue(())
     }
 
     pub(super) fn finish(

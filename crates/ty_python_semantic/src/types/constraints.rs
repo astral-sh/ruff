@@ -4067,6 +4067,7 @@ impl<'db> PathBounds<'db> {
             return ControlFlow::Continue(path_bounds);
         }
 
+        let node_support = storage.node_support(node).cloned();
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
@@ -4088,7 +4089,15 @@ impl<'db> PathBounds<'db> {
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
         let mut path = interior.path_assignments(db, env, storage, path_source_order);
-        walker.visit_node(db, env, storage, &mut path, node, limits)?;
+        walker.visit_node(
+            db,
+            env,
+            storage,
+            limits,
+            &mut path,
+            node_support.as_ref(),
+            node,
+        )?;
         ControlFlow::Continue(walker.finish(db, env, storage))
     }
 
@@ -9680,15 +9689,30 @@ class E: ...
             };
             let mut walker = SolutionWalker::new(source_orders.clone());
             assert_eq!(
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits),
+                walker.visit_node(
+                    db,
+                    &env,
+                    &mut storage,
+                    &mut limits,
+                    &mut path,
+                    None,
+                    set.node
+                ),
                 ControlFlow::Break(error)
             );
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
             let mut walker = SolutionWalker::new(source_orders.clone());
-            let ControlFlow::Continue(()) =
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits);
+            let ControlFlow::Continue(()) = walker.visit_node(
+                db,
+                &env,
+                &mut storage,
+                &mut limits,
+                &mut path,
+                None,
+                set.node,
+            );
             assert_eq!(walker.finish(db, &env, &mut storage), expected);
         }
     }
