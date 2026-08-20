@@ -119,7 +119,10 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
+mod solutions;
 mod support;
+
+use solutions::SolutionWalker;
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -3755,66 +3758,6 @@ impl<'db> PathBounds<'db> {
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> Self {
-        struct CollectVisitor<'a> {
-            source_orders: &'a FxIndexSet<ConstraintId>,
-            sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
-        }
-
-        impl PathFold for CollectVisitor<'_> {
-            type Result = ();
-            type Break = Infallible;
-
-            fn satisfied<'db>(
-                &mut self,
-                _db: &'db dyn Db,
-                _storage: &mut ConstraintSetStorage<'db>,
-                path: &PathAssignments,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                let mut path: Vec<_> = path
-                    .positive_constraints()
-                    .map(|(constraint, source_constraint)| {
-                        let source_order = self
-                            .source_orders
-                            .get_index_of(&source_constraint)
-                            .expect("every TDD constraint should have a source order");
-                        (constraint, source_order)
-                    })
-                    .collect();
-                path.sort_by_key(|(_, source_order)| *source_order);
-                self.sorted_paths.push(path);
-                ControlFlow::Continue(())
-            }
-
-            fn unsatisfied<'db>(
-                &mut self,
-                _db: &'db dyn Db,
-                _storage: &mut ConstraintSetStorage<'db>,
-                _path: &PathAssignments,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Continue(())
-            }
-
-            fn impossible<'db>(
-                &mut self,
-                _db: &'db dyn Db,
-                _storage: &mut ConstraintSetStorage<'db>,
-                _path: &PathAssignments,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Continue(())
-            }
-
-            fn combine<'db>(
-                &mut self,
-                _db: &'db dyn Db,
-                _storage: &mut ConstraintSetStorage<'db>,
-                _if_true: Self::Result,
-                _if_uncertain: Self::Result,
-                _if_false: Self::Result,
-            ) -> ControlFlow<Self::Break, Self::Result> {
-                ControlFlow::Continue(())
-            }
-        }
-
         let mut source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
             db,
@@ -3836,65 +3779,11 @@ impl<'db> PathBounds<'db> {
             Node::Interior(interior) => interior,
         };
 
-        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
-        // any unions or intersections in our type mappings in a stable order. Constraints might
-        // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
-        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
-        // retain that stable per-tie ordering.
-        let mut collect_visitor = CollectVisitor {
-            source_orders: &source_orders,
-            sorted_paths: Vec::new(),
-        };
-        // Sequent discovery must also happen in source order. Sorting the collected paths below
-        // is too late: sequent pairs are not commutative, and TDD traversal order can otherwise
-        // discard gradual evidence before solution extraction.
+        let mut walker = SolutionWalker::new(source_orders);
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
         let mut path = interior.path_assignments(db, env, storage, path_source_order);
-        let _ = path.visit(db, env, storage, node, &mut collect_visitor);
-        collect_visitor.sorted_paths.sort_by(|path1, path2| {
-            let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
-            let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
-            source_orders1.cmp(source_orders2)
-        });
-
-        let mut result = Vec::with_capacity(collect_visitor.sorted_paths.len());
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxIndexMap::default();
-
-        for path in collect_visitor.sorted_paths {
-            mappings.clear();
-            for (constraint, _) in path {
-                let constraint = storage.constraint_data(constraint);
-                let typevar = constraint.typevar;
-                if let Some(lower) = constraint.bounds.lower {
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_lower(db, env, lower);
-
-                    if let Type::TypeVar(lower_bound_typevar) = lower {
-                        let bounds = mappings.entry(lower_bound_typevar).or_default();
-                        bounds.add_upper(db, env, Type::TypeVar(typevar));
-                    }
-                }
-
-                if let Some(upper) = constraint.bounds.upper {
-                    let bounds = mappings.entry(typevar).or_default();
-                    bounds.add_upper(db, env, upper);
-
-                    if let Type::TypeVar(upper_bound_typevar) = upper {
-                        let bounds = mappings.entry(upper_bound_typevar).or_default();
-                        bounds.add_lower(db, env, Type::TypeVar(typevar));
-                    }
-                }
-            }
-
-            let path_bounds = mappings
-                .drain(..)
-                .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
-                .collect();
-            result.push(path_bounds);
-        }
-
-        PathBounds::Constrained(result.into_boxed_slice())
+        walker.visit_node(db, env, storage, &mut path, node);
+        walker.finish(db, env, storage)
     }
 
     /// Accumulates a conjunction of concrete bound constraints without constructing a
