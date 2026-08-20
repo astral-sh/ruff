@@ -1557,6 +1557,11 @@ impl TestContext {
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
         settings.add_filter(r#"\\\\"#, "/");
+        // For windows
+        settings.add_filter(
+            &tempdir_filter(project_dir.as_str().replace('\\', "/")),
+            "<temp_dir>/",
+        );
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",
