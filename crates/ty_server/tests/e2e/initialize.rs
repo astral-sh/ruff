@@ -90,7 +90,7 @@ fn workspace_diagnostic_registration_without_configuration() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_workspace(workspace_root, None)?
         .enable_workspace_configuration(false)
@@ -133,7 +133,7 @@ fn open_files_diagnostic_registration_without_configuration() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
         )
         .with_workspace(workspace_root, None)?
         .enable_workspace_configuration(false)
@@ -175,7 +175,7 @@ fn workspace_diagnostic_registration_via_initialization() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_workspace(workspace_root, None)?
         .enable_diagnostic_dynamic_registration(true)
@@ -214,7 +214,7 @@ fn open_files_diagnostic_registration_via_initialization() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
         )
         .with_workspace(workspace_root, None)?
         .enable_diagnostic_dynamic_registration(true)
@@ -335,7 +335,7 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_disable_language_services(true))
+        .with_initialization_options(&ClientOptions::default().with_disable_language_services(true))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -437,7 +437,7 @@ fn unknown_initialization_options() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_unknown([("bar".to_string(), Value::Null)].into()),
+            &ClientOptions::default().with_unknown([("bar".to_string(), Value::Null)].into()),
         )
         .build()
         .wait_until_workspaces_are_initialized();
@@ -492,7 +492,7 @@ fn register_multiple_capabilities() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .enable_diagnostic_dynamic_registration(true)
         .build()

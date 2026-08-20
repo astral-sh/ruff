@@ -1255,7 +1255,7 @@ impl TestServerBuilder {
     }
 
     /// Set the initial client options for the test server.
-    pub(crate) fn with_initialization_options(self, options: ClientOptions) -> Self {
+    pub(crate) fn with_initialization_options(self, options: &ClientOptions) -> Self {
         self.with_raw_initialization_options(json!(options))
     }
 
