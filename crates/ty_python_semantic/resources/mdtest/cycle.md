@@ -1,5 +1,27 @@
 # Cycles
 
+## Recursive lambda in a loop condition
+
+A lambda is always truthy. Determining whether the final assignment is reachable must not require
+inferring the lambda's return type, which depends on that same assignment.
+
+```py
+(f := lambda: f)
+while lambda: f:
+    pass
+f = 0
+```
+
+## Recursive lambda in a conditional
+
+The same cycle can arise when a conditional filters the bindings visible to a recursive lambda.
+
+```py
+f = lambda: f
+if not (lambda: f):
+    f = 0
+```
+
 ## Function signature
 
 Deferred annotations can result in cycles in resolving a function signature:

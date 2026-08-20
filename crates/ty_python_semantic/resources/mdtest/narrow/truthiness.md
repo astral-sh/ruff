@@ -1,5 +1,17 @@
 # Narrowing For Truthiness Checks (`if x` or `if not x`)
 
+## Generator expressions
+
+A generator object is truthy even when it yields no values.
+
+```py
+def narrow(value: int | None) -> None:
+    if (value for _ in ()):
+        if value is None:
+            return
+    reveal_type(value)  # revealed: int
+```
+
 ## Value Literals
 
 ```py

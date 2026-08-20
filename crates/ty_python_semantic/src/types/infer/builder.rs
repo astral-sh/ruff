@@ -2571,7 +2571,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         nested_bindings_kind: &NestedBindingsDefinitionKind,
         definition: Definition<'db>,
     ) {
-        const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 2048;
+        const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 4096;
 
         let db = self.db();
         let scope_id = definition.file_scope(db);

@@ -744,6 +744,28 @@ class Form(Ui):
     Ok(())
 }
 
+#[test]
+fn nested_binding_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);
+    let source = format!(
+        r#"def noop() -> None: ...
+{calls}value = 1
+values = [(value := 'abc') for _ in range(2)]
+value.bit_count()
+"#
+    );
+    db.write_file("/src/main.py", &source)?;
+
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Object of type `str` has no attribute `bit_count`"],
+    );
+
+    Ok(())
+}
+
 // Incremental inference tests
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {

@@ -3852,7 +3852,7 @@ def _(x: Literal["foo", b"bar"] | int):
             pass
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
-        case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
+        case _ if reveal_type(x):  # revealed: int & ~Literal[42]
             pass
 ```
 

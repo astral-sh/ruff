@@ -66,6 +66,45 @@ for from_count in range(count):
 reveal_type(from_count)  # revealed: int
 ```
 
+Narrowing established by a non-empty loop remains available after the loop.
+
+```py
+def narrowing_after_non_empty_range(value: int | None) -> None:
+    for _ in range(1):
+        if value is None:
+            return
+
+    reveal_type(value)  # revealed: int
+```
+
+The same narrowing is preserved at module scope.
+
+```py
+def get_value() -> int | None:
+    return None
+
+module_value = get_value()
+
+for _ in range(1):
+    if module_value is None:
+        raise RuntimeError
+
+reveal_type(module_value)  # revealed: int
+```
+
+It also works in a class body.
+
+```py
+class Example:
+    value = get_value()
+
+    for _ in range(1):
+        if value is None:
+            raise RuntimeError
+
+    reveal_type(value)  # revealed: int
+```
+
 The emptiness refinement is independent of the order in which range values are assigned:
 
 ```py
@@ -1929,7 +1968,7 @@ for _ in range(1_000_000):
         break
     node = node.next
 reveal_type(node)  # revealed: Node
-reveal_type(node.next)  # revealed: Node | None
+reveal_type(node.next)  # revealed: None | Node
 ```
 
 ### Nested collection cycles do not panic
