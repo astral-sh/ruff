@@ -405,7 +405,7 @@ impl<'db> ClassBase<'db> {
                 &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
             let new_self = self.apply_type_mapping_impl(
                 db,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
                     specialization,
                 )),
                 TypeContext::default(),

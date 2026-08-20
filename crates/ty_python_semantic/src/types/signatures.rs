@@ -1311,11 +1311,11 @@ impl<'db> Signature<'db> {
             return Some(self.clone());
         };
 
-        let mut builder = SpecializationBuilder::new(db, env, &constraints, inferable);
+        let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
-        let specialization = builder.build_with(generic_context, |typevar, bounds| {
+        let specialization = builder.build_with(|typevar, bounds| {
             if let Some(bounds) = bounds
                 && let Some(lower) = bounds.lower
                 && let Some(upper) = bounds.upper.as_single_bound(db, env)
@@ -1628,7 +1628,7 @@ impl<'db> Signature<'db> {
     fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
         let type_mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
         self.apply_type_mapping_impl(
             db,
             &type_mapping,
@@ -2362,33 +2362,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        // `inferable` has different roles in the two type-variable evaluation modes:
-        //
-        // * Eager comparisons decide whether the relation holds immediately. An unbound generic
-        //   method's `Self` can have an upper bound such as `C[T]`, so `T` must also be
-        //   inferable; otherwise, a concrete receiver such as `C[int]` is compared against a
-        //   fixed, symbolic `T` and valid higher-order calls are rejected.
-        // * Lazy comparisons record constraints for every type variable, regardless of whether
-        //   it is inferable. Here, `signature_inferable` also determines which type variables
-        //   `reduce_inferable` existentially removes below, so it must contain only variables
-        //   actually bound by these signatures. Including an enclosing class's `T` would turn a
-        //   decorator's return constraint `T <= R` into `exists T. T <= R`, losing the
-        //   relationship needed to infer `R = T`.
-        let include_bound_dependencies = self.typevar_evaluation == TypeVarEvaluation::Eager;
         let signature_typevars = |signature: &Signature<'db>| {
             signature
                 .generic_context
-                .map_or(TypeVarSet::None, |context| {
-                    if include_bound_dependencies {
-                        context.inferable_typevars(db)
-                    } else {
-                        TypeVarSet::from_typevars(db, context.variables(db))
-                    }
-                })
+                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db))
         };
         let source_inferable = signature_typevars(source);
         let target_inferable = signature_typevars(target);
         let signature_inferable = source_inferable.merge(db, target_inferable);
+
         let inferable = self.inferable.merge(db, signature_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.

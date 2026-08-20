@@ -25,9 +25,7 @@ use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet, walk_type_var_bounds,
-};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
@@ -502,78 +500,9 @@ impl<'db> GenericContext<'db> {
         remove_self_inner(db, self, binding_context)
     }
 
-    /// Returns the typevars that are inferable in this generic context. This set might include
-    /// more typevars than the ones directly bound by the generic context. For instance, consider a
-    /// method of a generic class:
-    ///
-    /// ```py
-    /// class C[A]:
-    ///     def method[T](self, t: T):
-    /// ```
-    ///
-    /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
-    /// also includes `A@C`. This is needed because at each call site, we need to infer the
-    /// specialized class instance type whose method is being invoked.
+    /// Returns the typevars directly bound by this generic context.
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
-        struct CollectTypeVars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> TypeVisitor<'db> for CollectTypeVars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                self.typevars
-                    .borrow_mut()
-                    .entry(bound_typevar.identity(db))
-                    .or_insert(bound_typevar);
-                let typevar = bound_typevar.typevar(db);
-                if let Some(bound_or_constraints) =
-                    typevar.bound_or_constraints(db, self.program_environment())
-                {
-                    walk_type_var_bounds(db, bound_or_constraints, self);
-                }
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, _, _| TypeVarSet::None,
-            heap_size=ruff_memory_usage::heap_size,
-        )]
-        fn inferable_typevars_inner<'db>(
-            db: &'db dyn Db,
-            generic_context: GenericContext<'db>,
-        ) -> TypeVarSet<'db> {
-            let env = ProgramEnvironment::from_program(generic_context.program(db));
-            let visitor = CollectTypeVars {
-                env: &env,
-                typevars: RefCell::default(),
-                recursion_guard: TypeCollector::default(),
-            };
-            for bound_typevar in generic_context.variables(db) {
-                visitor.visit_bound_type_var_type(db, bound_typevar);
-            }
-            TypeVarSet::from_typevars(db, visitor.typevars.into_inner().into_values())
-        }
-
-        inferable_typevars_inner(db, self)
+        TypeVarSet::from_typevars(db, self.variables(db))
     }
 
     pub(crate) fn variables(
@@ -1413,7 +1342,7 @@ impl<'db> Specialization<'db> {
         let new_specialization = self.apply_type_mapping(
             db,
             env,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(other)),
+            &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(other)),
         );
         match other.materialization_kind(db) {
             None => new_specialization,
@@ -2253,7 +2182,15 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
-    Specialization(Specialization<'db>),
+    Specialization {
+        specialization: Specialization<'db>,
+        /// Whether to substitute free owner variables in the declared domain of a retained
+        /// synthetic `Self`.
+        ///
+        /// This is only set when projecting a member from its enclosing generic owner. Ordinary
+        /// specialization preserves that domain as fixed evidence.
+        specialize_self_domain: bool,
+    },
     TypeAlias(Specialization<'db>),
     Partial {
         generic_context: GenericContext<'db>,
@@ -2269,6 +2206,23 @@ pub enum ApplySpecialization<'a, 'db> {
 }
 
 impl<'db> ApplySpecialization<'_, 'db> {
+    pub(crate) fn specialization(specialization: Specialization<'db>) -> Self {
+        Self::Specialization {
+            specialization,
+            specialize_self_domain: false,
+        }
+    }
+
+    pub(crate) fn specialize_self_domain(self) -> bool {
+        match self {
+            Self::Specialization {
+                specialize_self_domain,
+                ..
+            } => specialize_self_domain,
+            _ => false,
+        }
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(
@@ -2277,7 +2231,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            ApplySpecialization::Specialization(specialization)
+            ApplySpecialization::Specialization { specialization, .. }
             | ApplySpecialization::TypeAlias(specialization) => {
                 specialization.get(db, bound_typevar)
             }
@@ -2311,7 +2265,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
     /// context, preserving skipped type variables in partial specializations as identity mappings.
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
-            ApplySpecialization::Specialization(specialization)
+            ApplySpecialization::Specialization { specialization, .. }
             | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
             ApplySpecialization::Partial {
                 generic_context,
@@ -2367,6 +2321,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     db: &'db dyn Db,
     env: &'c ProgramEnvironment<'db>,
     constraints: &'c ConstraintSetBuilder<'db>,
+    generic_context: GenericContext<'db>,
     inferable: TypeVarSet<'db>,
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
@@ -2556,13 +2511,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         db: &'db dyn Db,
         env: &'c ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
+        generic_context: GenericContext<'db>,
     ) -> Self {
         Self {
             db,
             env,
             constraints,
-            inferable,
+            generic_context,
+            inferable: generic_context.inferable_typevars(db),
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
@@ -2590,10 +2546,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// `None` to use the inferred type unchanged.
     pub(crate) fn build_with(
         &mut self,
-        generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let db = self.db;
+        let generic_context = self.generic_context;
         let types = self
             .solve_pending_with(generic_context, &mut choose)
             .unwrap_or_else(|()| self.solve_hash_map_with(generic_context, &mut choose));
@@ -2616,11 +2572,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Returns an error if the call-wide pending constraints are unsatisfiable.
     pub(crate) fn build_inference_with(
         &mut self,
-        generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Result<TypeVarInference<'db>, ()> {
-        let types = self.solve_pending_with(generic_context, &mut choose)?;
-        Ok(self.typevar_inference(generic_context, &types))
+        let types = self.solve_pending_with(self.generic_context, &mut choose)?;
+        Ok(self.typevar_inference(self.generic_context, &types))
     }
 
     /// Build a diagnostic specialization after the call-wide constraints were unsatisfiable.
@@ -2630,7 +2585,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// even when a migrated inference path only populated `pending`.
     pub(crate) fn build_diagnostic_inference_with(
         &mut self,
-        generic_context: GenericContext<'db>,
         argument_relations: impl IntoIterator<Item = (Type<'db>, Type<'db>)>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> TypeVarInference<'db> {
@@ -2642,8 +2596,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.project_for_legacy_fallback(&analysis);
         }
 
-        let types = self.solve_hash_map_with(generic_context, &mut choose);
-        self.typevar_inference(generic_context, &types)
+        let types = self.solve_hash_map_with(self.generic_context, &mut choose);
+        self.typevar_inference(self.generic_context, &types)
     }
 
     fn typevar_inference(
@@ -4228,34 +4182,6 @@ mod tests {
     use crate::db::tests::setup_db;
 
     #[test]
-    fn generic_context_inferable_typevars_retain_instances_from_bounds() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let u = BoundTypeVarInstance::synthetic(
-            db,
-            &env,
-            Name::new_static("U"),
-            TypeVarVariance::Invariant,
-        );
-        let t = BoundTypeVarInstance::synthetic(
-            db,
-            &env,
-            Name::new_static("T"),
-            TypeVarVariance::Invariant,
-        )
-        .map_bound_or_constraints(db, |_| {
-            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
-        });
-        let context = GenericContext::from_typevar_instances(db, &env, [t]);
-
-        let inferable = context.inferable_typevars(db);
-        assert_eq!(inferable.iter(db).collect::<Vec<_>>(), [t, u]);
-        assert!(t.is_inferable(db, inferable));
-        assert!(u.is_inferable(db, inferable));
-    }
-
-    #[test]
     fn recording_constraints_does_not_project_legacy_mappings() {
         let db = setup_db();
         let db = &db;
@@ -4268,8 +4194,7 @@ mod tests {
         );
         let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
         let constraints = ConstraintSetBuilder::new();
-        let mut builder =
-            SpecializationBuilder::new(db, &env, &constraints, context.inferable_typevars(db));
+        let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
         let int = KnownClass::Int.to_instance(db, &env);
         let set = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, int, int);
 
@@ -4301,8 +4226,7 @@ mod tests {
         .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(int)));
         let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
         let constraints = ConstraintSetBuilder::new();
-        let mut builder =
-            SpecializationBuilder::new(db, &env, &constraints, context.inferable_typevars(db));
+        let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
         let lower_only =
             ConstraintSet::constrain_typevar_lower_bound(db, &env, &constraints, typevar, str);
         let rejected = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, str, str);

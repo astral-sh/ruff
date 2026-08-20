@@ -1342,21 +1342,35 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let member =
-            self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, specialization));
-
         // An unspecialized MRO retains mappings such as `Parent[T@Child]`, so ordinary members
         // accessed through `Child` must use its default arguments. Constructor methods are different:
         // we add their class's type variables to the callable's generic context, so those variables
         // are genuinely inferable and must remain generic instead of using the default arguments.
         if specialization.is_none()
-            && !matches!(name, "__new__" | "__init__")
             && let Some(generic_context) = self.generic_context(db)
         {
-            let specialization = generic_context.default_specialization(db, self.known(db));
-            member.map_type(|ty| ty.apply_specialization(db, specialization))
+            match name {
+                "__new__" | "__init__" => {
+                    // Specifically apply the identity specialization; otherwise `iter_mro` will
+                    // apply the default specialization for us.
+                    let specialization = generic_context.identity_specialization(db);
+                    self.class_member_from_mro(
+                        db,
+                        env,
+                        name,
+                        policy,
+                        self.iter_mro(db, Some(specialization)),
+                    )
+                }
+                _ => {
+                    let member =
+                        self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, None));
+                    let specialization = generic_context.default_specialization(db, self.known(db));
+                    member.map_type(|ty| ty.apply_specialization(db, specialization))
+                }
+            }
         } else {
-            member
+            self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, specialization))
         }
     }
 

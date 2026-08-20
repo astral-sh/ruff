@@ -218,10 +218,12 @@ fn create_bound_method<'db>(
     builtins_class: Type<'db>,
 ) -> Type<'db> {
     let env = ProgramEnvironment::from_program(program);
+    let self_instance = builtins_class.to_instance_approximation(db, &env).unwrap();
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance_approximation(db, &env).unwrap(),
+        self_instance,
+        self_instance,
     ))
 }
 

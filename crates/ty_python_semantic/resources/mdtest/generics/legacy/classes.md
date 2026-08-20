@@ -1166,6 +1166,102 @@ reveal_type(generic_context(c.method))
 reveal_type(generic_context(c.generic_method))
 ```
 
+## Members of constrained type variables
+
+Member lookup distributes over the constraints of a non-inferable type variable. Each member is
+bound to its matching receiver alternative, while `Self` continues to refer to the original type
+variable.
+
+```py
+from typing_extensions import Self, TypeVar
+
+class TextStream:
+    @property
+    def closed(self) -> bool:
+        return False
+
+    def close(self) -> None: ...
+    def clone(self) -> Self:
+        raise NotImplementedError
+
+class BinaryStream:
+    @property
+    def closed(self) -> bool:
+        return False
+
+    def close(self) -> None: ...
+    def clone(self) -> Self:
+        raise NotImplementedError
+
+Stream = TypeVar("Stream", TextStream, BinaryStream)
+
+def use_stream(stream: Stream) -> Stream:
+    # revealed: bool
+    reveal_type(stream.closed)
+    # revealed: (bound method Stream@use_stream when TextStream.close() -> None) | (bound method Stream@use_stream when BinaryStream.close() -> None)
+    reveal_type(stream.close)
+    if not stream.closed:
+        stream.close()
+    return stream.clone()
+```
+
+## Members of type variables with union upper bounds
+
+Unlike constraints, a union upper bound does not enumerate the possible assignments of a type
+variable. Member lookup can still use the upper bound to prove that a common member is available.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+U = TypeVar("U", bound=A | B)
+
+def use_union(value: A | B):
+    # revealed: int | str
+    reveal_type(value.value)
+
+def use_typevar(value: U):
+    # TODO: This should not error once member lookup supports union upper bounds.
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
+    # revealed: int | str
+    reveal_type(value.value)
+```
+
+## Correlated constrained receiver calls
+
+Multiple occurrences of the same constrained type variable have the same assignment. Distributing
+member lookup over the receiver's constraints must preserve that correlation when checking method
+arguments.
+
+```py
+from typing_extensions import TypeVar
+
+class A:
+    def combine(self, other: "A") -> None: ...
+
+class B:
+    def combine(self, other: "B") -> None: ...
+
+T = TypeVar("T", A, B)
+
+def combine(left: T, right: T) -> None:
+    # revealed: (bound method T@combine when A.combine(other: A) -> None) | (bound method T@combine when B.combine(other: B) -> None)
+    reveal_type(left.combine)
+    # TODO: This should not error once callable binding preserves the receiver branch correlation.
+    # error: [invalid-argument-type] "Argument to bound method `A.combine` is incorrect"
+    # error: [invalid-argument-type] "Argument to bound method `B.combine` is incorrect"
+    left.combine(right)
+```
+
 ## Specializations propagate
 
 In a specialized generic alias, the specialization is applied to the attributes and methods of the

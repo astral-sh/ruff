@@ -31,6 +31,15 @@ pub struct BoundMethodType<'db> {
     /// attribute on a bound method object
     #[returns(copy)]
     pub(super) self_instance: Type<'db>,
+
+    /// The receiver type used to validate and specialize the function signature.
+    ///
+    /// This normally equals [`self_instance`][Self::self_instance]. They differ when member lookup
+    /// distributes over the declared constraints of a typevar: This field contains the particular
+    /// declared constraint that this bound method belongs to, while `self_instance` is the typevar
+    /// itself.
+    #[returns(copy)]
+    pub(super) signature_receiver: Type<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -43,6 +52,7 @@ pub(super) fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 ) {
     visitor.visit_function_type(db, method.function(db));
     visitor.visit_type(db, method.self_instance(db));
+    visitor.visit_type(db, method.signature_receiver(db));
 }
 
 #[salsa::tracked]
@@ -66,9 +76,23 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn map_self_type(
         self,
         db: &'db dyn Db,
-        f: impl FnOnce(Type<'db>) -> Type<'db>,
+        mut f: impl FnMut(Type<'db>) -> Type<'db>,
     ) -> Self {
-        Self::new(db, self.function(db), f(self.self_instance(db)))
+        Self::new(
+            db,
+            self.function(db),
+            f(self.self_instance(db)),
+            f(self.signature_receiver(db)),
+        )
+    }
+
+    pub(crate) fn with_signature_receiver(
+        self,
+        db: &'db dyn Db,
+        self_instance: Type<'db>,
+        signature_receiver: Type<'db>,
+    ) -> Self {
+        Self::new(db, self.function(db), self_instance, signature_receiver)
     }
 
     #[salsa::tracked(
@@ -114,7 +138,7 @@ impl<'db> BoundMethodType<'db> {
         let env =
             ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
         let typing_self_type = self.typing_self_type(db);
-        let receiver_type = self.self_instance(db);
+        let receiver_type = self.signature_receiver(db);
 
         self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type)
     }
@@ -179,6 +203,8 @@ impl<'db> BoundMethodType<'db> {
             self.function(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
             self.self_instance(db)
+                .recursive_type_normalized_impl(db, env, div, true)?,
+            self.signature_receiver(db)
                 .recursive_type_normalized_impl(db, env, div, true)?,
         ))
     }
