@@ -61,6 +61,35 @@ with Manager() as value:
     reveal_type(value)  # revealed: int
 ```
 
+## Imported names can participate in cyclic loop and match bindings
+
+Names introduced by `from` imports can create the same cyclic loop and match bindings as imported
+modules, even when the imported value is not final.
+
+`source.py`:
+
+```py
+value = object()
+```
+
+`main.py`:
+
+```py
+from source import value
+
+class Matcher:
+    value = object()
+
+items = [object()]
+
+for _ in items:
+    match (value for _ in items):
+        case Matcher.value as value:
+            pass
+        case Matcher():
+            value = 0
+```
+
 ## Existing annotations constrain imported bindings
 
 An import must respect an existing declaration without creating a conflicting declaration of its

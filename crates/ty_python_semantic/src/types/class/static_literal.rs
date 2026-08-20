@@ -2948,8 +2948,13 @@ impl<'db> StaticClassLiteral<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers =
-                place_from_declarations(db, env, declarations).ignore_conflicting_declarations();
+            let declared_and_qualifiers = place_from_declarations(db, env, declarations)
+                .with_imported_final(
+                    db,
+                    env,
+                    use_def.end_of_scope_imported_final_candidates(symbol_id.into()),
+                )
+                .ignore_conflicting_declarations();
 
             match declared_and_qualifiers {
                 PlaceAndQualifiers {

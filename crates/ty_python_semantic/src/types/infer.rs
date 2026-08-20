@@ -1732,7 +1732,7 @@ impl<'db> DefinitionInference<'db> {
         self.types.declarations(owner)
     }
 
-    pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::Other(extra)) => extra.cycle_recovery,
             Some(_) | None => None,

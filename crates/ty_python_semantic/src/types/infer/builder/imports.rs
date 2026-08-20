@@ -24,10 +24,12 @@ use crate::{
 use ty_python_core::definition::Definition;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    /// Binds an imported value without declaring its type, except for inherited `Final` metadata.
+    /// Binds an imported value without declaring its type, while preserving inherited `Final`
+    /// metadata.
     ///
-    /// An import does not itself constrain later assignments. Imported `Final` values still need a
-    /// declaration so their qualifier survives re-exports and prevents later reassignment:
+    /// An import does not itself constrain later assignments. Retaining the source type and
+    /// qualifier for imported `Final` values lets the dedicated use-def queries preserve them
+    /// through re-exports and reject later reassignment:
     ///
     /// ```python
     /// # values.py

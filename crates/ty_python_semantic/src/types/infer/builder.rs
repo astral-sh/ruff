@@ -137,7 +137,6 @@ use crate::types::{
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
     UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    inferred_declaration,
     is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
@@ -154,7 +153,7 @@ use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
-use ty_python_core::symbol::{ScopedSymbolId, Symbol};
+use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
     ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness,
     unpack::UnpackPosition,
@@ -1531,66 +1530,68 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let place_id = binding.place(self.db());
         let place = place_table.place(place_id);
-        let forwarded_owner = place_id
-            .as_symbol()
-            .and_then(|symbol| self.forwarded_assignment_owner(file_scope_id, symbol));
 
-        let (declarations, is_local) = if let Some((owner_scope, owner_symbol)) = forwarded_owner {
+        let (declarations, imported_final_candidates, is_local) = if let Some(symbol) =
+            place_id.as_symbol()
+            && let Some((owner_scope, owner_symbol)) =
+                self.forwarded_assignment_owner(file_scope_id, symbol)
+        {
+            let owner_use_def = self.index.use_def_map(owner_scope);
             (
-                self.index
-                    .use_def_map(owner_scope)
-                    .end_of_scope_symbol_declarations(owner_symbol),
+                owner_use_def.end_of_scope_symbol_declarations(owner_symbol),
+                owner_use_def.end_of_scope_imported_final_candidates(owner_symbol.into()),
                 false,
             )
         } else {
-            (use_def.declarations_at_binding(binding), true)
+            (
+                use_def.declarations_at_binding(binding),
+                use_def.imported_final_candidates_at_binding(binding),
+                true,
+            )
         };
 
         let env = self.program_environment();
-        let (mut place_and_quals, conflicting) = place_from_declarations_with_reachability_cache(
+        let is_import = binding.kind(db).is_import();
+        let mut declared = place_from_declarations_with_reachability_cache(
             db,
             env,
             declarations,
             self.reachability_cache(),
-        )
-        .into_place_and_conflicting_declarations();
+        );
+        let mut has_final_declaration = declared.qualifiers().contains(TypeQualifiers::FINAL);
+        if !is_import {
+            declared = declared.with_imported_final_for_assignment(
+                db,
+                env,
+                imported_final_candidates,
+                self.reachability_cache(),
+            );
+        }
+        let (mut place_and_quals, conflicting) = declared.into_place_and_conflicting_declarations();
 
-        let may_inherit_imported_final = if let Some((owner_scope, owner_symbol)) = forwarded_owner
-        {
-            self.index
-                .place_table(owner_scope)
-                .symbol(owner_symbol)
-                .has_imported_binding()
-        } else {
-            place.as_symbol().is_some_and(Symbol::has_imported_binding)
-        };
+        // Imports into `global` and `nonlocal` names retain their qualifiers in the forwarding
+        // scope, while the owner's declarations continue to supply the declared type.
+        if !is_local && !is_import {
+            let local_declared = place_from_declarations_with_reachability_cache(
+                db,
+                env,
+                use_def.declarations_at_binding(binding),
+                self.reachability_cache(),
+            );
+            has_final_declaration |= local_declared.qualifiers().contains(TypeQualifiers::FINAL);
+            let local_place = local_declared
+                .with_imported_final_for_assignment(
+                    db,
+                    env,
+                    use_def.imported_final_candidates_at_binding(binding),
+                    self.reachability_cache(),
+                )
+                .ignore_conflicting_declarations();
 
-        let inherited_imported_final = if place_and_quals.place.is_undefined()
-            && !binding.kind(db).is_import()
-            && may_inherit_imported_final
-        {
-            let previous_bindings = if let Some((owner_scope, owner_symbol)) = forwarded_owner {
-                self.index
-                    .use_def_map(owner_scope)
-                    .end_of_scope_symbol_bindings(owner_symbol)
-            } else {
-                use_def.bindings_at_definition(binding)
-            };
-
-            previous_bindings
-                .filter_map(|previous| previous.binding.definition())
-                // Synthetic bindings never carry declarations, and inferring them can recurse
-                // through the loop or nested-scope bindings they summarize.
-                .filter(|previous| previous.kind(db).is_user_visible())
-                .filter_map(|previous| inferred_declaration(db, previous).declared())
-                .find(|imported| imported.qualifiers().contains(TypeQualifiers::FINAL))
-        } else {
-            None
-        };
-
-        if let Some(imported_final) = inherited_imported_final {
-            place_and_quals = Place::bound(imported_final.inner_type())
-                .with_qualifiers(imported_final.qualifiers());
+            place_and_quals.qualifiers |= local_place.qualifiers;
+            if place_and_quals.place.is_undefined() {
+                place_and_quals.place = local_place.place;
+            }
         }
 
         if let Some(conflicting) = conflicting {
@@ -1645,7 +1646,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node,
             qualifiers,
             is_local,
-            inherited_imported_final,
+            has_final_declaration,
         }
     }
 
@@ -4525,7 +4526,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node,
                 qualifiers: TypeQualifiers::empty(),
                 is_local: true,
-                inherited_imported_final: None,
+                has_final_declaration: false,
             };
             let target_ty = if let Some(value) = value {
                 // Infer the value as an ordinary assignment without using the rejected annotation
@@ -12925,7 +12926,8 @@ struct AddBinding<'db, 'ast> {
     node: AnyNodeRef<'ast>,
     qualifiers: TypeQualifiers,
     is_local: bool,
-    inherited_imported_final: Option<TypeAndQualifiers<'db>>,
+    /// Whether `Final` comes from an actual declaration, rather than an import.
+    has_final_declaration: bool,
 }
 
 impl<'db, 'ast> AddBinding<'db, 'ast> {
@@ -12967,36 +12969,26 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 
                     diagnostic.set_primary_annotation_message("Reassignment of `Final` symbol");
 
-                    if let Some(previous_definition) = previous_definition {
-                        // It is not very helpful to show the previous definition if it results from
-                        // an import. Ideally, we would show the original definition in the external
-                        // module, but that information is currently not threaded through attribute
-                        // lookup.
-                        if !previous_definition.kind(db).is_import()
-                            && self.inherited_imported_final.is_none()
+                    if self.has_final_declaration
+                        && let Some(previous_definition) = previous_definition
+                        && !previous_definition.kind(db).is_import()
+                    {
+                        // Imported `Final` has no local declaration to point to: an earlier invalid
+                        // assignment is not its declaration. Ideally, we would show the original
+                        // definition in the external module.
+                        let annotation = if let DefinitionKind::AnnotatedAssignment(assignment) =
+                            previous_definition.kind(db)
                         {
-                            if let DefinitionKind::AnnotatedAssignment(assignment) =
-                                previous_definition.kind(db)
-                            {
-                                let range = assignment.annotation(builder.module()).range();
-                                diagnostic.annotate(
-                                    builder
-                                        .context
-                                        .secondary(range)
-                                        .message("Symbol declared as `Final` here"),
-                                );
-                            } else {
-                                let range = previous_definition.full_range(db, builder.module());
-                                diagnostic.annotate(
-                                    builder
-                                        .context
-                                        .secondary(range)
-                                        .message("Symbol declared as `Final` here"),
-                                );
-                            }
-                            diagnostic
-                                .set_primary_annotation_message("Symbol later reassigned here");
-                        }
+                            builder
+                                .context
+                                .secondary(assignment.annotation(builder.module()).range())
+                        } else {
+                            builder
+                                .context
+                                .secondary(previous_definition.full_range(db, builder.module()))
+                        };
+                        diagnostic.annotate(annotation.message("Symbol declared as `Final` here"));
+                        diagnostic.set_primary_annotation_message("Symbol later reassigned here");
                     }
                 }
             }
@@ -13043,12 +13035,6 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         }
 
         builder.bindings.insert(self.binding, bound_ty);
-
-        if let Some(inherited_imported_final) = self.inherited_imported_final {
-            builder
-                .declarations
-                .insert(self.binding, inherited_imported_final);
-        }
 
         inferred_ty
     }

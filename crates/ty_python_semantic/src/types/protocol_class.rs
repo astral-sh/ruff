@@ -180,7 +180,12 @@ impl<'db> ProtocolClass<'db> {
             }
 
             for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
-                let place_result = place_from_declarations(db, env, declarations);
+                let place_result = place_from_declarations(db, env, declarations)
+                    .with_imported_final(
+                        db,
+                        env,
+                        use_def_map.end_of_scope_imported_final_candidates(symbol_id.into()),
+                    );
                 let first_declaration = place_result.first_declaration;
                 let place = place_result.ignore_conflicting_declarations();
                 if let Some(ty) = place.place.ignore_possibly_undefined() {
