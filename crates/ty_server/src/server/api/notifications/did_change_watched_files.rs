@@ -69,22 +69,20 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             return Ok(());
         }
 
+        let client_capabilities = session.client_capabilities();
         let roots: Vec<_> = session
             .workspaces()
             .into_iter()
             .map(|(root, _)| root.clone())
             .collect();
-
         for root in roots {
             tracing::debug!("Applying changes to `{root}`");
 
-            session.apply_changes(&AnySystemPath::System(root.clone()), &changes);
+            session.apply_changes(client, &AnySystemPath::System(root.clone()), &changes);
             publish_settings_diagnostics(session, client, root);
         }
 
         session.synchronize_closed_scripts(client);
-
-        let client_capabilities = session.client_capabilities();
 
         if client_capabilities.supports_workspace_diagnostic_refresh() {
             client.send_request::<types::DiagnosticRefreshRequest>(session, (), |_, ()| {});

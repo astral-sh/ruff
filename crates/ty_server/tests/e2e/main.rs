@@ -80,6 +80,8 @@ use lsp_types::{
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
+#[cfg(feature = "test-uv")]
+use ruff_db::system::System as _;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, SystemVirtualPath, TestSystem};
 use rustc_hash::FxHashMap;
 use serde_json::{Value, json};
@@ -599,6 +601,25 @@ impl TestServer {
     pub(crate) fn await_diagnostic_refresh(&mut self) {
         let (id, ()) = self.await_request::<lsp_types::DiagnosticRefreshRequest>();
         self.send(Message::Response(Response::new_ok(id, ())));
+    }
+
+    /// Checks server-created progress with a begin and end notification and no intermediate reports.
+    #[cfg(feature = "test-uv")]
+    #[track_caller]
+    pub(crate) fn assert_work_done_progress(&mut self, expected_title: &str) -> Result<()> {
+        let (request_id, progress) =
+            self.await_request::<lsp_types::WorkDoneProgressCreateRequest>();
+        self.send(Message::Response(Response::new_ok(request_id, ())));
+
+        let begin = self.await_notification::<lsp_types::ProgressNotification>();
+        assert_eq!(begin.token, progress.token);
+        let begin: lsp_types::WorkDoneProgressBegin = serde_json::from_value(begin.value)?;
+        assert_eq!(begin.title, expected_title);
+
+        let end = self.await_notification::<lsp_types::ProgressNotification>();
+        assert_eq!(end.token, progress.token);
+        let _: lsp_types::WorkDoneProgressEnd = serde_json::from_value(end.value)?;
+        Ok(())
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and
@@ -1263,6 +1284,13 @@ impl TestServerBuilder {
     pub(crate) fn with_raw_initialization_options(mut self, options: Value) -> Self {
         self.initialization_options = Some(options);
         self
+    }
+
+    /// Enable uv integration using the uv executable on the test process's PATH.
+    #[cfg(feature = "test-uv")]
+    pub(crate) fn with_real_uv(self, use_uv: UseUv) -> Result<Self> {
+        let uv = OsSystem::default().which("uv")?;
+        Ok(self.with_use_uv(use_uv).with_env_var("UV", uv.as_str()))
     }
 
     /// Configure which uv integrations the test server enables.

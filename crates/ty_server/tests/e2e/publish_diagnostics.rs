@@ -966,8 +966,6 @@ mod uv_metadata {
     use anyhow::Result;
     use lsp_types::{Code, PublishDiagnosticsNotification};
     use ruff_db::system::SystemPath;
-    #[cfg(feature = "test-uv")]
-    use ruff_db::system::{OsSystem, System as _};
     use serde_json::json;
     use ty_project::UseUv;
 
@@ -975,18 +973,26 @@ mod uv_metadata {
 
     #[cfg(feature = "test-uv")]
     #[test]
-    fn project_refresh_clears_errors() -> Result<()> {
-        let manifest =
-            "[project]\nname = 'example'\nversion = '0.1.0'\nrequires-python = '>=3.8'\n";
-        let uv = OsSystem::default().which("uv")?;
+    fn project_refresh_reports_progress_and_clears_errors() -> Result<()> {
+        let manifest = r#"
+[project]
+name = "example"
+version = "0.1.0"
+requires-python = ">=3.8"
+"#;
         let mut server = TestServerBuilder::new()?
             .with_workspace(SystemPath::new("src"), None)?
             .with_file(
                 "src/pyproject.toml",
-                format!("{manifest}\n[tool.uv]\npackage = 'invalid'\n"),
+                format!(
+                    r#"{manifest}
+[tool.uv]
+package = "invalid"
+"#
+                ),
             )?
-            .with_use_uv(UseUv::On)
-            .with_env_var("UV", uv.as_str())
+            .with_real_uv(UseUv::On)?
+            .enable_work_done_progress(true)
             .build()
             .wait_until_workspaces_are_initialized();
         let event = lsp_types::FileEvent {
@@ -1001,16 +1007,18 @@ mod uv_metadata {
         );
 
         server.write_file("src/pyproject.toml", manifest)?;
-        let output = Command::new(uv.as_std_path())
+        let output = Command::new("uv")
             .current_dir(server.file_path("src"))
-            .args(["lock", "--offline"])
+            .args(["sync", "--offline"])
             .output()?;
         anyhow::ensure!(
             output.status.success(),
-            "uv lock failed: {}",
+            "uv sync failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
         server.did_change_watched_files(vec![event.clone()]);
+
+        server.assert_work_done_progress("Refreshing example metadata")?;
 
         // The existing warning is republished while the refresh is pending, then cleared.
         assert_eq!(

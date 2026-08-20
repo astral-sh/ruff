@@ -279,7 +279,7 @@ impl Project {
         self.metadata(db).root()
     }
 
-    fn name(self, db: &dyn Db) -> &str {
+    pub fn name(self, db: &dyn Db) -> &str {
         self.metadata(db).name()
     }
 

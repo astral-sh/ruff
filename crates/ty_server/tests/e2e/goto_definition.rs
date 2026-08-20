@@ -65,7 +65,7 @@ mod uv_metadata {
         TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
         WorkspaceDocumentDiagnosticReport,
     };
-    use ruff_db::system::{OsSystem, System as _, SystemPath, SystemPathBuf};
+    use ruff_db::system::{SystemPath, SystemPathBuf};
     use ty_project::UseUv;
     use ty_server::{ClientOptions, DiagnosticMode};
 
@@ -85,29 +85,14 @@ from attrs import define
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, source)?
-            .with_use_uv(UseUv::Scripts)
-            .with_env_var("UV", uv_executable()?)
+            .with_real_uv(UseUv::Scripts)?
             .enable_work_done_progress(true)
             .build()
             .wait_until_workspaces_are_initialized();
 
         server.open_text_document(script, source, 1);
 
-        let (request_id, progress) =
-            server.await_request::<lsp_types::WorkDoneProgressCreateRequest>();
-        server.send(lsp_server::Message::Response(lsp_server::Response::new_ok(
-            request_id,
-            (),
-        )));
-
-        let begin = server.await_notification::<lsp_types::ProgressNotification>();
-        assert_eq!(begin.token, progress.token);
-        let begin: lsp_types::WorkDoneProgressBegin = serde_json::from_value(begin.value)?;
-        assert_eq!(begin.title, "Syncing script.py");
-
-        let end = server.await_notification::<lsp_types::ProgressNotification>();
-        assert_eq!(end.token, progress.token);
-        let _: lsp_types::WorkDoneProgressEnd = serde_json::from_value(end.value)?;
+        server.assert_work_done_progress("Syncing script.py")?;
 
         let definition = server
             .goto_definition_request(script, Position::new(4, 18))
@@ -174,8 +159,7 @@ from attrs import define
             .with_workspace(second_workspace, None)?
             .with_file(first_script, first_source)?
             .with_file(second_script, second_source)?
-            .with_use_uv(UseUv::Scripts)
-            .with_env_var("UV", uv_executable()?)
+            .with_real_uv(UseUv::Scripts)?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -233,8 +217,7 @@ from idna import encode
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, initial)?
-            .with_use_uv(UseUv::Scripts)
-            .with_env_var("UV", uv_executable()?)
+            .with_real_uv(UseUv::Scripts)?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -310,8 +293,7 @@ from attrs import define
         let mut server = TestServerBuilder::new()?
             .with_workspace(SystemPath::new("src"), None)?
             .with_file(script, initial)?
-            .with_use_uv(UseUv::Scripts)
-            .with_env_var("UV", uv_executable()?)
+            .with_real_uv(UseUv::Scripts)?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -357,8 +339,7 @@ print(define)
                 Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
             )?
             .with_file(script, ordinary)?
-            .with_use_uv(UseUv::Scripts)
-            .with_env_var("UV", uv_executable()?)
+            .with_real_uv(UseUv::Scripts)?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -409,8 +390,7 @@ from attrs import define
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, initial)?
-            .with_use_uv(UseUv::Scripts)
-            .with_env_var("UV", uv_executable()?)
+            .with_real_uv(UseUv::Scripts)?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -494,8 +474,7 @@ from idna import encode
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, initial)?
-            .with_use_uv(UseUv::Scripts)
-            .with_env_var("UV", uv_executable()?)
+            .with_real_uv(UseUv::Scripts)?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -523,9 +502,5 @@ from idna import encode
         );
 
         Ok(())
-    }
-
-    fn uv_executable() -> Result<String> {
-        Ok(OsSystem::default().which("uv")?.into_string())
     }
 }
