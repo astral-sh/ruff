@@ -233,6 +233,14 @@ A proposal for a new lint rule in Ruff should include the following components:
     When choosing a diagnostic range (marked by `^^^^` above), also consider that the start of the
     range determines where `noqa` comments will be valid
 
+It may be difficult to determine all of this information before attempting an implementation. In
+that case, the essential aspects of an initial rule request are:
+
+- A proposed name
+- A proposed category (with the caveat that an ecosystem report helps to detect `pedantic` rules)
+- The first three sections of the rule documentation
+- An example diagnostic
+
 #### Rule naming convention
 
 Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "allow
