@@ -1038,6 +1038,35 @@ def inferable_last[I, N0, N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11]() -> Non
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
+### Gradual constraints on non-inferable type variables
+
+Gradual materializations that only constrain independent outer type variables cannot affect an
+inferable type variable. Repeated occurrences must not cause their materializations to be
+enumerated.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def _[I, K, V]() -> None:
+    constraints = ConstraintSet.lower_bound(int, I)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+    constraints &= is_constraint_set_assignable_to(Any, tuple[K, V, K, V, K, V] | None)
+
+    # revealed: tuple[Solution[I=int]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+```
+
 ### Repeated gradual alternatives on inferable bounds
 
 Independent gradual materializations can produce the same bound. Solving them must not enumerate

@@ -41,24 +41,48 @@ impl<'db> SolutionWalker<'db> {
         source_orders: FxIndexSet<ConstraintId>,
     ) -> Self {
         let inferable_support = Support::from_typevar_set(db, storage, inferable);
-        let relevant_gradual_origins = if storage.has_gradual_variables() {
-            source_orders
+        let mut relevant_gradual_origins = FxHashMap::default();
+        let mut canonical_gradual_constraints = FxHashMap::default();
+        if storage.has_gradual_variables() {
+            let mut relevant_support = inferable_support.clone();
+            relevant_support.close_over_constraints(storage, &source_orders.iter().copied());
+            let has_incomplete_support = source_orders
                 .iter()
-                .filter_map(|constraint| storage.constraint_data(*constraint).as_typevar())
-                .flat_map(|constraint| [constraint.provenance.lower, constraint.provenance.upper])
-                .flatten()
-                .map(|origin| (origin, origin))
-                .collect()
-        } else {
-            FxHashMap::default()
-        };
+                .any(|&constraint| !storage.constraint_support(constraint).is_complete());
+            let mut unrelated_constraints = FxHashMap::default();
+            for &constraint_id in &source_orders {
+                let Some(constraint) = storage.constraint_data(constraint_id).as_typevar() else {
+                    continue;
+                };
+
+                if has_incomplete_support
+                    || storage
+                        .constraint_support(constraint_id)
+                        .overlaps_with(&relevant_support)
+                {
+                    for origin in [constraint.provenance.lower, constraint.provenance.upper]
+                        .into_iter()
+                        .flatten()
+                    {
+                        relevant_gradual_origins.insert(origin, origin);
+                    }
+                } else {
+                    let representative = *unrelated_constraints
+                        .entry((constraint.typevar, constraint.bounds))
+                        .or_insert(constraint_id);
+                    if representative != constraint_id {
+                        canonical_gradual_constraints.insert(constraint_id, representative);
+                    }
+                }
+            }
+        }
 
         let mut walker = Self {
             inferable,
             inferable_support,
             source_orders,
             relevant_gradual_origins,
-            canonical_gradual_constraints: FxHashMap::default(),
+            canonical_gradual_constraints,
             relevant_gradual_nodes: FxHashMap::default(),
             explored_nodes: FxHashSet::default(),
             explored_gradual_nodes: FxHashSet::default(),
@@ -100,6 +124,10 @@ impl<'db> SolutionWalker<'db> {
                 representative = None;
                 continue;
             };
+            if !walker.relevant_gradual_origins.contains_key(&origin) {
+                representative = None;
+                continue;
+            }
 
             let support = storage.constraint_support(constraint_id);
             if origin_uses.get(&origin).copied() != Some(1) || support.iter().nth(1).is_some() {
