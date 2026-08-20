@@ -235,6 +235,7 @@ impl Violation for PytestUnittestAssertion {
 struct ExceptionHandlerVisitor<'a, 'b> {
     exception_name: &'a str,
     current_assert: Option<&'a Stmt>,
+    diagnostic_reported: bool,
     checker: &'a Checker<'b>,
 }
 
@@ -243,6 +244,7 @@ impl<'a, 'b> ExceptionHandlerVisitor<'a, 'b> {
         Self {
             exception_name,
             current_assert: None,
+            diagnostic_reported: false,
             checker,
         }
     }
@@ -253,6 +255,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
         match stmt {
             Stmt::Assert(_) => {
                 self.current_assert = Some(stmt);
+                self.diagnostic_reported = false;
                 visitor::walk_stmt(self, stmt);
                 self.current_assert = None;
             }
@@ -263,15 +266,17 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if let Some(current_assert) = self.current_assert {
-                    if id.as_str() == self.exception_name {
-                        self.checker.report_diagnostic(
-                            PytestAssertInExcept {
-                                name: id.to_string(),
-                            },
-                            current_assert.range(),
-                        );
-                    }
+                if let Some(current_assert) = self.current_assert
+                    && !self.diagnostic_reported
+                    && id.as_str() == self.exception_name
+                {
+                    self.checker.report_diagnostic(
+                        PytestAssertInExcept {
+                            name: id.to_string(),
+                        },
+                        current_assert.range(),
+                    );
+                    self.diagnostic_reported = true;
                 }
             }
             _ => visitor::walk_expr(self, expr),
