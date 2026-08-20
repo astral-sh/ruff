@@ -1,14 +1,15 @@
 use std::borrow::Cow;
 
+use lsp_server::ErrorCode;
 use lsp_types::request::CodeLensRequest;
 use lsp_types::{CodeLens, CodeLensParams, Url};
 use ty_ide::{CodeLensCommand, code_lens};
 use ty_project::{Db as _, ProjectDatabase};
-use ty_python_semantic::Program;
 
 use crate::capabilities::SupportedCommand;
 use crate::document::ToRangeExt;
-use crate::server::api::requests::execute_command::RunTestArgs;
+use crate::server::api::LSPResult;
+use crate::server::api::requests::execute_command::{RunTestArgs, python_executable};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -47,9 +48,8 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
 
         let items = code_lens(db, file);
         let cwd = root.to_string();
-        let Some(python_executable) = Program::get(db).python_executable(db) else {
-            return Ok(None);
-        };
+        let python_executable =
+            python_executable(db).with_failure_code(ErrorCode::InternalError)?;
 
         let lenses: Vec<CodeLens> = items
             .into_iter()
