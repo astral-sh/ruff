@@ -8392,13 +8392,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
-        if named.target.is_name_expr() {
+        if named.target.is_name_expr() && !self.in_string_annotation() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
             result.binding_type(definition)
         } else {
-            // For syntactically invalid targets, we still need to run type inference:
+            // String annotations have no indexed definitions, and syntactically invalid targets
+            // cannot define a name. Both sides still need inference to preserve their diagnostics.
             self.infer_expression(&named.target, TypeContext::default());
             self.infer_expression(&named.value, TypeContext::default());
             Type::unknown()
