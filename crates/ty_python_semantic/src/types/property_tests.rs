@@ -209,6 +209,16 @@ mod stable {
         forall fully_static_types t. t.is_subtype_of(db, env, t)
     );
 
+    // `tuple[T]` is a subtype of `tuple[T, ...]` for every fully static `T`, including `Never`.
+    type_property_test!(
+        fixed_length_tuple_is_subtype_of_homogeneous_tuple, db, env,
+        forall fully_static_types t. {
+            let fixed = Type::heterogeneous_tuple(db, env, [t]);
+            let homogeneous = Type::homogeneous_tuple(db, env, t);
+            fixed.is_subtype_of(db, env, homogeneous)
+        }
+    );
+
     // For any two fully static types, each type in the pair must be a subtype of their union.
     // (This is clearly not true for non-fully-static types, since their subtyping is not
     // reflexive.)

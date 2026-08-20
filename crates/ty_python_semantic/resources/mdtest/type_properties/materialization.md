@@ -74,11 +74,11 @@ def _(bottom_callable: Bottom[Callable[[Any, Unknown], None]]):
 
 The invariant position is represented with the `Bottom` special form.
 
-There is an argument that `Bottom[list[Any]]` should simplify to `Never`, since it is the infinite
-intersection of all possible materializations of `list[Any]`, and (due to invariance) these
-materializations are disjoint types. But currently we do not make this simplification: there doesn't
-seem to be any compelling need for it, and allowing more gradual types to materialize to `Never` has
-undesirable implications for mutual assignability of seemingly-unrelated gradual types.
+`Bottom[list[Any]]` has no runtime inhabitants, but we retain it as a non-bottom static type. Its
+list shape prevents unrelated gradual types from becoming mutually assignable. As a lower bound, it
+is a subtype of every materialization of `list[Any]`, including `list[int]` and `list[str]`. The
+generic disjointness check does not yet consistently preserve that common subtype; see the
+[invariant-generic disjointness TODOs](is_disjoint_from.md#invariant-and-covariant-generic-specializations).
 
 ```py
 def _(bottom_list: Bottom[list[Any]]):
@@ -302,6 +302,20 @@ static_assert(is_equivalent_to(Bottom[tuple[Unknown, int]], tuple[Never, int]))
 static_assert(is_equivalent_to(Top[tuple[Any, int, Unknown]], tuple[object, int, object]))
 static_assert(is_equivalent_to(Bottom[tuple[Any, int, Unknown]], tuple[Never, int, Never]))
 ```
+
+Materializing tuple elements also preserves variable-length segments, even when their element type
+becomes `Never`.
+
+```py
+static_assert(is_equivalent_to(Top[tuple[Any, ...]], tuple[object, ...]))
+static_assert(is_equivalent_to(Bottom[tuple[Any, ...]], tuple[Never, ...]))
+static_assert(not is_equivalent_to(Bottom[tuple[Any, ...]], tuple[()]))
+static_assert(is_equivalent_to(Bottom[tuple[int, *tuple[Any, ...], str]], tuple[int, *tuple[Never, ...], str]))
+```
+
+TODO: Account for gradual tuple length when computing the lower bound. `tuple[Any, ...]` can
+materialize to distinct fixed lengths, so the current element-wise result is not a subtype of every
+materialization.
 
 Except for when the tuple itself is in a contravariant position, then all positions in the tuple
 inherit the contravariant position.

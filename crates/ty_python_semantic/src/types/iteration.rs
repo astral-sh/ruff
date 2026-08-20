@@ -157,11 +157,11 @@ impl<'db> Type<'db> {
                     _ => None,
                 },
                 Type::Never => {
-                    // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
-                    // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
-                    // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
-                    // TODO: Consider removing this special case, and instead hide the indexing
-                    // diagnostic in unreachable code.
+                    // Preserve a permissive iteration fallback for an expression that cannot
+                    // produce a value.
+                    // TODO: Revisit this workaround now that `tuple[Never, ...]` retains its
+                    // variable-length shape. Unreachable-code handling should suppress diagnostics
+                    // caused by impossible iteration.
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
                 Type::TypeAlias(alias) => non_async_special_case(db, env, alias.value_type(db)),

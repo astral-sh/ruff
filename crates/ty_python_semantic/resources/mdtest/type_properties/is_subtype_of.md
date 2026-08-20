@@ -353,6 +353,22 @@ static_assert(
 )
 ```
 
+## Subtyping across mixed tuple boundaries
+
+A required element at one end can satisfy a requirement at the other end when the intervening
+elements are all `Never`.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+# TODO: Align required prefixes and suffixes across the variable-length segment.
+# Both assertions should pass.
+static_assert(is_subtype_of(tuple[int, *tuple[Never, ...]], tuple[*tuple[object, ...], int]))  # error: [static-assert-error]
+static_assert(is_subtype_of(tuple[*tuple[Never, ...], int], tuple[int, *tuple[object, ...]]))  # error: [static-assert-error]
+```
+
 ## Subtyping of the gradual tuple
 
 ```toml

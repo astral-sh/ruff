@@ -252,8 +252,9 @@ static_assert(is_disjoint_from(tuple[Never], tuple[()]))
 static_assert(is_disjoint_from(tuple[Never, Never], tuple[int]))
 ```
 
-Tuple elements are covariant. Consequently, a potentially inhabited `tuple[Never]` is a common
-subtype of tuple types whose element types would otherwise be disjoint.
+`tuple[Never]` retains its shape as a non-bottom static type. Because tuple elements are covariant,
+it is a common subtype of tuple types with disjoint element types. This static overlap does not
+imply that their intersection has a runtime inhabitant.
 
 ```py
 static_assert(is_subtype_of(tuple[Never], tuple[int]))
@@ -296,12 +297,25 @@ static_assert(not is_disjoint_from(BottomTuple, tuple[str]))
 static_assert(is_disjoint_from(BottomTuple, tuple[()]))
 ```
 
-A homogeneous `tuple[Never, ...]` has no required elements and therefore simplifies to the empty
-tuple type rather than overlapping tuples with required elements.
+A homogeneous `tuple[Never, ...]` retains every possible static tuple length. It therefore overlaps
+both the empty tuple and fixed-length tuples through their corresponding `Never` element types, even
+when the fixed-length intersection has no runtime inhabitants.
 
 ```py
 static_assert(not is_disjoint_from(tuple[Never, ...], tuple[()]))
-static_assert(is_disjoint_from(tuple[Never, ...], tuple[int]))
+static_assert(not is_disjoint_from(tuple[Never, ...], tuple[int]))
+static_assert(not is_disjoint_from(tuple[Never, ...], tuple[int, str]))
+static_assert(not is_disjoint_from(tuple[Never, ...], tuple[Never]))
+static_assert(is_disjoint_from(tuple[Never, ...], str))
+```
+
+A mixed tuple with a homogeneous `Never` segment also retains all lengths compatible with its
+required prefix and suffix. Tuples shorter than that required portion remain disjoint.
+
+```py
+static_assert(not is_disjoint_from(tuple[int, Unpack[tuple[Never, ...]], str], tuple[int, str]))
+static_assert(not is_disjoint_from(tuple[int, Unpack[tuple[Never, ...]], str], tuple[int, int, str]))
+static_assert(is_disjoint_from(tuple[int, Unpack[tuple[Never, ...]], str], tuple[int]))
 ```
 
 ## Unions
@@ -1097,20 +1111,23 @@ tag identifies the `NewType` applied to a value. Neither kind of tag is visible 
 object itself, but both affect which types an inhabitant belongs to.
 
 Generic tags carry guarantees about how an object can be used. The invariant types `list[int]` and
-`list[str]` are disjoint because one reference could append a string that the other would then
-incorrectly read as an integer. These incompatible generic tags cannot describe the same object
-simultaneously in soundly typed code.
+`list[str]` cannot share a realizable typed inhabitant: one reference could append a string that the
+other would then incorrectly read as an integer. This does not by itself establish static
+disjointness. We retain `Bottom[list[Any]]` as a non-bottom common subtype, but the generic
+disjointness check does not yet account for this static overlap.
 
-Unlike incompatible invariant generic tags, distinct `NewType` tags can describe different typed
-inhabitants of the same runtime object. If `UserId` and `OrderId` are distinct integer `NewType`s,
-both `UserId(value)` and `OrderId(value)` return the same integer unchanged at runtime, but their
-tags are incompatible. The two `NewType`s are disjoint even though their values can identify the
-same runtime object. Both types still overlap `int`, which does not require either specific tag.
+Distinct `NewType` tags can describe different typed inhabitants of the same runtime object. If
+`UserId` and `OrderId` are distinct integer `NewType`s, both `UserId(value)` and `OrderId(value)`
+return the same integer unchanged at runtime, but their tags are incompatible. The two `NewType`s
+are disjoint even though their values can identify the same runtime object. Both types still overlap
+`int`, which does not require either specific tag.
 
 ### Invariant and covariant generic specializations
 
-Incompatible invariant arguments make generic specializations disjoint. Covariant specializations
-can still overlap when a common empty or bottom specialization satisfies both.
+The current implementation treats incompatible invariant arguments as proof of disjointness. The
+assertions below record this behavior, which still needs to account for non-bottom common subtypes.
+Covariant specializations already overlap when a common empty or bottom specialization satisfies
+both.
 
 ```pyi
 from collections.abc import Sequence
@@ -1118,6 +1135,8 @@ from typing import Any, Generic, TypeVar
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
+# TODO: `Bottom[list[Any]]` is a non-bottom subtype of both specializations,
+# so their static intersection must not simplify to `Never`. This should return false.
 static_assert(is_disjoint_from(list[int], list[str]))
 
 T = TypeVar("T")
@@ -1144,16 +1163,19 @@ class InvSubA(Invariant[A]):
 class CoSubB(Covariant[B]):
     pass
 
+# TODO: Account for `Bottom[Invariant[Any]]` when checking these invariant specializations
+# and their subclasses for static overlap.
 static_assert(is_disjoint_from(Invariant[A], Invariant[B]))
 static_assert(is_disjoint_from(InvSubA, Invariant[B]))
 static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
 static_assert(not is_disjoint_from(Invariant[Any], Invariant[B]))
 static_assert(not is_disjoint_from(Invariant[B], Invariant[Any]))
-# `A | Any` cannot materialize to be equivalent to `B`.
+# The current invariant-tag check observes that `A | Any` cannot materialize to `B`.
 static_assert(is_disjoint_from(Invariant[A | Any], Invariant[B]))
 static_assert(is_disjoint_from(Invariant[B], Invariant[A | Any]))
 static_assert(is_disjoint_from(Invariant[A & Any], Invariant[B]))
 static_assert(is_disjoint_from(Invariant[B], Invariant[A & Any]))
+# TODO: These specializations share the non-bottom subtype `Bottom[InvariantPair[A, Any]]`.
 static_assert(is_disjoint_from(InvariantPair[A, A], InvariantPair[A, B]))
 static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
 static_assert(not is_disjoint_from(Covariant[A], CoSubB))
@@ -1218,6 +1240,7 @@ def _[U]():
     static_assert(not is_disjoint_from(Invariant[Id[U]], Invariant[int]))
 
 static_assert(not is_disjoint_from(Invariant[Id[int]], Invariant[int]))
+# TODO: Account for the non-bottom common subtype `Bottom[Invariant[Any]]` here as well.
 static_assert(is_disjoint_from(Invariant[Id[int]], Invariant[str]))
 
 class Mixed[T, U]:

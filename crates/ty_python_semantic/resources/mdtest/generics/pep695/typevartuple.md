@@ -711,6 +711,10 @@ def check_structural(
 Unions of structurally compatible protocols retain the same tuple. Incompatible alternatives are
 rejected, but their overlapping tuple constraints are preserved in the fallback result.
 
+TODO: Intersect fixed-length tuples elementwise, so `tuple[str] & tuple[bytes]` becomes
+`tuple[Never]`. The fallback should preserve that one-element pack instead of producing a nested,
+arbitrary-length tuple.
+
 ```py
 class Other[*Ts](Protocol):
     def call(self, *args: *Ts) -> None: ...

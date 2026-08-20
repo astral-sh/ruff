@@ -850,18 +850,21 @@ impl<'db> Type<'db> {
         checker.check_type_pair(db, self, other)
     }
 
-    /// Return true if `self & other` should simplify to `Never`:
-    /// if the intersection of the two types could never be inhabited by any
-    /// possible runtime value.
+    /// Return true if the static intersection `self & other` should simplify to `Never`.
+    ///
+    /// Having no runtime inhabitants is not sufficient. For example, `tuple[int] & tuple[str]`
+    /// is runtime-uninhabited, but `tuple[Never]` is a common subtype of both operands. We preserve
+    /// `tuple[Never]` as a non-bottom static type to retain its tuple shape, so their intersection
+    /// must not simplify to `Never`.
     ///
     /// Our implementation of disjointness for non-fully-static types only
     /// returns true if the *top materialization* of `self` has no overlap with
     /// the *top materialization* of `other`.
     ///
-    /// For example, `list[int]` is disjoint from `list[str]`: the two types have
-    /// no overlap. But `list[Any]` is not disjoint from `list[str]`: there exists
+    /// For example, `list[int]` is disjoint from `str`: the two types have
+    /// no static overlap. But `list[Any]` is not disjoint from `list[str]`: there exists
     /// a fully static materialization of `list[Any]` (`list[str]`) that is a
-    /// subtype of `list[str]`
+    /// subtype of `list[str]`.
     ///
     /// This function aims to have no false positives, but might return wrong
     /// `false` answers in some cases.

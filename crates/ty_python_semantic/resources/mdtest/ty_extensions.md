@@ -359,9 +359,9 @@ from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never, Union
 
 static_assert(is_equivalent_to(type, type[object]))
-static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
 static_assert(is_equivalent_to(int | str, Union[int, str]))
 
+static_assert(not is_equivalent_to(tuple[Never, ...], tuple[()]))
 static_assert(not is_equivalent_to(int, str))
 static_assert(not is_equivalent_to(int | str, int | str | bytes))
 ```

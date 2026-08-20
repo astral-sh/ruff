@@ -171,8 +171,9 @@ x: list[Never] = []
 
 ## Tuples involving `Never`
 
-A type like `tuple[int, Never]` remains distinct from `Never`. A tuple annotation can describe
-user-defined subclasses, so its element types remain part of the type:
+A type like `tuple[int, Never]` remains distinct from `Never`. No runtime value satisfies its
+required `Never` element, but its tuple shape and other element types remain part of the static
+type:
 
 ```py
 from ty_extensions import static_assert
