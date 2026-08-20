@@ -2384,19 +2384,22 @@ def _(command: Any):
     mapping: DictLike[type[Command]] = reveal_type({"command": command})
 ```
 
-Type context specialized to a gradual type should not be ignored:
+Gradual type context retains its concrete lower bounds.
 
 ```py
+from typing import Any
 from ty_extensions._internal import Unknown
 
 def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
     raise NotImplementedError
 
 def _(dynamic: Unknown):
-    # TODO: This should not error.
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Unknown, int | str | Unknown]
+    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[Unknown | str | int, Unknown | int | str]
+
+def _(dynamic: Any):
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Any, int | str | Any]
+    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[Any | str | int, Any | int | str]
 ```
 
 Note that long chains of callables with constraint dependencies in reverse source-order may require

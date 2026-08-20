@@ -7721,6 +7721,15 @@ impl<'db> Binding<'db> {
         // approach would be to propagate constraint sets as type context, making bidirectional
         // inference constraint-set-aware, or to infer constraint sets directly for argument types,
         // and avoid the need to construct type context before call inference has completed.
+        //
+        // A gradual specialization can retain useful concrete bounds, but only when an argument
+        // actually is gradual. Otherwise, inherited gradual evidence can hide an incompatible
+        // static argument during a later inference round.
+        let has_gradual_argument = self
+            .parameter_tys
+            .iter()
+            .flatten()
+            .any(|argument| argument.has_dynamic(db, env));
         Some(generic_context.specialize_recursive(
             db,
             generic_context.variables(db).map(|typevar| {
@@ -7730,7 +7739,13 @@ impl<'db> Binding<'db> {
                 let argument_constraints = self
                     .specialization(db)
                     .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_dynamic(db, env))
+                    .filter(|ty| {
+                        !ty.has_dynamic(db, env)
+                            || (has_gradual_argument
+                                && ty
+                                    .materialize_once(db, env)
+                                    .is_some_and(|range| !range.bottom.is_never()))
+                    })
                     .map(|ty| ty.promote(db, env));
 
                 // TODO: We should similarly combine both the call expression and argument constraints
