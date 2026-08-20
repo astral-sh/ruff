@@ -105,8 +105,9 @@ use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
-use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::{ExpressionNodeKey, Program};
 use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
@@ -267,6 +268,7 @@ struct OwnedConstraintSetInner<'db> {
     constraint_indices: RankBitBox,
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     gradual_variables: Box<[DynamicType<'db>]>,
+    gradual_occurrences: Option<Box<GradualOccurrences<'db>>>,
     nodes: Box<[InteriorNodeData]>,
     node_supports: Box<[SupportId]>,
     node_indices: RankBitBox,
@@ -276,6 +278,17 @@ struct OwnedConstraintSetInner<'db> {
     /// history.
     source_orders: Box<[SourceOrder]>,
 }
+
+/// The stable identity of a gradual decision created by an explicit constraint-set expression.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct GradualOccurrence<'db> {
+    scope: ScopeId<'db>,
+    expression: ExpressionNodeKey,
+    variable: GradualVariableId,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct GradualOccurrences<'db>(Box<[(GradualVariableId, GradualOccurrence<'db>)]>);
 
 impl Default for OwnedConstraintSet<'_> {
     fn default() -> Self {
@@ -304,6 +317,37 @@ impl<'db> OwnedConstraintSet<'db> {
     /// acceptable.
     pub(crate) fn is_trivially_always_satisfied(&self) -> bool {
         self.node == ALWAYS_TRUE
+    }
+
+    /// Retains the identity of each gradual decision across repeated loads of this expression.
+    pub(crate) fn with_gradual_occurrences(
+        mut self,
+        scope: ScopeId<'db>,
+        expression: ExpressionNodeKey,
+    ) -> Self {
+        if let Some(inner) = &mut self.inner
+            && !inner.gradual_variables.is_empty()
+        {
+            let occurrences = inner
+                .gradual_variables
+                .iter()
+                .enumerate()
+                .map(|(index, _)| {
+                    let variable = GradualVariableId::from_usize(index);
+                    (
+                        variable,
+                        GradualOccurrence {
+                            scope,
+                            expression,
+                            variable,
+                        },
+                    )
+                })
+                .collect();
+            Arc::make_mut(inner).gradual_occurrences =
+                Some(Box::new(GradualOccurrences(occurrences)));
+        }
+        self
     }
 
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
@@ -1150,6 +1194,9 @@ struct ConstraintSetStorage<'db> {
     /// The gradual type associated with each opaque decision or occurrence.
     gradual_variables: IndexVec<GradualVariableId, DynamicType<'db>>,
 
+    /// Stable decisions are only needed for explicitly constructed constraint-set expressions.
+    gradual_occurrences: Option<Box<FxHashMap<GradualOccurrence<'db>, GradualVariableId>>>,
+
     /// The materialization responsible for bounds created by the current projected relation.
     active_gradual_origin: Option<GradualVariableId>,
 
@@ -1429,6 +1476,20 @@ impl<'db> ConstraintSetBuilder<'db> {
                 })
             })
             .collect();
+        let gradual_occurrences = storage.gradual_occurrences.and_then(|occurrences| {
+            let mut occurrences: Vec<_> = (*occurrences)
+                .into_iter()
+                .filter_map(|(occurrence, variable)| {
+                    mapped_variables
+                        .get(&variable)
+                        .copied()
+                        .map(|variable| (variable, occurrence))
+                })
+                .collect();
+            occurrences.sort_unstable_by_key(|(variable, _)| variable.index());
+            (!occurrences.is_empty())
+                .then(|| Box::new(GradualOccurrences(occurrences.into_boxed_slice())))
+        });
         let constraint_supports = storage
             .constraint_supports
             .into_iter()
@@ -1456,6 +1517,7 @@ impl<'db> ConstraintSetBuilder<'db> {
                 constraint_indices,
                 typevars: storage.typevars,
                 gradual_variables: gradual_variables.into_boxed_slice(),
+                gradual_occurrences,
                 nodes,
                 node_supports,
                 node_indices,
@@ -1477,8 +1539,8 @@ impl<'db> ConstraintSetBuilder<'db> {
     /// `OwnedConstraintSet::query` when you only need to query a single owned set, since that
     /// avoids remapping and preserves the original TDD structure.
     ///
-    /// Each load also gives the owned set's opaque gradual decisions fresh builder-local
-    /// identities, preventing distinct loads from conflating unrelated gradual constraints.
+    /// Untagged gradual decisions receive fresh builder-local identities. Explicit constraint-set
+    /// expressions instead retain their stable decision identities across repeated loads.
     pub(crate) fn load<'c>(
         &'c self,
         db: &'db dyn Db,
@@ -1649,6 +1711,34 @@ impl<'db> ConstraintSetStorage<'db> {
     fn next_gradual_variable_id(&mut self, ty: DynamicType<'db>) -> GradualVariableId {
         let id = self.gradual_variables.push(ty);
         self.adjusted_gradual_variable_id(id)
+    }
+
+    /// Reuses a stable expression-local decision without affecting ordinary relation templates.
+    fn intern_gradual_occurrence(
+        &mut self,
+        occurrence: GradualOccurrence<'db>,
+        ty: DynamicType<'db>,
+    ) -> GradualVariableId {
+        let compacted = self.compacted.as_ref();
+        let occurrences = self.gradual_occurrences.get_or_insert_with(|| {
+            Box::new(
+                compacted
+                    .and_then(|inner| inner.gradual_occurrences.as_ref())
+                    .into_iter()
+                    .flat_map(|occurrences| occurrences.0.iter())
+                    .map(|&(variable, occurrence)| (occurrence, variable))
+                    .collect(),
+            )
+        });
+        if let Some(&variable) = occurrences.get(&occurrence) {
+            return variable;
+        }
+
+        let variable = self.next_gradual_variable_id(ty);
+        self.gradual_occurrences
+            .get_or_insert_default()
+            .insert(occurrence, variable);
+        variable
     }
 
     fn gradual_origin(&self, id: GradualVariableId) -> GradualOrigin<'db> {
@@ -2008,8 +2098,39 @@ impl<'db> ConstraintSetStorage<'db> {
                 self.gradual_variables.len(),
             ))
             .index();
-        self.gradual_variables
-            .extend(inner.gradual_variables.iter().copied());
+        let gradual_variables = if let Some(occurrences) = &inner.gradual_occurrences {
+            Some(
+                inner
+                    .gradual_variables
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .map(|(index, ty)| {
+                        let variable = GradualVariableId::from_usize(index);
+                        if let Ok(index) = occurrences
+                            .0
+                            .binary_search_by_key(&variable, |(variable, _)| *variable)
+                        {
+                            let occurrence = occurrences.0[index].1;
+                            self.intern_gradual_occurrence(occurrence, ty)
+                        } else {
+                            self.next_gradual_variable_id(ty)
+                        }
+                    })
+                    .collect::<Box<[_]>>(),
+            )
+        } else {
+            self.gradual_variables
+                .extend(inner.gradual_variables.iter().copied());
+            None
+        };
+        let map_variable = |variable: GradualVariableId| {
+            gradual_variables
+                .as_ref()
+                .map_or(variable + gradual_offset, |variables| {
+                    variables[variable.index()]
+                })
+        };
 
         // Rebuild constraints in their saved order, using the destination's typevar ordering.
         let constraints: Box<[_]> = inner
@@ -2017,9 +2138,7 @@ impl<'db> ConstraintSetStorage<'db> {
             .iter()
             .map(|old_constraint| match old_constraint {
                 ConstraintData::TypeVar(old_constraint) => {
-                    let mut provenance = old_constraint
-                        .provenance
-                        .map(|origin| origin + gradual_offset);
+                    let mut provenance = old_constraint.provenance.map(map_variable);
                     provenance.lower = provenance
                         .lower
                         .or(old_constraint.bounds.lower.and(self.active_gradual_origin));
@@ -2036,9 +2155,9 @@ impl<'db> ConstraintSetStorage<'db> {
                         provenance,
                     )
                 }
-                ConstraintData::Gradual(variable) => variable
-                    .map(|id| id + gradual_offset)
-                    .new_node(db, env, self),
+                ConstraintData::Gradual(variable) => {
+                    variable.map(map_variable).new_node(db, env, self)
+                }
             })
             .collect();
 
@@ -2141,7 +2260,7 @@ pub struct TypeVarId;
 
 /// The builder-local identity of one gradual materialization constraint.
 #[newtype_index]
-#[derive(Ord, PartialOrd, get_size2::GetSize)]
+#[derive(Ord, PartialOrd, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct GradualVariableId;
 
 /// A gradual occurrence shared by its distinct materialization decisions.

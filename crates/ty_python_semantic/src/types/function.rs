@@ -82,7 +82,7 @@ use crate::types::diagnostic::{
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
 use crate::types::infer::{infer_definition_types, nearest_enclosing_class, original_class_type};
-use crate::types::known_instance::DeprecatedInstance;
+use crate::types::known_instance::{DeprecatedInstance, InternedConstraintSet};
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
@@ -2481,6 +2481,21 @@ impl KnownFunction {
         let parameter_types = overload.parameter_types();
 
         match self {
+            KnownFunction::IsConstraintSetAssignableTo => {
+                let Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)) =
+                    overload.return_ty
+                else {
+                    return;
+                };
+                let constraints = tracked
+                    .constraints(db)
+                    .clone()
+                    .with_gradual_occurrences(context.scope(), call_expression.into());
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    InternedConstraintSet::new(db, constraints),
+                )));
+            }
+
             KnownFunction::RevealType => {
                 let env = context.program_environment();
                 let revealed_type = overload

@@ -1425,6 +1425,10 @@ static_assert((gradual | ConstraintSet.never()) == gradual)
 static_assert((ConstraintSet.never() | gradual) == gradual)
 static_assert((gradual & ConstraintSet.always()) == gradual)
 static_assert((ConstraintSet.always() & gradual) == gradual)
+static_assert((gradual & gradual) == gradual)
+static_assert((gradual | gradual) == gradual)
+static_assert((gradual & ~gradual) == ConstraintSet.never())
+static_assert((gradual | ~gradual) == ConstraintSet.always())
 static_assert(gradual)
 static_assert(is_assignable_to(Any, int))
 static_assert(is_constraint_set_assignable_to(Any, object) == ConstraintSet.always())
@@ -1467,6 +1471,9 @@ def _[T]() -> None:
 first = is_constraint_set_assignable_to(Any, int)
 second = is_constraint_set_assignable_to(Any, str)
 
+static_assert(first != second)
+static_assert(not first.satisfies(second))
+
 # revealed: ConstraintSet[((gradual@0) ∧ (gradual@1))]
 reveal_type((first & second).with_detailed_display())
 ```
@@ -1475,6 +1482,9 @@ Independent materializations remain distinct even when their relations are ident
 
 ```py
 same_target = is_constraint_set_assignable_to(Any, int)
+
+static_assert(first != same_target)
+static_assert(not first.satisfies(same_target))
 
 # revealed: ConstraintSet[((gradual@0) ∧ (gradual@1))]
 reveal_type((first & same_target).with_detailed_display())
