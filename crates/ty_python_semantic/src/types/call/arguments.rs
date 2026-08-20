@@ -46,35 +46,57 @@ struct CallArgument<'a, 'db> {
     types: CallArgumentTypes<'db>,
 }
 
+/// The result of inferring an argument under a particular type context.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CallArgumentType<'db> {
+    pub(crate) ty: Type<'db>,
+    /// A failed generic or overloaded call still produces a recovery type, but that type cannot
+    /// establish a match for the overload that supplied the context.
+    pub(crate) is_valid: bool,
+}
+
+impl<'db> CallArgumentType<'db> {
+    fn valid(ty: Type<'db>) -> Self {
+        Self { ty, is_valid: true }
+    }
+}
+
 /// Inferred types for a given argument.
 ///
 /// Note that a single argument may produce multiple distinct inferred types when inferred
 /// with type context across multiple bindings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
-    fallback_type: Option<Type<'db>>,
-    types: FxHashMap<Type<'db>, Type<'db>>,
+    fallback_type: Option<CallArgumentType<'db>>,
+    types: FxHashMap<Type<'db>, CallArgumentType<'db>>,
 }
 
 impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
-            fallback_type: fallback_ty,
+            fallback_type: fallback_ty.map(CallArgumentType::valid),
             types: FxHashMap::default(),
         }
     }
 
     /// Returns the most appropriate type of this argument when there is no specific declared type.
     pub(crate) fn get_default(&self) -> Option<Type<'db>> {
-        // If this type was inferred against exactly one declared type, or was inferred against
-        // multiple, but resulted in a single inferred type, we have an exact type to return.
-        if let Ok(exact_ty) = self
+        self.default_inference().map(|inferred| inferred.ty)
+    }
+
+    fn default_inference(&self) -> Option<CallArgumentType<'db>> {
+        // If every contextual inference produced the same type, use it as the default. At least
+        // one of those inferences must have succeeded for the common type to establish a match.
+        if let Ok(ty) = self
             .types
             .values()
-            .exactly_one()
-            .or_else(|_| self.types.values().all_equal_value())
+            .map(|inferred| inferred.ty)
+            .all_equal_value()
         {
-            return Some(*exact_ty);
+            return Some(CallArgumentType {
+                ty,
+                is_valid: self.types.values().any(|inferred| inferred.is_valid),
+            });
         }
 
         self.fallback_type
@@ -82,19 +104,29 @@ impl<'db> CallArgumentTypes<'db> {
 
     /// Returns the type of this argument when inferred against the provided declared type.
     pub(crate) fn get_for_declared_type(&self, tcx: Type<'db>) -> Type<'db> {
-        self.types
-            .get(&tcx)
-            .copied()
-            .or_else(|| self.get_default())
+        self.inference_for_declared_type(tcx)
+            .map(|inferred| inferred.ty)
             .unwrap_or(Type::unknown())
     }
 
+    pub(crate) fn is_valid_for_declared_type(&self, tcx: Type<'db>) -> bool {
+        self.inference_for_declared_type(tcx)
+            .is_none_or(|inferred| inferred.is_valid)
+    }
+
+    fn inference_for_declared_type(&self, tcx: Type<'db>) -> Option<CallArgumentType<'db>> {
+        self.types
+            .get(&tcx)
+            .copied()
+            .or_else(|| self.default_inference())
+    }
+
     /// Insert the type of this argument when inferred with the provided type context.
-    fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
-        match tcx.into().annotation {
-            None => self.fallback_type = Some(ty),
+    fn insert(&mut self, tcx: TypeContext<'db>, inferred: CallArgumentType<'db>) {
+        match tcx.annotation {
+            None => self.fallback_type = Some(inferred),
             Some(tcx) => {
-                self.types.insert(tcx, ty);
+                self.types.insert(tcx, inferred);
             }
         }
     }
@@ -102,8 +134,11 @@ impl<'db> CallArgumentTypes<'db> {
     fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
         self.types
             .iter()
-            .map(|(tcx, ty)| (TypeContext::new(Some(*tcx)), *ty))
-            .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
+            .map(|(tcx, inferred)| (TypeContext::new(Some(*tcx)), inferred.ty))
+            .chain(
+                self.fallback_type
+                    .map(|inferred| (TypeContext::default(), inferred.ty)),
+            )
     }
 }
 
@@ -210,13 +245,13 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         &mut self,
         index: usize,
         tcx: impl Into<TypeContext<'db>>,
-        ty: Type<'db>,
+        inferred: CallArgumentType<'db>,
     ) {
         self.items
             .get_mut(index)
             .expect("argument index should be valid")
             .types
-            .insert(tcx, ty);
+            .insert(tcx.into(), inferred);
     }
 
     pub(crate) fn clear_types(&mut self, index: usize) {
@@ -379,7 +414,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 };
 
                 // Find the next type that can be expanded.
-                let expanded_types = loop {
+                let (expanded_types, is_valid) = loop {
                     let arg_type = self.argument_types(index)?;
                     // TODO: For types inferred multiple times with distinct type context, we currently only
                     // expand the default inference. Note that direct expansion of a type inferred against a
@@ -388,10 +423,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     // argument type against the union a given subset of type contexts before expansion. However,
                     // this only shows up in very convoluted instances of generic call inference across multiple
                     // overloads, and is unlikely to happen in practice.
-                    if let Some(arg_type) = arg_type.get_default()
-                        && let Some(expanded_types) = expand_type(db, &env, arg_type)
+                    if let Some(inferred) = arg_type.default_inference()
+                        && let Some(expanded_types) = expand_type(db, &env, inferred.ty)
                     {
-                        break expanded_types;
+                        break (expanded_types, inferred.is_valid);
                     }
                     index += 1;
                 };
@@ -410,8 +445,15 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 for pre_expanded_types in state.iter(self) {
                     for subtype in &expanded_types {
                         let mut expanded_argument = pre_expanded_types.clone();
-                        expanded_argument.items[index].types =
-                            CallArgumentTypes::new(Some(*subtype));
+                        // This argument is now checked against one member of its default type.
+                        // Contextual failures on other arguments still apply.
+                        expanded_argument.items[index].types = CallArgumentTypes {
+                            fallback_type: Some(CallArgumentType {
+                                ty: *subtype,
+                                is_valid,
+                            }),
+                            types: FxHashMap::default(),
+                        };
                         expanded_arguments.push(expanded_argument);
                     }
                 }

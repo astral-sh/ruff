@@ -1607,6 +1607,182 @@ def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
     return future
 ```
 
+## Failed generic calls do not match outer overloads
+
+Generic call inference currently fails when the `Child` return context conflicts with the `Parent`
+argument. The resulting `Unknown` must not make the outer overload ambiguous.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Parent: ...
+class Child(Parent): ...
+
+@overload
+def inner[T](value: T, key: None = None) -> T: ...
+@overload
+def inner[T](value: T, key: Callable[[T], object]) -> T: ...
+def inner[T](value: T, key: Callable[[T], object] | None = None) -> T:
+    return value
+
+@overload
+def outer(value: Child) -> Child: ...
+@overload
+def outer(value: Parent) -> Parent: ...
+def outer(value: Parent) -> Parent:
+    return value
+
+def _(value: Parent):
+    reveal_type(inner(value, lambda _: None))  # revealed: Parent
+    reveal_type(outer(inner(value, lambda _: None)))  # revealed: Parent
+```
+
+## Failed generic calls with invariant return types
+
+No specialization of the inner call can accept `list[Parent]` and return `list[Child]`. Its recovery
+type must not select the first outer overload.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Parent: ...
+class Child(Parent): ...
+
+@overload
+def inner[T](value: T, key: None = None) -> T: ...
+@overload
+def inner[T](value: T, key: Callable[[T], object]) -> T: ...
+def inner[T](value: T, key: Callable[[T], object] | None = None) -> T:
+    return value
+
+@overload
+def outer(value: list[Child]) -> list[Child]: ...
+@overload
+def outer(value: list[Parent]) -> list[Parent]: ...
+def outer(value: object) -> object:
+    return value
+
+def _(value: list[Parent]):
+    reveal_type(outer(inner(value, lambda _: None)))  # revealed: list[Parent]
+```
+
+The same rule applies to non-overloaded generic calls:
+
+```py
+def direct[T](value: T, key: Callable[[T], object]) -> T:
+    return value
+
+def _(value: list[Parent]):
+    reveal_type(outer(direct(value, lambda _: None)))  # revealed: list[Parent]
+```
+
+As well as calls nested in collection literals:
+
+```py
+@overload
+def outer_tuple(value: tuple[list[Child]]) -> list[Child]: ...
+@overload
+def outer_tuple(value: tuple[list[Parent]]) -> list[Parent]: ...
+def outer_tuple(value: tuple[object]) -> object:
+    return value[0]
+
+def _(value: list[Parent]):
+    reveal_type(outer_tuple((inner(value, lambda _: None),)))  # revealed: list[Parent]
+```
+
+When both contextual inferences are valid, ordinary overload declaration order still applies.
+
+```py
+@overload
+def ordered(value: list[Parent]) -> int: ...
+@overload
+def ordered(value: list[Child]) -> str: ...
+def ordered(value: object) -> int | str:
+    raise NotImplementedError
+
+reveal_type(ordered([Child()]))  # revealed: int
+```
+
+## Argument expansion preserves failures in other arguments
+
+Expanding `tag` does not change the inner call's return type. The `int` member still has no matching
+overload because `list[Parent]` is not assignable to `list[Child]`.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Parent: ...
+class Child(Parent): ...
+
+def inner[T](value: T, key: Callable[[T], object]) -> T:
+    return value
+
+@overload
+def outer(value: list[Child], tag: int) -> int: ...
+@overload
+def outer(value: list[Parent], tag: str) -> str: ...
+def outer(value: object, tag: int | str) -> int | str:
+    return tag
+
+def _(value: list[Parent], tag: int | str):
+    # error: [no-matching-overload]
+    reveal_type(outer(inner(value, lambda _: None), tag))  # revealed: Unknown
+```
+
+## Overload matching preserves gradual and known return types
+
+A genuine `Any` still makes overload matching ambiguous. An invalid non-generic call also retains
+its declared return type, which can select an outer overload.
+
+```py
+from typing import Any, overload
+
+@overload
+def outer(value: str) -> str: ...
+@overload
+def outer(value: int) -> int: ...
+def outer(value: str | int) -> str | int:
+    return value
+
+def inner(value: int) -> str:
+    return str(value)
+
+def _(dynamic: Any):
+    reveal_type(outer(dynamic))  # revealed: Unknown
+    # error: [invalid-argument-type]
+    reveal_type(outer(inner("wrong argument")))  # revealed: str
+```
+
+## Overload inference does not discard shared lambda bodies
+
+Lambda bodies currently obtain their parameter types through the enclosing statement. A failure in
+that shared inference must not discard both callback candidates.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+@overload
+def inner(value: int) -> int: ...
+@overload
+def inner(value: bytes) -> int: ...
+def inner(value: int | bytes) -> int:
+    return 0
+
+@overload
+def outer(callback: Callable[[str], int]) -> str: ...
+@overload
+def outer(callback: Callable[[int], int]) -> int: ...
+def outer(callback: Callable[[str], int] | Callable[[int], int]) -> str | int:
+    raise NotImplementedError
+
+# TODO: Infer the body independently for each candidate, and reveal `int`.
+reveal_type(outer(lambda value: inner(value)))  # revealed: str
+```
+
 ## Class constructor parameters
 
 The parameters of both `__init__` and `__new__` are used as type context sources for constructor

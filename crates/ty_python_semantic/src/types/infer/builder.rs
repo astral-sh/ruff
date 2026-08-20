@@ -8,7 +8,7 @@ use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -51,7 +51,9 @@ use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attri
 use crate::types::call::bind::{
     ArgumentTypeContext, CheckTypesMode, OverloadSet, requires_overload_evaluation,
 };
-use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::call::{
+    Binding, Bindings, CallArgumentType, CallArguments, CallError, CallErrorKind,
+};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
@@ -279,6 +281,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Only populated for expressions that have non-empty flags.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
+    /// Calls that failed generic or overload inference. Keep these separate from diagnostics,
+    /// which can be suppressed, and from recovery types, which are still useful to other callers.
+    failed_calls: FxHashSet<ExpressionNodeKey>,
+
     /// The constraints on any collection initializers that are accessed in this region.
     //
     // TODO: Store projected constraint sets directly here instead of specialized receiver types.
@@ -486,6 +492,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: OnceCell::new(),
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
+            failed_calls: FxHashSet::default(),
             collection_use_constraints: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
             expected_types: FxHashMap::default(),
@@ -557,6 +564,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Replace expression types and discard failures from their previous inference. A later
+    /// fixpoint iteration may successfully infer a call that failed under an earlier context.
+    fn extend_expression_types(
+        &mut self,
+        expressions: impl IntoIterator<Item = (ExpressionNodeKey, Type<'db>)>,
+    ) {
+        if self.failed_calls.is_empty() {
+            self.expressions.extend(expressions);
+        } else {
+            self.expressions
+                .extend(expressions.into_iter().inspect(|(expression, _)| {
+                    self.failed_calls.remove(expression);
+                }));
+        }
+    }
+
     fn extend_definition(
         &mut self,
         definition: Definition<'db>,
@@ -565,8 +588,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.expressions
-            .extend(inference.expressions.iter().copied());
+        self.extend_expression_types(inference.expressions.iter().copied());
         self.declarations.extend(inference.declarations(definition));
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
@@ -601,6 +623,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 DefinitionInferenceExtra::Undecorated(_)
                 | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
                 DefinitionInferenceExtra::Other(extra) => {
+                    self.failed_calls.extend(extra.failed_calls.iter().copied());
                     self.called_functions
                         .extend(extra.called_functions.iter().copied());
                     self.extend_cycle_recovery(extra.cycle_recovery);
@@ -642,8 +665,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.expressions
-            .extend(inference.expressions.iter().copied());
+        self.extend_expression_types(inference.expressions.iter().copied());
         self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
@@ -651,6 +673,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(extra) = &inference.extra {
+            self.failed_calls.extend(extra.failed_calls.iter().copied());
             self.called_functions
                 .extend(extra.called_functions.iter().copied());
             self.return_types_and_ranges
@@ -676,10 +699,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
-        self.expressions
-            .extend(inference.expressions.iter().copied());
+        self.extend_expression_types(inference.expressions.iter().copied());
 
         if let Some(extra) = &inference.extra {
+            self.failed_calls.extend(extra.failed_calls.iter().copied());
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.called_functions
@@ -712,8 +735,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.expressions
-            .extend(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.extend_expression_types(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.failed_calls.extend(&inference.failed_calls);
         self.context.extend(&inference.diagnostics);
         self.extend_cycle_recovery(inference.cycle_recovery);
         self.called_functions
@@ -751,9 +774,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
-        self.expressions.extend(inference.expressions.iter());
+        self.extend_expression_types(inference.expressions.iter());
 
         if let Some(extra) = &inference.extra {
+            self.failed_calls.extend(extra.failed_calls.iter().copied());
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
@@ -6127,6 +6151,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         mode: CallArgumentInferenceMode,
     ) {
+        let mut infer_argument = |builder: &mut Self, arg: ArgExpr<'db, '_>| {
+            let ty = infer_argument_ty(builder, arg);
+            CallArgumentType {
+                ty,
+                is_valid: !builder.expression_has_failed_call(arg.1),
+            }
+        };
+
         let insert_argument_ty =
             |argument_index,
              inferred_ty,
@@ -6162,7 +6194,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let tcx = argument_tcx
                         .map(ArgumentTypeContext::type_context)
                         .unwrap_or_default();
-                    let inferred_ty = infer_argument_ty(self, (argument_index, ast_argument, tcx));
+                    let inferred_ty = infer_argument(self, (argument_index, ast_argument, tcx));
                     insert_argument_ty(argument_index, inferred_ty, argument_tcx, argument_types);
                 }
 
@@ -6173,7 +6205,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // speculative mode, infer the argument without type context as the
                     // default inference.
                     if mode.requires_default_inference() {
-                        let inferred_ty = infer_argument_ty(
+                        let inferred_ty = infer_argument(
                             self,
                             (argument_index, ast_argument, TypeContext::default()),
                         );
@@ -6217,7 +6249,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .unwrap_or_default();
 
                         let mut speculative_builder = self.speculate();
-                        let inferred_ty = infer_argument_ty(
+                        let inferred_ty = infer_argument(
                             &mut speculative_builder,
                             (argument_index, ast_argument, tcx),
                         );
@@ -6239,6 +6271,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+    }
+
+    /// Whether this argument contains a failed generic or overloaded call in its own scope.
+    fn expression_has_failed_call(&self, expression: &ast::Expr) -> bool {
+        // Lambda bodies obtain parameter types through the enclosing statement, rather than the
+        // current speculative context. Until they can be inferred independently, failures in that
+        // separate scope cannot rule out an overload.
+        !self.failed_calls.is_empty()
+            && any_over_expr(expression, |expr| {
+                self.failed_calls.contains(&expr.into())
+                    && self.index.expression_scope_id(expr)
+                        == self.index.expression_scope_id(expression)
+            })
     }
 
     fn infer_maybe_standalone_statement(&mut self, statement: &ast::Stmt) {
@@ -6391,6 +6436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match cache_entry {
             Some(ExpressionCacheEntry::Small(ty)) => {
+                self.failed_calls.remove(&expression_key);
                 self.store_expression_type(expression, ty);
                 ty
             }
@@ -8928,6 +8974,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        self.failed_calls.remove(&call_expression.into());
+
         let db = self.db();
         let env = self.program_environment();
         let ast::ExprCall {
@@ -9364,6 +9412,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
             Err(_) => {
+                if bindings.has_failed_call_inference() {
+                    self.failed_calls.insert(call_expression.into());
+                }
                 bindings.report_diagnostics(&self.context, call_expression.into());
                 return bindings.return_type(db, env);
             }
@@ -11172,6 +11223,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions,
             qualifiers: _,
             type_expression_flags,
+            failed_calls,
             collection_use_constraints,
             string_annotations,
             expected_types,
@@ -11212,6 +11264,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         FullExpressionCacheEntry {
             expressions,
             type_expression_flags,
+            failed_calls,
             collection_use_constraints,
             string_annotations,
             expected_types,
@@ -11232,6 +11285,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions,
             qualifiers,
             type_expression_flags,
+            failed_calls,
             mut collection_use_constraints,
             string_annotations,
             expected_types,
@@ -11269,6 +11323,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !return_types_and_ranges.is_empty()
             || !qualifiers.is_empty()
             || !type_expression_flags.is_empty()
+            || !failed_calls.is_empty()
             || !collection_use_constraints.is_empty())
         .then(|| {
             collection_use_constraints.shrink_to_fit();
@@ -11282,6 +11337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .into_boxed_slice(),
                 return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
+                failed_calls: FrozenSet::from(failed_calls),
                 collection_use_constraints,
                 cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
@@ -11364,6 +11420,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery: _,
             qualifiers: _,
             type_expression_flags: _,
+            failed_calls: _,
         } = self;
         let diagnostics = context.finish();
 
@@ -11393,6 +11450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions,
             qualifiers,
             type_expression_flags,
+            failed_calls,
             mut collection_use_constraints,
             string_annotations,
             expected_types,
@@ -11424,6 +11482,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             + usize::from(!collection_use_constraints.is_empty())
             + usize::from(!called_functions.is_empty())
             + usize::from(!type_expression_flags.is_empty())
+            + usize::from(!failed_calls.is_empty())
             + usize::from(cycle_recovery.is_some())
             + usize::from(!deferred.is_empty())
             + usize::from(!diagnostics.is_empty())
@@ -11480,6 +11539,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                     type_expression_flags: FrozenMap::from(type_expression_flags),
+                    failed_calls: FrozenSet::from(failed_calls),
                     cycle_recovery,
                     deferred: deferred.into_boxed_slice(),
                     diagnostics,
@@ -11530,6 +11590,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             string_annotations,
             expected_types,
             type_expression_flags,
+            failed_calls,
             mut collection_use_constraints,
             expressions,
             scope,
@@ -11565,6 +11626,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !diagnostics.is_empty()
             || cycle_recovery.is_some()
             || !type_expression_flags.is_empty()
+            || !failed_calls.is_empty()
             || !collection_use_constraints.is_empty()
             || !qualifiers.is_empty())
         .then(|| {
@@ -11574,6 +11636,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 qualifiers: FrozenMap::from(qualifiers),
                 expected_types: FrozenMap::from(expected_types),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
+                failed_calls: FrozenSet::from(failed_calls),
                 collection_use_constraints,
                 cycle_recovery,
                 diagnostics,
@@ -11624,6 +11687,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
             qualifiers: _,
             type_expression_flags: _,
+            failed_calls: _,
         } = *self;
 
         let mut builder = TypeInferenceBuilder::new(
@@ -11673,6 +11737,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             type_expression_flags,
+            failed_calls,
             collection_use_constraints,
             string_annotations,
             expected_types,
@@ -11711,7 +11776,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "speculative `TypeInferenceBuilder` should only be used for expression inference"
         );
 
-        self.expressions.extend(expressions.iter());
+        self.extend_expression_types(expressions);
+        self.failed_calls.extend(failed_calls);
         self.context.extend(&diagnostics);
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations
@@ -11825,6 +11891,7 @@ enum ExpressionCacheEntry<'db> {
 struct FullExpressionCacheEntry<'db> {
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    failed_calls: FxHashSet<ExpressionNodeKey>,
     collection_use_constraints: CollectionUseConstraints<'db>,
     string_annotations: FxHashSet<ExpressionNodeKey>,
     expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
@@ -11849,6 +11916,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         self.expressions.len() == 1
             && self.expressions.get(&expression) == Some(&ty)
             && self.type_expression_flags.is_empty()
+            && self.failed_calls.is_empty()
             && self.collection_use_constraints.is_empty()
             && self.string_annotations.is_empty()
             && self.expected_types.is_empty()
@@ -11864,6 +11932,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
     ) -> ExpressionInference<'db> {
         let extra = (!self.string_annotations.is_empty()
             || !self.type_expression_flags.is_empty()
+            || !self.failed_calls.is_empty()
             || !self.collection_use_constraints.is_empty()
             || !self.expected_types.is_empty()
             || self.cycle_recovery.is_some()
@@ -11886,6 +11955,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
                 string_annotations: FrozenSet::from(self.string_annotations),
                 expected_types: FrozenMap::from(self.expected_types),
                 type_expression_flags: FrozenMap::from(self.type_expression_flags),
+                failed_calls: FrozenSet::from(self.failed_calls),
                 bindings: self.bindings.into_boxed_slice(),
                 diagnostics: self.diagnostics,
                 called_functions: self.called_functions.into_iter().collect(),

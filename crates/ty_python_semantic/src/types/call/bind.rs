@@ -31,7 +31,9 @@ use crate::lint::LintMetadata;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
+use crate::types::call::arguments::{
+    CallArgumentType, CallArgumentTypes, Expansion, is_expandable_type,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBounds, Solutions,
@@ -1018,6 +1020,24 @@ impl<'db> Bindings<'db> {
                 .callables()
                 .flat_map(CallableBinding::matching_overloads)
                 .any(|(_, overload)| f(overload))
+        })
+    }
+
+    /// Whether a union element has no matching signature and requires generic or overload
+    /// inference. Unlike a non-generic call's known return type, its recovery type cannot
+    /// establish an outer overload match.
+    pub(crate) fn has_failed_call_inference(&self) -> bool {
+        self.elements.iter().any(|element| {
+            element
+                .callables()
+                .all(|binding| binding.matching_overloads().next().is_none())
+                && element.callables().any(|binding| {
+                    binding.overloads.len() > 1
+                        || binding
+                            .overloads
+                            .iter()
+                            .any(|overload| overload.signature.generic_context.is_some())
+                })
         })
     }
 
@@ -3725,7 +3745,7 @@ impl<'db> CallableBinding<'db> {
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(
+            overload.check_overload_types(
                 db,
                 env,
                 constraints,
@@ -3916,7 +3936,7 @@ impl<'db> CallableBinding<'db> {
                 );
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(
+                    overload.check_overload_types(
                         db,
                         env,
                         constraints,
@@ -7086,7 +7106,7 @@ impl<'db> ArgumentTypeContext<'db> {
         self,
         arguments_types: &mut CallArguments<'_, 'db>,
         argument_index: usize,
-        inferred_ty: Type<'db>,
+        inferred_ty: CallArgumentType<'db>,
     ) {
         match self {
             Self::Standard {
@@ -7820,6 +7840,33 @@ impl<'db> Binding<'db> {
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
         self.argument_matches = matcher.finish(db, env);
+    }
+
+    /// Check a competing overload without allowing failed argument inference to establish a match.
+    fn check_overload_types(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) {
+        self.check_types(db, env, constraints, arguments, call_expression_tcx);
+
+        if self
+            .argument_matches
+            .iter()
+            .zip(arguments.iter_types())
+            .any(|(matched, argument)| {
+                matched.iter().any(|parameter| {
+                    !argument.is_valid_for_declared_type(
+                        self.signature.parameters()[parameter.index].annotated_type(),
+                    )
+                })
+            })
+        {
+            self.mark_as_unmatched_overload();
+        }
     }
 
     fn check_types(
