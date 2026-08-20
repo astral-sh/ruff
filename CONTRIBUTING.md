@@ -68,7 +68,7 @@ Ruff is written in Rust. You'll need to install the
 You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 
 ```shell
-cargo install cargo-insta
+cargo install --locked cargo-insta
 ```
 
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
@@ -612,7 +612,7 @@ git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter
 Install `hyperfine`:
 
 ```shell
-cargo install hyperfine
+cargo install --locked hyperfine
 ```
 
 To benchmark the release build:
@@ -777,7 +777,7 @@ critcmp main pr
 You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comparison.
 
 ```bash
-cargo install critcmp
+cargo install --locked critcmp
 ```
 
 #### Tips
@@ -831,7 +831,7 @@ flamegraph --perfdata perf.data --no-inline
 Install [`cargo-instruments`](https://crates.io/crates/cargo-instruments):
 
 ```shell
-cargo install cargo-instruments
+cargo install --locked cargo-instruments
 ```
 
 Then run the profiler with
