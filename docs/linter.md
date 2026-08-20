@@ -146,9 +146,10 @@ rule (e.g., `unused-import`).
 
 ## Rule categories
 
-In [preview](preview.md), Ruff supports rule categories similar to those in the [Clippy] linter in
-addition to the Flake8-style linter groups described above. These categories are broader than the
-linter groups and determine whether rules are enabled by default. These categories and their brief descriptions, in order of decreasing severity, are:
+In [preview](preview.md), Ruff supports rule categories in addition to the Flake8-style linter
+groups described above. These categories are broader than the linter groups and determine whether
+rules are enabled by default. These categories and their brief descriptions, in order of decreasing
+severity, are:
 
 - **Correctness**: These rules flag code that is outright wrong or useless as written. If you
   encounter a correctness issue, you should try to fix it rather than suppressing the error with
@@ -700,5 +701,3 @@ This convention mirrors that of tools like ESLint, Prettier, and RuboCop.
     found, _even if_ all such violations were fixed automatically. Note that the use of
     `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
     fixing.
-
-[Clippy]: https://doc.rust-lang.org/clippy/lints.html
