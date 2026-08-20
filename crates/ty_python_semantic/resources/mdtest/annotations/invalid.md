@@ -239,8 +239,8 @@ c: "TypedDict('T', {}, extra_items=missing)[int]"
 ## Invalid subscript arguments in string annotations
 
 Even when a subscript's operand is a valid name, it might not be a generic type. We reject such
-specializations without evaluating their arguments in string annotations. This also applies inside
-`type[...]`, whose argument must itself be a valid type expression.
+specializations without evaluating their arguments in string annotations. Unsupported `type[...]`
+arguments also skip expression inference, while retaining their existing fallback type.
 
 `runtime.py`:
 
@@ -251,9 +251,7 @@ from typing import Any
 a: "int[(name := missing)]"
 # error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
 b: "type[int[(name := missing)]]"
-# error: [invalid-type-form] "Named expressions are not allowed"
 c: "type[(name := missing)]"
-# error: [invalid-type-form] "Special form `typing.Any` expected no type parameter"
 d: "type[Any[(name := missing)]]"
 ```
 
@@ -268,9 +266,7 @@ from typing import Any
 a: "int[(name := missing)]"
 # error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
 b: "type[int[(name := missing)]]"
-# error: [invalid-type-form] "Named expressions are not allowed"
 c: "type[(name := missing)]"
-# error: [invalid-type-form] "Special form `typing.Any` expected no type parameter"
 d: "type[Any[(name := missing)]]"
 ```
 
@@ -288,7 +284,6 @@ python-version = "3.13"
 # error: [unresolved-reference] "Name `missing` used when not defined"
 a: int[(name := missing)]
 
-# error: [invalid-type-form] "Named expressions are not allowed"
 # error: [unresolved-reference] "Name `other_missing` used when not defined"
 b: type[(other := other_missing)]
 ```
