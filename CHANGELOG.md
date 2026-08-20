@@ -18,7 +18,7 @@ Released on 2026-08-20.
 
 ### Rule changes
 
-- Align mixed t-string/bytes error message with CPython 3.14 ([#27766](https://github.com/astral-sh/ruff/pull/27766))
+- [syntax-errors] Align mixed t-string/bytes error message with CPython 3.14 ([#27766](https://github.com/astral-sh/ruff/pull/27766))
 - \[`ruff`\] Add `ctypes.LittleEndianStructure` and related types to existing exception (`RUF012`) ([#27753](https://github.com/astral-sh/ruff/pull/27753))
 - [syntax-errors] Detect duplicate keyword arguments ([#17804](https://github.com/astral-sh/ruff/pull/17804))
 - [syntax-errors] Detect parameters declared `nonlocal` ([#27628](https://github.com/astral-sh/ruff/pull/27628))
