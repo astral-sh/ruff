@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.16.4
+
+Released on 2026-08-20.
+
+### Preview features
+
+- \[`flake8-use-pathlib`\] Add autofixes for `PTH116` ([#26460](https://github.com/astral-sh/ruff/pull/26460))
+- \[`refurb`\] Restrict `delete-full-slice` to lists (`FURB131`) ([#27711](https://github.com/astral-sh/ruff/pull/27711))
+- \[`refurb`\] Skip `FURB101` and `FURB103` when the `open` argument is a file descriptor ([#27643](https://github.com/astral-sh/ruff/pull/27643))
+
+### Bug fixes
+
+- Fix `InvalidInstruction` on windows CPUs that do not support `POPCNT` ([#27803](https://github.com/astral-sh/ruff/pull/27803))
+- \[`pyflakes`\] Emit semantic syntax errors in string type definitions as `F722` ([#27835](https://github.com/astral-sh/ruff/pull/27835))
+- \[`pylint`\] Allow `os._exit` imports in `import-private-name` (`PLC2701`) ([#27738](https://github.com/astral-sh/ruff/pull/27738))
+
+### Rule changes
+
+- Align t-string/bytes mix error with CPython 3.14 ([#27766](https://github.com/astral-sh/ruff/pull/27766))
+- \[`ruff`\] Add `ctypes.LittleEndianStructure` and others alike to existing exception (`RUF012`) ([#27753](https://github.com/astral-sh/ruff/pull/27753))
+- [syntax-errors] Detect duplicate keyword arguments ([#17804](https://github.com/astral-sh/ruff/pull/17804))
+- [syntax-errors] Name is parameter and nonlocal ([#27628](https://github.com/astral-sh/ruff/pull/27628))
+
+### Server
+
+- Offer display-only fixes and mark safe fixes preferred ([#27807](https://github.com/astral-sh/ruff/pull/27807))
+- Support pull diagnostics for notebook cells ([#27779](https://github.com/astral-sh/ruff/pull/27779))
+
+### Documentation
+
+- Add default indicator to rules table ([#27724](https://github.com/astral-sh/ruff/pull/27724))
+- Fix broken link to Python docs ([#27757](https://github.com/astral-sh/ruff/pull/27757))
+
+### Other changes
+
+- Align Renovate config with preset ([#27762](https://github.com/astral-sh/ruff/pull/27762))
+- Export `UV_DEFAULT_INDEX` in `release.sh` ([#27934](https://github.com/astral-sh/ruff/pull/27934))
+- Fix s390x stacker assembly in release builds ([#27776](https://github.com/astral-sh/ruff/pull/27776))
+- Guarantee minimum stack size when parsing a module, standalone expression, and suites ([#25464](https://github.com/astral-sh/ruff/pull/25464))
+- Reduce configuration deserialization code size ([#27924](https://github.com/astral-sh/ruff/pull/27924))
+- Use an explicit PyPI index during release preparation ([#27901](https://github.com/astral-sh/ruff/pull/27901))
+- Use the versions bot's ruleset bypass when merging ([#27879](https://github.com/astral-sh/ruff/pull/27879))
+- [ty] Check packed AST index bounds ([#27849](https://github.com/astral-sh/ruff/pull/27849))
+- [ty] Optimize inherited recursive protocol comparisons ([#27922](https://github.com/astral-sh/ruff/pull/27922))
+
+### Contributors
+
+- [@AbhinavMir](https://github.com/AbhinavMir)
+- [@eduardorittner](https://github.com/eduardorittner)
+- [@royb3](https://github.com/royb3)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@carljm](https://github.com/carljm)
+- [@rosstitmarsh](https://github.com/rosstitmarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@zaniebot](https://github.com/zaniebot)
+- [@ewdurbin](https://github.com/ewdurbin)
+- [@woodruffw](https://github.com/woodruffw)
+- [@Sacrimento](https://github.com/Sacrimento)
+- [@lakshayxi](https://github.com/lakshayxi)
+- [@WhiteFox0-0](https://github.com/WhiteFox0-0)
+- [@baltasarblanco](https://github.com/baltasarblanco)
+
 ## 0.16.3
 
 Released on 2026-08-13.
