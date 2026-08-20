@@ -240,19 +240,25 @@ c: "TypedDict('T', {}, extra_items=missing)[int]"
 
 Even when a subscript's operand is a valid name, it might not be a generic type. We reject such
 specializations without evaluating their arguments in string annotations. Unsupported `type[...]`
-arguments also skip expression inference, while retaining their existing fallback type.
+arguments are checked as type expressions while retaining their existing fallback type.
 
 `runtime.py`:
 
 ```py
-from typing import Any
+from typing import Any, Tuple
 
 # error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
 a: "int[(name := missing)]"
 # error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
 b: "type[int[(name := missing)]]"
+# error: [invalid-type-form] "Named expressions are not allowed"
 c: "type[(name := missing)]"
+# error: [invalid-type-form] "Named expressions are not allowed"
 d: "type[Any[(name := missing)]]"
+# error: [invalid-type-form] "`lambda` expressions are not allowed"
+e: "type[Tuple[lambda default=(name := missing): None]]"
+# error: [invalid-type-form] "`lambda` expressions are not allowed"
+f: "type[lambda default=(name := missing): None]"
 ```
 
 Stub files use the same error recovery.
@@ -260,19 +266,26 @@ Stub files use the same error recovery.
 `stub.pyi`:
 
 ```pyi
-from typing import Any
+from typing import Any, Tuple
 
 # error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
 a: "int[(name := missing)]"
 # error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
 b: "type[int[(name := missing)]]"
+# error: [invalid-type-form] "Named expressions are not allowed"
 c: "type[(name := missing)]"
+# error: [invalid-type-form] "Named expressions are not allowed"
 d: "type[Any[(name := missing)]]"
+# error: [invalid-type-form] "`lambda` expressions are not allowed"
+e: "type[Tuple[lambda default=(name := missing): None]]"
+# error: [invalid-type-form] "`lambda` expressions are not allowed"
+f: "type[lambda default=(name := missing): None]"
 ```
 
 ## Invalid subscript arguments in evaluated annotations
 
-For annotations that are evaluated, we still report errors in the invalid argument.
+For annotations that are evaluated, we report invalid type arguments and errors encountered while
+evaluating them.
 
 ```toml
 [environment]
@@ -284,8 +297,13 @@ python-version = "3.13"
 # error: [unresolved-reference] "Name `missing` used when not defined"
 a: int[(name := missing)]
 
+# error: [invalid-type-form] "Named expressions are not allowed"
 # error: [unresolved-reference] "Name `other_missing` used when not defined"
 b: type[(other := other_missing)]
+
+# error: [invalid-type-form] "Function calls are not allowed"
+# error: [unresolved-reference] "Name `missing_call` used when not defined"
+c: type[missing_call()]
 ```
 
 ## Multiple starred expressions in a `tuple` specialization

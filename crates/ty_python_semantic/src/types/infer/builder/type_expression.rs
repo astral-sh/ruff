@@ -1384,9 +1384,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         subclass_of_type_argument(self, slice, slice_ty)
                     }
                     _ => {
-                        if !self.in_string_annotation() {
-                            self.infer_expression(parameters, TypeContext::default());
-                        }
+                        self.infer_type_expression(parameters);
                         todo_type!("unsupported nested subscript in type[X]")
                     }
                 };
@@ -1394,9 +1392,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 parameters_ty
             }
             _ => {
-                if !self.in_string_annotation() {
-                    self.infer_expression(slice, TypeContext::default());
-                }
+                self.infer_type_expression(slice);
                 todo_type!("unsupported type[X] special form")
             }
         }
