@@ -519,6 +519,7 @@ impl KnownModule {
             | Self::TyExtensionsInternal
             | Self::TyExtensionsPydantic
             | Self::ImportLib
+            | Self::UnittestCase
             | Self::UnittestMock
             | Self::Uuid
             | Self::Warnings
