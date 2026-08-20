@@ -702,6 +702,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
+        let interface = protocol.interface(db);
+
         // A concrete source normally contributes useful structural inference beyond its nominal
         // specialization; for example, `()` must infer `Iterable[Never]`. Recursive receiver
         // binding is the exception: same-origin protocol sources and protocols with explicitly
@@ -712,16 +714,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && !protocol.class_origin(db).is_some_and(|target_origin| {
                 source.class(db, env).class_literal(db) == target_origin.class_literal(db)
             })
-            && !protocol
-                .interface(db)
+            && !interface
                 .members(db)
                 .any(|member| member.has_explicit_receiver_annotation(db))
         {
             return None;
         }
 
-        let mut members: Vec<_> = protocol
-            .interface(db)
+        let mut members: Vec<_> = interface
             .members(db)
             .map(|member| (member.structural_member_priority(db, env), member))
             .collect();
@@ -741,23 +741,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_all(db, self.constraints, |(_, member)| {
                     self.type_satisfies_protocol_member(db, ty, member)
                 });
-        if structurally_satisfied
-            .implies(db, self.constraints, || nominally_satisfied)
-            .is_always_satisfied(db, env)
-        {
-            return Some(structurally_satisfied);
-        }
-
         for (_, member) in recursive_members {
-            structurally_satisfied = structurally_satisfied.and(db, self.constraints, || {
-                self.type_satisfies_protocol_member(db, ty, member)
-            });
             if structurally_satisfied
                 .implies(db, self.constraints, || nominally_satisfied)
                 .is_always_satisfied(db, env)
             {
                 break;
             }
+            structurally_satisfied = structurally_satisfied.and(db, self.constraints, || {
+                self.type_satisfies_protocol_member(db, ty, member)
+            });
         }
 
         Some(structurally_satisfied)

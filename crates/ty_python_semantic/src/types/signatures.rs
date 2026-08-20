@@ -1286,10 +1286,6 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<Self> {
-        if !self.can_bind_self_to(db, env, receiver_type) {
-            return None;
-        }
-
         let bound_signature =
             self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
@@ -1355,6 +1351,10 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<Self> {
+        if !self.can_bind_self_to(db, env, receiver_type) {
+            return None;
+        }
+
         self.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
             .map(|signature| {
                 signature.bind_self_with_receiver(
