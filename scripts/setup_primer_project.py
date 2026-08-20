@@ -24,7 +24,7 @@
 # exclude-newer = "P7D"
 #
 # [tool.uv.sources]
-# # Keep the script's lockfile in sync the mypy-primer pin in the project's uv.lock file
+# # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file
 # # so memory reports and ecosystem jobs use the same project definitions.
 # mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
 # ///
