@@ -440,7 +440,7 @@ impl RuleSelector {
     pub fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
-            RuleSelector::Category(..) => Specificity::Linter,
+            RuleSelector::Category(..) => Specificity::Category,
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
@@ -499,10 +499,11 @@ impl RuleSelector {
 pub enum Specificity {
     /// The specificity when selecting all rules (e.g., `--select ALL`).
     All,
+    /// The specificity when selecting a category (e.g., `--select correctness`).
+    Category,
     /// The specificity when selecting a legacy linter group (e.g., `--select C` or `--select T`).
     LinterGroup,
-    /// The specificity when selecting a category or linter (e.g., `--select pedantic` or
-    /// `--select UP`).
+    /// The specificity when selecting a linter (e.g., `--select UP`).
     Linter,
     /// The specificity when selecting via a rule prefix with a one-character code (e.g., `--select PLE1`).
     Prefix1Char,

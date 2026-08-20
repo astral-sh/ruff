@@ -2,12 +2,13 @@
 
 Categories (e.g. `correctness`, `suspicious`), linter groups (e.g. `RUF`, `UP`), linter prefixes
 (e.g. `RUF1`), and rules (e.g. `F401`, `unused-import`) can be combined in the same configuration.
-More specific selectors take precedence over broader selectors. When selectors have the same
-specificity, `ignore` takes precedence over `select`. In short, the current precedence relationship
-is:
+In general, more specific selectors take precedence over broader selectors. Although all categories
+aren't strictly "broader" than all linter groups, the general trend still applies. When selectors
+have the same specificity, `ignore` takes precedence over `select`. In short, the current precedence
+relationship is:
 
 ```ignore
-ALL < category = linter group < linter prefix < rule
+ALL < category < linter group < linter prefix < rule
 ```
 
 ## Categories and linter groups can be combined
@@ -41,7 +42,7 @@ ignore = ["ALL"]
 import os  # error: [unused-import]
 ```
 
-## Category ignores take precedence over linter groups
+## Linter group selection takes precedence over category ignores
 
 ```toml
 [lint]
@@ -51,7 +52,7 @@ ignore = ["correctness"]
 ```
 
 ```py
-import os
+import os  # error: [unused-import]
 ```
 
 ## Linter group ignores take precedence over category selectors
