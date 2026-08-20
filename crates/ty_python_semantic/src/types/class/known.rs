@@ -2166,6 +2166,7 @@ mod tests {
         let mut current_version = program.python_version(&db);
         let python_platform = program.python_platform(&db).clone();
         let search_paths = program.search_paths(&db).clone();
+        let python_executable = program.python_executable(&db).clone();
 
         for (class, version_added) in classes {
             if version_added != current_version {
@@ -2176,6 +2177,7 @@ mod tests {
                     },
                     python_platform: python_platform.clone(),
                     search_paths: search_paths.clone(),
+                    python_executable: python_executable.clone(),
                 };
                 program = Program::from_settings(&db, &settings);
                 current_version = version_added;
