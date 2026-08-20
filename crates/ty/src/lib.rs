@@ -6,6 +6,7 @@ mod rule;
 mod server;
 mod version;
 
+use std::fmt::Display;
 use std::io::{BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
@@ -27,7 +28,9 @@ use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, ScriptEnvironmentAvailability, UvSyncProgress, watch};
+use ty_project::{
+    CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress, watch,
+};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
@@ -502,7 +505,9 @@ impl MainLoop {
 
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(&changes);
+                    db.apply_changes_with_progress(&changes, &|db, project| {
+                        self.progress.for_project(db, project)
+                    });
 
                     let environments = db.uv_environments().clone();
                     for file in environments.files() {
@@ -726,17 +731,24 @@ impl ProgressDisplay {
         }
     }
 
+    fn for_project(&self, db: &dyn Db, project: Project) -> Option<Box<dyn UvSyncProgress>> {
+        self.start("Refreshing", format_args!("{} metadata", project.name(db)))
+    }
+
     fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn UvSyncProgress>> {
+        let path = file.path(db).as_system_path()?;
+        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
+        self.start("Syncing", path)
+    }
+
+    fn start(&self, action: &str, target: impl Display) -> Option<Box<dyn UvSyncProgress>> {
         if self.bars.is_hidden() {
             return None;
         }
 
-        let path = file.path(db).as_system_path()?;
-        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
-
         let bar = self.bars.insert(0, indicatif::ProgressBar::hidden());
         bar.set_style(indicatif::ProgressStyle::with_template("{wide_msg}").unwrap());
-        bar.set_message(format!("   {} {path}", "Syncing".bold().cyan()));
+        bar.set_message(format!("   {} {target}", action.bold().cyan()));
         Some(Box::new(UvSyncProgressBar { bar }))
     }
 
