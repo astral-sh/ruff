@@ -325,7 +325,7 @@ def foo(
         )?
         .with_file(foo, foo_content)?
         .with_initialization_options(
-            ClientOptions::default()
+            &ClientOptions::default()
                 .with_show_syntax_errors(false)
                 .with_diagnostic_mode(DiagnosticMode::Workspace),
         )
@@ -668,7 +668,7 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(file_a, file_a_content)?
         .with_file(file_b, file_b_content_v1)?
@@ -791,7 +791,7 @@ def foo() -> str:
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .build()
         .wait_until_workspaces_are_initialized();
@@ -881,7 +881,7 @@ def foo() -> str:
     let mut builder = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         );
 
     for i in 0..NUM_FILES {
@@ -958,7 +958,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     let mut builder = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         );
 
     for i in 0..NUM_FILES {
@@ -1392,7 +1392,7 @@ fn create_workspace_server_with_file(
         .with_workspace(workspace_root, None)?
         .with_file(file_path, file_content)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .build()
         .wait_until_workspaces_are_initialized())
