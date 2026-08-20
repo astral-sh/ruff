@@ -136,9 +136,9 @@ if TYPE_CHECKING:
 
 ### Protocol metaclasses
 
-Modeling a source protocol's metaclass as `ABCMeta` does not imply that it has a custom `__or__`
-method. Partially stringified unions with protocol classes and their subclasses fail at runtime
-before Python 3.14.
+A source protocol's default `_ProtocolMeta` does not supply a string-accepting `__or__` method.
+Partially stringified unions with protocol classes and their subclasses fail at runtime before
+Python 3.14.
 
 ```toml
 [environment]

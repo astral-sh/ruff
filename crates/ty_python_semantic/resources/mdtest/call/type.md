@@ -1354,8 +1354,8 @@ NT = type("NT", (NamedTuple,), {})
 
 ### Protocol bases
 
-When a dynamic class inherits from a source-defined protocol, ty models the inherited metaclass as
-`ABCMeta`:
+When a dynamic class inherits from a source-defined protocol, it also inherits the protocol's
+`_ProtocolMeta` metaclass:
 
 ```py
 from typing import Protocol
@@ -1366,15 +1366,15 @@ class MyProtocol(Protocol):
 
 ProtoImpl = type("ProtoImpl", (MyProtocol,), {"method": lambda self: 42})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
-reveal_type(type(ProtoImpl))  # revealed: <class 'ABCMeta'>
+reveal_type(type(ProtoImpl))  # revealed: <class '_ProtocolMeta'>
 reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 
 instance = ProtoImpl()
 reveal_type(instance)  # revealed: ProtoImpl
 ```
 
-Unlike protocol inheritance used only in a stub, the source declaration imposes a real metaclass
-constraint. A subclass of the dynamic class cannot choose an unrelated metaclass.
+This is a real metaclass constraint, unlike the lookup-only `ABCMeta` fallback for protocol bases
+declared in stubs. A subclass of the dynamic class cannot choose an unrelated metaclass.
 
 ```py
 class Meta(type): ...

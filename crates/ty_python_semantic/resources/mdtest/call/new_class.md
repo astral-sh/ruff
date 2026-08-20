@@ -194,7 +194,7 @@ reveal_type(MyEnum)  # revealed: <class 'MyEnum'>
 
 ### Protocol bases
 
-`types.new_class()` also preserves the `ABCMeta` metaclass inferred for source-defined protocols.
+`types.new_class()` also preserves the `_ProtocolMeta` metaclass of source-defined protocols.
 
 ```py
 import types
@@ -202,7 +202,7 @@ from typing import Protocol
 
 class Interface(Protocol): ...
 
-reveal_type(type(types.new_class("Dynamic", (Interface,))))  # revealed: <class 'ABCMeta'>
+reveal_type(type(types.new_class("Dynamic", (Interface,))))  # revealed: <class '_ProtocolMeta'>
 ```
 
 ### Generic and TypedDict bases

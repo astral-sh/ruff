@@ -276,8 +276,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // we also check for the case where one of the operands is a class-literal type
                             // or generic-alias type and the other is a string literal. The normal dunder lookup
                             // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
-                            // ABCMeta also inherits these operators unchanged. Neither a source protocol's
-                            // ABCMeta constraint nor a stub-only fallback establishes a custom operator.
+                            // ABCMeta and _ProtocolMeta inherit these operators unchanged. A stub-only
+                            // protocol fallback does not establish a custom operator either.
                             let should_emit_error = if dunder_fails {
                                 true
                             } else {
@@ -290,7 +290,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                                 .for_inheritance(db, env)
                                                 .to_class_type(db)
                                                 .and_then(|metaclass| metaclass.known(db)),
-                                            Some(KnownClass::Type | KnownClass::ABCMeta)
+                                            Some(
+                                                KnownClass::Type
+                                                    | KnownClass::ABCMeta
+                                                    | KnownClass::ProtocolMeta
+                                            )
                                         ) =>
                                     {
                                         Some(literal)

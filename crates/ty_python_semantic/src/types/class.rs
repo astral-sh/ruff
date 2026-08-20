@@ -3358,9 +3358,8 @@ pub(super) enum DisjointBaseKind {
 /// therefore produce false conflicts. The fallback exposes ABC methods such as `register`, but
 /// does not participate in metaclass selection.
 ///
-/// A `Protocol` base declared in source instead imposes an `ABCMeta` constraint. We use `ABCMeta`
-/// rather than the private `_ProtocolMeta` because libraries such as beartype use `ABCMeta` as a
-/// type-checking stand-in for `type(Protocol)`, while inheriting the real metaclass at runtime.
+/// A `Protocol` base declared in source instead selects its actual `_ProtocolMeta` metaclass,
+/// which participates in metaclass selection and constrains subclasses in the usual way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum ClassMetaclass<'db> {
     Selected(Type<'db>),

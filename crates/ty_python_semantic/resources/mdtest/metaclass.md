@@ -672,9 +672,9 @@ reveal_type(C.__class__)  # revealed: <class 'M'>
 
 ## Protocol metaclass inheritance
 
-A protocol declared in Python source imposes an `ABCMeta` constraint, which is compatible with an
-abstract base class. A compatible explicit metaclass must be preserved, including when its base is
-obtained by calling `type`.
+A protocol declared in Python source uses `typing._ProtocolMeta`, which derives from `ABCMeta`.
+Explicitly specifying `ABCMeta` selects the more derived `_ProtocolMeta`. A compatible custom
+metaclass must be preserved, including when its base is obtained by calling `type`.
 
 ```py
 from abc import ABC, ABCMeta
@@ -685,8 +685,8 @@ class Base(ABC): ...
 class Combined(Base, P): ...
 class ExplicitABC(Protocol, metaclass=ABCMeta): ...
 
-reveal_type(type(Combined))  # revealed: <class 'ABCMeta'>
-reveal_type(type(ExplicitABC))  # revealed: <class 'ABCMeta'>
+reveal_type(type(Combined))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(ExplicitABC))  # revealed: <class '_ProtocolMeta'>
 
 class Meta(type(Protocol)): ...
 class Derived(Base, P, metaclass=Meta): ...
@@ -700,16 +700,16 @@ subclassing an existing one.
 ```py
 class Unrelated(type): ...
 
-# error: [conflicting-metaclass] "`ABCMeta` (metaclass of base class `typing.Protocol`)"
+# error: [conflicting-metaclass] "`_ProtocolMeta` (metaclass of base class `typing.Protocol`)"
 class InvalidDirect(Protocol, metaclass=Unrelated): ...
 class InvalidSubclass(P, metaclass=Unrelated): ...  # error: [conflicting-metaclass]
 ```
 
-## Runtime-compatible custom protocol metaclasses
+## Obsolete protocol-metaclass workaround
 
-At least one library, beartype, uses `ABCMeta` while type checking and the actual protocol metaclass
-at runtime. This is valid at runtime, and its explicit metaclass satisfies the modeled `ABCMeta`
-constraint.
+An older beartype workaround, written before typeshed exposed `_ProtocolMeta`, substitutes `ABCMeta`
+while type checking and uses the actual protocol metaclass at runtime. Although this can work at
+runtime, its type-checking branch hides the required `_ProtocolMeta` base and is rejected.
 
 ```py
 from abc import ABCMeta
@@ -721,11 +721,17 @@ else:
     ProtocolMeta = type(Protocol)
 
 class Meta(ProtocolMeta): ...
-class P(Protocol, metaclass=Meta): ...
-class Child(P, Protocol): ...
+class P(Protocol, metaclass=Meta): ...  # error: [conflicting-metaclass]
+```
 
-reveal_type(type(P))  # revealed: <class 'Meta'>
-reveal_type(type(Child))  # revealed: <class 'Meta'>
+Deriving the custom metaclass directly from `type(Protocol)` exposes the correct relationship to the
+type checker and works at runtime.
+
+```py
+class SupportedMeta(type(Protocol)): ...
+class Supported(Protocol, metaclass=SupportedMeta): ...
+
+reveal_type(type(Supported))  # revealed: <class 'SupportedMeta'>
 ```
 
 ## Callable class metaclass with a stub protocol fallback
@@ -842,8 +848,8 @@ static_assert(not is_disjoint_from(Child, Other))
 static_assert(not is_subtype_of(type[Child], ABCMeta))
 ```
 
-Explicitly listing `Protocol` in source declares a new protocol with an `ABCMeta` constraint, even
-when another base contributes only the stub fallback.
+Explicitly listing `Protocol` in source declares a new protocol with a `_ProtocolMeta` constraint,
+even when another base contributes only the stub fallback.
 
 `source.py`:
 
@@ -909,8 +915,8 @@ class OwnAttribute(Interface):
 
 ## Source protocol metaclasses inherited through stubs
 
-A subclass defined in a stub inherits a source protocol's `ABCMeta` constraint. Passing through a
-stub does not turn that selected metaclass into a fallback.
+A subclass defined in a stub inherits a source protocol's `_ProtocolMeta` constraint. Passing
+through a stub does not turn that selected metaclass into a fallback.
 
 `source.py`:
 
@@ -936,7 +942,7 @@ from interface import Interface
 class Meta(type): ...
 class Derived(Interface, metaclass=Meta): ...  # error: [conflicting-metaclass]
 
-reveal_type(type(Interface))  # revealed: <class 'ABCMeta'>
+reveal_type(type(Interface))  # revealed: <class '_ProtocolMeta'>
 ```
 
 ## Built-in collection metaclasses

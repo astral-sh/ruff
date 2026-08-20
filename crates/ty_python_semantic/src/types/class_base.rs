@@ -377,7 +377,7 @@ impl<'db> ClassBase<'db> {
             Self::Protocol if subclass.file(db).is_stub(db) => {
                 return ClassMetaclass::ProtocolFallback;
             }
-            Self::Protocol => KnownClass::ABCMeta.to_class_literal(db, env),
+            Self::Protocol => KnownClass::ProtocolMeta.to_class_literal(db, env),
             Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),

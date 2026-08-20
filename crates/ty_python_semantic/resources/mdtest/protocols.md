@@ -291,19 +291,22 @@ reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 
 ## Protocol metaclasses
 
-A protocol declared in Python source is modeled with `ABCMeta`, which approximates its private
-runtime metaclass. Nominal subclasses inherit this metaclass and its abstract base class methods.
+A protocol declared in Python source uses `typing._ProtocolMeta`. Nominal subclasses inherit this
+metaclass and the abstract base class methods it provides through `ABCMeta`.
 
 ```py
-from typing import Protocol
+from typing import Protocol, _ProtocolMeta
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class Parent(Protocol): ...
 class Child(Parent, Protocol): ...
 class Concrete(Child): ...
 
-reveal_type(type(Parent))  # revealed: <class 'ABCMeta'>
-reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
-reveal_type(type(Concrete))  # revealed: <class 'ABCMeta'>
+reveal_type(type(Parent))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Child))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Concrete))  # revealed: <class '_ProtocolMeta'>
+static_assert(is_subtype_of(type[Concrete], _ProtocolMeta))
 ```
 
 The same applies to generic protocols and the `typing_extensions` backport.
@@ -317,8 +320,8 @@ T = TypeVar("T")
 class GenericProtocol(Protocol[T]): ...
 class BackportedProtocol(ExtensionsProtocol): ...
 
-reveal_type(type(GenericProtocol))  # revealed: <class 'ABCMeta'>
-reveal_type(type(BackportedProtocol))  # revealed: <class 'ABCMeta'>
+reveal_type(type(GenericProtocol))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(BackportedProtocol))  # revealed: <class '_ProtocolMeta'>
 ```
 
 ## Virtual subclass registration
