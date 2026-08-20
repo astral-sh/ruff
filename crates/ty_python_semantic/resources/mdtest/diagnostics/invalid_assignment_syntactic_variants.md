@@ -338,6 +338,8 @@ error[invalid-assignment]: Object of type `Literal[15]` is not assignable to `st
 
 ## Multiple targets
 
+An unpacked assignment points to the particular value assigned to each incompatible target.
+
 ```py
 x: int
 y: str
@@ -347,23 +349,22 @@ x, y = ("a", "b")  # snapshot: invalid-assignment
 x, y = (0, 0)  # snapshot: invalid-assignment
 ```
 
-TODO: the right hand side annotation should ideally only point to the `"a"` part of the `("a", "b")`
-tuple:
-
 ```snapshot
 error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `int`
- --> src/mdtest_snippet.py:4:8
+ --> src/mdtest_snippet.py:4:9
   |
 1 | x: int
   |    --- Declared type
 2 | y: str
 3 |
 4 | x, y = ("a", "b")  # snapshot: invalid-assignment
-  |        ^^^^^^^^^^ Incompatible value of type `Literal["a"]`
+  | -       ^^^ Incompatible value of type `Literal["a"]`
+  | |
+  | Assigned to this variable
 
 
 error[invalid-assignment]: Object of type `Literal[0]` is not assignable to `str`
- --> src/mdtest_snippet.py:6:8
+ --> src/mdtest_snippet.py:6:12
   |
 2 | y: str
   |    --- Declared type
@@ -371,7 +372,201 @@ error[invalid-assignment]: Object of type `Literal[0]` is not assignable to `str
 4 | x, y = ("a", "b")  # snapshot: invalid-assignment
 5 |
 6 | x, y = (0, 0)  # snapshot: invalid-assignment
-  |        ^^^^^^ Incompatible value of type `Literal[0]`
+  |    -       ^ Incompatible value of type `Literal[0]`
+  |    |
+  |    Assigned to this variable
+```
+
+## Nested unpacking targets
+
+Nested tuple targets point to the corresponding nested value.
+
+```py
+value: int
+other, (value, last) = (0, ("wrong", 1))  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:2:29
+  |
+1 | value: int
+  |        --- Declared type
+2 | other, (value, last) = (0, ("wrong", 1))  # snapshot: invalid-assignment
+  |         -----               ^^^^^^^ Incompatible value of type `Literal["wrong"]`
+  |         |
+  |         Assigned to this variable
+```
+
+## List unpacking values
+
+List literals can be matched to unpacking targets in the same way as tuple literals.
+
+```py
+value: int
+value, other = ["wrong", 1]  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:2:17
+  |
+1 | value: int
+  |        --- Declared type
+2 | value, other = ["wrong", 1]  # snapshot: invalid-assignment
+  | -----           ^^^^^^^ Incompatible value of type `Literal["wrong"]`
+  | |
+  | Assigned to this variable
+```
+
+## Starred unpacking targets
+
+Values before and after a starred target still have unambiguous source expressions.
+
+```py
+first: int
+last: int
+
+first, *middle, last = ("wrong", 1, 2)  # snapshot: invalid-assignment
+first, *middle, last = (1, 2, "wrong")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:4:25
+  |
+1 | first: int
+  |        --- Declared type
+2 | last: int
+3 |
+4 | first, *middle, last = ("wrong", 1, 2)  # snapshot: invalid-assignment
+  | -----                   ^^^^^^^ Incompatible value of type `Literal["wrong"]`
+  | |
+  | Assigned to this variable
+
+
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:5:31
+  |
+2 | last: int
+  |       --- Declared type
+3 |
+4 | first, *middle, last = ("wrong", 1, 2)  # snapshot: invalid-assignment
+5 | first, *middle, last = (1, 2, "wrong")  # snapshot: invalid-assignment
+  |                 ----          ^^^^^^^ Incompatible value of type `Literal["wrong"]`
+  |                 |
+  |                 Assigned to this variable
+```
+
+## Starred unpacking values
+
+Explicit values before and after a starred value can also be matched to their targets.
+
+```py
+first: int
+last: int
+middle = (1,)
+
+first, _, last = ("wrong", *middle, 2)  # snapshot: invalid-assignment
+first, _, last = (1, *middle, "wrong")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:5:19
+  |
+1 | first: int
+  |        --- Declared type
+2 | last: int
+3 | middle = (1,)
+4 |
+5 | first, _, last = ("wrong", *middle, 2)  # snapshot: invalid-assignment
+  | -----             ^^^^^^^ Incompatible value of type `Literal["wrong"]`
+  | |
+  | Assigned to this variable
+
+
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:6:31
+  |
+6 | first, _, last = (1, *middle, "wrong")  # snapshot: invalid-assignment
+  |           ----                ^^^^^^^ Incompatible value of type `Literal["wrong"]`
+  |           |
+  |           Assigned to this variable
+  |
+ ::: src/mdtest_snippet.py:2:7
+  |
+2 | last: int
+  |       --- Declared type
+```
+
+## Values assigned to starred unpacking targets
+
+A starred target collects a slice of values into a new list. Incompatible elements in that slice can
+still be identified individually.
+
+```py
+middle: list[int]
+first, *middle, last = (1, "wrong", 2)  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `list[Literal["wrong"]]` is not assignable to `list[int]`
+ --> src/mdtest_snippet.py:2:28
+  |
+1 | middle: list[int]
+  |         --------- Declared type
+2 | first, *middle, last = (1, "wrong", 2)  # snapshot: invalid-assignment
+  |         ------             ^^^^^^^ Incompatible iterable element of type `Literal["wrong"]` (expected `int`)
+  |         |
+  |         Assigned to this variable
+```
+
+## Multiple values assigned to starred unpacking targets
+
+When a starred target collects several values, the diagnostic highlights the entire collected slice
+without including values assigned to the surrounding targets.
+
+```py
+middle: list[int]
+first, *middle, last = 1, 2, 3, "wrong", 4  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `list[Literal[2, 3, "wrong"]]` is not assignable to `list[int]`
+ --> src/mdtest_snippet.py:2:27
+  |
+1 | middle: list[int]
+  |         --------- Declared type
+2 | first, *middle, last = 1, 2, 3, "wrong", 4  # snapshot: invalid-assignment
+  |         ------            ^^^^^^^^^^^^^ Incompatible iterable element of type `Literal[2, 3, "wrong"]` (expected `int`)
+  |         |
+  |         Assigned to this variable
+```
+
+## Opaque unpacking values
+
+When an unpacked value is not a tuple or list literal, the entire value remains the best available
+source expression.
+
+```py
+def values() -> tuple[str, int]:
+    return "wrong", 1
+
+value: int
+value, other = values()  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `str` is not assignable to `int`
+ --> src/mdtest_snippet.py:5:16
+  |
+4 | value: int
+  |        --- Declared type
+5 | value, other = values()  # snapshot: invalid-assignment
+  | -----          ^^^^^^^^ Incompatible value of type `str`
+  | |
+  | Assigned to this variable
 ```
 
 ## Shadowing of classes and functions

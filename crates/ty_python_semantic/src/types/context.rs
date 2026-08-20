@@ -26,7 +26,7 @@ use crate::{
     suppression::suppressions,
 };
 use ty_module_resolver::ResolverEnvironment;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ProgramFile, semantic_index};
 
@@ -223,6 +223,21 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The annotation returned has no message attached to it.
     pub(crate) fn secondary<T: Ranged>(&self, ranged: T) -> Annotation {
         Annotation::secondary(self.span(ranged))
+    }
+
+    /// Whether `target` is one element of an unpacked assignment.
+    pub(super) fn is_unpacked_assignment_target(
+        &self,
+        target: impl Into<DefinitionNodeKey>,
+    ) -> bool {
+        semantic_index(self.db(), self.program_file)
+            .try_definition(target)
+            .is_some_and(|definition| {
+                matches!(
+                    definition.kind(self.db()),
+                    DefinitionKind::Assignment(assignment) if assignment.unpack().is_some()
+                )
+            })
     }
 
     #[inline]
@@ -576,6 +591,7 @@ pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
     source: LintSource,
     primary_range: TextRange,
     message_override: Option<(String, String)>,
+    secondary_annotation: Option<Annotation>,
 }
 
 impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
@@ -654,6 +670,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
             source,
             primary_range: range,
             message_override: None,
+            secondary_annotation: None,
         })
     }
 
@@ -681,6 +698,9 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         let primary_span = Span::from(self.ctx.file()).with_range(self.primary_range);
         let mut diag = Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
         diag.annotate(Annotation::primary(primary_span));
+        if let Some(annotation) = self.secondary_annotation {
+            diag.annotate(annotation);
+        }
         let message_override = self.message_override.map(|(message, info)| {
             diag.info(info);
             message
@@ -692,6 +712,12 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
             diag: Some(diag),
             message_override,
         }
+    }
+
+    /// Attach a secondary annotation before a deferred call diagnostic is constructed.
+    pub(super) fn with_secondary_annotation(mut self, annotation: Annotation) -> Self {
+        self.secondary_annotation = Some(annotation);
+        self
     }
 
     /// Replace the headline message when the diagnostic is finalized and add an info

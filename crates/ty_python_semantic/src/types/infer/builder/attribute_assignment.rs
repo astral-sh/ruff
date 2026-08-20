@@ -930,6 +930,16 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         ),
                         info: "This assignment implicitly calls a custom `__setattr__` method",
                         argument_ranges: &[self.target.range(), self.value.range()],
+                        secondary_annotation: self
+                            .builder
+                            .context
+                            .is_unpacked_assignment_target(self.target)
+                            .then(|| {
+                                self.builder
+                                    .context
+                                    .secondary(self.target)
+                                    .message("Assigned to this target")
+                            }),
                     },
                 );
             }

@@ -1993,11 +1993,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         .validate();
                                     }
                                 } else {
+                                    let expected_value_ty = if self
+                                        .context
+                                        .is_unpacked_assignment_target(target)
+                                    {
+                                        object_ty
+                                            .known_specialization(db, env, KnownClass::Dict)
+                                            .and_then(|specialization| {
+                                                match specialization.types(db) {
+                                                    [_, value] => Some(*value),
+                                                    _ => None,
+                                                }
+                                            })
+                                            .or_else(|| {
+                                                object_ty
+                                                    .known_specialization(db, env, KnownClass::List)
+                                                    .and_then(|specialization| match specialization
+                                                        .types(db)
+                                                    {
+                                                        [element] => Some(*element),
+                                                        _ => None,
+                                                    })
+                                            })
+                                    } else {
+                                        None
+                                    };
+                                    let precise_value_annotation =
+                                        expected_value_ty.is_some_and(|expected| {
+                                            !rhs_value_ty.is_assignable_to(db, env, expected)
+                                        });
+                                    let diagnostic_range = if precise_value_annotation {
+                                        rhs_value_node.range()
+                                    } else {
+                                        target.range.cover(rhs_value_node.range())
+                                    };
+
                                     if emit_diagnostic
-                                        && let Some(builder) = self.context.report_lint(
-                                            &INVALID_ASSIGNMENT,
-                                            target.range.cover(rhs_value_node.range()),
-                                        )
+                                        && let Some(builder) = self
+                                            .context
+                                            .report_lint(&INVALID_ASSIGNMENT, diagnostic_range)
                                     {
                                         let settings =
                                             DisplaySettings::from_possibly_ambiguous_types(
@@ -2016,6 +2050,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             on object of type `{object_d}`",
                                             slice_ty.display_with(db, env, settings),
                                         ));
+
+                                        if precise_value_annotation {
+                                            diagnostic.annotate(
+                                                self.context
+                                                    .secondary(target)
+                                                    .message("Assigned to this target"),
+                                            );
+
+                                            if let Some(expected) = expected_value_ty {
+                                                diagnostic.set_primary_annotation_message(
+                                                    format_args!(
+                                                        "Expected value of type `{}`, got `{}`",
+                                                        expected.display(db, env),
+                                                        rhs_value_ty.display(db, env),
+                                                    ),
+                                                );
+                                            }
+                                        }
 
                                         // Special diagnostic for dictionaries
                                         if let Some([expected_key_ty, expected_value_ty]) =
@@ -2036,11 +2088,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 );
                                             }
 
-                                            if !rhs_value_ty.is_assignable_to(
-                                                db,
-                                                env,
-                                                *expected_value_ty,
-                                            ) {
+                                            if !precise_value_annotation
+                                                && !rhs_value_ty.is_assignable_to(
+                                                    db,
+                                                    env,
+                                                    *expected_value_ty,
+                                                )
+                                            {
                                                 diagnostic.annotate(
                                                     self.context.secondary(rhs_value_node).message(
                                                         format_args!(

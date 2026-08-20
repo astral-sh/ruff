@@ -113,7 +113,7 @@ use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
-use crate::types::unpacker::UnpackResult;
+use crate::types::unpacker::{UnpackResult, fixed_sequence_elements, unpacked_assignment_value};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
@@ -2380,12 +2380,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && let Some(node) = node
             {
                 if let ast::Expr::Tuple(tuple) = node
-                    && !tuple.iter().any(ast::Expr::is_starred_expr)
-                    && Some(tuple.len()) == tuple_spec.len().into_fixed_length()
+                    && let Some(tuple_length) = tuple_spec.len().into_fixed_length()
+                    && let Some(elements) = fixed_sequence_elements(node, tuple_length)
                 {
                     let invalid_elements = invalid_elements
                         .iter()
-                        .map(|(index, ty)| (&tuple.elts[*index], *ty));
+                        .map(|(index, ty)| (&elements[*index], *ty));
 
                     report_invalid_exception_tuple_caught(
                         &self.context,
@@ -2877,7 +2877,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 self.context.extend(unpacked.diagnostics());
-                self.infer_unpacked_assignment_target(target, value, unpacked);
+                self.infer_unpacked_assignment_target(target, target, value, unpacked);
             } else {
                 self.infer_target(target, value, &|builder, tcx| {
                     builder.infer_standalone_expression(value, tcx)
@@ -2889,22 +2889,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_unpacked_assignment_target(
         &mut self,
         target: &ast::Expr,
+        unpack_target: &ast::Expr,
         value: &ast::Expr,
         unpacked: &UnpackResult<'db>,
     ) {
         match target {
             ast::Expr::Starred(ast::ExprStarred { value: target, .. }) => {
-                self.infer_unpacked_assignment_target(target, value, unpacked);
+                self.infer_unpacked_assignment_target(target, unpack_target, value, unpacked);
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for target in elts {
-                    self.infer_unpacked_assignment_target(target, value, unpacked);
+                    self.infer_unpacked_assignment_target(target, unpack_target, value, unpacked);
                 }
             }
             _ => {
                 let assigned_ty = unpacked.expression_type(target);
-                self.infer_target_impl(target, value, Some(&|_, _| assigned_ty));
+                let assigned_value =
+                    unpacked_assignment_value(unpack_target, value, target).unwrap_or(value);
+                self.infer_target_impl(target, assigned_value, Some(&|_, _| assigned_ty));
             }
         }
     }

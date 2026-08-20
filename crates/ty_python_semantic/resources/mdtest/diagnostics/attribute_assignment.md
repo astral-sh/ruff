@@ -286,6 +286,39 @@ info: Function defined here
   |         ^^^^^^^                         ---------- Parameter declared here
 ```
 
+### Invalid argument type in an unpacked assignment
+
+An unpacked descriptor assignment points to the value passed to its `__set__` method.
+
+```py
+class Descriptor:
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class C:
+    attr: Descriptor = Descriptor()
+
+instance = C()
+instance.attr, other = ("wrong", 1)  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
+ --> src/mdtest_snippet.py:9:25
+  |
+9 | instance.attr, other = ("wrong", 1)  # snapshot: invalid-assignment
+  | -------------           ^^^^^^^ Expected `int`, found `Literal["wrong"]`
+  | |
+  | Assigned to this target
+info: Argument to function `Descriptor.__set__` is incorrect
+info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __set__(self, instance: object, value: int) -> None:
+  |         ^^^^^^^                         ---------- Parameter declared here
+```
+
 ### Invalid `__set__` method signature
 
 ```py

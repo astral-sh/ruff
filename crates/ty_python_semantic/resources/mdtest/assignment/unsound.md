@@ -333,10 +333,7 @@ info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
 
-As do unpacked assignments.
-
-TODO: ideally the annotation would highlight only the call to `returns_any()` here, not the whole
-tuple.
+An unpacked assignment points to the individual expression that supplies its unsound value.
 
 ```py
 unpacked_value: int
@@ -345,12 +342,42 @@ unpacked_value, other_value = (returns_any(), "hello")  # snapshot: unsound-assi
 
 ```snapshot
 error[unsound-assignment]: Unsound assignment
-  --> src/mdtest_snippet.py:11:31
+  --> src/mdtest_snippet.py:11:32
    |
 10 | unpacked_value: int
    |                 --- Expected a subtype of `int` because of this annotation
 11 | unpacked_value, other_value = (returns_any(), "hello")  # snapshot: unsound-assignment
-   |                               ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred as `Any`
+   | --------------                 ^^^^^^^^^^^^^ Inferred as `Any`
+   | |
+   | Assigned to this variable
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to nested unpacking targets
+
+A nested tuple target points to the corresponding dynamic expression in the nested value.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+value: int
+other, (value, last) = (0, (returns_any(), 1))  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:29
+  |
+6 | value: int
+  |        --- Expected a subtype of `int` because of this annotation
+7 | other, (value, last) = (0, (returns_any(), 1))  # snapshot: unsound-assignment
+  |         -----               ^^^^^^^^^^^^^ Inferred as `Any`
+  |         |
+  |         Assigned to this variable
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```

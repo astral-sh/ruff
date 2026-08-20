@@ -3720,6 +3720,37 @@ info: Method defined here
   |         ^^^^^^^^^^^                  ---------------------- Parameter declared here
 ```
 
+### Invalid argument type in an unpacked assignment
+
+An unpacked assignment to a custom attribute setter identifies the incompatible value and the
+attribute receiving it.
+
+```py
+class CustomSetAttr:
+    def __setattr__(self, name: str, value: int) -> None:
+        pass
+
+instance = CustomSetAttr()
+instance.attribute, other = ("wrong", 1)  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `Literal["wrong"]` to attribute `attribute` on type `CustomSetAttr`
+ --> src/mdtest_snippet.py:6:30
+  |
+6 | instance.attribute, other = ("wrong", 1)  # snapshot: invalid-assignment
+  | ------------------           ^^^^^^^ Expected `int`, found `Literal["wrong"]`
+  | |
+  | Assigned to this target
+info: Argument to bound method `CustomSetAttr.__setattr__` is incorrect
+info: This assignment implicitly calls a custom `__setattr__` method
+info: Method defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __setattr__(self, name: str, value: int) -> None:
+  |         ^^^^^^^^^^^                  ---------- Parameter declared here
+```
+
 ### Overloaded `__setattr__`
 
 ```py

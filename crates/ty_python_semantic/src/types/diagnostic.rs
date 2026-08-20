@@ -26,6 +26,7 @@ use crate::types::string_annotation::{
 use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
+use crate::types::unpacker::{starred_assignment_values, unpacked_assignment_value};
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard,
     SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance, binding_type,
@@ -1771,9 +1772,24 @@ fn assignment_value_node<'db, 'ast>(
     definition_kind: &DefinitionKind<'db>,
 ) -> Option<&'ast ast::Expr> {
     match definition_kind {
-        DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_) => {
-            definition_kind.value(context.module())
+        DefinitionKind::Assignment(assignment) => {
+            let module = context.module();
+            let value = assignment.value(module);
+
+            Some(
+                assignment
+                    .unpack()
+                    .and_then(|unpack| {
+                        unpacked_assignment_value(
+                            unpack.target(context.db(), module),
+                            value,
+                            assignment.target(module),
+                        )
+                    })
+                    .unwrap_or(value),
+            )
         }
+        DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(context.module()),
         DefinitionKind::NamedExpression(assignment) => {
             Some(&*assignment.node(context.module()).value)
         }
@@ -1823,6 +1839,70 @@ fn assignment_diagnostic_range(
         .unwrap_or_else(|| target_node.range())
 }
 
+/// The incompatible element type and source range collected into a starred unpacking target.
+struct InvalidStarredAssignmentElement<'db> {
+    collected_range: TextRange,
+    actual_type: Type<'db>,
+    expected_type: Type<'db>,
+}
+
+fn invalid_starred_assignment_element<'db>(
+    context: &InferContext<'db, '_>,
+    definition_kind: &DefinitionKind<'db>,
+    target_type: Type<'db>,
+    value_type: Type<'db>,
+) -> Option<InvalidStarredAssignmentElement<'db>> {
+    let DefinitionKind::Assignment(assignment) = definition_kind else {
+        return None;
+    };
+    let unpack = assignment.unpack()?;
+    let db = context.db();
+    let env = context.program_environment();
+    let module = context.module();
+    let collected = starred_assignment_values(
+        unpack.target(db, module),
+        assignment.value(module),
+        assignment.target(module),
+    )?;
+    let expected_type = target_type
+        .try_iterate(db, env)
+        .ok()?
+        .homogeneous_element_type(db, env);
+    let actual_type = value_type
+        .try_iterate(db, env)
+        .ok()?
+        .homogeneous_element_type(db, env);
+
+    if actual_type.is_assignable_to(db, env, expected_type) {
+        return None;
+    }
+
+    Some(InvalidStarredAssignmentElement {
+        collected_range: collected.first()?.range().cover(collected.last()?.range()),
+        actual_type,
+        expected_type,
+    })
+}
+
+fn annotate_unpacked_assignment_target(
+    context: &InferContext,
+    diagnostic: &mut LintDiagnosticGuard,
+    target: AnyNodeRef,
+    definition_kind: &DefinitionKind,
+    has_declaration_annotation: bool,
+) {
+    if has_declaration_annotation
+        && let DefinitionKind::Assignment(assignment) = definition_kind
+        && assignment.unpack().is_some()
+    {
+        diagnostic.annotate(
+            context
+                .secondary(target)
+                .message("Assigned to this variable"),
+        );
+    }
+}
+
 /// Set an assignment's primary message and return whether a message was added.
 fn set_assignment_primary_annotation(
     diagnostic: &mut LintDiagnosticGuard,
@@ -1863,6 +1943,8 @@ pub(super) fn report_invalid_assignment<'db>(
 ) {
     let db = context.db();
     let definition_kind = definition.kind(context.db());
+    let invalid_element =
+        invalid_starred_assignment_element(context, definition_kind, target_ty, value_ty);
     let value_node = assignment_value_node(context, definition_kind);
 
     if let Some(value_node) = value_node
@@ -1877,10 +1959,20 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [target_ty, value_ty]);
+    let settings = DisplaySettings::from_possibly_ambiguous_types(
+        db,
+        env,
+        [target_ty, value_ty].into_iter().chain(
+            invalid_element
+                .iter()
+                .flat_map(|element| [element.actual_type, element.expected_type]),
+        ),
+    );
 
-    let diagnostic_range = assignment_diagnostic_range(context, target_node, value_node);
-
+    let diagnostic_range = invalid_element
+        .as_ref()
+        .map(|element| element.collected_range)
+        .unwrap_or_else(|| assignment_diagnostic_range(context, target_node, value_node));
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         diagnostic_range,
@@ -1913,7 +2005,7 @@ pub(super) fn report_invalid_assignment<'db>(
         }
     }
 
-    if let Some(declaration_annotation) =
+    let has_declaration_annotation = if let Some(declaration_annotation) =
         assignment_declaration_annotation(context, definition_kind, declaration)
     {
         diag.annotate(declaration_annotation.into_annotation(
@@ -1921,20 +2013,42 @@ pub(super) fn report_invalid_assignment<'db>(
             target_ty.display_with(db, env, settings.clone()),
             "Declared type",
         ));
+        true
     } else if value_node.is_some() {
         diag.annotate(context.secondary(target_node).message(format_args!(
             "Declared type `{}`",
             target_ty.display_with(db, env, settings.clone())
         )));
-    }
-
-    let has_primary_annotation = set_assignment_primary_annotation(
+        false
+    } else {
+        false
+    };
+    annotate_unpacked_assignment_target(
+        context,
         &mut diag,
+        target_node,
         definition_kind,
-        value_node,
-        value_ty.display_with(db, env, settings),
-        AssignmentDiagnosticKind::Invalid,
+        has_declaration_annotation,
     );
+
+    let has_primary_annotation = if let Some(element) = invalid_element {
+        diag.set_primary_annotation_message(format_args!(
+            "Incompatible iterable element of type `{}` (expected `{}`)",
+            element.actual_type.display_with(db, env, settings.clone()),
+            element
+                .expected_type
+                .display_with(db, env, settings.clone()),
+        ));
+        true
+    } else {
+        set_assignment_primary_annotation(
+            &mut diag,
+            definition_kind,
+            value_node,
+            value_ty.display_with(db, env, settings),
+            AssignmentDiagnosticKind::Invalid,
+        )
+    };
 
     if value_node.is_some() {
         let error_context = value_ty.assignability_error_context(db, env, target_ty);
@@ -2000,7 +2114,7 @@ pub(super) fn report_unsound_assignment<'db>(
         AssignmentDiagnosticKind::Unsound,
     );
 
-    if let Some(declaration_annotation) =
+    let has_declaration_annotation = if let Some(declaration_annotation) =
         assignment_declaration_annotation(context, definition_kind, declaration)
     {
         diagnostic.annotate(declaration_annotation.into_annotation(
@@ -2008,11 +2122,22 @@ pub(super) fn report_unsound_assignment<'db>(
             &expected_display,
             format_args!("Expected a subtype of `{expected_display}` because of this annotation"),
         ));
+        true
     } else if value_node.is_some() {
         diagnostic.annotate(context.secondary(target_node).message(format_args!(
             "Expected a subtype of `{expected_display}` because of its declared type"
         )));
-    }
+        false
+    } else {
+        false
+    };
+    annotate_unpacked_assignment_target(
+        context,
+        &mut diagnostic,
+        target_node,
+        definition_kind,
+        has_declaration_annotation,
+    );
 
     diagnostic.info(format_args!(
         "`{actual_display}` is assignable to `{expected_display}`, \
@@ -2107,6 +2232,7 @@ pub(super) fn report_bad_dunder_get_call<'db>(
                     descriptor_type.display(db, env),
                 ),
                 argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+                secondary_annotation: None,
             },
         );
     }
@@ -2160,6 +2286,7 @@ pub(super) fn report_bad_attribute_access_call<'db>(
             ),
             info: &format!("This access implicitly calls `{}`", method.as_str()),
             argument_ranges: &[target.range()],
+            secondary_annotation: None,
         },
     );
 }
@@ -2189,6 +2316,7 @@ pub(super) fn report_bad_import_call<'db>(
             ),
             info: "This import implicitly calls a module-level `__getattr__` function",
             argument_ranges: &[target.range()],
+            secondary_annotation: None,
         },
     );
 }
@@ -2245,6 +2373,9 @@ pub(super) fn report_bad_dunder_set_call<'db>(
                     descriptor_type.display(db, env)
                 ),
                 argument_ranges,
+                secondary_annotation: context
+                    .is_unpacked_assignment_target(target)
+                    .then(|| context.secondary(target).message("Assigned to this target")),
             },
         );
     }
