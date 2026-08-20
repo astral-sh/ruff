@@ -2384,14 +2384,15 @@ def _(command: Any):
     mapping: DictLike[type[Command]] = reveal_type({"command": command})
 ```
 
-Gradual type context retains its concrete lower bounds.
+Static type context remains unchanged, and gradual type context retains its concrete lower bounds.
 
 ```py
-from typing import Any
 from ty_extensions._internal import Unknown
 
 def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
     raise NotImplementedError
+
+reveal_type(merge({"a": 1}, {2: "b"}))  # revealed: tuple[str | int, int | str]
 
 def _(dynamic: Unknown):
     reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Unknown, int | str | Unknown]

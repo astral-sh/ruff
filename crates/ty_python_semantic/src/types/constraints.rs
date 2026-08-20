@@ -287,6 +287,7 @@ struct GradualOccurrence<'db> {
     variable: GradualVariableId,
 }
 
+/// Keeps the optional occurrence sidecar behind a thin pointer in cached constraint sets.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct GradualOccurrences<'db>(Box<[(GradualVariableId, GradualOccurrence<'db>)]>);
 
@@ -4517,7 +4518,7 @@ impl<'db> SolutionProvenance<'db> {
             return;
         };
         let Some(gradual) = self.gradual.as_deref_mut() else {
-            self.gradual = other.gradual.clone();
+            self.gradual.clone_from(&other.gradual);
             return;
         };
 

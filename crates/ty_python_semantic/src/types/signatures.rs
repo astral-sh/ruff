@@ -2680,12 +2680,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && target_parameters.as_paramspec_with_prefix().is_some()
         {
             // A gradual return type constrains its materialization, not the inferred parameter list.
-            ConstraintSet::constrain_gradual(
-                db,
-                env,
-                self.constraints,
-                self.constraints.next_gradual_variable(dynamic),
-            )
+            self.gradual(db, self.constraints.next_gradual_variable(dynamic))
         } else {
             self.check_type_pair(db, source.return_ty, target.return_ty)
         };

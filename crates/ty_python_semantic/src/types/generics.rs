@@ -3455,12 +3455,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // A gradual formal can only contribute new bounds when the actual type contains an
         // inferable type variable. Otherwise, structural inference must retain the informative
         // elements of gradual unions and intersections.
-        let gradual_formal_constrains_actual = formal.materialize_once(db, self.env).is_some()
-            && any_over_type(db, self.env, actual, false, |ty| {
-                ty.as_typevar()
-                    .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
-            });
-        if actual.materialize_once(db, self.env).is_some() || gradual_formal_constrains_actual {
+        if actual.materialize_once(db, self.env).is_some()
+            || (formal.materialize_once(db, self.env).is_some()
+                && any_over_type(db, self.env, actual, false, |ty| {
+                    ty.as_typevar()
+                        .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
+                }))
+        {
             if let Type::TypeAlias(alias) = formal {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
             }

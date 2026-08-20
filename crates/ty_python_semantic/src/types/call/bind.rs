@@ -7725,11 +7725,6 @@ impl<'db> Binding<'db> {
         // A gradual specialization can retain useful concrete bounds, but only when an argument
         // actually is gradual. Otherwise, inherited gradual evidence can hide an incompatible
         // static argument during a later inference round.
-        let has_gradual_argument = self
-            .parameter_tys
-            .iter()
-            .flatten()
-            .any(|argument| argument.has_dynamic(db, env));
         Some(generic_context.specialize_recursive(
             db,
             generic_context.variables(db).map(|typevar| {
@@ -7741,10 +7736,14 @@ impl<'db> Binding<'db> {
                     .and_then(|specialization| specialization.get(db, typevar))
                     .filter(|ty| {
                         !ty.has_dynamic(db, env)
-                            || (has_gradual_argument
-                                && ty
-                                    .materialize_once(db, env)
-                                    .is_some_and(|range| !range.bottom.is_never()))
+                            || (ty
+                                .materialize_once(db, env)
+                                .is_some_and(|range| !range.bottom.is_never())
+                                && self
+                                    .parameter_tys
+                                    .iter()
+                                    .flatten()
+                                    .any(|argument| argument.has_dynamic(db, env)))
                     })
                     .map(|ty| ty.promote(db, env));
 

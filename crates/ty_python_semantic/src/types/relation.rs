@@ -1937,7 +1937,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    fn gradual(&self, db: &'db dyn Db, variable: GradualVariable) -> ConstraintSet<'db, 'c> {
+    pub(super) fn gradual(
+        &self,
+        db: &'db dyn Db,
+        variable: GradualVariable,
+    ) -> ConstraintSet<'db, 'c> {
         ConstraintSet::constrain_gradual(db, self.env, self.constraints, variable)
     }
 

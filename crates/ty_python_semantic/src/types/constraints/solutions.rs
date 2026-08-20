@@ -43,12 +43,15 @@ impl<'db> SolutionWalker<'db> {
         let inferable_support = Support::from_typevar_set(db, storage, inferable);
         let mut relevant_gradual_origins = FxHashMap::default();
         let mut canonical_gradual_constraints = FxHashMap::default();
+        let mut has_incomplete_support = false;
         if storage.has_gradual_variables() {
-            let mut relevant_support = inferable_support.clone();
-            relevant_support.close_over_constraints(storage, &source_orders.iter().copied());
-            let has_incomplete_support = source_orders
+            has_incomplete_support = source_orders
                 .iter()
                 .any(|&constraint| !storage.constraint_support(constraint).is_complete());
+            let mut relevant_support = inferable_support.clone();
+            if !has_incomplete_support {
+                relevant_support.close_over_constraints(storage, &source_orders.iter().copied());
+            }
             let mut unrelated_constraints = FxHashMap::default();
             for &constraint_id in &source_orders {
                 let Some(constraint) = storage.constraint_data(constraint_id).as_typevar() else {
@@ -88,19 +91,15 @@ impl<'db> SolutionWalker<'db> {
             explored_gradual_nodes: FxHashSet::default(),
             sorted_paths: Vec::default(),
         };
-        if walker.relevant_gradual_origins.len() < 2 {
+        if walker.relevant_gradual_origins.len() < 2 || has_incomplete_support {
             return walker;
         }
 
         let mut origin_uses = FxHashMap::default();
-        let mut has_incomplete_support = false;
         for &constraint_id in &walker.source_orders {
             let Some(constraint) = storage.constraint_data(constraint_id).as_typevar() else {
                 continue;
             };
-
-            let support = storage.constraint_support(constraint_id);
-            has_incomplete_support |= !support.is_complete();
 
             for origin in [constraint.provenance.lower, constraint.provenance.upper]
                 .into_iter()
@@ -108,9 +107,6 @@ impl<'db> SolutionWalker<'db> {
             {
                 *origin_uses.entry(origin).or_insert(0) += 1;
             }
-        }
-        if has_incomplete_support {
-            return walker;
         }
 
         // Consecutive occurrences that supply the same bound are interchangeable.
@@ -431,6 +427,7 @@ impl<'db> SolutionWalker<'db> {
                     materialization_origins.push(origin);
                 }
             }
+            materialization_origins.sort_unstable();
         }
 
         self.sorted_paths.push(ConstraintPath {
