@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use lsp_types::request::CodeLensRequest;
 use lsp_types::{CodeLens, CodeLensParams, Url};
-use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_ide::{CodeLensCommand, code_lens};
 use ty_project::{Db as _, ProjectDatabase};
+use ty_python_semantic::Program;
 
 use crate::capabilities::SupportedCommand;
 use crate::document::ToRangeExt;
@@ -47,7 +47,7 @@ impl BackgroundDocumentRequestHandler for CodeLensRequestHandler {
 
         let items = code_lens(db, file);
         let cwd = root.to_string();
-        let python_executable = snapshot.workspace_settings().python_executable();
+        let python_executable = Program::get(db).python_executable(db);
 
         let lenses: Vec<CodeLens> = items
             .into_iter()
