@@ -1048,16 +1048,14 @@ struct GradualProjectionKey<'db> {
     source: Type<'db>,
     position: GradualRangePosition,
     target: Type<'db>,
-    variable: GradualVariable,
+    gradual_origin: Option<GradualVariableId>,
 }
 
 impl<'db> HasIdentity<'db> for GradualProjectionKey<'db> {
     type Id = (TypeIdentity<'db>, GradualRangePosition, TypeIdentity<'db>);
 
     fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
-        // `variable` remains part of the exact cache key, preventing distinct materialization
-        // conditions from sharing an opaque decision. It is omitted only from the recursive
-        // identity so allocating that decision cannot evade cycle detection.
+        // An enclosing materialization affects provenance, but not whether a projection recurs.
         self.source.may_share_type_identity(db, other.source)
             && self.position == other.position
             && self.target.may_share_type_identity(db, other.target)
@@ -1406,6 +1404,44 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         // A variable absent from both endpoint constraint sets is unbounded.
         target.specialize_all(db, env, Type::Dynamic(range.dynamic))
+    }
+
+    fn check_gradual_projection(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        range: Materialization<'db>,
+        position: GradualRangePosition,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let mut was_computed = false;
+        let constraints = self.relation_visitor.visit_gradual_projection(
+            db,
+            GradualProjectionKey {
+                source,
+                position,
+                target,
+                gradual_origin: self.constraints.active_gradual_origin(),
+            },
+            || {
+                was_computed = true;
+                let variable = self.constraints.next_gradual_variable(range.dynamic);
+                match position {
+                    GradualRangePosition::Source => {
+                        self.check_gradual_source(db, source, range, target, variable)
+                    }
+                    GradualRangePosition::Target => {
+                        self.check_gradual_target(db, source, target, range, variable)
+                    }
+                }
+            },
+        )?;
+
+        Some(if was_computed {
+            constraints
+        } else {
+            constraints.freshen_gradual_variables(db, self.env, self.constraints)
+        })
     }
 
     fn check_gradual_source(
@@ -2201,35 +2237,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
             }
 
-            if let Some(range) = source_range {
-                let variable = self.constraints.next_gradual_variable(range.dynamic);
-                if let Some(constraints) = self.relation_visitor.visit_gradual_projection(
+            if let Some(range) = source_range
+                && let Some(constraints) = self.check_gradual_projection(
                     db,
-                    GradualProjectionKey {
-                        source,
-                        position: GradualRangePosition::Source,
-                        target,
-                        variable,
-                    },
-                    || self.check_gradual_source(db, source, range, target, variable),
-                ) {
-                    return constraints;
-                }
+                    source,
+                    target,
+                    range,
+                    GradualRangePosition::Source,
+                )
+            {
+                return constraints;
             }
-            if let Some(range) = target_range {
-                let variable = self.constraints.next_gradual_variable(range.dynamic);
-                if let Some(constraints) = self.relation_visitor.visit_gradual_projection(
+            if let Some(range) = target_range
+                && let Some(constraints) = self.check_gradual_projection(
                     db,
-                    GradualProjectionKey {
-                        source,
-                        position: GradualRangePosition::Target,
-                        target,
-                        variable,
-                    },
-                    || self.check_gradual_target(db, source, target, range, variable),
-                ) {
-                    return constraints;
-                }
+                    source,
+                    target,
+                    range,
+                    GradualRangePosition::Target,
+                )
+            {
+                return constraints;
             }
         }
 

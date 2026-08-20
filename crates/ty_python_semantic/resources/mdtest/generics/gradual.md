@@ -497,6 +497,37 @@ def _(gradual: Any, unknown: Unknown, lower: str, upper: Callable[[int], None]):
     reveal_type(project(unknown, gradual, lower, upper))  # revealed: tuple[int & Any, Unknown | str]
 ```
 
+## Repeated gradual projections
+
+Repeated projections onto the same generic type preserve each occurrence's gradual type while
+combining their constraints with a concrete lower bound.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def repeated[T](
+    values: tuple[tuple[T] | None, tuple[T] | None],
+    lower: T,
+) -> T:
+    return lower
+
+def repeated_upper[T](
+    callbacks: tuple[Callable[[tuple[T] | None], None], Callable[[tuple[T] | None], None]],
+) -> T:
+    raise NotImplementedError
+
+def accepts_any(value: Any) -> None: ...
+def accepts_unknown(value: Unknown) -> None: ...
+def _(gradual: Any, unknown: Unknown, lower: int):
+    reveal_type(repeated((gradual, gradual), lower))  # revealed: Any | int
+    reveal_type(repeated((unknown, unknown), lower))  # revealed: Unknown | int
+    reveal_type(repeated((gradual, unknown), lower))  # revealed: Any | int
+    reveal_type(repeated((unknown, gradual), lower))  # revealed: Any | int
+    reveal_type(repeated_upper((accepts_any, accepts_any)))  # revealed: Any
+    reveal_type(repeated_upper((accepts_unknown, accepts_unknown)))  # revealed: Unknown
+```
+
 ## Concrete bounds across independent union alternatives
 
 A concrete argument can constrain different type variables on different union branches,
