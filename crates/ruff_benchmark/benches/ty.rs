@@ -1359,16 +1359,6 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
 
     let cases = [
         (
-            "ty_micro[repeated_statement_calls_module_scope]",
-            String::from("value = 'abc'\n"),
-            "value.upper()\n",
-        ),
-        (
-            "ty_micro[repeated_statement_calls_class_scope]",
-            String::from("class Example:\n    value = 'abc'\n"),
-            "    value.upper()\n",
-        ),
-        (
             "ty_micro[repeated_statement_calls]",
             String::from("def f() -> None:\n    value = 'abc'\n"),
             "    value.upper()\n",
