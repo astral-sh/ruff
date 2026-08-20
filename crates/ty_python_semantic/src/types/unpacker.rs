@@ -371,7 +371,13 @@ pub(super) fn fixed_sequence_elements(
 ) -> Option<&[ast::Expr]> {
     let elements = sequence_elts(expression)?;
 
-    (elements.len() == expected_length && elements.iter().all(|element| !element.is_starred_expr()))
+    if elements.len() != expected_length {
+        return None;
+    }
+
+    elements
+        .iter()
+        .all(|element| !element.is_starred_expr())
         .then_some(elements)
 }
 
@@ -385,10 +391,8 @@ pub(super) fn unpacked_assignment_value<'ast>(
     value: &'ast ast::Expr,
     requested_target: &ast::Expr,
 ) -> Option<&'ast ast::Expr> {
-    match assignment_values_for_target(unpack_target, value, requested_target)? {
-        UnpackedAssignmentValues::Single(value) => Some(value),
-        UnpackedAssignmentValues::Collected(_) => None,
-    }
+    assignment_values_for_target(unpack_target, value, requested_target)
+        .and_then(UnpackedAssignmentValues::as_single)
 }
 
 /// Return the explicit values collected by a starred assignment target.
@@ -400,15 +404,30 @@ pub(super) fn starred_assignment_values<'ast>(
     value: &'ast ast::Expr,
     requested_target: &ast::Expr,
 ) -> Option<&'ast [ast::Expr]> {
-    match assignment_values_for_target(unpack_target, value, requested_target)? {
-        UnpackedAssignmentValues::Single(_) => None,
-        UnpackedAssignmentValues::Collected(values) => Some(values),
-    }
+    assignment_values_for_target(unpack_target, value, requested_target)
+        .and_then(UnpackedAssignmentValues::as_collected)
 }
 
+#[derive(Debug, Clone, Copy)]
 enum UnpackedAssignmentValues<'ast> {
     Single(&'ast ast::Expr),
     Collected(&'ast [ast::Expr]),
+}
+
+impl<'ast> UnpackedAssignmentValues<'ast> {
+    fn as_single(self) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::Single(value) => Some(value),
+            Self::Collected(_) => None,
+        }
+    }
+
+    fn as_collected(self) -> Option<&'ast [ast::Expr]> {
+        match self {
+            Self::Single(_) => None,
+            Self::Collected(values) => Some(values),
+        }
+    }
 }
 
 fn assignment_values_for_target<'ast>(

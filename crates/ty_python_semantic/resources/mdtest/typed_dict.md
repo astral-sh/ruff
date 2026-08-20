@@ -430,8 +430,17 @@ bob["extra"] = True
 
 ## Unpacked assignments to `TypedDict` variables
 
-A dictionary literal assigned to a `TypedDict` variable through unpacking is not inferred with the
-variable's type context, so an incompatible literal must still produce an assignment diagnostic.
+This is a regression test for a bug in an early implementation of precise annotations for unpacked
+assignments.
+
+When a dictionary literal is assigned directly to a `TypedDict` variable, ty checks the literal
+against the variable's type and suppresses the assignment diagnostic to avoid reporting the same
+error twice. A dictionary literal inside an unpacked value does not receive that type context, so
+this more specific diagnostic is never emitted.
+
+The early implementation passed the inner dictionary to the duplicate-diagnostic check after
+identifying it for the primary annotation. This incorrectly suppressed the assignment diagnostic as
+well, causing ty to report no error for an incompatible dictionary.
 
 ```py
 from typing import TypedDict

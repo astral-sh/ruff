@@ -1845,6 +1845,7 @@ fn assignment_diagnostic_range(
 }
 
 /// The incompatible element type and source range collected into a starred unpacking target.
+#[derive(Debug)]
 struct StarredAssignmentElement<'db> {
     collected_range: TextRange,
     actual_type: Type<'db>,
@@ -2128,7 +2129,7 @@ pub(super) fn report_unsound_assignment<'db>(
     ));
     if let Some(element) = unsound_element {
         diagnostic.set_primary_annotation_message(format_args!(
-            "Inferred iterable element as `{}` (expected a subtype of `{}`)",
+            "Iterable element inferred as `{}` (expected a subtype of `{}`)",
             element.actual_type.display_with(db, env, settings.clone()),
             element.expected_type.display_with(db, env, settings),
         ));

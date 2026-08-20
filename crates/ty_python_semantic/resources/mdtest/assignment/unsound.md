@@ -403,7 +403,7 @@ error[unsound-assignment]: Unsound assignment
 6 | middle: list[int]
   |         --------- Expected a subtype of `list[int]` because of this annotation
 7 | first, *middle, last = (0, returns_any(), 1)  # snapshot: unsound-assignment
-  |         ------             ^^^^^^^^^^^^^ Inferred iterable element as `Any` (expected a subtype of `int`)
+  |         ------             ^^^^^^^^^^^^^ Iterable element inferred as `Any` (expected a subtype of `int`)
   |         |
   |         Assigned to this variable
 info: `list[Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
@@ -432,7 +432,7 @@ error[unsound-assignment]: Unsound assignment
 6 | middle: list[int]
   |         --------- Expected a subtype of `list[int]` because of this annotation
 7 | first, *middle, last = (0, 1, returns_any(), 2, 3)  # snapshot: unsound-assignment
-  |         ------             ^^^^^^^^^^^^^^^^^^^ Inferred iterable element as `Literal[1, 2] | Any` (expected a subtype of `int`)
+  |         ------             ^^^^^^^^^^^^^^^^^^^ Iterable element inferred as `Literal[1, 2] | Any` (expected a subtype of `int`)
   |         |
   |         Assigned to this variable
 info: `list[Literal[1, 2] | Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
