@@ -15,7 +15,6 @@ module. For example, see `super::type_hierarchy`.
 mod call_hierarchy_incoming_calls;
 mod call_hierarchy_outgoing_calls;
 mod code_action;
-mod code_lens;
 mod completion;
 mod diagnostic;
 mod discover_tests;
@@ -48,7 +47,6 @@ mod workspace_symbols;
 pub(super) use call_hierarchy_incoming_calls::CallHierarchyIncomingCallsRequestHandler;
 pub(super) use call_hierarchy_outgoing_calls::CallHierarchyOutgoingCallsRequestHandler;
 pub(super) use code_action::CodeActionRequestHandler;
-pub(super) use code_lens::CodeLensRequestHandler;
 pub(super) use completion::CompletionRequestHandler;
 pub(super) use diagnostic::DocumentDiagnosticRequestHandler;
 pub(super) use discover_tests::DiscoverTestsRequestHandler;
