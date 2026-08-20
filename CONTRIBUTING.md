@@ -239,7 +239,7 @@ Like Clippy, Ruff's rule names should make grammatical and logical sense when re
 ${rule}" or "allow ${rule} items", as in the context of suppression comments.
 
 For example, `AssertFalse` fits this convention: it flags `assert False` statements, and so a
-suppression comment would be framed as "allow `assert False`".
+suppression comment would be framed as "ignore `assert False`".
 
 As such, rule names should...
 
@@ -259,7 +259,7 @@ preserving the original rule name.
 
 Choosing a category is a crucial part of the rule proposal and acceptance process. To paraphrase the
 [Clippy documentation](https://rust-lang.github.io/rfcs/2476-clippy-uno.html#what-lints-belong-in-clippy),
-if a rule doesn't fit in the categories, it doesn't fit in Ruff. Descriptions of each category can
+if a rule doesn't fit in the categories, it probably doesn't fit in Ruff. Descriptions of each category can
 be found in the [rule category documentation](https://docs.astral.sh/ruff/linter/#rule-categories),
 but the flow chart below is intended to facilitate category assignment.
 
@@ -310,7 +310,7 @@ detecting code that is obviously incorrect or useless, the options narrow to `co
 runtime errors, or silently do something the user didn't intend. Similarly, `suspicious` lints flag
 the same kind of code, but in cases where Ruff can't be sure what the user intended. A perfect
 example of a `suspicious` rule is `mutable-argument-default` (`B006`). This classic footgun is
-almost always a mistake, but in some narrow cases beyond Ruff's understanding, it may be
+almost always a mistake, but in some cases, it may be
 intentional, in which case a `noqa` or `ruff: ignore` comment should be used. Such suppression
 comments should essentially never be reasonable for a `correctness` lint but are fine for
 `suspicious` lints.
