@@ -1,7 +1,7 @@
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{Stmt, StmtFunctionDef};
+use ruff_python_ast::{Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::{HasType, SemanticModel};
@@ -31,7 +31,7 @@ pub fn code_lens(db: &dyn Db, file: File) -> Vec<CodeLensItem> {
     for stmt in &parsed.syntax().body {
         match stmt {
             Stmt::FunctionDef(func) => {
-                if let Some(lens) = test_func_codelens(func) {
+                if let Some(lens) = test_func_codelens(func, None) {
                     items.push(lens);
                 }
             }
@@ -62,7 +62,7 @@ pub fn code_lens(db: &dyn Db, file: File) -> Vec<CodeLensItem> {
 
                 for class_stmt in &class.body {
                     if let Stmt::FunctionDef(func) = class_stmt
-                        && let Some(lens) = test_func_codelens(func)
+                        && let Some(lens) = test_func_codelens(func, Some(class))
                     {
                         items.push(lens);
                     }
@@ -75,15 +75,18 @@ pub fn code_lens(db: &dyn Db, file: File) -> Vec<CodeLensItem> {
     items
 }
 
-fn test_func_codelens(func: &StmtFunctionDef) -> Option<CodeLensItem> {
-    if func.name.as_str().starts_with("test") {
+fn test_func_codelens(
+    func: &StmtFunctionDef,
+    class: Option<&StmtClassDef>,
+) -> Option<CodeLensItem> {
+    if !func.name.as_str().starts_with("test") {
         return None;
     }
     Some(CodeLensItem {
         range: func.name.range(),
         title: String::from("Run test"),
         command: CodeLensCommand::RunTest {
-            class_name: None,
+            class_name: class.map(|c| c.name.id.clone()),
             function_name: Some(func.name.id.clone()),
         },
     })
