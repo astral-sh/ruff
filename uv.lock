@@ -1,5 +1,5 @@
 version = 1
-revision = 4
+revision = 3
 requires-python = ">=3.7"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -1557,6 +1557,32 @@ typeshed-docstrings = [
 typeshed-formatting = [
     { name = "black", marker = "python_full_version >= '3.10'" },
 ]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [{ name = "prek", marker = "python_full_version >= '3.12'", specifier = "==0.4.12" }]
+docs = [
+    { name = "mkdocs", marker = "python_full_version >= '3.12'", specifier = ">=1.6.1" },
+    { name = "mkdocs-github-admonitions-plugin", marker = "python_full_version >= '3.12'", specifier = ">=0.1.1" },
+    { name = "mkdocs-llmstxt", marker = "python_full_version >= '3.12'", specifier = ">=0.2.0" },
+    { name = "mkdocs-material", marker = "python_full_version >= '3.12'", specifier = ">=9.7.7" },
+    { name = "mkdocs-redirects", marker = "python_full_version >= '3.12'", specifier = ">=1.2.3" },
+    { name = "pyyaml", marker = "python_full_version >= '3.12'", specifier = ">=6.0.3" },
+]
+release = [{ name = "rooster", marker = "python_full_version >= '3.12'", specifier = "==0.1.1" }]
+ruff-lsp-test = [
+    { name = "lsprotocol", marker = "python_full_version >= '3.12'", specifier = ">=2023.0.0" },
+    { name = "packaging", marker = "python_full_version >= '3.12'", specifier = ">=23.1" },
+    { name = "pygls", marker = "python_full_version >= '3.12'", specifier = ">=1.1.0,<2" },
+    { name = "pytest", marker = "python_full_version >= '3.12'", specifier = ">=9.0.3,<10" },
+    { name = "pytest-asyncio", marker = "python_full_version >= '3.12'", specifier = ">=0.21.2" },
+    { name = "python-lsp-jsonrpc", marker = "python_full_version >= '3.12'", specifier = ">=1.0.0" },
+    { name = "typing-extensions", marker = "python_full_version >= '3.12'", specifier = ">=4.7.1" },
+]
+ty-ecosystem = [{ name = "ecosystem-analyzer", marker = "python_full_version >= '3.13'", git = "https://github.com/astral-sh/ecosystem-analyzer" }]
+typeshed-docstrings = [{ name = "docstring-adder", marker = "python_full_version >= '3.10'", git = "https://github.com/astral-sh/docstring-adder.git" }]
+typeshed-formatting = [{ name = "black", marker = "python_full_version >= '3.10'", git = "https://github.com/psf/black.git" }]
 
 [[package]]
 name = "shellingham"
