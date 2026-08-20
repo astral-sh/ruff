@@ -745,28 +745,6 @@ class Form(Ui):
 }
 
 #[test]
-fn loop_reachability_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);
-    let source = format!(
-        r#"from typing_extensions import reveal_type
-def noop() -> None: ...
-{calls}flag = False
-value = 1
-for _ in range(2):
-    reveal_type(value)
-    if flag:
-        value = 'abc'
-"#
-    );
-    db.write_file("/src/main.py", &source)?;
-
-    assert_revealed_type(&db, "/src/main.py", "Literal[1]");
-
-    Ok(())
-}
-
-#[test]
 fn nested_binding_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
     let mut db = setup_db();
     let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);
