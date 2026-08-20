@@ -77,6 +77,38 @@ def narrowing_after_non_empty_range(value: int | None) -> None:
     reveal_type(value)  # revealed: int
 ```
 
+This narrowing is not yet preserved for module- and class-scope loops. We currently avoid combining
+reachability and narrowing in these loops because doing so can introduce cycles through deferred
+annotations.
+
+```py
+def get_value() -> int | None:
+    return None
+
+module_value = get_value()
+
+for _ in range(1):
+    if module_value is None:
+        raise RuntimeError
+
+# TODO: This should be `int`, since the loop always runs.
+reveal_type(module_value)  # revealed: int | None
+```
+
+The same limitation applies to a loop in a class body.
+
+```py
+class Example:
+    value = get_value()
+
+    for _ in range(1):
+        if value is None:
+            raise RuntimeError
+
+    # TODO: This should be `int`, since the loop always runs.
+    reveal_type(value)  # revealed: int | None
+```
+
 The emptiness refinement is independent of the order in which range values are assigned:
 
 ```py
