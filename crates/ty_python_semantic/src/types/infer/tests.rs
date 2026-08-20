@@ -744,6 +744,50 @@ class Form(Ui):
     Ok(())
 }
 
+#[test]
+fn loop_reachability_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);
+    let source = format!(
+        r#"from typing_extensions import reveal_type
+def noop() -> None: ...
+{calls}flag = False
+value = 1
+for _ in range(2):
+    reveal_type(value)
+    if flag:
+        value = 'abc'
+"#
+    );
+    db.write_file("/src/main.py", &source)?;
+
+    assert_revealed_type(&db, "/src/main.py", "Literal[1]");
+
+    Ok(())
+}
+
+#[test]
+fn nested_binding_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);
+    let source = format!(
+        r#"def noop() -> None: ...
+{calls}value = 1
+values = [(value := 'abc') for _ in range(2)]
+value.bit_count()
+"#
+    );
+    db.write_file("/src/main.py", &source)?;
+
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Object of type `str` has no attribute `bit_count`"],
+    );
+
+    Ok(())
+}
+
 // Incremental inference tests
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {

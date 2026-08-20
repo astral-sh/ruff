@@ -1506,7 +1506,7 @@ fn loop_header_reachability_impl<'db>(
 ) -> LoopHeaderReachability<'db> {
     // This cutoff was chosen by benchmarking real isort to keep loop analysis
     // overhead minimal while preserving diagnostics.
-    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
 
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
