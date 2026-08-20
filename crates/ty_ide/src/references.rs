@@ -1,5 +1,5 @@
 //! This module implements the core functionality of the "references",
-//! "document highlight" and "rename" language server features. It locates
+//! "document highlight" and "rename" language server features: it locates
 //! all references to a named symbol. Unlike a simple text search for the
 //! symbol's name, this is a "semantic search" where the text and the semantic
 //! meaning must match.
@@ -9,11 +9,46 @@
 //! scope or within classes, are visible outside the module. Finding
 //! all references to these externally-visible symbols therefore requires
 //! an expensive search of all source files in the workspace.
+//!
+//! Our most general algorithm for finding references to a particular selection,
+//! which we'll refer to as "shared definitions matching", proceeds as follows:
+//!
+//! 1. Resolve the user's selection to a particular textual symbol, say, `x`.
+//! 2. Build a target set of the all the definitions (bindings and declarations)
+//!    for that symbol that are reachable within its scope. Call that set `A`.
+//! 3. Scan for all occurences of symbols that are also named `x`. For each such
+//!    candidate `y`, build the set of definitions that are reachable for `y`
+//!    within its scope. Call that set `B`.
+//! 4. Intersect sets `A` and `B`. If the intersection is non-empty, then `x`
+//!    and `y` share a definition, and so we conclude that `y` is a reference to `x.`
+//!
+//! That algorithm is generally too permissive, because it does not filter out
+//! those definitions which cannot actually reach a particular load. As such,
+//! we've begun to replace that algorithm with one based on reaching definitions
+//! (a.k.a. use-def relationships).
+//!
+//! In particular, the "references" feature now follows use-def relationships:
+//!
+//! - A query on a load returns that load and the bindings that might directly
+//!   (i.e., non-transitively) supply it. Conversely, a query on a binding
+//!   returns that binding and all loads that it directly supplies. Structural
+//!   references (e.g., keyword labels, `global`/`nonlocal` scope declarations)
+//!   are included alongside their corresponding bindings.
+//! - Use-def relationships are used to partition results into separate families.
+//!   For example in `x: int; x = 1; print(x)`, the annotation (`x: int`) forms
+//!   a separate family from the assignment and load (`x = 1; print(x)`).
+//! - If use-def analysis cannot identify the source bindings for a load then we
+//!   fall back to shared-definition matching for that load. For example, `x: int`
+//!   on its own does not bind a value, but it still shares a definition with a
+//!   later `print(x)`.
+//!
+//! Conversely, the "rename" and "document highlights" features still use
+//! shared definition matching for every occurrence.
 
 use crate::goto::{Definitions, GotoTarget};
 use crate::{Db, ReferenceKind, ReferenceTarget};
 use rayon::prelude::*;
-use ruff_db::parsed::parsed_module;
+use ruff_db::{files::FileRange, parsed::parsed_module};
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
@@ -93,16 +128,24 @@ pub(crate) fn references(
 ) -> Option<Vec<ReferenceTarget>> {
     let source_file = file.file(db);
     let model = SemanticModel::new(db, file);
-    let target_definitions = goto_target.definitions(&model, mode.to_import_alias_resolution())?;
+    let symbol_definitions = goto_target.definitions(&model, mode.to_import_alias_resolution())?;
     let is_externally_visible_symbol =
-        has_any_external_visible_definitions(db, &target_definitions);
-    let target_definitions = target_definitions.goto_declaration(&model, goto_target)?;
-
+        has_any_external_visible_definitions(db, &symbol_definitions);
+    let symbol_definitions = symbol_definitions.goto_declaration(&model, goto_target)?;
+    let is_parameter = parameter_owner_is_externally_visible(db, &symbol_definitions);
     // Extract the target text from the goto target for fast comparison
     let target_text = goto_target.to_string()?;
+    let target = if matches!(
+        mode,
+        ReferencesMode::References | ReferencesMode::ReferencesSkipDeclaration
+    ) {
+        ReferenceSearchTarget::for_selection(&model, goto_target, symbol_definitions, &target_text)
+    } else {
+        ReferenceSearchTarget::shared_definitions_only(&model, goto_target, symbol_definitions)
+    };
 
     // Find all of the references to the symbol within this file
-    let mut references = references_for_file(db, file, &target_definitions, &target_text, mode);
+    let mut references = references_for_file(db, file, &target, &target_text, mode);
 
     // Check if we should search across files based on the mode
     let search_across_files = matches!(
@@ -115,8 +158,6 @@ pub(crate) fn references(
     // Parameters are local by scope, but they can have cross-file references via keyword
     // argument labels (e.g. `f(param=...)`). Handle this case with a narrow scan that only
     // considers keyword arguments.
-    let is_parameter = parameter_owner_is_externally_visible(db, &target_definitions);
-
     if search_across_files && (is_parameter || is_externally_visible_symbol) {
         let program = model.program();
         let files = db.project().files(db);
@@ -138,12 +179,12 @@ pub(crate) fn references(
                 let other_file = ProgramFile::new(db, other_file, program);
 
                 if is_externally_visible_symbol {
-                    references_for_file(db, other_file, &target_definitions, &target_text, mode)
+                    references_for_file(db, other_file, &target, &target_text, mode)
                 } else {
                     references_for_keyword_arguments_in_file(
                         db,
                         other_file,
-                        &target_definitions,
+                        &target,
                         &target_text,
                         mode,
                     )
@@ -162,10 +203,194 @@ pub(crate) fn references(
     }
 }
 
+/// The selection and semantic relationships included in a reference search.
+#[derive(Debug)]
+struct ReferenceSearchTarget<'db> {
+    /// The source occurrence on which the search started.
+    selection: FileRange,
+    /// The selection's definitions, used for shared-definition matching.
+    selection_definitions: Definitions<'db>,
+    /// The relationships followed from the selection.
+    kind: ReferenceSearchKind<'db>,
+}
+
+impl<'db> ReferenceSearchTarget<'db> {
+    /// Creates a relationship-sensitive search target for `goto_target`.
+    ///
+    /// Falls back to shared-definition matching when use-def analysis cannot derive the selected
+    /// occurrence's relationships.
+    fn for_selection(
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
+        selection_definitions: Definitions<'db>,
+        target_text: &str,
+    ) -> Self {
+        Self {
+            selection: FileRange::new(model.file(), goto_target.range()),
+            kind: search_kind_for_selection(
+                model,
+                goto_target,
+                &selection_definitions,
+                target_text,
+            ),
+            selection_definitions,
+        }
+    }
+
+    /// Creates a search target that matches occurrences sharing a definition with the selection.
+    fn shared_definitions_only(
+        model: &SemanticModel<'_>,
+        goto_target: &GotoTarget<'_>,
+        selection_definitions: Definitions<'db>,
+    ) -> Self {
+        Self {
+            selection: FileRange::new(model.file(), goto_target.range()),
+            selection_definitions,
+            kind: ReferenceSearchKind::SharedDefinitions,
+        }
+    }
+
+    /// Returns whether an occurrence belongs to this search target.
+    fn matches(
+        &self,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
+        covering_node: &CoveringNode<'_>,
+        candidate_definitions: &Definitions<'db>,
+        target_text: &str,
+    ) -> bool {
+        if matches!(self.kind, ReferenceSearchKind::SharedDefinitions) {
+            return candidate_definitions.intersects(&self.selection_definitions);
+        }
+
+        let local_definition = model.first_local_definition(covering_node);
+        let binding = binding_definitions(
+            model,
+            goto_target,
+            candidate_definitions,
+            local_definition.as_ref(),
+        );
+        let loaded_name = loaded_name(model, goto_target, local_definition.as_ref());
+        let load_definitions = loaded_name.and_then(|name| load_definitions(model, name));
+        let structural = structural_definitions(
+            model,
+            goto_target,
+            candidate_definitions,
+            binding.as_ref(),
+            load_definitions.as_ref(),
+            local_definition.as_ref(),
+            target_text,
+        );
+
+        match &self.kind {
+            ReferenceSearchKind::Binding {
+                value_definitions,
+                structural_definitions: target_structural_definitions,
+            } => {
+                binding
+                    .as_ref()
+                    .is_some_and(|binding| binding.intersects(value_definitions))
+                    || structural.as_ref().is_some_and(|structural| {
+                        structural.intersects(target_structural_definitions)
+                    })
+                    // Fall back to shared-definition matching when no complete set of definitions
+                    // exists.
+                    || match (loaded_name, load_definitions) {
+                        (Some(_), Some(load_definitions)) => {
+                            load_definitions.intersects(value_definitions)
+                        }
+                        (Some(_), None) => {
+                            candidate_definitions.intersects(&self.selection_definitions)
+                        }
+                        (None, _) => {
+                            binding.is_none()
+                                && structural.is_none()
+                                && candidate_definitions.intersects(&self.selection_definitions)
+                        }
+                    }
+            }
+            ReferenceSearchKind::Load {
+                binding_definitions: target_binding_definitions,
+            } => {
+                binding
+                    .as_ref()
+                    .is_some_and(|binding| binding.intersects(target_binding_definitions))
+                    || structural
+                        .is_some_and(|structural| structural.intersects(target_binding_definitions))
+            }
+            ReferenceSearchKind::SharedDefinitions => false,
+        }
+    }
+
+    /// Returns whether `candidate` is the occurrence on which the search started.
+    fn is_selection(&self, candidate: FileRange) -> bool {
+        self.selection == candidate
+    }
+
+    /// Returns the selection's definitions.
+    fn selection_definitions(&self) -> &Definitions<'db> {
+        &self.selection_definitions
+    }
+}
+
+/// The relationship-matching strategy for a reference search.
+#[derive(Debug)]
+enum ReferenceSearchKind<'db> {
+    /// Follow relationships from one or more selected bindings.
+    Binding {
+        /// Definitions whose binding occurrences and directly supplied loads are included.
+        value_definitions: Definitions<'db>,
+        /// Definitions whose structurally related occurrences are included.
+        structural_definitions: Definitions<'db>,
+    },
+    /// Include the selected load and the definition-side occurrences related to it.
+    Load {
+        /// Definitions whose binding and structurally related occurrences are included.
+        binding_definitions: Definitions<'db>,
+    },
+    /// Match every occurrence that shares a definition with the selection.
+    SharedDefinitions,
+}
+
+fn goto_definitions<'db>(definitions: &[Definition<'db>]) -> Definitions<'db> {
+    Definitions::new(
+        definitions
+            .iter()
+            .copied()
+            .map(ResolvedDefinition::Definition)
+            .collect(),
+    )
+}
+
+fn module_export_structural_family<'db>(
+    model: &SemanticModel<'db>,
+    symbol_definitions: &Definitions<'db>,
+    name: &str,
+) -> Option<Definitions<'db>> {
+    let definitions = symbol_definitions
+        .iter()
+        .filter_map(ResolvedDefinition::definition)
+        .filter_map(|definition| {
+            let module = ty_module_resolver::file_to_module(
+                model.db(),
+                definition
+                    .program_file(model.db())
+                    .resolver_file(model.db()),
+            )?;
+            let resolution = model.definitions_for_module_global(module, name)?;
+            Some(goto_definitions(resolution.definitions()))
+        })
+        .fold(Definitions::new(Vec::new()), |family, definitions| {
+            family.union(&definitions)
+        });
+
+    (!definitions.is_empty()).then_some(definitions)
+}
+
 fn references_for_keyword_arguments_in_file(
     db: &dyn Db,
     file: ProgramFile<'_>,
-    target_definitions: &Definitions<'_>,
+    target: &ReferenceSearchTarget<'_>,
     target_text: &str,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
@@ -184,7 +409,7 @@ fn references_for_keyword_arguments_in_file(
     let mut finder = KeywordArgumentReferencesFinder(LocalReferencesFinder {
         model: &model,
         tokens: module.tokens(),
-        target_definitions,
+        target,
         references: &mut references,
         mode,
         target_text,
@@ -226,7 +451,7 @@ fn is_slots_assignment(node: AnyNodeRef<'_>, value: AnyNodeRef<'_>) -> bool {
 fn references_for_file(
     db: &dyn Db,
     file: ProgramFile<'_>,
-    target_definitions: &Definitions<'_>,
+    target: &ReferenceSearchTarget<'_>,
     target_text: &str,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
@@ -237,7 +462,7 @@ fn references_for_file(
 
     let mut finder = LocalReferencesFinder {
         model: &model,
-        target_definitions,
+        target,
         references: &mut references,
         mode,
         tokens: module.tokens(),
@@ -372,11 +597,280 @@ impl From<ast::ExprContext> for OccurrenceKind {
     }
 }
 
+fn search_kind_for_selection<'db>(
+    model: &SemanticModel<'db>,
+    goto_target: &GotoTarget<'_>,
+    selection_definitions: &Definitions<'db>,
+    target_text: &str,
+) -> ReferenceSearchKind<'db> {
+    if let GotoTarget::StringAnnotationSubexpr {
+        string_expr,
+        subrange,
+        levels,
+        ..
+    } = goto_target
+    {
+        // String annotations have their own semantic model. Classify the expression inside it.
+        if *levels == 2 {
+            return ReferenceSearchKind::SharedDefinitions;
+        }
+
+        let Some((sub_ast, sub_model)) = model.enter_string_annotation(string_expr) else {
+            return ReferenceSearchKind::SharedDefinitions;
+        };
+        let covering_node = covering_node(sub_ast.syntax().into(), *subrange);
+        let Some(sub_target) = GotoTarget::from_covering_node(
+            &sub_model,
+            &covering_node,
+            subrange.start(),
+            sub_ast.tokens(),
+        ) else {
+            return ReferenceSearchKind::SharedDefinitions;
+        };
+        return search_kind_for_load(&sub_model, &sub_target, selection_definitions, target_text);
+    }
+
+    if matches!(
+        goto_target,
+        GotoTarget::Expression(ast::ExprRef::Name(name))
+            if matches!(
+                name.ctx,
+                ast::ExprContext::Load | ast::ExprContext::Del | ast::ExprContext::Invalid
+            )
+    ) || matches!(
+        goto_target,
+        GotoTarget::Call {
+            callable: ast::ExprRef::Name(_),
+            ..
+        }
+    ) {
+        search_kind_for_load(model, goto_target, selection_definitions, target_text)
+    } else {
+        let parsed = parsed_module(model.db(), model.python_file());
+        let module = parsed.load(model.db());
+        let covering_node = covering_node(module.syntax().into(), goto_target.range());
+        search_kind_for_binding(
+            model,
+            goto_target,
+            &covering_node,
+            selection_definitions,
+            target_text,
+        )
+    }
+}
+
+fn search_kind_for_binding<'db>(
+    model: &SemanticModel<'db>,
+    goto_target: &GotoTarget<'_>,
+    covering_node: &CoveringNode<'_>,
+    selection_definitions: &Definitions<'db>,
+    target_text: &str,
+) -> ReferenceSearchKind<'db> {
+    let local_definition = model.first_local_definition(covering_node);
+    let binding = binding_definitions(
+        model,
+        goto_target,
+        selection_definitions,
+        local_definition.as_ref(),
+    );
+    let mut structural = structural_definitions(
+        model,
+        goto_target,
+        selection_definitions,
+        binding.as_ref(),
+        None,
+        local_definition.as_ref(),
+        target_text,
+    );
+
+    // Structural-only selections, such as global declarations, start from the definitions to
+    // which their syntax points.
+    let Some(mut value_definitions) = binding.or_else(|| structural.take()) else {
+        return ReferenceSearchKind::SharedDefinitions;
+    };
+    if value_definitions.is_empty() {
+        return ReferenceSearchKind::SharedDefinitions;
+    }
+
+    let structural_definitions = structural.map_or_else(
+        || value_definitions.clone(),
+        |structural| value_definitions.union(&structural),
+    );
+    // Selecting the exported name in `from module import name` follows both sides of the import.
+    if matches!(goto_target, GotoTarget::ImportExportedName { .. }) {
+        value_definitions = structural_definitions.clone();
+    }
+
+    ReferenceSearchKind::Binding {
+        value_definitions,
+        structural_definitions,
+    }
+}
+
+fn search_kind_for_load<'db>(
+    model: &SemanticModel<'db>,
+    goto_target: &GotoTarget<'_>,
+    selection_definitions: &Definitions<'db>,
+    target_text: &str,
+) -> ReferenceSearchKind<'db> {
+    let Some(load_definitions) =
+        target_name(goto_target).and_then(|name| load_definitions(model, name))
+    else {
+        return ReferenceSearchKind::SharedDefinitions;
+    };
+    let binding_definitions = match structural_definitions(
+        model,
+        goto_target,
+        selection_definitions,
+        None,
+        Some(&load_definitions),
+        None,
+        target_text,
+    ) {
+        Some(structural) => load_definitions.union(&structural),
+        None => load_definitions,
+    };
+
+    ReferenceSearchKind::Load {
+        binding_definitions,
+    }
+}
+
+fn binding_definitions<'db>(
+    model: &SemanticModel<'db>,
+    goto_target: &GotoTarget<'_>,
+    symbol_definitions: &Definitions<'db>,
+    local_definition: Option<&Definition<'db>>,
+) -> Option<Definitions<'db>> {
+    let mut binding = match target_name(goto_target).map(|name| name.ctx) {
+        Some(ast::ExprContext::Store) => Some(symbol_definitions.clone()),
+        Some(ast::ExprContext::Del) => None,
+        _ if matches!(
+            goto_target,
+            GotoTarget::FunctionDef(_)
+                | GotoTarget::ClassDef(_)
+                | GotoTarget::Parameter(_)
+                | GotoTarget::ImportModuleAlias { .. }
+                | GotoTarget::ImportExportedName { .. }
+                | GotoTarget::ImportSymbolAlias { .. }
+                | GotoTarget::ExceptVariable(_)
+                | GotoTarget::PatternMatchRest(_)
+                | GotoTarget::PatternMatchStarName(_)
+                | GotoTarget::PatternMatchAsName(_)
+                | GotoTarget::TypeParamTypeVarName(_)
+                | GotoTarget::TypeParamParamSpecName(_)
+                | GotoTarget::TypeParamTypeVarTupleName(_)
+        ) =>
+        {
+            Some(symbol_definitions.clone())
+        }
+        _ => None,
+    };
+
+    if binding.is_some()
+        && let Some(definition) = local_definition
+        && !matches!(definition.kind(model.db()), DefinitionKind::Function(_))
+    {
+        binding = Some(Definitions::new(vec![ResolvedDefinition::Definition(
+            *definition,
+        )]));
+    }
+
+    binding
+}
+
+fn structural_definitions<'db>(
+    model: &SemanticModel<'db>,
+    goto_target: &GotoTarget<'_>,
+    symbol_definitions: &Definitions<'db>,
+    binding: Option<&Definitions<'db>>,
+    load_definitions: Option<&Definitions<'db>>,
+    local_definition: Option<&Definition<'db>>,
+    target_text: &str,
+) -> Option<Definitions<'db>> {
+    let mut structural = match goto_target {
+        GotoTarget::KeywordArgument { .. }
+        | GotoTarget::NonLocal { .. }
+        | GotoTarget::Globals { .. } => Some(symbol_definitions.clone()),
+        GotoTarget::ImportExportedName { .. } => {
+            module_export_structural_family(model, symbol_definitions, target_text)
+        }
+        _ if load_definitions.is_some_and(|load_definitions| {
+            load_definitions.iter().any(|resolved| {
+                resolved
+                    .definition()
+                    .is_some_and(|definition| definition.kind(model.db()).is_import())
+            })
+        }) =>
+        {
+            module_export_structural_family(model, symbol_definitions, target_text)
+        }
+        _ => None,
+    };
+
+    if let Some(binding) = binding
+        && let Some(definition) = local_definition
+        && definition.scope(model.db()).scope(model.db()).kind() == ScopeKind::Module
+        && let Some(module_definitions) =
+            module_export_structural_family(model, symbol_definitions, target_text)
+        && binding.intersects(&module_definitions)
+    {
+        structural = Some(module_definitions);
+    }
+
+    structural
+}
+
+fn loaded_name<'a>(
+    model: &SemanticModel<'_>,
+    goto_target: &GotoTarget<'a>,
+    local_definition: Option<&Definition<'_>>,
+) -> Option<&'a ast::ExprName> {
+    let name = target_name(goto_target)?;
+    if matches!(
+        name.ctx,
+        ast::ExprContext::Load | ast::ExprContext::Del | ast::ExprContext::Invalid
+    ) || local_definition.is_some_and(|definition| {
+        matches!(
+            definition.kind(model.db()),
+            DefinitionKind::AugmentedAssignment(_)
+        )
+    }) {
+        Some(name)
+    } else {
+        None
+    }
+}
+
+fn load_definitions<'db>(
+    model: &SemanticModel<'db>,
+    name: &ast::ExprName,
+) -> Option<Definitions<'db>> {
+    let resolution = model.name_load(name)?;
+    if !resolution.is_complete() {
+        return None;
+    }
+
+    let definitions = goto_definitions(resolution.definitions());
+    (!definitions.is_empty()).then_some(definitions)
+}
+
+fn target_name<'a>(goto_target: &GotoTarget<'a>) -> Option<&'a ast::ExprName> {
+    match goto_target {
+        GotoTarget::Expression(ast::ExprRef::Name(name))
+        | GotoTarget::Call {
+            callable: ast::ExprRef::Name(name),
+            ..
+        } => Some(name),
+        _ => None,
+    }
+}
+
 /// AST visitor to find all references to a specific symbol by comparing semantic definitions
 struct LocalReferencesFinder<'a> {
     model: &'a SemanticModel<'a>,
     tokens: &'a Tokens,
-    target_definitions: &'a Definitions<'a>,
+    target: &'a ReferenceSearchTarget<'a>,
     references: &'a mut Vec<ReferenceTarget>,
     mode: ReferencesMode,
     target_text: &'a str,
@@ -466,7 +960,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 {
                     let mut sub_finder = LocalReferencesFinder {
                         model: &sub_model,
-                        target_definitions: self.target_definitions,
+                        target: self.target,
                         references: self.references,
                         mode: self.mode,
                         tokens: sub_ast.tokens(),
@@ -549,35 +1043,38 @@ impl<'a> LocalReferencesFinder<'a> {
         self.check_covering_node(&covering_node, kind);
     }
 
-    /// Returns the covering node's resolved definitions.
-    fn definitions_for_covering_node(
-        &self,
-        covering_node: &CoveringNode<'_>,
-    ) -> Option<Definitions<'a>> {
-        // Use the start of the covering node as the offset. Any offset within
-        // the node is fine here. Offsets matter only for import statements
-        // where the identifier might be a multi-part module name.
-        let offset = covering_node.node().start();
-        let goto_target =
-            GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens)?;
-
-        let definitions = goto_target
-            .definitions(self.model, self.mode.to_import_alias_resolution())?
-            .goto_declaration(self.model, &goto_target)?;
-
-        Some(definitions)
-    }
-
     fn check_covering_node(&mut self, covering_node: &CoveringNode<'_>, kind: OccurrenceKind) {
-        let Some(current_definitions) = self.definitions_for_covering_node(covering_node) else {
-            return;
-        };
-
-        // Check if any of the current definitions match our target definitions
-        if !self.target_definitions.intersects(&current_definitions) {
+        let candidate = FileRange::new(self.model.file(), covering_node.node().range());
+        if self.target.is_selection(candidate) {
+            self.push_reference(covering_node, kind);
             return;
         }
 
+        let offset = covering_node.node().start();
+        let Some(goto_target) =
+            GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens)
+        else {
+            return;
+        };
+        let Some(candidate_definitions) = goto_target
+            .definitions(self.model, self.mode.to_import_alias_resolution())
+            .and_then(|definitions| definitions.goto_declaration(self.model, &goto_target))
+        else {
+            return;
+        };
+
+        if self.target.matches(
+            self.model,
+            &goto_target,
+            covering_node,
+            &candidate_definitions,
+            self.target_text,
+        ) {
+            self.push_reference(covering_node, kind);
+        }
+    }
+
+    fn push_reference(&mut self, covering_node: &CoveringNode<'_>, kind: OccurrenceKind) {
         if matches!(self.mode, ReferencesMode::ReferencesSkipDeclaration) {
             let is_declaration = match kind {
                 OccurrenceKind::Declaration => true,
@@ -590,12 +1087,11 @@ impl<'a> LocalReferencesFinder<'a> {
             }
         }
 
-        let target = ReferenceTarget::new(
+        self.references.push(ReferenceTarget::new(
             self.model.file(),
             covering_node.node().range(),
             kind.to_reference_kind(),
-        );
-        self.references.push(target);
+        ));
     }
 
     /// Checks a string literal that may be an entry in a class's `__slots__`.
@@ -720,7 +1216,7 @@ impl<'a> LocalReferencesFinder<'a> {
             scope = node.parent()?;
         };
 
-        self.target_definitions.iter().any(|resolved| {
+        self.target.selection_definitions().iter().any(|resolved| {
             let Some(definition) = resolved.definition() else {
                 return false;
             };

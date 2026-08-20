@@ -244,7 +244,7 @@ pub(crate) enum GotoTarget<'a> {
 }
 
 /// The resolved definitions for a `GotoTarget`
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Definitions<'db>(Vec<ResolvedDefinition<'db>>);
 
 impl<'db> Definitions<'db> {
@@ -450,6 +450,14 @@ impl<'db> Definitions<'db> {
     /// exposes only part of the co-definition set.
     pub(crate) fn intersects(&self, other: &Self) -> bool {
         self.iter().any(|definition| other.0.contains(definition))
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub(crate) fn union(&self, other: &Self) -> Self {
+        Self::new(self.iter().chain(other).cloned().collect())
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, ResolvedDefinition<'db>> {
