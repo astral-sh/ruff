@@ -740,7 +740,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 });
         for (_, member) in recursive_members {
             if structurally_satisfied
-                .implies(db, self.constraints, || nominally_satisfied)
+                .implies(db, self.constraints, nominally_satisfied)
                 .is_always_satisfied(db, env)
             {
                 break;
