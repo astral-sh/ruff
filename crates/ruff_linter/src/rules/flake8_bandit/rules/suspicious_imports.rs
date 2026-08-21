@@ -254,7 +254,7 @@ impl Violation for SuspiciousXmlPulldomImport {
 ///
 /// [deprecated]: https://github.com/tiran/defusedxml/blob/c7445887f5e1bcea470a16f61369d29870cfcfe1/README.md#defusedxmllxml
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "v0.3.0")]
+#[violation_metadata(removed_since = "v0.3.0", category = Category::Security)]
 pub(crate) struct SuspiciousLxmlImport;
 
 impl Violation for SuspiciousLxmlImport {

@@ -153,7 +153,7 @@ impl Violation for MissingTypeKwargs {
 /// ```
 #[derive(ViolationMetadata)]
 #[deprecated(note = "ANN101 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct MissingTypeSelf;
 
 #[expect(deprecated)]
@@ -198,7 +198,7 @@ impl Violation for MissingTypeSelf {
 /// ```
 #[derive(ViolationMetadata)]
 #[deprecated(note = "ANN102 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct MissingTypeCls;
 
 #[expect(deprecated)]

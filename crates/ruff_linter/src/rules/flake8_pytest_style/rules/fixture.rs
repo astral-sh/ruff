@@ -238,7 +238,7 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[derive(ViolationMetadata)]
 #[deprecated(note = "PT004 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct PytestMissingFixtureNameUnderscore;
 
 #[expect(deprecated)]
@@ -304,7 +304,7 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[derive(ViolationMetadata)]
 #[deprecated(note = "PT005 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct PytestIncorrectFixtureNameUnderscore;
 
 #[expect(deprecated)]

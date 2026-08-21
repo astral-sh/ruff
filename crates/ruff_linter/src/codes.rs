@@ -162,10 +162,6 @@ pub enum Category {
     /// Internal testing rules that shouldn't be exposed to users.
     #[strum(disabled)]
     Testing,
-
-    /// Removed rules that shouldn't be exposed to users.
-    #[strum(disabled)]
-    Removed,
 }
 
 impl Category {

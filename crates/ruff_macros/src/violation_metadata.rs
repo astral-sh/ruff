@@ -109,7 +109,6 @@ fn get_metadata(attrs: &[Attribute]) -> syn::Result<Metadata> {
                 } else if meta.path.is_ident("removed_since") {
                     let lit: LitStr = parse_version(&meta)?;
                     metadata.status = Some(quote!(RuleStatus::Removed { since: #lit }));
-                    metadata.category = Some(syn::parse_quote!(crate::codes::Category::Removed));
                     return Ok(());
                 } else if meta.path.is_ident("category") {
                     metadata.category = Some(meta.value()?.parse()?);
