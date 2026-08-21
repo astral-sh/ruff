@@ -59,6 +59,21 @@ reveal_type(first)  # revealed: () -> Literal[0]
 reveal_type(named)  # revealed: () -> Literal[0]
 ```
 
+## Contextual inference in shared lambdas
+
+Each assignment target provides its own context to a shared lambda.
+
+```py
+from collections.abc import Callable
+
+first: Callable[[int], int]
+second: Callable[[int], int]
+first = second = lambda value: value.bit_length()
+
+reveal_type(first)  # revealed: (value: int) -> int
+reveal_type(second)  # revealed: (value: int) -> int
+```
+
 ## Contextual inference in assignment expressions
 
 A declared type on the assignment-expression target still supplies context to its lambda.
@@ -72,4 +87,15 @@ first = second = (named := lambda value: value.bit_length())
 reveal_type(first)  # revealed: (value: int) -> int
 reveal_type(second)  # revealed: (value: int) -> int
 reveal_type(named)  # revealed: (value: int) -> int
+```
+
+## Assignment expressions in lambda defaults
+
+A lambda default executes in the enclosing assignment, so an assignment expression in that default
+creates a binding owned by the shared assignment statement.
+
+```py
+first = second = lambda value=(named := 1): value
+
+reveal_type(named)  # revealed: Literal[1]
 ```
