@@ -183,7 +183,7 @@ impl Category {
 
     /// Return the rules in this category.
     pub(crate) fn rules(self) -> &'static [Rule] {
-        static RULES_BY_CATEGORY: LazyLock<[Vec<Rule>; Category::VARIANTS.len()]> =
+        static RULES_BY_CATEGORY: LazyLock<[Box<[Rule]>; Category::VARIANTS.len()]> =
             LazyLock::new(|| {
                 let mut rules = [const { Vec::new() }; Category::VARIANTS.len()];
 
@@ -191,7 +191,7 @@ impl Category {
                     rules[rule.category() as usize].push(rule);
                 }
 
-                rules
+                rules.map(Vec::into_boxed_slice)
             });
 
         &RULES_BY_CATEGORY[self as usize]
