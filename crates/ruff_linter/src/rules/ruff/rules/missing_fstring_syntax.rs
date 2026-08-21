@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::fastapi::rules::is_fastapi_route_call;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

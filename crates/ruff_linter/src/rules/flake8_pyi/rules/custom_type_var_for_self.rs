@@ -11,6 +11,7 @@ use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, TypingImporter};
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does

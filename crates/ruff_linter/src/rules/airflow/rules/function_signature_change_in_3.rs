@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::{FunctionSignatureChange, is_method_in_subclass};
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};

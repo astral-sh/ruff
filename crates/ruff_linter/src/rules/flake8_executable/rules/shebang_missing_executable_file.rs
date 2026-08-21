@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::{is_executable, is_wsl};
 

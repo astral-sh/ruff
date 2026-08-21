@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};

@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing::is_io_base_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad_end;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

@@ -6,6 +6,7 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::is_airflow_builtin_or_provider;
 use crate::{FixAvailability, Violation};
 

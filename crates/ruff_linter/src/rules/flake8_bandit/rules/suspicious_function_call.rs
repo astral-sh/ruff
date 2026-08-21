@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_suspicious_function_reference_enabled;
 
 /// ## What it does

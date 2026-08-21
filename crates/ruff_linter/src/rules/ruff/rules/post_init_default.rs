@@ -9,6 +9,7 @@ use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 

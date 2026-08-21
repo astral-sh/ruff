@@ -6,6 +6,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::{FixAvailability, Violation};
 

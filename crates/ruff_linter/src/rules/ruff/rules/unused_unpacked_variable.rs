@@ -3,6 +3,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::renamer::ShadowedKind;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

@@ -4,6 +4,7 @@ use ruff_python_ast::{ArgOrKeyword, Expr, ExprBooleanLiteral, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_builtin_open_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{

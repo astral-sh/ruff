@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does

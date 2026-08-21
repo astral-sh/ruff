@@ -6,6 +6,7 @@ use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_slots::helpers::has_slots;
 
 /// ## What it does

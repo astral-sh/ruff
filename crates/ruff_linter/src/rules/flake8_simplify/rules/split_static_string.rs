@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does

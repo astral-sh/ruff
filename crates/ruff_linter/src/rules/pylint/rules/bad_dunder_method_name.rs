@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 
 /// ## What it does

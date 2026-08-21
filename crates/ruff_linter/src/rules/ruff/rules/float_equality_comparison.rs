@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::is_infinity_string_literal;
 
 /// ## What it does

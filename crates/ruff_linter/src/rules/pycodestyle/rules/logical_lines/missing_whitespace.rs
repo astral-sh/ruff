@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Edit;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 
 use super::{DefinitionState, LogicalLine};

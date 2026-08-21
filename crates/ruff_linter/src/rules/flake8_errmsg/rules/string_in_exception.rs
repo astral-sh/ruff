@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::fresh_binding_name;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};

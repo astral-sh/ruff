@@ -3,6 +3,7 @@ use ruff_python_ast::{PythonVersion, Stmt, StmtImport, StmtImportFrom};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

@@ -5,6 +5,7 @@ use ruff_python_ast::{Expr, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does

@@ -14,6 +14,7 @@ use ruff_python_semantic::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::preview::{
     is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,

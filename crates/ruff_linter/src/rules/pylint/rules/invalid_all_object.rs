@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does

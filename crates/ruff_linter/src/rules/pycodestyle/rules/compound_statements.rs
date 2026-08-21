@@ -7,6 +7,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 

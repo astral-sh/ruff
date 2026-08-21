@@ -6,6 +6,7 @@ use ruff_python_semantic::{Modules, SemanticModel, analyze};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_django::helpers;
 

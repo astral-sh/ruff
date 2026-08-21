@@ -10,6 +10,7 @@ use ruff_python_stdlib::typing::simple_magic_return_type;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::rules::flake8_annotations::helpers::{auto_return_type, type_expr};
 use crate::rules::ruff::typing::type_hint_resolves_to_any;

@@ -6,6 +6,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};

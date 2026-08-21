@@ -3,6 +3,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use crate::Violation;
+use crate::codes::Category;
 
 use crate::checkers::ast::Checker;
 

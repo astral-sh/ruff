@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ArgOrKeyword, Arguments, Expr, ExprCall, PythonVersion};
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{
     FixAvailability, Violation,
     checkers::ast::Checker,

@@ -6,6 +6,7 @@ use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

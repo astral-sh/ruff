@@ -6,6 +6,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 

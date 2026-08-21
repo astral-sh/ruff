@@ -4,6 +4,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 use crate::{Edit, Fix, FixAvailability, Violation};

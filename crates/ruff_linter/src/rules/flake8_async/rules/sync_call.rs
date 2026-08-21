@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::rules::flake8_async::helpers::MethodName;
 use crate::{Edit, Fix, FixAvailability, Violation};

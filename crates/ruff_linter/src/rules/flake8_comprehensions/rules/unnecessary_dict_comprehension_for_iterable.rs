@@ -7,6 +7,7 @@ use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, Exp
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad_start;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

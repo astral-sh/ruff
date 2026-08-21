@@ -5,6 +5,7 @@ use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Fix, FixAvailability, Violation};
 
 use crate::renamer::Renamer;

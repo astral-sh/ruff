@@ -5,6 +5,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_async::helpers::AsyncModule;
 use crate::{AlwaysFixableViolation, Edit, Fix};

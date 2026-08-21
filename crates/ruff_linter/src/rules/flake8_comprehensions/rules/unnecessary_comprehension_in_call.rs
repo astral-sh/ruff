@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::FixAvailability;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_comprehension_with_min_max_sum_enabled;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{Edit, Fix, Violation};

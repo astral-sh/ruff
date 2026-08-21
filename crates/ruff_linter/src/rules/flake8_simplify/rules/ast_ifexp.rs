@@ -7,6 +7,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does

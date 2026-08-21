@@ -3,6 +3,7 @@ use ruff_python_ast::StmtTry;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Violation;
+use crate::codes::Category;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::num_statements;

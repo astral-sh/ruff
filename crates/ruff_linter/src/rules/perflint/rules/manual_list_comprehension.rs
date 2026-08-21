@@ -1,5 +1,6 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,

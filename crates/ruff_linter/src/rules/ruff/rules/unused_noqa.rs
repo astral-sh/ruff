@@ -3,6 +3,7 @@ use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
+use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub(crate) struct UnusedCodes<'a> {

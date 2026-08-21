@@ -6,6 +6,7 @@ use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does

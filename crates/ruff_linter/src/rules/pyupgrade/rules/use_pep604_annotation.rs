@@ -8,7 +8,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::codes::Rule;
+use crate::codes::{Category, Rule};
 use crate::fix::edits::pad;
 use crate::preview::is_pep604_future_annotations_fix_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};

@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{AlwaysFixableViolation, Fix};
 

@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_mutable_default_in_dataclass_field_enabled;
 use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_dataclass_field};
 

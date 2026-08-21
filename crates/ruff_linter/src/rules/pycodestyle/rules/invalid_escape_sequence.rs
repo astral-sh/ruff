@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad_start;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

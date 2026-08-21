@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyupgrade::fixes;
 use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_required_by_isort;
 use crate::{Edit, Fix, FixAvailability, Violation};

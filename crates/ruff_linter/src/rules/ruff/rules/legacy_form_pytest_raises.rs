@@ -8,6 +8,7 @@ use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 
+use crate::codes::Category;
 use crate::{FixAvailability, Violation, checkers::ast::Checker};
 
 /// ## What it does

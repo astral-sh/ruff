@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

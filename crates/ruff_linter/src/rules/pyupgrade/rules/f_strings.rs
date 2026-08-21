@@ -16,6 +16,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
 use crate::{Edit, Fix, FixAvailability, Violation};

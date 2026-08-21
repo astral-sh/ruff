@@ -3,6 +3,7 @@ use ruff_python_ast as ast;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for variables which are both declared as both `nonlocal` and

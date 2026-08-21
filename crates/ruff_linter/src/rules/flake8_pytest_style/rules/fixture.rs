@@ -13,6 +13,7 @@ use ruff_text_size::{TextLen, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};

@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::typing::is_list;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::refurb::helpers::generate_method_call;

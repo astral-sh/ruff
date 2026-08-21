@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, add_argument, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
 

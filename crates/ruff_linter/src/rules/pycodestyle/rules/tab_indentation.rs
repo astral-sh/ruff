@@ -6,6 +6,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for indentation that uses tabs.

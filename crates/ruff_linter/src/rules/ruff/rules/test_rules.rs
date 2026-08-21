@@ -19,6 +19,7 @@ use ruff_text_size::TextSize;
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

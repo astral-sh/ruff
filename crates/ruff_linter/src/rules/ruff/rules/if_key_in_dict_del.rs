@@ -3,6 +3,7 @@ use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 type Key = Expr;

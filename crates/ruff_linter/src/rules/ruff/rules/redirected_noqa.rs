@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};

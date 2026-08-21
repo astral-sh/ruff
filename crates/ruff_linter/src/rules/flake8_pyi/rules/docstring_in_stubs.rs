@@ -3,6 +3,7 @@ use ruff_python_ast::{ExprStringLiteral, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::{Checker, DocstringState, ExpectedDocstringKind};
+use crate::codes::Category;
 use crate::docstrings::extraction::docstring_from;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

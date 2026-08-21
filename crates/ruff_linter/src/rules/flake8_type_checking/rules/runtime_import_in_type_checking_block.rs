@@ -8,7 +8,7 @@ use ruff_python_semantic::{Imported, NodeId, Scope, ScopeId};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::codes::Rule;
+use crate::codes::{Category, Rule};
 use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annotation};

@@ -4,6 +4,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::rules::sequence_sorting::{
     MultilineStringSequenceValue, SequenceKind, SortClassification, SortingStyle,
     sort_single_line_elements_sequence,

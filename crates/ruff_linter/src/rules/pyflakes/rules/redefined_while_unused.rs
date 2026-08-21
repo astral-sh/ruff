@@ -10,6 +10,7 @@ use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::preview::{
     is_annotated_assignment_redefinition_enabled, is_f811_shadowing_in_type_checking_enabled,

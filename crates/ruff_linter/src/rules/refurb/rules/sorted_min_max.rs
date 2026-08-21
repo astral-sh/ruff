@@ -9,6 +9,7 @@ use crate::Fix;
 use crate::FixAvailability;
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `sorted()` to retrieve the minimum or maximum value in

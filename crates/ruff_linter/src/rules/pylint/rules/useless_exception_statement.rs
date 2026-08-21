@@ -5,6 +5,7 @@ use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_custom_exception_checking_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;

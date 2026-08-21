@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::LintContext};
 
 const BIDI_UNICODE: [char; 11] = [

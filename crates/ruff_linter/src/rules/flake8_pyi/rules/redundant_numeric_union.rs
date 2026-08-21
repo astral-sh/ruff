@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_resolve_string_annotation_pyi041_enabled;
 use crate::rules::flake8_type_checking::helpers::is_singledispatch_implementation;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};

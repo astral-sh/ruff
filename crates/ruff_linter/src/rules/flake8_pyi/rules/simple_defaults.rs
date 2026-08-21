@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 

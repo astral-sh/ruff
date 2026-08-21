@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::{Checker, DiagnosticGuard};
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for dictionary iterations that extract the dictionary value

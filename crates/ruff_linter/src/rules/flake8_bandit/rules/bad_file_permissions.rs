@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_s103_extended_dangerous_bits_enabled;
 
 /// ## What it does

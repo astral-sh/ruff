@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::class::is_enumeration;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does

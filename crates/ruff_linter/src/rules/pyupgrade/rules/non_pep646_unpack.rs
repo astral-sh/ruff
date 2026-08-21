@@ -3,6 +3,7 @@ use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does

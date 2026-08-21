@@ -2,6 +2,7 @@ use ruff_python_ast::StmtImportFrom;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::codes::Category;
 use crate::{Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, fix};
 

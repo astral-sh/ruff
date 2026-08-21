@@ -4,6 +4,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 
 use super::LogicalLine;
 

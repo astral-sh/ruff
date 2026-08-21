@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix};

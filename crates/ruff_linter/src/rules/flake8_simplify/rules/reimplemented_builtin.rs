@@ -10,6 +10,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
 use crate::{Edit, Fix, FixAvailability, Violation};

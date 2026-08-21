@@ -7,6 +7,7 @@ use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

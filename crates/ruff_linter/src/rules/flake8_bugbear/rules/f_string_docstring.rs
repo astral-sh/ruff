@@ -5,6 +5,7 @@ use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for docstrings that are written via f-strings.

@@ -11,6 +11,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::cst::matchers::{
     match_attribute, match_call_mut, match_expression, transform_expression_text,
 };

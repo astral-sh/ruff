@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

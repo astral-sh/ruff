@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::function_type;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does

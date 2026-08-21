@@ -9,6 +9,7 @@ use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use ruff_python_ast::PythonVersion;

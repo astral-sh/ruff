@@ -3,6 +3,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::fix::edits::delete_comment;
 use crate::noqa::{Code, Directive, FileNoqaDirectives};
 use crate::noqa::{Codes, NoqaDirectives};

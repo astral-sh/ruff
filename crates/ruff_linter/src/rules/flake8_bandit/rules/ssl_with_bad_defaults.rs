@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for function definitions with default arguments set to insecure SSL

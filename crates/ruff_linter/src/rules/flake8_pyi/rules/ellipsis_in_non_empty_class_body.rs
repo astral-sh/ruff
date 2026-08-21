@@ -4,6 +4,7 @@ use ruff_python_ast::{Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

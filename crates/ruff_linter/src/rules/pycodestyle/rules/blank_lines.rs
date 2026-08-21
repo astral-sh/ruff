@@ -19,6 +19,7 @@ use ruff_text_size::TextSize;
 
 use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::checkers::logical_lines::expand_indent;
+use crate::codes::Category;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::{AlwaysFixableViolation, Edit, Fix, Locator, Violation};

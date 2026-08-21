@@ -10,6 +10,7 @@ use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, Reso
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for mismatched argument types in "old-style" format strings.

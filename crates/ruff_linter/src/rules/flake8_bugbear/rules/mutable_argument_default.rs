@@ -13,6 +13,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::{
     is_b006_check_guaranteed_mutable_expr_enabled,
     is_b006_unsafe_fix_preserve_assignment_expr_enabled,

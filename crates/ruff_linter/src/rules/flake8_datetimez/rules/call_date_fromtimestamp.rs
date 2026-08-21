@@ -6,6 +6,7 @@ use ruff_python_semantic::Modules;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for usage of `datetime.date.fromtimestamp()`.

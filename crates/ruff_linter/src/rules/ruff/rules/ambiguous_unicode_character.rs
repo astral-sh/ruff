@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::{Checker, LintContext};
+use crate::codes::Category;
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
 use crate::rules::ruff::rules::Context;
 use crate::rules::ruff::rules::confusables::confusable;

@@ -8,6 +8,7 @@ use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## What it does

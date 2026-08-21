@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::SequenceIndexVisitor;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

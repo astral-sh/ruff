@@ -5,6 +5,7 @@ use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsSt
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::refurb::helpers::IterLocation;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 

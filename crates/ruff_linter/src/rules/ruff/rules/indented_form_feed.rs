@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::LintContext};
 
 /// ## What it does

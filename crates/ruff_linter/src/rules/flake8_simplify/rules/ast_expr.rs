@@ -7,6 +7,7 @@ use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 

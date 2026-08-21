@@ -9,6 +9,7 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

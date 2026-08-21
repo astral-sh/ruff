@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum VarKind {

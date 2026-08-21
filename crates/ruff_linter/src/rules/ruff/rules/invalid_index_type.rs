@@ -6,6 +6,7 @@ use std::fmt;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for indexed access to lists, strings, tuples, bytes, and comprehensions

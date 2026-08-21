@@ -10,6 +10,7 @@ use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

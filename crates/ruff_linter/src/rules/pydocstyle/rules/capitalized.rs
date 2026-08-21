@@ -3,6 +3,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

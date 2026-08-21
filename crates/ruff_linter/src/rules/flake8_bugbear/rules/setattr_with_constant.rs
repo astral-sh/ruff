@@ -7,6 +7,7 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does

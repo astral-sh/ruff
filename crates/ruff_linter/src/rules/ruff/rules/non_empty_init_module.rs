@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_type_checking_block;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does

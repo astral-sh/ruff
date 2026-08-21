@@ -5,6 +5,7 @@ use ruff_text_size::TextRange;
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::eradicate::detection::comment_contains_code;
