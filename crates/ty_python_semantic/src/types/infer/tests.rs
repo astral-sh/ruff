@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
@@ -582,7 +584,8 @@ class Ui:
             );
 
             for index in 0..MANY_WIDGETS {
-                ui.push_str(&format!(
+                write!(
+                    ui,
                     concat!(
                         "        self.widget_{index} = Widget()\n",
                         "        self.widget_{index}.configure()\n",
@@ -590,7 +593,7 @@ class Ui:
                         "        self.widget_{index}.configure()\n",
                     ),
                     index = index,
-                ));
+                )?;
             }
             ui.push_str("        self.target = Widget()\n");
 
@@ -639,7 +642,8 @@ class Inner:
 "#,
             );
             for index in 0..MANY_WIDGETS {
-                inner.push_str(&format!(
+                write!(
+                    inner,
                     concat!(
                         "        self.widget_{index} = Widget()\n",
                         "        self.widget_{index}.configure()\n",
@@ -647,7 +651,7 @@ class Inner:
                         "        self.widget_{index}.configure()\n",
                     ),
                     index = index,
-                ));
+                )?;
             }
             inner.push_str("        self.target = Widget()\n");
 
