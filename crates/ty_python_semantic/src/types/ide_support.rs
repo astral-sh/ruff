@@ -34,6 +34,27 @@ use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
+/// Returns resolved definitions for a name or attribute expression.
+///
+/// Import aliases in names follow `alias_resolution`; attributes retain the existing
+/// attribute-resolution behavior and resolve imported definitions to their targets.
+pub fn definitions_for_expression<'db>(
+    model: &SemanticModel<'db>,
+    expression: ast::ExprRef<'_>,
+    alias_resolution: ImportAliasResolution,
+) -> Option<Vec<ResolvedDefinition<'db>>> {
+    match expression {
+        ast::ExprRef::Name(name) => Some(definitions_for_name(
+            model,
+            name.id.as_str(),
+            expression.into(),
+            alias_resolution,
+        )),
+        ast::ExprRef::Attribute(attribute) => Some(definitions_for_attribute(model, attribute)),
+        _ => None,
+    }
+}
+
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.

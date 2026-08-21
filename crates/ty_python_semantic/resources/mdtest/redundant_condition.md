@@ -31,7 +31,7 @@ if func:  # snapshot: redundant-condition
 ```
 
 ```snapshot
-warning[redundant-condition]: Function `func` is always truthy in a boolean context
+warning[redundant-condition]: Function `func` is always truthy
  --> src/mdtest_snippet.py:3:4
   |
 3 | if func:  # snapshot: redundant-condition
@@ -55,11 +55,19 @@ def work(items: list[int]):
 ```
 
 ```snapshot
-warning[redundant-condition]: Object of type `GeneratorType[int, None, None]` is always truthy in a boolean context
+warning[redundant-condition]: A generator is always truthy
  --> src/mdtest_snippet.py:7:8
   |
 7 |     if filtered:  # snapshot: redundant-condition
-  |        ^^^^^^^^
+  |        ^^^^^^^^ Inferred type is `GeneratorType[int, None, None]`
+help: Did you mean to collect the generator into a tuple?
+  |
+6 |     filtered = (item for item in items if item < 42)
+  -     if filtered:  # snapshot: redundant-condition
+7 +     if tuple(filtered):  # snapshot: redundant-condition
+8 |         pass
+  |
+note: This is a display-only fix and is likely to be incorrect
 ```
 
 And testing an awaitable without awaiting it:
@@ -72,11 +80,12 @@ async def main():
 ```
 
 ```snapshot
-warning[redundant-condition]: Object of type `CoroutineType[Any, Any, Unknown]` is always truthy in a boolean context
+warning[redundant-condition]: Condition is always truthy
   --> src/mdtest_snippet.py:11:8
    |
 11 |     if coroutine():  # snapshot: redundant-condition
-   |        ^^^^^^^^^^^ Did you mean to `await` this expression?
+   |        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+help: Did you mean to `await` this expression?
    |
 10 | async def main():
    -     if coroutine():  # snapshot: redundant-condition
@@ -86,11 +95,134 @@ warning[redundant-condition]: Object of type `CoroutineType[Any, Any, Unknown]` 
 note: This is an unsafe fix and may change runtime behavior
 ```
 
+And testing a tuple that is known to always be empty or non-empty:
+
+```py
+class Foo:
+    def __init__(self):
+        self.single_element_tuple: tuple[int] = (42,)
+        self.two_element_tuple: tuple[int, int] = (423, 432)
+        self.at_least_one_element: tuple[int, *tuple[int, ...]] = (42,)
+        self.at_least_two_elements: tuple[int, int, *tuple[int, ...]] = (42, 42)
+        self.no_elements: tuple[()] = ()
+
+    def other_method(self):
+        if self.single_element_tuple:  # snapshot: redundant-condition
+            pass
+        if self.two_element_tuple:  # snapshot: redundant-condition
+            pass
+        if self.at_least_one_element:  # snapshot: redundant-condition
+            pass
+        if self.at_least_two_elements:  # snapshot: redundant-condition
+            pass
+        if self.no_elements:  # snapshot: redundant-condition
+            pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:22:12
+   |
+22 |         if self.single_element_tuple:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int]`
+
+
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:24:12
+   |
+24 |         if self.two_element_tuple:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, int]`
+
+
+warning[redundant-condition]: A tuple with >=1 element is always truthy
+  --> src/mdtest_snippet.py:26:12
+   |
+26 |         if self.at_least_one_element:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, *tuple[int, ...]]`
+
+
+warning[redundant-condition]: A tuple with >=2 elements is always truthy
+  --> src/mdtest_snippet.py:28:12
+   |
+28 |         if self.at_least_two_elements:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, int, *tuple[int, ...]]`
+
+
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:30:12
+   |
+30 |         if self.no_elements:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^ Inferred type is `tuple[()]`
+```
+
+And testing `None`:
+
+```py
+X = None
+
+if X:  # snapshot: redundant-condition
+    pass
+```
+
+```snapshot
+warning[redundant-condition]: `None` is always falsy
+  --> src/mdtest_snippet.py:34:4
+   |
+34 | if X:  # snapshot: redundant-condition
+   |    ^
+```
+
+And testing a string that is known to always be truthy or always be falsy:
+
+```py
+x = "foo"
+y = ""
+
+if x:  # snapshot: redundant-condition
+    pass
+
+if y:  # snapshot: redundant-condition
+    pass
+```
+
+```snapshot
+warning[redundant-condition]: A nonempty string is always truthy
+  --> src/mdtest_snippet.py:39:4
+   |
+39 | if x:  # snapshot: redundant-condition
+   |    ^ Inferred type is `Literal["foo"]`
+
+
+warning[redundant-condition]: An empty string is always falsy
+  --> src/mdtest_snippet.py:42:4
+   |
+42 | if y:  # snapshot: redundant-condition
+   |    ^ Inferred type is `Literal[""]`
+```
+
+or even a union of strings that is known to always be truthy:
+
+```py
+from typing import Literal
+
+def f(x: Literal["a", "b"]):
+    if x:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: A nonempty string is always truthy
+  --> src/mdtest_snippet.py:47:8
+   |
+47 |     if x:  # snapshot: redundant-condition
+   |        ^ Inferred type is `Literal["a", "b"]`
+```
+
 ## Other boolean contexts
 
 Redundant conditions are not merely detected in `if` tests. They are also detected in unary `not`
-operations, `while` loops, `if` expressions, `and` expressions, `or` expressions, and in
-comprehension `if` tests.
+operations, `while` loops, `if` expressions, `and` expressions, `or` expressions, `match` guards,
+and in comprehension `if` tests.
 
 ```py
 def coinflip() -> bool:
@@ -132,6 +264,11 @@ while func and coinflip():  # error: [redundant-condition]
 while not (func and coinflip()):  # error: [redundant-condition]
     pass
 
+def f(x: str | int):
+    match x:
+        case str() if func:  # error: [redundant-condition]
+            pass
+
 # N.B. this `while` statement must come last in the test snippet,
 # as ty considers all code following it to be unreachable,
 # and does not emit any diagnostics in unreachable code!
@@ -151,25 +288,47 @@ def f(x: Literal[1, 2]):
     if x > 5:  # error: [redundant-condition-strict]
         pass
 
-    if x:  # error: [redundant-condition-strict]
+    if x:  # snapshot: redundant-condition-strict
         pass
 
 def truthy(flag: bool):
     if flag:
         pass
-    elif True:  # error: [redundant-condition-strict]
+    elif True:  # snapshot: redundant-condition-strict
         pass
 
 def falsy(flag: bool):
     if flag:
         pass
-    elif False:  # error: [redundant-condition-strict]
+    elif False:  # snapshot: redundant-condition-strict
         pass
 ```
 
-To avoid two diagnostics being emitted on compound tests such as the following statements,
-we suppress `redundant-condition-strict` on subexpressions of `if`-statement tests, `elif` tests
-and `while` tests. Only a single diagnostic is emitted on each of these:
+```snapshot
+error[redundant-condition-strict]: Condition is always truthy
+ --> src/mdtest_snippet.py:7:8
+  |
+7 |     if x:  # snapshot: redundant-condition-strict
+  |        ^ Inferred type is `Literal[1, 2]`
+
+
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:13:10
+   |
+13 |     elif True:  # snapshot: redundant-condition-strict
+   |          ^^^^ Inferred type is `Literal[True]`
+
+
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:19:10
+   |
+19 |     elif False:  # snapshot: redundant-condition-strict
+   |          ^^^^^ Inferred type is `Literal[False]`
+```
+
+To avoid two diagnostics being emitted on compound tests such as the following statements, we
+suppress `redundant-condition-strict` on subexpressions of `if`-statement tests, `elif` tests and
+`while` tests. Only a single diagnostic is emitted on each of these:
 
 ```py
 def compound_truthy(x: str):
@@ -178,6 +337,10 @@ def compound_truthy(x: str):
 
     while isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
         break
+
+    match x:
+        case str() if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
+            pass
 ```
 
 ## Infinite `while` loops
@@ -284,17 +447,45 @@ module namespace:
 `b.py`:
 
 ```py
+import os
 import sys
+from typing import TYPE_CHECKING
 
 PLATFORM = sys.platform
 
 if PLATFORM == "linux":  # no diagnostic
     pass
 
+PLATFORM_ALIAS = PLATFORM
+
+if PLATFORM_ALIAS == "linux":  # no diagnostic
+    pass
+
+OS_MODULE = os
+OPERATING_SYSTEM = OS_MODULE.name
+
+if OPERATING_SYSTEM == "posix":  # no diagnostic
+    pass
+
 IS_PY314 = sys.version_info >= (3, 14)
 reveal_type(IS_PY314)  # revealed: Literal[True]
 
 if IS_PY314:  # no diagnostic
+    pass
+
+VERSION_INFO = sys.version_info
+
+if VERSION_INFO >= (3, 14):  # no diagnostic
+    pass
+
+CHECKING = TYPE_CHECKING
+
+if CHECKING:  # no diagnostic
+    pass
+
+ORDINARY_CONSTANT = 1 == 1
+
+if ORDINARY_CONSTANT:  # error: [redundant-condition-strict]
     pass
 ```
 
@@ -303,9 +494,16 @@ And even in other imported modules:
 `c.py`:
 
 ```py
-from b import PLATFORM
+import b
+from b import IS_PY314, PLATFORM
 
 if PLATFORM == "linux":  # no diagnostic
+    pass
+
+if b.PLATFORM_ALIAS == "linux":  # no diagnostic
+    pass
+
+if IS_PY314:  # no diagnostic
     pass
 ```
 

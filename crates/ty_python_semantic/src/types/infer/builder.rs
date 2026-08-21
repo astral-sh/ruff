@@ -8,8 +8,7 @@ use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
+use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -21,7 +20,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
-use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
@@ -67,11 +66,11 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
     INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     INVALID_TYPE_VARIABLE_DEFAULT, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT, TypeCheckDiagnostics, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
-    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
-    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
+    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR,
+    UNUSED_AWAITABLE, YieldKind, hint_if_stdlib_attribute_exists_on_other_versions,
+    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
+    report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
     report_invalid_assignment, report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -161,6 +160,7 @@ mod named_tuple;
 mod new_class;
 mod paramspec_validation;
 mod post_inference;
+mod redundant_conditions;
 mod subscript;
 mod type_call;
 mod type_expression;
@@ -2334,146 +2334,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn should_check_condition_redundancy(&self) -> bool {
-        if !self.db().should_check_file(self.file()) {
-            return false;
-        }
-
-        self.context.is_lint_enabled(&REDUNDANT_CONDITION)
-            || self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT)
-    }
-
-    fn check_condition_redundancy(
-        &self,
-        test: &ast::Expr,
-        test_type: Type<'db>,
-        test_truthiness: Truthiness,
-    ) {
-        if test_truthiness == Truthiness::Ambiguous {
-            return;
-        }
-
-        let db = self.db();
-        let env = self.program_environment();
-
-        match test {
-            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
-                if let Some(last) = values.last() {
-                    let ty = self.expression_type(last);
-                    self.check_condition_redundancy(last, ty, ty.bool(db, env));
-                }
-            }
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                ..
-            }) => return,
-            _ => {}
-        }
-
-        let int_instance = KnownClass::Int.to_instance(db, env);
-
-        let rule = if test_type.is_assignable_to(db, env, int_instance) {
-            if self
-                .index
-                .is_assertion_test_or_compound_condition_subexpression(
-                    self.scope().file_scope_id(db),
-                    test.range(),
-                )
-            {
-                return;
-            }
-            if !self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT) {
-                return;
-            }
-            &REDUNDANT_CONDITION_STRICT
-        } else {
-            if !self.context.is_lint_enabled(&REDUNDANT_CONDITION) {
-                return;
-            }
-            &REDUNDANT_CONDITION
-        };
-
-        let sys_version_info = Type::sys_version_info();
-        let not_implemented = KnownClass::NotImplementedType.to_instance(db, env);
-
-        if any_over_expr(test, |expr| {
-            match expr {
-                ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => {
-                    return true;
-                }
-                ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
-                    if attr == "TYPE_CHECKING" =>
-                {
-                    return true;
-                }
-                _ => {}
-            }
-
-            // Exclude any conditions involving `sys.platform` or `os.name`, or other attribute
-            // expressions where the value is the `sys` module or the `os` module.
-            if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = expr
-                && let Type::ModuleLiteral(module) = self.expression_type(value)
-                && matches!(
-                    module.module(db).known(db),
-                    Some(KnownModule::Sys | KnownModule::Os)
-                )
-            {
-                return true;
-            }
-
-            // exclude any conditions involving `sys.version_info` or `NotImplemented`
-            let subexpression_type = self.expression_type(expr);
-            subexpression_type.is_subtype_of(db, env, sys_version_info)
-                || subexpression_type.is_subtype_of(db, env, not_implemented)
-        }) {
-            return;
-        }
-
-        match test_truthiness {
-            Truthiness::AlwaysTrue => {
-                if let Some(builder) = self.context.report_lint(rule, test) {
-                    if let Type::FunctionLiteral(function) = test_type {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Function `{}` is always truthy in a boolean context",
-                            function.name(db)
-                        ));
-                        diagnostic
-                            .set_primary_annotation_message("Did you mean to call this function?");
-                        if !function.signature(db).has_parameters() {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                                "()".to_string(),
-                                test.end(),
-                            )));
-                        }
-                    } else {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Object of type `{}` is always truthy in a boolean context",
-                            test_type.display(db, env)
-                        ));
-                        if test_type.try_await(db, env).is_ok() {
-                            diagnostic.set_primary_annotation_message(
-                                "Did you mean to `await` this expression?",
-                            );
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                                "await ".to_string(),
-                                test.start(),
-                            )));
-                        }
-                    }
-                }
-            }
-            Truthiness::AlwaysFalse => {
-                if let Some(builder) = self.context.report_lint(rule, test) {
-                    builder.into_diagnostic(format_args!(
-                        "Object of type `{}` is always falsy in a boolean context",
-                        test_type.display(db, env)
-                    ));
-                }
-            }
-            Truthiness::Ambiguous => {}
-        }
-    }
-
     fn infer_try_statement(&mut self, try_statement: &ast::StmtTry) {
         let ast::StmtTry {
             range: _,
@@ -2922,8 +2782,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(guard) = guard.as_deref() {
                 let guard_ty = self.infer_standalone_expression(guard, TypeContext::default());
 
-                if let Err(err) = guard_ty.try_bool(db, self.program_environment()) {
-                    err.report_diagnostic(&self.context, guard);
+                let truthiness = guard_ty
+                    .try_bool(db, self.program_environment())
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, guard);
+                        err.fallback_truthiness()
+                    });
+
+                if self.should_check_condition_redundancy() {
+                    self.check_condition_redundancy(guard, guard_ty, truthiness);
                 }
             }
 

@@ -2187,7 +2187,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Records an `if`, `elif`, or `while` test that uses `not`, `and`, or `or`.
+    /// Records an `if`, `elif`, `while` or `match` guard test that uses `not`, `and`, or `or`.
     fn record_compound_condition_test(&mut self, test: &ast::Expr) {
         if matches!(
             test,
@@ -4532,6 +4532,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let mut previous_pattern: Option<PatternPredicate<'_>> = None;
 
                 for (i, case) in cases.iter().enumerate() {
+                    if let Some(guard) = case.guard.as_deref() {
+                        self.record_compound_condition_test(guard);
+                    }
                     let match_pattern_predicate = self.create_pattern_predicate(
                         subject_expr,
                         &case.pattern,

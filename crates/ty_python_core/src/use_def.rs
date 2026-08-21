@@ -2650,7 +2650,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_boolean_test_context(BooleanTestContext::Assertion(range));
     }
 
-    /// Records a compound `if`, `elif`, or `while` test for its proper subexpressions.
+    /// Records a compound `if`, `elif`, `while` or `match`-guard test for its proper subexpressions.
     ///
     /// The test itself is excluded when looking up this context, so its overall truthiness can
     /// still be checked.

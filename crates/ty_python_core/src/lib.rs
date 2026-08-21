@@ -557,9 +557,9 @@ impl<'db> SemanticIndex<'db> {
     /// This is useful information for the `redundant-condition-strict` rule, which is suppressed
     /// in these contexts.
     ///
-    /// An assertion test and all its subexpressions match. For `if`, `elif`, and `while` tests
-    /// using `not`, `and`, or `or`, only proper subexpressions match, so callers can still check
-    /// the overall condition's truthiness.
+    /// An assertion test and all its subexpressions match. For `if`, `elif`, `while` and
+    /// `match`-guard tests using `not`, `and`, or `or`, only proper subexpressions match, so
+    /// callers can still check the overall condition's truthiness.
     ///
     /// Only tests recorded in `scope_id` are considered; an outer statement's context does not
     /// extend into a lambda or another nested scope.

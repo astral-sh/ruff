@@ -7,8 +7,8 @@ def _(foo: str):
     reveal_type(True or False)  # revealed: Literal[True]
     # error: [redundant-condition] "always truthy"
     reveal_type("x" or "y" or "z")  # revealed: Literal["x"]
-    # error: 17 [redundant-condition] "Object of type `Literal[""]` is always falsy in a boolean context"
-    # error: 23 [redundant-condition] "Object of type `Literal["y"]` is always truthy in a boolean context"
+    # error: 17 [redundant-condition] "An empty string is always falsy"
+    # error: 23 [redundant-condition] "Object of type `Literal["y"]` is always truthy"
     reveal_type("" or "y" or "z")  # revealed: Literal["y"]
     reveal_type(False or "z")  # revealed: Literal["z"]
     reveal_type(False or True)  # revealed: Literal[True]
@@ -25,11 +25,11 @@ def _(foo: str):
     reveal_type(False and True)  # revealed: Literal[False]
     reveal_type(foo and False)  # revealed: (str & ~AlwaysTruthy) | Literal[False]
     reveal_type(foo and True)  # revealed: (str & ~AlwaysTruthy) | Literal[True]
-    # error: [redundant-condition] "Object of type `Literal["y"]` is always truthy in a boolean context"
-    # error: [redundant-condition] "Object of type `Literal["x"]` is always truthy in a boolean context"
+    # error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
+    # error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
     reveal_type("x" and "y" and "z")  # revealed: Literal["z"]
-    # error: [redundant-condition] "Object of type `Literal["y"]` is always truthy in a boolean context"
-    # error: [redundant-condition] "Object of type `Literal["x"]` is always truthy in a boolean context"
+    # error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
+    # error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
     reveal_type("x" and "y" and "")  # revealed: Literal[""]
     # error: [redundant-condition] "always falsy"
     reveal_type("" and "y")  # revealed: Literal[""]
@@ -50,23 +50,23 @@ def _(flag: bool):
 ## Complex
 
 ```py
-# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy in a boolean context"
-# error: [redundant-condition] "Object of type `Literal["x"]` is always truthy in a boolean context"
-# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy in a boolean context"
+# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
+# error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
+# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
 reveal_type("x" and "y" or "z")  # revealed: Literal["y"]
-# error: [redundant-condition] "Object of type `Literal["x"]` is always truthy in a boolean context"
+# error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
 reveal_type("x" or "y" and "z")  # revealed: Literal["x"]
-# error: [redundant-condition] "Object of type `Literal[""]` is always falsy in a boolean context"
-# error: [redundant-condition] "Object of type `Literal[""]` is always falsy in a boolean context"
+# error: [redundant-condition] "An empty string is always falsy"
+# error: [redundant-condition] "An empty string is always falsy"
 reveal_type("" and "y" or "z")  # revealed: Literal["z"]
-# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy in a boolean context"
-# error: [redundant-condition] "Object of type `Literal[""]` is always falsy in a boolean context"
+# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
+# error: [redundant-condition] "An empty string is always falsy"
 reveal_type("" or "y" and "z")  # revealed: Literal["z"]
-# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy in a boolean context"
-# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy in a boolean context"
-# error: [redundant-condition] "Object of type `Literal["x"]` is always truthy in a boolean context"
+# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
+# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
+# error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
 reveal_type("x" and "y" or "")  # revealed: Literal["y"]
-# error: [redundant-condition] "Object of type `Literal["x"]` is always truthy in a boolean context"
+# error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
 reveal_type("x" or "y" and "")  # revealed: Literal["x"]
 ```
 

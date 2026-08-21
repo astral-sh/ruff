@@ -39,8 +39,8 @@ def _(x: X):
         reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 def _(x: X):
-    # error: [redundant-condition] "Object of type `Literal[-1, True, "foo", b"bar"]` is always truthy in a boolean context"
-    # error: [redundant-condition] "Object of type `Literal[0, False, "", b""] | None | tuple[()]` is always falsy in a boolean context"
+    # error: [redundant-condition] "Object of type `Literal[-1, True, "foo", b"bar"]` is always truthy"
+    # error: [redundant-condition] "Object of type `Literal[0, False, "", b""] | None | tuple[()]` is always falsy"
     if not (x and not x):
         reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
     else:
@@ -54,8 +54,8 @@ def _(x: X):
         reveal_type(x)  # revealed: Never
 
 def _(x: X):
-    # error: [redundant-condition] "Object of type `Literal[0, False, "", b""] | None | tuple[()]` is always falsy in a boolean context"
-    # error: [redundant-condition] "Object of type `Literal[-1, True, "foo", b"bar"]` is always truthy in a boolean context"
+    # error: [redundant-condition] "Object of type `Literal[0, False, "", b""] | None | tuple[()]` is always falsy"
+    # error: [redundant-condition] "Object of type `Literal[-1, True, "foo", b"bar"]` is always truthy"
     if not (x or not x):
         reveal_type(x)  # revealed: Never
     else:
@@ -294,7 +294,7 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(x)  # revealed: Literal[0, 1]
         reveal_type(y)  # revealed: Literal["", "hello"]
 
-    # error: [redundant-condition] "Object of type `Literal["hello"]` is always truthy in a boolean context"
+    # error: [redundant-condition] "Object of type `Literal["hello"]` is always truthy"
     if (x or not x) and (y and not y):
         reveal_type(x)  # revealed: Never
         reveal_type(y)  # revealed: Never
