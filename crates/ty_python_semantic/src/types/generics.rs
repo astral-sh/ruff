@@ -2030,16 +2030,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
-        // `tuple[Any, ...]` can materialize to a builtin tuple type of any length. Our top and
-        // bottom materializations of it are currently incorrect: they materialize the element
-        // types but do not account for the tuple's gradual arity. The endpoint comparisons below
-        // therefore cannot establish `Box[tuple[int]] <: Top[Box[tuple[Any, ...]]]` for an
-        // invariant `Box`.
+        // `tuple[Any, ...]` can materialize to a builtin tuple type of any length. Its top
+        // materialization, `tuple[object, ...]`, is correct. Our bottom materialization is
+        // incorrect: it becomes `tuple[()]`, which is not a subtype of every fixed-length
+        // tuple. The endpoint comparisons below therefore cannot establish
+        // `Box[tuple[int]] <: Top[Box[tuple[Any, ...]]]` for an invariant `Box`.
         // Handle this unrestricted materialization family directly. Tuple subclasses do not
         // qualify: `Box[MyTuple]` is not a materialization of `Box[tuple[Any, ...]]`.
-        // TODO: Correct top and bottom materialization for gradual tuple arity, including required
-        // prefixes and suffixes, so we can remove this special case without changing fully static
-        // tuple shapes.
+        // TODO: Correct bottom materialization for gradual tuple arity, including required prefixes
+        // and suffixes, and compare these materialization families generally without changing fully
+        // static tuple shapes.
         if let (Some(source_tuple), Some(target_tuple)) = (
             source_type.exact_tuple_instance_spec(db),
             target_type.exact_tuple_instance_spec(db),
