@@ -1546,6 +1546,35 @@ def identity[T](value: T) -> T:
 reveal_type(identity(1))  # revealed: Any
 ```
 
+### Assignability of ParamSpec callables with gradual return types
+
+A callable returning a concrete type is assignable to a callable with the same `ParamSpec` and a
+gradual return type. This also holds when the source return type is `Never` or a type variable.
+
+```py
+from collections.abc import Callable
+from typing import Any, Never
+from ty_extensions._internal import Unknown
+
+def int_to_any[**P](source: Callable[P, int]) -> Callable[P, Any]:
+    return source
+
+def object_to_any[**P](source: Callable[P, object]) -> Callable[P, Any]:
+    return source
+
+def never_to_any[**P](source: Callable[P, Never]) -> Callable[P, Any]:
+    return source
+
+def int_to_unknown[**P](source: Callable[P, int]) -> Callable[P, Unknown]:
+    return source
+
+def never_to_unknown[**P](source: Callable[P, Never]) -> Callable[P, Unknown]:
+    return source
+
+def generic_to_any[**P, T](source: Callable[P, T]) -> Callable[P, Any]:
+    return source
+```
+
 ## Callable protocols with `ParamSpec` and class constructors
 
 When a class is passed to a function expecting a callable protocol with `ParamSpec`, the `ParamSpec`

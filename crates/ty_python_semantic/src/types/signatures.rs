@@ -2678,6 +2678,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // if the return types are incompatible.
         let return_type_constraints = if let Some(dynamic) = target.return_ty.as_dynamic()
             && target_parameters.as_paramspec_with_prefix().is_some()
+            && source_parameters.as_paramspec_with_prefix().is_none()
         {
             // A gradual return type constrains its materialization, not the inferred parameter list.
             self.gradual(db, self.constraints.next_gradual_variable(dynamic))
