@@ -75,6 +75,8 @@ use crate::{Db, FxIndexMap, FxIndexSet};
 
 mod collection;
 
+use collection::{PytestTestKind, pytest_test_for_binding};
+
 /// Resolves pytest fixtures requested by `parameter`.
 ///
 /// This function can be used to resolve either a fixture requested by a test
@@ -440,7 +442,6 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
     ) -> Option<Self> {
         let function_definition = index.expect_single_definition(function_ref);
         let function = function_ref.node(module);
-        let file = function_definition.program_file(db);
 
         // Parameters on fixture declarations request their values from other fixtures:
         //
@@ -454,10 +455,11 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
         let is_fixture_dependency = !function.decorator_list.is_empty()
             && fixture_declaration(db, function_definition).is_some();
 
+        // Pytest collects `unittest.TestCase` methods but does not inject fixtures into them.
+        // https://docs.pytest.org/en/9.0.x/how-to/unittest.html#pytest-features-in-unittest-testcase-subclasses
         if !is_fixture_dependency
-            && (!is_collected_test(db, file, function, class_scope, module)
-                || class_scope
-                    .is_some_and(|class_scope| is_unittest_test_case(db, file, class_scope)))
+            && pytest_test_for_binding(db, function_definition)
+                .is_none_or(|test| test.kind() != PytestTestKind::Pytest)
         {
             return None;
         }
@@ -1387,80 +1389,6 @@ fn non_type_parameter_parent(
     } else {
         Some(parent)
     }
-}
-
-/// Returns whether a function matches pytest's default naming conventions for
-/// [test discovery](https://docs.pytest.org/en/9.0.x/explanation/goodpractices.html#test-discovery).
-fn is_collected_test(
-    db: &dyn Db,
-    file: ProgramFile<'_>,
-    function: &ast::StmtFunctionDef,
-    class_scope: Option<FileScopeId>,
-    module: &ParsedModuleRef,
-) -> bool {
-    let Some(file_name) = file
-        .file(db)
-        .path(db)
-        .as_system_path()
-        .and_then(|path| path.file_name())
-    else {
-        return false;
-    };
-
-    let Some(stem) = file_name.strip_suffix(".py") else {
-        return false;
-    };
-
-    if !(stem.starts_with("test_") || stem.ends_with("_test"))
-        || !function.name.as_str().starts_with("test")
-    {
-        return false;
-    }
-
-    let index = semantic_index(db, file);
-    let mut class_scope = class_scope;
-    while let Some(scope) = class_scope {
-        let Some(class_ref) = index.scope(scope).node().as_class() else {
-            return false;
-        };
-        if !class_ref.node(module).name.as_str().starts_with("Test") {
-            return false;
-        }
-        let Some(parent_scope) = non_type_parameter_parent(index, scope) else {
-            return false;
-        };
-        match index.scope(parent_scope).kind() {
-            ScopeKind::Class => class_scope = Some(parent_scope),
-            ScopeKind::Module => class_scope = None,
-            _ => return false,
-        }
-    }
-    true
-}
-
-/// Returns whether the class inherits from the canonical `unittest.TestCase`.
-///
-/// Pytest does not inject fixture parameters into
-/// [`unittest.TestCase` methods](https://docs.pytest.org/en/9.0.x/how-to/unittest.html#pytest-features-in-unittest-testcase-subclasses).
-fn is_unittest_test_case(db: &dyn Db, file: ProgramFile<'_>, class_scope: FileScopeId) -> bool {
-    let index = semantic_index(db, file);
-    let class_ref = index.scope(class_scope).node().expect_class();
-    let definition = index.expect_single_definition(class_ref);
-    let Some(class) = original_class_type(db, definition) else {
-        return false;
-    };
-
-    class.iter_mro(db).any(|ancestor| {
-        let ClassBase::Class(ancestor) = ancestor else {
-            return false;
-        };
-        let Some((ancestor, _)) = ancestor.static_class_literal(db) else {
-            return false;
-        };
-        ancestor.name(db) == "TestCase"
-            && file_to_module(db, ancestor.program_file(db).resolver_file(db))
-                .is_some_and(|module| module.name(db).as_str() == "unittest.case")
-    })
 }
 
 /// Returns whether a static mark supplies this parameter directly or cannot be interpreted.

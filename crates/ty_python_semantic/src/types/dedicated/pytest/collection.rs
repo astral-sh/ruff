@@ -117,16 +117,23 @@ fn pytest_tests_in_file<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Box<[Py
 
 /// A function that pytest collects as a test.
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct PytestTest<'db> {
+pub(crate) struct PytestTest<'db> {
     binding: Definition<'db>,
     function: Definition<'db>,
     kind: PytestTestKind,
     enclosing_class: Option<Definition<'db>>,
 }
 
+impl PytestTest<'_> {
+    /// Returns the collection mechanism responsible for this test.
+    pub(crate) fn kind(&self) -> PytestTestKind {
+        self.kind
+    }
+}
+
 /// The collection mechanism responsible for a test.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-enum PytestTestKind {
+pub(crate) enum PytestTestKind {
     /// A function or method collected according to pytest's naming and class conventions.
     Pytest,
     /// A method collected because its class inherits from `unittest.TestCase`.
@@ -140,7 +147,7 @@ enum PytestTestKind {
 /// Returns `None` for unavailable bindings, values whose function cannot be identified, fixtures,
 /// and bindings that fail the naming or enclosing-class rules.
 #[salsa::tracked(returns(as_ref))]
-fn pytest_test_for_binding<'db>(
+pub(crate) fn pytest_test_for_binding<'db>(
     db: &'db dyn Db,
     binding: Definition<'db>,
 ) -> Option<PytestTest<'db>> {
