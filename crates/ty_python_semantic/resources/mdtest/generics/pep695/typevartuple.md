@@ -320,6 +320,18 @@ def f(i: int, s: str, b: bool, t: tuple[int, str], vt: tuple[int, ...]) -> None:
     reveal_type(simple(*t))  # revealed: tuple[Unknown, ...]
 ```
 
+A gradual tuple also infers a gradual pack when the parameter allows `None`.
+
+```py
+from typing import Any
+
+def optional[*Ts](value: tuple[*Ts] | None) -> tuple[*Ts] | None:
+    return value
+
+def check_optional(value: tuple[Any, ...]) -> None:
+    reveal_type(optional(value))  # revealed: tuple[Any, ...] | None
+```
+
 ### Assignability to fixed-length tuples
 
 An unspecialized type variable tuple can contain any number of elements, so a tuple containing one
@@ -395,8 +407,8 @@ def gradual_packs[*Ts](dynamic: tuple[Any, ...], unknown: tuple[Unknown, ...]) -
     static_assert(not is_subtype_of(tuple[Unknown, ...], tuple[*Ts]))
 ```
 
-A gradual tuple with a fixed prefix or suffix cannot match every possible pack length, even when the
-required element is `Any`.
+A gradual tuple with a fixed prefix or suffix cannot be assigned to a bare symbolic pack, which may
+be empty. This remains true when the required element is `Any`.
 
 ```py
 def fixed_boundaries[*Ts](
@@ -405,6 +417,150 @@ def fixed_boundaries[*Ts](
 ) -> None:
     plain: tuple[*Ts] = prefix  # error: [invalid-assignment]
     plain = suffix  # error: [invalid-assignment]
+```
+
+### Mixed gradual tuple assignability to symbolic packs
+
+Fixed prefixes and suffixes are compared covariantly. The gradual segment can supply additional
+required target elements as well as the symbolic pack, but fixed source elements cannot disappear.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_subtype_of
+
+def mixed_sources[*Ts](
+    prefix: tuple[bool, *tuple[Any, ...]],
+    suffix: tuple[*tuple[Unknown, ...], str],
+    both: tuple[bool, *tuple[Any, ...], str],
+) -> None:
+    prefixed: tuple[int, *Ts] = prefix
+    suffixed: tuple[*Ts, object] = suffix
+    bounded: tuple[int, *Ts, object] = both
+    longer: tuple[int, bytes, *Ts, float, object] = both
+
+    too_short: tuple[int, *Ts] = both  # error: [invalid-assignment]
+    wrong_prefix: tuple[str, *Ts, object] = both  # error: [invalid-assignment]
+    wrong_suffix: tuple[int, *Ts, int] = both  # error: [invalid-assignment]
+
+    static_assert(not is_subtype_of(tuple[bool, *tuple[Any, ...], str], tuple[int, *Ts, object]))
+```
+
+### Fixed source elements crossing symbolic packs
+
+A fixed source element that falls inside the symbolic pack must be assignable to every possible
+element type. `Any`, `Unknown`, and `Never` allow this; `int` and `Any | int` do not. Even a `Never`
+element remains a required tuple position when the pack is empty.
+
+```py
+from typing import Any, Never
+from ty_extensions._internal import Unknown
+
+def crossing_sources[*Ts](
+    any_prefix: tuple[Any, *tuple[Any, ...]],
+    unknown_suffix: tuple[*tuple[Any, ...], Unknown],
+    never_prefix: tuple[Never, *tuple[Any, ...]],
+    int_prefix: tuple[int, *tuple[Any, ...]],
+    union_suffix: tuple[*tuple[Any, ...], Any | int],
+) -> None:
+    moved_prefix: tuple[*Ts, int] = any_prefix
+    moved_suffix: tuple[int, *Ts] = unknown_suffix
+    bottom_prefix: tuple[*Ts, int] = never_prefix
+
+    too_short: tuple[*Ts] = never_prefix  # error: [invalid-assignment]
+    restricted_prefix: tuple[*Ts, int] = int_prefix  # error: [invalid-assignment]
+    restricted_suffix: tuple[int, *Ts] = union_suffix  # error: [invalid-assignment]
+```
+
+A scalar type variable can match itself at an aligned position, but it does not constrain the
+unrelated elements of the symbolic pack.
+
+```py
+def scalar_source[T, *Ts](source: tuple[T, *tuple[Any, ...]]) -> None:
+    aligned: tuple[T, *Ts] = source
+    crossing: tuple[*Ts, int] = source  # error: [invalid-assignment]
+```
+
+### Symbolic pack assignability to mixed gradual tuples
+
+Fixed source endpoints remain usable when the symbolic pack is erased to a gradual segment. The
+target boundaries must also fit when the symbolic pack is empty.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_subtype_of
+
+def mixed_targets[*Ts](source: tuple[bool, *Ts, str]) -> None:
+    bounded: tuple[int, *tuple[Any, ...], object] = source
+    prefixed: tuple[int, *tuple[Unknown, ...]] = source
+    suffixed: tuple[*tuple[Any, ...], object] = source
+
+    too_long: tuple[int, bytes, *tuple[Any, ...], str] = source  # error: [invalid-assignment]
+    wrong_prefix: tuple[str, *tuple[Any, ...], object] = source  # error: [invalid-assignment]
+    wrong_suffix: tuple[int, *tuple[Any, ...], int] = source  # error: [invalid-assignment]
+
+    static_assert(not is_subtype_of(tuple[bool, *Ts, str], tuple[int, *tuple[Any, ...], object]))
+```
+
+### Fixed target elements crossing symbolic packs
+
+A fixed target element that falls inside the symbolic pack must accept every possible element type.
+`object` and `Any` allow this, but `int` and a separate scalar type variable do not. Unlike a source
+element of type `Any | int`, a target element of that type can accept any pack element by
+materializing its `Any` appropriately.
+
+```py
+from typing import Any
+
+def crossing_targets[*Ts](
+    prefix: tuple[int, *Ts],
+    suffix: tuple[*Ts, int],
+    long_suffix: tuple[*Ts, int, str],
+    plain: tuple[*Ts],
+) -> None:
+    moved_prefix: tuple[object, *tuple[Any, ...]] = suffix
+    moved_long_suffix: tuple[object, *tuple[Any, ...], str] = long_suffix
+    moved_suffix: tuple[*tuple[Any, ...], Any] = prefix
+    union_suffix: tuple[*tuple[Any, ...], Any | int] = prefix
+
+    restricted_prefix: tuple[int, *tuple[Any, ...]] = suffix  # error: [invalid-assignment]
+    restricted_suffix: tuple[*tuple[Any, ...], int] = prefix  # error: [invalid-assignment]
+    too_short: tuple[object, *tuple[Any, ...]] = plain  # error: [invalid-assignment]
+
+def scalar_target[T, *Ts](source: tuple[*Ts, int]) -> None:
+    target: tuple[T, *tuple[Any, ...]] = source  # error: [invalid-assignment]
+```
+
+### Aliases of gradual tuple elements
+
+An alias of `Any` also makes a variadic segment gradual in length. Aliases of `list[Any]` or
+`Any | int` do not have that effect, nor does a recursive container alias.
+
+```py
+from typing import Any
+
+type Dynamic = Any
+type IndirectDynamic = Dynamic
+type AnyList = list[Any]
+type PartlyDynamic = Any | int
+type Recursive = list[Recursive]
+
+def gradual_aliases[*Ts](
+    source: tuple[int, *tuple[IndirectDynamic, ...], str],
+    symbolic: tuple[int, *Ts, str],
+) -> None:
+    packed: tuple[int, *Ts, str] = source
+    erased: tuple[int, *tuple[IndirectDynamic, ...], str] = symbolic
+
+def non_gradual_aliases[*Ts](
+    containers: tuple[int, *tuple[AnyList, ...]],
+    union: tuple[int, *tuple[PartlyDynamic, ...]],
+    recursive: tuple[int, *tuple[Recursive, ...]],
+) -> None:
+    pack: tuple[int, *Ts] = containers  # error: [invalid-assignment]
+    pack = union  # error: [invalid-assignment]
+    pack = recursive  # error: [invalid-assignment]
 ```
 
 ### Starred variadic parameters
