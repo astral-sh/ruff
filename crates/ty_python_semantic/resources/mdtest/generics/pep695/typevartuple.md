@@ -221,9 +221,9 @@ class Array[*Ts]:
 
 ### Constrained inference from synthetic `Self`
 
-A fixed synthetic `Self` domain should provide evidence for inferring a fresh constrained type
-variable, without making the owner's type variables inference targets. This currently fails when the
-matching constraint contains a `TypeVarTuple`.
+A fixed synthetic `Self` domain provides evidence for inferring a fresh constrained type variable,
+without making the owner's type variables inference targets. A constraint with gradual tuple
+arguments can accept a `TypeVarTuple` specialization.
 
 ```py
 from typing import Any, Generic, TypeVar
@@ -234,8 +234,6 @@ class Container[T, *Ts]:
     values: tuple[T, *Ts]
 
     def interface(self) -> "Interface[Container[Any, *tuple[Any, ...]]]":
-        # TODO: This should not error once fixed `TypeVarTuple` relations are supported.
-        # error: [invalid-argument-type] "Argument to `Interface.__init__` is incorrect"
         return Interface(self)
 
 C = TypeVar(
@@ -337,9 +335,9 @@ def middle_pack[*Ts](value: tuple[int, *Ts, str]) -> tuple[int, str]:
 
 ### Assignability involving type variable tuples
 
-A symbolic type variable tuple can be erased to a homogeneous `object` tuple, but a homogeneous
-tuple cannot be used to construct an arbitrary symbolic pack. Two independently bound packs are also
-not interchangeable.
+A symbolic type variable tuple can be erased to a homogeneous `object` tuple, but a fully static
+homogeneous tuple cannot be used to construct an arbitrary symbolic pack. Two independently bound
+packs are also not interchangeable.
 
 ```py
 def erase_pack[*Ts](values: tuple[*Ts]) -> tuple[object, ...]:
@@ -377,6 +375,36 @@ from ty_extensions._internal import is_assignable_to
 
 def materialized_default[*Ts = *tuple[Any, ...]]() -> None:
     static_assert(is_assignable_to(tuple[*Ts], Top[tuple[*Ts]]))
+```
+
+### Gradual tuple assignability to symbolic packs
+
+A fully gradual tuple can materialize to any specialization of a type variable tuple, including
+fixed elements around the pack. This permits assignment, but does not make it a subtype of the
+symbolic tuple.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_subtype_of
+
+def gradual_packs[*Ts](dynamic: tuple[Any, ...], unknown: tuple[Unknown, ...]) -> None:
+    plain: tuple[*Ts] = dynamic
+    plain = unknown
+    bounded: tuple[int, *Ts, str] = unknown
+    static_assert(not is_subtype_of(tuple[Unknown, ...], tuple[*Ts]))
+```
+
+A gradual tuple with a fixed prefix or suffix cannot match every possible pack length, even when the
+required element is `Any`.
+
+```py
+def fixed_boundaries[*Ts](
+    prefix: tuple[Any, *tuple[Any, ...]],
+    suffix: tuple[*tuple[Any, ...], Any],
+) -> None:
+    plain: tuple[*Ts] = prefix  # error: [invalid-assignment]
+    plain = suffix  # error: [invalid-assignment]
 ```
 
 ### Starred variadic parameters
