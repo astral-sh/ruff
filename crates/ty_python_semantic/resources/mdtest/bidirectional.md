@@ -2333,6 +2333,8 @@ def _(dtype: FloatDtype):
     reveal_type(x)  # revealed: float
 ```
 
+Intersection bindings are similarly evaluated under fixpoint iteration:
+
 ```py
 from typing import Protocol, runtime_checkable
 
@@ -2380,6 +2382,25 @@ class Command: ...
 def _(command: Any):
     # revealed: dict[str, Any]
     mapping: DictLike[type[Command]] = reveal_type({"command": command})
+```
+
+Static type context remains unchanged, and gradual type context retains its concrete lower bounds.
+
+```py
+from ty_extensions._internal import Unknown
+
+def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+reveal_type(merge({"a": 1}, {2: "b"}))  # revealed: tuple[str | int, int | str]
+
+def _(dynamic: Unknown):
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Unknown, int | str | Unknown]
+    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[Unknown | str | int, Unknown | int | str]
+
+def _(dynamic: Any):
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Any, int | str | Any]
+    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[Any | str | int, Any | int | str]
 ```
 
 Note that long chains of callables with constraint dependencies in reverse source-order may require
@@ -2863,6 +2884,19 @@ reveal_type(x23)  # revealed: list[float | str | None]
 x24 = {"a": 1}
 x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
+```
+
+A lambda's provisional parameter type must not prevent its callable type from constraining the keys
+of an unannotated dictionary:
+
+```py
+def _():
+    values = {}
+    values["first"] = 1
+    key = lambda value: value
+    reveal_type(values)  # revealed: dict[str | ((value) -> Unknown), int]
+    values[key] = 2
+    reveal_type(values[key])  # revealed: int
 ```
 
 ## Multi-inference diagnostics

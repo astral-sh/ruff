@@ -4942,7 +4942,7 @@ element type to generic inference.
 from typing import Any
 
 def collect(cls: type[Any], enabled: bool) -> None:
-    reveal_type(list(cls if enabled else (1,)))  # revealed: list[int]
+    reveal_type(list(cls if enabled else (1,)))  # revealed: list[Any | int]
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
@@ -5904,6 +5904,37 @@ def infer_protocol_union_box(x: Box[T], y: U) -> tuple[T, U]:
 
 def check_protocol_union_box(x: IntBox | StrBox):
     reveal_type(infer_protocol_union_box(x, 1))  # revealed: tuple[int | str, Literal[1]]
+```
+
+## Repeated protocol comparisons preserve gradual origins
+
+Each structural comparison retains its gradual origin and any independent concrete lower bound.
+
+```py
+from typing import Any, Protocol, TypeVar
+from ty_extensions._internal import Unknown
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Protocol[T]):
+    @property
+    def first(self) -> tuple[T]: ...
+    @property
+    def second(self) -> tuple[T]: ...
+
+def shared(values: tuple[Box[T] | None, Box[T] | None], lower: T) -> T:
+    raise NotImplementedError
+
+def distinct(values: tuple[Box[T] | None, Box[U] | None], lower: T) -> tuple[T, U]:
+    raise NotImplementedError
+
+def _(gradual: Any, unknown: Unknown, lower: int):
+    reveal_type(shared((gradual, gradual), lower))  # revealed: Any | int
+    reveal_type(shared((unknown, unknown), lower))  # revealed: Unknown | int
+    reveal_type(shared((gradual, unknown), lower))  # revealed: Any | int
+    reveal_type(distinct((gradual, unknown), lower))  # revealed: tuple[Any | int, Unknown]
+    reveal_type(distinct((unknown, gradual), lower))  # revealed: tuple[Unknown | int, Any]
 ```
 
 ## Nominal subtyping of protocols
@@ -7516,10 +7547,9 @@ class A2(Protocol[T2]):
 class B1(A1[T3], Protocol[T3]): ...
 class B2(A2[T4], Protocol[T4]): ...
 
-# TODO should just be `B2[Any]`
-reveal_type(T3.__bound__)  # revealed: B2[Any] | Unknown
+reveal_type(T3.__bound__)  # revealed: B2[Any]
 
-# TODO error: [invalid-type-arguments]
+# error: [invalid-type-arguments]
 def f(x: B1[int]):
     pass
 

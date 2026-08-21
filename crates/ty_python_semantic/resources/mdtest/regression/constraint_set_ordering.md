@@ -218,6 +218,73 @@ def chain_uts[U, T, S]() -> None:
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
+## Gradual equality preserves bound direction
+
+Equal type variables retain the direction of gradual and concrete bounds in either order.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def identity[U](value: U) -> U:
+    return value
+
+def forward[S, T](value: tuple[S] | None, callback: Callable[[S], T], lower: T) -> tuple[S, T]:
+    raise NotImplementedError
+
+def reverse[T, S](value: tuple[S] | None, callback: Callable[[S], T], lower: T) -> tuple[S, T]:
+    raise NotImplementedError
+
+def _(gradual: Any, unknown: Unknown, lower: int):
+    reveal_type(forward(gradual, identity, lower))  # revealed: tuple[Any, Any | int]
+    reveal_type(reverse(gradual, identity, lower))  # revealed: tuple[Any, Any | int]
+    reveal_type(forward(unknown, identity, lower))  # revealed: tuple[Unknown, Unknown | int]
+    reveal_type(reverse(unknown, identity, lower))  # revealed: tuple[Unknown, Unknown | int]
+```
+
+## Matching concrete bounds remain independent of gradual bounds
+
+Matching concrete lower and upper bounds produce a static solution regardless of argument order.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def lower_first[T](value: tuple[T] | None, lower: T, upper: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def upper_first[T](value: tuple[T] | None, upper: Callable[[T], None], lower: T) -> T:
+    raise NotImplementedError
+
+def _(gradual: Any, unknown: Unknown, value: int, upper: Callable[[int], None]):
+    reveal_type(lower_first(gradual, value, upper))  # revealed: int
+    reveal_type(lower_first(unknown, value, upper))  # revealed: int
+    reveal_type(upper_first(gradual, upper, value))  # revealed: int
+    reveal_type(upper_first(unknown, upper, value))  # revealed: int
+```
+
+## Independent gradual bounds across multiple type variables
+
+Each projected gradual argument retains its own occurrence and independent concrete bound.
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown
+
+def bounds[A, B, C, D](
+    first: tuple[A] | None,
+    second: tuple[B] | None,
+    third: tuple[C] | None,
+    fourth: tuple[D] | None,
+    lower: tuple[A, B, C, D],
+) -> tuple[A, B, C, D]:
+    raise NotImplementedError
+
+def _(gradual: Any, unknown: Unknown, lower: tuple[int, str, bool, bytes]):
+    # revealed: tuple[Any | int, Unknown | str, Any | bool, Unknown | bytes]
+    reveal_type(bounds(gradual, unknown, gradual, unknown, lower))
+```
+
 ## Non-inferable constraint source order and typevar orientation
 
 A non-inferable constraint can appear before or after inferable constraints, and a bare relationship

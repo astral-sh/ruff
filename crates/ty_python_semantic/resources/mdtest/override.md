@@ -1075,3 +1075,77 @@ class DeferredChild1(DeferredBase):
 class DeferredChild2(DeferredBase):
     def method(self) -> None: ...
 ```
+
+## Gradual receiver annotations accept generic subclasses
+
+An explicit gradual receiver does not restrict which instances can call an inherited method. It must
+not impose additional constraints on the type variables of a generic subclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, NoReturn, TypeVar
+
+T = TypeVar("T")
+
+class NeverReturningMixin:
+    def reverse(self: Any) -> NoReturn:
+        raise TypeError
+
+class NoneReturningMixin:
+    def reverse(self: Any) -> None:
+        raise TypeError
+
+class NeverReturningList(NeverReturningMixin, list[T]): ...
+class NoneReturningList(NoneReturningMixin, list[T]): ...
+```
+
+A union containing `Any` also accepts every possible receiver.
+
+```py
+class GradualUnionMixin:
+    def reverse(self: Any | str) -> None:
+        raise TypeError
+
+class GradualUnionList(GradualUnionMixin, list[T]): ...
+```
+
+A type alias of `Any` must not restrict the receiver either.
+
+```py
+type DynamicAlias = Any
+
+class GradualAliasMixin:
+    def reverse(self: DynamicAlias) -> None:
+        raise TypeError
+
+class GradualAliasList(GradualAliasMixin, list[T]): ...
+```
+
+An unrestricted receiver must not suppress an incompatible return type.
+
+```py
+class InvalidMixin:
+    def reverse(self: Any) -> str:
+        return "invalid"
+
+# error: [invalid-method-override]
+class InvalidList(InvalidMixin, list[T]): ...
+
+class InvalidGradualUnionMixin:
+    def reverse(self: Any | str) -> str:
+        return "invalid"
+
+# error: [invalid-method-override]
+class InvalidGradualUnionList(InvalidGradualUnionMixin, list[T]): ...
+
+class InvalidGradualAliasMixin:
+    def reverse(self: DynamicAlias) -> str:
+        return "invalid"
+
+# error: [invalid-method-override]
+class InvalidGradualAliasList(InvalidGradualAliasMixin, list[T]): ...
+```

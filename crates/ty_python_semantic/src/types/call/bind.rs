@@ -3000,8 +3000,13 @@ impl<'db> Bindings<'db> {
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
                             let lhs = constraints.load(db, env, tracked.constraints(db));
-                            let rhs = constraints.load(db, env, other.constraints(db));
-                            lhs.implies(db, constraints, || rhs)
+                            let rhs = if tracked == *other {
+                                lhs
+                            } else {
+                                constraints.load(db, env, other.constraints(db))
+                            };
+                            lhs.implies(db, constraints, rhs)
+                                .for_all_gradual(db, env, constraints)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -3859,7 +3864,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied(db, env)
+                        .is_gradually_satisfied(db, env)
                 })
             });
             if !is_argument_assignable_to_any_overload {
@@ -5531,7 +5536,7 @@ fn validate_keyword_unpack_key_type<'db>(
             constraints,
             inferable_typevars,
         )
-        .is_always_satisfied(db, env)
+        .is_gradually_satisfied(db, env)
     {
         KeywordUnpackKeyTypeCheck::Valid
     } else {
@@ -5633,7 +5638,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .unwrap_or_else(|| parameter.annotated_type());
                         let argument_type = matched_parameter
                             .argument_type
-                            .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type));
+                            .or_else(|| argument_types.try_get_for_declared_type(declared_type))?;
 
                         Some(ArgumentRelation::new(
                             argument_index,
@@ -5895,21 +5900,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         // Filter out inferable typevars (cross-typevar references from
-                        // SequentMap transitivity) and unspecialized typevars (from partially
-                        // specialized contexts).
+                        // SequentMap transitivity) and provisional markers.
                         let inferred_ty = builder
                             .remove_inferable_typevar_artifacts_from_solution(
                                 binding.bound_typevar,
                                 binding.solution,
                             )
                             .filter_union(db, self.env, |ty| {
-                                if ty.has_unspecialized_type_var(db, self.env) {
+                                if ty.has_provisional_marker(db, self.env) {
                                     partially_specialized_declared_type.insert(identity);
                                     return false;
                                 }
                                 true
                             });
-                        if inferred_ty.has_unspecialized_type_var(db, self.env) {
+                        if inferred_ty.has_provisional_marker(db, self.env) {
                             continue;
                         }
 
@@ -7717,6 +7721,10 @@ impl<'db> Binding<'db> {
         // approach would be to propagate constraint sets as type context, making bidirectional
         // inference constraint-set-aware, or to infer constraint sets directly for argument types,
         // and avoid the need to construct type context before call inference has completed.
+        //
+        // A gradual specialization can retain useful concrete bounds, but only when an argument
+        // actually is gradual. Otherwise, inherited gradual evidence can hide an incompatible
+        // static argument during a later inference round.
         Some(generic_context.specialize_recursive(
             db,
             generic_context.variables(db).map(|typevar| {
@@ -7726,7 +7734,17 @@ impl<'db> Binding<'db> {
                 let argument_constraints = self
                     .specialization(db)
                     .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_dynamic(db, env))
+                    .filter(|ty| {
+                        !ty.has_dynamic(db, env)
+                            || (ty
+                                .materialize_once(db, env)
+                                .is_some_and(|range| !range.bottom.is_never())
+                                && self
+                                    .parameter_tys
+                                    .iter()
+                                    .flatten()
+                                    .any(|argument| argument.has_dynamic(db, env)))
+                    })
                     .map(|ty| ty.promote(db, env));
 
                 // TODO: We should similarly combine both the call expression and argument constraints

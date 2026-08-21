@@ -311,3 +311,61 @@ def alternation[X: (int, str), Y: (int, str)]() -> None:
     missing_str = int_only.exists(tuple[X]).for_all(tuple[Y])
     static_assert(not missing_str)
 ```
+
+## Gradual bounds through quantified variables
+
+Existentially quantifying an intermediate type variable preserves the originating gradual type and
+bound direction. Equivalent direct and transitive bounds produce a single solution.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+from ty_extensions._internal import ConstraintSet, Unknown, is_constraint_set_assignable_to
+
+def _[S, T]() -> None:
+    bridge = ConstraintSet.upper_bound(S, T)
+    gradual = is_constraint_set_assignable_to(Any, tuple[S] | tuple[T])
+    unknown = is_constraint_set_assignable_to(Unknown, tuple[S] | tuple[T])
+
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type((gradual & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Unknown]]
+    reveal_type((unknown & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+
+def _[S, T]() -> None:
+    bridge = ConstraintSet.upper_bound(T, S)
+    gradual = is_constraint_set_assignable_to(Intersection[tuple[S], tuple[T]], Any)
+    unknown = is_constraint_set_assignable_to(Intersection[tuple[S], tuple[T]], Unknown)
+
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type((gradual & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Unknown]]
+    reveal_type((unknown & bridge).exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+```
+
+A transitive gradual bound retains its originating type when another materialization relates the two
+type variables.
+
+```py
+def _[S, T]() -> None:
+    first = is_constraint_set_assignable_to(Any, tuple[S] | tuple[T])
+    second = is_constraint_set_assignable_to(tuple[S] | Unknown, tuple[T])
+
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type((first & second).exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type((second & first).exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+
+    with_lower = first & second & ConstraintSet.lower_bound(int, T)
+    # revealed: tuple[Solution[T=Any | int]]
+    reveal_type(with_lower.exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+
+def _[S, T]() -> None:
+    first = is_constraint_set_assignable_to(Unknown, tuple[S] | tuple[T])
+    second = is_constraint_set_assignable_to(tuple[S] | Any, tuple[T])
+
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type((first & second).exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=Any]]
+    reveal_type((second & first).exists(tuple[S]).solutions_for(T, inferable=tuple[T]))
+```

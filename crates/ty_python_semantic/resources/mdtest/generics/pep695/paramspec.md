@@ -1522,6 +1522,59 @@ reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ```
 
+### Generic decorators with gradual return types
+
+A gradual callable return type must not introduce alternative parameter-list specializations when
+inferring a `ParamSpec` from a generic decorated function.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+class Wrapper[**P]:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
+        raise NotImplementedError
+
+class Decorator:
+    def __call__[**P](self, fn: Callable[P, Any]) -> Wrapper[P]:
+        raise NotImplementedError
+
+@Decorator()
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(identity(1))  # revealed: Any
+```
+
+### Assignability of ParamSpec callables with gradual return types
+
+A callable returning a concrete type is assignable to a callable with the same `ParamSpec` and a
+gradual return type. This also holds when the source return type is `Never` or a type variable.
+
+```py
+from collections.abc import Callable
+from typing import Any, Never
+from ty_extensions._internal import Unknown
+
+def int_to_any[**P](source: Callable[P, int]) -> Callable[P, Any]:
+    return source
+
+def object_to_any[**P](source: Callable[P, object]) -> Callable[P, Any]:
+    return source
+
+def never_to_any[**P](source: Callable[P, Never]) -> Callable[P, Any]:
+    return source
+
+def int_to_unknown[**P](source: Callable[P, int]) -> Callable[P, Unknown]:
+    return source
+
+def never_to_unknown[**P](source: Callable[P, Never]) -> Callable[P, Unknown]:
+    return source
+
+def generic_to_any[**P, T](source: Callable[P, T]) -> Callable[P, Any]:
+    return source
+```
+
 ## Callable protocols with `ParamSpec` and class constructors
 
 When a class is passed to a function expecting a callable protocol with `ParamSpec`, the `ParamSpec`

@@ -136,6 +136,34 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Gradual bounds on generic receivers
+
+Specializing a generic receiver preserves gradual lower and upper bounds on its bound methods.
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+class Box[T]:
+    def lower[U](self: "Box[U]", value: U) -> U:
+        raise NotImplementedError
+
+    def upper[U](self: "Box[U]", callback: Callable[[U], None]) -> U:
+        raise NotImplementedError
+
+def lower[T](callback: Callable[[T], T], value: T) -> T:
+    raise NotImplementedError
+
+def upper[T](callback: Callable[[Callable[[T], None]], T], value: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def _(gradual: Box[Any], unknown: Box[Unknown], value: int, callback: Callable[[int], None]):
+    reveal_type(lower(gradual.lower, value))  # revealed: Any | int
+    reveal_type(lower(unknown.lower, value))  # revealed: Unknown | int
+    reveal_type(upper(gradual.upper, callback))  # revealed: int & Any
+    reveal_type(upper(unknown.upper, callback))  # revealed: int & Unknown
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:
@@ -639,6 +667,30 @@ class A: ...
 def callback(value: A | Any) -> None: ...
 
 reveal_type(infer(callback))  # revealed: A | Any
+```
+
+## Combining gradual and static inferred upper bounds
+
+A gradual upper bound and a static upper bound should both be preserved, regardless of the order of
+the callable arguments.
+
+```py
+from typing import Any, Callable, final
+
+def infer[T](
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+def accepts_any(value: Any) -> None: ...
+def accepts_a(value: A) -> None: ...
+
+reveal_type(infer(accepts_any, accepts_a))  # revealed: Any & A
+reveal_type(infer(accepts_a, accepts_any))  # revealed: A & Any
 ```
 
 ## Overloaded callable as generic `Callable` argument

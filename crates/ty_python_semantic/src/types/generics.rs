@@ -13,11 +13,11 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBoundSolution, PathBounds, SolutionPaths, Solutions,
+    PathBoundSolution, PathBounds, SolutionPaths, Solutions, TypeVarSolution,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    DisjointnessChecker, GradualEvaluation, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor};
@@ -2181,7 +2181,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
-pub enum ApplySpecialization<'a, 'db> {
+pub(crate) enum ApplySpecialization<'a, 'db> {
     Specialization {
         specialization: Specialization<'db>,
         /// Whether to substitute free owner variables in the declared domain of a retained
@@ -2200,8 +2200,9 @@ pub enum ApplySpecialization<'a, 'db> {
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
-    /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
-    /// substitute a typevar nested inside another constraint's bound.
+    /// Maps every type variable to the provided type.
+    All(Type<'db>),
+    /// Maps a single type variable to the provided type.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
 }
 
@@ -2251,6 +2252,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
+            ApplySpecialization::All(replacement) => Some(*replacement),
             ApplySpecialization::Single(typevar, ty) => {
                 if bound_typevar.is_same_typevar_as(db, *typevar) {
                     Some(*ty)
@@ -2290,7 +2292,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
+            ApplySpecialization::ReturnCallables(_)
+            | ApplySpecialization::All(_)
+            | ApplySpecialization::Single(_, _) => None,
         }
     }
 }
@@ -2669,19 +2673,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Solutions::Constrained(solutions) => solutions.into_vec(),
         };
 
-        let mut types = FxHashMap::default();
-        for solution in solutions {
-            for binding in solution {
-                let identity = binding.bound_typevar.identity(db);
-                types
-                    .entry(identity)
-                    .and_modify(|existing| {
-                        *existing =
-                            UnionType::from_two_elements(db, self.env, *existing, binding.solution);
-                    })
-                    .or_insert(binding.solution);
-            }
+        let mut bindings: FxHashMap<_, TypeVarSolution<'db>> = FxHashMap::default();
+        for binding in solutions.into_iter().flatten() {
+            let identity = binding.bound_typevar.identity(db);
+            bindings
+                .entry(identity)
+                .and_modify(|existing| existing.merge(db, self.env, &binding))
+                .or_insert(binding);
         }
+        let mut types: FxHashMap<_, _> = bindings
+            .into_iter()
+            .map(|(identity, binding)| (identity, binding.solution))
+            .collect();
 
         // Sequent-map transitivity can add relationships between inferable typevars to path
         // bounds. Those relationships are important while solving, but should not become recursive
@@ -3444,6 +3447,41 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
+        // A bare gradual formal contains no type variables to infer.
+        if matches!(formal, Type::Dynamic(_)) {
+            return Ok(());
+        }
+
+        // A gradual formal can only contribute new bounds when the actual type contains an
+        // inferable type variable. Otherwise, structural inference must retain the informative
+        // elements of gradual unions and intersections.
+        if actual.materialize_once(db, self.env).is_some()
+            || (formal.materialize_once(db, self.env).is_some()
+                && any_over_type(db, self.env, actual, false, |ty| {
+                    ty.as_typevar()
+                        .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
+                }))
+        {
+            if let Type::TypeAlias(alias) = formal {
+                return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
+            }
+
+            // Handle gradual types directly before union/intersection expansion.
+            let when = actual.has_relation_to_with_variance(
+                self.db,
+                self.env,
+                formal,
+                self.constraints,
+                self.inferable,
+                TypeRelation::Assignability,
+                TypeVarEvaluation::Lazy,
+                GradualEvaluation::Lazy,
+                polarity,
+            );
+            self.infer_from_constraint_set(when)?;
+            return Ok(());
+        }
+
         // Remove the union elements from `actual` that are not related to `formal`, and vice
         // versa.
         //
@@ -3686,7 +3724,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_always_satisfied(db, self.env)
+                            .is_gradually_satisfied(db, self.env)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -3748,7 +3786,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                         self.constraints,
                                         self.inferable,
                                     )
-                                    .is_always_satisfied(db, self.env)
+                                    .is_gradually_satisfied(db, self.env)
                             } else {
                                 ty.when_assignable_to(
                                     db,
@@ -3757,7 +3795,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     self.constraints,
                                     self.inferable,
                                 )
-                                .is_always_satisfied(db, self.env)
+                                .is_gradually_satisfied(db, self.env)
                             };
 
                             if is_satisfied {
