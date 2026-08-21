@@ -3489,7 +3489,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             _ => {
                 if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
                     match tuple.resize(db, env, TupleLength::Fixed(length)) {
-                        Ok(tuple) => Type::tuple(TupleType::new(db, env, &tuple)),
+                        Ok(resized) => {
+                            let narrowed = Type::tuple(TupleType::new(db, env, &resized));
+                            if let TupleSpec::Variable(variable) = tuple.as_ref()
+                                && variable.variable().typevartuple().is_some()
+                            {
+                                // Resizing forgets which TypeVarTuple these elements came from.
+                                // Retain that identity alongside the observed length and elements.
+                                IntersectionType::from_two_elements(db, env, resolved, narrowed)
+                            } else {
+                                narrowed
+                            }
+                        }
                         Err(_) => Type::Never,
                     }
                 } else {
