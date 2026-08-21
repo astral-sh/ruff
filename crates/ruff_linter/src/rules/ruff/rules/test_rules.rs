@@ -335,7 +335,7 @@ impl TestRule for AnotherDeprecatedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.0.0")]
+#[violation_metadata(removed_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct RemovedTestRule;
 
 impl Violation for RemovedTestRule {
@@ -369,7 +369,7 @@ impl TestRule for RemovedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.0.0")]
+#[violation_metadata(removed_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct AnotherRemovedTestRule;
 
 impl Violation for AnotherRemovedTestRule {
@@ -403,7 +403,7 @@ impl TestRule for AnotherRemovedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.0.0")]
+#[violation_metadata(removed_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct RedirectedFromTestRule;
 
 impl Violation for RedirectedFromTestRule {
@@ -471,7 +471,7 @@ impl TestRule for RedirectedToTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.0.0")]
+#[violation_metadata(removed_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct RedirectedFromPrefixTestRule;
 
 impl Violation for RedirectedFromPrefixTestRule {
