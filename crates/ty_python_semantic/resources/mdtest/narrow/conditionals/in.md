@@ -1278,6 +1278,132 @@ def open_typed_dict_container(value: Literal["present", "other", "missing", 1], 
         reveal_type(value)  # revealed: Literal["present", "other", "missing"]
 ```
 
+## `TypedDict` membership with an unknown key
+
+Both class-based and functional `TypedDict`s return `bool` for membership checks and direct
+`__contains__` calls, even when the key is `Any`. Calling an attribute that does not exist on `bool`
+must still produce an error:
+
+```py
+from typing import Any, TypedDict
+
+class Items(TypedDict):
+    required: int
+
+FunctionalItems = TypedDict("FunctionalItems", {"required": int})
+
+def unknown_key(items: Items, functional_items: FunctionalItems, key: Any) -> None:
+    reveal_type(key in items)  # revealed: bool
+    reveal_type(items.__contains__(key))  # revealed: bool
+    # error: [unresolved-attribute] "Object of type `bool` has no attribute `imaginary_method`"
+    items.__contains__(key).imaginary_method()
+
+    reveal_type(key in functional_items)  # revealed: bool
+    reveal_type(functional_items.__contains__(key))  # revealed: bool
+```
+
+## Mapping key membership permits subscript access
+
+A successful membership check permits a mapping to be subscripted with the same key, even when the
+key is not included in its annotated key type:
+
+```py
+from collections.abc import Mapping
+from typing import Literal, TypedDict
+
+class Values(TypedDict):
+    present: int
+
+def mapping_membership(mapping: Mapping[Literal["present"], int]) -> None:
+    if "missing" in mapping:
+        reveal_type(mapping["missing"])  # revealed: object
+
+def mapping_union(value: Values | Mapping[Literal["present"], int]) -> None:
+    if "missing" in value:
+        reveal_type(value["missing"])  # revealed: object
+```
+
+## Multiple mapping key membership conditions
+
+When a condition checks multiple keys, each successful membership check remains available for
+subscript access:
+
+```py
+from collections.abc import Mapping
+from typing import Literal
+
+def both_keys_are_present(mapping: Mapping[Literal["known"], int]) -> None:
+    has_first = "first" in mapping
+    has_second = "second" in mapping
+
+    if has_first and has_second:
+        reveal_type(mapping["first"])  # revealed: object
+        reveal_type(mapping["second"])  # revealed: object
+```
+
+## Mapping key membership disjunction
+
+If at least one of two keys must be present, excluding one establishes that the other can be
+subscripted:
+
+```py
+from collections.abc import Mapping
+from typing import Literal
+
+def either_key_is_present(mapping: Mapping[Literal["known"], int]) -> None:
+    if "first" in mapping or "second" in mapping:
+        if "first" not in mapping:
+            reveal_type(mapping["second"])  # revealed: object
+```
+
+## Multiple `TypedDict` key membership conditions
+
+Every successful membership check on an open `TypedDict` union remains available, including keys not
+declared by every union member:
+
+```py
+from typing import TypedDict
+
+class First(TypedDict):
+    first: int
+
+class Second(TypedDict):
+    second: int
+
+def both_keys_are_present(value: First | Second) -> None:
+    has_first = "first" in value
+    has_second = "second" in value
+
+    if has_first and has_second:
+        reveal_type(value["first"])  # revealed: object
+        reveal_type(value["second"])  # revealed: object
+```
+
+## Mapping membership and nominal refinement
+
+Narrowing a mapping union by a nominal attribute preserves a preceding membership check, so the
+previously established key remains safe to subscript:
+
+```py
+from collections.abc import Mapping
+from typing import Final, Literal
+
+class First(Mapping[Literal["first"], int]):
+    kind: Final[Literal["first"]] = "first"
+
+class Second(Mapping[Literal["second"], int]):
+    kind: Final[Literal["second"]] = "second"
+
+def read_missing(value: First | Second) -> object:
+    has_missing = "missing" in value
+    is_first = value.kind == "first"
+
+    if has_missing and is_first:
+        return value["missing"]
+
+    raise KeyError("missing")
+```
+
 ## bool
 
 ```py

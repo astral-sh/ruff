@@ -296,27 +296,32 @@ def copy_narrowed_mapping(value: Item | Mapping[str, Any]) -> dict[str, object] 
 
 fn benchmark_missing_key_typed_dict_union_copy(criterion: &mut Criterion) {
     const NUM_VARIANTS: usize = 12;
+    const LARGE_NUM_VARIANTS: usize = 16;
 
     setup_rayon();
 
     // Regression benchmark for https://github.com/astral-sh/ty/issues/4176.
-    let mut code = "from typing import Literal, NotRequired, TypedDict\n\n".to_string();
-    for i in 0..NUM_VARIANTS {
-        writeln!(
-            &mut code,
-            "class Item{i}(TypedDict):\n    kind: Literal[{i}]\n    field_{i}: NotRequired[int]\n"
-        )
-        .ok();
-    }
-
-    code.push_str("type Item = ");
-    for i in 0..NUM_VARIANTS {
-        if i > 0 {
-            code.push_str(" | ");
+    let declarations = |num_variants: usize| {
+        let mut code = "from typing import Literal, NotRequired, TypedDict\n\n".to_string();
+        for i in 0..num_variants {
+            writeln!(
+                &mut code,
+                "class Item{i}(TypedDict):\n    kind: Literal[{i}]\n    field_{i}: NotRequired[int]\n"
+            )
+            .ok();
         }
-        write!(&mut code, "Item{i}").ok();
-    }
 
+        code.push_str("type Item = ");
+        for i in 0..num_variants {
+            if i > 0 {
+                code.push_str(" | ");
+            }
+            write!(&mut code, "Item{i}").ok();
+        }
+        code
+    };
+
+    let mut code = declarations(NUM_VARIANTS);
     code.push_str(
         r#"
 
@@ -338,6 +343,52 @@ def copy(value: Item) -> dict[str, object] | None:
             BatchSize::SmallInput,
         );
     });
+
+    let large_union = declarations(LARGE_NUM_VARIANTS);
+
+    let cases = [
+        (
+            "ty_micro[multiple_missing_keys_typed_dict_union_copy]",
+            r#"
+
+def copy(value: Item) -> dict[str, object] | None:
+    if "first" in value and "second" in value and "third" in value and "fourth" in value:
+        return dict(value)
+    return None
+"#,
+        ),
+        (
+            "ty_micro[guarded_missing_key_typed_dict_union_copy]",
+            r#"
+
+from collections.abc import Mapping
+from typing import TypeGuard
+
+def is_item(value: Mapping[str, object]) -> TypeGuard[Item]:
+    return True
+
+def copy(value: Mapping[str, object]) -> dict[str, object] | None:
+    if is_item(value) and "missing" in value:
+        return dict(value)
+    return None
+"#,
+        ),
+    ];
+
+    for (name, body) in cases {
+        let code = format!("{large_union}{body}");
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
