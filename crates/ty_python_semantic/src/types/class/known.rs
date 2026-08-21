@@ -209,6 +209,8 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType
+            | Self::MemberDescriptorType
+            | Self::GetSetDescriptorType
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
