@@ -1487,7 +1487,41 @@ mod uv_metadata {
     };
     use ty_project::UseUv;
 
-    use super::{DocumentDiagnosticReport, Result, SystemPath, TestServerBuilder};
+    use super::{
+        ClientOptions, DiagnosticMode, DocumentDiagnosticReport, Result, SystemPath,
+        TestServerBuilder, WorkspaceDocumentDiagnosticReport,
+    };
+
+    #[test]
+    fn opening_new_file_updates_workspace_index() -> Result<()> {
+        let added = SystemPath::new("src/added.py");
+        let source = "missing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(
+                SystemPath::new("src"),
+                Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+            )?
+            .with_file(SystemPath::new("src/initial.py"), source)?
+            .with_use_uv(UseUv::Scripts)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        // Build the index before creating the file, without sending a watcher event.
+        let _ = server.workspace_diagnostic_request(None, None);
+        server.write_file(added, source)?;
+        server.open_text_document(added, source, 1);
+
+        let uri = server.file_uri(added);
+        let diagnostics = server.workspace_diagnostic_request(None, None);
+        assert!(diagnostics.items.iter().any(|report| matches!(
+            report,
+            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)
+                if report.uri == uri
+        )));
+
+        Ok(())
+    }
 
     #[test]
     fn synchronization_failure_highlights_script_metadata() -> Result<()> {

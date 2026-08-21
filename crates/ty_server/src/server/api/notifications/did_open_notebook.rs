@@ -41,7 +41,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             let cell_document =
                 TextDocument::new(cell.uri, cell.text, cell.version, cell.language_id)
                     .with_notebook(notebook_path.clone());
-            session.open_text_document(cell_document);
+            session.open_text_document(client, cell_document);
         }
 
         // Always publish diagnostics because notebooks only support publish diagnostics.

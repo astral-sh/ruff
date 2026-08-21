@@ -21,11 +21,7 @@ impl SyncNotificationHandler for DidSaveTextDocumentHandler {
     ) -> Result<()> {
         if let Ok(document) = session.document_handle(&params.text_document.uri) {
             // Keep diagnostics visible if unsaved edits first turned this file into a script.
-            session.synchronize_script(
-                client,
-                document.notebook_or_file_path(),
-                ScriptEnvironmentAvailability::Available,
-            );
+            document.synchronize_script(session, client, ScriptEnvironmentAvailability::Available);
         }
 
         for document in session.file_document_handles() {

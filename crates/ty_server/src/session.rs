@@ -21,9 +21,10 @@ use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
+use salsa::Database as _;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
-use ty_project::watch::{ChangeEvent, CreatedKind};
+use ty_project::watch::ChangeEvent;
 use ty_project::{
     ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability,
     SemanticDb as _, UseUv,
@@ -262,24 +263,6 @@ impl Session {
             .iter()
             .map(|(root, state)| (root.clone(), state.db.script_environments().sync_wakeups()))
             .collect()
-    }
-
-    /// Synchronizes an open script, using `availability` until its first synchronization completes.
-    pub(crate) fn synchronize_script(
-        &mut self,
-        client: &Client,
-        path: &AnySystemPath,
-        availability: ScriptEnvironmentAvailability,
-    ) {
-        let Some(system_path) = path.as_system() else {
-            return;
-        };
-        let capabilities = self.resolved_client_capabilities;
-        let db = self.project_db_mut(path);
-        let Some(file) = db.files().try_system(db, system_path) else {
-            return;
-        };
-        Self::request_script_sync(db, file, client, capabilities, availability);
     }
 
     /// Resynchronizes closed scripts whose metadata changed after filesystem events.
@@ -1356,9 +1339,44 @@ impl Session {
     /// Registers a text document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
     ///
+    /// Starts script synchronization from the backing file before installing the editor contents.
+    ///
     /// Returns a handle to the opened document.
-    pub(crate) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+    pub(crate) fn open_text_document(
+        &mut self,
+        client: &Client,
+        document: TextDocument,
+    ) -> DocumentHandle {
         let language_id = document.language_id();
+
+        // Request synchronization before installing the editor contents because uv reads the
+        // script from disk. This ensures both use the saved metadata, so saving changed metadata
+        // requests another synchronization.
+        if self.use_uv != UseUv::Off
+            && language_id == LanguageId::Python
+            && document.notebook().is_none()
+            && let DocumentKey::File(system_path) = DocumentKey::from_uri(document.uri())
+        {
+            let capabilities = self.resolved_client_capabilities;
+            let db = self.project_db_mut(&AnySystemPath::System(system_path.clone()));
+
+            // Refresh any cached disk revision before reading the script tag. A filesystem
+            // change may not have reached the watcher yet, and the later open event will
+            // refresh the file from the editor contents instead.
+            File::sync_path(db, &system_path);
+            if let Ok(file) = system_path_to_file(db, &system_path) {
+                // Keep the synchronization alive when the editor buffer is installed. Cancel any
+                // blocking initialization now instead of reusing one that index_mut would cancel.
+                db.trigger_cancellation();
+                Self::request_script_sync(
+                    db,
+                    file,
+                    client,
+                    capabilities,
+                    ScriptEnvironmentAvailability::Pending,
+                );
+            }
+        }
         let handle = self.index_mut().open_text_document(document);
         self.open_document_in_db(&handle, Some(language_id));
         handle
@@ -1367,16 +1385,6 @@ impl Session {
     fn open_document_in_db(&mut self, document: &DocumentHandle, language_id: Option<LanguageId>) {
         let path = document.notebook_or_file_path();
 
-        // This is a "maybe" because the `File` might've not been interned yet i.e., the
-        // `try_system` call will return `None` which doesn't mean that the file is new, it's just
-        // that the server didn't need the file yet.
-        let is_maybe_new_system_file = path.as_system().is_some_and(|system_path| {
-            let db = self.project_db(path);
-            db.files()
-                .try_system(db, system_path)
-                .is_none_or(|file| !file.exists(db))
-        });
-
         // When we know the document isn't a Python source file
         // then we'll avoid adding it to the project. (But we
         // still track it as part of the index.)
@@ -1384,15 +1392,7 @@ impl Session {
 
         match path {
             AnySystemPath::System(system_path) => {
-                let event = if is_maybe_new_system_file {
-                    ChangeEvent::Created {
-                        path: system_path.clone(),
-                        kind: CreatedKind::File,
-                    }
-                } else {
-                    ChangeEvent::Opened(system_path.clone())
-                };
-                self.apply_changes(path, &[event]);
+                self.apply_changes(path, &[ChangeEvent::Opened(system_path.clone())]);
 
                 if is_not_python {
                     return;
@@ -1960,6 +1960,25 @@ impl DocumentHandle {
 
     pub(crate) fn is_cell_or_notebook(&self) -> bool {
         matches!(self, Self::Cell { .. } | Self::Notebook { .. })
+    }
+
+    /// Synchronizes an open script, using `availability` until its first synchronization completes.
+    pub(crate) fn synchronize_script(
+        &self,
+        session: &mut Session,
+        client: &Client,
+        availability: ScriptEnvironmentAvailability,
+    ) {
+        let path = self.notebook_or_file_path();
+        let Some(system_path) = path.as_system() else {
+            return;
+        };
+        let capabilities = session.resolved_client_capabilities;
+        let db = session.project_db_mut(path);
+        let Some(file) = db.files().try_system(db, system_path) else {
+            return;
+        };
+        Session::request_script_sync(db, file, client, capabilities, availability);
     }
 
     pub(crate) fn update_text_document(
