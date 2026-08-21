@@ -200,7 +200,12 @@ Commit the generated README and `.known-crates` update with the new crate.
 
 ### Proposing a new lint rule
 
-A proposal for a new lint rule in Ruff should include the following components:
+Rule suggestions can start out as brief issues. If a maintainer thinks the rule could be a good
+addition to Ruff, they will apply the `needs-design` label to suggest filling out the steps
+described below in support of the rule's acceptance. Some of this information will be easier to
+obtain with a working rule implementation and doesn't need to be present in the initial proposal.
+
+A design for a new lint rule in Ruff should include the following components:
 
 - A proposed name that follows our [rule naming convention](#rule-naming-convention)
 
@@ -211,16 +216,24 @@ A proposal for a new lint rule in Ruff should include the following components:
     - What it does - a one line description of what the rule checks
     - Why is this bad? - a longer explanation of the pattern flagged by the rule and why it causes problems in real projects
     - Example - a code example showing the problematic code, as well as a code block showing the fixed code
-    - (optional) Known problems - any known limitations of the rule, such as false positives or negatives
-    - (optional) Fix availability - if the rule only has an autofix in some cases, explain why
-    - (optional) Fix safety - if the rule’s fix is ever unsafe, explain why
-    - (optional) Options - if the rule depends upon any configuration options, list them
-    - (optional) See also - if there are other similar or synergistic rules, list them
-    - (optional) References - if there are any relevant external references to Python or other documentation, list them
+
+    Some rules benefit from additional documentation. These sections usually emerge through the
+    implementation process and aren't required in a design proposal. "Fix safety" and "Options"
+    sections are required for rules with unsafe fixes and that rely on any settings, respectively,
+    but the rest of these are fully optional. You can `grep` for each heading to see where they are
+    often used.
+
+    - Known problems - any known limitations of the rule, such as false positives or negatives
+    - Fix availability - if the rule only has an autofix in some cases, explain why
+    - Fix safety - if the rule’s fix is ever unsafe, explain why
+    - Options - if the rule depends upon any configuration options, list them
+    - See also - if there are other similar or synergistic rules, list them
+    - References - if there are any relevant external references to Python or other documentation, list them
 
 - An example diagnostic including the proposed name, primary message, and fix title (if applicable)
 
-    For example:
+    This is another nice bonus that isn't required for a design proposal but concisely reveals a lot
+    of helpful information about a rule. For example:
 
     ```markdown
     my-new-rule: primary diagnostic message
@@ -232,14 +245,6 @@ A proposal for a new lint rule in Ruff should include the following components:
 
     When choosing a diagnostic range (marked by `^^^^` above), also consider that the start of the
     range determines where `noqa` comments will be valid
-
-It may be difficult to determine all of this information before attempting an implementation. In
-that case, the essential aspects of an initial rule request are:
-
-- A proposed name
-- A proposed category (with the caveat that an ecosystem report helps to detect `pedantic` rules)
-- The first three sections of the rule documentation
-- An example diagnostic
 
 #### Rule naming convention
 
