@@ -84,6 +84,36 @@ impl serde::Serialize for NoqaCode {
 }
 
 /// The category assigned to a lint rule.
+///
+/// These categories are similar to those found in [Clippy] and form much broader groupings than the
+/// linter-based groups. Categories are intended to be our primary classification mechanism for
+/// rules going forward, with the linter groups eventually being deprecated and removed, albeit in
+/// the relatively distant future. The categorization of a rule determines two important properties:
+/// - its default status, `style` and above are currently enabled by default
+/// - its default severity, in a future where we have multiple diagnostic severities
+///
+/// Assuming we continue to follow Clippy, `correctness` lints will have a severity of `error` by
+/// default, while the other on-by-default categories will have a severity of `warn` by default.
+///
+/// Secondary groups like the legacy linter groups are orthogonal selection mechanisms that have no
+/// impact on severity or default status, and may, and usually do, include rules from multiple
+/// categories. For example, many `F` rules are `correctness` lints, but `F` includes `suspicious`
+/// and even `pedantic` rules too. At some point in the future, we may support additional secondary
+/// groups that are not legacy linter groups as well.
+///
+/// The precedence between categories, linter groups, linter prefixes, and rules is determined by
+/// the [`crate::rule_selector::Specificity`] returned by
+/// [`crate::rule_selector::RuleSelector::specificity`], and currently follows this ordering:
+///
+/// ```text
+/// ALL < category < linter group < linter prefix < rule
+/// ```
+///
+/// The ordering of variants isn't currently used anywhere, but they should be kept in descending
+/// order of severity, with error categories first, followed by warning, and then by off-by-default
+/// categories.
+///
+/// [Clippy]: https://doc.rust-lang.org/clippy/lints.html
 #[derive(
     Debug,
     Copy,
