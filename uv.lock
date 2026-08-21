@@ -387,7 +387,7 @@ dependencies = [
 [[package]]
 name = "ecosystem-analyzer"
 version = "0.1.0"
-source = { git = "https://github.com/astral-sh/ecosystem-analyzer#a602846d9c13d7c6d7268dff728442f68c47d923" }
+source = { git = "https://github.com/astral-sh/ecosystem-analyzer#ef0bbe10e9e28c887e74b5a4101a511e65c783b4" }
 dependencies = [
     { name = "click" },
     { name = "gitpython" },
@@ -918,7 +918,7 @@ wheels = [
 [[package]]
 name = "mypy-primer"
 version = "0.1.0"
-source = { git = "https://github.com/hauntsaninja/mypy_primer?rev=db37f8a384c45c02fc52544fd819f979d66e174a#db37f8a384c45c02fc52544fd819f979d66e174a" }
+source = { git = "https://github.com/hauntsaninja/mypy_primer?rev=3058720299b812c393ad926bcca96eede20fa683#3058720299b812c393ad926bcca96eede20fa683" }
 
 [[package]]
 name = "packaging"
@@ -1521,7 +1521,7 @@ wheels = [
 
 [[package]]
 name = "ruff"
-version = "0.16.3"
+version = "0.16.4"
 source = { editable = "." }
 
 [package.dev-dependencies]

@@ -1,3 +1,6 @@
+use std::assert_matches;
+use std::fmt::Write;
+
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
@@ -300,14 +303,14 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 
     let owner_type = Type::unknown();
     let owner = DefinitionTypes::from_parts(first, vec![(first, owner_type)], vec![]);
-    assert!(matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type));
+    assert_matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type);
     assert_eq!(
         owner.bindings(first).collect::<Vec<_>>(),
         [(first, owner_type)]
     );
 
     let non_owner = DefinitionTypes::from_parts(first, vec![(second, owner_type)], vec![]);
-    assert!(matches!(non_owner, DefinitionTypes::Other(_)));
+    assert_matches!(non_owner, DefinitionTypes::Other(_));
     assert_eq!(
         non_owner.bindings(first).collect::<Vec<_>>(),
         [(second, owner_type)]
@@ -582,7 +585,8 @@ class Ui:
             );
 
             for index in 0..MANY_WIDGETS {
-                ui.push_str(&format!(
+                write!(
+                    ui,
                     concat!(
                         "        self.widget_{index} = Widget()\n",
                         "        self.widget_{index}.configure()\n",
@@ -590,7 +594,7 @@ class Ui:
                         "        self.widget_{index}.configure()\n",
                     ),
                     index = index,
-                ));
+                )?;
             }
             ui.push_str("        self.target = Widget()\n");
 
@@ -639,7 +643,8 @@ class Inner:
 "#,
             );
             for index in 0..MANY_WIDGETS {
-                inner.push_str(&format!(
+                write!(
+                    inner,
                     concat!(
                         "        self.widget_{index} = Widget()\n",
                         "        self.widget_{index}.configure()\n",
@@ -647,7 +652,7 @@ class Inner:
                         "        self.widget_{index}.configure()\n",
                     ),
                     index = index,
-                ));
+                )?;
             }
             inner.push_str("        self.target = Widget()\n");
 
@@ -740,6 +745,28 @@ class Form(Ui):
     ])?;
 
     assert_revealed_type(&db, "/src/package/consumer.py", "int");
+
+    Ok(())
+}
+
+#[test]
+fn nested_binding_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);
+    let source = format!(
+        r#"def noop() -> None: ...
+{calls}value = 1
+values = [(value := 'abc') for _ in range(2)]
+value.bit_count()
+"#
+    );
+    db.write_file("/src/main.py", &source)?;
+
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Object of type `str` has no attribute `bit_count`"],
+    );
 
     Ok(())
 }

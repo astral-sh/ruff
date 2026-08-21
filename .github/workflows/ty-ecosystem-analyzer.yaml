@@ -134,6 +134,8 @@ jobs:
     timeout-minutes: 10
     env:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
+      # Enable experimental support for installing PEP 723 script dependencies.
+      TY_UV: scripts
     steps:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1

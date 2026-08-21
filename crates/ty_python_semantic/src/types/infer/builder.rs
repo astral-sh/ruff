@@ -923,6 +923,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred_state.in_string_annotation()
     }
 
+    /// Temporarily changes lookup behavior without discarding the current string annotation.
+    ///
+    /// Parsed string nodes do not belong to the module's semantic index, so their enclosing
+    /// annotation must remain available even when nested expressions request another lookup mode.
+    fn replace_deferred_state(
+        &mut self,
+        state: DeferredExpressionState,
+    ) -> DeferredExpressionState {
+        let previous = self.deferred_state;
+        if !previous.in_string_annotation() {
+            self.deferred_state = state;
+        }
+        previous
+    }
+
     /// Returns `true` if `expr` is a call to a known diagnostic function
     /// (e.g., `reveal_type` or `assert_type`) whose return value should not
     /// trigger the `unused-awaitable` lint.
@@ -2556,7 +2571,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         nested_bindings_kind: &NestedBindingsDefinitionKind,
         definition: Definition<'db>,
     ) {
-        const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 2048;
+        const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 4096;
 
         let db = self.db();
         let scope_id = definition.file_scope(db);
@@ -4615,7 +4630,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if is_pep_613_type_alias {
                 self.context.inference_flags |= InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS;
                 if self.in_stub() {
-                    self.deferred_state = DeferredExpressionState::Deferred;
+                    self.replace_deferred_state(DeferredExpressionState::Deferred);
                 }
             }
 
@@ -6280,7 +6295,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
         state: DeferredExpressionState,
     ) -> Type<'db> {
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let previous_deferred_state = self.replace_deferred_state(state);
         let ty = self.infer_expression(expression, tcx);
         self.deferred_state = previous_deferred_state;
         ty
@@ -6656,7 +6671,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut type_context_mappings: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
             FxHashMap::default();
-        for solution in solutions {
+        for solution in solutions.into_vec() {
             for binding in solution {
                 let inferred_ty = binding
                     .solution
@@ -7401,7 +7416,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(db);
         let identity_instance = Type::instance(db, env, ClassType::Generic(collection_alias));
-        let mut builder = SpecializationBuilder::new(db, env, &constraints, inferable);
+        let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -7482,7 +7497,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // inference.
                     Solutions::Unsatisfiable | Solutions::Unconstrained => {}
                     Solutions::Constrained(solutions) => {
-                        for solution in &solutions {
+                        for solution in solutions.as_slice() {
                             for binding in solution {
                                 // The SequentMap's transitivity reasoning can inject
                                 // cross-typevar references into the solution bounds.
@@ -7822,7 +7837,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = collection_alias
             .origin(self.db())
             .apply_specialization(db, |_| {
-                builder.build_with(generic_context, |current_typevar, bounds| {
+                builder.build_with(|current_typevar, bounds| {
                     let lower = bounds?.lower?;
 
                     let lower = if is_empty_collection_type_context(tcx) {
@@ -7913,7 +7928,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let mut yield_tcx: Option<UnionAccumulator<'db>> = None;
-        for solution in solutions {
+        for solution in solutions.into_vec() {
             for binding in solution {
                 if binding.bound_typevar != yield_typevar {
                     continue;
@@ -8377,13 +8392,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
-        if named.target.is_name_expr() {
+        if named.target.is_name_expr() && !self.in_string_annotation() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
             result.binding_type(definition)
         } else {
-            // For syntactically invalid targets, we still need to run type inference:
+            // String annotations have no indexed definitions, and syntactically invalid targets
+            // cannot define a name. Both sides still need inference to preserve their diagnostics.
             self.infer_expression(&named.target, TypeContext::default());
             self.infer_expression(&named.value, TypeContext::default());
             Type::unknown()
@@ -8474,8 +8490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = lambda_expression;
 
         // In stub files, default values may reference names that are defined later in the file.
-        let in_stub = self.in_stub();
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
+        let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
         // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
         // in the union/intersection.

@@ -1175,8 +1175,8 @@ reveal_type(invoke(lift_invariant, 1))
 
 ## Passing unbound generic methods to generic functions
 
-An unbound method of a generic class can be passed to a generic higher-order function. The class
-type parameter must still be inferred from the concrete receiver expected by that function.
+An unbound method accessed through a bare generic class uses the class's default specialization. The
+higher-order function can still infer its own type parameter from its other arguments.
 
 ```py
 from __future__ import annotations
@@ -1187,6 +1187,9 @@ class Box[T]:
     def merge(self, other: Box[T]) -> Box[T]:
         return self
 
+reveal_type(Box.merge)  # revealed: def merge(self, other: Box[Unknown]) -> Box[Unknown]
+reveal_type(Box[str].merge)  # revealed: def merge(self, other: Box[str]) -> Box[str]
+
 def fold[T](function: Callable[[T, T], T], values: list[T]) -> T:
     return values[0]
 
@@ -1194,7 +1197,8 @@ def merge_boxes(values: list[Box[str]]) -> Box[str]:
     return fold(Box.merge, values)
 ```
 
-The same applies to the standard-library `set.union` method passed to `functools.reduce`.
+The same applies to the standard-library `set.union` method passed to `functools.reduce`: `reduce`
+infers its result from the iterable rather than reopening `set`'s default specialization.
 
 ```py
 from functools import reduce
@@ -1571,6 +1575,42 @@ def first_recursive[T: Recursive](values: list[T], sink: Callable[[T], None]) ->
 def _(values: list[Recursive], sink: Callable[[object], None]) -> None:
     # revealed: None | int | set[int] | Sequence[Divergent] | Mapping[str, Divergent]
     reveal_type(first_recursive(values, sink))
+```
+
+## Inferring from multiple intersection arguments
+
+Each argument below satisfies `Source[T]` in two ways. Combining independent alternatives must
+remain bounded, and the merged inference result retains evidence from all four arguments. Reordering
+the arguments does not change that result.
+
+```py
+from typing import assert_type
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+class G: ...
+class H: ...
+
+def first[T](a: Source[T], b: Source[T], c: Source[T], d: Source[T]) -> T:
+    return a.get()
+
+def _(
+    a: Intersection[Source[A], Source[B]],
+    b: Intersection[Source[C], Source[D]],
+    c: Intersection[Source[E], Source[F]],
+    d: Intersection[Source[G], Source[H]],
+) -> None:
+    assert_type(first(a, b, c, d), A | B | C | D | E | F | G | H)
+    assert_type(first(d, c, b, a), A | B | C | D | E | F | G | H)
 ```
 
 ## Typevars in a union

@@ -8,7 +8,7 @@ cd "$SCRIPT_DIR"
 
 if ! cargo fuzz --help >&/dev/null; then
   echo "Installing cargo-fuzz..."
-  cargo install --git https://github.com/rust-fuzz/cargo-fuzz.git
+  cargo install --git https://github.com/rust-fuzz/cargo-fuzz.git --rev bf2fc668dafda5295aa6fd01825ee67b885f0f2b
 fi
 
 if [ ! -d corpus/common ]; then

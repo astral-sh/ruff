@@ -24,11 +24,8 @@ env:
 permissions: {}
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    environment: release-playground
-    env:
-      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,6 +46,49 @@ jobs:
       - name: "Build Ruff playground"
         run: npm run build --workspace ruff-playground
         working-directory: playground
+      - name: "Upload Ruff playground"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ruff-playground-dist
+          path: playground/ruff/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release-playground
+    env:
+      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+      - name: "Download Ruff playground"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ruff-playground-dist
+          path: playground/ruff/dist
+          digest-mismatch: error
+      - name: "Verify static playground assets"
+        run: |
+          # The build runs without deployment credentials, but its output may
+          # still be compromised. Check for missing required assets, and reject
+          # links and special files before the publisher consumes the artifact.
+          # Wrangler can deploy `_worker.js` in the output or `functions/` in its
+          # working directory as server-side Pages code, so reject both.
+          # These checks do not establish that the generated HTML or JavaScript is safe.
+          test -f playground/ruff/dist/index.html
+          test ! -e playground/ruff/dist/_worker.js
+          test ! -e functions
+          if [[ -n "$(find playground/ruff/dist ! -type f ! -type d -print -quit)" ]]; then
+            echo "Playground artifacts must contain only regular files and directories"
+            exit 1
+          fi
       - name: "Install deployment dependencies"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
         run: npm ci --ignore-scripts

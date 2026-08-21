@@ -4,7 +4,7 @@
 # All additional options are passed to `rooster release`
 set -eu
 
-export UV_PREVIEW=1
+export UV_DEFAULT_INDEX='https://pypi.org/simple'
 
 script_root="$(realpath "$(dirname "$0")")"
 project_root="$(dirname "$script_root")"
@@ -22,7 +22,7 @@ uv run --script "$project_root/scripts/generate-crate-readmes.py"
 
 echo "Updating lockfiles..."
 cargo update -p ruff
-uv lock --default-index https://pypi.org/simple
+uv lock
 
 echo "Checking crates.io publish setup..."
-uv run --default-index https://pypi.org/simple --script "$project_root/scripts/setup-crates-io-publish.py" --quiet
+uv run --script "$project_root/scripts/setup-crates-io-publish.py" --quiet

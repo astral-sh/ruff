@@ -177,6 +177,8 @@ struct WorkspacePython {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use ruff_db::system::{SystemPath, TestSystem};
     use ty_static::EnvVars;
 
@@ -186,10 +188,10 @@ mod tests {
     fn rejects_invalid_metadata() {
         let system = TestSystem::default();
 
-        assert!(matches!(
+        assert_matches!(
             UvWorkspace::from_metadata(b"{", &system),
             Err(UvWorkspaceError::InvalidMetadata(_))
-        ));
+        );
     }
 
     #[test]
@@ -197,11 +199,11 @@ mod tests {
         let system = TestSystem::default();
         system.set_env_var(EnvVars::UV, "/custom/uv");
 
-        assert!(matches!(
+        assert_matches!(
             UvWorkspace::discover(SystemPath::new("/app"), &system),
             Err(UvWorkspaceError::Invocation(error))
                 if error.kind() == std::io::ErrorKind::Unsupported
-        ));
+        );
     }
 
     #[test]
@@ -263,10 +265,10 @@ mod tests {
             }
         }"#;
 
-        assert!(matches!(
+        assert_matches!(
             UvWorkspace::from_metadata(metadata, &system),
             Err(UvWorkspaceError::InvalidPythonVersion(_))
-        ));
+        );
 
         Ok(())
     }

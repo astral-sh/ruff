@@ -1034,6 +1034,8 @@ fn hash_single<T: Hash>(value: &T) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
 
     #[test]
@@ -1170,7 +1172,7 @@ mod tests {
             MemberExpr::try_from_expr(ast::ExprRef::from(small_expr.expr())).unwrap();
 
         // Should use Small allocation
-        assert!(matches!(small_member.segments, Segments::Small(_)));
+        assert_matches!(small_member.segments, Segments::Small(_));
         assert_eq!(small_member.num_segments(), 7);
 
         // Test Heap allocation: 8 segments (exceeds inline capacity)
@@ -1179,7 +1181,7 @@ mod tests {
         let heap_member = MemberExpr::try_from_expr(ast::ExprRef::from(heap_expr.expr())).unwrap();
 
         // Should use Heap allocation
-        assert!(matches!(heap_member.segments, Segments::Heap(_)));
+        assert_matches!(heap_member.segments, Segments::Heap(_));
         assert_eq!(heap_member.num_segments(), 8);
 
         // Test Small allocation with relative offset limit
@@ -1189,7 +1191,7 @@ mod tests {
             MemberExpr::try_from_expr(ast::ExprRef::from(small_offset_expr.expr())).unwrap();
 
         // Should use Small allocation (3 segments, small offsets)
-        assert!(matches!(small_offset_member.segments, Segments::Small(_)));
+        assert_matches!(small_offset_member.segments, Segments::Small(_));
         assert_eq!(small_offset_member.num_segments(), 3);
 
         // Test Small allocation with maximum 63-byte relative offset limit
@@ -1200,7 +1202,7 @@ mod tests {
         let max_offset_member =
             MemberExpr::try_from_expr(ast::ExprRef::from(max_offset_expr.expr())).unwrap();
         // Should still use Small allocation (exactly at the limit)
-        assert!(matches!(max_offset_member.segments, Segments::Small(_)));
+        assert_matches!(max_offset_member.segments, Segments::Small(_));
         assert_eq!(max_offset_member.num_segments(), 2);
 
         // Test that heap allocation works for segment content that would exceed relative offset limits
@@ -1211,7 +1213,7 @@ mod tests {
         let long_expr = parse_expression(&long_expr_code).unwrap();
         let long_member = MemberExpr::try_from_expr(ast::ExprRef::from(long_expr.expr())).unwrap();
         // Should use Heap allocation due to large relative offset
-        assert!(matches!(long_member.segments, Segments::Heap(_)));
+        assert_matches!(long_member.segments, Segments::Heap(_));
         assert_eq!(long_member.num_segments(), 2);
     }
 }

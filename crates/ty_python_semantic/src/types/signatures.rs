@@ -1286,10 +1286,6 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<Self> {
-        if !self.can_bind_self_to(db, env, receiver_type) {
-            return None;
-        }
-
         let bound_signature =
             self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
@@ -1300,31 +1296,32 @@ impl<'db> Signature<'db> {
         let when = constraints.load(db, env, receiver_constraints);
         let inferable = self.inferable_typevars(db);
 
-        match when.solutions(db, env, &constraints, inferable) {
-            Solutions::Unsatisfiable => return None,
-            Solutions::Unconstrained => return Some(self.clone()),
+        match when.solutions(db, env, inferable) {
+            Ok(Solutions::Unsatisfiable) => return None,
+            Ok(Solutions::Unconstrained) | Err(_) => return Some(self.clone()),
             // Each receiver path can leave a different type variable unconstrained. Preserve the
             // original relation instead of combining those independent solutions.
-            Solutions::Constrained(solutions) if solutions.len() > 1 => {
+            Ok(Solutions::Constrained(solutions)) if solutions.as_slice().len() > 1 => {
                 return Some(self.clone());
             }
-            Solutions::Constrained(_) => {}
+            Ok(Solutions::Constrained(_)) => {}
         }
 
         let Some(generic_context) = self.generic_context else {
             return Some(self.clone());
         };
 
-        let mut builder = SpecializationBuilder::new(db, env, &constraints, inferable);
+        let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
-        let specialization = builder.build_with(generic_context, |typevar, bounds| {
+        let specialization = builder.build_with(|typevar, bounds| {
             if let Some(bounds) = bounds
                 && let Some(lower) = bounds.lower
                 && let Some(upper) = bounds.upper.as_single_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
-                && let Ok(Some(solution)) = PathBounds::default_solve(db, env, &constraints, bounds)
+                && let Some(solution) =
+                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
             {
                 return Some(solution);
             }
@@ -1335,7 +1332,8 @@ impl<'db> Signature<'db> {
                     .variance_of(db, env, typevar.identity(db))
                     .is_covariant()
                 && bounds.lower.is_some_and(|lower| !lower.is_never())
-                && let Ok(Some(solution)) = PathBounds::default_solve(db, env, &constraints, bounds)
+                && let Some(solution) =
+                    PathBounds::default_solve(db, env, &constraints, bounds).as_type()
             {
                 return Some(solution);
             }
@@ -1355,6 +1353,10 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<Self> {
+        if !self.can_bind_self_to(db, env, receiver_type) {
+            return None;
+        }
+
         self.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
             .map(|signature| {
                 signature.bind_self_with_receiver(
@@ -1628,7 +1630,7 @@ impl<'db> Signature<'db> {
     fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
         let type_mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
         self.apply_type_mapping_impl(
             db,
             &type_mapping,
@@ -2362,33 +2364,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        // `inferable` has different roles in the two type-variable evaluation modes:
-        //
-        // * Eager comparisons decide whether the relation holds immediately. An unbound generic
-        //   method's `Self` can have an upper bound such as `C[T]`, so `T` must also be
-        //   inferable; otherwise, a concrete receiver such as `C[int]` is compared against a
-        //   fixed, symbolic `T` and valid higher-order calls are rejected.
-        // * Lazy comparisons record constraints for every type variable, regardless of whether
-        //   it is inferable. Here, `signature_inferable` also determines which type variables
-        //   `reduce_inferable` existentially removes below, so it must contain only variables
-        //   actually bound by these signatures. Including an enclosing class's `T` would turn a
-        //   decorator's return constraint `T <= R` into `exists T. T <= R`, losing the
-        //   relationship needed to infer `R = T`.
-        let include_bound_dependencies = self.typevar_evaluation == TypeVarEvaluation::Eager;
         let signature_typevars = |signature: &Signature<'db>| {
             signature
                 .generic_context
-                .map_or(TypeVarSet::None, |context| {
-                    if include_bound_dependencies {
-                        context.inferable_typevars(db)
-                    } else {
-                        TypeVarSet::from_typevars(db, context.variables(db))
-                    }
-                })
+                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db))
         };
         let source_inferable = signature_typevars(source);
         let target_inferable = signature_typevars(target);
         let signature_inferable = source_inferable.merge(db, target_inferable);
+
         let inferable = self.inferable.merge(db, signature_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.

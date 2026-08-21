@@ -51,7 +51,7 @@ use crate::types::function::{FunctionType, KnownFunction};
 use crate::types::infer::{function_known_decorators, infer_definition_types, original_class_type};
 use crate::types::signatures::Parameter as SignatureParameter;
 use crate::types::{
-    ClassBase, ClassLiteral, ProgramEnvironment, Type, definition_expression_type,
+    ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, Type, definition_expression_type,
     extract_fixed_length_iterable_element_types,
 };
 
@@ -692,17 +692,8 @@ fn mark_excludes_fixture<'db>(
     let Some(call) = expression.as_call_expr() else {
         return false;
     };
-    let Some(attribute) = call.func.as_attribute_expr() else {
-        return false;
-    };
-    if attribute.attr.as_str() != "parametrize"
-        || !is_known_class_instance(
-            db,
-            definition,
-            expression_type(&attribute.value),
-            "MarkGenerator",
-            &[KnownModule::Pytest, KnownModule::PytestMarkStructures],
-        )
+    if !expression_type(&call.func)
+        .is_some_and(|ty| ty.is_instance_of(db, KnownClass::PytestParametrizeMarkDecorator))
     {
         return false;
     }
@@ -1397,6 +1388,11 @@ def test_aliased_direct(value): ...
 @aliased_mark.parametrize("value", [1], indirect=True)
 def test_aliased_indirect(value): ...
 
+parametrize = pytest.mark.parametrize
+
+@parametrize("value", [1])
+def test_bare_aliased_direct(value): ...
+
 @pytest.mark.parametrize("value", [1])
 class TestParametrized:
     def test_value(self, value): ...
@@ -1413,6 +1409,7 @@ class TestOuter:
         let test_mixed = test.function("test_mixed");
         let test_aliased_direct = test.function("test_aliased_direct");
         let test_aliased_indirect = test.function("test_aliased_indirect");
+        let test_bare_aliased_direct = test.function("test_bare_aliased_direct");
         let test_class_parametrized = test.function("TestParametrized.test_value");
         let test_outer_class_parametrized = test.function("TestOuter.TestInner.test_value");
 
@@ -1446,6 +1443,8 @@ class TestOuter:
 
         assert_snapshot!(test_mixed.fixture_resolution("other"), @"No fixture resolved for parameter `other`");
         assert_snapshot!(test_aliased_direct.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
+
+        assert_snapshot!(test_bare_aliased_direct.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
 
         assert_snapshot!(test_aliased_indirect.fixture_resolution("value"), @"
         info[pytest-fixture]: Resolve fixture for parameter
@@ -1615,8 +1614,10 @@ def test_use(value): ...
 class MarkDecorator:
     def __call__(self, *args: object, **kwargs: object) -> object: ...
 
+class _ParametrizeMarkDecorator(MarkDecorator): ...
+
 class MarkGenerator:
-    parametrize: MarkDecorator
+    parametrize: _ParametrizeMarkDecorator
 "#,
             )
             .with_file(

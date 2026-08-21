@@ -1586,7 +1586,7 @@ impl<'db> Bindings<'db> {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
-                                        BoundMethodType::new(db, function, *owner),
+                                        BoundMethodType::new(db, function, *owner, *owner),
                                     ));
                                 }
                                 [Some(instance), None] => {
@@ -1594,6 +1594,7 @@ impl<'db> Bindings<'db> {
                                         BoundMethodType::new(
                                             db,
                                             function,
+                                            instance.to_meta_type(db, env),
                                             instance.to_meta_type(db, env),
                                         ),
                                     ));
@@ -1607,7 +1608,7 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(Type::FunctionLiteral(function));
                             } else {
                                 overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
-                                    db, function, *first,
+                                    db, function, *first, *first,
                                 )));
                             }
                         }
@@ -1621,7 +1622,7 @@ impl<'db> Bindings<'db> {
                                 match overload.parameter_types() {
                                     [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, *function, *owner),
+                                            BoundMethodType::new(db, *function, *owner, *owner),
                                         ));
                                     }
 
@@ -1630,6 +1631,7 @@ impl<'db> Bindings<'db> {
                                             BoundMethodType::new(
                                                 db,
                                                 *function,
+                                                instance.to_meta_type(db, env),
                                                 instance.to_meta_type(db, env),
                                             ),
                                         ));
@@ -1646,7 +1648,9 @@ impl<'db> Bindings<'db> {
                                     }
                                     [_, Some(instance), _] => {
                                         overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, *function, *instance),
+                                            BoundMethodType::new(
+                                                db, *function, *instance, *instance,
+                                            ),
                                         ));
                                     }
 
@@ -3056,11 +3060,11 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let set = constraints.load(db, env, tracked.constraints(db));
-                        let result = match set.solutions(db, env, &constraints, inferable) {
-                            Solutions::Constrained(paths) => Type::heterogeneous_tuple(
+                        let result = match set.solutions(db, env, inferable) {
+                            Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
                                 db,
                                 env,
-                                paths.into_iter().map(|path| {
+                                paths.into_vec().into_iter().map(|path| {
                                     let path: Box<[_]> = path
                                         .into_iter()
                                         .filter(|binding| binding.bound_typevar == typevar)
@@ -3070,8 +3074,9 @@ impl<'db> Bindings<'db> {
                                     ))
                                 }),
                             ),
-                            Solutions::Unsatisfiable => Type::none(db, env),
-                            Solutions::Unconstrained => Type::empty_tuple(db, env),
+                            Ok(Solutions::Unsatisfiable) => Type::none(db, env),
+                            Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
+                            Err(_) => Type::unknown(),
                         };
                         overload.set_return_type(result);
                     }
@@ -3093,11 +3098,11 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let set = constraints.load(db, env, tracked.constraints(db));
-                        let result = match set.solutions(db, env, &constraints, inferable) {
-                            Solutions::Constrained(paths) => Type::heterogeneous_tuple(
+                        let result = match set.solutions(db, env, inferable) {
+                            Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
                                 db,
                                 env,
-                                paths.into_iter().map(|path| {
+                                paths.into_vec().into_iter().map(|path| {
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
                                         InternedConstraintSetSolution::new(
                                             db,
@@ -3106,8 +3111,9 @@ impl<'db> Bindings<'db> {
                                     ))
                                 }),
                             ),
-                            Solutions::Unsatisfiable => Type::none(db, env),
-                            Solutions::Unconstrained => Type::empty_tuple(db, env),
+                            Ok(Solutions::Unsatisfiable) => Type::none(db, env),
+                            Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
+                            Err(_) => Type::unknown(),
                         };
                         overload.set_return_type(result);
                     }
@@ -5808,8 +5814,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(db);
-        let mut builder =
-            SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
+        let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -5856,7 +5861,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     self.inferable_typevars,
                 );
 
-                // Use `solutions_with` to determine per-typevar variance from the raw
+                // Use `solve_with` to determine per-typevar variance from the raw
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
@@ -5876,7 +5881,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let mut preferred: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
                     FxHashMap::default();
 
-                for solution in &solutions {
+                for solution in solutions.as_slice() {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(db);
 
@@ -5936,7 +5941,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 // Add preferred types to the builder so they serve as the base mapping
                 // when argument inference adds more types.
-                for solution in &solutions {
+                for solution in solutions.as_slice() {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(db);
                         if let Some(&ty) = preferred.get(&identity) {
@@ -5967,8 +5972,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder =
-                SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
+            builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
             specialization_errors.clear();
             self.constraint_set_errors.fill(false);
 
@@ -6017,10 +6021,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             // The promotion override must not select an unsatisfiable solution.
-            let Ok(Some(solution)) = PathBounds::default_solve(db, self.env, constraints, bounds)
-            else {
-                return None;
-            };
+            let solution =
+                PathBounds::default_solve(db, self.env, constraints, bounds).as_type()?;
             let promoted = solution.promote(db, self.env);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
@@ -6046,10 +6048,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             maybe_promote(typevar, bounds)
         };
-        let inference = match builder.build_inference_with(generic_context, &mut choose) {
+        let inference = match builder.build_inference_with(&mut choose) {
             Ok(inference) => inference,
             Err(()) => builder.build_diagnostic_inference_with(
-                generic_context,
                 self.argument_relations()
                     .map(|relation| (relation.declared_type, relation.argument_type)),
                 choose,
@@ -6134,8 +6135,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             (error, argument_index)
         })?;
 
-        if let Some(generic_context) = self.signature.generic_context {
-            let specialization = builder.build_with(generic_context, |_, _| None);
+        if self.signature.generic_context.is_some() {
+            let specialization = builder.build_with(|_, _| None);
             let expected_ty = formal.apply_specialization(db, specialization);
 
             // The legacy solver keeps the first pack when another occurrence has a different length.
@@ -7692,7 +7693,7 @@ impl<'db> Binding<'db> {
                 PathBounds::preliminary_solve(db, env, constraints, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {
-                for solution in solutions {
+                for solution in solutions.into_vec() {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(db);
                         return_type_solutions

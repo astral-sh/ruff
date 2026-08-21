@@ -15,7 +15,7 @@ use crate::types::attribute_write::{
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
@@ -1773,12 +1773,12 @@ pub(super) struct ProtocolMember<'a, 'db> {
 /// The declaration order is significant because the derived ordering is used when comparing
 /// protocol interfaces.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
-enum StructuralMemberPriority {
+pub(super) enum StructuralMemberPriority {
     /// A non-recursive member with at most one callable signature.
     Simple,
     /// A non-recursive callable member with multiple overloads.
     FiniteOverload,
-    /// A member that may recurse through a protocol or type alias, or whose finiteness is unknown.
+    /// A member that contains a protocol or recursive alias, or whose finiteness is unknown.
     Recursive,
 }
 
@@ -1881,18 +1881,33 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
     }
 
+    /// Returns whether an instance method has an explicit positional receiver annotation.
+    pub(super) fn has_explicit_receiver_annotation(&self, db: &'db dyn Db) -> bool {
+        match self.data.kind {
+            ProtocolMemberKind::Method(member, ProtocolMethodKind::Instance)
+                if let Type::Callable(callable) = member.ty() =>
+            {
+                callable
+                    .signatures(db)
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+            }
+            _ => false,
+        }
+    }
+
     /// Returns the priority for structurally comparing this member.
     ///
-    /// Simple finite members are cheapest, followed by finite overloads. Recursive and
-    /// alias-containing members are compared last because they can expand the same interface again.
-    fn structural_member_priority(
+    /// Simple finite members are cheapest, followed by finite overloads. Recursive members and
+    /// aliases that contain a protocol or are themselves recursive are compared last.
+    pub(super) fn structural_member_priority(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> StructuralMemberPriority {
         let is_recursive_type = |ty| {
-            any_over_type(db, env, ty, false, |nested| {
-                matches!(nested, Type::ProtocolInstance(_) | Type::TypeAlias(_))
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                matches!(nested, Type::ProtocolInstance(_))
             })
         };
 

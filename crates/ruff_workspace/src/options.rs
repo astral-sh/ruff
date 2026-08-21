@@ -516,6 +516,13 @@ pub struct Options {
     pub analyze: Option<AnalyzeOptions>,
 }
 
+impl Options {
+    /// Deserialize inline configuration in one crate, avoiding repeated code generation.
+    pub fn from_toml_table(table: toml::Table) -> Result<Self, toml::de::Error> {
+        table.try_into()
+    }
+}
+
 /// Configures how Ruff checks your code.
 ///
 /// Options specified in the `lint` section take precedence over the deprecated top-level settings.

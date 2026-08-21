@@ -1022,6 +1022,261 @@ def g(x: int | None):
     reveal_type(x)  # revealed: int
 ```
 
+### Module scope
+
+A terminal call at module scope removes a binding from its branch even when the branch condition
+does not narrow that binding.
+
+```py
+from typing import NoReturn
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def continue_normally() -> None:
+    pass
+
+flag: bool = bool(input())
+value = 1
+
+if flag:
+    value = "unreachable"
+    stop()
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
+A call that returns normally must retain the binding from its branch.
+
+```py
+continuing_value = 1
+other_flag: bool = bool(input())
+
+if other_flag:
+    continuing_value = "reachable"
+    continue_normally()
+
+reveal_type(continuing_value)  # revealed: Literal[1, "reachable"]
+```
+
+An unconditional terminal call eliminates the remaining bindings.
+
+```py
+stop()
+reveal_type(continuing_value)  # revealed: Never
+```
+
+### Class scope
+
+Terminal and non-terminal calls have the same effect on class-body bindings as they do on
+module-level bindings.
+
+```py
+from typing import NoReturn
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def continue_normally() -> None:
+    pass
+
+flag: bool = bool(input())
+other_flag: bool = bool(input())
+
+class Example:
+    value = 1
+
+    if flag:
+        value = "unreachable"
+        stop()
+
+    reveal_type(value)  # revealed: Literal[1]
+
+    continuing_value = 1
+
+    if other_flag:
+        continuing_value = "reachable"
+        continue_normally()
+
+    reveal_type(continuing_value)  # revealed: Literal[1, "reachable"]
+
+    stop()
+    reveal_type(continuing_value)  # revealed: Never
+```
+
+### Statically known branches in module and class scopes
+
+A terminal call in the reachable branch of a statically known condition removes its module-level
+binding, even though the condition does not directly narrow that binding.
+
+```py
+from typing import NoReturn
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+flag: bool = bool(input())
+module_value = 1
+
+if flag:
+    module_value = "unreachable"
+
+    if 1 + 1 == 2:
+        stop()
+    else:
+        pass
+
+reveal_type(module_value)  # revealed: Literal[1]
+module_value.bit_count()
+```
+
+The same statically known condition also removes the unreachable binding from a class body.
+
+```py
+class Example:
+    value = 1
+
+    if flag:
+        value = "unreachable"
+
+        if 1 + 1 == 2:
+            stop()
+        else:
+            pass
+
+    reveal_type(value)  # revealed: Literal[1]
+    value.bit_count()
+```
+
+### Generic calls in module and class scopes
+
+A generic call is terminal when its argument specializes the return type to `Never`.
+
+```py
+from typing import NoReturn, TypeVar, cast
+
+T = TypeVar("T")
+
+def identity(argument: T) -> T:
+    return argument
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+module_value = 1
+
+if bool(input()):
+    module_value = "unreachable"
+    identity(stop())
+
+reveal_type(module_value)  # revealed: Literal[1]
+```
+
+Generic specialization also works when its terminal argument is not a simple call.
+
+```py
+cast_value = 1
+
+if bool(input()):
+    cast_value = "unreachable"
+    identity(cast(NoReturn, None))
+
+reveal_type(cast_value)  # revealed: Literal[1]
+```
+
+The same terminal call also narrows bindings in a class body.
+
+```py
+class Example:
+    value = 1
+
+    if bool(input()):
+        value = "unreachable"
+        identity(stop())
+
+    reveal_type(value)  # revealed: Literal[1]
+```
+
+### Overloads in module scope
+
+When only one overload returns `Never`, select the matching overload before deciding whether its
+branch terminates.
+
+```py
+from typing import NoReturn, overload
+
+@overload
+def stop_if_int(argument: int) -> NoReturn: ...
+@overload
+def stop_if_int(argument: str) -> int: ...
+def stop_if_int(argument: int | str) -> int:
+    if isinstance(argument, int):
+        raise RuntimeError
+    return 1
+
+flag: bool = bool(input())
+value = 1
+
+if flag:
+    value = "unreachable"
+    stop_if_int(1)
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
+A local argument that requires inference must still select its terminal overload.
+
+```py
+local_argument: int = int(input())
+local_value = 1
+
+if bool(input()):
+    local_value = "unreachable"
+    stop_if_int(local_argument)
+
+reveal_type(local_value)  # revealed: Literal[1]
+```
+
+The overload that returns normally must not remove its branch.
+
+```py
+other_flag: bool = bool(input())
+continuing_value = 1
+
+if other_flag:
+    continuing_value = "reachable"
+    stop_if_int("safe")
+
+reveal_type(continuing_value)  # revealed: Literal[1, "reachable"]
+```
+
+### Calls with no applicable bound overloads
+
+A bound method with no applicable overloads is invalid, but its call can still return at runtime. It
+must not hide bindings from its branch or subsequent diagnostics.
+
+```py
+from __future__ import annotations
+from typing import overload
+
+class Example:
+    @overload
+    def method(self: str) -> None: ...
+    @overload
+    def method(self: bytes) -> None: ...
+    def method(self: Example | str | bytes) -> None:
+        pass
+
+value = 1
+
+if bool(input()):
+    value = "reachable"
+    Example().method()  # error: [no-matching-overload]
+
+reveal_type(value)  # revealed: Literal[1, "reachable"]
+value.bit_count()  # error: [unresolved-attribute]
+```
+
 ### Possibly unresolved diagnostics
 
 If the codepath on which a variable is not defined eventually returns `Never`, use of the variable
