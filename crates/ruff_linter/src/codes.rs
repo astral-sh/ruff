@@ -172,11 +172,13 @@ impl Category {
     /// Return the description of the category, derived from its documentation.
     #[cfg(any(feature = "clap", test))]
     pub(crate) fn description(self) -> &'static str {
-        strum::EnumMessage::get_documentation(&self)
-            .expect("Categories must be documented")
-            .lines()
-            .next()
-            .expect("Category documentation must have at least one line")
+        let Some(docs) =
+            strum::EnumMessage::get_documentation(&self).and_then(|docs| docs.lines().next())
+        else {
+            panic!("Category `{self}` missing required documentation");
+        };
+
+        docs
     }
 
     /// Return the rules in this category.
