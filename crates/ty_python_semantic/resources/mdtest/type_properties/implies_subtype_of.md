@@ -264,7 +264,7 @@ def tuple_assumptions[*Ts]() -> None:
 
 ## Compound types
 
-All of the relationships in the above section also apply when a typevar appears in a compound type.
+The relationships for [type variables](#type-variables) also apply within compound types.
 
 ```py
 from ty_extensions import static_assert
