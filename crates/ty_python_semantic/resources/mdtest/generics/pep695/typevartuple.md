@@ -1718,6 +1718,8 @@ type Alias[*Ts1, *Ts2] = tuple[*Ts1] | tuple[*Ts2]
 
 ### Must always be unpacked
 
+A type variable tuple represents zero or more types, so it cannot be used as a single type.
+
 ```py
 def invalid[*Ts](x: Ts) -> None: ...  # error: [invalid-type-form]
 def invalid_args[*Ts](*args: Ts) -> None: ...  # error: [invalid-type-form]
@@ -1726,8 +1728,80 @@ class InvalidTupleElement[*Ts]:
     # error: [invalid-type-form] "Bare TypeVarTuple `Ts` is not valid in this context in a type expression"
     values: tuple[Ts]
 
+reveal_type(InvalidTupleElement[int, str]().values)  # revealed: tuple[Unknown, ...]
+
 def valid[*Ts](x: tuple[*Ts]) -> tuple[*Ts]:
     return x
+```
+
+A tuple annotation containing a bare type variable tuple recovers to `tuple[Unknown, ...]`. Treating
+the bare pack as one `Unknown` element would incorrectly impose a fixed length, even when other
+elements surround it.
+
+```py
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+def mixed[*Ts](values: tuple[int, Ts, str]) -> None:
+    reveal_type(values)  # revealed: tuple[Unknown, ...]
+```
+
+### Missing unpack in a homogeneous tuple
+
+Adding an ellipsis does not make a bare type variable tuple a valid element type. The invalid
+specialization recovers to `tuple[Unknown, ...]`.
+
+```py
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+def homogeneous[*Ts](values: tuple[Ts, ...]) -> None:
+    reveal_type(values)  # revealed: tuple[Unknown, ...]
+```
+
+### Missing unpack inside another type
+
+Only the tuple containing the bare pack recovers to `tuple[Unknown, ...]`. An enclosing tuple or
+`type[]` annotation keeps its structure. An ordinary tuple with an `Unknown` element keeps its fixed
+length.
+
+```py
+from ty_extensions._internal import Unknown
+
+def nested[*Ts](
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    values: tuple[tuple[Ts]],
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    cls: type[tuple[Ts]],
+    fixed: tuple[Unknown],
+) -> None:
+    reveal_type(values)  # revealed: tuple[tuple[Unknown, ...]]
+    reveal_type(cls)  # revealed: type[tuple[Unknown, ...]]
+    reveal_type(fixed)  # revealed: tuple[Unknown]
+```
+
+### Missing unpack in quoted annotations
+
+Quoting the whole tuple annotation or just the bare type variable tuple does not change the
+diagnostic or the fallback type.
+
+```py
+def quoted[*Ts](
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    whole: "tuple[Ts]",
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    element: tuple["Ts"],
+) -> None:
+    reveal_type(whole)  # revealed: tuple[Unknown, ...]
+    reveal_type(element)  # revealed: tuple[Unknown, ...]
+```
+
+### Other errors alongside a missing unpack
+
+Recovering from a missing unpack does not prevent us from reporting independent errors in the
+remaining tuple elements.
+
+```py
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+# error: [unresolved-reference] "Name `Missing` used when not defined"
+def invalid_sibling[*Ts](values: tuple[Ts, Missing]) -> None:
+    reveal_type(values)  # revealed: tuple[Unknown, ...]
 ```
 
 ### Invalid unpack operand

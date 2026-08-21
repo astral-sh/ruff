@@ -22,10 +22,10 @@ use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
-    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
-    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
-    todo_type,
+    IntersectionType, InvalidTypeExpression, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    LiteralValueTypeKind, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
+    TypeContext, TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
+    UnionType, any_over_type, todo_type,
 };
 use crate::{FxOrderSet, add_inferred_python_version_hint_to_diagnostic};
 
@@ -99,7 +99,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     pub(super) fn infer_name_or_attribute_type_expression(
-        &self,
+        &mut self,
         ty: Type<'db>,
         annotation: &ast::Expr,
     ) -> Type<'db> {
@@ -121,6 +121,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.inference_flags(),
             )
             .unwrap_or_else(|error| {
+                if error.invalid_expressions.iter().any(|invalid| {
+                    matches!(invalid, InvalidTypeExpression::InvalidBareTypeVarTuple(_))
+                }) {
+                    self.store_type_expression_flags(
+                        annotation,
+                        TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE,
+                    );
+                }
                 error.into_fallback_type(&self.context, annotation, self.inference_flags())
             });
         self.check_for_unbound_type_variable(annotation, result_ty)
@@ -1062,6 +1070,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// This method assumes that a type has already been inferred and stored for the `value`
     /// of the subscript passed in.
+    ///
+    /// Recovers to `tuple[Unknown, ...]` if an element is a `TypeVarTuple` missing an unpack.
+    /// Recovering that element as `Unknown` would assume a single element where the intended
+    /// length is unknown.
     pub(super) fn infer_tuple_type_expression(
         &mut self,
         tuple: &ast::ExprSubscript,
@@ -1081,9 +1093,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                         previously_in_valid_unpack_context,
                     );
-                    if self
-                        .type_expression_flags(element)
-                        .contains(TypeExpressionFlags::UNPACK)
+                    let element_flags = self.type_expression_flags(element);
+                    if element_flags.contains(TypeExpressionFlags::UNPACK)
                         && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
                     {
                         let mut diagnostic =
@@ -1092,6 +1103,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "`...` cannot be used after an unpacked element",
                         );
                     }
+                    let element_ty = if element_flags
+                        .contains(TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE)
+                    {
+                        Type::unknown()
+                    } else {
+                        element_ty
+                    };
                     let result = TupleType::homogeneous(db, env, element_ty);
                     self.store_expression_type(&tuple.slice, Type::tuple(result));
                     return result;
@@ -1100,6 +1118,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut element_types = TupleSpecBuilder::with_capacity(elements.len());
 
                 let mut first_unpacked_variadic_tuple = None;
+                let mut has_bare_typevartuple = false;
 
                 for element in elements {
                     if element.is_ellipsis_literal_expr() {
@@ -1124,6 +1143,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                         previously_in_valid_unpack_context,
                     );
+                    has_bare_typevartuple |= self
+                        .type_expression_flags(element)
+                        .contains(TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE);
                     // Determine if this element unpacks a tuple: either `*expr` or `Unpack[expr]`
                     let is_unpack = matches!(element, ast::Expr::Starred(_))
                         || matches!(
@@ -1180,7 +1202,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
 
-                let ty = TupleType::new(db, env, &element_types.build());
+                // Finish inferring every element before recovering, so independent errors are
+                // still reported. Do not propagate the missing-unpack flag to the tuple itself:
+                // an enclosing `tuple[tuple[Ts]]` still has exactly one element.
+                let ty = if has_bare_typevartuple {
+                    TupleType::homogeneous(db, env, Type::unknown())
+                } else {
+                    TupleType::new(db, env, &element_types.build())
+                };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
@@ -1200,7 +1229,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
                     }
                     self.store_expression_type(single_element, Type::unknown());
-                    return TupleType::heterogeneous(db, env, std::iter::once(Type::unknown()));
+                    return TupleType::heterogeneous(db, env, [Type::unknown()]);
                 }
                 let previously_in_valid_unpack_context = self
                     .context
@@ -1211,6 +1240,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                     previously_in_valid_unpack_context,
                 );
+                if self
+                    .type_expression_flags(single_element)
+                    .contains(TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE)
+                {
+                    return TupleType::homogeneous(db, env, Type::unknown());
+                }
                 let single_element_is_unpack = matches!(single_element, ast::Expr::Starred(_))
                     || matches!(
                         single_element,
@@ -1226,16 +1261,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     } else if let Type::TypeVar(typevar) = single_element_ty
                         && typevar.is_typevartuple(self.db())
                     {
-                        return TupleType::new(
-                            db,
-                            env,
-                            &TupleSpecBuilder::with_capacity(0)
-                                .concat_variadic_typevar(db, env, typevar)
-                                .build(),
-                        );
+                        return TupleType::unpacked_typevartuple(db, env, typevar);
                     }
                 }
-                TupleType::heterogeneous(db, env, std::iter::once(single_element_ty))
+                TupleType::heterogeneous(db, env, [single_element_ty])
             }
         }
     }
