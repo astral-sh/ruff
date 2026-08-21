@@ -544,6 +544,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 let env = self.env;
 
+                // TODO: Extend lazy inference for mixed gradual tuples: let gradual segments
+                // supply fixed target elements, and generate constraints for source packs that
+                // overlap fixed target elements.
                 if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
                 {
@@ -584,6 +587,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     });
                 }
 
+                // These checks must hold for every specialization of a non-inferable pack.
+                // Lazy evaluation needs to retain pack constraints for later solving; its empty
+                // `inferable` set does not imply universal quantification.
                 if self.is_eager_assignability() {
                     match (source.variable(), target.variable()) {
                         (source_segment, VariableSegment::TypeVarTuple(target_pack))
@@ -636,8 +642,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return ConstraintSet::from_bool(
                         self.constraints,
                         self.is_eager_assignability()
-                            && source.prefix_elements().is_empty()
-                            && source.suffix_elements().is_empty()
+                            && source.len().minimum() == 0
                             && matches!(
                                 source.variable(),
                                 VariableSegment::Homogeneous(Type::Dynamic(_))
@@ -889,9 +894,7 @@ impl<'db> VariableSegment<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        let Self::Homogeneous(element) = self else {
-            return None;
-        };
+        let element = self.homogeneous_type()?;
         // A static constructor or an alias cycle rules out gradual arity, even if it contains Any.
         (!any_over_type_expanding_aliases(db, env, element, |ty| {
             !matches!(ty, Type::TypeAlias(_) | Type::Dynamic(_))
