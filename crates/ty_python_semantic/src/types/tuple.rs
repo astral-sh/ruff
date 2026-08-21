@@ -28,6 +28,7 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
     IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
@@ -583,9 +584,55 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     });
                 }
 
+                if self.is_eager_assignability() {
+                    match (source.variable(), target.variable()) {
+                        (source_segment, VariableSegment::TypeVarTuple(target_pack))
+                            if !target_pack.is_inferable(db, self.inferable)
+                                && let Some(source_element) =
+                                    source_segment.gradual_element_type(db, env) =>
+                        {
+                            // The pack may be empty, so the source cannot require more elements
+                            // than the target's fixed ends. For longer packs, source endpoints
+                            // extending into the pack must be assignable to every element type,
+                            // which we check against `Never`. This also covers their overlap with
+                            // the opposite fixed end when the pack is short.
+                            if source.len().minimum() > target.len().minimum() {
+                                return self.never();
+                            }
+                            return self.check_tuple_boundaries(
+                                db,
+                                source,
+                                target,
+                                source_element,
+                                Type::Never,
+                            );
+                        }
+                        (VariableSegment::TypeVarTuple(source_pack), target_segment)
+                            if !source_pack.is_inferable(db, self.inferable)
+                                && let Some(target_element) =
+                                    target_segment.gradual_element_type(db, env) =>
+                        {
+                            // Conversely, the target's required elements must fit even with an
+                            // empty source pack. A target endpoint extending into the pack must
+                            // accept any possible element, which we check using `object`.
+                            if source.len().minimum() < target.len().minimum() {
+                                return self.never();
+                            }
+                            return self.check_tuple_boundaries(
+                                db,
+                                source,
+                                target,
+                                Type::object(),
+                                target_element,
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+
                 if matches!(target.variable(), VariableSegment::TypeVarTuple(_)) {
-                    // A fully gradual tuple can materialize to any specialization of the target
-                    // pack. Fixed source elements still constrain its length and cannot be ignored.
+                    // A fully gradual source imposes no length or element constraints, even
+                    // when the target pack is inferable.
                     return ConstraintSet::from_bool(
                         self.constraints,
                         self.is_eager_assignability()
@@ -692,6 +739,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             }
         }
+    }
+
+    /// Compare the fixed ends, pairing any overhanging elements with the provided variable types.
+    /// Use raw endpoints: a symbolic pack cannot be prenormalized as a homogeneous `object` segment.
+    fn check_tuple_boundaries(
+        &self,
+        db: &'db dyn Db,
+        source: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
+        target: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
+        source_variable: Type<'db>,
+        target_variable: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source
+            .iter_prefix_elements()
+            .zip_longest(target.iter_prefix_elements())
+            .chain(
+                source
+                    .iter_suffix_elements()
+                    .rev()
+                    .zip_longest(target.iter_suffix_elements().rev()),
+            )
+            .when_all(db, self.constraints, |pair| {
+                let (source, target) = match pair {
+                    EitherOrBoth::Both(source, target) => (source, target),
+                    EitherOrBoth::Left(source) => (source, target_variable),
+                    EitherOrBoth::Right(target) => (source_variable, target),
+                };
+                self.check_type_pair(db, source, target)
+            })
     }
 }
 
@@ -805,6 +881,22 @@ impl<'db> VariableSegment<'db> {
             Self::Homogeneous(element) => Some(element),
             Self::TypeVarTuple(_) => None,
         }
+    }
+
+    /// Return the homogeneous element type if this segment has gradual arity, including aliases.
+    fn gradual_element_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let Self::Homogeneous(element) = self else {
+            return None;
+        };
+        // A static constructor or an alias cycle rules out gradual arity, even if it contains Any.
+        (!any_over_type_expanding_aliases(db, env, element, |ty| {
+            !matches!(ty, Type::TypeAlias(_) | Type::Dynamic(_))
+        }))
+        .then_some(element)
     }
 
     pub(crate) const fn typevartuple(self) -> Option<BoundTypeVarInstance<'db>> {
