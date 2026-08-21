@@ -744,15 +744,15 @@ reveal_type(type(Direct))  # revealed: <class 'Meta'>
 
 ## Protocol metaclass fallback in a custom typeshed
 
-The same fallback applies to a configured typeshed, including one stored inside the project. These
-minimal standard-library stubs provide the types needed to check that distinction.
+The same fallback applies to a configured typeshed. These minimal standard-library stubs provide the
+types used below.
 
 ```toml
 [environment]
-typeshed = "/src/custom-typeshed"
+typeshed = "/typeshed"
 ```
 
-`/src/custom-typeshed/stdlib/builtins.pyi`:
+`/typeshed/stdlib/builtins.pyi`:
 
 ```pyi
 class object: ...
@@ -760,13 +760,13 @@ class type: ...
 class tuple: ...
 ```
 
-`/src/custom-typeshed/stdlib/abc.pyi`:
+`/typeshed/stdlib/abc.pyi`:
 
 ```pyi
 class ABCMeta(type): ...
 ```
 
-`/src/custom-typeshed/stdlib/typing.pyi`:
+`/typeshed/stdlib/typing.pyi`:
 
 ```pyi
 from abc import ABCMeta
@@ -780,7 +780,7 @@ class _ProtocolMeta(ABCMeta): ...
 def reveal_type(obj, /): ...
 ```
 
-`/src/custom-typeshed/stdlib/interface.pyi`:
+`/typeshed/stdlib/interface.pyi`:
 
 ```pyi
 from typing import Protocol

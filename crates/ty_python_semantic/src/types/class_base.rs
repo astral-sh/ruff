@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use ruff_db::files::FilePath;
+use ty_module_resolver::{SearchPath, file_to_module};
 
 use crate::ProgramEnvironment;
 use crate::types::class::{ClassMetaclass, CodeGeneratorKind};
@@ -377,20 +377,11 @@ impl<'db> ClassBase<'db> {
         let metaclass = match self {
             Self::Class(class) => return class.inferred_metaclass(db),
             Self::Protocol => {
-                let file = subclass.file(db);
-                // Use the file's location rather than its resolved module: a custom typeshed
-                // directory can also be inside a first-party search path.
-                let is_typeshed_stub = file.is_stub(db)
-                    && match file.path(db) {
-                        FilePath::Vendored(path) => path.strip_prefix("stdlib").is_ok(),
-                        FilePath::System(path) => subclass
-                            .program_file(db)
-                            .program(db)
-                            .custom_stdlib_search_path(db)
-                            .is_some_and(|stdlib| path.starts_with(stdlib)),
-                        FilePath::SystemVirtual(_) => false,
-                    };
-                if is_typeshed_stub {
+                if subclass.file(db).is_stub(db)
+                    && file_to_module(db, subclass.program_file(db).resolver_file(db))
+                        .and_then(|module| module.search_path(db))
+                        .is_some_and(SearchPath::is_standard_library)
+                {
                     return ClassMetaclass::ProtocolFallback;
                 }
                 KnownClass::ProtocolMeta.to_class_literal(db, env)
