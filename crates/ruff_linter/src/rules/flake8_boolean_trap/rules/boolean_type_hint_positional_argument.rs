@@ -1,12 +1,15 @@
+use bitflags::bitflags;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, Parameters};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_parser::typing::ParsedAnnotation;
+use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union_and_optional};
 use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_boolean_type_hint_pos_arg_literal_enabled;
 use crate::rules::flake8_boolean_trap::helpers::{
     add_liskov_substitution_principle_help, is_allowed_func_def,
 };
@@ -92,11 +95,17 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// round_number(1.5, up=False)
 /// ```
 ///
+/// ## Preview
+/// When [preview] is enabled, this rule also flags `typing.Literal` annotations that
+/// include both `True` and `False` as variants - e.g. `Literal[True, False]`.
+/// A `Literal` containing only `True` or only `False` is not flagged.
+///
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanTypeHintPositionalArgument;
@@ -128,7 +137,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
-        if !match_annotation_to_complex_bool(annotation, checker.semantic()) {
+        if !match_annotation_to_complex_bool(annotation, checker) {
             continue;
         }
 
@@ -146,11 +155,6 @@ pub(crate) fn boolean_type_hint_positional_argument(
             return;
         }
 
-        // If `bool` isn't actually a reference to the `bool` built-in, return.
-        if !checker.semantic().has_builtin_binding("bool") {
-            return;
-        }
-
         let mut diagnostic =
             checker.report_diagnostic(BooleanTypeHintPositionalArgument, parameter.identifier());
 
@@ -158,50 +162,109 @@ pub(crate) fn boolean_type_hint_positional_argument(
     }
 }
 
+bitflags! {
+    struct SeenBoolLiterals: u8 {
+        const TRUE = 1 << 0;
+        const FALSE = 1 << 1;
+    }
+}
+
+impl SeenBoolLiterals {
+    fn from_value(value: bool) -> Self {
+        if value { Self::TRUE } else { Self::FALSE }
+    }
+}
+
 /// Returns `true` if the annotation is a boolean type hint (e.g., `bool`), or a type hint that
 /// includes boolean as a variant (e.g., `bool | int`).
-fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel) -> bool {
+///
+/// In preview, `bool` may also be composed from `Literal` members containing `True`/`False`,
+/// E.g. `Literal[True] | Literal[False]`, `Literal[True, False]`.
+fn match_annotation_to_complex_bool<'a, 'b>(annotation: &'b Expr, checker: &Checker<'a>) -> bool
+where
+    'a: 'b,
+{
+    let semantic = checker.semantic();
+
+    let mut seen = SeenBoolLiterals::empty();
+
+    if match_simple_bool(annotation, checker, &mut seen) {
+        return true;
+    }
+
+    // Resolve a top-level quoted (forward-reference) union, e.g. `x: "bool | str"`,
+    // since `traverse_union` doesn't resolve it by itself.
+    let Some(annotation) = resolve_possibly_quoted_annotation(annotation, checker) else {
+        return false;
+    };
+
+    let mut matched = false;
+    // Ex) `typing.Union[bool, int]` or `Literal[True] | Literal[False] | int`
+    traverse_union_and_optional(
+        &mut |inner_expr, _parent| {
+            matched = matched || match_simple_bool(inner_expr, checker, &mut seen);
+        },
+        semantic,
+        annotation,
+    );
+    matched
+}
+
+fn match_simple_bool<'a, 'b>(
+    annotation: &'b Expr,
+    checker: &Checker<'a>,
+    seen: &mut SeenBoolLiterals,
+) -> bool
+where
+    'a: 'b,
+{
+    // Resolve quoted (forward-reference) annotations, e.g. `"Literal[True, False]"`, before
+    // matching. Returns early if the string fails to parse.
+    let Some(annotation) = resolve_possibly_quoted_annotation(annotation, checker) else {
+        return false;
+    };
+
+    let semantic = checker.semantic();
+    let settings = checker.settings();
     match annotation {
         // Ex) `bool`
-        Expr::Name(name) => &name.id == "bool",
-        // Ex) `"bool"`
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
-        // Ex) `bool | int`
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: ast::Operator::BitOr,
-            right,
-            ..
-        }) => {
-            match_annotation_to_complex_bool(left, semantic)
-                || match_annotation_to_complex_bool(right, semantic)
-        }
-        // Ex) `typing.Union[bool, int]`
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            // If the typing modules were never imported, we'll never match below.
-            if !semantic.seen_typing() {
-                return false;
-            }
-
-            let qualified_name = semantic.resolve_qualified_name(value);
-            if qualified_name.as_ref().is_some_and(|qualified_name| {
-                semantic.match_typing_qualified_name(qualified_name, "Union")
-            }) {
-                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                    elts.iter()
-                        .any(|elt| match_annotation_to_complex_bool(elt, semantic))
-                } else {
-                    // Union with a single type is an invalid type annotation
-                    false
-                }
-            } else if qualified_name.as_ref().is_some_and(|qualified_name| {
-                semantic.match_typing_qualified_name(qualified_name, "Optional")
-            }) {
-                match_annotation_to_complex_bool(slice, semantic)
-            } else {
-                false
-            }
+        Expr::Name(name) => &name.id == "bool" && semantic.has_builtin_binding("bool"),
+        // Ex) `typing.Literal[True, False]`
+        Expr::Subscript(ast::ExprSubscript { value, .. })
+            if is_boolean_type_hint_pos_arg_literal_enabled(settings)
+                && semantic.match_typing_expr(value, "Literal") =>
+        {
+            // Mark seen literals until we've confirmed the full bool (`True` and `False`).
+            traverse_literal(
+                &mut |elt, _parent| {
+                    if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = elt {
+                        *seen |= SeenBoolLiterals::from_value(*value);
+                    }
+                },
+                semantic,
+                annotation,
+            );
+            seen.is_all()
         }
         _ => false,
     }
+}
+
+/// Resolves `annotation` if it's a quoted string, e.g. `"Literal[True, False]"`.
+/// Returns the (possibly unchanged) annotation, or `None` if string failed to be parsed
+/// as a type expression.
+fn resolve_possibly_quoted_annotation<'a, 'b>(
+    annotation: &'b Expr,
+    checker: &Checker<'a>,
+) -> Option<&'b Expr>
+where
+    'a: 'b,
+{
+    let Expr::StringLiteral(string_expr) = annotation else {
+        return Some(annotation);
+    };
+    checker
+        .parse_type_annotation(string_expr)
+        .ok()
+        .map(ParsedAnnotation::expression)
 }
