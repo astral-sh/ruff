@@ -2041,7 +2041,11 @@ impl<'db> ClassType<'db> {
                                 env,
                                 &[slice_bound, slice_bound, slice_bound],
                             ),
-                            Type::homogeneous_tuple(db, env, all_elements_unioned),
+                            if tuple.len().into_fixed_length() == Some(0) {
+                                Type::empty_tuple(db, env)
+                            } else {
+                                Type::homogeneous_tuple(db, env, all_elements_unioned)
+                            },
                         ));
 
                         let getitem_signature =

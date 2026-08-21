@@ -425,10 +425,20 @@ c = (1, 2, 3)
 
 reveal_type(a is (1, 2))  # revealed: bool
 reveal_type(a is not (1, 2))  # revealed: bool
+```
 
-reveal_type(a is b)  # revealed: Literal[False]
-reveal_type(a is not b)  # revealed: Literal[True]
+Tuple types with incompatible element types can have a non-bottom static intersection even when no
+runtime value inhabits it. Identity comparisons currently use this conservative static relation.
 
+```py
+# TODO: A runtime-disjointness check should reveal Literal[False] and Literal[True], respectively.
+reveal_type(a is b)  # revealed: bool
+reveal_type(a is not b)  # revealed: bool
+```
+
+Tuples with incompatible lengths cannot be the same object.
+
+```py
 reveal_type(a is c)  # revealed: Literal[False]
 reveal_type(a is not c)  # revealed: Literal[True]
 ```

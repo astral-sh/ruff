@@ -3185,16 +3185,31 @@ impl<'db> Bindings<'db> {
                                 // iterable (it could be a Liskov-uncompliant subtype of the `Iterable` class that sets
                                 // `__iter__ = None`, for example). That would be badly written Python code, but we still
                                 // need to be able to handle it without crashing.
-                                let return_type = if let Type::Union(union) = argument {
-                                    union.map(db, env, |element| {
-                                        Type::tuple(TupleType::new(
+                                let tuple_from_iterable = |iterable: &Type<'db>| {
+                                    let spec = iterable.iterate(db, env);
+                                    if let TupleSpec::Variable(tuple) = spec.as_ref()
+                                        && matches!(
+                                            tuple.variable(),
+                                            VariableSegment::Homogeneous(Type::Never)
+                                        )
+                                    {
+                                        // A runtime tuple construction cannot consume any elements
+                                        // from a `Never` segment. Keep this result precise without
+                                        // erasing the segment from the iterable's static type.
+                                        return Type::heterogeneous_tuple(
                                             db,
                                             env,
-                                            &element.iterate(db, env),
-                                        ))
-                                    })
+                                            tuple
+                                                .iter_prefix_elements()
+                                                .chain(tuple.iter_suffix_elements()),
+                                        );
+                                    }
+                                    Type::tuple(TupleType::new(db, env, &spec))
+                                };
+                                let return_type = if let Type::Union(union) = argument {
+                                    union.map(db, env, tuple_from_iterable)
                                 } else {
-                                    Type::tuple(TupleType::new(db, env, &argument.iterate(db, env)))
+                                    tuple_from_iterable(argument)
                                 };
                                 overload.set_return_type(return_type);
                             }

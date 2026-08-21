@@ -10,8 +10,10 @@
 //!
 //! The description of which elements can appear in a `tuple` is called a [`TupleSpec`]. Other
 //! things besides `tuple` instances can be described by a tuple spec — for instance, the targets
-//! of an unpacking assignment. A `tuple` specialization can include `Never` as a fixed-length
-//! element because a user-defined tuple subclass can inhabit that type.
+//! of an unpacking assignment. `Never` elements remain part of a tuple's static shape. A required
+//! `Never` element makes the tuple runtime-uninhabited, but does not turn it into the universal
+//! bottom type. A variable-length `Never` segment also retains its possible static lengths, so
+//! `tuple[Never]` remains a subtype of `tuple[Never, ...]`.
 
 use crate::{Program, ProgramEnvironment};
 use std::cmp::Ordering;
@@ -174,19 +176,6 @@ impl<'db> TupleType<'db> {
         env: &ProgramEnvironment<'db>,
         spec: &TupleSpec<'db>,
     ) -> Self {
-        // If the variable-length portion is Never, it can only be instantiated with zero elements.
-        // That means this isn't a variable-length tuple after all!
-        if let TupleSpec::Variable(tuple) = spec
-            && matches!(tuple.variable(), VariableSegment::Homogeneous(Type::Never))
-        {
-            let tuple = TupleSpec::Fixed(FixedLengthTuple::from_elements(
-                tuple
-                    .iter_prefix_elements()
-                    .chain(tuple.iter_suffix_elements()),
-            ));
-            return TupleType::new_internal(db, env.program(db), tuple);
-        }
-
         TupleType::new_internal(db, env.program(db), spec)
     }
 
@@ -241,10 +230,7 @@ impl<'db> TupleType<'db> {
         env: &ProgramEnvironment<'db>,
         element: Type<'db>,
     ) -> Self {
-        match element {
-            Type::Never => TupleType::empty(db, env),
-            _ => TupleType::new_internal(db, env.program(db), TupleSpec::homogeneous(element)),
-        }
+        TupleType::new_internal(db, env.program(db), TupleSpec::homogeneous(element))
     }
 
     /// Packs a `TypeVarTuple` into the tuple value used for generic specialization relations.
@@ -603,6 +589,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
+                // TODO: Also align required elements across the variable-length part, as in
+                // `tuple[int, *tuple[Never, ...]] <: tuple[*tuple[object, ...], int]`.
                 let mut result = self.always();
                 let pairwise = source
                     .prenormalized_prefix_elements(db, env, source_prenormalize_variable)
@@ -696,7 +684,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
     pub(super) fn check_tuple_spec_pair(
         &self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         left: &TupleSpec<'db>,
         right: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -710,46 +698,13 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             return self.always();
         }
 
-        // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
-        let any_disjoint = |a: &[Type<'db>], b: &[Type<'db>], rev: bool| {
-            if rev {
-                std::iter::zip(a.iter().rev(), b.iter().rev()).when_any(
-                    db,
-                    self.constraints,
-                    |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
-                )
-            } else {
-                std::iter::zip(a, b).when_any(db, self.constraints, |(&left_elem, &right_elem)| {
-                    self.check_type_pair(db, left_elem, right_elem)
-                })
-            }
-        };
-
-        match (left, right) {
-            (Tuple::Fixed(left), Tuple::Fixed(right)) => {
-                any_disjoint(left.all_elements(), right.all_elements(), false)
-            }
-
-            // Note that we don't compare the variable-length portions; two pure homogeneous tuples
-            // `tuple[A, ...]` and `tuple[B, ...]` can never be disjoint even if A and B are
-            // disjoint, because `tuple[()]` would be assignable to both.
-            (Tuple::Variable(left), Tuple::Variable(right)) => {
-                any_disjoint(left.prefix_elements(), right.prefix_elements(), false).or(
-                    db,
-                    self.constraints,
-                    || any_disjoint(left.suffix_elements(), right.suffix_elements(), true),
-                )
-            }
-
-            (Tuple::Fixed(fixed), Tuple::Variable(variable))
-            | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                any_disjoint(fixed.all_elements(), variable.prefix_elements(), false).or(
-                    db,
-                    self.constraints,
-                    || any_disjoint(fixed.all_elements(), variable.suffix_elements(), true),
-                )
-            }
-        }
+        // Tuple elements are covariant, so `tuple[Never]` is a common subtype of `tuple[int]` and
+        // `tuple[str]`. We preserve `tuple[Never]` as a non-bottom static type to retain its tuple
+        // shape, even though it has no runtime inhabitants. Therefore, incompatible element types
+        // do not make tuple specializations with compatible lengths statically disjoint.
+        // TODO: Use a separate runtime-disjointness check for identity comparisons and reachability
+        // after narrowing, without changing this static relation or intersection simplification.
+        self.never()
     }
 }
 

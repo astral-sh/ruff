@@ -839,16 +839,18 @@ from typing_extensions import Any, Never, Sequence
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to
 
-# The bottom materialization of `tuple[Any]` is `tuple[Never]`. Both
-# `tuple[int]` and `tuple[()]` are disjoint from `tuple[Never]`, so they are
-# assignable to `~tuple[Any]`.
-static_assert(is_assignable_to(tuple[int], ~tuple[Any]))
+# The bottom materialization of `tuple[Any]` is `tuple[Never]`. Because
+# `tuple[Never]` is a non-bottom static subtype of `tuple[int]`, `tuple[int]`
+# is not assignable to `~tuple[Any]` under the current disjointness-based rule.
+# `tuple[()]` remains disjoint because it has an incompatible length.
+static_assert(not is_assignable_to(tuple[int], ~tuple[Any]))
 static_assert(is_assignable_to(tuple[()], ~tuple[Any]))
 
-# But the bottom materialization of `tuple[Any, ...]` is `tuple[Never, ...]`,
-# which simplifies to `tuple[()]`, so `tuple[int]` is still assignable to
-# `~tuple[Any, ...]`, but `tuple[()]` is not
-static_assert(is_assignable_to(tuple[int], ~tuple[Any, ...]))
+# Currently, the bottom materialization of `tuple[Any, ...]` is
+# `tuple[Never, ...]`. It retains every possible static tuple length, so
+# neither `tuple[int]` nor `tuple[()]` is disjoint from it.
+# TODO: Account for gradual tuple length when computing this lower bound.
+static_assert(not is_assignable_to(tuple[int], ~tuple[Any, ...]))
 static_assert(not is_assignable_to(tuple[()], ~tuple[Any, ...]))
 
 # Similarly, the bottom materialization of `Sequence[Any]` is `Sequence[Never]`,
@@ -859,17 +861,15 @@ static_assert(not is_assignable_to(tuple[()], ~tuple[Any, ...]))
 # `tuple[()]` is a subtype of both `Sequence[Never]` and `tuple[int, ...]`, so
 # `tuple[int, ...]` and `Sequence[Never]` cannot be considered disjoint.
 #
-# Other `list` and `tuple` specializations *are* assignable to `~Sequence[Any]`,
-# however, since there are many fully static materializations of `Sequence[Any]`
-# that would be disjoint from a given `list` or `tuple` specialization.
+# `tuple[int]` also overlaps `Sequence[Never]` because `tuple[Never]` is a
+# common subtype. Practical assignability may eventually permit additional
+# assignments to negated types whose static intersection is runtime-uninhabited.
 static_assert(not is_assignable_to(tuple[()], ~Sequence[Any]))
 static_assert(not is_assignable_to(list[Never], ~Sequence[Any]))
 static_assert(not is_assignable_to(tuple[int, ...], ~Sequence[Any]))
+static_assert(not is_assignable_to(tuple[int], ~Sequence[Any]))
 
-# TODO: should pass (`tuple[int]` should be considered disjoint from `Sequence[Never]`)
-static_assert(is_assignable_to(tuple[int], ~Sequence[Any]))  # error: [static-assert-error]
-
-# TODO: should pass (`list[int]` should be considered disjoint from `Sequence[Never]`)
+# TODO: Revisit practical assignability here without requiring static disjointness.
 static_assert(is_assignable_to(list[int], ~Sequence[Any]))  # error: [static-assert-error]
 
 # If the left-hand side is also not fully static,
@@ -879,21 +879,22 @@ static_assert(is_assignable_to(list[int], ~Sequence[Any]))  # error: [static-ass
 
 # `tuple[Any, ...]` cannot be assignable to `~tuple[Any, ...]`,
 # because the bottom materialization of `tuple[Any, ...]` is
-# `tuple[()]`, and `tuple[()]` is not disjoint from itself
+# `tuple[Never, ...]`, which is not disjoint from itself.
 static_assert(not is_assignable_to(tuple[Any, ...], ~tuple[Any, ...]))
 
-# but `tuple[Any]` is assignable to `~tuple[Any]`,
-# as the bottom materialization of `tuple[Any]` is `Never`,
-# and `Never` *is* disjoint from itself
-static_assert(is_assignable_to(tuple[Any], ~tuple[Any]))
+# `tuple[Any]` also cannot be assigned to `~tuple[Any]`: its bottom
+# materialization is `tuple[Never]`, which is not disjoint from itself.
+static_assert(not is_assignable_to(tuple[Any], ~tuple[Any]))
 
-# The same principle applies for non-fully-static `list` specializations.
-# TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
+# The same question arises for non-fully-static `list` specializations.
+# TODO: Revisit practical assignability while preserving the non-bottom static
+# type `Bottom[list[Any]]`.
 static_assert(is_assignable_to(list[Any], ~list[Any]))  # error: [static-assert-error]
 
-# `Bottom[list[Any]]` is `Never`, which is disjoint from `Bottom[Sequence[Any]]`
-# (which is `Sequence[Never]`).
-# TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
+# `Bottom[list[Any]]` and `Bottom[Sequence[Any]]` (which is `Sequence[Never]`)
+# have no common runtime inhabitant, but that does not make their static
+# intersection `Never`.
+# TODO: Revisit this together with practical assignability to negated types.
 static_assert(is_assignable_to(list[Any], ~Sequence[Any]))  # error: [static-assert-error]
 ```
 

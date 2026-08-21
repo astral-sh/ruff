@@ -2,9 +2,9 @@
 
 ## Tuples as product types
 
-Tuples can be used to construct product types. Inhabitants of the type `tuple[P, Q]` are ordered
-pairs `(p, q)` where `p` is an inhabitant of `P` and `q` is an inhabitant of `Q`, analogous to the
-Cartesian product of sets.
+Tuples can be used to construct product types. Runtime inhabitants of the type `tuple[P, Q]` are
+ordered pairs `(p, q)` where `p` is an inhabitant of `P` and `q` is an inhabitant of `Q`, analogous
+to the Cartesian product of sets.
 
 ```py
 from typing_extensions import assert_type
@@ -75,6 +75,23 @@ reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
 def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes, bool, bytes]):
     reveal_type(tuple(x))  # revealed: tuple[int, str] | tuple[bytes, bool]
     reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
+```
+
+Calling `tuple` constructs a runtime value, so a homogeneous `Never` segment contributes no elements
+to the result. The argument's static type still retains that segment, and any required prefix or
+suffix remains present in the constructed tuple.
+
+```py
+def construct_from_never_segment(
+    homogeneous: tuple[Never, ...],
+    mixed: tuple[int, *tuple[Never, ...], str],
+    alternatives: list[Never] | tuple[int],
+) -> None:
+    reveal_type(homogeneous)  # revealed: tuple[Never, ...]
+    reveal_type(tuple(homogeneous))  # revealed: tuple[()]
+    reveal_type(mixed)  # revealed: tuple[int, *tuple[Never, ...], str]
+    reveal_type(tuple(mixed))  # revealed: tuple[int, str]
+    reveal_type(tuple(alternatives))  # revealed: tuple[()] | tuple[int]
 ```
 
 ## Instantiating tuple subclasses
@@ -227,18 +244,19 @@ static_assert(not is_singleton(tuple[None]))
 python-version = "3.11"
 ```
 
-The `Never` type contains no inhabitants, but a tuple annotation can also describe user-defined
-subclasses. A tuple type containing `Never` as a mandatory element therefore retains its shape
-instead of simplifying to `Never`.
+The `Never` type contains no inhabitants, so a tuple with a mandatory `Never` element is also
+runtime-uninhabited. We nevertheless retain its length and element types instead of simplifying it
+to `Never`. This preserves its tuple shape and prevents assignment to unrelated types.
 
 ```py
 from typing import Never
 from ty_extensions import static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
 
 static_assert(not is_equivalent_to(tuple[Never], Never))
 static_assert(not is_equivalent_to(tuple[int, Never], Never))
 static_assert(not is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
+static_assert(not is_assignable_to(tuple[Never], str))
 ```
 
 Tuple expressions also preserve their element types when an element has type `Never`.
@@ -249,18 +267,35 @@ def tuple_from_never(value: Never) -> None:
     reveal_type((1, value))  # revealed: tuple[Literal[1], Never]
 ```
 
-If the variable-length portion of a tuple is `Never`, then that portion of the tuple must always be
-empty. This means that the tuple is not actually variable-length!
+A homogeneous `Never` tuple can only be empty at runtime, but its static type retains every possible
+tuple length. Fixed-length tuples containing `Never` remain subtypes, and the empty tuple remains a
+proper subtype rather than becoming equivalent to the homogeneous tuple.
 
 ```py
-from typing import Never
-from ty_extensions import static_assert
-from ty_extensions._internal import is_equivalent_to
+static_assert(not is_equivalent_to(tuple[Never, ...], tuple[()]))
+static_assert(not is_equivalent_to(tuple[Never, ...], Never))
 
-static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
-static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...]], tuple[int]))
-static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...], int], tuple[int, int]))
-static_assert(is_equivalent_to(tuple[*tuple[Never, ...], int], tuple[int]))
+static_assert(is_subtype_of(tuple[()], tuple[Never, ...]))
+static_assert(is_subtype_of(tuple[Never], tuple[Never, ...]))
+static_assert(is_subtype_of(tuple[Never, Never], tuple[Never, ...]))
+static_assert(not is_subtype_of(tuple[Never, ...], tuple[()]))
+
+static_assert(not is_assignable_to(tuple[Never, ...], str))
+```
+
+A homogeneous `Never` segment in a mixed tuple also retains its variable-length shape. The required
+prefix and suffix remain present even though the segment can only be empty at runtime.
+
+```py
+static_assert(not is_equivalent_to(tuple[int, *tuple[Never, ...]], tuple[int]))
+static_assert(not is_equivalent_to(tuple[int, *tuple[Never, ...], str], tuple[int, str]))
+static_assert(not is_equivalent_to(tuple[*tuple[Never, ...], str], tuple[str]))
+
+static_assert(is_subtype_of(tuple[int], tuple[int, *tuple[Never, ...]]))
+static_assert(is_subtype_of(tuple[int, Never], tuple[int, *tuple[Never, ...]]))
+static_assert(is_subtype_of(tuple[int, str], tuple[int, *tuple[Never, ...], str]))
+static_assert(is_subtype_of(tuple[int, Never, str], tuple[int, *tuple[Never, ...], str]))
+static_assert(not is_subtype_of(tuple[int, *tuple[Never, ...]], tuple[int]))
 ```
 
 ## Homogeneous non-empty tuples
@@ -354,7 +389,7 @@ of the other.)
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions._internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
 
 static_assert(is_disjoint_from(tuple[()], tuple[int]))
 static_assert(not is_disjoint_from(tuple[()], tuple[int, ...]))
@@ -362,11 +397,12 @@ static_assert(not is_disjoint_from(tuple[int], tuple[int, ...]))
 static_assert(not is_disjoint_from(tuple[str, ...], tuple[int, ...]))
 ```
 
-A tuple that is required to contain elements `P1, P2` is disjoint from a tuple that is required to
-contain elements `Q1, Q2` if either `P1` is disjoint from `Q1` or if `P2` is disjoint from `Q2`.
+Tuple elements are covariant, and a tuple type containing `Never` retains its shape as a non-bottom
+static type. Consequently, even tuples with disjoint element types can have a common static subtype
+without sharing a runtime inhabitant.
 
 ```py
-from typing import final
+from typing import Never, final
 
 @final
 class F1: ...
@@ -380,14 +416,17 @@ class N2: ...
 static_assert(is_disjoint_from(F1, F2))
 static_assert(not is_disjoint_from(N1, N2))
 
-static_assert(is_disjoint_from(tuple[F1, F2], tuple[F2, F1]))
-static_assert(is_disjoint_from(tuple[F1, N1], tuple[F2, N2]))
-static_assert(is_disjoint_from(tuple[N1, F1], tuple[N2, F2]))
+static_assert(is_subtype_of(tuple[Never, Never], tuple[F1, F2]))
+static_assert(is_subtype_of(tuple[Never, Never], tuple[F2, F1]))
+
+static_assert(not is_disjoint_from(tuple[F1, F2], tuple[F2, F1]))
+static_assert(not is_disjoint_from(tuple[F1, N1], tuple[F2, N2]))
+static_assert(not is_disjoint_from(tuple[N1, F1], tuple[N2, F2]))
 static_assert(not is_disjoint_from(tuple[N1, N2], tuple[N2, N1]))
 
-static_assert(is_disjoint_from(tuple[F1, *tuple[int, ...], F2], tuple[F2, *tuple[int, ...], F1]))
-static_assert(is_disjoint_from(tuple[F1, *tuple[int, ...], N1], tuple[F2, *tuple[int, ...], N2]))
-static_assert(is_disjoint_from(tuple[N1, *tuple[int, ...], F1], tuple[N2, *tuple[int, ...], F2]))
+static_assert(not is_disjoint_from(tuple[F1, *tuple[int, ...], F2], tuple[F2, *tuple[int, ...], F1]))
+static_assert(not is_disjoint_from(tuple[F1, *tuple[int, ...], N1], tuple[F2, *tuple[int, ...], N2]))
+static_assert(not is_disjoint_from(tuple[N1, *tuple[int, ...], F1], tuple[N2, *tuple[int, ...], F2]))
 static_assert(not is_disjoint_from(tuple[N1, *tuple[int, ...], N2], tuple[N2, *tuple[int, ...], N1]))
 
 static_assert(not is_disjoint_from(tuple[F1, F2, *tuple[object, ...]], tuple[*tuple[object, ...], F2, F1]))
@@ -396,9 +435,8 @@ static_assert(not is_disjoint_from(tuple[N1, F1, *tuple[object, ...]], tuple[*tu
 static_assert(not is_disjoint_from(tuple[N1, N2, *tuple[object, ...]], tuple[*tuple[object, ...], N2, N1]))
 ```
 
-The variable-length portion of a tuple can never cause the tuples to be disjoint, since all
-variable-length tuple types contain the empty tuple. (Note that per above, the variable-length
-portion of a tuple cannot be `Never`; internally we simplify this to a fixed-length tuple.)
+Every homogeneous variable-length tuple admits the empty tuple, regardless of its element type.
+Thus, differing element types in the variable-length portion alone do not establish disjointness.
 
 ```py
 static_assert(not is_disjoint_from(tuple[F1, ...], tuple[F2, ...]))
@@ -416,9 +454,8 @@ static_assert(not is_disjoint_from(tuple[int, str], C))
 class CommonSubtype(tuple[int, str], C): ...
 ```
 
-However, we model heterogeneous tuples to be disjoint from other heterogeneous tuples. To reconcile
-these two things, we explicitly ban two differently specialized heterogeneous tuples from coexisting
-in the same MRO:
+Although differently specialized tuple types can overlap through a common subtype, a class cannot
+directly inherit two incompatible tuple specializations through its MRO:
 
 ```py
 class I1(tuple[F1, F2]): ...

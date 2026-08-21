@@ -372,6 +372,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
+            // Preserve known empty results without collapsing the static `tuple[Never, ...]`
+            // type. Restrict this to built-in tuple specializations so operands whose static types
+            // name a tuple subclass still use normal operator dispatch.
+            (Type::NominalInstance(left), Type::NominalInstance(right), ast::Operator::Add)
+                if left
+                    .own_tuple_spec(db)
+                    .is_some_and(|tuple| tuple.len().into_fixed_length() == Some(0))
+                    && right
+                        .own_tuple_spec(db)
+                        .is_some_and(|tuple| tuple.len().into_fixed_length() == Some(0)) =>
+            {
+                Some(Type::empty_tuple(db, env))
+            }
+
+            (Type::NominalInstance(tuple), Type::LiteralValue(multiplier), ast::Operator::Mult)
+            | (Type::LiteralValue(multiplier), Type::NominalInstance(tuple), ast::Operator::Mult)
+                if matches!(
+                    multiplier.kind(),
+                    LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_)
+                ) && tuple
+                    .own_tuple_spec(db)
+                    .is_some_and(|tuple| tuple.len().into_fixed_length() == Some(0)) =>
+            {
+                Some(Type::empty_tuple(db, env))
+            }
+
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
                 if rhs.is_assignable_to(db, env, Type::TypedDict(left_typed_dict)) =>
             {

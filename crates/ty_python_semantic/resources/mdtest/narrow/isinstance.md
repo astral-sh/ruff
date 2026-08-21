@@ -851,6 +851,23 @@ def narrow_tuple_subclass(value: object) -> None:
         reveal_type(value[1])  # revealed: str
 ```
 
+A tuple subclass with a required `Never` element retains its nominal type even though no runtime
+value can satisfy that element type. Narrowing currently preserves the static intersection and
+continues checking the branch.
+
+```py
+from typing import Never
+
+class BottomTuple(tuple[Never]): ...
+
+def narrow_bottom_tuple(value: tuple[int]) -> None:
+    # TODO: Runtime inhabitability analysis should mark this branch unreachable.
+    if isinstance(value, BottomTuple):
+        reveal_type(value)  # revealed: BottomTuple
+        # error: [invalid-assignment]
+        invalid: int = "not an int"
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py

@@ -1,8 +1,8 @@
 # Tuples containing `Never`
 
-A heterogeneous `tuple[…]` type that contains `Never` remains distinct from `Never`. Tuple types
-include user-defined subclasses, so their element types must not be discarded solely because an
-ordinary tuple with those elements cannot be constructed.
+A heterogeneous `tuple[…]` type that contains `Never` remains distinct from `Never`. Although it has
+no runtime inhabitants, it retains its tuple length and element types. This prevents it from
+becoming assignable to unrelated types such as `str`.
 
 ```py
 from ty_extensions import static_assert
