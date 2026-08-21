@@ -685,6 +685,8 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
     use crate::ProgramEnvironment;
     use crate::db::tests::setup_db;
@@ -806,14 +808,14 @@ class RecursivePropertySetter[T](Protocol):
             global_instance_type(&db, &env, "GenericProperty").recursive_identity(&db),
             None
         );
-        assert!(matches!(
+        assert_matches!(
             global_instance_type(&db, &env, "RecursiveProperty").recursive_identity(&db),
             Some(TypeIdentity::RecursiveProtocol(_))
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             global_instance_type(&db, &env, "RecursivePropertySetter").recursive_identity(&db),
             Some(TypeIdentity::RecursiveProtocol(_))
-        ));
+        );
     }
 
     #[test]

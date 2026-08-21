@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::debug_assert_matches;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
@@ -204,11 +205,7 @@ fn all_submodule_names_for_package<'db>(
     }
 
     let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
-    debug_assert!(
-        matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
-        "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
-        path.file_name(),
-    );
+    debug_assert_matches!(path.file_name(), Some("__init__.py" | "__init__.pyi"));
 
     let resolver_environment = module.resolver_environment(db);
     Some(match path.parent()? {
