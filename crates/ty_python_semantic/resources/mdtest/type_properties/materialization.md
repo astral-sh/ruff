@@ -452,6 +452,21 @@ static_assert(not is_subtype_of(Box[tuple[bool, str]], Top[Box[tuple[int, *tuple
 static_assert(is_disjoint_from(Box[tuple[bool, str]], Top[Box[tuple[int, *tuple[Any, ...]]]]))
 ```
 
+A required suffix retains its invariant identity even when there is no required prefix. A `bool`
+cannot replace the required `int` suffix.
+
+```py
+static_assert(not is_subtype_of(Box[tuple[bool]], Top[Box[tuple[*tuple[Any, ...], int]]]))
+static_assert(is_disjoint_from(Box[tuple[bool]], Top[Box[tuple[*tuple[Any, ...], int]]]))
+```
+
+A tuple with a required suffix cannot materialize to an empty tuple.
+
+```py
+static_assert(not is_subtype_of(Box[tuple[()]], Top[Box[tuple[*tuple[Any, ...], int]]]))
+static_assert(is_disjoint_from(Box[tuple[()]], Top[Box[tuple[*tuple[Any, ...], int]]]))
+```
+
 TODO: Handle valid mixed gradual-length tuples without losing their required prefix and suffix
 elements. For example, `Box[tuple[int, str]]` should be a subtype of
 `Top[Box[tuple[int, *tuple[Any, ...]]]]`.
