@@ -12,7 +12,6 @@ use types::CompiledPerFileTargetVersionList;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
 
-use crate::codes::Category;
 use crate::line_width::LineLength;
 use crate::registry::Rule;
 use crate::rules::{
@@ -771,14 +770,6 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::SysVersionSlice1), // YTT303
 ];
 
-pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
-    RuleSelector::Category(Category::Correctness),
-    RuleSelector::Category(Category::Suspicious),
-    RuleSelector::Category(Category::Complexity),
-    RuleSelector::Category(Category::Performance),
-    RuleSelector::Category(Category::Style),
-];
-
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
 pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
@@ -951,11 +942,13 @@ impl Display for TargetVersion {
 
 #[cfg(test)]
 mod tests {
+    use crate::RuleSelector;
+    use crate::codes::Category;
     use crate::registry::RuleSet;
     use crate::rule_selector::PreviewOptions;
     use crate::settings::types::PreviewMode;
 
-    use super::{DEFAULT_SELECTORS, PREVIEW_DEFAULT_SELECTORS};
+    use super::DEFAULT_SELECTORS;
 
     #[test]
     fn preview_default_rules() {
@@ -968,7 +961,8 @@ mod tests {
             mode: PreviewMode::Enabled,
             require_explicit: false,
         };
-        let preview_defaults = PREVIEW_DEFAULT_SELECTORS
+        let preview_defaults = Category::default_categories()
+            .map(RuleSelector::Category)
             .iter()
             .flat_map(|selector| selector.rules(&preview_options))
             .collect::<RuleSet>();

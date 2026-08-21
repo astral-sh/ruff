@@ -13,6 +13,7 @@ use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
 use log::debug;
 use regex::Regex;
+use ruff_linter::codes::Category;
 use ruff_linter::preview::is_warn_on_unknown_selectors_enabled;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
@@ -34,8 +35,7 @@ use ruff_linter::settings::types::{
     RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
-    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, PREVIEW_DEFAULT_SELECTORS, TASK_TAGS,
-    TargetVersion,
+    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
 };
 use ruff_linter::{
     RuleSelector, UnresolvedRuleSelector, fs, warn_user_once, warn_user_once_by_id,
@@ -907,8 +907,10 @@ impl LintConfiguration {
             require_explicit: self.explicit_preview_rules.unwrap_or_default(),
         };
 
+        let preview_selectors;
         let selectors = if preview.mode.is_enabled() {
-            PREVIEW_DEFAULT_SELECTORS
+            preview_selectors = Category::default_categories().map(RuleSelector::Category);
+            &preview_selectors
         } else {
             DEFAULT_SELECTORS
         };

@@ -192,6 +192,17 @@ impl Category {
 
         &RULES_BY_CATEGORY[self as usize]
     }
+
+    /// Return the categories that should be enabled by default.
+    pub const fn default_categories() -> [Category; 5] {
+        [
+            Self::Correctness,
+            Self::Suspicious,
+            Self::Complexity,
+            Self::Performance,
+            Self::Style,
+        ]
+    }
 }
 
 #[derive(Debug, Copy, Clone, Serialize)]
