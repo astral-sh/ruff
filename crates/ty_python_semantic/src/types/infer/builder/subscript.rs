@@ -2379,6 +2379,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return TypeAndQualifiers::declared(Type::unknown());
         };
 
+        if self
+            .string_annotation
+            .is_some_and(|context| context.opaque_metadata)
+        {
+            // Metadata does not affect the annotated type. Without an index for the parsed
+            // annotation, interpreting assignments would lose their effects on later metadata
+            // (including metadata in sibling `Annotated` expressions). Keep the entire metadata
+            // opaque rather than report errors from an incomplete binding model.
+            return subscript_context.infer(self, first_argument);
+        }
+
         let previous_in_type_alias = self
             .context
             .inference_flags

@@ -1,5 +1,6 @@
 use ruff_db::parsed::parsed_string_annotation;
 use ruff_db::source::source_text;
+use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, ModExpression, StringFlags};
 use ruff_python_parser::{ParseError, ParseErrorType, Parsed};
 use ruff_text_size::Ranged;
@@ -9,6 +10,30 @@ use crate::lint::{Level, LintStatus};
 use crate::types::infer::InferenceFlags;
 
 use super::context::InferContext;
+
+/// Whether an expression needs assignment bindings to be interpreted faithfully.
+///
+/// This includes assignments in lambda defaults and nested scopes. String-annotation metadata
+/// containing these expressions is opaque until parsed annotations have a use-def model.
+pub(crate) fn contains_assignment_expression(expression: &ast::Expr) -> bool {
+    let mut visitor = AssignmentExpressionVisitor { found: false };
+    visitor.visit_expr(expression);
+    visitor.found
+}
+
+struct AssignmentExpressionVisitor {
+    found: bool,
+}
+
+impl<'ast> Visitor<'ast> for AssignmentExpressionVisitor {
+    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+        if expression.is_named_expr() {
+            self.found = true;
+        } else if !self.found {
+            walk_expr(self, expression);
+        }
+    }
+}
 
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/raw-string-type-annotation.md")]

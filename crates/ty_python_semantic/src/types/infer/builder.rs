@@ -357,6 +357,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
 
+    /// The outermost module-AST string whose parsed annotation we are visiting.
+    ///
+    /// AST provenance is independent of name-lookup deferredness: temporarily changing lookup
+    /// modes must never make a parsed annotation's nodes appear to belong to the semantic index.
+    string_annotation: Option<StringAnnotationContext>,
+
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
@@ -481,6 +487,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: vec![],
             called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
+            string_annotation: None,
             expressions: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
@@ -903,16 +910,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Are we currently in a context where name resolution should be deferred
     /// (`__future__.annotations`, stub file, or stringified annotation)?
     fn is_deferred(&self) -> bool {
-        self.deferred_state.is_deferred()
+        self.in_string_annotation() || self.deferred_state.is_deferred()
     }
 
     /// Return the node key of the given AST node, or the key of the outermost enclosing string
     /// literal, if the node originates from inside a stringified annotation.
     fn enclosing_node_key(&self, node: AnyNodeRef<'_>) -> NodeKey {
-        match self.deferred_state {
-            DeferredExpressionState::InStringAnnotation(enclosing_node_key) => enclosing_node_key,
-            _ => NodeKey::from_node(node),
-        }
+        self.string_annotation
+            .map_or_else(|| NodeKey::from_node(node), |context| context.anchor)
     }
 
     fn in_stub(&self) -> bool {
@@ -920,7 +925,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn in_string_annotation(&self) -> bool {
-        self.deferred_state.in_string_annotation()
+        self.string_annotation.is_some()
+    }
+
+    /// Infer a parsed string annotation while retaining its outermost module-AST anchor.
+    ///
+    /// Nested annotations share that anchor. Name lookup remains deferred even if a nested
+    /// expression temporarily changes `deferred_state`, as lambda defaults do.
+    fn with_string_annotation<T>(
+        &mut self,
+        string: &ast::ExprStringLiteral,
+        expression: &ast::Expr,
+        infer: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let anchor = self.enclosing_node_key(string.into());
+        let opaque_metadata = self
+            .string_annotation
+            .is_some_and(|context| context.opaque_metadata)
+            || crate::types::string_annotation::contains_assignment_expression(expression);
+        let previous = self.string_annotation.replace(StringAnnotationContext {
+            anchor,
+            opaque_metadata,
+        });
+        let result = infer(self);
+        self.string_annotation = previous;
+        result
     }
 
     /// Temporarily changes lookup behavior without discarding the current string annotation.
@@ -931,11 +960,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         state: DeferredExpressionState,
     ) -> DeferredExpressionState {
-        let previous = self.deferred_state;
-        if !previous.in_string_annotation() {
-            self.deferred_state = state;
-        }
-        previous
+        std::mem::replace(&mut self.deferred_state, state)
     }
 
     /// Returns `true` if `expr` is a call to a known diagnostic function
@@ -9941,7 +9966,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let env = self.program_environment();
-        let mode = if self.is_deferred() && self.in_string_annotation() {
+        let mode = if self.in_string_annotation() {
             PlaceLoadMode::StringAnnotation
         } else if self.is_deferred() {
             PlaceLoadMode::Deferred
@@ -11206,6 +11231,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
+            string_annotation: _,
             called_functions,
             index: _,
             region: _,
@@ -11268,6 +11294,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            string_annotation: _,
             index: _,
             region: _,
         } = self;
@@ -11374,6 +11401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
+            string_annotation: _,
             index: _,
             region: _,
             cycle_recovery: _,
@@ -11426,6 +11454,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            string_annotation: _,
             index: _,
             region: _,
             return_types_and_ranges: _,
@@ -11566,6 +11595,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            string_annotation: _,
             called_functions: _,
             index: _,
             region: _,
@@ -11617,6 +11647,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index,
             cycle_recovery,
             deferred_state,
+            string_annotation,
             typevar_binding_context,
             ref expression_cache,
             ref reachability_cache,
@@ -11657,6 +11688,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Ensure the speculative builder has the same inference context as the current one.
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
+        builder.string_annotation = string_annotation;
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
@@ -11707,6 +11739,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
+            string_annotation: _,
             called_functions,
             index: _,
             region: _,
@@ -12065,6 +12098,15 @@ impl<'a> Iterator for ArgumentsIter<'a> {
     }
 }
 
+/// Provenance and metadata policy for the parsed annotation currently being inferred.
+#[derive(Debug, Clone, Copy)]
+struct StringAnnotationContext {
+    /// The outermost string expression in the module AST.
+    anchor: NodeKey,
+    /// Assignment-bearing metadata needs a use-def model, not ordinary module inference.
+    opaque_metadata: bool,
+}
+
 /// The deferred state of a specific expression in an inference region.
 #[derive(Default, Debug, Clone, Copy)]
 enum DeferredExpressionState {
@@ -12074,47 +12116,15 @@ enum DeferredExpressionState {
 
     /// The expression is deferred.
     ///
-    /// In the following example,
-    /// ```py
-    /// from __future__ import annotation
-    ///
-    /// a: tuple[int, "ForwardRef"] = ...
-    /// ```
-    ///
-    /// The expression `tuple` and `int` are deferred but `ForwardRef` (after parsing) is both
-    /// deferred and in a string annotation context.
+    /// This controls lookup for module-AST expressions, for example in stub files or under
+    /// `from __future__ import annotations`. Parsed string annotations are always deferred,
+    /// independently of this state.
     Deferred,
-
-    /// The expression is in a string annotation context.
-    ///
-    /// This is required to differentiate between a deferred annotation and a string annotation.
-    /// The former can occur when there's a `from __future__ import annotations` statement or we're
-    /// in a stub file.
-    ///
-    /// In the following example,
-    /// ```py
-    /// a: "List[int]" = ...
-    /// b: tuple[int, "ForwardRef"] = ...
-    /// ```
-    ///
-    /// The annotation of `a` is completely inside a string while for `b`, it's only partially
-    /// stringified.
-    ///
-    /// This variant wraps a [`NodeKey`] that allows us to retrieve the original
-    /// [`ast::ExprStringLiteral`] node which created the string annotation.
-    InStringAnnotation(NodeKey),
 }
 
 impl DeferredExpressionState {
     const fn is_deferred(self) -> bool {
-        matches!(
-            self,
-            DeferredExpressionState::Deferred | DeferredExpressionState::InStringAnnotation(_)
-        )
-    }
-
-    const fn in_string_annotation(self) -> bool {
-        matches!(self, DeferredExpressionState::InStringAnnotation(_))
+        matches!(self, DeferredExpressionState::Deferred)
     }
 }
 

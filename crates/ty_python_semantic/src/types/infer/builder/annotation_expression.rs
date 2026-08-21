@@ -72,12 +72,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         deferred_state: DeferredExpressionState,
         pep_613_policy: PEP613Policy,
     ) -> TypeAndQualifiers<'db> {
-        // `DeferredExpressionState::InStringAnnotation` takes precedence over other deferred states.
-        // However, if it's not a stringified annotation, we must still ensure that annotation expressions
-        // are always deferred in stub files.
-        let state = if deferred_state.in_string_annotation() {
-            deferred_state
-        } else if self.in_stub() {
+        // Annotation expressions are always deferred in stub files.
+        let state = if self.in_stub() {
             DeferredExpressionState::Deferred
         } else {
             deferred_state
@@ -383,13 +379,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Some(parsed) => {
                 self.string_annotations
                     .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
-                // String annotations are always evaluated in the deferred context.
-                self.infer_annotation_expression(
-                    parsed.expr(),
-                    DeferredExpressionState::InStringAnnotation(
-                        self.enclosing_node_key(string.into()),
-                    ),
-                )
+                self.with_string_annotation(string, parsed.expr(), |builder| {
+                    builder.infer_annotation_expression(
+                        parsed.expr(),
+                        DeferredExpressionState::Deferred,
+                    )
+                })
             }
             None => TypeAndQualifiers::declared(Type::unknown()),
         }

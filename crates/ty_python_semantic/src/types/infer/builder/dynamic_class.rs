@@ -10,7 +10,7 @@ use crate::types::diagnostic::{
     report_inconsistent_generic_bases,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
-use crate::types::infer::builder::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::types::infer::builder::TypeInferenceBuilder;
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
 
@@ -56,9 +56,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 - anchor_u32
         };
 
-        if let DeferredExpressionState::InStringAnnotation(enclosing_node_key) = self.deferred_state
-        {
-            let enclosing_index = enclosing_node_key.index();
+        if let Some(context) = self.string_annotation {
+            let enclosing_index = context.anchor.index();
             let string: &ast::ExprStringLiteral = self
                 .module()
                 .get_by_index(enclosing_index)

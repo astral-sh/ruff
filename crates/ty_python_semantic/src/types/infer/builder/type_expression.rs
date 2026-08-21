@@ -131,7 +131,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
         let ignore_runtime_errors = |builder: &Self| {
-            builder.deferred_state.is_deferred()
+            builder.is_deferred()
                 || builder.in_stub()
                 || builder.is_in_type_checking_block(builder.scope(), expression)
                 || builder
@@ -1031,12 +1031,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .context
                     .inference_flags
                     .replace(InferenceFlags::IN_NESTED_TYPE_EXPRESSION, string_was_nested);
-                let ty = self.infer_type_expression_with_state(
-                    parsed_expr,
-                    DeferredExpressionState::InStringAnnotation(
-                        self.enclosing_node_key(string.into()),
-                    ),
-                );
+                let ty = self.with_string_annotation(string, parsed_expr, |builder| {
+                    builder.infer_type_expression(parsed_expr)
+                });
                 self.context.inference_flags.set(
                     InferenceFlags::IN_NESTED_TYPE_EXPRESSION,
                     previously_in_nested_type_expression,
@@ -2899,17 +2896,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     self.string_annotations
                         .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
-                    let node_key = self.enclosing_node_key(string.into());
-
-                    let previous_deferred_state = self.replace_deferred_state(
-                        DeferredExpressionState::InStringAnnotation(node_key),
-                    );
-                    let result = matches!(
-                        parsed.expr(),
-                        ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
-                    )
-                    .then(|| self.infer_callable_parameter_types(parsed.expr()));
-                    self.deferred_state = previous_deferred_state;
+                    let result = self.with_string_annotation(string, parsed.expr(), |builder| {
+                        matches!(
+                            parsed.expr(),
+                            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+                        )
+                        .then(|| builder.infer_callable_parameter_types(parsed.expr()))
+                    });
 
                     if let Some(result) = result {
                         return result;
@@ -3048,8 +3041,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 self.string_annotations
                     .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
-                let node_key = self.enclosing_node_key(string.into());
-
                 if !matches!(
                     parsed.expr(),
                     ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
@@ -3058,12 +3049,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return None;
                 }
 
-                let previous_deferred_state = self
-                    .replace_deferred_state(DeferredExpressionState::InStringAnnotation(node_key));
-                let result = self.infer_concatenate_tail(parsed.expr());
-                self.deferred_state = previous_deferred_state;
-
-                result
+                self.with_string_annotation(string, parsed.expr(), |builder| {
+                    builder.infer_concatenate_tail(parsed.expr())
+                })
             }
             _ => {
                 let ty = self.infer_type_expression(expr);

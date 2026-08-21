@@ -22,6 +22,60 @@ def _(x: Annotated[tuple[str, int], bytes]):
     reveal_type(x)  # revealed: tuple[str, int]
 ```
 
+## Assignment expressions in string annotations
+
+Metadata can contain assignment expressions, but parsed string annotations do not have a use-def
+model. If a string annotation contains an assignment expression, we treat its metadata as opaque and
+still check the annotated type. This avoids interpreting the assignment without its effects on later
+expressions. No binding is added to the surrounding Python scope.
+
+```py
+from typing_extensions import Annotated
+
+def f(value: "Annotated[int, (metadata := 0), metadata]"):
+    reveal_type(value)  # revealed: int
+
+metadata  # error: [unresolved-reference]
+```
+
+The policy applies to the whole parsed annotation, including conditional assignments, lambda
+defaults, and metadata in sibling `Annotated` expressions.
+
+```py
+flag = True
+
+def conditional(value: "Annotated[int, (metadata := 0) if flag else (metadata := 1), metadata]"):
+    reveal_type(value)  # revealed: int
+
+def nested(value: "Annotated[int, lambda default=(metadata := (other := 0)): None]"):
+    reveal_type(value)  # revealed: int
+
+def siblings(value: "Annotated[int, (metadata := 0)] | Annotated[str, metadata]"):
+    reveal_type(value)  # revealed: int | str
+```
+
+The type argument is still checked, and metadata without assignment expressions retains its usual
+diagnostics.
+
+```py
+# error: [unresolved-reference]
+def invalid_type(value: "Annotated[missing, (metadata := 0)]"): ...
+
+# error: [unresolved-reference]
+def invalid_metadata(value: "Annotated[int, missing]"): ...
+```
+
+## Assignment expressions in stub string annotations
+
+The same metadata is supported in stub files.
+
+```pyi
+from typing_extensions import Annotated
+
+value: "Annotated[int, (metadata := 0), metadata]"
+reveal_type(value)  # revealed: int
+```
+
 ## Inside `type[...]`
 
 `Annotated` can wrap a class or specialized generic class inside `type[...]` without changing the
