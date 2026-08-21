@@ -282,11 +282,11 @@ while func:  # error: [redundant-condition]
 
 ## Always truthy values appearing later in compound conditions
 
-A subexpression in a compound condition can be inferred as always truthy or always falsy even if
-the condition overall is inferred as having ambiguous truthiness. We still report these
-subexpressions:
+A subexpression in a compound condition can be inferred as always truthy or always falsy even if the
+condition overall is inferred as having ambiguous truthiness. We still report these subexpressions:
 
 ```py
+def func(): ...
 def compound_statement_conditions(flag: bool, other: bool):
     if flag and func:  # snapshot: redundant-condition
         pass
@@ -314,43 +314,42 @@ def compound_assertion_condition(flag: bool):
 
 ```snapshot
 warning[redundant-condition]: Function `func` is always truthy
-  --> src/mdtest_snippet.py:48:17
-   |
-48 |     if flag and func:  # snapshot: redundant-condition
-   |                 ^^^^ Did you mean to call this function?
-   |
-47 | def compound_statement_conditions(flag: bool, other: bool):
-   -     if flag and func:  # snapshot: redundant-condition
-48 +     if flag and func():  # snapshot: redundant-condition
-49 |         pass
-   |
+ --> src/mdtest_snippet.py:4:17
+  |
+4 |     if flag and func:  # snapshot: redundant-condition
+  |                 ^^^^ Did you mean to call this function?
+  |
+3 | def compound_statement_conditions(flag: bool, other: bool):
+  -     if flag and func:  # snapshot: redundant-condition
+4 +     if flag and func():  # snapshot: redundant-condition
+5 |         pass
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 
 warning[redundant-condition]: Function `func` is always truthy
-  --> src/mdtest_snippet.py:64:33
+  --> src/mdtest_snippet.py:20:33
    |
-64 |     selected = True if flag and func else False  # snapshot: redundant-condition
+20 |     selected = True if flag and func else False  # snapshot: redundant-condition
    |                                 ^^^^ Did you mean to call this function?
    |
-63 | def compound_expression_conditions(flag: bool):
+19 | def compound_expression_conditions(flag: bool):
    -     selected = True if flag and func else False  # snapshot: redundant-condition
-64 +     selected = True if flag and func() else False  # snapshot: redundant-condition
-65 |     filtered = [value for value in range(1) if flag and func]  # error: [redundant-condition]
+20 +     selected = True if flag and func() else False  # snapshot: redundant-condition
+21 |     filtered = [value for value in range(1) if flag and func]  # error: [redundant-condition]
    |
 note: This is an unsafe fix and may change runtime behavior
 
 
 warning[redundant-condition]: Function `func` is always truthy
-  --> src/mdtest_snippet.py:69:21
+  --> src/mdtest_snippet.py:25:21
    |
-69 |     assert flag and func  # snapshot: redundant-condition
+25 |     assert flag and func  # snapshot: redundant-condition
    |                     ^^^^ Did you mean to call this function?
    |
-68 | def compound_assertion_condition(flag: bool):
+24 | def compound_assertion_condition(flag: bool):
    -     assert flag and func  # snapshot: redundant-condition
-69 +     assert flag and func()  # snapshot: redundant-condition
-70 |
+25 +     assert flag and func()  # snapshot: redundant-condition
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -1158,7 +1157,10 @@ module namespace:
 ```py
 import os
 import sys
+from os import name as os_name
 from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING as TYPE_CHECKINGGGGG
+from sys import version_info as foo, platform as sys_platform
 
 PLATFORM = sys.platform
 
@@ -1199,6 +1201,28 @@ ORDINARY_CONSTANT = 1 == 1
 
 if ORDINARY_CONSTANT:  # error: [redundant-condition-strict]
     pass
+
+BAR = foo
+
+reveal_type(BAR >= (3, 14))  # revealed: Literal[True]
+
+if BAR >= (3, 14):  # no diagnostic
+    pass
+
+reveal_type(TYPE_CHECKINGGGGG)  # revealed: Literal[True]
+
+if TYPE_CHECKINGGGGG:
+    pass
+
+reveal_type(sys_platform)  # revealed: Literal["linux"]
+
+if sys_platform == "linux":  # no diagnostic
+    pass
+
+reveal_type(os_name)  # revealed: Literal["posix"]
+
+if os_name == "posix":  # no diagnostic
+    pass
 ```
 
 And even in other imported modules:
@@ -1207,7 +1231,7 @@ And even in other imported modules:
 
 ```py
 import b
-from b import IS_PY314, PLATFORM
+from b import IS_PY314, PLATFORM, BAR
 
 if PLATFORM == "linux":  # no diagnostic
     pass
@@ -1216,6 +1240,11 @@ if b.PLATFORM_ALIAS == "linux":  # no diagnostic
     pass
 
 if IS_PY314:  # no diagnostic
+    pass
+
+reveal_type(BAR >= (3, 14))  # revealed: Literal[True]
+
+if BAR >= (3, 14):  # no diagnostic
     pass
 ```
 

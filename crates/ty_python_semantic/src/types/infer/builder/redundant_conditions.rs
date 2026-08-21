@@ -5,8 +5,12 @@ use ruff_db::{parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ruff_text_size::Ranged;
-use ty_module_resolver::KnownModule;
-use ty_python_core::{Truthiness, definition::Definition, scope::NodeWithScopeKind};
+use ty_module_resolver::{KnownModule, file_to_module};
+use ty_python_core::{
+    Truthiness,
+    definition::{Definition, DefinitionKind},
+    scope::NodeWithScopeKind,
+};
 
 use crate::{
     Db, ImportAliasResolution, SemanticModel, definitions_for_expression,
@@ -550,11 +554,37 @@ fn definition_contains_special_cased_condition<'db>(
     definition: Definition<'db>,
 ) -> bool {
     let module = parsed_module(db, definition.python_file(db)).load(db);
-    let Some(value) = definition.kind(db).value(&module) else {
+    let definition_kind = definition.kind(db);
+    let file = definition.file(db);
+    let program_file = definition.program_file(db);
+
+    let in_known_module = |known| {
+        file_to_module(db, program_file.resolver_file(db))
+            .is_some_and(|module| module.is_known(db, known))
+    };
+
+    if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition_kind
+        && file.is_stub(db)
+        && let ast::Expr::Name(ast::ExprName { id, .. }) = annotated_assignment.target(&module)
+    {
+        match &**id {
+            "version_info" | "platform" if in_known_module(KnownModule::Sys) => {
+                return true;
+            }
+            "name" if in_known_module(KnownModule::Os) => {
+                return true;
+            }
+            "TYPE_CHECKING" if in_known_module(KnownModule::Typing) => {
+                return true;
+            }
+            _ => {}
+        }
+    }
+
+    let Some(value) = definition_kind.value(&module) else {
         return false;
     };
 
-    let program_file = definition.program_file(db);
     let model = SemanticModel::new(db, program_file);
     let inference = infer_definition_types(db, definition);
 
