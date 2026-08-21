@@ -2369,7 +2369,7 @@ A legacy type variable in the protocol's type arguments still makes the enclosin
 from typing import Any, Protocol, TypeVar
 from ty_extensions import Top
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class LegacyProtocol(Protocol[T]):
     value: Any

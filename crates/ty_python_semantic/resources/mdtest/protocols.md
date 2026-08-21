@@ -3925,8 +3925,8 @@ reveal_type(abs(5))  # revealed: int
 def f(x: Literal[5]) -> None:
     reveal_type(abs(x))  # revealed: int
 
-InT = TypeVar("InT")
-OutT = TypeVar("OutT")
+InT = TypeVar("InT", contravariant=True)
+OutT = TypeVar("OutT", covariant=True)
 
 class CanMul(Protocol[InT, OutT]):
     def __mul__(self, x: InT, /) -> OutT: ...
@@ -4174,7 +4174,7 @@ from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subty
 class NewStyleClassScoped[T](Protocol):
     def method(self, input: T) -> None: ...
 
-S = TypeVar("S")
+S = TypeVar("S", contravariant=True)
 
 class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
@@ -5885,7 +5885,7 @@ Other type variables in the same call are still inferred from their correspondin
 ```py
 from typing import Protocol, TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 U = TypeVar("U")
 
 class Box(Protocol[T]):
@@ -7502,8 +7502,8 @@ Protocols can have TypeVars with forward reference bounds that form cycles.
 ```py
 from typing import Any, Protocol, TypeVar
 
-T1 = TypeVar("T1", bound="A2[Any]")
-T2 = TypeVar("T2", bound="A1[Any]")
+T1 = TypeVar("T1", bound="A2[Any]", covariant=True)
+T2 = TypeVar("T2", bound="A1[Any]", covariant=True)
 T3 = TypeVar("T3", bound="B2[Any]")
 T4 = TypeVar("T4", bound="B1[Any]")
 
