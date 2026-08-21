@@ -654,6 +654,8 @@ pub enum ProjectMetadataError {
 mod tests {
     //! Integration tests for project discovery
 
+    use std::assert_matches;
+
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
     use ruff_db::system::{SystemPathBuf, TestSystem};
@@ -1135,18 +1137,18 @@ unclosed table, expected `]`
                 .map(RelativePathBuf::path),
             Some(environment.as_path())
         );
-        assert!(matches!(
+        assert_matches!(
             project_environment
                 .and_then(|environment| environment.python.as_ref())
                 .map(RelativePathBuf::source),
             Some(ValueSource::UvWorkspace)
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             project_environment
                 .and_then(|environment| environment.python_version.as_ref())
                 .map(ruff_ranged_value::RangedValue::source),
             Some(ValueSource::UvWorkspace)
-        ));
+        );
 
         let user_config_directory = root.join("config");
         system

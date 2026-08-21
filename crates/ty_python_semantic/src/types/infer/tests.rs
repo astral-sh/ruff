@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::fmt::Write;
 
 use super::builder::TypeInferenceBuilder;
@@ -302,14 +303,14 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 
     let owner_type = Type::unknown();
     let owner = DefinitionTypes::from_parts(first, vec![(first, owner_type)], vec![]);
-    assert!(matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type));
+    assert_matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type);
     assert_eq!(
         owner.bindings(first).collect::<Vec<_>>(),
         [(first, owner_type)]
     );
 
     let non_owner = DefinitionTypes::from_parts(first, vec![(second, owner_type)], vec![]);
-    assert!(matches!(non_owner, DefinitionTypes::Other(_)));
+    assert_matches!(non_owner, DefinitionTypes::Other(_));
     assert_eq!(
         non_owner.bindings(first).collect::<Vec<_>>(),
         [(second, owner_type)]

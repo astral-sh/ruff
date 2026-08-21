@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use std::borrow::Cow;
+use std::debug_assert_matches;
 
 use ruff_db::parsed::ParsedModuleRef;
 
@@ -70,8 +71,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         let db = self.db();
-        debug_assert!(
-            matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
+        debug_assert_matches!(
+            target,
+            ast::Expr::List(_) | ast::Expr::Tuple(_),
             "Unpacking target must be a list or tuple expression"
         );
 

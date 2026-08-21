@@ -1,3 +1,5 @@
+use std::debug_assert_matches;
+
 use crate::Db;
 use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
@@ -259,8 +261,10 @@ impl Ty {
                 let ty = known_module_symbol(db, env, KnownModule::Dataclasses, "MISSING")
                     .place
                     .expect_type();
-                debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db, env)))
+                debug_assert_matches!(
+                    ty,
+                    Type::NominalInstance(instance)
+                        if is_single_member_enum(db, instance.class_literal(db, env))
                 );
                 ty
             }

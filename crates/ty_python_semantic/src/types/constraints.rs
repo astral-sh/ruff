@@ -7084,6 +7084,8 @@ impl SatisfiedClauses {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
 
     use indoc::indoc;
@@ -7829,10 +7831,10 @@ class E: ...
         // Check satisfiability against each upper clause before punting on the union-bearing
         // merged upper bound. The old size heuristic returned `CannotSimplify` here before
         // discovering that `int` cannot satisfy the second upper clause.
-        assert!(matches!(
+        assert_matches!(
             left.intersect(db, &env, &mut storage, right),
             IntersectionResult::Disjoint
-        ));
+        );
     }
 
     #[test]

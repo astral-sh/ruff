@@ -16,6 +16,7 @@ use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::PythonVersion;
 use ruff_source_file::OneIndexed;
+use std::assert_matches;
 use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
@@ -169,11 +170,9 @@ fn run_test(
                 return None;
             }
 
-            assert!(
-                matches!(
-                    embedded.lang,
-                    "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth"
-                ),
+            assert_matches!(
+                embedded.lang,
+                "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth",
                 "Supported file types are: py (or python), pyi, ipynb, text, cfg and ignore"
             );
 

@@ -1,5 +1,6 @@
 //! Internal abstractions for differentiating between different kinds of search paths.
 
+use std::assert_matches;
 use std::fmt;
 use std::sync::Arc;
 
@@ -71,8 +72,9 @@ impl ModulePath {
                     "Extension must be `pyi`; got `{component_extension}`"
                 );
             } else {
-                assert!(
-                    matches!(component_extension, "pyi" | "py"),
+                assert_matches!(
+                    component_extension,
+                    "pyi" | "py",
                     "Extension must be `py` or `pyi`; got `{component_extension}`"
                 );
             }

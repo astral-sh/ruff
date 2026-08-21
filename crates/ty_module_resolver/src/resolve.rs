@@ -2036,6 +2036,8 @@ mod tests {
         clippy::disallowed_methods,
         reason = "These are tests, so it's fine to do I/O by-passing System."
     )]
+    use std::assert_matches;
+
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
@@ -2384,8 +2386,8 @@ mod tests {
             resolve_module(&db, ImportingFile::File(importing_file, py311), &namespace).unwrap();
         let py312_namespace =
             resolve_module(&db, ImportingFile::File(importing_file, py312), &namespace).unwrap();
-        assert!(matches!(py311_namespace, Module::Namespace(_)));
-        assert!(matches!(py312_namespace, Module::Namespace(_)));
+        assert_matches!(py311_namespace, Module::Namespace(_));
+        assert_matches!(py312_namespace, Module::Namespace(_));
         assert_eq!(py311_namespace.python_version(&db), PythonVersion::PY311);
         assert_eq!(py312_namespace.python_version(&db), PythonVersion::PY312);
         assert_ne!(py311_namespace, py312_namespace);
