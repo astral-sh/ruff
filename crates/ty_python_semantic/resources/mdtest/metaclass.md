@@ -866,18 +866,30 @@ reveal_type(type(Pinned))  # revealed: <class 'ABCMeta'>
 
 ## Typeshed protocol metaclass attributes in the class namespace
 
-A typeshed protocol fallback does not guarantee that the metaclass creates attributes in the class
-namespace, or impose a type on attributes defined there.
+The `ABCMeta` fallback inferred from typeshed bases does not guarantee that the runtime metaclass
+creates attributes in the class namespace. It therefore does not make attributes such as
+`__abstractmethods__` available on instances.
+
+For example, typeshed declares `weakref.WeakSet` as a `MutableSet` subclass, but at runtime it
+inherits directly from `object` and has metaclass `type`.
 
 ```py
-from collections.abc import Iterable
+from weakref import WeakSet
 
-class StubClass(Iterable[object]): ...
+class Child(WeakSet[object]): ...
 
-def f(stub: StubClass):
-    stub.__abstractmethods__  # error: [unresolved-attribute]
+reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
 
-class OwnAttribute(Iterable[object]):
+def f(child: Child):
+    child.__abstractmethods__  # error: [unresolved-attribute]
+```
+
+The fallback also does not constrain the types of attributes defined in the class namespace. For
+example, a `WeakSet` subclass can define its own `__abstractmethods__` without matching `ABCMeta`'s
+declaration.
+
+```py
+class OwnAttribute(WeakSet[object]):
     __abstractmethods__ = 1
 ```
 
