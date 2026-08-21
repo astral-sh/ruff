@@ -1,8 +1,9 @@
 use std::marker::PhantomData;
+use std::ops::ControlFlow;
 
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
-    PathAssignments, PathBounds,
+    PathAssignments, PathBounds, SolutionLimits,
 };
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -22,59 +23,49 @@ impl<'db> SolutionWalker<'db> {
         }
     }
 
-    pub(super) fn visit_node(
+    pub(super) fn visit_node<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         node: NodeId,
-    ) {
+        limits: &mut L,
+    ) -> ControlFlow<L::Break> {
+        limits.visit_node()?;
         if node == ALWAYS_FALSE {
-            return;
+            return ControlFlow::Continue(());
         }
 
         // If the current node is ALWAYS_TRUE, we can immediately report the current solution.
         if node == ALWAYS_TRUE {
+            limits.satisfied_path()?;
             self.found_satisfied_path(path);
-            return;
+            return ControlFlow::Continue(());
         }
 
         // At this point we actually have to walk the outgoing edges of this node.
         let interior = storage.interior_node_data(node);
-        path.walk_edge(
-            db,
-            env,
-            storage,
-            interior.constraint.when_true(),
-            |storage, path, _new_range, found_conflict| {
-                if !found_conflict {
-                    self.visit_node(db, env, storage, path, interior.if_true);
-                }
-            },
-        );
-        path.walk_edge(
-            db,
-            env,
-            storage,
-            interior.constraint.when_unconstrained(),
-            |storage, path, _new_range, found_conflict| {
-                if !found_conflict {
-                    self.visit_node(db, env, storage, path, interior.if_uncertain);
-                }
-            },
-        );
-        path.walk_edge(
-            db,
-            env,
-            storage,
-            interior.constraint.when_false(),
-            |storage, path, _new_range, found_conflict| {
-                if !found_conflict {
-                    self.visit_node(db, env, storage, path, interior.if_false);
-                }
-            },
-        );
+        let constraint = interior.constraint;
+        for (assignment, child) in [
+            (constraint.when_true(), interior.if_true),
+            (constraint.when_unconstrained(), interior.if_uncertain),
+            (constraint.when_false(), interior.if_false),
+        ] {
+            path.walk_edge(
+                db,
+                env,
+                storage,
+                assignment,
+                |storage, path, _new_range, found_conflict| {
+                    if !found_conflict {
+                        self.visit_node(db, env, storage, path, child, limits)?;
+                    }
+                    ControlFlow::Continue(())
+                },
+            )?;
+        }
+        ControlFlow::Continue(())
     }
 
     fn found_satisfied_path(&mut self, path: &PathAssignments) {
