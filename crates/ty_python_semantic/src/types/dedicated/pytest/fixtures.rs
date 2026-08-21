@@ -64,6 +64,7 @@ use ty_python_core::{
 
 use super::collection::{PytestTestKind, pytest_test_for_binding};
 use super::is_available_definition;
+use super::parametrization::{Parametrization, parametrizations};
 use crate::lexical_name_path::lexical_name_path_for_definition;
 use crate::place::definitions::DefinitionResolution;
 use crate::types::function::{FunctionType, KnownFunction};
@@ -416,7 +417,6 @@ struct FixtureRequestContext<'db, 'ast> {
     function_definition: Definition<'db>,
     function_type: FunctionType<'db>,
     function: &'ast ast::StmtFunctionDef,
-    module: &'ast ParsedModuleRef,
     index: &'db ty_python_core::SemanticIndex<'db>,
     class_scope: Option<FileScopeId>,
     is_fixture_dependency: bool,
@@ -464,7 +464,6 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
             function_definition,
             function_type,
             function,
-            module,
             index,
             class_scope,
             is_fixture_dependency,
@@ -566,19 +565,14 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
     /// Returns whether static parametrization on the function or an enclosing class prevents this
     /// fixture request.
     fn directly_parametrized(&self, db: &'db dyn Db, parameter_name: &str) -> bool {
-        if !self.function.decorator_list.is_empty() {
-            let decorators = function_known_decorators(db, self.function_definition);
-            if self.function.decorator_list.iter().any(|decorator| {
-                mark_excludes_fixture(
-                    db,
-                    self.function_definition,
-                    &decorator.expression,
-                    parameter_name,
-                    |expression| decorators.expression_type(expression),
-                )
-            }) {
-                return true;
-            }
+        if !self.function.decorator_list.is_empty()
+            && parametrizations(db, self.function_definition)
+                .iter()
+                .any(|parametrization| {
+                    parametrization_excludes_fixture(parametrization, parameter_name)
+                })
+        {
+            return true;
         }
 
         std::iter::successors(self.class_scope, |class_scope| {
@@ -588,18 +582,10 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
         .any(|class_scope| {
             let class_ref = self.index.scope(class_scope).node().expect_class();
             let definition = self.index.expect_single_definition(class_ref);
-            class_ref
-                .node(self.module)
-                .decorator_list
+            parametrizations(db, definition)
                 .iter()
-                .any(|decorator| {
-                    mark_excludes_fixture(
-                        db,
-                        definition,
-                        &decorator.expression,
-                        parameter_name,
-                        |expression| Some(definition_expression_type(db, definition, expression)),
-                    )
+                .any(|parametrization| {
+                    parametrization_excludes_fixture(parametrization, parameter_name)
                 })
         })
     }
@@ -1376,42 +1362,18 @@ fn non_type_parameter_parent(
 }
 
 /// Returns whether a static mark supplies this parameter directly or cannot be interpreted.
-fn mark_excludes_fixture<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    expression: &ast::Expr,
+fn parametrization_excludes_fixture(
+    parametrization: &Parametrization,
     parameter_name: &str,
-    expression_type: impl Fn(&ast::Expr) -> Option<Type<'db>>,
 ) -> bool {
-    let Some(call) = expression.as_call_expr() else {
-        return false;
-    };
-    if !expression_type(&call.func)
-        .is_some_and(|ty| ty.is_instance_of(db, KnownClass::PytestParametrizeMarkDecorator))
-    {
-        return false;
-    }
-
-    let Some(names) = call
-        .arguments
-        .find_argument_value("argnames", 0)
-        .and_then(|argnames| {
-            statically_known_parametrize_names(db, definition, argnames, &expression_type)
-        })
-    else {
+    let Some((_, names)) = parametrization.argnames().known() else {
         return true;
     };
-    if !names.contains(&parameter_name) {
+    if !names.iter().any(|name| name.name() == Some(parameter_name)) {
         return false;
     }
 
-    is_indirect(
-        db,
-        definition,
-        &call.arguments,
-        parameter_name,
-        &expression_type,
-    ) != Some(true)
+    parametrization.indirect().is_indirect(parameter_name) != Some(true)
 }
 
 /// Returns whether a type is an instance of `class_name` from one of `modules`.
@@ -1438,58 +1400,6 @@ fn is_known_class_instance(
         && file_to_module(db, class.program_file(db).resolver_file(db))
             .and_then(|module| module.known(db))
             .is_some_and(|module| modules.contains(&module))
-}
-
-/// Returns how `parameter_name` is configured by the `indirect` argument.
-///
-/// `Some(true)` means the parameter is definitely indirect, `Some(false)` means it is definitely
-/// direct, and `None` preserves uncertainty when the argument cannot be interpreted statically.
-fn is_indirect<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    arguments: &ast::Arguments,
-    parameter_name: &str,
-    expression_type: &impl Fn(&ast::Expr) -> Option<Type<'db>>,
-) -> Option<bool> {
-    let Some(expression) = arguments.find_argument_value("indirect", 2) else {
-        return Some(false);
-    };
-    let ty = expression_type(expression)?;
-    if ty == Type::bool_literal(true) {
-        return Some(true);
-    }
-    if ty == Type::bool_literal(false) {
-        return Some(false);
-    }
-    statically_known_parametrize_names(db, definition, expression, expression_type)
-        .map(|names| names.contains(&parameter_name))
-}
-
-/// Returns statically known pytest parametrization names from a string or fixed-length iterable.
-fn statically_known_parametrize_names<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    expression: &ast::Expr,
-    expression_type: &impl Fn(&ast::Expr) -> Option<Type<'db>>,
-) -> Option<Vec<&'db str>> {
-    let ty = expression_type(expression)?;
-    if let Some(string) = ty.as_string_literal() {
-        return Some(
-            string
-                .value(db)
-                .split(|character: char| character == ',' || character.is_whitespace())
-                .filter(|name| !name.is_empty())
-                .collect(),
-        );
-    }
-
-    let environment = ProgramEnvironment::from_file(definition.program_file(db));
-    extract_fixed_length_iterable_element_types(db, &environment, expression, |element| {
-        expression_type(element).unwrap_or_else(Type::unknown)
-    })?
-    .iter()
-    .map(|element| element.as_string_literal().map(|string| string.value(db)))
-    .collect()
 }
 
 /// Returns the statically known string sequence bound to a module symbol.
@@ -1590,12 +1500,13 @@ mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ruff_python_ast as ast;
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::Ranged;
     use ty_python_core::definition::Definition;
     use ty_python_core::semantic_index;
 
     use super::{
-        FixtureExposure, FixtureNameSource, end_of_scope_definition,
+        FixtureBinding, FixtureExposure, FixtureNameSource, end_of_scope_definition,
         fixture_bindings_for_parameter, fixture_exposures_for_definition,
         pytest_global_plugin_files,
     };
@@ -2259,6 +2170,112 @@ class TestOuter:
 
         assert_snapshot!(test_class_parametrized.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
         assert_snapshot!(test_outer_class_parametrized.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
+    }
+
+    #[test]
+    fn excludes_parameters_with_unknown_parametrization() {
+        let test = PytestTestCase::new(
+            "/src/test_example.py",
+            &dedent(
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def value(): ...
+
+                @pytest.fixture
+                def other(): ...
+
+                names: list[str]
+                unknown_name: str
+                indirect: bool
+
+                @pytest.mark.parametrize(names, [])
+                def test_unknown_names(value, other): ...
+
+                @pytest.mark.parametrize(["value", unknown_name], [])
+                def test_partial_names(value, other): ...
+
+                @pytest.mark.parametrize("value", [], indirect=indirect)
+                def test_unknown_indirect(value, other): ...
+
+                @pytest.mark.parametrize(["value", unknown_name], [])
+                class TestPartialNames:
+                    def test_value(self, value, other): ...
+
+                @pytest.mark.parametrize(names, [])
+                class TestUnknownNames:
+                    def test_value(self, value): ...
+
+                @pytest.mark.parametrize("value", [], indirect=indirect)
+                class TestUnknownIndirect:
+                    def test_value(self, value, other): ...
+                "#,
+            ),
+        );
+
+        for (owner, name) in [
+            ("test_unknown_names", "value"),
+            ("test_unknown_names", "other"),
+            ("test_partial_names", "value"),
+            ("test_partial_names", "other"),
+            ("test_unknown_indirect", "value"),
+            ("TestPartialNames.test_value", "value"),
+            ("TestPartialNames.test_value", "other"),
+            ("TestUnknownNames.test_value", "value"),
+            ("TestUnknownIndirect.test_value", "value"),
+        ] {
+            let function = test.function(owner);
+            let parameter = function.parameter_definition(name);
+            assert_eq!(
+                fixture_bindings_for_parameter(&test.db, parameter).len(),
+                0,
+                "{owner}.{name}"
+            );
+        }
+
+        let other_fixture = test.global_definition("/src/test_example.py", "other");
+        for owner in ["test_unknown_indirect", "TestUnknownIndirect.test_value"] {
+            let function = test.function(owner);
+            let parameter = function.parameter_definition("other");
+            let fixtures: Vec<_> = fixture_bindings_for_parameter(&test.db, parameter)
+                .iter()
+                .map(FixtureBinding::fixture)
+                .collect();
+            assert_eq!(fixtures, [other_fixture], "{owner}.other");
+        }
+    }
+
+    #[test]
+    fn resolves_fixtures_named_by_a_string_indirect_argument() {
+        let test = PytestTestCase::new(
+            "/src/test_example.py",
+            &dedent(
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def a(): ...
+
+                @pytest.fixture
+                def b(): ...
+
+                @pytest.mark.parametrize("a, b", [(1, 2)], indirect="ab")
+                def test_example(a, b): ...
+                "#,
+            ),
+        );
+        let function = test.function("test_example");
+
+        for name in ["a", "b"] {
+            let parameter = function.parameter_definition(name);
+            let fixture = test.global_definition("/src/test_example.py", name);
+            let fixtures: Vec<_> = fixture_bindings_for_parameter(&test.db, parameter)
+                .iter()
+                .map(FixtureBinding::fixture)
+                .collect();
+            assert_eq!(fixtures, [fixture], "test_example.{name}");
+        }
     }
 
     #[test]
@@ -3407,7 +3424,7 @@ resource = None
     }
 
     impl PytestTestCase {
-        fn new(path: &'static str, source: &'static str) -> Self {
+        fn new(path: &'static str, source: &str) -> Self {
             Self {
                 db: pytest_db(path, source),
                 path,
@@ -3596,16 +3613,16 @@ resource = None
         })
     }
 
-    fn pytest_db(path: &'static str, source: &'static str) -> TestDb {
+    fn pytest_db(path: &str, source: &str) -> TestDb {
         pytest_db_with_files(&[(path, source)])
     }
 
-    fn pytest_db_with_files(files: &[(&'static str, &'static str)]) -> TestDb {
+    fn pytest_db_with_files(files: &[(&str, &str)]) -> TestDb {
         pytest_db_with_files_and_src_roots(files, vec![SystemPathBuf::from("/src")])
     }
 
     fn pytest_db_with_files_and_src_roots(
-        files: &[(&'static str, &'static str)],
+        files: &[(&str, &str)],
         src_roots: Vec<SystemPathBuf>,
     ) -> TestDb {
         pytest_db_with_config_and_src_roots(
@@ -3625,15 +3642,12 @@ default_plugins = (
         )
     }
 
-    fn pytest_db_with_config(
-        files: &[(&'static str, &'static str)],
-        config: &'static str,
-    ) -> TestDb {
+    fn pytest_db_with_config(files: &[(&str, &str)], config: &'static str) -> TestDb {
         pytest_db_with_config_and_src_roots(files, vec![SystemPathBuf::from("/src")], config)
     }
 
     fn pytest_db_with_config_and_src_roots(
-        files: &[(&'static str, &'static str)],
+        files: &[(&str, &str)],
         src_roots: Vec<SystemPathBuf>,
         config: &'static str,
     ) -> TestDb {

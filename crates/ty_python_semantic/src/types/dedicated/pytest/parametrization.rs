@@ -50,7 +50,7 @@ pub(crate) struct Parametrizations(Box<[Parametrization]>);
 
 impl Parametrizations {
     /// Iterates over the owner's parametrizations in decorator order.
-    fn iter(&self) -> impl Iterator<Item = &Parametrization> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &Parametrization> {
         self.0.iter()
     }
 }
@@ -72,7 +72,7 @@ impl Parametrization {
     }
 
     /// Returns the statically recovered `argnames`.
-    const fn argnames(&self) -> &StaticArgnames {
+    pub(crate) const fn argnames(&self) -> &StaticArgnames {
         &self.argnames
     }
 
@@ -82,7 +82,7 @@ impl Parametrization {
     }
 
     /// Returns the statically recovered `indirect` configuration.
-    const fn indirect(&self) -> &StaticIndirect {
+    pub(crate) const fn indirect(&self) -> &StaticIndirect {
         &self.indirect
     }
 
@@ -139,7 +139,7 @@ impl StaticArgnames {
 
     /// Returns all statically known names, preserving an empty known collection.
     /// Returns `None` if the argument is missing or cannot be interpreted, or if any name is unknown.
-    fn known(&self) -> Option<(ArgnamesForm, &[StaticArgname])> {
+    pub(crate) fn known(&self) -> Option<(ArgnamesForm, &[StaticArgname])> {
         let (form, names) = self.names()?;
         names
             .iter()
@@ -166,7 +166,7 @@ pub(crate) struct StaticArgname {
 
 impl StaticArgname {
     /// Returns the argument name when its value is statically known.
-    fn name(&self) -> Option<&str> {
+    pub(crate) fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
@@ -194,7 +194,7 @@ impl StaticIndirect {
     ///
     /// Returns `Some(true)` for an indirect parameter, `Some(false)` for a direct parameter,
     /// and `None` if the indirect configuration is unknown.
-    fn is_indirect(&self, name: &str) -> Option<bool> {
+    pub(crate) fn is_indirect(&self, name: &str) -> Option<bool> {
         match self {
             Self::False => Some(false),
             Self::True => Some(true),
