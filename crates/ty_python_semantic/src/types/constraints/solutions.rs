@@ -88,6 +88,11 @@ impl<'db> SolutionWalker<'db> {
                 (constraint, source_order)
             })
             .collect();
+        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
+        // any unions or intersections in our type mappings in a stable order. Constraints might
+        // come out of `PathAssignments` with identical `source_order`s, but if they do, those
+        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
+        // retain that stable per-tie ordering.
         path.sort_by_key(|(_, source_order)| *source_order);
         self.sorted_paths.push(path);
     }
