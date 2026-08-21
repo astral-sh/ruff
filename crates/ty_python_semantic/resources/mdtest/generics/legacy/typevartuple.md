@@ -683,9 +683,10 @@ reveal_type(test(fn2))  # revealed: tuple[str, bytes]
 
 ## Missing unpack
 
-A legacy type variable tuple must also be unpacked. An invalid tuple annotation recovers to
-`tuple[Unknown, ...]`, rather than the single-element `tuple[Unknown]`. This avoids a cascading
-assignment error when the value is assigned to a correctly unpacked tuple annotation.
+A legacy type variable tuple must also be unpacked. In a tuple annotation, it recovers as
+`*tuple[Unknown, ...]`, so `tuple[Ts]` becomes `tuple[Unknown, ...]`, rather than the single-element
+`tuple[Unknown]`. This avoids a cascading assignment error when the value is assigned to a correctly
+unpacked tuple annotation.
 
 ```py
 from typing import Generic, TypeVarTuple
@@ -712,8 +713,8 @@ def legacy_tuple(values: Tuple[Ts]) -> None:
 
 ## Missing unpack in implicit tuple aliases
 
-Tuple specializations used to define implicit type aliases recover to `tuple[Unknown, ...]` when a
-type variable tuple is not unpacked. This applies to both `tuple` and `typing.Tuple`.
+Tuple specializations used to define implicit type aliases also recover bare type variable tuples as
+`*tuple[Unknown, ...]`. This applies to both `tuple` and `typing.Tuple`.
 
 ```py
 from typing import Tuple, TypeVarTuple
@@ -733,8 +734,8 @@ def aliases(builtin: BuiltinAlias, legacy: LegacyAlias) -> None:
 
 ## Missing unpack in a union-valued tuple element
 
-A name that may refer to a bare type variable tuple also causes the tuple annotation to recover to
-`tuple[Unknown, ...]`, even when the name may refer to a valid element type instead.
+In a homogeneous tuple annotation, a name that may refer to a bare type variable tuple or a valid
+element type preserves the valid alternative and recovers the bare pack to `Unknown`.
 
 ```py
 from typing import TypeVarTuple
@@ -747,7 +748,6 @@ def condition() -> bool:
 Element = Ts if condition() else int
 
 # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
-def homogeneous_union(values: tuple[Element, ...]) -> tuple[str, ...]:
-    reveal_type(values)  # revealed: tuple[Unknown, ...]
-    return values
+def homogeneous_union(values: tuple[Element, ...]) -> None:
+    reveal_type(values)  # revealed: tuple[Unknown | int, ...]
 ```
