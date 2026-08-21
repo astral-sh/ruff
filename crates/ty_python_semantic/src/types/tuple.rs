@@ -467,16 +467,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // (or any other dynamic type), then the `...` is the _gradual choice_ of all
                 // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
                 // length.
-                let VariableSegment::Homogeneous(source_variable) = source.variable() else {
-                    // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
-                    // over all specializations rather than making a gradual choice of length.
-                    return self.never();
-                };
-                if !self.is_eager_assignability() || !source_variable.is_dynamic() {
+                //
+                // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
+                // over all specializations rather than making a gradual choice of length.
+                let env = self.env;
+                if !self.is_eager_assignability()
+                    || source.variable().gradual_element_type(db, env).is_none()
+                {
                     return self.never();
                 }
-
-                let env = self.env;
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
