@@ -269,14 +269,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // we also check for the case where one of the operands is a class-literal type
                             // or generic-alias type and the other is a string literal. The normal dunder lookup
                             // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
+                            // ABCMeta and _ProtocolMeta inherit these operators unchanged. The typeshed
+                            // protocol fallback does not establish a custom operator either.
                             let should_emit_error = if dunder_fails {
                                 true
                             } else {
                                 let literal = match (left_type_value, right_type_value) {
                                     (Type::ClassLiteral(class), Type::LiteralValue(literal))
                                     | (Type::LiteralValue(literal), Type::ClassLiteral(class))
-                                        if class.metaclass(db)
-                                            == KnownClass::Type.to_class_literal(db, env) =>
+                                        if matches!(
+                                            class
+                                                .inferred_metaclass(db)
+                                                .for_inheritance(db, env)
+                                                .to_class_type(db)
+                                                .and_then(|metaclass| metaclass.known(db)),
+                                            Some(
+                                                KnownClass::Type
+                                                    | KnownClass::ABCMeta
+                                                    | KnownClass::ProtocolMeta
+                                            )
+                                        ) =>
                                     {
                                         Some(literal)
                                     }

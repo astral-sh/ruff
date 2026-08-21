@@ -1,5 +1,5 @@
 use crate::Db;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
     source::source_text,
@@ -625,27 +625,23 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
             MetaclassErrorKind::Conflict {
-                candidate1:
+                candidate:
                     MetaclassCandidate {
                         metaclass: metaclass1,
-                        explicit_metaclass_of: class1,
+                        base: base1,
                     },
-                candidate2:
-                    MetaclassCandidate {
-                        metaclass: metaclass2,
-                        explicit_metaclass_of: class2,
-                    },
-                candidate1_is_base_class,
+                base_metaclass: metaclass2,
+                base: base2,
             } => {
-                if *candidate1_is_base_class {
+                if let Some(base1) = base1 {
                     report_conflicting_metaclass_from_bases(
                         context,
                         class_node.into(),
                         class.name(db),
                         *metaclass1,
-                        class1.name(db),
+                        base1.name(db),
                         *metaclass2,
-                        class2.name(db),
+                        base2.name(db),
                     );
                 } else if let Some(builder) =
                     context.report_lint(&CONFLICTING_METACLASS, class_node)
@@ -654,9 +650,14 @@ pub(crate) fn check_static_class_definitions<'db>(
                         Type::from(class),
                         Type::from(*metaclass1),
                         Type::from(*metaclass2),
-                        Type::from(*class2),
+                        Type::from(*base2),
                     ];
                     let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                    let base = if let ClassBase::Class(base) = base2 {
+                        Either::Left(base.class_literal(db).display_with(db, settings.clone()))
+                    } else {
+                        Either::Right(base2.display_with(db, env, settings.clone()))
+                    };
                     builder.into_diagnostic(format_args!(
                         "The metaclass of a derived class (`{class}`) \
                             must be a subclass of the metaclasses of all its bases, \
@@ -667,10 +668,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                         metaclass_of_class = metaclass1
                             .class_literal(db)
                             .display_with(db, settings.clone()),
-                        metaclass_of_base = metaclass2
-                            .class_literal(db)
-                            .display_with(db, settings.clone()),
-                        base = ClassLiteral::Static(*class2).display_with(db, settings),
+                        metaclass_of_base = metaclass2.class_literal(db).display_with(db, settings),
                     ));
                 }
             }
@@ -1157,7 +1155,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
 ) {
     let db = context.db();
     let env = context.program_environment();
-    let metaclass = class.metaclass(db);
+    let metaclass = class.inferred_metaclass(db).for_inheritance(db, env);
     if metaclass == KnownClass::Type.to_class_literal(db, env) {
         return;
     }

@@ -168,6 +168,127 @@ pub enum KnownClass {
 }
 
 impl KnownClass {
+    /// Return whether this class is known to have `type` as its runtime metaclass.
+    ///
+    /// Built-in and extension types can inherit from collection ABCs only in their stubs. Those
+    /// bases must not give the runtime class an inferred protocol metaclass.
+    pub(super) fn has_known_type_metaclass(self, python_version: PythonVersion) -> bool {
+        match self {
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Memoryview
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Range
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::Slice
+            | Self::Property
+            | Self::BaseException
+            | Self::Exception
+            | Self::Warning
+            | Self::BaseExceptionGroup
+            | Self::ExceptionGroup
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Super
+            | Self::NotImplementedError
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::UnionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::CoroutineType
+            | Self::NotImplementedType
+            | Self::BuiltinFunctionType
+            | Self::EllipsisType
+            | Self::Deque => true,
+
+            Self::Sentinel => python_version >= PythonVersion::PY315,
+
+            Self::Enum
+            | Self::EnumProperty
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
+            | Self::ABCMeta
+            | Self::NoneType
+            | Self::SupportsKeysAndGetItem
+            | Self::Awaitable
+            | Self::Generator
+            | Self::AsyncGenerator
+            | Self::Deprecated
+            | Self::StdlibAlias
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::ProtocolMeta
+            | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
+            | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
+            | Self::NoDefaultType
+            | Self::NewType
+            | Self::Hashable
+            | Self::SupportsIndex
+            | Self::Iterable
+            | Self::Iterator
+            | Self::AsyncIterator
+            | Self::Sequence
+            | Self::Mapping
+            | Self::MutableMapping
+            | Self::ExtensionsTypeVar
+            | Self::ExtensionTypedDictFallback
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::OrderedDict
+            | Self::VersionInfo
+            | Self::Field
+            | Self::KwOnly
+            | Self::NamedTupleFallback
+            | Self::NamedTupleLike
+            | Self::TypedDictFallback
+            | Self::Template
+            | Self::Path
+            | Self::FunctoolsPartial
+            | Self::ConstraintSet
+            | Self::ConstraintSetSolution
+            | Self::GenericContext
+            | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel
+            | Self::PydanticStrict
+            | Self::PytestParametrizeMarkDecorator => false,
+        }
+    }
+
     pub(crate) const fn is_bool(self) -> bool {
         matches!(self, Self::Bool)
     }

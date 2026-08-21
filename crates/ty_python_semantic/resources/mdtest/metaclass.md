@@ -670,6 +670,254 @@ class C(A, B): ...
 reveal_type(C.__class__)  # revealed: <class 'M'>
 ```
 
+## Protocol metaclass inheritance
+
+A protocol declared in Python source uses `typing._ProtocolMeta`, which derives from `ABCMeta`.
+Explicitly specifying `ABCMeta` selects the more derived `_ProtocolMeta`. A compatible custom
+metaclass is preserved, including when its base is obtained by calling `type`.
+
+```py
+from abc import ABC, ABCMeta
+from typing import Protocol
+
+class P(Protocol): ...
+class Base(ABC): ...
+class Combined(Base, P): ...
+class ExplicitABC(Protocol, metaclass=ABCMeta): ...
+
+reveal_type(type(Combined))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(ExplicitABC))  # revealed: <class '_ProtocolMeta'>
+
+class Meta(type(Protocol)): ...
+class Derived(Base, P, metaclass=Meta): ...
+
+reveal_type(type(Derived))  # revealed: <class 'Meta'>
+```
+
+An unrelated metaclass conflicts with this constraint, both when declaring a protocol and when
+subclassing an existing one.
+
+```py
+class Unrelated(type): ...
+
+# error: [conflicting-metaclass] "`_ProtocolMeta` (metaclass of base class `typing.Protocol`)"
+class InvalidDirect(Protocol, metaclass=Unrelated): ...
+class InvalidSubclass(P, metaclass=Unrelated): ...  # error: [conflicting-metaclass]
+```
+
+Deriving an otherwise unrelated metaclass from `ABCMeta` does not make it compatible with
+`_ProtocolMeta`.
+
+```py
+class UnrelatedABC(ABCMeta): ...
+class InvalidABC(P, metaclass=UnrelatedABC): ...  # error: [conflicting-metaclass]
+```
+
+## Protocol metaclass fallback in typeshed
+
+Typeshed can list `Protocol` as a base even when the runtime class does not inherit from
+`typing.Protocol`. For example, `collections.abc.Iterable` is an ordinary abstract base class at
+runtime. Its typeshed definition therefore does not establish that the class has `_ProtocolMeta` as
+its metaclass.
+
+When no custom metaclass is selected, ty uses `ABCMeta` instead of `type` for class attribute
+lookup. This fallback makes ABC methods such as `register` available:
+
+```py
+from collections.abc import Iterable
+
+class Registered: ...
+
+reveal_type(type(Iterable))  # revealed: <class 'ABCMeta'>
+reveal_type(Iterable.register(Registered))  # revealed: type[Registered]
+```
+
+The inferred `ABCMeta` is not a claim about the exact runtime metaclass. It does not constrain
+subclasses, so a subclass can choose a metaclass unrelated to `ABCMeta` without a conflict.
+
+```py
+class Meta(type): ...
+class Direct(Iterable[object], metaclass=Meta): ...
+
+reveal_type(type(Direct))  # revealed: <class 'Meta'>
+```
+
+## Protocol metaclass fallback in a custom typeshed
+
+The same fallback applies to a configured typeshed. These minimal standard-library stubs provide the
+types used below.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class type: ...
+class tuple: ...
+```
+
+`/typeshed/stdlib/abc.pyi`:
+
+```pyi
+class ABCMeta(type): ...
+```
+
+`/typeshed/stdlib/typing.pyi`:
+
+```pyi
+from abc import ABCMeta
+
+class _SpecialForm: ...
+
+Protocol: _SpecialForm
+
+class _ProtocolMeta(ABCMeta): ...
+
+def reveal_type(obj, /): ...
+```
+
+`/typeshed/stdlib/interface.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Interface(Protocol): ...
+```
+
+The typeshed protocol gets the lookup fallback, but an unrelated explicit metaclass wins.
+
+`main.py`:
+
+```py
+from interface import Interface
+from typing import reveal_type
+
+class Meta(type): ...
+class Derived(Interface, metaclass=Meta): ...
+
+reveal_type(Interface.__class__)  # revealed: <class 'ABCMeta'>
+reveal_type(Derived.__class__)  # revealed: <class 'Meta'>
+```
+
+## Inheritance of a typeshed protocol metaclass fallback
+
+A source-defined subclass inherits the same non-constraining fallback from a typeshed protocol. An
+indirect or dynamically created subclass can choose an unrelated metaclass. `Child` can also share a
+subclass with `Other`, despite `Other`'s final metaclass, and `type[Child]` is not a subtype of
+`ABCMeta`.
+
+```py
+from abc import ABCMeta
+from collections.abc import Iterable
+from typing import final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+class Child(Iterable[object]): ...
+
+@final
+class Meta(type): ...
+
+class Other(metaclass=Meta): ...
+class Left(Child, Other): ...
+class Right(Other, Child): ...
+
+Dynamic = type("Dynamic", (Iterable,), {})
+Combined = type("Combined", (Child, Other), {})
+
+class ViaDynamic(Dynamic, metaclass=Meta): ...
+
+reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
+reveal_type(type(Left))  # revealed: <class 'Meta'>
+reveal_type(type(Right))  # revealed: <class 'Meta'>
+reveal_type(type(Combined))  # revealed: <class 'Meta'>
+reveal_type(type(ViaDynamic))  # revealed: <class 'Meta'>
+static_assert(not is_disjoint_from(Child, Other))
+static_assert(not is_subtype_of(type[Child], ABCMeta))
+```
+
+Explicitly listing `Protocol` in source declares a new protocol with a `_ProtocolMeta` constraint,
+even when another base contributes only the typeshed fallback.
+
+```py
+from typing import Protocol
+
+class SourceProtocol(Iterable[object], Protocol): ...
+class Invalid(SourceProtocol, metaclass=Meta): ...  # error: [conflicting-metaclass]
+```
+
+## Explicit typeshed protocol metaclasses
+
+Explicitly choosing the inferred `ABCMeta` makes it a real constraint on later subclasses.
+
+```py
+from collections.abc import Iterable
+
+class Meta(type): ...
+class Pinned(Iterable[object], metaclass=type(Iterable)): ...
+class Invalid(Pinned, metaclass=Meta): ...  # error: [conflicting-metaclass]
+
+reveal_type(type(Pinned))  # revealed: <class 'ABCMeta'>
+```
+
+## Typeshed protocol metaclass attributes in the class namespace
+
+The `ABCMeta` fallback inferred from typeshed bases does not guarantee that the runtime metaclass
+creates attributes in the class namespace. It therefore does not make attributes such as
+`__abstractmethods__` available on instances.
+
+For example, typeshed declares `weakref.WeakSet` as a `MutableSet` subclass, but at runtime it
+inherits directly from `object` and has metaclass `type`.
+
+```py
+from weakref import WeakSet
+
+class Child(WeakSet[object]): ...
+
+reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
+
+def f(child: Child):
+    child.__abstractmethods__  # error: [unresolved-attribute]
+```
+
+The fallback also does not constrain the types of attributes defined in the class namespace. For
+example, a `WeakSet` subclass can define its own `__abstractmethods__` without matching `ABCMeta`'s
+declaration.
+
+```py
+class OwnAttribute(WeakSet[object]):
+    __abstractmethods__ = 1
+```
+
+## Built-in collection metaclasses
+
+Typeshed includes collection ABCs in some built-in classes' bases to describe their interfaces.
+Those stub-only bases do not change the built-ins' runtime metaclasses or introduce conflicts when
+they are subclassed.
+
+```py
+from collections import deque
+from types import GeneratorType
+
+reveal_type(type(str))  # revealed: <class 'type'>
+reveal_type(type(tuple))  # revealed: <class 'type'>
+reveal_type(type(list))  # revealed: <class 'type'>
+reveal_type(type(dict))  # revealed: <class 'type'>
+reveal_type(type(deque))  # revealed: <class 'type'>
+reveal_type(type(GeneratorType))  # revealed: <class 'type'>
+
+class Meta(type): ...
+class CustomList(list[int], metaclass=Meta): ...
+class OrdinaryList(list[int]): ...
+
+reveal_type(type(CustomList))  # revealed: <class 'Meta'>
+reveal_type(type(OrdinaryList))  # revealed: <class 'type'>
+```
+
 ## Metaclass metaclass
 
 A class has an explicit base with a custom metaclass. That metaclass itself has a custom metaclass.

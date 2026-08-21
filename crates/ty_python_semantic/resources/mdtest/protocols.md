@@ -289,6 +289,65 @@ static_assert(is_subtype_of(TypeOf[Protocol], typing._ProtocolMeta))
 reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```
 
+## Protocol metaclasses
+
+By default, a protocol declared outside typeshed uses `typing._ProtocolMeta`. Nominal subclasses
+inherit this metaclass and the abstract base class methods it provides through `ABCMeta`.
+
+```py
+from typing import Protocol, _ProtocolMeta
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Parent(Protocol): ...
+class Child(Parent, Protocol): ...
+class Concrete(Child): ...
+
+reveal_type(type(Parent))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Child))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Concrete))  # revealed: <class '_ProtocolMeta'>
+static_assert(is_subtype_of(type[Concrete], _ProtocolMeta))
+```
+
+The same applies to generic protocols and the `typing_extensions` backport.
+
+```py
+from typing import TypeVar
+from typing_extensions import Protocol as ExtensionsProtocol
+
+T = TypeVar("T")
+
+class GenericProtocol(Protocol[T]): ...
+class BackportedProtocol(ExtensionsProtocol): ...
+
+reveal_type(type(GenericProtocol))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(BackportedProtocol))  # revealed: <class '_ProtocolMeta'>
+```
+
+## Virtual subclass registration
+
+Protocol classes inherit `ABCMeta.register`, which returns the registered class with its type
+intact.
+
+```py
+from typing import Protocol
+
+class P(Protocol): ...
+class Concrete: ...
+
+reveal_type(P.register(Concrete))  # revealed: type[Concrete]
+```
+
+The method is also available on collection ABCs that typeshed models using protocols. This is a
+regression test for <https://github.com/astral-sh/ty/issues/1204>.
+
+```py
+from collections.abc import Container, Mapping
+
+reveal_type(Container.register(Concrete))  # revealed: type[Concrete]
+reveal_type(Mapping.register(Concrete))  # revealed: type[Concrete]
+```
+
 ## Diagnostics and autofixes for `Protocol` classes defined in invalid ways
 
 <!-- snapshot-diagnostics -->

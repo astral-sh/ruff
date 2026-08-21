@@ -1354,7 +1354,8 @@ NT = type("NT", (NamedTuple,), {})
 
 ### Protocol bases
 
-Inheriting from a class that is itself a protocol is valid:
+When a dynamic class inherits from a source-defined protocol, it also inherits the protocol's
+`_ProtocolMeta` metaclass:
 
 ```py
 from typing import Protocol
@@ -1365,10 +1366,20 @@ class MyProtocol(Protocol):
 
 ProtoImpl = type("ProtoImpl", (MyProtocol,), {"method": lambda self: 42})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
+reveal_type(type(ProtoImpl))  # revealed: <class '_ProtocolMeta'>
 reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 
 instance = ProtoImpl()
 reveal_type(instance)  # revealed: ProtoImpl
+```
+
+A subclass of the dynamic class cannot choose a metaclass unrelated to `_ProtocolMeta`.
+
+```py
+class Meta(type): ...
+
+# error: [conflicting-metaclass]
+class Invalid(ProtoImpl, metaclass=Meta): ...
 ```
 
 ### TypedDict bases
