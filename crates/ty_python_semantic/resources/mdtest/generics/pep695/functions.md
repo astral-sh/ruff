@@ -1577,6 +1577,42 @@ def _(values: list[Recursive], sink: Callable[[object], None]) -> None:
     reveal_type(first_recursive(values, sink))
 ```
 
+## Inferring from multiple intersection arguments
+
+Each argument below satisfies `Source[T]` in two ways. Combining independent alternatives must
+remain bounded, and the merged inference result retains evidence from all four arguments. Reordering
+the arguments does not change that result.
+
+```py
+from typing import assert_type
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+class G: ...
+class H: ...
+
+def first[T](a: Source[T], b: Source[T], c: Source[T], d: Source[T]) -> T:
+    return a.get()
+
+def _(
+    a: Intersection[Source[A], Source[B]],
+    b: Intersection[Source[C], Source[D]],
+    c: Intersection[Source[E], Source[F]],
+    d: Intersection[Source[G], Source[H]],
+) -> None:
+    assert_type(first(a, b, c, d), A | B | C | D | E | F | G | H)
+    assert_type(first(d, c, b, a), A | B | C | D | E | F | G | H)
+```
+
 ## Typevars in a union
 
 ```py

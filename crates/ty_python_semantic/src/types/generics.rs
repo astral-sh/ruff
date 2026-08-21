@@ -11,6 +11,7 @@ use smallvec::SmallVec;
 use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
+use crate::types::constraints::projection::{SolutionBudget, SolutionProjection};
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
     PathBoundSolution, PathBounds, SolutionPaths, Solutions,
@@ -2324,8 +2325,15 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     generic_context: GenericContext<'db>,
     inferable: TypeVarSet<'db>,
     pending: ConstraintSet<'db, 'c>,
-    types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
+    types: LegacyTypeMappings<'db>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
+}
+
+/// The legacy mapping is usable only if no accepted relation was omitted in its entirety.
+/// Missing evidence from one argument can make the other arguments' inferred types too narrow.
+enum LegacyTypeMappings<'db> {
+    Available(FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>),
+    BudgetExceeded,
 }
 
 /// The result of type variable inference before choosing how to handle unsolved type variables.
@@ -2396,11 +2404,14 @@ impl<'db> TypeVarInference<'db> {
 ///
 /// Failed paths can occur alongside valid paths, but their declaration failures matter only when
 /// every path is rejected. Preserve that evidence exclusively for unsatisfiable constraint sets.
-/// Budget-exhausted paths retain their fallback bindings and completeness information.
+/// Per-variable budget exhaustion retains fallback bindings and completeness information. If
+/// collecting the whole relation exceeds a limit, no partial family is available for projection.
 enum ConstraintSetAnalysis<'db> {
     Unsatisfiable(SmallVec<[ConstraintFailure<'db>; 1]>),
     Unconstrained,
     Constrained(SolutionPaths<'db>),
+    /// A collection or result limit was exceeded. No partial family is safe to project.
+    BudgetExceeded,
 }
 
 impl<'db> ConstraintSetAnalysis<'db> {
@@ -2521,7 +2532,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             generic_context,
             inferable: generic_context.inferable_typevars(db),
             pending: ConstraintSet::from_bool(constraints, true),
-            types: FxHashMap::default(),
+            types: LegacyTypeMappings::Available(FxHashMap::default()),
             paramspec_seen: FxHashSet::default(),
         }
     }
@@ -2648,40 +2659,56 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // was not enough: `solutions_with` still performed the expensive path traversal, and the
         // skipped projection changed precision in LiteralString tests. See the
         // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
-        let solutions = match self.pending.solutions_with(
+        let mut types = match self.pending.try_fold_solutions(
             db,
             self.env,
-            self.constraints,
             self.inferable,
+            SolutionBudget::default(),
             |_variance, path_bound| {
                 let typevar = path_bound.bound_typevar;
                 if let Some(ty) = choose(typevar, Some(path_bound)) {
                     return PathBoundSolution::Solved(ty);
                 }
 
-                PathBounds::default_solve(db, self.env, self.constraints, path_bound)
+                // The legacy projection accepts per-variable fallback bindings.
+                match PathBounds::default_solve(db, self.env, self.constraints, path_bound) {
+                    PathBoundSolution::BudgetExceeded { fallback } => {
+                        fallback.map_or(PathBoundSolution::Unsolved, PathBoundSolution::Solved)
+                    }
+                    outcome => outcome,
+                }
+            },
+            FxHashMap::default(),
+            |mut types: FxHashMap<_, _>, solution, budget| {
+                for binding in solution {
+                    budget.charge_type(db, binding.solution)?;
+                    let identity = binding.bound_typevar.identity(db);
+                    types
+                        .entry(identity)
+                        .and_modify(|existing| {
+                            *existing = UnionType::from_two_elements(
+                                db,
+                                self.env,
+                                *existing,
+                                binding.solution,
+                            );
+                        })
+                        .or_insert(binding.solution);
+                }
+                Ok(types)
             },
         ) {
-            Solutions::Unsatisfiable => return Err(()),
-            Solutions::Unconstrained => {
+            Ok(SolutionProjection::Unsatisfiable) => return Err(()),
+            Ok(SolutionProjection::Unconstrained) => {
                 return Ok(self.solve_hash_map_with(generic_context, choose));
             }
-            Solutions::Constrained(solutions) => solutions.into_vec(),
-        };
-
-        let mut types = FxHashMap::default();
-        for solution in solutions {
-            for binding in solution {
-                let identity = binding.bound_typevar.identity(db);
-                types
-                    .entry(identity)
-                    .and_modify(|existing| {
-                        *existing =
-                            UnionType::from_two_elements(db, self.env, *existing, binding.solution);
-                    })
-                    .or_insert(binding.solution);
+            Err(_) => {
+                // A partial mapping may be narrower than the unvisited alternatives. Recover
+                // without choosing a witness or repeating the exhausted traversal/construction.
+                return Ok(self.unknown_type_mappings(generic_context));
             }
-        }
+            Ok(SolutionProjection::Constrained(types)) => types,
+        };
 
         // Sequent-map transitivity can add relationships between inferable typevars to path
         // bounds. Those relationships are important while solving, but should not become recursive
@@ -2854,12 +2881,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         let db = self.db;
+        let LegacyTypeMappings::Available(types) = &mut self.types else {
+            return self.unknown_type_mappings(generic_context);
+        };
         generic_context
             .variables_inner(db)
             .iter()
             .filter_map(|(identity, variable)| {
-                let mapped_ty = self
-                    .types
+                let mapped_ty = types
                     .get_mut(identity)
                     .map(|accumulator| accumulator.get_or_build(db, self.env));
                 let chosen = match mapped_ty {
@@ -2874,6 +2903,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .collect()
     }
 
+    fn unknown_type_mappings(
+        &self,
+        generic_context: GenericContext<'db>,
+    ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        let db = self.db;
+        let unknown = generic_context.unknown_specialization(db, None);
+        generic_context
+            .variables_inner(db)
+            .keys()
+            .copied()
+            .zip(unknown.types(db).iter().copied())
+            .collect()
+    }
+
     fn insert_hash_map_type_mapping(
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
@@ -2881,7 +2924,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) {
         let db = self.db;
         let identity = bound_typevar.identity(db);
-        match self.types.entry(identity) {
+        let LegacyTypeMappings::Available(types) = &mut self.types else {
+            return;
+        };
+        match types.entry(identity) {
             Entry::Occupied(mut entry) => {
                 match bound_typevar.kind(db) {
                     TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
@@ -2957,13 +3003,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ty: Type<'db>,
     ) -> bool {
         let db = self.db;
-        self.types
-            .get_mut(&bound_typevar)
-            .is_some_and(|inferred_ty| {
-                inferred_ty
-                    .get_or_build(db, self.env)
-                    .is_assignable_to(db, self.env, ty)
-            })
+        let LegacyTypeMappings::Available(types) = &mut self.types else {
+            return false;
+        };
+        types.get_mut(&bound_typevar).is_some_and(|inferred_ty| {
+            inferred_ty
+                .get_or_build(db, self.env)
+                .is_assignable_to(db, self.env, ty)
+        })
     }
 
     /// Add a type mapping for a bound typevar using the given variance to determine how the
@@ -2997,11 +3044,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn analyze_constraint_set(&self, set: ConstraintSet<'db, 'c>) -> ConstraintSetAnalysis<'db> {
         let db = self.db;
         let mut failures = SmallVec::new();
-        let solutions = set.solutions_with(
+        let solutions = set.solutions_with_budget(
             db,
             self.env,
-            self.constraints,
             self.inferable,
+            SolutionBudget::default(),
             |_variance, path_bound| {
                 let solution =
                     PathBounds::preliminary_solve(db, self.env, self.constraints, path_bound);
@@ -3015,9 +3062,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         );
 
         match solutions {
-            Solutions::Unsatisfiable => ConstraintSetAnalysis::Unsatisfiable(failures),
-            Solutions::Unconstrained => ConstraintSetAnalysis::Unconstrained,
-            Solutions::Constrained(solutions) => ConstraintSetAnalysis::Constrained(solutions),
+            Ok(Solutions::Unsatisfiable) => ConstraintSetAnalysis::Unsatisfiable(failures),
+            Ok(Solutions::Unconstrained) => ConstraintSetAnalysis::Unconstrained,
+            Ok(Solutions::Constrained(solutions)) => ConstraintSetAnalysis::Constrained(solutions),
+            Err(_) => ConstraintSetAnalysis::BudgetExceeded,
         }
     }
 
@@ -3025,10 +3073,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ///
     /// This projection loses correlations between alternatives, so callers must only request it
     /// after they have accepted the corresponding relation.
+    /// Omitting an accepted relation makes the legacy mapping unavailable for precise recovery.
     ///
     /// TODO: Remove this compatibility path once [`build_with`][Self::build_with] and all other
     /// inference consumers can build specializations solely from the call-wide constraint set.
     fn project_for_legacy_fallback(&mut self, analysis: &ConstraintSetAnalysis<'db>) {
+        if matches!(analysis, ConstraintSetAnalysis::BudgetExceeded) {
+            self.types = LegacyTypeMappings::BudgetExceeded;
+            return;
+        }
+        if matches!(self.types, LegacyTypeMappings::BudgetExceeded) {
+            return;
+        }
         let ConstraintSetAnalysis::Constrained(solutions) = analysis else {
             return;
         };
@@ -3393,8 +3449,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         .map_or(Ok(()), Err);
                 };
 
-                // One accepted alternative proves that their disjunction is satisfiable; solving
-                // the combined TDD again would eagerly repeat the expensive path enumeration.
+                // Retain every alternative that was not proved unsatisfiable. Solving the
+                // combined TDD here would repeat their potentially expensive path traversals.
                 self.record_constraint_set(combined);
                 for (_, analysis) in accepted {
                     self.project_for_legacy_fallback(&analysis);
@@ -4205,15 +4261,58 @@ mod tests {
         let set = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, int, int);
 
         let analysis = builder.analyze_constraint_set(set);
-        assert!(builder.types.is_empty());
+        assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
         assert!(builder.pending.is_always_satisfied(db, &env));
 
         builder.record_constraint_set(set);
-        assert!(builder.types.is_empty());
+        assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
         assert!(!builder.pending.is_always_satisfied(db, &env));
 
         builder.project_for_legacy_fallback(&analysis);
         assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
+    }
+
+    #[test]
+    fn exhausted_constraint_projection_does_not_use_partial_legacy_mapping() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let typevar = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
+        let constraints = ConstraintSetBuilder::new();
+        let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
+        let str = KnownClass::Str.to_instance(db, &env);
+
+        let alternatives = (0_i64..)
+            .take(SolutionBudget::default().paths + 1)
+            .when_any(db, &constraints, |index| {
+                let ty = UnionType::from_two_elements(db, &env, str, Type::int_literal(index));
+                ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, ty, ty)
+            });
+        assert!(builder.add_constraint_set(alternatives).is_ok());
+        builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
+        assert!(matches!(builder.types, LegacyTypeMappings::BudgetExceeded));
+        assert!(!builder.pending.is_never_satisfied(db, &env));
+
+        let mut choices = 0;
+        let inference = builder.build_inference_with(|_, _| {
+            choices += 1;
+            None
+        });
+        assert_eq!(choices, 0);
+        assert_eq!(
+            inference.map(|inference| inference.types(db)),
+            Ok(&[Some(Type::unknown())][..])
+        );
+        assert_eq!(
+            builder.solve_hash_map_with(context, &mut |_, _| Some(str)),
+            FxHashMap::from_iter([(typevar.identity(db), Type::unknown())])
+        );
     }
 
     #[test]
