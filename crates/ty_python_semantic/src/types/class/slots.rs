@@ -6,7 +6,10 @@ use ty_python_core::{place_table, use_def_map};
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::class::{CodeGeneratorKind, StaticClassLiteral};
 use crate::types::generics::Specialization;
-use crate::types::{ClassBase, DataclassFlags, KnownClass, Type};
+use crate::types::{
+    ClassBase, ClassLiteral, DataclassFlags, KnownClass, SpecialFormType, Type,
+    definition_expression_type, tuple::Tuple,
+};
 use crate::{Db, FxIndexSet, ProgramEnvironment};
 
 /// The information that can be recovered from a class's own `__slots__` assignment.
@@ -16,13 +19,14 @@ enum SlotDefinition {
     Names(Box<[Name]>),
     /// The declaration is definitely nonempty, but at least one name is unknown.
     NonEmpty,
-    /// Neither the names nor the presence of any slots can be established.
-    Dynamic,
+    /// The class has no slot declaration, or its declaration cannot be resolved statically.
+    DynamicOrNone,
 }
 
 /// An interpreter-created `types.MemberDescriptorType` for an instance slot.
 ///
-/// Unlike a Python property, an ordinary slot reads and writes its instance storage directly.
+/// Its `__get__` and `__set__` methods access the memory reserved for the slot in each instance,
+/// without invoking the Python-level getter, setter, or deleter callbacks used by a `property`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct SlotDescriptorType<'db> {
     #[returns(copy)]
@@ -89,7 +93,8 @@ impl InstanceDictionary {
             | KnownClass::Mapping
             | KnownClass::MutableMapping
             | KnownClass::Hashable
-            | KnownClass::SupportsIndex => Self::Absent,
+            | KnownClass::SupportsIndex
+            | KnownClass::NamedTupleFallback => Self::Absent,
             KnownClass::BaseException
             | KnownClass::Exception
             | KnownClass::Warning
@@ -97,7 +102,82 @@ impl InstanceDictionary {
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
             | KnownClass::Classmethod => Self::Present,
-            _ => Self::Unknown,
+            KnownClass::Type
+            | KnownClass::NotImplementedError
+            | KnownClass::Enum
+            | KnownClass::EnumProperty
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NotImplementedType
+            | KnownClass::BuiltinFunctionType
+            | KnownClass::EllipsisType
+            | KnownClass::NoneType
+            | KnownClass::SupportsKeysAndGetItem
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::AsyncGenerator
+            | KnownClass::Deprecated
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::ProtocolMeta
+            | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
+            | KnownClass::TypeAliasType
+            | KnownClass::ExtensionsTypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NewType
+            | KnownClass::AsyncIterator
+            | KnownClass::ExtensionsTypeVar
+            | KnownClass::ExtensionTypedDictFallback
+            | KnownClass::Sentinel
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::VersionInfo
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::NamedTupleLike
+            | KnownClass::TypedDictFallback
+            | KnownClass::Template
+            | KnownClass::Path
+            | KnownClass::FunctoolsPartial
+            | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
+            | KnownClass::TyExtensionsIterator
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => Self::Unknown,
         }
     }
 
@@ -125,12 +205,6 @@ impl InstanceLayout {
             dictionary: InstanceDictionary::Unknown,
         }
     }
-}
-
-fn literal_slot_name(expression: &ast::Expr) -> Option<Name> {
-    expression
-        .as_string_literal_expr()
-        .map(|literal| Name::new(literal.value.to_str()))
 }
 
 #[salsa::tracked]
@@ -163,7 +237,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         match self.slot_definition(db) {
             SlotDefinition::Names(names) => Some(names),
-            SlotDefinition::NonEmpty | SlotDefinition::Dynamic => None,
+            SlotDefinition::NonEmpty | SlotDefinition::DynamicOrNone => None,
         }
     }
 
@@ -173,26 +247,34 @@ impl<'db> StaticClassLiteral<'db> {
             && match self.slot_definition(db) {
                 SlotDefinition::Names(names) => !names.is_empty(),
                 SlotDefinition::NonEmpty => true,
-                SlotDefinition::Dynamic => false,
+                SlotDefinition::DynamicOrNone => false,
             }
     }
 
-    /// Returns whether a dataclass decorator generates slots for this class.
+    /// Returns whether this class synthesizes slots through a dataclass or named tuple.
     pub(super) fn has_generated_slots(self, db: &'db dyn Db) -> bool {
         self.dataclass_params(db).is_some_and(|parameters| {
             parameters.flags(db).contains(DataclassFlags::SLOTS)
                 && ProgramEnvironment::from_scope(self.body_scope(db)).python_version(db)
                     >= PythonVersion::PY310
-        })
+        }) || self.has_named_tuple_slots(db)
     }
 
-    /// Resolves explicit slot declarations and fields synthesized by slotted dataclasses.
+    /// Returns whether this class directly inherits the synthesized named-tuple layout.
+    fn has_named_tuple_slots(self, db: &'db dyn Db) -> bool {
+        self.has_explicit_bases(db)
+            && self
+                .explicit_bases(db)
+                .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
+    }
+
+    /// Resolves explicit slots, empty named-tuple layouts, and slotted dataclass fields.
     ///
     /// Tuple and string values retain their inferred literal types; mutable list, set, and
     /// dictionary literals are resolved from the indexed reaching assignment.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _| SlotDefinition::Dynamic,
+        cycle_initial=|_, _, _| SlotDefinition::DynamicOrNone,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn slot_definition(self, db: &'db dyn Db) -> SlotDefinition {
@@ -205,8 +287,12 @@ impl<'db> StaticClassLiteral<'db> {
             .symbol_id("__slots__")
             .filter(|_| self.has_explicit_slots(db))
         else {
+            if self.has_named_tuple_slots(db) {
+                return SlotDefinition::Names(Box::default());
+            }
+
             if !self.has_generated_slots(db) {
-                return SlotDefinition::Dynamic;
+                return SlotDefinition::DynamicOrNone;
             }
 
             // Dataclasses generate slots for their fields, excluding inherited storage:
@@ -258,7 +344,7 @@ impl<'db> StaticClassLiteral<'db> {
             ..
         }) = place_from_bindings(db, &env, bindings).place
         else {
-            return SlotDefinition::Dynamic;
+            return SlotDefinition::DynamicOrNone;
         };
 
         // A single string is itself a slot name: `__slots__ = "value"`.
@@ -271,21 +357,26 @@ impl<'db> StaticClassLiteral<'db> {
         //     names = ("first", "second")
         //     __slots__ = names
         //
-        // An unknown tuple element prevents recovering every name, but still proves the
-        // declaration is nonempty.
-        if let Type::NominalInstance(instance) = slots_ty
-            && let Some(specification) = instance.tuple_spec(db, &env)
-            && let Some(tuple) = specification.as_fixed_length()
-        {
-            return tuple
-                .iter_all_elements()
-                .map(|element| {
-                    element
-                        .as_string_literal()
-                        .map(|literal| Name::new(literal.value(db)))
-                })
-                .collect::<Option<Box<[_]>>>()
-                .map_or(SlotDefinition::NonEmpty, SlotDefinition::Names);
+        // An unknown element prevents recovering every name. A variable-length tuple still
+        // proves the declaration is nonempty when its minimum length is greater than zero.
+        if let Some(tuple) = slots_ty.tuple_instance_spec(db, &env) {
+            match &*tuple {
+                Tuple::Fixed(tuple) => {
+                    return tuple
+                        .iter_all_elements()
+                        .map(|element| {
+                            element
+                                .as_string_literal()
+                                .map(|literal| Name::new(literal.value(db)))
+                        })
+                        .collect::<Option<Box<[_]>>>()
+                        .map_or(SlotDefinition::NonEmpty, SlotDefinition::Names);
+                }
+                Tuple::Variable(_) if tuple.len().minimum() > 0 => {
+                    return SlotDefinition::NonEmpty;
+                }
+                Tuple::Variable(_) => {}
+            }
         }
 
         // Mutable container types do not retain their individual literal elements:
@@ -294,18 +385,25 @@ impl<'db> StaticClassLiteral<'db> {
         //     __slots__ = {"value"}
         //     __slots__ = {"value": "Documentation"}
         //
-        // Recover their names from the single reaching class-body assignment instead.
+        // Recover each element's inferred string-literal type from the single reaching class-body
+        // assignment instead, so names supplied through other variables are also recognized.
         let Ok(definition) = use_def
             .end_of_scope_symbol_bindings(symbol)
             .filter_map(|binding| binding.binding.definition())
             .exactly_one()
         else {
-            return SlotDefinition::Dynamic;
+            return SlotDefinition::DynamicOrNone;
         };
 
         let parsed = parsed_module(db, self.python_file(db)).load(db);
         let Some(value) = definition.kind(db).value(&parsed) else {
-            return SlotDefinition::Dynamic;
+            return SlotDefinition::DynamicOrNone;
+        };
+
+        let literal_slot_name = |expression: &ast::Expr| {
+            definition_expression_type(db, definition, expression)
+                .as_string_literal()
+                .map(|literal| Name::new(literal.value(db)))
         };
 
         let names = match value {
@@ -319,7 +417,7 @@ impl<'db> StaticClassLiteral<'db> {
             _ => None,
         };
 
-        names.map_or(SlotDefinition::Dynamic, SlotDefinition::Names)
+        names.map_or(SlotDefinition::DynamicOrNone, SlotDefinition::Names)
     }
 
     /// Collects slot storage and instance-dictionary availability across the complete MRO.
@@ -347,17 +445,30 @@ impl<'db> StaticClassLiteral<'db> {
         let mut dictionary = InstanceDictionary::Absent;
 
         for base in self.iter_mro(db, None) {
-            if matches!(base, ClassBase::Generic | ClassBase::Protocol) {
-                continue;
-            }
-
-            let ClassBase::Class(base) = base else {
-                dictionary = dictionary.inherited_with(InstanceDictionary::Unknown);
-                continue;
+            let base = match base {
+                ClassBase::Class(base) => base,
+                ClassBase::Any | ClassBase::Divergent(_) | ClassBase::Dynamic(_) => {
+                    dictionary = dictionary.inherited_with(InstanceDictionary::Unknown);
+                    continue;
+                }
+                ClassBase::TypedDict(_) | ClassBase::Generic | ClassBase::Protocol => continue,
             };
-            let Some((base, _)) = base.static_class_literal(db) else {
-                dictionary = dictionary.inherited_with(InstanceDictionary::Unknown);
-                continue;
+
+            let base = match base.class_literal(db) {
+                ClassLiteral::Static(base) => base,
+                // Functional named tuples synthesize empty slots, while TypedDict instances use
+                // dictionary item storage rather than an instance-attribute dictionary.
+                ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => continue,
+                // Enum instances retain an instance dictionary even when the enum is created
+                // through the functional API.
+                ClassLiteral::DynamicEnum(_) => {
+                    dictionary = InstanceDictionary::Present;
+                    continue;
+                }
+                ClassLiteral::Dynamic(_) => {
+                    dictionary = dictionary.inherited_with(InstanceDictionary::Unknown);
+                    continue;
+                }
             };
 
             if let Some(names) = base.slot_names(db) {

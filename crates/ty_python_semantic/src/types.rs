@@ -3670,6 +3670,7 @@ impl<'db> Type<'db> {
                 "Calling `class_object_member` on class literals and subclass-of types \
                 should always find an MRO",
             );
+
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Protocol(protocol) => {
@@ -4917,6 +4918,7 @@ impl<'db> Type<'db> {
                     fallback.into(),
                     InstanceFallbackShadowsNonDataDescriptor::No,
                 );
+
                 if result
                     .unwrap_or_else(|error| error.fallback_member(db))
                     .is_class_var()
@@ -8904,6 +8906,8 @@ impl<'db> Type<'db> {
                         .and_then(|deleter| deleter.definition(db, env))
                 }),
 
+            // Navigating to the type of `Slotted.value` should open the `MemberDescriptorType`
+            // class in typeshed, rather than the slot's instance-value annotation.
             Self::SlotDescriptor(_) => KnownClass::MemberDescriptorType
                 .to_instance(db, env)
                 .definition(db, env),
@@ -9352,6 +9356,12 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             .flatten()
             .map(|ty| ty.variance_of(db, env, typevar))
             .collect(),
+            // A generic class can store another class's slot descriptor directly:
+            //
+            //     class Owner[T]:
+            //         descriptor = Slotted[T].value
+            //
+            // The descriptor's value can be both read and written, so `Owner` is invariant in T.
             Type::SlotDescriptor(descriptor) => descriptor
                 .value_type(db)
                 .with_polarity(TypeVarVariance::Invariant)

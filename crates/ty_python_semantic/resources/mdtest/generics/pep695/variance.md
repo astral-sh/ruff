@@ -525,6 +525,17 @@ static_assert(not is_subtype_of(Slotted[B], Slotted[A]))
 static_assert(not is_subtype_of(Slotted[A], Slotted[B]))
 ```
 
+A slot descriptor also carries its mutable value type when stored directly on another generic class.
+Its owner is therefore invariant even though the descriptor is assigned as a class member.
+
+```py
+class DescriptorOwner[T]:
+    descriptor = Slotted[T].value
+
+static_assert(not is_subtype_of(DescriptorOwner[B], DescriptorOwner[A]))
+static_assert(not is_subtype_of(DescriptorOwner[A], DescriptorOwner[B]))
+```
+
 ### Immutable Attributes
 
 Immutable attributes can't be written to, and thus constrain the typevar to covariance, not

@@ -80,6 +80,22 @@ def create(name: str) -> None:
     class C(A, B): ...  # error: [instance-layout-conflict]
 ```
 
+A variable-length tuple also creates a distinct instance layout when its type guarantees at least
+one slot name.
+
+```py
+from typing_extensions import Unpack
+
+def create_with_variadic_slots(names: tuple[str, Unpack[tuple[str, ...]]]) -> None:
+    class VariadicSlots:
+        __slots__ = names
+
+    class KnownSlots:
+        __slots__ = ("value",)
+
+    class Incompatible(VariadicSlots, KnownSlots): ...  # error: [instance-layout-conflict]
+```
+
 ## Synthesized `__slots__` from dataclasses
 
 ```py

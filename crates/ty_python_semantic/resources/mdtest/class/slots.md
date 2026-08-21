@@ -330,6 +330,38 @@ reveal_type(IndirectSlots().value)  # revealed: Unknown
 IndirectSlots().missing  # error: [unresolved-attribute]
 ```
 
+The elements of mutable slot declarations can also refer to statically known string values.
+
+```py
+slot_name = "value"
+
+class IndirectListSlots:
+    __slots__ = [slot_name]
+
+reveal_type(IndirectListSlots().value)  # revealed: Unknown
+IndirectListSlots().missing  # error: [unresolved-attribute]
+```
+
+The same inference applies to set elements.
+
+```py
+class IndirectSetSlots:
+    __slots__ = {slot_name}
+
+reveal_type(IndirectSetSlots().value)  # revealed: Unknown
+IndirectSetSlots().missing  # error: [unresolved-attribute]
+```
+
+Dictionary keys are evaluated in the same way.
+
+```py
+class IndirectDictionarySlots:
+    __slots__ = {slot_name: "Documentation for the slot."}
+
+reveal_type(IndirectDictionarySlots().value)  # revealed: Unknown
+IndirectDictionarySlots().missing  # error: [unresolved-attribute]
+```
+
 ## Mutated slot declarations
 
 Slot names are taken from the original literal. Later changes to that literal are not evaluated, so
@@ -539,6 +571,50 @@ class OrdinaryChild(SlottedBase):
         self.extra = 1
 
 reveal_type(OrdinaryChild().extra)  # revealed: int
+```
+
+## Slotted subclasses of named tuples
+
+A named tuple synthesizes empty `__slots__`, so a subclass with its own empty slots does not gain an
+instance dictionary. An annotation alone cannot provide storage for a new attribute.
+
+```py
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    value: int
+
+class SlottedPoint(Point):
+    __slots__ = ()
+    extra: int
+
+SlottedPoint(1).extra = 2  # error: [unresolved-attribute]
+```
+
+Named tuples created with the functional syntax have the same empty-slot layout.
+
+```py
+FunctionalPoint = NamedTuple("FunctionalPoint", [("value", int)])
+
+class SlottedFunctionalPoint(FunctionalPoint):
+    __slots__ = ()
+    extra: int
+
+SlottedFunctionalPoint(1).extra = 2  # error: [unresolved-attribute]
+```
+
+The `collections.namedtuple` factory also creates a class without an instance dictionary.
+
+```py
+from collections import namedtuple
+
+LegacyPoint = namedtuple("LegacyPoint", ["value"])
+
+class SlottedLegacyPoint(LegacyPoint):
+    __slots__ = ()
+    extra: int
+
+SlottedLegacyPoint(1).extra = 2  # error: [unresolved-attribute]
 ```
 
 ## Dataclass-generated slots
