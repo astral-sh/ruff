@@ -613,11 +613,6 @@ def no_invalid_return_diagnostic_here_either[T](x: A[T]) -> ASub[T]:
 A class pattern matches every specialization of its variadic generic class, including a symbolic
 type variable tuple.
 
-```toml
-[environment]
-python-version = "3.11"
-```
-
 ```py
 from typing import Generic, TypeVarTuple, assert_never
 

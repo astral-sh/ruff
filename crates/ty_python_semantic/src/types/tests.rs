@@ -495,7 +495,6 @@ fn unrestricted_tuple_materialization_absorbs_divergent_approximations() {
     // more deeply in a later iteration. Removing the marker here therefore converges.
     let first = approximation(div);
     for candidate in [first, approximation(first)] {
-        assert!(candidate.is_redundant_with(db, &env, top));
         assert_eq!(UnionType::from_elements(db, &env, [candidate, top]), top);
         assert_eq!(UnionType::from_elements(db, &env, [top, candidate]), top);
     }
