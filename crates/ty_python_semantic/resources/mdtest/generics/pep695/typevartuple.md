@@ -1734,14 +1734,14 @@ def valid[*Ts](x: tuple[*Ts]) -> tuple[*Ts]:
     return x
 ```
 
-A tuple annotation containing a bare type variable tuple recovers to `tuple[Unknown, ...]`. Treating
-the bare pack as one `Unknown` element would incorrectly impose a fixed length, even when other
-elements surround it.
+A bare type variable tuple in a tuple annotation recovers as `*tuple[Unknown, ...]`, preserving any
+fixed elements before and after it. Treating the bare pack as one `Unknown` element would
+incorrectly impose a fixed length.
 
 ```py
 # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
 def mixed[*Ts](values: tuple[int, Ts, str]) -> None:
-    reveal_type(values)  # revealed: tuple[Unknown, ...]
+    reveal_type(values)  # revealed: tuple[int, *tuple[Unknown, ...], str]
 ```
 
 ### Missing unpack in a homogeneous tuple
@@ -1757,9 +1757,8 @@ def homogeneous[*Ts](values: tuple[Ts, ...]) -> None:
 
 ### Missing unpack inside another type
 
-Only the tuple containing the bare pack recovers to `tuple[Unknown, ...]`. An enclosing tuple or
-`type[]` annotation keeps its structure. An ordinary tuple with an `Unknown` element keeps its fixed
-length.
+Recovery only affects the bare pack's position in its tuple. An enclosing tuple or `type[]`
+annotation keeps its structure. An ordinary tuple with an `Unknown` element keeps its fixed length.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -1801,7 +1800,24 @@ remaining tuple elements.
 # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
 # error: [unresolved-reference] "Name `Missing` used when not defined"
 def invalid_sibling[*Ts](values: tuple[Ts, Missing]) -> None:
-    reveal_type(values)  # revealed: tuple[Unknown, ...]
+    reveal_type(values)  # revealed: tuple[*tuple[Unknown, ...], Unknown]
+```
+
+### Missing unpack alongside other variadic elements
+
+A bare type variable tuple alongside a valid variadic unpack or another bare pack reports only the
+missing-unpack errors, without a cascading multiple-unpack error.
+
+```py
+def other_variadic[*Ts](
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    before: tuple[Ts, *tuple[int, ...]],
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    after: tuple[*tuple[int, ...], Ts],
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    repeated: tuple[Ts, Ts],
+) -> None: ...
 ```
 
 ### Invalid unpack operand

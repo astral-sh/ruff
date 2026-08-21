@@ -17,7 +17,7 @@ use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
-use crate::types::tuple::{TupleSpecBuilder, TupleType};
+use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -1071,9 +1071,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// This method assumes that a type has already been inferred and stored for the `value`
     /// of the subscript passed in.
     ///
-    /// Recovers to `tuple[Unknown, ...]` if an element is a `TypeVarTuple` missing an unpack.
-    /// Recovering that element as `Unknown` would assume a single element where the intended
-    /// length is unknown.
+    /// Recovers a bare `TypeVarTuple` as `*tuple[Unknown, ...]`, preserving surrounding elements.
+    /// An enclosing `tuple[tuple[Ts]]` still has exactly one element.
     pub(super) fn infer_tuple_type_expression(
         &mut self,
         tuple: &ast::ExprSubscript,
@@ -1093,8 +1092,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                         previously_in_valid_unpack_context,
                     );
-                    let element_flags = self.type_expression_flags(element);
-                    if element_flags.contains(TypeExpressionFlags::UNPACK)
+                    if self
+                        .type_expression_flags(element)
+                        .contains(TypeExpressionFlags::UNPACK)
                         && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
                     {
                         let mut diagnostic =
@@ -1103,13 +1103,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "`...` cannot be used after an unpacked element",
                         );
                     }
-                    let element_ty = if element_flags
-                        .contains(TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE)
-                    {
-                        Type::unknown()
-                    } else {
-                        element_ty
-                    };
                     let result = TupleType::homogeneous(db, env, element_ty);
                     self.store_expression_type(&tuple.slice, Type::tuple(result));
                     return result;
@@ -1118,7 +1111,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut element_types = TupleSpecBuilder::with_capacity(elements.len());
 
                 let mut first_unpacked_variadic_tuple = None;
-                let mut has_bare_typevartuple = false;
 
                 for element in elements {
                     if element.is_ellipsis_literal_expr() {
@@ -1143,9 +1135,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                         previously_in_valid_unpack_context,
                     );
-                    has_bare_typevartuple |= self
-                        .type_expression_flags(element)
-                        .contains(TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE);
                     // Determine if this element unpacks a tuple: either `*expr` or `Unpack[expr]`
                     let is_unpack = matches!(element, ast::Expr::Starred(_))
                         || matches!(
@@ -1197,19 +1186,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         } else {
                             // TODO: emit a diagnostic
                         }
+                    } else if self
+                        .type_expression_flags(element)
+                        .contains(TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE)
+                    {
+                        // Do not count recovery as another explicit unpack.
+                        element_types =
+                            element_types.concat(db, env, &TupleSpec::homogeneous(Type::unknown()));
                     } else {
                         element_types.push(element_ty);
                     }
                 }
 
-                // Finish inferring every element before recovering, so independent errors are
-                // still reported. Do not propagate the missing-unpack flag to the tuple itself:
-                // an enclosing `tuple[tuple[Ts]]` still has exactly one element.
-                let ty = if has_bare_typevartuple {
-                    TupleType::homogeneous(db, env, Type::unknown())
-                } else {
-                    TupleType::new(db, env, &element_types.build())
-                };
+                let ty = TupleType::new(db, env, &element_types.build());
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
