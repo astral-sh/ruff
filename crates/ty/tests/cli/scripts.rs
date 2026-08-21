@@ -1,4 +1,5 @@
 use insta_cmd::assert_cmd_snapshot;
+use ty_static::EnvVars;
 
 use crate::CliTest;
 
@@ -1317,4 +1318,368 @@ fn invalid_script_search_paths_do_not_blame_python_environment() -> anyhow::Resu
     ");
 
     Ok(())
+}
+
+#[test]
+fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        "#!/usr/bin/env python3\n\n# /// script\n# dependencies = []\n# ///\nprint(missing)\n",
+    )?
+    .with_filter(
+        "program not found",
+        "No such file or directory (os error 2)",
+    );
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("script.py")
+            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::UV, "missing-uv-executable"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[uv-metadata]: Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
+    --> script.py:3:1
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn ordinary_files_do_not_initialize_scripts() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "script.py",
+            "# /// script\n# dependencies = []\n# ///\nvalue = 1\n",
+        ),
+        ("ordinary.py", "value = 1\n"),
+    ])?;
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("ordinary.py")
+            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::UV, "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn disabled_integration_does_not_initialize_scripts() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        "# /// script\n# dependencies = []\n# ///\nvalue = 1\n",
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("script.py")
+            .env(EnvVars::UV, "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn excluded_scripts_do_not_initialize_their_environments() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("ty.toml", "[src]\nexclude-scripts = true\n"),
+        (
+            "script.py",
+            "# /// script\n# dependencies = []\n# ///\nvalue = 1\n",
+        ),
+        ("ordinary.py", "value = 1\n"),
+    ])?;
+    assert_cmd_snapshot!(
+        case.command()
+            .arg(".")
+            .args(["--config-file", "ty.toml"])
+            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::UV, "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[cfg(feature = "test-uv")]
+mod uv_metadata {
+    use std::{fs, process::Command};
+
+    use insta_cmd::assert_cmd_snapshot;
+    use ty_static::EnvVars;
+
+    use crate::CliTest;
+
+    fn command_with_script_uv(case: &CliTest) -> Command {
+        let mut command = case.command_inheriting_environment();
+        command
+            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::UV, "uv")
+            .env("UV_CACHE_DIR", case.root().join("cache"));
+        command
+    }
+
+    fn assert_uv_supports_script_metadata() -> anyhow::Result<()> {
+        let output = Command::new("uv")
+            .args(["workspace", "metadata", "--help"])
+            .output()?;
+
+        assert!(
+            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("--script"),
+            "installed uv does not support script metadata"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn uses_uv_script_environment_and_python_version() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_file(
+            "script.py",
+            r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["attrs==25.4.0"]
+        # [tool.ty.environment]
+        # python-version = "3.10"
+        # ///
+
+        import sys
+        from attrs import define
+        from typing import reveal_type
+
+        @define
+        class User:
+            value: int
+
+        reveal_type(User(1).value)
+        reveal_type(sys.version_info[:2])
+        "#,
+        )?
+        .with_filter(r"Literal\[(?:1[2-9]|[2-9][0-9])\]", "Literal[<uv-minor>]");
+
+        assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py"), @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        info[revealed-type]: Revealed type
+          --> script.py:17:13
+           |
+        17 | reveal_type(User(1).value)
+           |             ^^^^^^^^^^^^^ `int`
+
+        info[revealed-type]: Revealed type
+          --> script.py:18:13
+           |
+        18 | reveal_type(sys.version_info[:2])
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[<uv-minor>]]`
+
+        Found 2 diagnostics
+
+        ----- stderr -----
+        ");
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .args(["--python-version", "3.11"]),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        info[revealed-type]: Revealed type
+          --> script.py:17:13
+           |
+        17 | reveal_type(User(1).value)
+           |             ^^^^^^^^^^^^^ `int`
+
+        info[revealed-type]: Revealed type
+          --> script.py:18:13
+           |
+        18 | reveal_type(sys.version_info[:2])
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
+
+        Found 2 diagnostics
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn cli_python_selects_script_interpreter_without_replacing_its_environment()
+    -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_file(
+            "scripts/script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.11"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+
+            import sys
+            from attrs import define
+            from typing import reveal_type
+
+            @define
+            class User:
+                value: int
+
+            reveal_type(User(1).value)
+            reveal_type(sys.version_info[:2])
+            "#,
+        )?;
+
+        // The CLI environment selects uv's interpreter, but the script's dependencies must still
+        // come from the separate environment that uv creates for the script.
+        let environment = case.root().join(".venv");
+        let output = Command::new("uv")
+            .args(["venv", "--no-project", "--python", "3.12"])
+            .arg(&environment)
+            .env("UV_CACHE_DIR", case.root().join("cache"))
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "failed to create project environment: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("scripts/script.py")
+                .args(["--python", ".venv"]),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        info[revealed-type]: Revealed type
+          --> scripts/script.py:15:13
+           |
+        15 | reveal_type(User(1).value)
+           |             ^^^^^^^^^^^^^ `int`
+
+        info[revealed-type]: Revealed type
+          --> scripts/script.py:16:13
+           |
+        16 | reveal_type(sys.version_info[:2])
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+
+        Found 2 diagnostics
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn fixes_script_using_uv_environment() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_file(
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+
+            from attrs import define
+
+            @define
+            class User:
+                value: int
+
+            User(1)  # ty: ignore[unresolved-reference]
+            "#,
+        )?;
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .arg("--fix")
+                .args(["--warn", "unused-ignore-comment"]),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Found 1 diagnostic (1 fixed, 0 remaining).
+
+        ----- stderr -----
+        "
+        );
+
+        let updated = fs::read_to_string(case.root().join("script.py"))?;
+        assert!(!updated.contains("ty: ignore"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn failed_uv_script_synchronization_reports_an_error() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_file(
+            "script.py",
+            "# /// script\n# requires-python = '>=3.8'\n# dependencies = ['missing-script-dependency==99.0.0']\n# ///\nprint(missing)\n",
+        )?
+        .with_filter(
+            r"(?s)`uv workspace metadata` failed with status.*?missing-script-dependency==99\.0\.0.*?\n(Found 1 diagnostic)",
+            "`uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved\n$1",
+        );
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .env("UV_OFFLINE", "1"),
+            @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[uv-metadata]: `uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved
+        Found 1 diagnostic
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
 }

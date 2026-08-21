@@ -205,7 +205,9 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
 
     // Merge with the project level options by replaying the individual options
     // in the correct precedence order.
-    for options in metadata.options_in_precedence_order(metadata.options()) {
+    for options in metadata
+        .options_in_precedence_order(metadata.options(), metadata.uv_workspace_options.as_deref())
+    {
         merged.rules.combine_with(options.rules.clone());
         merged.analysis.combine_with(options.analysis.clone());
     }
