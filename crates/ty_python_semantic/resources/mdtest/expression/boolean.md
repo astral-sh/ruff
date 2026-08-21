@@ -52,17 +52,14 @@ def _(flag: bool):
 ```py
 # error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
 # error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
-# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
 reveal_type("x" and "y" or "z")  # revealed: Literal["y"]
 # error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
 reveal_type("x" or "y" and "z")  # revealed: Literal["x"]
-# error: [redundant-condition] "An empty string is always falsy"
 # error: [redundant-condition] "An empty string is always falsy"
 reveal_type("" and "y" or "z")  # revealed: Literal["z"]
 # error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
 # error: [redundant-condition] "An empty string is always falsy"
 reveal_type("" or "y" and "z")  # revealed: Literal["z"]
-# error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
 # error: [redundant-condition] "Object of type `Literal["y"]` is always truthy"
 # error: [redundant-condition] "Object of type `Literal["x"]` is always truthy"
 reveal_type("x" and "y" or "")  # revealed: Literal["y"]

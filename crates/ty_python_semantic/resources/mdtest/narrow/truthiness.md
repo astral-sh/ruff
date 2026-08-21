@@ -6,6 +6,7 @@ A generator object is truthy even when it yields no values.
 
 ```py
 def narrow(value: int | None) -> None:
+    # error: [redundant-condition] "always truthy"
     if (value for _ in ()):
         if value is None:
             return
@@ -40,7 +41,6 @@ def _(x: X):
 
 def _(x: X):
     # error: [redundant-condition] "Object of type `Literal[-1, True, "foo", b"bar"]` is always truthy"
-    # error: [redundant-condition] "Object of type `Literal[0, False, "", b""] | None | tuple[()]` is always falsy"
     if not (x and not x):
         reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
     else:
@@ -55,7 +55,6 @@ def _(x: X):
 
 def _(x: X):
     # error: [redundant-condition] "Object of type `Literal[0, False, "", b""] | None | tuple[()]` is always falsy"
-    # error: [redundant-condition] "Object of type `Literal[-1, True, "foo", b"bar"]` is always truthy"
     if not (x or not x):
         reveal_type(x)  # revealed: Never
     else:

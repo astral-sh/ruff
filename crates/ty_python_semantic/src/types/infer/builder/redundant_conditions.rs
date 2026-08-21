@@ -9,11 +9,11 @@ use ty_module_resolver::KnownModule;
 use ty_python_core::{Truthiness, definition::Definition, scope::NodeWithScopeKind};
 
 use crate::{
-    Db, ImportAliasResolution, ProgramEnvironment, SemanticModel, definitions_for_expression,
+    Db, ImportAliasResolution, SemanticModel, definitions_for_expression,
     types::{
         KnownClass, Type,
         diagnostic::{REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT},
-        infer::TypeInferenceBuilder,
+        infer::{InferenceFlags, TypeInferenceBuilder},
         infer_definition_types,
         tuple::TupleLength,
     },
@@ -59,12 +59,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // - In `if True and func`, the `if` checks the result's truthiness. The result is
             //   `func`, so the uncalled function should produce a diagnostic.
             //
-            // Check the final operand whenever the complete expression reaches this method.
-            // The earlier operands were already checked by `infer_boolean_expression`.
+            // Check the final operand whenever the complete expression reaches this method;
+            // `infer_boolean_expression` has already checked the earlier operands. For values
+            // handled by `redundant-condition`, these operand checks are sufficient: checking the
+            // complete expression again would duplicate a diagnostic. Values assignable to `int`,
+            // including booleans, use `redundant-condition-strict` instead. That rule suppresses
+            // diagnostics on subexpressions of conditions, so the complete expression still needs
+            // to be checked.
             ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
                 if let Some(last) = values.last() {
                     let ty = self.expression_type(last);
                     self.check_condition_redundancy(last, ty, ty.bool(db, env));
+                }
+
+                if !test_type.is_assignable_to(db, env, int_instance) {
+                    return;
                 }
             }
 
@@ -132,7 +141,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let model = SemanticModel::new(db, self.program_file());
 
         if any_over_expr(test, |expression| {
-            is_special_cased_condition_expression(db, env, &model, expression, |expr| {
+            is_special_cased_condition_expression(db, &model, expression, |expr| {
                 self.expression_type(expr)
             })
         }) {
@@ -154,7 +163,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             diagnostic.set_primary_annotation_message(
                                 "Did you mean to call this function?",
                             );
-                            if !signatures.has_parameters() {
+                            if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+                                && !signatures.has_parameters()
+                            {
                                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                                     "()".to_string(),
                                     test.end(),
@@ -310,6 +321,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     fn can_await_here(&self) -> bool {
+        // Python forbids `await` in annotation nodes.
+        if self
+            .inference_flags()
+            .contains(InferenceFlags::IN_ANNOTATION)
+        {
+            return false;
+        }
+
         let db = self.db();
 
         for (_, scope) in self.index.ancestor_scopes(self.scope().file_scope_id(db)) {
@@ -317,7 +336,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 NodeWithScopeKind::Function(function) => {
                     return function.node(self.module()).is_async;
                 }
-                NodeWithScopeKind::Lambda(_) | NodeWithScopeKind::Class(_) => {
+                NodeWithScopeKind::Lambda(_)
+                | NodeWithScopeKind::Class(_)
+                | NodeWithScopeKind::ClassTypeParameters(_)
+                | NodeWithScopeKind::FunctionTypeParameters(_)
+                | NodeWithScopeKind::TypeAliasTypeParameters(_)
+                | NodeWithScopeKind::TypeAlias(_) => {
                     return false;
                 }
                 NodeWithScopeKind::GeneratorExpression(_) => {
@@ -326,11 +350,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 NodeWithScopeKind::Module => {
                     return source_text(db, self.file()).is_notebook();
                 }
-                NodeWithScopeKind::ClassTypeParameters(_)
-                | NodeWithScopeKind::FunctionTypeParameters(_)
-                | NodeWithScopeKind::TypeAliasTypeParameters(_)
-                | NodeWithScopeKind::TypeAlias(_)
-                | NodeWithScopeKind::DictComprehension(_)
+                NodeWithScopeKind::DictComprehension(_)
                 | NodeWithScopeKind::ListComprehension(_)
                 | NodeWithScopeKind::SetComprehension(_) => continue,
             }
@@ -463,7 +483,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 /// Recognizes environment-dependent conditions, including constants reached through aliases.
 fn is_special_cased_condition_expression<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
     model: &SemanticModel<'db>,
     expression: &ast::Expr,
     expression_type: impl Fn(&ast::Expr) -> Type<'db>,
@@ -522,12 +541,11 @@ fn definition_contains_special_cased_condition<'db>(
     };
 
     let program_file = definition.program_file(db);
-    let env = ProgramEnvironment::from_file(program_file);
     let model = SemanticModel::new(db, program_file);
     let inference = infer_definition_types(db, definition);
 
     any_over_expr(value, |expression| {
-        is_special_cased_condition_expression(db, &env, &model, expression, |expr| {
+        is_special_cased_condition_expression(db, &model, expression, |expr| {
             inference.expression_type(expr)
         })
     })

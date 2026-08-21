@@ -3894,7 +3894,6 @@ match x:
         pass
     # error: [redundant-condition] "always truthy"
     # error: [redundant-condition] "always truthy"
-    # error: [redundant-condition] "always truthy"
     case "foo" if (x := "bar") and reveal_type(x):  #  revealed: Literal["bar"]
         pass
 
