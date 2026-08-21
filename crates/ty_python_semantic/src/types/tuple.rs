@@ -896,7 +896,7 @@ impl<'db> VariableSegment<'db> {
         let element = self.homogeneous_type()?;
         // A static constructor or an alias cycle rules out gradual arity, even if it contains Any.
         (!any_over_type_expanding_aliases(db, env, element, |ty| {
-            !matches!(ty, Type::TypeAlias(_) | Type::Dynamic(_))
+            !matches!(ty, Type::TypeAlias(_)) && !ty.is_dynamic()
         }))
         .then_some(element)
     }
