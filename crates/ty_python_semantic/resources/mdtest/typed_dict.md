@@ -7697,6 +7697,17 @@ class ChildWithBadValueType(Base):
     year: NotRequired[int]
 ```
 
+Recursive items are subject to the same consistency requirement. A recursive `TypedDict` is not
+consistent with the base's `bool` extra items:
+
+```py
+class RecursiveBase(TypedDict, extra_items=bool): ...
+
+# error: [invalid-typed-dict-header]
+class RecursiveChild(RecursiveBase):
+    child: NotRequired["RecursiveChild"]
+```
+
 ### A subclass of a TypedDict with read-only `extra_items: T` may add required or non-required items assignable to `T`
 
 ```py
@@ -8424,6 +8435,68 @@ class HasReadOnly(TypedDict, extra_items=int):
     x: NotRequired[ReadOnly[int]]
 
 static_assert(not is_assignable_to(HasReadOnly, dict[str, int]))
+```
+
+### Recursive fields with mutable extra items
+
+A declared item can have a different type from the extra items, including a reference to the
+`TypedDict` itself. Such a type is compatible with `Mapping[str, object]`, but not with a mutable
+dictionary whose values must all be `bool`:
+
+```py
+from collections.abc import Mapping
+from typing_extensions import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Recursive(TypedDict, total=False, extra_items=bool):
+    child: "Recursive"
+
+static_assert(is_assignable_to(Recursive, Mapping[str, object]))
+static_assert(not is_assignable_to(Recursive, dict[str, bool]))
+static_assert(not is_subtype_of(Recursive, dict[str, bool]))
+```
+
+### Mutually recursive fields with dictionary-valued extra items
+
+Recursive items can also refer to another `TypedDict`. Even when the extra items are themselves
+dictionaries, the declared items need not be consistent with them:
+
+```py
+from collections.abc import Mapping
+from typing_extensions import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Left(TypedDict, total=False, extra_items=dict[str, object]):
+    child: "Right"
+
+class Right(TypedDict, total=False, extra_items=dict[str, object]):
+    child: Left
+
+static_assert(is_assignable_to(Left, Mapping[str, object]))
+static_assert(not is_assignable_to(Left, dict[str, dict[str, object]]))
+static_assert(not is_subtype_of(Right, dict[str, dict[str, object]]))
+```
+
+### Recursive functional TypedDicts with mutable extra items
+
+The functional syntax has the same dictionary compatibility rules as the class syntax:
+
+```py
+from collections.abc import Mapping
+from typing_extensions import NotRequired, TypedDict
+
+Recursive = TypedDict("Recursive", {"child": "NotRequired[Recursive]"}, extra_items=bool)
+
+def as_mapping(value: Recursive) -> Mapping[str, object]:
+    return value
+
+def as_dict(value: Recursive) -> dict[str, bool]:
+    return value  # error: [invalid-return-type]
+
+def update(value: Recursive) -> None:
+    value.update({"child": value})
 ```
 
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly

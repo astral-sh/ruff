@@ -2241,11 +2241,29 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::TypedDict(typed_dict), _) => {
                 self.with_recursion_guard(db, source, target, || {
-                    let dict_value_type = if self.relation.is_assignability() {
-                        typed_dict.assignable_dict_value_type(db, env)
-                    } else {
-                        typed_dict.dict_value_type(db, env)
-                    };
+                    let dict_value_type =
+                        typed_dict.dict_value_type_if(db, |field_ty, extra_ty| {
+                            let result = if self.relation.is_assignability() {
+                                // Mutual assignability lets gradual field types satisfy the mutable
+                                // dict contract. Check the schema without inferring type variables or
+                                // contributing error context, but keep the active recursion guards.
+                                let checker = Self {
+                                    inferable: TypeVarSet::None,
+                                    typevar_evaluation: TypeVarEvaluation::Eager,
+                                    context_tree: None,
+                                    ..self.clone()
+                                };
+                                checker.check_type_pair(db, field_ty, extra_ty).and(
+                                    db,
+                                    self.constraints,
+                                    || checker.check_type_pair(db, extra_ty, field_ty),
+                                )
+                            } else {
+                                self.as_equivalence_checker()
+                                    .check_type_pair(db, field_ty, extra_ty)
+                            };
+                            result.is_always_satisfied(db, env)
+                        });
                     let fallback = if let Some(value_ty) = dict_value_type {
                         KnownClass::Dict.to_specialized_instance(
                             db,
