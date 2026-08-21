@@ -3350,7 +3350,7 @@ mod tests {
             PreviewMode::Disabled,
         );
         assert_eq!(count, 0);
-        assert_eq!(output, format!("{contents}"));
+        assert_eq!(output, contents);
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [UnusedVariable {
