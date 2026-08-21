@@ -2038,8 +2038,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Handle this unrestricted materialization family directly. Tuple subclasses do not
         // qualify: `Box[MyTuple]` is not a materialization of `Box[tuple[Any, ...]]`.
         // TODO: Correct bottom materialization for gradual tuple arity, including required prefixes
-        // and suffixes, and compare these materialization families generally without changing fully
-        // static tuple shapes.
+        // and suffixes, and handle these materialization families in the general invariant comparison.
+        // Then remove this entire special-case block.
         if let (Some(source_tuple), Some(target_tuple)) = (
             source_type.exact_tuple_instance_spec(db),
             target_type.exact_tuple_instance_spec(db),
