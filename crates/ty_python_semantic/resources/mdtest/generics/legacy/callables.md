@@ -386,6 +386,43 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
     return wrapper
 ```
 
+## Return type inference from partially annotated overloads
+
+The catch-all overload returns `object`, which is preserved when inferring a return type from the
+whole callback even though the literal-specific overloads have unannotated return types.
+
+```py
+from typing import Callable, Literal, TypeVar, overload
+from typing_extensions import assert_type
+
+R = TypeVar("R")
+T = TypeVar("T")
+
+def infer_return(callback: Callable[[T], R]) -> R:
+    raise NotImplementedError
+
+@overload
+def callback(value: Literal["a"]): ...
+@overload
+def callback(value: Literal["b"]): ...
+@overload
+def callback(value: Literal["c"]): ...
+@overload
+def callback(value: Literal["d", "e"]): ...
+@overload
+def callback(value: Literal["f", "g"]): ...
+@overload
+def callback(value: Literal["h", "i"]): ...
+@overload
+def callback(value: Literal["j", "k"]): ...
+@overload
+def callback(value: object) -> object: ...
+def callback(value):
+    raise NotImplementedError
+
+assert_type(infer_return(callback), object)
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its

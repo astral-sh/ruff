@@ -23,9 +23,9 @@ impl Default for SolutionBudget {
         // Allow long, simple conjunctions and sizable existing unions without allowing their
         // alternatives to expand into an equally large family of specializations.
         Self {
-            paths: 64,
-            visits: 16_384,
-            type_terms: 4_096,
+            paths: 4_096,
+            visits: 32_768,
+            type_terms: 8_192,
         }
     }
 }

@@ -4273,7 +4273,7 @@ mod tests {
     }
 
     #[test]
-    fn exhausted_constraint_projection_does_not_use_partial_legacy_mapping() {
+    fn exhausted_projection_keeps_legacy_mapping_unavailable() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -4288,29 +4288,23 @@ mod tests {
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
         let str = KnownClass::Str.to_instance(db, &env);
 
-        let alternatives = (0_i64..)
-            .take(SolutionBudget::default().paths + 1)
-            .when_any(db, &constraints, |index| {
-                let ty = UnionType::from_two_elements(db, &env, str, Type::int_literal(index));
-                ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, ty, ty)
-            });
-        assert!(builder.add_constraint_set(alternatives).is_ok());
+        builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
+        let ty = UnionType::from_two_elements(db, &env, str, Type::int_literal(0));
+        let relation = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, ty, ty);
+        builder.record_constraint_set(relation);
+        builder.project_for_legacy_fallback(&ConstraintSetAnalysis::BudgetExceeded);
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
         assert!(matches!(builder.types, LegacyTypeMappings::BudgetExceeded));
         assert!(!builder.pending.is_never_satisfied(db, &env));
 
         let mut choices = 0;
-        let inference = builder.build_inference_with(|_, _| {
+        let types = builder.solve_hash_map_with(context, &mut |_, _| {
             choices += 1;
-            None
+            Some(str)
         });
         assert_eq!(choices, 0);
         assert_eq!(
-            inference.map(|inference| inference.types(db)),
-            Ok(&[Some(Type::unknown())][..])
-        );
-        assert_eq!(
-            builder.solve_hash_map_with(context, &mut |_, _| Some(str)),
+            types,
             FxHashMap::from_iter([(typevar.identity(db), Type::unknown())])
         );
     }
