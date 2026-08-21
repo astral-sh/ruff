@@ -33,7 +33,7 @@ exit_code: 0
   "category": "correctness",
   "source_location": {
     "file": "<FILE>",
-    "line": 144
+    "line": 145
   }
 }
 ----- stderr -----
