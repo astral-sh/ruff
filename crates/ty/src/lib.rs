@@ -6,6 +6,7 @@ mod rule;
 mod server;
 mod version;
 
+use std::fmt::Display;
 use std::io::{BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
@@ -27,7 +28,9 @@ use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, ScriptEnvironmentAvailability, ScriptSyncProgress, watch};
+use ty_project::{
+    CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress, watch,
+};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
@@ -155,12 +158,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
-    if watch && project_metadata.has_uv_workspace() {
-        return Err(anyhow!(
-            "`--watch` is not supported with uv workspace integration"
-        ));
-    }
-
     project_metadata.apply_configuration_files(&system)?;
 
     project_metadata.apply_override_options(args.into_options());
@@ -280,7 +277,7 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
-    /// Progress bars shared by project checks and background script synchronization.
+    /// Progress bars shared by project checks and background uv synchronization.
     progress: ProgressDisplay,
 
     /// Interface for displaying information to the user.
@@ -341,15 +338,15 @@ impl MainLoop {
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
-        let script_sync_wakeups = db.script_environments().sync_wakeups();
+        let uv_sync_wakeups = db.uv_environments().sync_wakeups();
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
         request_check(db, &check_sender);
 
         // Apply all queued changes before starting a pending check because every applied change
         // cancels the running check.
         while let Ok(message) = crossbeam_channel::select_biased! {
-            recv(script_sync_wakeups) -> wakeup => {
-                wakeup.map(|()| MainLoopMessage::PollScriptEnvironments)
+            recv(uv_sync_wakeups) -> wakeup => {
+                wakeup.map(|()| MainLoopMessage::PollUvEnvironments)
             }
             recv(self.receiver) -> message => message,
             recv(check_receiver) -> request => request.map(|()| MainLoopMessage::CheckWorkspace),
@@ -357,8 +354,8 @@ impl MainLoop {
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     // Synchronization may have started after this request was queued.
-                    if db.script_environments().has_pending_synchronizations() {
-                        tracing::debug!("Deferring check until script synchronization completes");
+                    if db.uv_environments().has_pending_synchronizations() {
+                        tracing::debug!("Deferring check until uv synchronization completes");
                         continue;
                     }
                     let db = db.clone();
@@ -487,10 +484,16 @@ impl MainLoop {
                     return Ok(exit_status);
                 }
 
-                MainLoopMessage::PollScriptEnvironments => {
-                    let environments = db.script_environments().clone();
-                    if !environments.poll_sync(db).is_empty() {
+                MainLoopMessage::PollUvEnvironments => {
+                    let environments = db.uv_environments().clone();
+                    let changes = environments.poll_sync(db);
+                    if !changes.is_empty() {
                         revision += 1;
+                    }
+                    if changes.project.is_some()
+                        && let Some(watcher) = self.watcher.as_mut()
+                    {
+                        watcher.update(db);
                     }
                     request_check(db, &check_sender);
                 }
@@ -502,9 +505,11 @@ impl MainLoop {
 
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(&changes);
+                    db.apply_changes_with_progress(&changes, &|db, project| {
+                        self.progress.for_project(db, project)
+                    });
 
-                    let environments = db.script_environments().clone();
+                    let environments = db.uv_environments().clone();
                     for file in environments.files() {
                         environments.request_sync(
                             db,
@@ -691,7 +696,7 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.checking_bar.tick();
     }
 
-    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn UvSyncProgress>> {
         self.progress.for_script(db, file)
     }
 
@@ -711,7 +716,7 @@ impl Drop for IndicatifReporter {
     }
 }
 
-/// Coordinates the file-checking bar and per-script synchronization messages.
+/// Coordinates the file-checking bar and uv synchronization messages.
 #[derive(Clone)]
 struct ProgressDisplay {
     bars: indicatif::MultiProgress,
@@ -726,19 +731,25 @@ impl ProgressDisplay {
         }
     }
 
-    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+    fn for_project(&self, db: &dyn Db, project: Project) -> Option<Box<dyn UvSyncProgress>> {
+        self.start("Refreshing", format_args!("{} metadata", project.name(db)))
+    }
+
+    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn UvSyncProgress>> {
+        let path = file.path(db).as_system_path()?;
+        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
+        self.start("Syncing", path)
+    }
+
+    fn start(&self, action: &str, target: impl Display) -> Option<Box<dyn UvSyncProgress>> {
         if self.bars.is_hidden() {
             return None;
         }
 
-        let path = file.path(db).as_system_path()?;
-        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
-
         let bar = self.bars.insert(0, indicatif::ProgressBar::hidden());
         bar.set_style(indicatif::ProgressStyle::with_template("{wide_msg}").unwrap());
-        bar.set_message(format!("   {} {path}", "Syncing".bold().cyan()));
-
-        Some(Box::new(ScriptSyncProgressBar { bar }))
+        bar.set_message(format!("   {} {target}", action.bold().cyan()));
+        Some(Box::new(UvSyncProgressBar { bar }))
     }
 
     fn finish_checking(&self, bar: &indicatif::ProgressBar) {
@@ -751,13 +762,13 @@ impl ProgressDisplay {
     }
 }
 
-struct ScriptSyncProgressBar {
+struct UvSyncProgressBar {
     bar: indicatif::ProgressBar,
 }
 
-impl ScriptSyncProgress for ScriptSyncProgressBar {}
+impl UvSyncProgress for UvSyncProgressBar {}
 
-impl Drop for ScriptSyncProgressBar {
+impl Drop for UvSyncProgressBar {
     fn drop(&mut self) {
         self.bar.finish_and_clear();
     }
@@ -785,13 +796,13 @@ enum MainLoopMessage {
         result: Vec<Diagnostic>,
         revision: u64,
     },
-    PollScriptEnvironments,
+    PollUvEnvironments,
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
 }
 
 fn request_check(db: &dyn Db, sender: &crossbeam_channel::Sender<()>) {
-    if db.script_environments().has_pending_synchronizations() {
+    if db.uv_environments().has_pending_synchronizations() {
         return;
     }
 

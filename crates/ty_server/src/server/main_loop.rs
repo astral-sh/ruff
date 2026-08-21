@@ -157,8 +157,8 @@ impl Server {
                         // self.try_register_file_watcher(&client);
                     }
                 },
-                Event::PollScriptEnvironments { project_root } => {
-                    self.session.poll_script_sync(&client, &project_root);
+                Event::PollUvEnvironments { project_root } => {
+                    self.session.poll_uv_sync(&client, &project_root);
                 }
             }
         }
@@ -188,8 +188,8 @@ impl Server {
             return Ok(Some(Event::Message(deferred)));
         }
 
-        let script_sync = ScriptSyncWakeups(self.session.script_sync_wakeups());
-        script_sync.select(&self.connection.receiver, &self.main_loop_receiver)
+        let uv_sync = UvSyncWakeups(self.session.uv_sync_wakeups());
+        uv_sync.select(&self.connection.receiver, &self.main_loop_receiver)
     }
 
     fn initialize(&mut self, client: &Client) {
@@ -224,7 +224,7 @@ pub(crate) enum Event {
 
     Action(Action),
 
-    PollScriptEnvironments {
+    PollUvEnvironments {
         project_root: SystemPathBuf,
     },
 }
@@ -244,10 +244,10 @@ impl std::fmt::Debug for SendRequest {
     }
 }
 
-/// Script-environment wakeups for the currently active project databases.
-struct ScriptSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
+/// Uv-environment wakeups for the currently active project databases.
+struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
 
-impl ScriptSyncWakeups {
+impl UvSyncWakeups {
     /// Waits for a project wakeup, client message, or main-loop action.
     fn select(
         &self,
@@ -265,7 +265,7 @@ impl ScriptSyncWakeups {
 
         if let Some((project_root, receiver)) = self.0.get(index) {
             return operation.recv(receiver).map(|()| {
-                Some(Event::PollScriptEnvironments {
+                Some(Event::PollUvEnvironments {
                     project_root: project_root.clone(),
                 })
             });

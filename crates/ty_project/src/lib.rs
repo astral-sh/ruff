@@ -23,17 +23,17 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
-pub use script::{ScriptEnvironmentAvailability, ScriptEnvironments, script_tag};
+pub use script::script_tag;
 use std::backtrace::BacktraceStatus;
 use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::{Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
-pub use uv::UseUv;
+pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges};
 
 mod db;
 mod files;
@@ -143,7 +143,7 @@ pub trait ProgressReporter: Send + Sync {
     /// Creates an owned progress guard for synchronizing `file`'s standalone-script environment.
     ///
     /// Returns `None` when synchronization progress should not be displayed.
-    fn for_script(&self, _db: &dyn Db, _file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+    fn for_script(&self, _db: &dyn Db, _file: File) -> Option<Box<dyn UvSyncProgress>> {
         None
     }
 
@@ -156,13 +156,17 @@ pub trait ProgressReporter: Send + Sync {
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>);
 }
 
-/// An owned progress guard for synchronizing a standalone script's environment.
+/// An owned progress guard for a project or standalone-script uv metadata request.
 ///
 /// Creating the guard starts progress reporting and dropping it finishes progress reporting. A
 /// background synchronization may move the guard between threads and outlive the operation that
 /// scheduled it. Implementations must not retain a database because doing so could keep a cancelled
 /// database snapshot alive until synchronization finishes.
-pub trait ScriptSyncProgress: Send {}
+pub trait UvSyncProgress: Send {}
+
+/// Creates progress reporting when a project metadata refresh is scheduled.
+pub type ProjectSyncProgressFactory<'a> =
+    dyn Fn(&dyn Db, Project) -> Option<Box<dyn UvSyncProgress>> + 'a;
 
 /// Reporter that collects all diagnostics into a `Vec`.
 #[derive(Default)]
@@ -275,7 +279,7 @@ impl Project {
         self.metadata(db).root()
     }
 
-    fn name(self, db: &dyn Db) -> &str {
+    pub fn name(self, db: &dyn Db) -> &str {
         self.metadata(db).name()
     }
 
@@ -306,6 +310,65 @@ impl Project {
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),
             IncludeResult::Included { .. }
         )
+    }
+
+    /// Rediscovers this project from `path` and applies its metadata and settings.
+    /// If discovery fails, the project is left unchanged.
+    pub(crate) fn rediscover(
+        self,
+        db: &mut dyn Db,
+        path: &SystemPath,
+        environment: uv::ProjectEnvironment,
+    ) -> Result<ProjectReloadResult, ProjectMetadataError> {
+        let mut metadata = self
+            .metadata(db)
+            .rediscover(db.system(), path, environment)?;
+        if let Err(error) = metadata.apply_configuration_files(db.system()) {
+            let error = anyhow::Error::new(error);
+            tracing::error!(
+                "Failed to apply configuration files, \
+                continuing without applying them: {error:#}"
+            );
+        }
+
+        metadata.try_add_project_root(db);
+        let merged_options = metadata.to_merged_options();
+
+        let program_settings_diagnostics =
+            match merged_options.to_program_settings(db.system(), db.vendored(), &FallibleStrategy)
+            {
+                Ok((program_settings, diagnostics)) => {
+                    self.update_program(db, program_settings);
+                    diagnostics
+                }
+                Err(error) => {
+                    tracing::error!(
+                        "Failed to convert metadata to program settings, \
+                         continuing without applying them: {error}"
+                    );
+                    Vec::new()
+                }
+            };
+
+        let (settings, mut settings_diagnostics) =
+            match merged_options.to_settings(db, &FallibleStrategy) {
+                Ok((settings, diagnostics)) => (Some(settings), diagnostics),
+                Err(error) => {
+                    tracing::warn!(
+                        "Keeping old project configuration because loading the new \
+                         settings failed with: {error}"
+                    );
+                    (None, vec![error.into_diagnostic()])
+                }
+            };
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(db)),
+        );
+
+        tracing::debug!("Reloading project after structural change");
+        Ok(self.reload(db, metadata, settings, settings_diagnostics))
     }
 
     /// Reload the project after its metadata or settings have changed.
@@ -377,11 +440,7 @@ impl Project {
             name = self.name(db)
         );
 
-        let mut diagnostics: Vec<Diagnostic> = self
-            .settings_diagnostics(db)
-            .iter()
-            .map(OptionDiagnostic::to_diagnostic)
-            .collect();
+        let mut diagnostics = self.check_settings(db);
 
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
@@ -404,9 +463,7 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
-                let initialization = db
-                    .script_environments()
-                    .initialize_blocking(db, file, reporter);
+                let initialization = db.uv_environments().initialize_blocking(db, file, reporter);
                 if initialization.is_pending() {
                     // The CLI watch loop or language server already scheduled this script's first
                     // synchronization in the background. Until it completes, there is no
@@ -678,6 +735,7 @@ impl Project {
         self.settings_diagnostics(db)
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
+            .chain(self.metadata(db).uv_diagnostic(db))
             .collect()
     }
 }
@@ -706,7 +764,7 @@ pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
         return true;
     };
 
-    script.has_valid_settings(db) && !db.script_environments().is_initialization_pending(db, file)
+    script.has_valid_settings(db) && !db.uv_environments().is_initialization_pending(db, file)
 }
 
 /// Returns `true` if the file should be checked.

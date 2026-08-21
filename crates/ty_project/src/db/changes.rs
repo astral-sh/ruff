@@ -1,6 +1,6 @@
 use crate::db::{Db, ProjectDatabase};
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
-use crate::{ProjectMetadata, ProjectReloadResult};
+use crate::{ProjectMetadata, ProjectReloadResult, ProjectSyncProgressFactory};
 use std::collections::BTreeSet;
 
 use crate::walk::{ProjectFilesWalker, create_walker_builder};
@@ -29,8 +29,17 @@ impl ChangeResult {
 }
 
 impl ProjectDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes))]
     pub fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
+        self.apply_changes_with_progress(changes, &|_, _| None)
+    }
+
+    /// Applies file changes, reporting progress if project metadata must be refreshed.
+    #[tracing::instrument(level = "debug", skip_all)]
+    pub fn apply_changes_with_progress(
+        &mut self,
+        changes: &[ChangeEvent],
+        make_progress: &ProjectSyncProgressFactory<'_>,
+    ) -> ChangeResult {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
         let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
@@ -240,76 +249,40 @@ impl ProjectDatabase {
         Files::sync_all_recursive(self, sync_recursively);
 
         if reload_project {
-            let new_project_metadata = project.metadata(self).rediscover(self.system());
-            match new_project_metadata {
-                Ok(mut metadata) => {
-                    if let Err(error) = metadata.apply_configuration_files(self.system()) {
+            // The active project root may have been deleted. Start rediscovery from the closest
+            // existing ancestor so ty can fall back to an enclosing project.
+            let path = project_root
+                .ancestors()
+                .find(|path| self.system().is_directory(path))
+                .unwrap_or(&project_root);
+            let metadata = project.metadata(self);
+            if metadata.use_uv().workspace_discovery_enabled()
+                && metadata.config_file_override().is_none()
+            {
+                self.uv_environments()
+                    .request_project_sync(self, path, make_progress);
+            } else {
+                // We're not refreshing uv metadata, so use the existing environment.
+                let environment = metadata.environment().clone();
+                match project.rediscover(self, path, environment) {
+                    Ok(ProjectReloadResult::Unchanged) => {}
+                    Ok(ProjectReloadResult::Changed { files_changed }) => {
+                        result.project_changed = true;
+                        if files_changed {
+                            // The project file set has already been rebuilt; continuing would
+                            // run incremental discovery from paths collected before the reload.
+                            return result;
+                        }
+                    }
+                    Err(error) => {
                         let error = anyhow::Error::new(error);
                         tracing::error!(
-                            "Failed to apply configuration files, \
-                            continuing without applying them: {error:#}"
+                            "Failed to load project, keeping old project configuration: {error:#}"
                         );
-                    }
-
-                    metadata.try_add_project_root(self);
-                    let merged_options = metadata.to_merged_options();
-
-                    let program_settings_diagnostics = match merged_options.to_program_settings(
-                        self.system(),
-                        self.vendored(),
-                        &FallibleStrategy,
-                    ) {
-                        Ok((program_settings, diagnostics)) => {
-                            project.update_program(self, program_settings);
-                            diagnostics
+                        if reload_project_files {
+                            project.reload_files(self);
+                            return result;
                         }
-                        Err(error) => {
-                            tracing::error!(
-                                "Failed to convert metadata to program settings, \
-                                continuing without applying them: {error}"
-                            );
-                            Vec::new()
-                        }
-                    };
-
-                    let (settings, mut settings_diagnostics) =
-                        match merged_options.to_settings(self, &FallibleStrategy) {
-                            Ok((settings, diagnostics)) => (Some(settings), diagnostics),
-                            Err(error) => {
-                                tracing::warn!(
-                                    "Keeping old project configuration because loading the new \
-                                     settings failed with: {error}"
-                                );
-                                (None, vec![error.into_diagnostic()])
-                            }
-                        };
-                    settings_diagnostics.extend(
-                        program_settings_diagnostics
-                            .into_iter()
-                            .map(|diagnostic| diagnostic.into_diagnostic(self)),
-                    );
-
-                    tracing::debug!("Reloading project after structural change");
-                    match project.reload(self, metadata, settings, settings_diagnostics) {
-                        ProjectReloadResult::Unchanged => {}
-                        ProjectReloadResult::Changed { files_changed } => {
-                            result.project_changed = true;
-                            if files_changed {
-                                // The project file set has already been rebuilt; continuing would
-                                // run incremental discovery from paths collected before the reload.
-                                return result;
-                            }
-                        }
-                    }
-                }
-                Err(error) => {
-                    let error = anyhow::Error::new(error);
-                    tracing::error!(
-                        "Failed to load project, keeping old project configuration: {error:#}"
-                    );
-                    if reload_project_files {
-                        project.reload_files(self);
-                        return result;
                     }
                 }
             }

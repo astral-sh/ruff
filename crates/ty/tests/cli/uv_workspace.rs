@@ -403,13 +403,27 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
         .env("TY_OUTPUT_FORMAT", "concise");
 
     assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    pyproject.toml: warning[uv-metadata] Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    command.env_remove("TY_OUTPUT_FORMAT");
+    command.arg("--exit-zero-on-warning");
+    assert_cmd_snapshot!(command, @"
     success: true
     exit_code: 0
     ----- stdout -----
-    All checks passed!
+    warning[uv-metadata]: Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
+    --> pyproject.toml:1:1
+
+    Found 1 diagnostic
 
     ----- stderr -----
-    WARN Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
     ");
 
     Ok(())
