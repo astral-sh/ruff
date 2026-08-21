@@ -8,6 +8,15 @@ use crate::types::may_exist_at_runtime;
 mod collection;
 mod fixtures;
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "parts of the shared model are reserved for the type-inference consumer"
+    )
+)]
+pub(crate) mod parametrization;
+
 pub use fixtures::{
     FixtureBinding, FixtureExposure, FixtureNameSource, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files,
