@@ -3230,23 +3230,6 @@ impl NodeId {
         result
     }
 
-    fn remove_noninferable<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-    ) -> (Self, Option<SourceOrderId>) {
-        match self.node() {
-            Node::AlwaysTrue => (ALWAYS_TRUE, None),
-            Node::AlwaysFalse => (ALWAYS_FALSE, None),
-            Node::Interior(interior) => {
-                interior.remove_noninferable(db, env, storage, inferable, source_order)
-            }
-        }
-    }
-
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
@@ -3756,7 +3739,13 @@ impl<'db> PathBounds<'db> {
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> Self {
-        let mut source_orders = storage.calculate_source_orders(source_order);
+        let interior = match node.node() {
+            Node::AlwaysTrue => return PathBounds::Unconstrained,
+            Node::AlwaysFalse => return PathBounds::Unsatisfiable,
+            Node::Interior(interior) => interior,
+        };
+
+        let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
             db,
             env,
@@ -3768,18 +3757,8 @@ impl<'db> PathBounds<'db> {
             return path_bounds;
         }
 
-        let (node, derived_source_order) =
-            node.remove_noninferable(db, env, storage, inferable, source_order);
-        source_orders.extend(storage.calculate_source_orders(derived_source_order));
-        let interior = match node.node() {
-            Node::AlwaysTrue => return PathBounds::Unconstrained,
-            Node::AlwaysFalse => return PathBounds::Unsatisfiable,
-            Node::Interior(interior) => interior,
-        };
-
-        let mut walker = SolutionWalker::new(source_orders);
-        let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(db, env, storage, path_source_order);
+        let mut walker = SolutionWalker::new(db, storage, inferable, source_orders);
+        let mut path = interior.path_assignments(db, env, storage, source_order);
         walker.visit_node(db, env, storage, &mut path, node);
         walker.finish(db, env, storage)
     }
@@ -4356,47 +4335,6 @@ impl InteriorNode {
         )
     }
 
-    fn remove_noninferable<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let is_bare_inferable_typevar = |ty: Type<'_>| {
-            ty.as_typevar()
-                .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
-        };
-        self.abstract_inner(
-            db,
-            env,
-            storage,
-            source_order,
-            // We only want to keep constraints on inferable typevars. If the constraint's typevar
-            // is itself inferable, we keep it. We also need to keep some constraints in
-            // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
-            // This ensure that our quantification logic does not depend on typevar ordering.
-            //
-            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
-            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
-            // only checked the inferability of the constrained typevar, we would keep the first
-            // encoding but remove the second.
-            &mut |storage: &ConstraintSetStorage<'_>, constraint| {
-                let constraint = storage.constraint_data(constraint);
-                !constraint.typevar.is_inferable(db, inferable)
-                    && !constraint
-                        .bounds
-                        .lower
-                        .is_some_and(is_bare_inferable_typevar)
-                    && !constraint
-                        .bounds
-                        .upper
-                        .is_some_and(is_bare_inferable_typevar)
-            },
-        )
-    }
-
     fn abstract_inner<'db, F>(
         self,
         db: &'db dyn Db,
@@ -4593,7 +4531,16 @@ impl InteriorNode {
                 .expect("every BDD constraint should have a source-order entry")
         });
 
-        if !self.node().is_single_conjunction(storage) {
+        // Concrete alternatives cannot introduce relationships between distinct typevars, so
+        // they can use the same independence optimization as a single conjunction.
+        if !self.node().is_single_conjunction(storage)
+            && constraints.iter().any(|constraint| {
+                !storage
+                    .constraint_data(*constraint)
+                    .bounds
+                    .is_concrete(db, env)
+            })
+        {
             return PathAssignments::new(constraints, FxHashSet::default());
         }
 
@@ -4675,6 +4622,18 @@ impl ConstraintAssignment {
             ConstraintAssignment::Negative(constraint) => constraint,
             ConstraintAssignment::Unconstrained(constraint) => constraint,
         }
+    }
+
+    fn as_constrained(self) -> Option<ConstraintId> {
+        match self {
+            ConstraintAssignment::Positive(constraint)
+            | ConstraintAssignment::Negative(constraint) => Some(constraint),
+            ConstraintAssignment::Unconstrained(_) => None,
+        }
+    }
+
+    fn is_positive(self) -> bool {
+        matches!(self, ConstraintAssignment::Positive(_))
     }
 
     fn negated(self) -> Self {
@@ -6617,17 +6576,6 @@ impl PathAssignments {
         result
     }
 
-    fn positive_constraints(&self) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
-        self.assignments.iter().filter_map(
-            |(assignment, (source_constraint, _))| match assignment {
-                ConstraintAssignment::Positive(constraint) => {
-                    Some((*constraint, *source_constraint))
-                }
-                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
-            },
-        )
-    }
-
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
         self.assignments.contains_key(&assignment)
     }
@@ -8332,7 +8280,7 @@ class E: ...
     }
 
     #[test]
-    fn constraint_ordering_changes_nested_transitive_solutions() {
+    fn nested_transitive_solutions_are_independent_of_constraint_order() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -8362,19 +8310,14 @@ class E: ...
                     .and(storage, list_int_t)
                     .or(storage, bytes_v)
             },
-            // TODO: All permutations should produce the first result. TDD traversal currently
-            // leaks irrelevant positive constraints onto the `V = bytes` alternative.
             [
                 "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]",
-                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; T=list[int], V=bytes; V=bytes]",
-                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; U=int, V=bytes; V=bytes]",
-                "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[T=list[int], U=int; T=list[U], V=bytes; V=bytes]",
             ],
         );
     }
 
     #[test]
-    fn constraint_ordering_changes_negated_alternative_solutions() {
+    fn negated_alternative_solutions_are_independent_of_constraint_order() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -8400,13 +8343,7 @@ class E: ...
                     .negate(storage)
                     .or(storage, bytes_u)
             },
-            // TODO: All permutations should produce the first result. A satisfied alternative
-            // should not infer `T` from unrelated positive decisions made earlier in a BDD path.
-            [
-                "never=false always=false merged=[U=bytes] paths=[; U=bytes]",
-                "never=false always=false merged=[T=str, U=bytes] paths=[; T=str, U=bytes; U=bytes]",
-                "never=false always=false merged=[T=int, U=bytes] paths=[; T=int, U=bytes; U=bytes]",
-            ],
+            ["never=false always=false merged=[U=bytes] paths=[; U=bytes]"],
         );
     }
 
