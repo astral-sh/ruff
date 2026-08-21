@@ -674,7 +674,7 @@ reveal_type(C.__class__)  # revealed: <class 'M'>
 
 A protocol declared in Python source uses `typing._ProtocolMeta`, which derives from `ABCMeta`.
 Explicitly specifying `ABCMeta` selects the more derived `_ProtocolMeta`. A compatible custom
-metaclass must be preserved, including when its base is obtained by calling `type`.
+metaclass is preserved, including when its base is obtained by calling `type`.
 
 ```py
 from abc import ABC, ABCMeta
@@ -884,7 +884,7 @@ class OwnAttribute(Iterable[object]):
 ## Built-in collection metaclasses
 
 Typeshed includes collection ABCs in some built-in classes' bases to describe their interfaces.
-Those stub-only bases must not change the built-ins' runtime metaclasses or introduce conflicts when
+Those stub-only bases do not change the built-ins' runtime metaclasses or introduce conflicts when
 they are subclassed.
 
 ```py

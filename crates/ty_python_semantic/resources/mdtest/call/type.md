@@ -1373,8 +1373,7 @@ instance = ProtoImpl()
 reveal_type(instance)  # revealed: ProtoImpl
 ```
 
-This is a real metaclass constraint, unlike the lookup-only `ABCMeta` fallback for protocol bases
-declared in typeshed. A subclass of the dynamic class cannot choose an unrelated metaclass.
+A subclass of the dynamic class cannot choose a metaclass unrelated to `_ProtocolMeta`.
 
 ```py
 class Meta(type): ...
