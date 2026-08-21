@@ -528,7 +528,7 @@ pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<Unpack<'db>>,
     pub(crate) value: &'ast ast::Expr,
     pub(crate) target: &'ast ast::Expr,
-    pub(crate) value_bindings_owner: AssignmentValueBindingsOwner,
+    pub(crate) owner: BindingsOwner,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -694,12 +694,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 unpack,
                 value,
                 target,
-                value_bindings_owner,
+                owner,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 unpack,
                 value: AstNodeRef::new(parsed, value),
                 target: AstNodeRef::new(parsed, target),
-                value_bindings_owner,
+                owner,
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
                 node,
@@ -844,7 +844,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value: _,
                 unpack: _,
                 target,
-                value_bindings_owner: _,
+                owner: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
@@ -1428,7 +1428,7 @@ impl ImportFromSubmoduleDefinitionKind {
 
 /// The inference region that owns bindings created while evaluating an assignment's value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub enum AssignmentValueBindingsOwner {
+pub enum BindingsOwner {
     /// A simple-name assignment is represented by its definition.
     Definition,
     /// An assignment with multiple, unpacking, or non-name targets is represented by its statement.
@@ -1440,7 +1440,7 @@ pub struct AssignmentDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
     value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
-    value_bindings_owner: AssignmentValueBindingsOwner,
+    owner: BindingsOwner,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -1456,8 +1456,8 @@ impl<'db> AssignmentDefinitionKind<'db> {
         self.target.node(module)
     }
 
-    pub fn value_bindings_owner(&self) -> AssignmentValueBindingsOwner {
-        self.value_bindings_owner
+    pub fn owner(&self) -> BindingsOwner {
+        self.owner
     }
 }
 

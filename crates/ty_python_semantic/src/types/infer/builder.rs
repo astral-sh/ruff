@@ -127,7 +127,7 @@ use crate::types::{
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{
-    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, AssignmentValueBindingsOwner,
+    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, BindingsOwner,
     ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind,
     LoopHeaderDefinitionKind, NestedBindingExecution, NestedBindingsDefinitionKind,
@@ -3403,11 +3403,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
                     let inference = infer_expression_types(self.db(), standalone_expression, tcx);
-                    match assignment.value_bindings_owner() {
-                        AssignmentValueBindingsOwner::Definition => {
+                    match assignment.owner() {
+                        BindingsOwner::Definition => {
                             self.extend_expression(inference);
                         }
-                        AssignmentValueBindingsOwner::Statement => {
+                        BindingsOwner::Statement => {
                             self.extend_expression_without_bindings(inference);
                         }
                     }
