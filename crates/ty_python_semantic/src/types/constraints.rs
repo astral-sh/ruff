@@ -2025,28 +2025,18 @@ impl<'db> ConstraintBounds<'db> {
 /// bounds such as `(A | B) & (C | D)` factored rather than distributing them into the DNF
 /// representation used by [`Type`].
 ///
-/// Every `UpperBound` contains at least one validity clause. An unconstrained validity upper bound
-/// is represented explicitly by `object`. An explicit evidence bound of `object` remains meaningful
-/// because evidence and validity clauses are stored separately.
+/// An empty validity set represents an unconstrained validity upper bound of `object`. This avoids
+/// allocating or checking the intersection identity on every path. An explicit evidence bound of
+/// `object` remains meaningful because evidence and validity clauses are stored separately.
 ///
 /// Redundant clauses are retained to preserve evidence even when a validity restriction is
 /// stronger. Consumers that require one effective bound can recover it with
 /// [`UpperBound::as_single_bound`] without eagerly expanding intersections of unions.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UpperBound<'db> {
     evidence: FxOrderSet<Type<'db>>,
     mixed: FxOrderSet<Type<'db>>,
     validity: FxOrderSet<Type<'db>>,
-}
-
-impl Default for UpperBound<'_> {
-    fn default() -> Self {
-        Self {
-            evidence: FxOrderSet::default(),
-            mixed: FxOrderSet::default(),
-            validity: FxOrderSet::from_iter([Type::object()]),
-        }
-    }
 }
 
 impl<'db> UpperBound<'db> {
@@ -2097,7 +2087,12 @@ impl<'db> UpperBound<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        Self::single_bound_from_iterator(db, env, self.iter_clauses())
+        let clauses = self.iter_clauses();
+        if clauses.clone().next().is_none() {
+            Some(Type::object())
+        } else {
+            Self::single_bound_from_iterator(db, env, clauses)
+        }
     }
 
     fn single_bound_from_iterator(
@@ -2152,9 +2147,6 @@ impl<'db> UpperBound<'db> {
             }
             ConstraintBound::Validity(ty) => {
                 if !self.validity.contains(&Type::Never) {
-                    if self.validity.len() == 1 && self.validity.contains(&Type::object()) {
-                        self.validity.clear();
-                    }
                     self.validity.insert(ty);
                 }
             }
