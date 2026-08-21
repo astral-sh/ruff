@@ -2468,7 +2468,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 generic_context.inferable_typevars(db),
             )
             .solve_with(|variance, path_bound| {
-                let Some(lower) = path_bound.lower else {
+                let Some(lower) = path_bound.inference_lower(db, &self.env) else {
                     return PathBoundSolution::Unsolved;
                 };
                 if variance != TypeVarVariance::Invariant
