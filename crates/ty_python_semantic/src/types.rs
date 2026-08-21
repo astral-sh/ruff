@@ -66,7 +66,7 @@ use crate::place::{
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
 use crate::types::call::bind::ConstructorCallableKind;
-use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
+use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding, ConstructorStack};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -5647,8 +5647,17 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
+        self.bindings_impl(db, env, None)
+    }
+
+    fn bindings_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        stack: Option<&ConstructorStack<'_, 'db>>,
+    ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.bindings(db, env);
+            return fallback.bindings_impl(db, env, stack);
         }
 
         match self {
@@ -5660,14 +5669,16 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db, env) {
                     None => CallableBinding::not_callable(self).into(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db, env),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.bindings_impl(db, env, stack)
+                    }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Bindings::from_union(
                             self,
                             constraints
                                 .elements(db)
                                 .iter()
-                                .map(|ty| ty.bindings(db, env)),
+                                .map(|ty| ty.bindings_impl(db, env, stack)),
                         )
                     }
                 }
@@ -5885,22 +5896,22 @@ impl<'db> Type<'db> {
                 // TODO this should be called from `constructor_bindings` for better consistency
                 .known_class_literal_bindings(db, env, class)
                 .unwrap_or_else(|| {
-                    self.constructor_bindings(db, env, ClassType::NonGeneric(class))
+                    self.constructor_bindings(db, env, ClassType::NonGeneric(class), stack)
                 }),
 
             Type::GenericAlias(alias) => {
-                self.constructor_bindings(db, env, ClassType::Generic(alias))
+                self.constructor_bindings(db, env, ClassType::Generic(alias), stack)
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(dynamic_type) => {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
-                SubclassOfInner::Class(class) => self.constructor_bindings(db, env, class),
+                SubclassOfInner::Class(class) => self.constructor_bindings(db, env, class, stack),
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map_or_else(
                     || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
                     |origin| {
-                        let bindings = self.constructor_bindings(db, env, *origin);
+                        let bindings = self.constructor_bindings(db, env, *origin, stack);
                         if protocol.materialization_kind(db).is_some() {
                             bindings.with_constructed_instance_type(
                                 db,
@@ -5922,16 +5933,15 @@ impl<'db> Type<'db> {
                             {
                                 bindings
                             } else {
-                                constructor.bindings(db, env)
+                                constructor.bindings_impl(db, env, stack)
                             }
                         }
                         TypeVarBoundOrConstraints::Constraints(constraints) => {
                             Bindings::from_union(
                                 self,
-                                constraints
-                                    .elements(db)
-                                    .iter()
-                                    .map(|ty| ty.to_meta_type(db, env).bindings(db, env)),
+                                constraints.elements(db).iter().map(|ty| {
+                                    ty.to_meta_type(db, env).bindings_impl(db, env, stack)
+                                }),
                             )
                         }
                     };
@@ -5975,7 +5985,7 @@ impl<'db> Type<'db> {
                         definedness: boundness,
                         ..
                     }) => {
-                        let mut bindings = dunder_callable.bindings(db, env);
+                        let mut bindings = dunder_callable.bindings_impl(db, env, stack);
                         bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Definedness::PossiblyUndefined {
                             bindings.set_dunder_call_is_possibly_unbound();
@@ -5998,7 +6008,7 @@ impl<'db> Type<'db> {
                 union
                     .elements(db)
                     .iter()
-                    .map(|element| element.bindings(db, env)),
+                    .map(|element| element.bindings_impl(db, env, stack)),
             ),
 
             // A narrowed `type[T: Base] & type[Child]` still needs to construct `T & Child`,
@@ -6018,7 +6028,9 @@ impl<'db> Type<'db> {
                     && let Type::NominalInstance(lookup_instance) =
                         instance_type.flatten_typevars(db, env)
                     && let Some(bindings) = {
-                        let bindings = lookup_instance.to_meta_type(db, env).bindings(db, env);
+                        let bindings = lookup_instance
+                            .to_meta_type(db, env)
+                            .bindings_impl(db, env, stack);
                         bindings.has_only_constructor_items().then_some(bindings)
                     } =>
             {
@@ -6031,12 +6043,12 @@ impl<'db> Type<'db> {
                 self,
                 intersection
                     .positive_elements_or_object(db)
-                    .map(|element| element.bindings(db, env)),
+                    .map(|element| element.bindings_impl(db, env, stack)),
             ),
 
-            Type::EnumComplement(complement) => {
-                complement.to_intersection(db, env).bindings(db, env)
-            }
+            Type::EnumComplement(complement) => complement
+                .to_intersection(db, env)
+                .bindings_impl(db, env, stack),
 
             Type::DataclassDecorator(_) => {
                 let typevar = BoundTypeVarInstance::synthetic(
@@ -6065,9 +6077,9 @@ impl<'db> Type<'db> {
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
             Type::LiteralValue(literal) => match literal.kind() {
-                LiteralValueTypeKind::Enum(enum_literal) => {
-                    enum_literal.enum_class_instance(db, env).bindings(db, env)
-                }
+                LiteralValueTypeKind::Enum(enum_literal) => enum_literal
+                    .enum_class_instance(db, env)
+                    .bindings_impl(db, env, stack),
                 _ => CallableBinding::not_callable(self).into(),
             },
 
@@ -6084,13 +6096,13 @@ impl<'db> Type<'db> {
             Type::KnownInstance(
                 KnownInstanceType::FunctoolsPartial(partial)
                 | KnownInstanceType::FunctoolsPartialCall(partial),
-            ) => Type::Callable(partial.partial(db)).bindings(db, env),
+            ) => Type::Callable(partial.partial(db)).bindings_impl(db, env, stack),
 
-            Type::KnownInstance(known_instance) => {
-                known_instance.instance_fallback(db, env).bindings(db, env)
-            }
+            Type::KnownInstance(known_instance) => known_instance
+                .instance_fallback(db, env)
+                .bindings_impl(db, env, stack),
 
-            Type::TypeAlias(alias) => alias.value_type(db).bindings(db, env),
+            Type::TypeAlias(alias) => alias.value_type(db).bindings_impl(db, env, stack),
 
             Type::PropertyInstance(_)
             | Type::AlwaysFalsy
@@ -6431,6 +6443,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         class: ClassType<'db>,
+        stack: Option<&ConstructorStack<'_, 'db>>,
     ) -> Bindings<'db> {
         fn resolve_dunder_new_callable<'db>(
             db: &'db dyn Db,
@@ -6555,6 +6568,13 @@ impl<'db> Type<'db> {
             _ => self,
         };
 
+        let stack = ConstructorStack::new(self_type, stack);
+        if stack.is_recursive() {
+            // Leave the return type unknown so the enclosing constructor supplies its own instance
+            // type, rather than using the class where the cycle happened to be detected.
+            return Binding::single(self_type, Signature::dynamic(Type::unknown())).into();
+        }
+
         // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
         // We preserve its full overload set here and defer constructor branching decisions
         // until call-time overload resolution.
@@ -6589,13 +6609,13 @@ impl<'db> Type<'db> {
         let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
             Some(place) => match resolve_dunder_new_callable(db, env, self_type, place) {
                 Some((new_callable, definedness)) => {
-                    let mut bindings =
-                        bind_constructor_new(db, env, new_callable.bindings(db, env), self_type)
-                            .into_constructor_bindings(
-                                constructor_instance_ty,
-                                ConstructorCallableKind::New,
-                            )
-                            .with_constructed_instance_type(db, constructor_instance_ty);
+                    let bindings = new_callable.bindings_impl(db, env, Some(&stack));
+                    let mut bindings = bind_constructor_new(db, env, bindings, self_type)
+                        .into_constructor_bindings(
+                            constructor_instance_ty,
+                            ConstructorCallableKind::New,
+                        )
+                        .with_constructed_instance_type(db, constructor_instance_ty);
                     if definedness == Definedness::PossiblyUndefined {
                         bindings.set_implicit_dunder_new_is_possibly_unbound();
                     }
@@ -6617,7 +6637,7 @@ impl<'db> Type<'db> {
                 _,
             ) => {
                 let mut bindings = init_method
-                    .bindings(db, env)
+                    .bindings_impl(db, env, Some(&stack))
                     .into_constructor_bindings(
                         constructor_instance_ty,
                         ConstructorCallableKind::Init,
@@ -6642,7 +6662,7 @@ impl<'db> Type<'db> {
                         ..
                     }) => {
                         let mut bindings = init_method
-                            .bindings(db, env)
+                            .bindings_impl(db, env, Some(&stack))
                             .into_constructor_bindings(
                                 constructor_instance_ty,
                                 ConstructorCallableKind::Init,
@@ -6696,7 +6716,7 @@ impl<'db> Type<'db> {
         }) = metaclass_dunder_call.place
         {
             let mut metaclass_bindings = metaclass_call_method
-                .bindings(db, env)
+                .bindings_impl(db, env, Some(&stack))
                 .into_constructor_bindings(
                     constructor_instance_ty,
                     ConstructorCallableKind::MetaclassCall,
