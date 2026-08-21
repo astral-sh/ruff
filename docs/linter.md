@@ -210,8 +210,7 @@ will typically only want to select individual rules from these categories direct
 
 ### Interaction with other selectors
 
-For now, these categories can be freely mixed with linter groups, linter prefixes, rule codes, and
-rule names, although we plan to deprecate and eventually remove the linter groups in the future. In
+Categories can be freely mixed with linter groups, linter prefixes, rule codes, and rule names. In
 addition to the priority relationships described above for settings like `lint.select`,
 `lint.extend-select`, and `lint.ignore`, and those for various configuration sources like
 `pyproject.toml` files and the CLI, the various selectors also have precedence relationships with
@@ -264,6 +263,10 @@ will select all `E` and `F` rules, with the exception of `F401`. Analogously, a 
     ```
 
 would select all `pedantic` rules, except for the `PTH` rules.
+
+Note that we plan to deprecate and eventually remove the linter groups in the future. If you give
+the new categories a try and run into situations where you need to fall back on linter groups,
+please let us know on the [tracking issue](https://github.com/astral-sh/ruff/issues/27959).
 
 ## Fixes
 
