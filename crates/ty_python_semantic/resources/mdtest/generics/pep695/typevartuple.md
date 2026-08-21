@@ -173,6 +173,99 @@ indirect: Variadic[str] = inferred
 direct: Variadic[str] = Variadic(1)
 ```
 
+Concrete contexts do not supply missing arguments or discard extra ones.
+
+```py
+# error: [invalid-assignment]
+missing_argument: Variadic[int] = reveal_type(Variadic())  # revealed: Variadic[()]
+
+# error: [invalid-assignment]
+extra_argument: Variadic[int] = reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+```
+
+A contextual specialization cannot supply missing constructor arguments. Empty calls infer an empty
+pack, and one argument cannot satisfy an arbitrary outer pack, even when it matches a required
+suffix. This applies with or without a fixed suffix.
+
+```py
+def empty_with_context[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
+    # error: [invalid-return-type]
+    return reveal_type(Variadic())  # revealed: Variadic[()]
+
+def nonempty_with_context[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
+    # error: [invalid-return-type]
+    return reveal_type(Variadic(1))  # revealed: Variadic[int]
+
+def empty_without_suffix[*Us](shape: tuple[*Us]) -> Variadic[*Us]:
+    # error: [invalid-return-type]
+    return reveal_type(Variadic())  # revealed: Variadic[()]
+```
+
+Forwarding the outer pack supplies the required arguments. A compatible context can still widen
+their element types without changing the pack's shape.
+
+```py
+widened: Variadic[object] = Variadic(1)
+
+def forward_without_suffix[*Us](shape: tuple[*Us]) -> Variadic[*Us]:
+    return Variadic(*shape)
+
+def forward_with_suffix[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
+    return Variadic(*shape, 1)
+
+def widen_suffix[*Us](shape: tuple[*Us]) -> Variadic[*Us, object]:
+    return Variadic(*shape, 1)
+```
+
+An unpacked `tuple[Any, ...]` can match any length, so a compatible context can specialize it. The
+same gradual behavior applies when a tuple is passed as one element of the pack.
+
+```py
+from typing import Any
+
+def gradual_arguments(values: tuple[Any, ...]) -> None:
+    concrete: Variadic[int, str] = reveal_type(Variadic(*values))  # revealed: Variadic[int, str]
+    nested: Variadic[object, tuple[int]] = reveal_type(Variadic(1, values))  # revealed: Variadic[object, tuple[int]]
+
+def gradual_with_context[*Us](shape: tuple[*Us], values: tuple[Any, ...]) -> Variadic[*Us, int]:
+    return Variadic(*values)
+
+def gradual_boundaries[*Us](
+    shape: tuple[*Us],
+    prefix: tuple[int, *tuple[Any, ...]],
+    suffix: tuple[*tuple[Any, ...], str],
+) -> None:
+    first: Variadic[int, *Us, str] = Variadic(*prefix)
+    last: Variadic[int, *Us, str] = Variadic(*suffix)
+```
+
+Aliases of `Any` preserve gradual length when the context supplies a concrete specialization.
+
+```py
+type Dynamic = Any
+
+def gradual_alias_arguments(values: tuple[Dynamic, ...]) -> None:
+    concrete: Variadic[int, str] = reveal_type(Variadic(*values))  # revealed: Variadic[int, str]
+```
+
+Fixed elements still constrain the pack's length and types, even when other elements are gradual.
+
+```py
+def fixed_any_with_context[*Us](shape: tuple[*Us], values: tuple[Any]) -> Variadic[*Us, int]:
+    fixed_length: Variadic[int] = reveal_type(Variadic(*values))  # revealed: Variadic[int]
+    # error: [invalid-return-type]
+    return reveal_type(Variadic(*values))  # revealed: Variadic[Any]
+
+def incompatible_gradual_prefix[*Us](shape: tuple[*Us], values: tuple[int, *tuple[Any, ...]]) -> Variadic[*Us, int]:
+    return Variadic(*values)  # error: [invalid-return-type]
+
+def incompatible_gradual_element(values: tuple[bytes, *tuple[Any, ...]]) -> Variadic[int, str]:
+    return Variadic(*values)  # error: [invalid-return-type]
+
+def too_many_gradual_boundaries(values: tuple[int, *tuple[Any, ...], str]) -> Variadic[int]:
+    return Variadic(*values)  # error: [invalid-return-type]
+```
+
 ### Unspecified type arguments
 
 An unsubscripted variadic generic behaves as if it used an unknown-length tuple of `Any` arguments.

@@ -6066,6 +6066,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ///
     /// Comparing the complete argument tuple with the declared tuple preserves fixed elements,
     /// nested type variable tuples, and the unbounded shape of splatted arguments.
+    /// If requested, checks the preferred type context as well. A `false` result tells the caller
+    /// to retry inference using only argument constraints.
     ///
     /// ```py
     /// def collect[*Ts](*args: *Ts) -> tuple[*Ts]: ...
@@ -6077,14 +6079,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn infer_typevartuple_argument_constraints<'c>(
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
+        check_type_context: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
-    ) -> Result<(), (SpecializationError<'db>, Option<usize>)> {
+    ) -> bool {
         let db = self.db;
         let Some((parameter_index, parameter)) = self.signature.parameters().variadic() else {
-            return Ok(());
+            return true;
         };
         if !parameter.has_starred_annotation() {
-            return Ok(());
+            return true;
         }
 
         // An untouched variadic parameter remains available to future calls of a partial. In
@@ -6096,7 +6099,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .any(|matched| matched.index == parameter_index)
             })
         {
-            return Ok(());
+            return true;
         }
 
         let (formal, typevartuple) = match parameter.annotated_type() {
@@ -6113,27 +6116,41 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
                     })
                 else {
-                    return Ok(());
+                    return true;
                 };
                 (annotation, typevartuple)
             }
         };
 
         if !self.can_infer_typevartuple_arguments(parameter_index, typevartuple) {
-            return Ok(());
+            return true;
         }
 
         let Some((actual, argument_indices)) =
             self.collect_typevartuple_arguments(parameter_index, parameter, formal)
         else {
-            return Ok(());
+            return true;
         };
 
-        builder.infer(formal, actual).map_err(|error| {
-            let argument_index =
-                argument_indices.and_then(|(first, last)| (first == last).then_some(first));
-            (error, argument_index)
-        })?;
+        if let Err(error) = builder.infer(formal, actual) {
+            // Fixed elements may already have produced the same specialization error.
+            if !specialization_errors.iter().any(|existing| {
+                matches!(
+                    existing,
+                    BindingError::SpecializationError {
+                        error: existing,
+                        ..
+                    } if existing == &error
+                )
+            }) {
+                specialization_errors.push(BindingError::SpecializationError {
+                    error,
+                    argument_index: argument_indices
+                        .and_then(|(first, last)| (first == last).then_some(first)),
+                });
+            }
+            return !check_type_context;
+        }
 
         if self.signature.generic_context.is_some() {
             let specialization = builder.build_with(|_, _| None);
@@ -6157,9 +6174,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     parameter_source: None,
                 });
             }
+
+            // A preferred return context can fix the pack before argument inference reaches it.
+            // Check the complete arguments against that specialization, including the empty tuple
+            // from `A()`, so an incompatible `A[*Us, int]` is retried without the context.
+            return !check_type_context
+                || self.is_partial_application
+                || actual
+                    .apply_specialization(db, specialization)
+                    .is_assignable_to(db, self.env, expected_ty);
         }
 
-        Ok(())
+        true
     }
 
     /// Returns whether a type variable tuple can be inferred from its variadic arguments.
@@ -6343,25 +6369,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        if let Err((error, argument_index)) =
-            self.infer_typevartuple_argument_constraints(builder, specialization_errors)
-            && !specialization_errors.iter().any(|existing| {
-                matches!(
-                    existing,
-                    BindingError::SpecializationError {
-                        error: existing,
-                        ..
-                    } if existing == &error
-                )
-            })
-        {
-            specialization_errors.push(BindingError::SpecializationError {
-                error,
-                argument_index,
-            });
-        }
-
-        preferred_type_mappings
+        self.infer_typevartuple_argument_constraints(
+            builder,
+            !preferred_type_mappings.is_empty(),
+            specialization_errors,
+        ) && preferred_type_mappings
             .iter()
             .all(|(&identity, &preferred_ty)| {
                 partially_specialized_declared_type.contains(&identity)
