@@ -1694,10 +1694,68 @@ class B:
 reveal_type(B.__slots__)  # revealed: tuple[Literal["x"], Literal["y"]]
 ```
 
+A dataclass cannot generate slots when its class body already defines `__slots__`. The invalid
+dataclass should produce only the dataclass error, not additional errors for its fields.
+
+```py
+@dataclass(slots=True)
+class ExistingSlots:  # error: [invalid-dataclass] "Dataclass `ExistingSlots` cannot combine `slots=True` with manually assigned `__slots__`"
+    value: int
+    __slots__ = ()
+```
+
+An explicit `__slots__` declaration remains valid when slot generation is disabled.
+
+```py
+@dataclass(slots=False)
+class ValidExistingSlots:
+    __slots__ = ("value",)
+    value: int
+```
+
+An explicit `__slots__` declaration also conflicts when its names are not statically known.
+
+```py
+def choose_slots() -> tuple[str, ...]:
+    return ("value",)
+
+@dataclass(slots=True)
+class DynamicExistingSlots:  # error: [invalid-dataclass] "Dataclass `DynamicExistingSlots` cannot combine `slots=True` with manually assigned `__slots__`"
+    value: int
+    __slots__ = choose_slots()
+```
+
+A bare annotation does not bind `__slots__` in the runtime class namespace, so it does not prevent
+the dataclass from generating slots.
+
+```py
+from typing import ClassVar
+
+@dataclass(slots=True)
+class AnnotatedSlots:
+    __slots__: ClassVar[tuple[str, ...]]
+    value: int
+
+reveal_type(AnnotatedSlots.__slots__)  # revealed: tuple[Literal["value"]]
+```
+
+Like other class attributes, `__slots__` assignments inside `TYPE_CHECKING` blocks are visible to
+static analysis.
+
+```py
+from typing import TYPE_CHECKING
+
+@dataclass(slots=True)
+class TypeCheckingSlots:  # error: [invalid-dataclass] "Dataclass `TypeCheckingSlots` cannot combine `slots=True` with manually assigned `__slots__`"
+    value: int
+
+    if TYPE_CHECKING:
+        __slots__ = ("other",)
+```
+
 ### `weakref_slot`
 
-When a dataclass is defined with `weakref_slot=True` on Python >=3.11, the `__weakref__` attribute
-is generated. For now, we do not attempt to infer a more precise type for it.
+On Python 3.11 and later, `weakref_slot=True` creates a `__weakref__` descriptor on the dataclass.
 
 ```toml
 [environment]
@@ -1711,7 +1769,19 @@ from dataclasses import dataclass
 class C:
     x: int
 
-reveal_type(C.__weakref__)  # revealed: Any | None
+reveal_type(C.__weakref__)  # revealed: Any
+reveal_type(C(1).__weakref__)  # revealed: Any
+reveal_type(C.__slots__)  # revealed: tuple[Literal["x"], Literal["__weakref__"]]
+```
+
+A slotted subclass uses the inherited weak-reference slot instead of creating another one.
+
+```py
+@dataclass(slots=True, weakref_slot=True)
+class Child(C):
+    y: int
+
+reveal_type(Child.__slots__)  # revealed: tuple[Literal["y"]]
 ```
 
 `weakref_slot=True` requires `slots=True`:

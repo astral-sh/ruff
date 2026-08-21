@@ -9,6 +9,7 @@ class:
 
 - `order=True` with `eq=False`
 - `weakref_slot=True` with `slots=False`
+- `slots=True` when the class already defines `__slots__`
 
 Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
 `Enum`, or `Protocol` is also invalid:

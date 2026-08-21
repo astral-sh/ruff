@@ -890,6 +890,30 @@ c.name = None
 c.name = 42
 ```
 
+### Writing to a property's documentation
+
+A property stores its documentation in a writable descriptor even though property instances do not
+have an instance dictionary.
+
+```py
+class Example:
+    @property
+    def value(self) -> int:
+        return 1
+
+    value.__doc__ = "Updated documentation"
+```
+
+A property created directly has the same writable `__doc__` attribute. Assignments must still
+respect its `str | None` annotation, and arbitrary instance attributes remain unsupported.
+
+```py
+descriptor = property(lambda instance: 1)
+descriptor.__doc__ = None
+descriptor.__doc__ = 1  # error: [invalid-assignment]
+descriptor.extra = 1  # error: [unresolved-attribute]
+```
+
 ### Overriding properties in subclasses
 
 When a subclass overrides a property, accessing other inherited properties from within the

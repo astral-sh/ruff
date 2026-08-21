@@ -1233,9 +1233,9 @@ class D(A, B, C): ...
 **Known problems**
 
 
-Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
-of string literals, or tuples of string literals) are not currently considered disjoint
-bases by ty.
+Classes whose `__slots__` values cannot be determined statically are not always considered
+disjoint bases by ty. Static definitions can include string literals, fixed-length tuples,
+and literal lists, sets, or dictionaries of string literals.
 
 Additionally, this check is not exhaustive: many C extensions (including several in
 the standard library) define classes that use extended memory layouts and thus cannot
@@ -1542,6 +1542,7 @@ class:
 
 - `order=True` with `eq=False`
 - `weakref_slot=True` with `slots=False`
+- `slots=True` when the class already defines `__slots__`
 
 Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
 `Enum`, or `Protocol` is also invalid:

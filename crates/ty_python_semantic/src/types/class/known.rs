@@ -83,6 +83,8 @@ pub enum KnownClass {
     MethodType,
     MethodWrapperType,
     WrapperDescriptorType,
+    MemberDescriptorType,
+    GetSetDescriptorType,
     UnionType,
     GeneratorType,
     AsyncGeneratorType,
@@ -328,6 +330,8 @@ impl KnownClass {
             | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
             | Self::WrapperDescriptorType
+            | Self::MemberDescriptorType
+            | Self::GetSetDescriptorType
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
@@ -482,6 +486,8 @@ impl KnownClass {
             | KnownClass::MethodType
             | KnownClass::MethodWrapperType
             | KnownClass::WrapperDescriptorType
+            | KnownClass::MemberDescriptorType
+            | KnownClass::GetSetDescriptorType
             | KnownClass::UnionType
             | KnownClass::GeneratorType
             | KnownClass::AsyncGeneratorType
@@ -598,6 +604,8 @@ impl KnownClass {
             | KnownClass::MethodType
             | KnownClass::MethodWrapperType
             | KnownClass::WrapperDescriptorType
+            | KnownClass::MemberDescriptorType
+            | KnownClass::GetSetDescriptorType
             | KnownClass::UnionType
             | KnownClass::GeneratorType
             | KnownClass::AsyncGeneratorType
@@ -715,6 +723,8 @@ impl KnownClass {
             | KnownClass::MethodType
             | KnownClass::MethodWrapperType
             | KnownClass::WrapperDescriptorType
+            | KnownClass::MemberDescriptorType
+            | KnownClass::GetSetDescriptorType
             | KnownClass::UnionType
             | KnownClass::GeneratorType
             | KnownClass::AsyncGeneratorType
@@ -844,6 +854,8 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType
+            | Self::MemberDescriptorType
+            | Self::GetSetDescriptorType
             | Self::NoneType
             | Self::SpecialForm
             | Self::TypeVar
@@ -958,6 +970,8 @@ impl KnownClass {
             | KnownClass::MethodType
             | KnownClass::MethodWrapperType
             | KnownClass::WrapperDescriptorType
+            | KnownClass::MemberDescriptorType
+            | KnownClass::GetSetDescriptorType
             | KnownClass::UnionType
             | KnownClass::GeneratorType
             | KnownClass::AsyncGeneratorType
@@ -1066,6 +1080,8 @@ impl KnownClass {
             Self::UnionType => "UnionType",
             Self::MethodWrapperType => "MethodWrapperType",
             Self::WrapperDescriptorType => "WrapperDescriptorType",
+            Self::MemberDescriptorType => "MemberDescriptorType",
+            Self::GetSetDescriptorType => "GetSetDescriptorType",
             Self::BuiltinFunctionType => "BuiltinFunctionType",
             Self::GeneratorType => "GeneratorType",
             Self::AsyncGeneratorType => "AsyncGeneratorType",
@@ -1493,7 +1509,9 @@ impl KnownClass {
             | Self::BuiltinFunctionType
             | Self::EllipsisType
             | Self::NotImplementedType
-            | Self::WrapperDescriptorType => KnownModule::Types,
+            | Self::WrapperDescriptorType
+            | Self::MemberDescriptorType
+            | Self::GetSetDescriptorType => KnownModule::Types,
             Self::NoneType | Self::SupportsKeysAndGetItem => KnownModule::Typeshed,
             Self::Awaitable
             | Self::Generator
@@ -1614,6 +1632,8 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType
+            | Self::MemberDescriptorType
+            | Self::GetSetDescriptorType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
             | Self::CoroutineType
@@ -1748,6 +1768,8 @@ impl KnownClass {
             "UnionType" => &[Self::UnionType],
             "MethodWrapperType" => &[Self::MethodWrapperType],
             "WrapperDescriptorType" => &[Self::WrapperDescriptorType],
+            "MemberDescriptorType" => &[Self::MemberDescriptorType],
+            "GetSetDescriptorType" => &[Self::GetSetDescriptorType],
             "BuiltinFunctionType" => &[Self::BuiltinFunctionType],
             "NewType" => &[Self::NewType],
             "TypeAliasType" => &[Self::TypeAliasType, Self::ExtensionsTypeAliasType],
@@ -1881,6 +1903,8 @@ impl KnownClass {
             | Self::AsyncGeneratorType
             | Self::CoroutineType
             | Self::WrapperDescriptorType
+            | Self::MemberDescriptorType
+            | Self::GetSetDescriptorType
             | Self::BuiltinFunctionType
             | Self::Field
             | Self::KwOnly

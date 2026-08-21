@@ -866,6 +866,9 @@ impl<'db> BoundSuperType<'db> {
             Type::PropertyInstance(property) => {
                 return delegate_to(property.instance_fallback(db, env));
             }
+            Type::SlotDescriptor(_) => {
+                return delegate_to(KnownClass::MemberDescriptorType.to_instance(db, env));
+            }
             Type::BoundSuper(_) => {
                 return delegate_to(KnownClass::Super.to_instance(db, env));
             }

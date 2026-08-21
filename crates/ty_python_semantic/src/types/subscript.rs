@@ -893,6 +893,7 @@ impl<'db> Type<'db> {
                 | Type::AlwaysTruthy
                 | Type::ProtocolInstance(_)
                 | Type::PropertyInstance(_)
+                | Type::SlotDescriptor(_)
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
