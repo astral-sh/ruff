@@ -108,6 +108,23 @@ impl ProjectionTypeBudget {
 }
 
 impl<'db> ConstraintSet<'db, '_> {
+    /// Computes default solutions for each BDD path within the default projection budget.
+    pub(crate) fn solutions(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let builder = self.builder;
+        self.solutions_with(
+            db,
+            env,
+            inferable,
+            SolutionBudget::default(),
+            |_variance, path_bound| PathBounds::default_solve(db, env, builder, path_bound),
+        )
+    }
+
     fn bounded_path_bounds(
         self,
         db: &'db dyn Db,
@@ -126,13 +143,17 @@ impl<'db> ConstraintSet<'db, '_> {
         )
     }
 
-    /// Like [`Self::solutions_with`], but bounds path traversal and retained type terms.
+    /// Computes solutions using a caller-provided selector within the given projection budget.
+    ///
+    /// The selector receives the typevar's variance and explicit lower and upper bounds. Its
+    /// outcome distinguishes missing evidence, invalid paths, and exhausted solution budgets.
+    /// The caller is responsible for combining the resulting paths (typically via union).
     ///
     /// Per-variable budget exhaustion preserves available fallback bindings and marks the path
     /// family as [`SolutionPaths::BudgetExceeded`](super::SolutionPaths::BudgetExceeded).
     /// Exhausting a limit in the supplied [`SolutionBudget`] instead returns an error without a
     /// partial path family.
-    pub(crate) fn solutions_with_budget(
+    pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -140,16 +161,14 @@ impl<'db> ConstraintSet<'db, '_> {
         budget: SolutionBudget,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
-        let solutions = self
-            .bounded_path_bounds(db, env, inferable, budget)?
-            .solve_with(choose);
-        if let Solutions::Constrained(paths) = &solutions {
-            let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
-            for binding in paths.as_slice().iter().flatten() {
+        let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
+        let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
+        path_bounds.try_solve_with(choose, |solution| {
+            for binding in solution {
                 type_budget.charge_type(db, binding.solution)?;
             }
-        }
-        Ok(solutions)
+            Ok(())
+        })
     }
 
     /// Folds complete, correlated solutions without first allocating every solved path.

@@ -842,46 +842,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .negate(db, builder)
     }
 
-    /// Computes default solutions for each BDD path.
-    pub(crate) fn solutions(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &'c ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
-    ) -> Solutions<'db> {
-        self.solutions_with(db, env, builder, inferable, |_variance, path_bound| {
-            PathBounds::default_solve(db, env, builder, path_bound)
-        })
-    }
-
-    /// Computes solutions using a caller-provided selector for each typevar on each BDD path.
-    ///
-    /// The selector receives the typevar's variance and explicit lower and upper bounds. Its
-    /// outcome distinguishes missing evidence, invalid paths, and exhausted solution budgets.
-    /// The caller is responsible for combining the resulting paths (typically via union).
-    pub(crate) fn solutions_with(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &'c ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
-        choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
-    ) -> Solutions<'db> {
-        self.verify_builder(builder);
-        let mut storage = builder.storage.borrow_mut();
-        let path_bounds = PathBounds::compute(
-            db,
-            env,
-            &mut storage,
-            self.node,
-            inferable,
-            self.source_order,
-        );
-        drop(storage);
-        path_bounds.solve_with(choose)
-    }
-
     pub(crate) fn display(
         self,
         db: &'db dyn Db,
@@ -3992,11 +3952,21 @@ impl<'db> PathBounds<'db> {
     /// the path's available bindings, but marks the resulting path family as incomplete.
     pub(crate) fn solve_with(
         &self,
-        mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
+        choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
     ) -> Solutions<'db> {
+        let Ok(solutions) = self.try_solve_with(choose, |_| Ok::<(), Infallible>(()));
+        solutions
+    }
+
+    /// Checks each retained solution before collecting it or solving the next path.
+    fn try_solve_with<E>(
+        &self,
+        mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
+        mut check_solution: impl FnMut(&Solution<'db>) -> Result<(), E>,
+    ) -> Result<Solutions<'db>, E> {
         let paths = match self {
-            PathBounds::Unsatisfiable => return Solutions::Unsatisfiable,
-            PathBounds::Unconstrained => return Solutions::Unconstrained,
+            PathBounds::Unsatisfiable => return Ok(Solutions::Unsatisfiable),
+            PathBounds::Unconstrained => return Ok(Solutions::Unconstrained),
             PathBounds::Constrained(paths) => paths,
         };
 
@@ -4007,18 +3977,19 @@ impl<'db> PathBounds<'db> {
             else {
                 continue;
             };
+            check_solution(&solution)?;
             exceeded_budget |= path_exceeded_budget;
             solutions.push(solution);
         }
 
         if solutions.is_empty() {
-            return Solutions::Unsatisfiable;
+            return Ok(Solutions::Unsatisfiable);
         }
-        Solutions::Constrained(if exceeded_budget {
+        Ok(Solutions::Constrained(if exceeded_budget {
             SolutionPaths::BudgetExceeded(solutions)
         } else {
             SolutionPaths::Complete(solutions)
-        })
+        }))
     }
 
     /// Solves one complete path, retaining whether any of its bindings used a fallback.
@@ -7826,13 +7797,15 @@ mod tests {
             )
         };
 
-        let solutions = set.solutions(db, &env, &builder, inferable);
+        let solutions = set.solutions(db, &env, inferable);
         assert_eq!(
             solutions,
-            Solutions::Constrained(SolutionPaths::Complete(vec![vec![TypeVarSolution {
-                bound_typevar: t,
-                solution: UnionType::from_elements(db, &env, [int, str]),
-            }]]))
+            Ok(Solutions::Constrained(SolutionPaths::Complete(vec![vec![
+                TypeVarSolution {
+                    bound_typevar: t,
+                    solution: UnionType::from_elements(db, &env, [int, str]),
+                }
+            ]])))
         );
 
         let storage = builder.storage.borrow();
@@ -7863,7 +7836,7 @@ mod tests {
             )
         };
 
-        let Solutions::Constrained(solutions) = set.solutions(db, &env, &builder, inferable) else {
+        let Ok(Solutions::Constrained(solutions)) = set.solutions(db, &env, inferable) else {
             panic!("expected constrained solutions");
         };
         let solutions = solutions.into_vec();
@@ -7907,8 +7880,8 @@ mod tests {
         };
 
         assert_eq!(
-            set.solutions(db, &env, &builder, inferable),
-            Solutions::Unsatisfiable
+            set.solutions(db, &env, inferable),
+            Ok(Solutions::Unsatisfiable)
         );
 
         let storage = builder.storage.borrow();
@@ -8446,9 +8419,9 @@ class E: ...
             drop(storage);
 
             let set = ConstraintSet::from_node(&builder, node, source_order);
-            let solutions = set.solutions(db, &env, &builder, inferable);
+            let solutions = set.solutions(db, &env, inferable);
             let mut merged = FxHashMap::default();
-            if let Solutions::Constrained(paths) = &solutions {
+            if let Ok(Solutions::Constrained(paths)) = &solutions {
                 for path in paths.as_slice() {
                     for binding in path {
                         merged
@@ -8478,9 +8451,9 @@ class E: ...
                 })
                 .join(", ");
             let paths = match &solutions {
-                Solutions::Unsatisfiable => String::from("unsatisfiable"),
-                Solutions::Unconstrained => String::from("unconstrained"),
-                Solutions::Constrained(paths) => paths
+                Ok(Solutions::Unsatisfiable) => String::from("unsatisfiable"),
+                Ok(Solutions::Unconstrained) => String::from("unconstrained"),
+                Ok(Solutions::Constrained(paths)) => paths
                     .as_slice()
                     .iter()
                     .map(|path| {
@@ -8495,6 +8468,7 @@ class E: ...
                             .join(", ")
                     })
                     .join("; "),
+                Err(error) => format!("error: {error:?}"),
             };
             signatures.insert(format!(
                 "never={} always={} merged=[{merged}] paths=[{paths}]",

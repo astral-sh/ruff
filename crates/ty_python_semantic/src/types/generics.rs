@@ -3044,7 +3044,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn analyze_constraint_set(&self, set: ConstraintSet<'db, 'c>) -> ConstraintSetAnalysis<'db> {
         let db = self.db;
         let mut failures = SmallVec::new();
-        let solutions = set.solutions_with_budget(
+        let solutions = set.solutions_with(
             db,
             self.env,
             self.inferable,
@@ -3347,8 +3347,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(db, env, formal);
         let mapping_when = self.constraints.load(db, env, &mapping_when);
         // Logically equivalent constraints can still infer different solutions, such as `Any`
-        // instead of `object`; preserve the original constraints when gradual evidence differs.
-        let mapping_solutions = mapping_when.solutions(db, env, self.constraints, self.inferable);
+        // instead of `object`; preserve the original constraints when gradual evidence differs
+        // or either solution collection exceeds its budget.
+        let mapping_solutions = mapping_when.solutions(db, env, self.inferable).ok()?;
         if !typed_dicts.into_iter().all(|element| {
             let element_when = self.constraints.load(
                 db,
@@ -3358,8 +3359,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             element_when
                 .iff(db, self.constraints, mapping_when)
                 .is_always_satisfied(db, env)
-                && element_when.solutions(db, env, self.constraints, self.inferable)
-                    == mapping_solutions
+                && element_when
+                    .solutions(db, env, self.inferable)
+                    .is_ok_and(|solutions| solutions == mapping_solutions)
         }) {
             return None;
         }

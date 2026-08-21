@@ -10,7 +10,7 @@ use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBoundSolution, PathBounds, Solution, TypeVarSolution,
+    PathBoundSolution, PathBounds, Solution, SolutionPaths, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
@@ -290,35 +290,39 @@ fn four_independent_binary_arguments_have_sixteen_solutions() {
 fn incomplete_solution_discards_the_projection() {
     let db = setup_db();
     let db = &db;
+    let env = db.program_environment();
     let t = create_typevar(db, "T");
     let int = known_instance(db, KnownClass::Int);
     let str = known_instance(db, KnownClass::Str);
+    let builder = ConstraintSetBuilder::new();
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+    let budget = SolutionBudget {
+        type_terms: 2,
+        ..SolutionBudget::default()
+    };
 
-    for reverse in [false, true] {
-        let mut paths = vec![
-            Box::new([PathBound::exact(t, int)]) as Box<[_]>,
-            Box::new([PathBound::exact(t, str)]) as Box<[_]>,
-        ];
-        if reverse {
-            paths.reverse();
-        }
-        let paths = PathBounds::Constrained(paths.into_boxed_slice());
+    for alternatives in [[int, str], [str, int]] {
+        let set = binary_choice(db, &builder, t, alternatives);
+        let choose = |_, bound: &PathBound<'_>| {
+            if bound.lower == Some(str) {
+                PathBoundSolution::BudgetExceeded {
+                    fallback: Some(str),
+                }
+            } else {
+                PathBoundSolution::Solved(int)
+            }
+        };
 
         assert_eq!(
-            paths.try_fold_with(
-                |_, bound| {
-                    if bound.lower == Some(str) {
-                        PathBoundSolution::BudgetExceeded {
-                            fallback: Some(str),
-                        }
-                    } else {
-                        PathBoundSolution::Solved(int)
-                    }
-                },
-                0,
-                &mut ProjectionTypeBudget::new(0),
-                |count, _, _| Ok(count + 1),
-            ),
+            set.solutions_with(db, &env, inferable, budget, choose),
+            Ok(Solutions::Constrained(SolutionPaths::BudgetExceeded(
+                alternatives.map(|ty| vec![binding(t, ty)]).into()
+            )))
+        );
+        assert_eq!(
+            set.try_fold_solutions(db, &env, inferable, budget, choose, 0, |count, _, _| Ok(
+                count + 1
+            ),),
             Err(ProjectionError::IncompleteSolution)
         );
     }
@@ -328,49 +332,77 @@ fn incomplete_solution_discards_the_projection() {
 fn rejected_exhausted_path_does_not_poison_valid_sibling() {
     let db = setup_db();
     let db = &db;
+    let env = db.program_environment();
     let t = create_typevar(db, "T");
     let u = create_typevar(db, "U");
     let int = known_instance(db, KnownClass::Int);
     let str = known_instance(db, KnownClass::Str);
     let bytes = known_instance(db, KnownClass::Bytes);
+    let inferable = TypeVarSet::from_typevars(db, [t, u]);
+    let budget = SolutionBudget {
+        type_terms: 1,
+        ..SolutionBudget::default()
+    };
 
     for reverse_bounds in [false, true] {
         for reverse_paths in [false, true] {
-            let mut rejected = vec![PathBound::exact(t, str), PathBound::exact(u, bytes)];
-            if reverse_bounds {
-                rejected.reverse();
-            }
-            let mut paths = vec![
-                rejected.into_boxed_slice(),
-                Box::new([PathBound::exact(t, int)]) as Box<[_]>,
-            ];
-            if reverse_paths {
-                paths.reverse();
-            }
-            let paths = PathBounds::Constrained(paths.into_boxed_slice());
+            let builder = ConstraintSetBuilder::new();
+            let t_str = exact(db, &builder, t, str);
+            let u_bytes = exact(db, &builder, u, bytes);
+            let rejected = if reverse_bounds {
+                u_bytes.and(db, &builder, || t_str)
+            } else {
+                t_str.and(db, &builder, || u_bytes)
+            };
+            let valid = exact(db, &builder, t, int);
+            let set = if reverse_paths {
+                valid.or(db, &builder, || rejected)
+            } else {
+                rejected.or(db, &builder, || valid)
+            };
 
-            assert_eq!(
-                paths.try_fold_with(
-                    |_, bound| {
-                        if bound.bound_typevar == u {
-                            PathBoundSolution::Unsatisfiable
-                        } else if bound.lower == Some(str) {
-                            PathBoundSolution::BudgetExceeded {
-                                fallback: Some(str),
+            // Only the valid sibling consumes the budget, even when the rejected path had
+            // already selected a type or retained a fallback before finding its contradiction.
+            for rejected_binding in [
+                PathBoundSolution::Solved(str),
+                PathBoundSolution::BudgetExceeded {
+                    fallback: Some(str),
+                },
+            ] {
+                let choose = |_, bound: &PathBound<'_>| {
+                    if bound.bound_typevar == u {
+                        PathBoundSolution::Unsatisfiable
+                    } else if bound.lower == Some(str) {
+                        rejected_binding
+                    } else {
+                        PathBoundSolution::Solved(int)
+                    }
+                };
+                assert_eq!(
+                    set.solutions_with(db, &env, inferable, budget, choose),
+                    Ok(Solutions::Constrained(SolutionPaths::Complete(vec![vec![
+                        binding(t, int),
+                    ]])))
+                );
+                assert_eq!(
+                    set.try_fold_solutions(
+                        db,
+                        &env,
+                        inferable,
+                        budget,
+                        choose,
+                        Vec::new(),
+                        |mut paths, path, budget| {
+                            for binding in path {
+                                budget.charge_type(db, binding.solution)?;
                             }
-                        } else {
-                            PathBoundSolution::Solved(int)
-                        }
-                    },
-                    Vec::new(),
-                    &mut ProjectionTypeBudget::new(0),
-                    |mut paths, path, _| {
-                        paths.push(path.to_vec());
-                        Ok(paths)
-                    },
-                ),
-                Ok(SolutionProjection::Constrained(vec![vec![binding(t, int)]]))
-            );
+                            paths.push(path.to_vec());
+                            Ok(paths)
+                        },
+                    ),
+                    Ok(SolutionProjection::Constrained(vec![vec![binding(t, int)]]))
+                );
+            }
         }
     }
 }
@@ -384,23 +416,38 @@ fn valid_unsolved_path_is_not_unconstrained() {
     let builder = ConstraintSetBuilder::new();
     let set = exact(db, &builder, t, known_instance(db, KnownClass::Int));
     let inferable = TypeVarSet::from_typevars(db, [t]);
+    let budget = SolutionBudget {
+        type_terms: 0,
+        ..SolutionBudget::default()
+    };
 
-    for (selected, expected) in [
+    for (selected, collected, projected) in [
         (
             PathBoundSolution::Unsolved,
-            SolutionProjection::Constrained(1),
+            Solutions::Constrained(SolutionPaths::Complete(vec![vec![]])),
+            Ok(SolutionProjection::Constrained(1)),
+        ),
+        (
+            PathBoundSolution::BudgetExceeded { fallback: None },
+            Solutions::Constrained(SolutionPaths::BudgetExceeded(vec![vec![]])),
+            Err(ProjectionError::IncompleteSolution),
         ),
         (
             PathBoundSolution::Unsatisfiable,
-            SolutionProjection::Unsatisfiable,
+            Solutions::Unsatisfiable,
+            Ok(SolutionProjection::Unsatisfiable),
         ),
     ] {
+        assert_eq!(
+            set.solutions_with(db, &env, inferable, budget, |_, _| selected),
+            Ok(collected)
+        );
         assert_eq!(
             set.try_fold_solutions(
                 db,
                 &env,
                 inferable,
-                SolutionBudget::default(),
+                budget,
                 |_, _| selected,
                 0,
                 |count, path, _| {
@@ -408,7 +455,7 @@ fn valid_unsolved_path_is_not_unconstrained() {
                     Ok(count + 1)
                 },
             ),
-            Ok(expected)
+            projected
         );
     }
 }
@@ -427,30 +474,26 @@ fn type_budget_is_charged_before_constructing_a_union() {
         .or(db, &builder, || exact(db, &builder, t, bytes));
     let inferable = TypeVarSet::from_typevars(db, [t]);
 
-    assert_eq!(
-        set.solutions_with_budget(
-            db,
-            &env,
-            inferable,
-            SolutionBudget {
-                type_terms: 2,
-                ..SolutionBudget::default()
-            },
-            |_, bound| PathBounds::default_solve(db, &env, &builder, bound),
-        ),
-        Err(ProjectionError::TypeBudgetExceeded)
-    );
+    for max_type_terms in [0, 1, 2, 3] {
+        let budget = SolutionBudget {
+            type_terms: max_type_terms,
+            ..SolutionBudget::default()
+        };
+        let mut selected = 0;
+        let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
+            selected += 1;
+            PathBounds::default_solve(db, &env, &builder, bound)
+        });
+        // One additional path is selected to discover that it exceeds the budget; later
+        // paths are not solved.
+        assert_eq!(selected, (max_type_terms + 1).min(3));
 
-    for max_type_terms in [0, 2, 3] {
         let mut constructed = 0;
         let result = set.try_fold_solutions(
             db,
             &env,
             inferable,
-            SolutionBudget {
-                type_terms: max_type_terms,
-                ..SolutionBudget::default()
-            },
+            budget,
             |_, bound| PathBounds::default_solve(db, &env, &builder, bound),
             Type::Never,
             |accumulated, path, budget| {
@@ -464,8 +507,15 @@ fn type_budget_is_charged_before_constructing_a_union() {
 
         assert_eq!(constructed, max_type_terms);
         if max_type_terms < 3 {
+            assert_eq!(collected, Err(ProjectionError::TypeBudgetExceeded));
             assert_eq!(result, Err(ProjectionError::TypeBudgetExceeded));
         } else {
+            assert_eq!(
+                collected,
+                Ok(Solutions::Constrained(SolutionPaths::Complete(
+                    [int, str, bytes].map(|ty| vec![binding(t, ty)]).into()
+                )))
+            );
             assert_eq!(
                 result,
                 Ok(SolutionProjection::Constrained(UnionType::from_elements(

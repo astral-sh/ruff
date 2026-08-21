@@ -1296,15 +1296,15 @@ impl<'db> Signature<'db> {
         let when = constraints.load(db, env, receiver_constraints);
         let inferable = self.inferable_typevars(db);
 
-        match when.solutions(db, env, &constraints, inferable) {
-            Solutions::Unsatisfiable => return None,
-            Solutions::Unconstrained => return Some(self.clone()),
+        match when.solutions(db, env, inferable) {
+            Ok(Solutions::Unsatisfiable) => return None,
+            Ok(Solutions::Unconstrained) | Err(_) => return Some(self.clone()),
             // Each receiver path can leave a different type variable unconstrained. Preserve the
             // original relation instead of combining those independent solutions.
-            Solutions::Constrained(solutions) if solutions.as_slice().len() > 1 => {
+            Ok(Solutions::Constrained(solutions)) if solutions.as_slice().len() > 1 => {
                 return Some(self.clone());
             }
-            Solutions::Constrained(_) => {}
+            Ok(Solutions::Constrained(_)) => {}
         }
 
         let Some(generic_context) = self.generic_context else {
