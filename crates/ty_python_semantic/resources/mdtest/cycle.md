@@ -22,6 +22,68 @@ if not (lambda: f):
     f = 0
 ```
 
+## Recursive lambda in a boolean conditional
+
+A lambda remains truthy when combined with another condition. Branch reachability does not depend on
+its return type, even when that return type depends on an assignment in the branch.
+
+```py
+f = lambda: f
+if True and (lambda: f):
+    f = 0
+```
+
+The same applies to disjunctions and negated lambdas.
+
+```py
+g = lambda: g
+if False or not (lambda: g):
+    g = 0
+```
+
+When the other operand is not statically known, it alone determines the condition's truthiness.
+
+```py
+h = lambda: h
+if h and (lambda: h):
+    h = 0
+
+i = lambda: i
+if (lambda: i) and i:
+    i = 0
+```
+
+Additional nonconstant operands do not make the lambda's return type relevant to reachability.
+
+```py
+j = lambda: j
+condition: bool = bool()
+if j and condition and (lambda: j):
+    j = 0
+```
+
+## Recursive lambda in a boolean loop condition
+
+Combining a recursive lambda with another condition does not require its return type to determine
+whether a loop body is reachable.
+
+```py
+f = lambda: f
+while True and (lambda: f):
+    f = 0
+```
+
+## Recursive lambda in a boolean assertion
+
+Assertions use the same reachability constraints as other conditions and do not depend on a lambda's
+return type.
+
+```py
+f = lambda: f
+assert True and (lambda: f)
+f = 0
+```
+
 ## Function signature
 
 Deferred annotations can result in cycles in resolving a function signature:

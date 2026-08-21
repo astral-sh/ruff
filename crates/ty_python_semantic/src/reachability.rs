@@ -209,8 +209,9 @@ use crate::{
         singleton_pattern_type,
     },
 };
+use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -229,7 +230,7 @@ use ty_python_core::{
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
     scope::ScopeId,
-    use_def_map,
+    semantic_index, use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -1589,14 +1590,108 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
     }
 }
 
+/// Evaluates predicate truthiness without inferring deferred bodies that cannot affect the result.
+///
+/// Inferring the body of a lambda in `condition and (lambda: value)` can depend on a binding whose
+/// visibility is guarded by that same condition, introducing a divergent Salsa cycle.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn analyze_expression_predicate<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    fn contains_deferred_expression(node: &ast::Expr) -> bool {
+        match node {
+            ast::Expr::Lambda(_) | ast::Expr::Generator(_) => true,
+            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+                values.iter().any(contains_deferred_expression)
+            }
+            ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                operand,
+                ..
+            }) => contains_deferred_expression(operand),
+            _ => false,
+        }
+    }
+
+    fn analyze_node<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: &SemanticIndex<'db>,
+        node: &ast::Expr,
+    ) -> Truthiness {
+        match node {
+            ast::Expr::Lambda(_) | ast::Expr::Generator(_) => Truthiness::AlwaysTrue,
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                Truthiness::from(*value)
+            }
+            ast::Expr::NoneLiteral(_) => Truthiness::AlwaysFalse,
+            ast::Expr::EllipsisLiteral(_) => Truthiness::AlwaysTrue,
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(value),
+                ..
+            }) => Truthiness::from(*value != 0),
+            ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                operand,
+                ..
+            }) if contains_deferred_expression(operand) => {
+                analyze_node(db, env, index, operand).negate()
+            }
+            ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+                let mut truthiness = match op {
+                    ast::BoolOp::And => Truthiness::AlwaysTrue,
+                    ast::BoolOp::Or => Truthiness::AlwaysFalse,
+                };
+
+                for value in values {
+                    let next = analyze_node(db, env, index, value);
+                    truthiness = match op {
+                        ast::BoolOp::And => truthiness.negate().or(next.negate()).negate(),
+                        ast::BoolOp::Or => truthiness.or(next),
+                    };
+
+                    if matches!(
+                        (op, truthiness),
+                        (ast::BoolOp::And, Truthiness::AlwaysFalse)
+                            | (ast::BoolOp::Or, Truthiness::AlwaysTrue)
+                    ) {
+                        break;
+                    }
+                }
+
+                truthiness
+            }
+            // Final boolean operands are not necessarily standalone expressions. Treating them as
+            // ambiguous avoids inferring their entire containing expression just for reachability.
+            _ => index
+                .try_expression(node)
+                .map_or(Truthiness::Ambiguous, |expression| {
+                    infer_same_file_expression_type(db, expression, TypeContext::default())
+                        .bool(db, env)
+                }),
+        }
+    }
+
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    let module = parsed_module(db, expression.python_file(db)).load(db);
+    let node = expression.node_ref(db).node(&module);
+
+    if contains_deferred_expression(node) {
+        let index = semantic_index(db, expression.program_file(db));
+        analyze_node(db, &env, index, node)
+    } else {
+        infer_same_file_expression_type(db, expression, TypeContext::default()).bool(db, &env)
+    }
+}
+
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
-            infer_same_file_expression_type(db, test_expr, TypeContext::default())
-                .bool(db, env)
-                .negate_if(!predicate.is_positive)
+            analyze_expression_predicate(db, test_expr).negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
             expression,
