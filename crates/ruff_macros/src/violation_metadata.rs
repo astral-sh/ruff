@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use proc_macro2::TokenStream;
 use quote::quote;
 use regex::Regex;
-use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, meta::ParseNestedMeta};
+use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, Path, meta::ParseNestedMeta};
 
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
@@ -83,7 +83,7 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 /// These attributes look like:
 ///
 /// ```ignore
-/// #[violation_metadata(stable_since = "1.2.3", category = "correctness")]
+/// #[violation_metadata(stable_since = "1.2.3", category = Category::Correctness)]
 /// struct MyRule;
 /// ```
 ///
@@ -109,28 +109,10 @@ fn get_metadata(attrs: &[Attribute]) -> syn::Result<Metadata> {
                 } else if meta.path.is_ident("removed_since") {
                     let lit: LitStr = parse_version(&meta)?;
                     metadata.status = Some(quote!(RuleStatus::Removed { since: #lit }));
-                    metadata.category = Some(quote!(crate::codes::Category::Removed));
+                    metadata.category = Some(syn::parse_quote!(crate::codes::Category::Removed));
                     return Ok(());
                 } else if meta.path.is_ident("category") {
-                    let lit: LitStr = meta.value()?.parse()?;
-                    metadata.category = Some(match lit.value().as_str() {
-                        "correctness" => quote!(crate::codes::Category::Correctness),
-                        "suspicious" => quote!(crate::codes::Category::Suspicious),
-                        "complexity" => quote!(crate::codes::Category::Complexity),
-                        "performance" => quote!(crate::codes::Category::Performance),
-                        "style" => quote!(crate::codes::Category::Style),
-                        "security" => quote!(crate::codes::Category::Security),
-                        "formatting" => quote!(crate::codes::Category::Formatting),
-                        "pedantic" => quote!(crate::codes::Category::Pedantic),
-                        "restriction" => quote!(crate::codes::Category::Restriction),
-                        "testing" => quote!(crate::codes::Category::Testing),
-                        category => {
-                            return Err(Error::new_spanned(
-                                lit,
-                                format_args!("Unknown rule category `{category}`"),
-                            ));
-                        }
-                    });
+                    metadata.category = Some(meta.value()?.parse()?);
                     return Ok(());
                 }
                 Err(Error::new_spanned(
@@ -146,7 +128,7 @@ fn get_metadata(attrs: &[Attribute]) -> syn::Result<Metadata> {
 #[derive(Default)]
 struct Metadata {
     status: Option<TokenStream>,
-    category: Option<TokenStream>,
+    category: Option<Path>,
 }
 
 fn parse_attr<'a, const LEN: usize>(

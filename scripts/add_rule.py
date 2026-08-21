@@ -138,6 +138,7 @@ use ruff_macros::{{ViolationMetadata, derive_message_formats}};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 ///
@@ -151,7 +152,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = "{category}")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::{pascal_case(category)})]
 pub(crate) struct {name};
 
 impl Violation for {name} {{
