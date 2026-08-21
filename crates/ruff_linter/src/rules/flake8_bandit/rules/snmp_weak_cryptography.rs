@@ -29,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.218", category = "security")]
+#[violation_metadata(stable_since = "v0.0.218", category = Category::Security)]
 pub(crate) struct SnmpWeakCryptography;
 
 impl Violation for SnmpWeakCryptography {

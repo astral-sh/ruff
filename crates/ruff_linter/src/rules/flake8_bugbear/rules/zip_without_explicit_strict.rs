@@ -39,7 +39,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ## References
 /// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.167", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.167", category = Category::Pedantic)]
 pub(crate) struct ZipWithoutExplicitStrict;
 
 impl AlwaysFixableViolation for ZipWithoutExplicitStrict {

@@ -27,7 +27,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     x: int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260", category = "style")]
+#[violation_metadata(stable_since = "v0.0.260", category = Category::Style)]
 pub(crate) struct PassInClassBody;
 
 impl AlwaysFixableViolation for PassInClassBody {

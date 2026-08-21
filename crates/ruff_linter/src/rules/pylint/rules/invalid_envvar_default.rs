@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// int(os.getenv("FOO", "1"))
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.255", category = "suspicious")]
+#[violation_metadata(stable_since = "v0.0.255", category = Category::Suspicious)]
 pub(crate) struct InvalidEnvvarDefault;
 
 impl Violation for InvalidEnvvarDefault {

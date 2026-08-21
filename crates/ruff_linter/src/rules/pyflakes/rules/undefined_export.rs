@@ -40,7 +40,7 @@ use crate::Violation;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.25", category = "correctness")]
+#[violation_metadata(stable_since = "v0.0.25", category = Category::Correctness)]
 pub(crate) struct UndefinedExport {
     pub name: String,
 }

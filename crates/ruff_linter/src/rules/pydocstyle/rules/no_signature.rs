@@ -41,7 +41,7 @@ use crate::docstrings::Docstring;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.70", category = Category::Pedantic)]
 pub(crate) struct SignatureInDocstring;
 
 impl Violation for SignatureInDocstring {

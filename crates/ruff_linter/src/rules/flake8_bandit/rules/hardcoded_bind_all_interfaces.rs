@@ -27,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-200](https://cwe.mitre.org/data/definitions/200.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.116", category = "security")]
+#[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
 pub(crate) struct HardcodedBindAllInterfaces;
 
 impl Violation for HardcodedBindAllInterfaces {

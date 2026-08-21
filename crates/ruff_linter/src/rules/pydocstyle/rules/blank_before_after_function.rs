@@ -42,7 +42,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70", category = "formatting")]
+#[violation_metadata(stable_since = "v0.0.70", category = Category::Formatting)]
 pub(crate) struct BlankLineBeforeFunction {
     num_lines: usize,
 }
@@ -93,7 +93,7 @@ impl Violation for BlankLineBeforeFunction {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70", category = "formatting")]
+#[violation_metadata(stable_since = "v0.0.70", category = Category::Formatting)]
 pub(crate) struct BlankLineAfterFunction {
     num_lines: usize,
 }

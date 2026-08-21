@@ -27,7 +27,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: Keywords](https://docs.python.org/3/reference/lexical_analysis.html#keywords)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MissingWhitespaceAfterKeyword;
 
 impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {

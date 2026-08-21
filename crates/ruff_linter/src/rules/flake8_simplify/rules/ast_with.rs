@@ -56,7 +56,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211", category = "complexity")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Complexity)]
 pub(crate) struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {

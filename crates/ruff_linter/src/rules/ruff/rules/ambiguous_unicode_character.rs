@@ -46,7 +46,7 @@ use crate::rules::ruff::rules::confusables::confusable;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.102", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.102", category = Category::Pedantic)]
 pub(crate) struct AmbiguousUnicodeCharacterString {
     confusable: char,
     representant: char,
@@ -100,7 +100,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.102", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.102", category = Category::Pedantic)]
 pub(crate) struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
     representant: char,
@@ -154,7 +154,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.108", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.108", category = Category::Pedantic)]
 pub(crate) struct AmbiguousUnicodeCharacterComment {
     confusable: char,
     representant: char,

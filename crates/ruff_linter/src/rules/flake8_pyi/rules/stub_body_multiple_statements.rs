@@ -29,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// def function(): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271", category = "correctness")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct StubBodyMultipleStatements;
 
 impl Violation for StubBodyMultipleStatements {

@@ -38,7 +38,7 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 ///
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.250", category = "complexity")]
+#[violation_metadata(stable_since = "v0.0.250", category = Category::Complexity)]
 pub(crate) struct VerboseLogMessage;
 
 impl Violation for VerboseLogMessage {

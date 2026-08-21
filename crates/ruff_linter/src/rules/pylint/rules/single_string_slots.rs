@@ -48,7 +48,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276", category = "suspicious")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Suspicious)]
 pub(crate) struct SingleStringSlots;
 
 impl Violation for SingleStringSlots {

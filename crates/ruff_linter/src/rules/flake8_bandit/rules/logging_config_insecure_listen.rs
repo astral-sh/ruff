@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `logging.config.listen()`](https://docs.python.org/3/library/logging.config.html#logging.config.listen)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231", category = "security")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Security)]
 pub(crate) struct LoggingConfigInsecureListen;
 
 impl Violation for LoggingConfigInsecureListen {

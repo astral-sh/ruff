@@ -34,7 +34,7 @@ use ruff_python_ast::PythonVersion;
 ///     y: float
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.0", category = "pedantic")]
+#[violation_metadata(preview_since = "0.9.0", category = Category::Pedantic)]
 pub(crate) struct ClassAsDataStructure;
 
 impl Violation for ClassAsDataStructure {

@@ -41,7 +41,7 @@ use crate::checkers::ast::Checker;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Pedantic)]
 pub(crate) struct DjangoNonLeadingReceiverDecorator;
 
 impl Violation for DjangoNonLeadingReceiverDecorator {

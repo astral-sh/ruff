@@ -55,7 +55,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Class definitions](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
 pub(crate) struct DuplicateBases {
     base: String,
     class: String,

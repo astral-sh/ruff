@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// var = [1, 2, 3][0]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.278", category = "correctness")]
+#[violation_metadata(stable_since = "v0.0.278", category = Category::Correctness)]
 pub(crate) struct InvalidIndexType {
     value_type: String,
     index_type: String,

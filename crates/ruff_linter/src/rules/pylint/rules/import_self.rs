@@ -23,7 +23,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// def foo(): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.265", category = "correctness")]
+#[violation_metadata(stable_since = "v0.0.265", category = Category::Correctness)]
 pub(crate) struct ImportSelf {
     name: String,
 }

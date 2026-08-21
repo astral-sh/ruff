@@ -39,7 +39,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## Options
 /// - `lint.isort.required-imports`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.218", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.218", category = Category::Pedantic)]
 pub(crate) struct MissingRequiredImport(pub String);
 
 impl AlwaysFixableViolation for MissingRequiredImport {

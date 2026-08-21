@@ -26,7 +26,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct WhitespaceBeforeParameters {
     bracket: TokenKind,
 }

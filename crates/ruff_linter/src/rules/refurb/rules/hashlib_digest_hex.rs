@@ -35,7 +35,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `hashlib`](https://docs.python.org/3/library/hashlib.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0", category = "complexity")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct HashlibDigestHex;
 
 impl Violation for HashlibDigestHex {

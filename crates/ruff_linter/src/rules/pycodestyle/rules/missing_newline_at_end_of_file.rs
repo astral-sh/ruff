@@ -24,7 +24,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// spam(1)\n
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.61", category = "formatting")]
+#[violation_metadata(stable_since = "v0.0.61", category = Category::Formatting)]
 pub(crate) struct MissingNewlineAtEndOfFile;
 
 impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {

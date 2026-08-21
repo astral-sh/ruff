@@ -43,7 +43,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0", category = "complexity")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Complexity)]
 pub(crate) struct EnumerateForLoop {
     index: String,
 }

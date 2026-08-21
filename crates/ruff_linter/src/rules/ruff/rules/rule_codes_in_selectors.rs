@@ -35,7 +35,7 @@ use crate::{
 /// select = ["unused-import"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.22", category = "pedantic")]
+#[violation_metadata(preview_since = "0.15.22", category = Category::Pedantic)]
 pub(crate) struct RuleCodesInSelectors {
     selector: &'static str,
     name: &'static str,
