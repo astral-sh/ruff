@@ -395,6 +395,30 @@ def incompatible_bound[T]() -> None:
     reveal_type(incompatible.solutions_for(T, inferable=tuple[T]))  # revealed: None
 ```
 
+### Opposite materializations of recursive protocols
+
+A fixed `Any` in a recursive method changes independently of the protocol's type parameter. The
+top-materialized return type `object` cannot satisfy the bottom-materialized return requirement
+`Never`. The matching nonrecursive property can constrain `T`, but no specialization satisfies the
+complete protocol.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+class RecursiveValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    def consume(self, child: RecursiveValue[Any]) -> Any: ...
+
+def inspect[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Top[RecursiveValue[str]], Bottom[RecursiveValue[T]])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
 ## Intersection
 
 The intersection of two constraint sets requires that the constraints in both sets hold. In many

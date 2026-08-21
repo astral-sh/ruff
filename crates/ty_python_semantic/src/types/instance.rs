@@ -560,51 +560,49 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Check that inexpensive case first: comparing every requirement of an unrelated
             // recursive protocol can expand its interface before structural member ordering gets
             // a chance to reject an incompatible finite member.
-            let nominal_is_safe = nominally_satisfied.is_never_satisfied(db, env)
+            let nominal_can_be_added = nominally_satisfied.is_never_satisfied(db, env)
                 || (!protocol.materialization_changes_requirements(db, env, protocol)
                     && !source_protocol.is_some_and(|source| {
                         source.materialization_changes_requirements(db, env, protocol)
                     }));
 
-            if nominal_is_safe {
-                if result
+            if nominal_can_be_added
+                && result
                     .union(db, self.constraints, nominally_satisfied)
                     .is_trivially_always_satisfied()
-                {
-                    return result;
-                }
+            {
+                return result;
+            }
 
-                // For union simplification, failing the nominal relation between two
-                // specializations of the same protocol class is enough to keep both union elements.
-                // Falling back to the structural relation can recursively compare every protocol
-                // member even though a failed redundancy check only means that we preserve a
-                // potentially redundant union arm.
-                let can_use_nominal_redundancy =
-                    matches!(self.relation, TypeRelation::Redundancy { pure: false })
-                        && source_protocol_as_nominal.is_some_and(|source_instance| {
-                            source_instance.class(db, env).class_literal(db)
-                                == nominal_instance.class(db, env).class_literal(db)
-                        });
+            // For union simplification, failing the nominal relation between two
+            // specializations of the same protocol class is enough to keep both union elements.
+            // Falling back to the structural relation can recursively compare every protocol
+            // member even though a failed redundancy check only means that we preserve a
+            // potentially redundant union arm.
+            let can_use_nominal_redundancy = nominal_can_be_added
+                && matches!(self.relation, TypeRelation::Redundancy { pure: false })
+                && source_protocol_as_nominal.is_some_and(|source_instance| {
+                    source_instance.class(db, env).class_literal(db)
+                        == nominal_instance.class(db, env).class_literal(db)
+                });
 
-                // Eager finite checks can only reject. Lazy comparisons can also contribute
-                // structural solutions, so try them before using the nominal fallback.
-                if (self.typevar_evaluation == TypeVarEvaluation::Lazy
-                    || !can_use_nominal_redundancy)
-                    && let Some(structurally_satisfied) = self
-                        .try_check_non_recursive_protocol_members(
-                            db,
-                            ty,
-                            protocol,
-                            source_protocol_as_nominal,
-                            nominal_instance,
-                        )
-                {
-                    return result.or(db, self.constraints, || structurally_satisfied);
-                }
+            // Eager finite checks can only reject. Lazy comparisons can also contribute
+            // structural solutions, so try them before using the nominal fallback.
+            if (self.typevar_evaluation == TypeVarEvaluation::Lazy || !can_use_nominal_redundancy)
+                && let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
+                    db,
+                    ty,
+                    protocol,
+                    source_protocol_as_nominal,
+                    nominal_instance,
+                    nominally_satisfied,
+                )
+            {
+                return result.or(db, self.constraints, || structurally_satisfied);
+            }
 
-                if can_use_nominal_redundancy {
-                    return nominally_satisfied;
-                }
+            if can_use_nominal_redundancy {
+                return nominally_satisfied;
             }
         }
 
@@ -776,7 +774,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Tries to relate the finite members of two specializations of the same protocol.
     ///
     /// This retains structural solutions such as `T | int`, while recursive members are the
-    /// coinductive edge currently being proved. Returns `None` when the shortcut is inapplicable.
+    /// coinductive edge currently being proved. Materialized protocols additionally require the
+    /// finite constraints to establish the nominal relation without losing type-variable constraints.
+    /// Returns `None` when the shortcut is inapplicable.
     ///
     /// Eager comparisons can only reject: matching the finite requirements does not prove that
     /// the omitted recursive members are compatible.
@@ -787,6 +787,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
         source_protocol_as_nominal: Option<NominalInstanceType<'db>>,
         nominal_instance: NominalInstanceType<'db>,
+        nominally_satisfied: ConstraintSet<'db, 'c>,
     ) -> Option<ConstraintSet<'db, 'c>> {
         if self.is_context_collection_enabled() {
             return None;
@@ -807,13 +808,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
-        // A materialized recursive member can impose bounds that finite members do not
-        // capture, even when the nominal relation is impossible. Check the full interface.
-        if source_protocol.materialization_kind(db).is_some()
-            || protocol.materialization_kind(db).is_some()
-        {
-            return None;
-        }
+        // Assignability chooses Bottom for an unmaterialized source and Top for an
+        // unmaterialized target. The opposite direction can change a fixed `Any` in an
+        // omitted recursive signature from `object` to `Never`, independently of its type
+        // parameters. Only the full structural comparison can establish that relation.
+        let is_materialized = match (
+            source_protocol.materialization_kind(db),
+            protocol.materialization_kind(db),
+        ) {
+            (None, None) => false,
+            (Some(MaterializationKind::Top), Some(MaterializationKind::Bottom)) => return None,
+            _ if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                && self.relation.is_assignability() =>
+            {
+                true
+            }
+            _ => return None,
+        };
 
         let identity_protocol = target_alias
             .origin(db)
@@ -844,6 +855,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 target_interface.materialization_kind(),
             ),
         );
+
+        if is_materialized
+            && (target_alias
+                .specialization(db)
+                .types(db)
+                .iter()
+                .chain(source_alias.specialization(db).types(db))
+                .any(|argument| {
+                    any_over_type_expanding_aliases(db, env, *argument, |nested| {
+                        matches!(nested, Type::TypeVar(typevar)
+                            if !structurally_satisfied.mentions_typevar(typevar))
+                    })
+                })
+                || !structurally_satisfied
+                    .implies(db, self.constraints, || nominally_satisfied)
+                    .is_always_satisfied(db, env))
+        {
+            // A recursive member may supply the only constraint for a type variable, or
+            // impose the opposite bound through a consuming position. In either case the
+            // finite members alone do not prove the complete materialized relation.
+            return None;
+        }
 
         // We run the eager comparison to reject incompatible finite requirements before
         // expanding recursive members. If it cannot reject, the caller checks the full

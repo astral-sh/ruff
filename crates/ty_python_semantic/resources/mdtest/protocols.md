@@ -7070,6 +7070,35 @@ def valid(value: Chain[Iterable[int]]) -> None:
     reveal_type(value.flatten())  # revealed: Chain[int]
 ```
 
+### Explicit receivers on overloaded recursive protocol methods
+
+An overloaded method can constrain its receiver to a tuple specialization of the same recursive
+protocol. Comparing the fixed-length overload with the gradual fallback terminates without
+repeatedly expanding the recursive requirement, and the call preserves the callback's return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def child(self) -> Chain[tuple[T]]: ...
+    @overload
+    def map_star[A, B, R](self: Chain[tuple[A, B]], callback: Callable[[A, B], R]) -> Chain[R]: ...
+    @overload
+    def map_star[R](self: Chain[tuple[Any, ...]], callback: Callable[..., R]) -> Chain[R]: ...
+
+def check(value: Chain[tuple[int, str]]) -> None:
+    reveal_type(value.map_star(lambda first, second: 1))  # revealed: Chain[Literal[1]]
+```
+
 ### Structural inference from recursive protocol requirements
 
 An inherited protocol specialization can erase a class type parameter. A recursive member can still
