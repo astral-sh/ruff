@@ -786,6 +786,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source_alias.origin(db) != target_alias.origin(db) {
             return None;
         }
+
+        // A materialized recursive member can impose bounds that finite members do not
+        // capture, even when the nominal relation is impossible. Check the full interface.
+        if source_protocol.materialization_kind(db).is_some()
+            || protocol.materialization_kind(db).is_some()
+        {
+            return None;
+        }
+
         let identity_protocol = target_alias
             .origin(db)
             .identity_specialization(db)
