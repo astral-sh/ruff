@@ -2090,121 +2090,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if !self.should_check_condition_redundancy() {
-            return;
+        if self.should_check_condition_redundancy() {
+            self.check_suite_for_redundant_if_statements(suite);
         }
-
-        for (i, statement) in suite.iter().enumerate() {
-            let ast::Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                ..
-            }) = statement
-            else {
-                continue;
-            };
-
-            let test_type = self.expression_type(test);
-            let test_truthiness = test_type.bool(db, env);
-
-            match test_truthiness {
-                Truthiness::Ambiguous => {}
-                Truthiness::AlwaysFalse => {
-                    if !self.is_deliberately_unreachable_suite(body) {
-                        self.check_condition_redundancy(test, test_type, test_truthiness);
-                    }
-                }
-                Truthiness::AlwaysTrue => match elif_else_clauses.as_slice() {
-                    [single] => {
-                        if !(single.test.is_none()
-                            && self.is_deliberately_unreachable_suite(&single.body))
-                        {
-                            self.check_condition_redundancy(test, test_type, test_truthiness);
-                        }
-                    }
-                    [] => {
-                        if !self.is_deliberately_unreachable_suite(&suite[i + 1..]) {
-                            self.check_condition_redundancy(test, test_type, test_truthiness);
-                        }
-                    }
-                    _ => {
-                        self.check_condition_redundancy(test, test_type, test_truthiness);
-                    }
-                },
-            }
-
-            for (elif_i, elif_else) in elif_else_clauses.iter().enumerate() {
-                let ast::ElifElseClause {
-                    body,
-                    test: Some(test),
-                    ..
-                } = elif_else
-                else {
-                    break;
-                };
-
-                let test_type = self.expression_type(test);
-                let test_truthiness = test_type.bool(db, env);
-
-                match test_truthiness {
-                    Truthiness::Ambiguous => continue,
-                    Truthiness::AlwaysFalse => {
-                        if self.is_deliberately_unreachable_suite(body) {
-                            continue;
-                        }
-                    }
-                    Truthiness::AlwaysTrue => match elif_else_clauses.get(elif_i + 1) {
-                        Some(clause) => {
-                            if clause.test.is_none()
-                                && self.is_deliberately_unreachable_suite(&clause.body)
-                            {
-                                continue;
-                            }
-                        }
-                        None => {
-                            if self.is_deliberately_unreachable_suite(&suite[i + 1..]) {
-                                continue;
-                            }
-                        }
-                    },
-                }
-
-                self.check_condition_redundancy(test, test_type, test_truthiness);
-            }
-        }
-    }
-
-    fn is_deliberately_unreachable_suite(&self, suite: &[ast::Stmt]) -> bool {
-        if suite.iter().all(|stmt| {
-            stmt.as_expr_stmt()
-                .is_some_and(|stmt_expr| stmt_expr.value.is_string_literal_expr())
-        }) {
-            return false;
-        }
-
-        let db = self.db();
-        let env = self.program_environment();
-
-        let not_implemented = KnownClass::NotImplementedType.to_instance(db, env);
-
-        suite.iter().all(|stmt| match stmt {
-            ast::Stmt::Raise(_) | ast::Stmt::Assert(_) => true,
-            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => match &**value {
-                ast::Expr::StringLiteral(..) => true,
-                ast::Expr::Call(..) => {
-                    self.expression_type(value)
-                        .is_equivalent_to(db, env, Type::Never)
-                }
-                _ => false,
-            },
-            ast::Stmt::Return(ast::StmtReturn {
-                value: Some(expr), ..
-            }) => self
-                .expression_type(expr)
-                .is_assignable_to(db, env, not_implemented),
-            _ => false,
-        })
     }
 
     fn infer_statement(&mut self, statement: &ast::Stmt) {
@@ -10978,12 +10866,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // a `ConstraintSet` instance. Otherwise there are a huge number of `redundant-condition`
                 // diagnostics in our test suite for `static_assert(not is_assignable_to(foo, bar))` etc.
                 if self.should_check_condition_redundancy()
-                    && !(cfg!(debug_assertions)
-                        && ty.is_assignable_to(
-                            db,
-                            env,
-                            KnownClass::ConstraintSet.to_instance(db, env),
-                        ))
+                    && !matches!(ty, Type::KnownInstance(KnownInstanceType::ConstraintSet(_)))
                 {
                     self.check_condition_redundancy(&unary.operand, ty, original_truthiness);
                 }

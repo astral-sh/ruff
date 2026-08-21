@@ -233,6 +233,9 @@ def func(): ...
 if not func:  # error: [redundant-condition]
     pass
 
+if not not func:  # error: [redundant-condition]
+    pass
+
 a = True if func else False  # error: [redundant-condition]
 
 if coinflip() if func else False:  # error: [redundant-condition]
@@ -275,6 +278,251 @@ def f(x: str | int):
 #
 while func:  # error: [redundant-condition]
     pass
+```
+
+## Edge cases
+
+A nonempty tuple subclass can still be falsy if it overrides `__bool__`:
+
+```py
+from typing import Literal
+
+async def coroutine(): ...
+
+class FalsyTuple(tuple[int, int]):
+    def __bool__(self) -> Literal[False]:
+        return False
+
+def check_falsy_tuple(value: FalsyTuple):
+    if value:  # error: [redundant-condition] "Object of type `FalsyTuple` is always falsy"
+        pass
+```
+
+Calling an asynchronous function or a function with an always-truthy return value does not resolve
+the redundant condition, so we do not offer autofixes in these cases that add calls to the function:
+
+```py
+async def inspect_async_function():
+    if coroutine:  # snapshot: redundant-condition
+        pass
+
+def always_truthy() -> Literal[True]:
+    return True
+
+def inspect_truthy_function():
+    if always_truthy:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Function `coroutine` is always truthy
+  --> src/mdtest_snippet.py:13:8
+   |
+13 |     if coroutine:  # snapshot: redundant-condition
+   |        ^^^^^^^^^
+
+
+warning[redundant-condition]: Function `always_truthy` is always truthy
+  --> src/mdtest_snippet.py:20:8
+   |
+20 |     if always_truthy:  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^^^
+```
+
+An awaitable in a synchronous function or a lambda still produces a diagnostic, but suggesting
+`await` would create invalid syntax, so we also do not add an autofix here:
+
+```py
+def inspect_synchronous_awaitable():
+    if coroutine():  # snapshot: redundant-condition
+        pass
+
+async def inspect_lambda_awaitable():
+    return lambda: True if coroutine() else False  # snapshot: redundant-condition
+```
+
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:23:8
+   |
+23 |     if coroutine():  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+
+
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:27:28
+   |
+27 |     return lambda: True if coroutine() else False  # snapshot: redundant-condition
+   |                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+```
+
+Awaiting an expression is valid within a comprehension in an asynchronous function or within a
+generator expression:
+
+```py
+async def inspect_comprehension_awaitable():
+    return [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
+
+def inspect_generator_awaitable():
+    return (value for value in range(1) if coroutine())  # snapshot: redundant-condition
+```
+
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:29:44
+   |
+29 |     return [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
+   |                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+help: Did you mean to `await` this expression?
+   |
+28 | async def inspect_comprehension_awaitable():
+   -     return [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
+29 +     return [value for value in range(1) if await coroutine()]  # snapshot: redundant-condition
+30 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:32:44
+   |
+32 |     return (value for value in range(1) if coroutine())  # snapshot: redundant-condition
+   |                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+help: Did you mean to `await` this expression?
+   |
+31 | def inspect_generator_awaitable():
+   -     return (value for value in range(1) if coroutine())  # snapshot: redundant-condition
+32 +     return (value for value in range(1) if await coroutine())  # snapshot: redundant-condition
+33 | async def inspect_named_awaitable():
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Assignment expressions need parentheses so the assignment still happens before awaiting its result:
+
+```py
+async def inspect_named_awaitable():
+    if value := coroutine():  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:34:8
+   |
+34 |     if value := coroutine():  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+help: Did you mean to `await` this expression?
+   |
+33 | async def inspect_named_awaitable():
+   -     if value := coroutine():  # snapshot: redundant-condition
+34 +     if await (value := coroutine()):  # snapshot: redundant-condition
+35 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Unary and binary operations need parentheses so the entire original expression is awaited:
+
+```py
+class AwaitableOperations:
+    async def __neg__(self) -> bool:
+        return True
+
+    async def __add__(self, other: object) -> bool:
+        return True
+
+async def inspect_awaitable_operations(value: AwaitableOperations):
+    if -value:  # snapshot: redundant-condition
+        pass
+
+    if value + value:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:44:8
+   |
+44 |     if -value:  # snapshot: redundant-condition
+   |        ^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+help: Did you mean to `await` this expression?
+   |
+43 | async def inspect_awaitable_operations(value: AwaitableOperations):
+   -     if -value:  # snapshot: redundant-condition
+44 +     if await (-value):  # snapshot: redundant-condition
+45 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:47:8
+   |
+47 |     if value + value:  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+help: Did you mean to `await` this expression?
+   |
+46 |
+   -     if value + value:  # snapshot: redundant-condition
+47 +     if await (value + value):  # snapshot: redundant-condition
+48 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Conditional expressions also need parentheses so the selected branch is awaited:
+
+```py
+async def inspect_conditional_awaitable(flag: bool):
+    if coroutine() if flag else coroutine():  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:50:8
+   |
+50 |     if coroutine() if flag else coroutine():  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+help: Did you mean to `await` this expression?
+   |
+49 | async def inspect_conditional_awaitable(flag: bool):
+   -     if coroutine() if flag else coroutine():  # snapshot: redundant-condition
+50 +     if await (coroutine() if flag else coroutine()):  # snapshot: redundant-condition
+51 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+An expression that has already been awaited needs parentheses before adding another `await`:
+
+```py
+from types import CoroutineType
+from typing import Any
+
+async def nested_coroutine() -> CoroutineType[Any, Any, bool]:
+    return coroutine()
+
+async def inspect_nested_awaitable():
+    if await nested_coroutine():  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:59:8
+   |
+59 |     if await nested_coroutine():  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+help: Did you mean to `await` this expression?
+   |
+58 | async def inspect_nested_awaitable():
+   -     if await nested_coroutine():  # snapshot: redundant-condition
+59 +     if await (await nested_coroutine()):  # snapshot: redundant-condition
+60 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Strict version
@@ -324,6 +572,36 @@ error[redundant-condition-strict]: Condition is always false
    |
 19 |     elif False:  # snapshot: redundant-condition-strict
    |          ^^^^^ Inferred type is `Literal[False]`
+```
+
+`redundant-condition-strict` is also emitted on negated conditions where the negated condition is
+inferred as an instance of `bool`:
+
+```py
+def negated_conditions():
+    if not False:  # error: [redundant-condition-strict] "Condition is always true"
+        pass
+
+    if not True:  # error: [redundant-condition-strict] "Condition is always false"
+        pass
+
+    if not 0:  # error: [redundant-condition-strict] "Condition is always true"
+        pass
+
+    if not 1:  # error: [redundant-condition-strict] "Condition is always false"
+        pass
+
+    if not not True:  # error: [redundant-condition-strict] "Condition is always true"
+        pass
+
+def negated_conditional_contexts(flag: bool):
+    if flag:
+        pass
+    elif not False:  # error: [redundant-condition-strict] "Condition is always true"
+        pass
+
+    while not False:  # error: [redundant-condition-strict] "Condition is always true"
+        break
 ```
 
 To avoid two diagnostics being emitted on compound tests such as the following statements, we
@@ -471,6 +749,9 @@ IS_PY314 = sys.version_info >= (3, 14)
 reveal_type(IS_PY314)  # revealed: Literal[True]
 
 if IS_PY314:  # no diagnostic
+    pass
+
+if not IS_PY314:  # no diagnostic
     pass
 
 VERSION_INFO = sys.version_info
@@ -635,6 +916,26 @@ def h(x: int | str):
         raise AssertionError
     # do other things that aren't raises or assertions:
     x = 1
+```
+
+An assertion that always succeeds does not establish exhaustiveness, whether it appears in the
+conditional body, an `else` block, or immediately after the statement:
+
+```py
+def successful_assertion_in_body():
+    if "":  # error: [redundant-condition] "An empty string is always falsy"
+        assert True
+
+def successful_assertion_in_else():
+    if "truthy":  # error: [redundant-condition] "Object of type `Literal["truthy"]` is always truthy"
+        pass
+    else:
+        assert True
+
+def successful_assertion_after_if():
+    if "truthy":  # error: [redundant-condition] "Object of type `Literal["truthy"]` is always truthy"
+        pass
+    assert True
 ```
 
 ## Suites containing only string literals

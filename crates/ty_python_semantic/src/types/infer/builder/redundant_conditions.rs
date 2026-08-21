@@ -1,9 +1,9 @@
-use ruff_db::parsed::parsed_module;
+use ruff_db::{parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ruff_text_size::Ranged;
 use ty_module_resolver::KnownModule;
-use ty_python_core::{Truthiness, definition::Definition};
+use ty_python_core::{Truthiness, definition::Definition, scope::NodeWithScopeKind};
 
 use crate::{
     Db, ImportAliasResolution, ProgramEnvironment, SemanticModel, definitions_for_expression,
@@ -38,22 +38,72 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let db = self.db();
         let env = self.program_environment();
+        let int_instance = KnownClass::Int.to_instance(db, env);
 
         match test {
+            // Python checks the truthiness of all but the final `and`/`or` operand to decide
+            // whether to short-circuit. If evaluation reaches the final operand, its value is
+            // simply returned. Accordingly, `infer_boolean_expression` passes the earlier
+            // operands to this method, but never passes the complete expression it is inferring.
+            //
+            // Receiving the complete `ast::Expr::BoolOp` expression here means a surrounding
+            // context, such as an `if`, a `while`, or an outer `and`/`or`, is checking its
+            // truthiness. This distinction determines whether the final operand also needs
+            // checking:
+            //
+            // - In `result = flag and func`, `func` is merely a possible result. Its truthiness
+            //   is not checked, so it should not produce a diagnostic.
+            // - In `if True and func`, the `if` checks the result's truthiness. The result is
+            //   `func`, so the uncalled function should produce a diagnostic.
+            //
+            // Check the final operand whenever the complete expression reaches this method.
+            // The earlier operands were already checked by `infer_boolean_expression`.
             ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
                 if let Some(last) = values.last() {
                     let ty = self.expression_type(last);
                     self.check_condition_redundancy(last, ty, ty.bool(db, env));
                 }
             }
+
+            // A negated condition reaches this method twice: `infer_unary_expression_type`
+            // checks the operand, and the enclosing `if` or `while` checks the whole condition.
+            // Whether the second check should produce a diagnostic depends on the operand:
+            //
+            // - For `if not func`, the operand check already reports the uncalled function under
+            //   `redundant-condition`. Checking the boolean `not func` as well would add a
+            //   duplicate `redundant-condition-strict` diagnostic.
+            // - For `if not False` or `if not 0`, the operand would use the strict rule. That rule
+            //   skips subexpressions of conditions to avoid reporting both a condition and its
+            //   parts, so the operand check emits nothing. Checking the whole `not` expression is
+            //   therefore necessary to report the redundant condition.
+            //
+            // Check the whole condition only when the original operand is boolean- or
+            // integer-like. Unwrap every `not` first: in `if not not func`, the immediate operand
+            // has type `bool`, but the original operand is still `func` and was already reported.
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::Not,
+                operand,
                 ..
-            }) => return,
+            }) => {
+                let mut original_operand = operand;
+                while let ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) = &**original_operand
+                {
+                    original_operand = operand;
+                }
+
+                if !self
+                    .expression_type(original_operand)
+                    .is_assignable_to(db, env, int_instance)
+                {
+                    return;
+                }
+            }
             _ => {}
         }
-
-        let int_instance = KnownClass::Int.to_instance(db, env);
 
         let rule = if test_type.is_assignable_to(db, env, int_instance) {
             if self
@@ -94,13 +144,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Function `{}` is always truthy",
                             function.name(db)
                         ));
-                        diagnostic
-                            .set_primary_annotation_message("Did you mean to call this function?");
-                        if !function.signature(db).has_parameters() {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                                "()".to_string(),
-                                test.end(),
-                            )));
+                        let signatures = function.signature(db);
+                        if signatures.iter().all(|signature| {
+                            signature.return_ty.bool(db, env) == Truthiness::Ambiguous
+                        }) {
+                            diagnostic.set_primary_annotation_message(
+                                "Did you mean to call this function?",
+                            );
+                            if !signatures.has_parameters() {
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                                    "()".to_string(),
+                                    test.end(),
+                                )));
+                            }
                         }
                     } else if let Some(tuple_spec) = test_type.tuple_instance_spec(db, env) {
                         let message = match tuple_spec.len() {
@@ -180,12 +236,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Inferred type is `{}`",
                             test_type.display(db, env)
                         ));
-                        if test_type.try_await(db, env).is_ok() {
+                        if test_type.try_await(db, env).is_ok() && self.can_await_here() {
                             diagnostic.help("Did you mean to `await` this expression?");
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                                "await ".to_string(),
-                                test.start(),
-                            )));
+
+                            let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
+                                Fix::unsafe_edits(
+                                    Edit::insertion("await (".to_string(), test.start()),
+                                    [Edit::insertion(")".to_string(), test.end())],
+                                )
+                            } else {
+                                Fix::unsafe_edit(Edit::insertion(
+                                    "await ".to_string(),
+                                    test.start(),
+                                ))
+                            };
+
+                            diagnostic.set_fix(fix);
                         }
                     }
                 }
@@ -194,8 +260,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let Some(builder) = self.context.report_lint(rule, test) {
                     if test_type.is_none(db) {
                         builder.into_diagnostic("`None` is always falsy");
-                    } else if let Some(tuple) = test_type.tuple_instance_spec(db, env) {
-                        debug_assert_eq!(tuple.len(), TupleLength::Fixed(0));
+                    } else if let Some(tuple) = test_type.tuple_instance_spec(db, env)
+                        && tuple.len() == TupleLength::Fixed(0)
+                    {
                         let message = "An empty tuple is always falsy";
                         let mut diagnostic = builder.into_diagnostic(message);
                         diagnostic.set_concise_message(message);
@@ -237,6 +304,156 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Truthiness::Ambiguous => {}
         }
+    }
+
+    fn can_await_here(&self) -> bool {
+        let db = self.db();
+
+        for (_, scope) in self.index.ancestor_scopes(self.scope().file_scope_id(db)) {
+            match scope.node() {
+                NodeWithScopeKind::Function(function) => {
+                    return function.node(self.module()).is_async;
+                }
+                NodeWithScopeKind::Lambda(_) | NodeWithScopeKind::Class(_) => {
+                    return false;
+                }
+                NodeWithScopeKind::GeneratorExpression(_) => {
+                    return true;
+                }
+                NodeWithScopeKind::Module => {
+                    return source_text(db, self.file()).is_notebook();
+                }
+                NodeWithScopeKind::ClassTypeParameters(_)
+                | NodeWithScopeKind::FunctionTypeParameters(_)
+                | NodeWithScopeKind::TypeAliasTypeParameters(_)
+                | NodeWithScopeKind::TypeAlias(_)
+                | NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_) => continue,
+            }
+        }
+
+        false
+    }
+
+    pub(super) fn check_suite_for_redundant_if_statements(&self, suite: &[ast::Stmt]) {
+        let db = self.db();
+        let env = self.program_environment();
+
+        for (i, statement) in suite.iter().enumerate() {
+            let ast::Stmt::If(ast::StmtIf {
+                test,
+                body,
+                elif_else_clauses,
+                ..
+            }) = statement
+            else {
+                continue;
+            };
+
+            let test_type = self.expression_type(test);
+            let test_truthiness = test_type.bool(db, env);
+
+            match test_truthiness {
+                Truthiness::Ambiguous => {}
+                Truthiness::AlwaysFalse => {
+                    if !self.is_deliberately_unreachable_suite(body) {
+                        self.check_condition_redundancy(test, test_type, test_truthiness);
+                    }
+                }
+                Truthiness::AlwaysTrue => match elif_else_clauses.as_slice() {
+                    [single] => {
+                        if !(single.test.is_none()
+                            && self.is_deliberately_unreachable_suite(&single.body))
+                        {
+                            self.check_condition_redundancy(test, test_type, test_truthiness);
+                        }
+                    }
+                    [] => {
+                        if !self.is_deliberately_unreachable_suite(&suite[i + 1..]) {
+                            self.check_condition_redundancy(test, test_type, test_truthiness);
+                        }
+                    }
+                    _ => {
+                        self.check_condition_redundancy(test, test_type, test_truthiness);
+                    }
+                },
+            }
+
+            for (elif_i, elif_else) in elif_else_clauses.iter().enumerate() {
+                let ast::ElifElseClause {
+                    body,
+                    test: Some(test),
+                    ..
+                } = elif_else
+                else {
+                    break;
+                };
+
+                let test_type = self.expression_type(test);
+                let test_truthiness = test_type.bool(db, env);
+
+                match test_truthiness {
+                    Truthiness::Ambiguous => continue,
+                    Truthiness::AlwaysFalse => {
+                        if self.is_deliberately_unreachable_suite(body) {
+                            continue;
+                        }
+                    }
+                    Truthiness::AlwaysTrue => match elif_else_clauses.get(elif_i + 1) {
+                        Some(clause) => {
+                            if clause.test.is_none()
+                                && self.is_deliberately_unreachable_suite(&clause.body)
+                            {
+                                continue;
+                            }
+                        }
+                        None => {
+                            if self.is_deliberately_unreachable_suite(&suite[i + 1..]) {
+                                continue;
+                            }
+                        }
+                    },
+                }
+
+                self.check_condition_redundancy(test, test_type, test_truthiness);
+            }
+        }
+    }
+
+    fn is_deliberately_unreachable_suite(&self, suite: &[ast::Stmt]) -> bool {
+        if suite.iter().all(|stmt| {
+            stmt.as_expr_stmt()
+                .is_some_and(|stmt_expr| stmt_expr.value.is_string_literal_expr())
+        }) {
+            return false;
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+
+        let not_implemented = KnownClass::NotImplementedType.to_instance(db, env);
+
+        suite.iter().all(|stmt| match stmt {
+            ast::Stmt::Raise(_) => true,
+            ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
+                self.expression_type(test).bool(db, env).may_be_false()
+            }
+            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => match &**value {
+                ast::Expr::StringLiteral(..) => true,
+                ast::Expr::Call(..) => {
+                    self.expression_type(value)
+                        .is_equivalent_to(db, env, Type::Never)
+                }
+                _ => false,
+            },
+            ast::Stmt::Return(ast::StmtReturn {
+                value: Some(expr), ..
+            }) => self
+                .expression_type(expr)
+                .is_assignable_to(db, env, not_implemented),
+            _ => false,
+        })
     }
 }
 

@@ -973,6 +973,10 @@ impl Truthiness {
         !self.is_always_false()
     }
 
+    pub const fn may_be_false(self) -> bool {
+        !self.is_always_true()
+    }
+
     pub const fn is_always_true(self) -> bool {
         matches!(self, Truthiness::AlwaysTrue)
     }
