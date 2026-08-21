@@ -14,29 +14,6 @@ pub(super) use bind::{
     Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
 };
 
-/// The constructors whose signatures are currently being expanded.
-///
-/// An immutable stack keeps union and intersection branches independent and avoids allocating for
-/// ordinary constructor calls.
-pub(super) struct ConstructorStack<'a, 'db> {
-    receiver: Type<'db>,
-    parent: Option<&'a Self>,
-}
-
-impl<'a, 'db> ConstructorStack<'a, 'db> {
-    pub(super) fn new(receiver: Type<'db>, parent: Option<&'a Self>) -> Self {
-        Self { receiver, parent }
-    }
-
-    pub(super) fn is_recursive(&self) -> bool {
-        // Descriptor overloads can distinguish `C` from `type[C]`. Different specializations also
-        // need separate expansion, even if one contains the other, because a constructor may ignore
-        // its nested type arguments.
-        std::iter::successors(self.parent, |active| active.parent)
-            .any(|active| active.receiver == self.receiver)
-    }
-}
-
 /// Whether the right operand's reflected method has priority based on the possible runtime
 /// classes of both operands.
 ///
