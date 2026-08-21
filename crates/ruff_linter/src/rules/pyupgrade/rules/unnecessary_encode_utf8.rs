@@ -12,20 +12,24 @@ use crate::fix::edits::{Parentheses, pad, remove_argument};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
-/// Checks for unnecessary calls to `ncode` as UTF-8, including unnecessary explicit encoding arguments.
+/// Checks for unnecessary calls to `encode` as UTF-8 and unnecessary explicit
+/// UTF-8 encoding arguments.
 ///
 /// ## Why is this bad?
-/// UTF-8 is the default encoding in Python, so there is no need to pass an explicit
-/// UTF-8 encoding to `ncode`. For ASCII literals, use a bytes literal instead.
+/// UTF-8 is the default encoding in Python, so there is no need to pass an
+/// explicit UTF-8 encoding to `encode`. For ASCII literals, use a bytes literal
+/// instead; for other strings, omit the explicit encoding argument.
 ///
 /// ## Example
 /// ```python
 /// "foo".encode("utf-8")
+/// "unicode text©".encode(encoding="utf-8")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// b"foo"
+/// "unicode text©".encode()
 /// ```
 ///
 /// ## References
@@ -149,88 +153,6 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
     ))
 }
 
-fn report_unnecessary_default_argument(checker: &Checker, call: &ast::ExprCall, encoding_arg: EncodingArg<'_>) {
-    match encoding_arg {
-        EncodingArg::Keyword(kwarg) => {
-            let mut diagnostic = checker.report_diagnostic(
-                UnnecessaryEncodeUTF8 {
-                    reason: Reason::DefaultArgument,
-                },
-                call.range(),
-            );
-            diagnostic.try_set_fix(|| {
-                remove_argument(
-                    kwarg,
-                    &call.arguments,
-                    Parentheses::Preserve,
-                    checker.locator().contents(),
-                    checker.tokens(),
-                )
-                .map(Fix::safe_edit)
-            });
-        }
-        EncodingArg::Positional(arg) => {
-            let mut diagnostic = checker.report_diagnostic(
-                UnnecessaryEncodeUTF8 {
-                    reason: Reason::DefaultArgument,
-                },
-                call.range(),
-            );
-            diagnostic.try_set_fix(|| {
-                remove_argument(
-                    arg,
-                    &call.arguments,
-                    Parentheses::Preserve,
-                    checker.locator().contents(),
-                    checker.tokens(),
-                )
-                .map(Fix::safe_edit)
-            });
-        }
-        EncodingArg::Empty => {}
-    }
-}
-fn report_unnecessary_default_argument(checker: &Checker, call: &ast::ExprCall, encoding_arg: EncodingArg<'_>) {
-    match encoding_arg {
-        EncodingArg::Keyword(kwarg) => {
-            let mut diagnostic = checker.report_diagnostic(
-                UnnecessaryEncodeUTF8 {
-                    reason: Reason::DefaultArgument,
-                },
-                call.range(),
-            );
-            diagnostic.try_set_fix(|| {
-                remove_argument(
-                    kwarg,
-                    &call.arguments,
-                    Parentheses::Preserve,
-                    checker.locator().contents(),
-                    checker.tokens(),
-                )
-                .map(Fix::safe_edit)
-            });
-        }
-        EncodingArg::Positional(arg) => {
-            let mut diagnostic = checker.report_diagnostic(
-                UnnecessaryEncodeUTF8 {
-                    reason: Reason::DefaultArgument,
-                },
-                call.range(),
-            );
-            diagnostic.try_set_fix(|| {
-                remove_argument(
-                    arg,
-                    &call.arguments,
-                    Parentheses::Preserve,
-                    checker.locator().contents(),
-                    checker.tokens(),
-                )
-                .map(Fix::safe_edit)
-            });
-        }
-        EncodingArg::Empty => {}
-    }
-}
 /// UP012
 pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
     let Some(variable) = match_encoded_variable(&call.func) else {
@@ -340,11 +262,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                 }
             }
         }
-        _ => {
-            if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
-                report_unnecessary_default_argument(checker, call, encoding_arg);
-            }
-        }
+        _ => {}
     }
 }
 /// In a string, there are two kinds of escape sequences: "single" and "multi".
