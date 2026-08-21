@@ -341,7 +341,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 decorated_ty => decorated_ty,
             };
             // If a class decorator application loses all precision, preserve the original class
-            // binding for decorators known to preserve unknown results.
+            // binding when the decorator's unknown-result policy permits preservation.
             let should_preserve_binding = is_unknown_decorator_result(db, decorated_ty)
                 && preserve_binding_for_unknown_result(
                     db,
@@ -606,9 +606,9 @@ fn is_unknown_class_object_decorator_result<'db>(db: &'db dyn Db, ty: Type<'db>)
 /// Policy for class decorators whose application result is unknown.
 ///
 /// This is only consulted after applying the decorator produced no useful replacement type. If the
-/// decorator itself statically suggests an unannotated identity-preserving shape, we keep the
-/// current class binding; if it explicitly promises a replacement type, or if the decorator is
-/// unknown, we let the unknown result replace the binding.
+/// decorator itself is unknown or statically suggests an unannotated identity-preserving shape,
+/// we keep the current class binding. If it explicitly promises a replacement type, we let the
+/// unknown result replace the binding.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum ClassDecoratorUnknownResultPolicy {
     /// Preserve the current class binding when the decorator result is unknown.
@@ -620,9 +620,9 @@ enum ClassDecoratorUnknownResultPolicy {
 impl ClassDecoratorUnknownResultPolicy {
     /// Infer the unknown-result policy from the decorator's own type.
     ///
-    /// Unannotated function and method decorators are treated as class-preserving when their
-    /// application result is unknown. Explicit return annotations are trusted as replacement
-    /// intent.
+    /// Unknown decorators and unannotated function and method decorators are treated as
+    /// class-preserving when their application result is unknown. Explicit return annotations are
+    /// trusted as replacement intent.
     fn from_decorator<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -630,7 +630,7 @@ impl ClassDecoratorUnknownResultPolicy {
         decorator_result_ty: Type<'db>,
     ) -> Self {
         if decorator_ty.is_unknown() {
-            return Self::ReplaceBinding;
+            return Self::PreserveBinding;
         }
 
         Self::known_from_decorator(db, env, decorator_ty, decorator_result_ty)

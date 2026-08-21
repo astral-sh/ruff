@@ -168,6 +168,31 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Decorated generic bases
+
+An unresolved class decorator should not erase a generic class's type parameters. Subclasses can
+inherit those parameters and remain generic.
+
+```py
+import collections.abc
+from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
+@collections.abc.Mapping.register
+class Mapping(Generic[K, V]): ...
+
+# revealed: ty_extensions._internal.GenericContext[K@Mapping, V@Mapping]
+reveal_type(generic_context(Mapping))
+
+class FrozenDict(Mapping[K, V]): ...
+
+mapping: FrozenDict[str, int]
+```
+
 ## Specializing classes with unavailable generic context
 
 When an earlier error prevents ty from determining a class's generic context, specializing the class
@@ -193,33 +218,6 @@ class Parser(typing.Generic[T]): ...
 
 # TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
 parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` cannot be specialized in a type expression"
-```
-
-### Decorated generic bases
-
-A decorator that ty cannot fully understand can obscure the generic context of a base class. A
-subclass that forwards type variables to that base remains possibly generic.
-
-```py
-import collections.abc
-from typing import Generic, TypeVar
-from ty_extensions._internal import generic_context
-
-K = TypeVar("K")
-V = TypeVar("V")
-
-# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
-@collections.abc.Mapping.register
-class Mapping(Generic[K, V]): ...
-
-# TODO: Invalid decorator causes us to lose the generic context from the class...
-reveal_type(generic_context(Mapping))  # revealed: None
-
-class FrozenDict(Mapping[K, V]): ...
-
-# TODO: ...which then causes us to emit this
-# error: [invalid-type-form] "Non-generic class `FrozenDict` cannot be specialized in a type expression"
-mapping: FrozenDict[str, int]
 ```
 
 ### Unresolved generic bases
