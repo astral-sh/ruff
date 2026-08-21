@@ -35,7 +35,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         test_type: Type<'db>,
         test_truthiness: Truthiness,
     ) {
-        if test_truthiness == Truthiness::Ambiguous {
+        if test_truthiness == Truthiness::Ambiguous && !test.is_bool_op_expr() {
             return;
         }
 
@@ -56,8 +56,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             //
             // - In `result = flag and func`, `func` is merely a possible result. Its truthiness
             //   is not checked, so it should not produce a diagnostic.
-            // - In `if True and func`, the `if` checks the result's truthiness. The result is
-            //   `func`, so the uncalled function should produce a diagnostic.
+            // - In `if flag and func`, the `if` checks `func` when `flag` is truthy, so the
+            //   uncalled function should produce a diagnostic even though the complete
+            //   condition has ambiguous truthiness.
             //
             // Check the final operand whenever the complete expression reaches this method;
             // `infer_boolean_expression` has already checked the earlier operands. For values
@@ -115,6 +116,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             _ => {}
+        }
+
+        if test_truthiness == Truthiness::Ambiguous {
+            return;
         }
 
         let rule = if test_type.is_assignable_to(db, env, int_instance) {
@@ -331,10 +336,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let db = self.db();
 
-        for (_, scope) in self.index.ancestor_scopes(self.scope().file_scope_id(db)) {
+        // A list, set, or dictionary comprehension inherits an enclosing annotation's restriction.
+        // A generator expression in between creates its own scope where `await` is valid.
+        let mut comprehension_in_annotation = false;
+
+        for (scope_id, scope) in self.index.ancestor_scopes(self.scope().file_scope_id(db)) {
             match scope.node() {
                 NodeWithScopeKind::Function(function) => {
-                    return function.node(self.module()).is_async;
+                    return !comprehension_in_annotation && function.node(self.module()).is_async;
                 }
                 NodeWithScopeKind::Lambda(_)
                 | NodeWithScopeKind::Class(_)
@@ -348,11 +357,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return true;
                 }
                 NodeWithScopeKind::Module => {
-                    return source_text(db, self.file()).is_notebook();
+                    return !comprehension_in_annotation
+                        && source_text(db, self.file()).is_notebook();
                 }
                 NodeWithScopeKind::DictComprehension(_)
                 | NodeWithScopeKind::ListComprehension(_)
-                | NodeWithScopeKind::SetComprehension(_) => continue,
+                | NodeWithScopeKind::SetComprehension(_) => {
+                    comprehension_in_annotation |= scope_id.is_defined_in_annotation(self.index);
+                }
             }
         }
 
@@ -378,7 +390,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let test_truthiness = test_type.bool(db, env);
 
             match test_truthiness {
-                Truthiness::Ambiguous => {}
+                Truthiness::Ambiguous => {
+                    self.check_condition_redundancy(test, test_type, test_truthiness);
+                }
                 Truthiness::AlwaysFalse => {
                     if !self.is_deliberately_unreachable_suite(body) {
                         self.check_condition_redundancy(test, test_type, test_truthiness);
@@ -417,7 +431,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let test_truthiness = test_type.bool(db, env);
 
                 match test_truthiness {
-                    Truthiness::Ambiguous => continue,
+                    Truthiness::Ambiguous => {}
                     Truthiness::AlwaysFalse => {
                         if self.is_deliberately_unreachable_suite(body) {
                             continue;
