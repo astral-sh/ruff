@@ -762,6 +762,16 @@ class SlottedString(str):
         self.extra = 1  # error: [unresolved-attribute]
 ```
 
+The structural mapping bases used to describe `dict` in typeshed do not add an instance dictionary.
+
+```py
+class SlottedDictionary(dict[str, int]):
+    __slots__ = ()
+
+    def initialize(self) -> None:
+        self.extra = 1  # error: [unresolved-attribute]
+```
+
 ## Built-in bases with instance dictionaries
 
 `staticmethod` instances have instance dictionaries, so a slotted subclass can still create
@@ -787,6 +797,49 @@ class SlottedClassMethod(classmethod[Any, ..., Any]):
     def __init__(self) -> None:
         super().__init__(lambda cls: 1)
         self.extra = 1
+```
+
+## Instance dictionaries inherited from standard-library bases
+
+A standard-library class with slots declared in typeshed does not supply an instance dictionary. A
+slotted subclass inherits that restricted layout.
+
+```py
+from pathlib import Path
+
+class SlottedPath(Path):
+    __slots__ = ()
+
+    def initialize(self) -> None:
+        self.extra = 1  # error: [unresolved-attribute]
+```
+
+An ordinary standard-library class without a slot declaration supplies an instance dictionary even
+when its subclass declares slots.
+
+```py
+from collections import Counter
+
+class SlottedCounter(Counter[str]):
+    __slots__ = ()
+
+    def initialize(self) -> None:
+        self.extra = 1
+```
+
+## Interpreter-managed classes without instance dictionaries
+
+Some classes implemented by the interpreter have restricted instance layouts that are not expressed
+through `__slots__` in typeshed.
+
+```py
+from types import GenericAlias
+
+class SlottedAlias(GenericAlias):
+    __slots__ = ()
+
+    def initialize(self) -> None:
+        self.extra = 1  # error: [unresolved-attribute]
 ```
 
 ## Descriptor setters do not require instance dictionaries

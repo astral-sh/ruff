@@ -64,8 +64,8 @@ enum InstanceDictionary {
 }
 
 impl InstanceDictionary {
-    /// Classify builtin storage and structural typing bases without relying on stub declarations.
-    fn for_known_class(class: KnownClass) -> Self {
+    /// Classify interpreter-managed storage that cannot be recovered from stub declarations.
+    fn for_known_class(class: KnownClass) -> Option<Self> {
         match class {
             KnownClass::Object
             | KnownClass::Bool
@@ -84,27 +84,40 @@ impl InstanceDictionary {
             | KnownClass::Dict
             | KnownClass::Slice
             | KnownClass::Property
+            | KnownClass::Super
+            | KnownClass::GenericAlias
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
             | KnownClass::MemberDescriptorType
             | KnownClass::GetSetDescriptorType
-            | KnownClass::Super
-            | KnownClass::Sequence
-            | KnownClass::Iterable
-            | KnownClass::Iterator
-            | KnownClass::Mapping
-            | KnownClass::MutableMapping
-            | KnownClass::Hashable
-            | KnownClass::SupportsIndex
-            | KnownClass::NamedTupleFallback => Self::Absent,
-            KnownClass::BaseException
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NotImplementedType
+            | KnownClass::BuiltinFunctionType
+            | KnownClass::EllipsisType
+            | KnownClass::NoneType => Some(Self::Absent),
+            // Typeshed adds these abstract bases to builtin sequences and mappings even though
+            // they do not occur in their runtime inheritance chains or provide instance storage.
+            KnownClass::Sequence | KnownClass::Mapping | KnownClass::MutableMapping => {
+                Some(Self::Absent)
+            }
+            // This synthetic base supplies named-tuple members without changing instance layouts.
+            KnownClass::NamedTupleFallback => Some(Self::Absent),
+            KnownClass::Type
+            | KnownClass::BaseException
             | KnownClass::Exception
             | KnownClass::Warning
+            | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
-            | KnownClass::Classmethod => Self::Present,
-            KnownClass::Type
-            | KnownClass::NotImplementedError
-            | KnownClass::Enum
+            | KnownClass::Classmethod
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType => Some(Self::Present),
+            KnownClass::Enum
             | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
@@ -115,20 +128,6 @@ impl InstanceDictionary {
             | KnownClass::Flag
             | KnownClass::IntFlag
             | KnownClass::ABCMeta
-            | KnownClass::GenericAlias
-            | KnownClass::ModuleType
-            | KnownClass::FunctionType
-            | KnownClass::MethodType
-            | KnownClass::MethodWrapperType
-            | KnownClass::WrapperDescriptorType
-            | KnownClass::UnionType
-            | KnownClass::GeneratorType
-            | KnownClass::AsyncGeneratorType
-            | KnownClass::CoroutineType
-            | KnownClass::NotImplementedType
-            | KnownClass::BuiltinFunctionType
-            | KnownClass::EllipsisType
-            | KnownClass::NoneType
             | KnownClass::SupportsKeysAndGetItem
             | KnownClass::Awaitable
             | KnownClass::Generator
@@ -148,6 +147,10 @@ impl InstanceDictionary {
             | KnownClass::ExtensionsTypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::Iterator
             | KnownClass::AsyncIterator
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ExtensionTypedDictFallback
@@ -177,7 +180,8 @@ impl InstanceDictionary {
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
             | KnownClass::PydanticRootModel
-            | KnownClass::PydanticStrict => Self::Unknown,
+            | KnownClass::PydanticStrict
+            | KnownClass::PytestParametrizeMarkDecorator => None,
         }
     }
 
@@ -478,8 +482,10 @@ impl<'db> StaticClassLiteral<'db> {
                 slots.extend(names.iter().cloned());
             } else if base.has_explicit_slots(db) {
                 dictionary = dictionary.inherited_with(InstanceDictionary::Unknown);
-            } else if let Some(known) = base.known(db) {
-                dictionary = dictionary.inherited_with(InstanceDictionary::for_known_class(known));
+            } else if let Some(known_dictionary) =
+                base.known(db).and_then(InstanceDictionary::for_known_class)
+            {
+                dictionary = dictionary.inherited_with(known_dictionary);
             } else if !base.is_protocol(db) {
                 dictionary = InstanceDictionary::Present;
             }
