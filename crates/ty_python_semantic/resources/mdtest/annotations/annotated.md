@@ -22,6 +22,21 @@ def _(x: Annotated[tuple[str, int], bytes]):
     reveal_type(x)  # revealed: tuple[str, int]
 ```
 
+## String annotations
+
+Metadata in a string annotation can include calls with unpacked dictionaries. The metadata does not
+affect the annotated type, regardless of where the annotation appears.
+
+```py
+from typing_extensions import Annotated
+
+value: "Annotated[int, dict(**{})]"
+
+def convert(value: "Annotated[str, dict(**{'name': 'value'})]") -> "Annotated[int, dict(**{})]":
+    reveal_type(value)  # revealed: str
+    return 1
+```
+
 ## Inside `type[...]`
 
 `Annotated` can wrap a class or specialized generic class inside `type[...]` without changing the
