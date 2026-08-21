@@ -127,11 +127,11 @@ use crate::types::{
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{
-    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
-    Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
-    ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    NestedBindingExecution, NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind,
-    WithItemDefinitionKind,
+    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, AssignmentValueBindingsOwner,
+    ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
+    ExceptHandlerDefinitionKind, ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind,
+    LoopHeaderDefinitionKind, NestedBindingExecution, NestedBindingsDefinitionKind,
+    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -3402,22 +3402,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
-                    if standalone_expression
-                        .assigned_to(self.db())
-                        .is_some_and(|assignment| {
-                            !matches!(
-                                assignment.node(self.module()).targets.as_slice(),
-                                [ast::Expr::Name(_)]
-                            )
-                        })
-                    {
-                        let inference =
-                            infer_expression_types(self.db(), standalone_expression, tcx);
-                        self.extend_expression_without_bindings(inference);
-                        inference.expression_type(value)
-                    } else {
-                        self.infer_standalone_expression_impl(value, standalone_expression, tcx)
+                    let inference = infer_expression_types(self.db(), standalone_expression, tcx);
+                    match assignment.value_bindings_owner() {
+                        AssignmentValueBindingsOwner::Definition => {
+                            self.extend_expression(inference);
+                        }
+                        AssignmentValueBindingsOwner::Statement => {
+                            self.extend_expression_without_bindings(inference);
+                        }
                     }
+                    inference.expression_type(value)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form

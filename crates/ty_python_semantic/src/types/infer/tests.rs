@@ -347,6 +347,28 @@ fn shared_assignment_statement_owns_lambda_default_bindings() -> anyhow::Result<
 }
 
 #[test]
+fn single_assignment_definition_owns_lambda_default_bindings() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/lambda_default.py",
+        "values = [lambda value=(named := 1): value]",
+    )?;
+
+    let file = system_path_to_file(&db, "/src/lambda_default.py").unwrap();
+    let values = first_public_binding(&db, file, "values");
+    let named = first_public_binding(&db, file, "named");
+
+    assert!(
+        infer_definition_types(&db, values)
+            .bindings(values)
+            .any(|(definition, _)| definition == named),
+        "the definition lost the binding created in its lambda default"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(
