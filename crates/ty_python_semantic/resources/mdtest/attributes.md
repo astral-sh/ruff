@@ -1601,6 +1601,7 @@ class CLoopInitialized(metaclass=LiteralInitializingMeta):
         pass
 
 class CNamedInitialized(metaclass=LiteralInitializingMeta):
+    # error: [redundant-condition] "always truthy"
     if attr := "invalid":  # error: [invalid-assignment]
         pass
 

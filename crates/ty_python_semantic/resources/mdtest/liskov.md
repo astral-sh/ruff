@@ -2398,6 +2398,7 @@ have bigger problems:
 from __future__ import annotations
 
 class MaybeEqWhile:
+    # error: [redundant-condition] "always truthy"
     while ...:
         def __eq__(self, other: MaybeEqWhile) -> bool:
             return True

@@ -36,6 +36,8 @@ class FinalClass: ...
 # therefore no subtype of `FinalClass` can define `__bool__`
 # or `__len__`, therefore `FinalClass` can safely be considered
 # always-truthy, therefore this always resolves to `None`
+#
+# error: [redundant-condition] "always truthy"
 reveal_type(FinalClass() and None)  # revealed: None
 ```
 

@@ -1,0 +1,462 @@
+# Detection of boolean tests that are always truthy or always falsy
+
+A common error in Python is to accidentally test truthiness of the wrong object; for example
+`if func:` (which is always true) where `if func():` was intended, or `if coroutine():` where
+`if await coroutine():` was intended. By default, ty alerts the user to these errors with the error
+code `redundant-condition`, but only if the inferred type of the object is not assignable to `int`.
+This heuristic catches the `if func` and `if coroutine()` cases, while avoiding false positives on
+cases such as `if DEBUG:` where `DEBUG = 0` or `DEBUG = False` is a constant.
+
+The remaining cases -- where the inferred type is assignable to `int` -- are covered by a separate,
+stricter rule (`redundant-condition-strict`).
+
+```toml
+[environment]
+python-version = "3.14"
+python-platform = "linux"
+
+[rules]
+redundant-condition-strict = "error"
+```
+
+## Basic cases
+
+We catch testing a function without calling it:
+
+```py
+def func(): ...
+
+if func:  # snapshot: redundant-condition
+    pass
+```
+
+```snapshot
+warning[redundant-condition]: Function `func` is always truthy in a boolean context
+ --> src/mdtest_snippet.py:3:4
+  |
+3 | if func:  # snapshot: redundant-condition
+  |    ^^^^ Did you mean to call this function?
+  |
+2 |
+  - if func:  # snapshot: redundant-condition
+3 + if func():  # snapshot: redundant-condition
+4 |     pass
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+And testing a generator expression without executing it:
+
+```py
+def work(items: list[int]):
+    filtered = (item for item in items if item < 42)
+    if filtered:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Object of type `GeneratorType[int, None, None]` is always truthy in a boolean context
+ --> src/mdtest_snippet.py:7:8
+  |
+7 |     if filtered:  # snapshot: redundant-condition
+  |        ^^^^^^^^
+```
+
+And testing an awaitable without awaiting it:
+
+```py
+async def coroutine(): ...
+async def main():
+    if coroutine():  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Object of type `CoroutineType[Any, Any, Unknown]` is always truthy in a boolean context
+  --> src/mdtest_snippet.py:11:8
+   |
+11 |     if coroutine():  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^ Did you mean to `await` this expression?
+   |
+10 | async def main():
+   -     if coroutine():  # snapshot: redundant-condition
+11 +     if await coroutine():  # snapshot: redundant-condition
+12 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+## Other boolean contexts
+
+Redundant conditions are not merely detected in `if` tests. They are also detected in unary `not`
+operations, `while` loops, `if` expressions, `and` expressions, `or` expressions, and in
+comprehension `if` tests.
+
+```py
+def coinflip() -> bool:
+    return True
+
+def func(): ...
+
+if not func:  # error: [redundant-condition]
+    pass
+
+a = True if func else False  # error: [redundant-condition]
+
+if coinflip() if func else False:  # error: [redundant-condition]
+    pass
+
+b = func and coinflip()  # error: [redundant-condition]
+
+if func and coinflip():  # error: [redundant-condition]
+    pass
+
+c = func or coinflip()  # error: [redundant-condition]
+
+if func or coinflip():  # error: [redundant-condition]
+    pass
+
+[x for x in range(3) if func]  # error: [redundant-condition]
+
+def function(flag: bool):
+    if flag:
+        pass
+    elif func:  # error: [redundant-condition]
+        pass
+
+assert func  # error: [redundant-condition]
+
+while func and coinflip():  # error: [redundant-condition]
+    pass
+
+while not (func and coinflip()):  # error: [redundant-condition]
+    pass
+
+# N.B. this `while` statement must come last in the test snippet,
+# as ty considers all code following it to be unreachable,
+# and does not emit any diagnostics in unreachable code!
+#
+while func:  # error: [redundant-condition]
+    pass
+```
+
+## Strict version
+
+Our stricter `redundant-condition-strict` rule extends this logic to boolean and integer tests:
+
+```py
+from typing import Literal
+
+def f(x: Literal[1, 2]):
+    if x > 5:  # error: [redundant-condition-strict]
+        pass
+
+    if x:  # error: [redundant-condition-strict]
+        pass
+
+def truthy(flag: bool):
+    if flag:
+        pass
+    elif True:  # error: [redundant-condition-strict]
+        pass
+
+def falsy(flag: bool):
+    if flag:
+        pass
+    elif False:  # error: [redundant-condition-strict]
+        pass
+```
+
+To avoid two diagnostics being emitted on compound tests such as the following statements,
+we suppress `redundant-condition-strict` on subexpressions of `if`-statement tests, `elif` tests
+and `while` tests. Only a single diagnostic is emitted on each of these:
+
+```py
+def compound_truthy(x: str):
+    if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
+        pass
+
+    while isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
+        break
+```
+
+## Infinite `while` loops
+
+We maintain a special case for `while` loops, since `while True:` and `while 1:` are common idioms
+used to create infinite loops in Python code. Complaining that the conditions `True` and `1` are
+"always truthy" in these contexts would obviously be absurd.
+
+Note that these need to be tested in separate files, as ty infers all code after a `while True` or
+`while 1` loop to be unreachable, and it does not emit any diagnostics in unreachable code!
+
+`while_true.py`:
+
+```py
+while True:  # no error
+    pass
+```
+
+`while_1.py`:
+
+```py
+while 1:
+    pass  # no error
+```
+
+## Defensive assertions
+
+Of the two rules, only `redundant-condition` is applied to tests in `assert` statements (and any
+subexpressions within those tests). This is to prevent false positives on defensive assertions such
+as the following, which are common in well written Python code:
+
+```py
+def f(x: str, y: str | int, z: str | int | bytes):
+    assert isinstance(x, str)
+    assert isinstance(y, str) or isinstance(y, int)
+    assert isinstance(z, str) or isinstance(z, int) or isinstance(z, bytes)
+    assert isinstance(x, str) and isinstance(y, (str, int))
+    assert not not isinstance(x, str)
+    assert isinstance(x, str) and (isinstance(y, str) or isinstance(y, int))
+    assert (isinstance(y, str) or isinstance(y, int)) and not not isinstance(x, str)
+```
+
+The ordinary rule still applies inside assertion tests, and the strict rule still applies to
+assertion messages:
+
+```py
+def func(): ...
+def assertion_boundaries(x: str, flag: bool):
+    assert func and isinstance(x, str)  # error: [redundant-condition]
+    assert flag, isinstance(x, str) and flag  # error: [redundant-condition-strict]
+```
+
+## `sys.version_info` checks, `sys.platform` checks, `os.name` checks, `if TYPE_CHECKING` checks
+
+Certain stdlib constants are heavily special-cased by ty, leading us to infer that certain `if`
+tests involving these constants will always be truthy or always be falsy. Since the branches of code
+here are deliberately unreachable, we try to avoid emitting false-positive diagnostics on these as
+well:
+
+`a.py`:
+
+```py
+import sys
+import os
+import typing
+from typing import TYPE_CHECKING
+
+def coinflip() -> bool:
+    return False
+
+reveal_type(sys.version_info >= (3, 14))  # revealed: Literal[True]
+reveal_type(sys.version_info < (3, 15))  # revealed: Literal[True]
+
+if sys.version_info >= (3, 14):  # no diagnostic
+    pass
+
+if coinflip():
+    pass
+elif sys.version_info < (3, 15):  # no diagnostic
+    pass
+
+if os.name == "posix":  # no diagnostic
+    pass
+
+if coinflip():
+    pass
+elif os.name == "nt":  # no diagnostic
+    pass
+
+reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
+
+if TYPE_CHECKING:  # no diagnostic
+    pass
+
+reveal_type(typing.TYPE_CHECKING)  # revealed: Literal[True]
+
+if not typing.TYPE_CHECKING:  # no diagnostic
+    pass
+```
+
+This even applies to cases where the value of one of these constants is aliased to a variable in the
+module namespace:
+
+`b.py`:
+
+```py
+import sys
+
+PLATFORM = sys.platform
+
+if PLATFORM == "linux":  # no diagnostic
+    pass
+
+IS_PY314 = sys.version_info >= (3, 14)
+reveal_type(IS_PY314)  # revealed: Literal[True]
+
+if IS_PY314:  # no diagnostic
+    pass
+```
+
+And even in other imported modules:
+
+`c.py`:
+
+```py
+from b import PLATFORM
+
+if PLATFORM == "linux":  # no diagnostic
+    pass
+```
+
+## Deliberately exhaustive `if` statements
+
+A common pattern is to have an `if` condition that is deliberately always true or false, so that the
+user can assert exhaustiveness explicitly. We detect these cases and avoid emitting diagnostics on
+them.
+
+```py
+import sys
+from typing_extensions import assert_never
+
+def f1(x: int | str):
+    if isinstance(x, int):
+        pass
+    # always True, but no diagnostic emitted: the `else` block following only contains `raise` statements
+    elif isinstance(x, str):
+        pass
+    else:
+        raise AssertionError
+        
+def f2(x: int | str):
+    if isinstance(x, int):
+        pass
+    # always False, but no diagnostic emitted: the block only contains `raise` statements
+    elif not isinstance(x, str):
+        raise AssertionError
+
+def f3(x: int | str):
+    if isinstance(x, int):
+        pass
+    # always True, but no diagnostic emitted: the `else` block following only contains `assert` statements
+    elif isinstance(x, str):
+        pass
+    else:
+        assert False, "unreachable"
+
+def f4(x: int | str):
+    if isinstance(x, int):
+        pass
+    # always True, but no diagnostic emitted: the `else` block following only contains calls that return `Never`
+    elif isinstance(x, str):
+        pass
+    else:
+        assert_never(x)
+
+def f5(x: int | str):
+    if isinstance(x, int):
+        pass
+    # always True, but no diagnostic emitted: the `else` block following only contains calls that return `Never`
+    elif isinstance(x, str):
+        pass
+    else:
+        "Some documentation as a standalone string, weirdly"
+        sys.exit("This should never happen??")
+
+def f6(x: int):
+    # always True, but no diagnostic emitted: the block inside the `if` only contains `raise` statements
+    if not isinstance(x, int):
+        raise TypeError
+
+def f7(x: int | str):
+    if isinstance(x, int):
+        pass
+    # always True, but no diagnostic emitted: the `else` block following only contains `raise` statements
+    elif isinstance(x, str) and not isinstance(x, int):
+        pass
+    else:
+        raise AssertionError
+
+def f8(x: int | str):
+    if isinstance(x, int):
+        pass
+    # always False, but no diagnostic emitted: the block only contains `raise` statements
+    elif not isinstance(x, str) or isinstance(x, int):
+        raise AssertionError
+
+def f9(x: str):
+    # always False, but no diagnostic emitted: the block only contains `raise` statements
+    if isinstance(x, str) and not isinstance(x, str):
+        raise AssertionError
+
+def f10(x: str):
+    # always False, but no diagnostic emitted: the block only contains `raise` statements
+    if not (isinstance(x, str) and isinstance(x, str)):
+        raise TypeError
+```
+
+We also avoid emitting the diagnostic if the exhaustiveness check just follows the if check, and is
+not in an `else` branch:
+
+```py
+def g(x: int | str):
+    if isinstance(x, int):
+        return
+
+    # always True, but no diagnostic emitted: the code following only contains `raise` statements
+    if isinstance(x, str):
+        return
+
+    raise AssertionError
+
+def g2(x: int | str):
+    if isinstance(x, int):
+        return
+    # always True, but no diagnostic emitted: the code following only contains `assert` statements
+    elif isinstance(x, str):
+        return
+    
+    assert False, "unreachable"
+```
+
+This also works if the entire block is nested:
+
+```py
+def unrelated_condition() -> bool:
+    return False
+
+def h(x: int | str):
+    if unrelated_condition():
+        if isinstance(x, int):
+            return
+
+        # always True, but no diagnostic emitted: the code following only contains `raise` statements
+        if isinstance(x, str):
+            return
+
+        raise AssertionError
+    # do other things that aren't raises or assertions:
+    x = 1
+```
+
+## Suites containing only string literals
+
+A standalone string following an `if` statement does not assert exhaustiveness:
+
+```py
+def trailing_string():
+    if True:  # error: [redundant-condition-strict]
+        pass
+
+    "This does not assert exhaustiveness."
+```
+
+A standalone string in an `else` block does not assert exhaustiveness either:
+
+```py
+def else_string():
+    if True:  # error: [redundant-condition-strict]
+        pass
+    else:
+        "This does not assert exhaustiveness."
+```

@@ -2187,6 +2187,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    /// Records an `if`, `elif`, or `while` test that uses `not`, `and`, or `or`.
+    fn record_compound_condition_test(&mut self, test: &ast::Expr) {
+        if matches!(
+            test,
+            ast::Expr::BoolOp(_)
+                | ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    ..
+                })
+        ) {
+            self.current_use_def_map_mut()
+                .record_compound_condition_test(test.range());
+        }
+    }
+
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
     /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
@@ -3861,6 +3876,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // `msg` branch back into the following flow, since there is no way of getting out
                 // of that branch. Code after the assertion starts from the condition's truthy flow.
 
+                self.current_use_def_map_mut()
+                    .record_assertion_test(test.range());
                 self.visit_expr(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test);
@@ -4030,6 +4047,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
+                self.record_compound_condition_test(&node.test);
                 self.visit_expr(&node.test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
@@ -4084,6 +4102,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     let next_falsy = if let Some(elif_test) = clause_test {
+                        self.record_compound_condition_test(elif_test);
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
@@ -4167,6 +4186,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
+                self.record_compound_condition_test(test);
                 self.visit_expr(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 

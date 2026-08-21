@@ -3888,6 +3888,7 @@ match x:
         pass
     case False if x and reveal_type(x):  #  revealed: Never
         pass
+    # error: [redundant-condition] "always truthy"
     case "foo" if (x := "bar") and reveal_type(x):  #  revealed: Literal["bar"]
         pass
 
