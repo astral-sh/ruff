@@ -938,6 +938,20 @@ def successful_assertion_after_if():
     assert True
 ```
 
+## Dunder methods that return `NotImplemented`
+
+In dunder methods, it is usually more idiomatic to `return NotImplemented` rather than `raise` if you're
+writing code with defensive runtime checks. We support this pattern too:
+
+```py
+class Foo:
+    def __add__(self, other: "Foo") -> "Foo":
+        # no diagnostic, even though this is inferred as always `True`!
+        if not isinstance(other, Foo):
+            return NotImplemented
+        return self
+```
+
 ## Suites containing only string literals
 
 A standalone string following an `if` statement does not assert exhaustiveness:

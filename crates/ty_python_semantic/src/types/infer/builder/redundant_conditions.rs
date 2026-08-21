@@ -1,3 +1,6 @@
+//! Analysis of whether a boolean test should be reported as being unintentionally
+//! always-true or always-false.
+
 use ruff_db::{parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
@@ -486,14 +489,6 @@ fn is_special_cased_condition_expression<'db>(
             _ => {}
         },
         _ => {}
-    }
-
-    if expression_type(expression).is_subtype_of(
-        db,
-        env,
-        KnownClass::NotImplementedType.to_instance(db, env),
-    ) {
-        return true;
     }
 
     if !matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
