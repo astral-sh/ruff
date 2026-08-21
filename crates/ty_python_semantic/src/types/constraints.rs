@@ -978,8 +978,8 @@ struct ConstraintSetStorage<'db> {
     /// appear in the source code. This ensures that any union and intersections types that appear
     /// in solutions are constructed in a stable (and source-consistent) order.
     ///
-    /// This is encoded as a binary tree over [`ConstraintId`]s. A preorder traversal of that tree
-    /// defines the ordering.
+    /// This is encoded as an interned binary DAG over [`ConstraintId`]s. The first occurrence of
+    /// each constraint in a left-first traversal defines the ordering.
     source_orders: IndexVec<SourceOrderId, SourceOrder>,
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
@@ -1549,25 +1549,23 @@ impl<'db> ConstraintSetStorage<'db> {
         &self,
         source_order: Option<SourceOrderId>,
     ) -> FxIndexSet<ConstraintId> {
-        fn walk(
-            storage: &ConstraintSetStorage,
-            current: SourceOrderId,
-            result: &mut FxIndexSet<ConstraintId>,
-        ) {
-            match storage.source_order_data(current) {
+        // Source-order sidecars share interned subtrees. Revisiting a subtree cannot contribute
+        // an earlier occurrence of any constraint, and can expand a small DAG exponentially.
+        let mut pending = Vec::from_iter(source_order);
+        let mut visited = FxHashSet::default();
+        let mut result = FxIndexSet::default();
+        while let Some(current) = pending.pop() {
+            if !visited.insert(current) {
+                continue;
+            }
+            match self.source_order_data(current) {
                 SourceOrder::Ordered(left, right) => {
-                    walk(storage, left, result);
-                    walk(storage, right, result);
+                    pending.extend([right, left]);
                 }
                 SourceOrder::Constraint(constraint) => {
                     result.insert(constraint);
                 }
             }
-        }
-
-        let mut result = FxIndexSet::default();
-        if let Some(source_order) = source_order {
-            walk(self, source_order, &mut result);
         }
         result
     }
@@ -1823,7 +1821,7 @@ pub struct ConstraintId;
 #[derive(get_size2::GetSize)]
 struct SourceOrderId;
 
-/// The nodes of the tree that defines source ordering for a constraint set.
+/// The nodes of the DAG that defines source ordering for a constraint set.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum SourceOrder {
     Ordered(SourceOrderId, SourceOrderId),
@@ -9106,6 +9104,62 @@ class E: ...
             let storage = builder.storage.borrow();
             assert_eq!(storage.source_orders.len(), original_source_order_count);
         }
+    }
+
+    #[test]
+    fn shared_source_order_subtrees_are_visited_once() {
+        let db = setup_db();
+        let db = &db;
+        let t = create_typevar(db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let mut left = create_constraint(db, &builder, t, KnownClass::Int);
+        let mut right = create_constraint(db, &builder, t, KnownClass::Str);
+        let expected = {
+            let storage = builder.storage.borrow();
+            [left.node, right.node].map(|node| storage.interior_node_data(node).constraint)
+        };
+        let original = left.or(db, &builder, || right);
+
+        // The TDD stops growing, but each sidecar shares both of its predecessors. Walking the
+        // sidecar as a tree would take exponentially many steps.
+        for _ in 0..63 {
+            let next = left.or(db, &builder, || right);
+            left = right;
+            right = next;
+        }
+        assert_eq!(right.node, original.node);
+        assert_eq!(
+            builder
+                .storage
+                .borrow()
+                .calculate_source_orders(right.source_order)
+                .into_iter()
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+
+    #[test]
+    fn deeply_nested_source_order_preserves_first_occurrences() {
+        let mut storage = ConstraintSetStorage::default();
+        let first = ConstraintId::from_usize(0);
+        let second = ConstraintId::from_usize(1);
+        let first_order = storage.constraint_source_order(first);
+        let second_order = storage.constraint_source_order(second);
+        let mut source_order = storage.ordered_source_order(Some(second_order), Some(first_order));
+
+        // Appending a repeated leaf creates a deep left spine without changing the order. The
+        // first occurrence of `second` is in the left subtree, not the right leaf at the root.
+        for _ in 0..32_768 {
+            source_order = storage.ordered_source_order(source_order, Some(second_order));
+        }
+        assert_eq!(
+            storage
+                .calculate_source_orders(source_order)
+                .into_iter()
+                .collect::<Vec<_>>(),
+            [second, first]
+        );
     }
 
     #[test]
