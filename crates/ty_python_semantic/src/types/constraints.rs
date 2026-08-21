@@ -2017,10 +2017,6 @@ impl<'db> ConstraintBounds<'db> {
                 && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
         })
     }
-
-    fn has_same_provenance(self, other: Self) -> bool {
-        self.lower.has_same_provenance(other.lower) && self.upper.has_same_provenance(other.upper)
-    }
 }
 
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
@@ -3807,13 +3803,21 @@ impl<'db> PathBound<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
+        let mut lower = self
+            .evidence_lower
+            .into_iter()
+            .chain(self.mixed_lower)
+            .chain((!self.validity_lower.is_never()).then_some(self.validity_lower));
+        let Some(first) = lower.next() else {
+            return Type::Never;
+        };
+        let Some(second) = lower.next() else {
+            return first;
+        };
         UnionType::from_elements(
             db,
             env,
-            self.evidence_lower
-                .into_iter()
-                .chain(self.mixed_lower)
-                .chain([self.validity_lower]),
+            iter::once(first).chain(iter::once(second)).chain(lower),
         )
     }
 
@@ -5195,21 +5199,6 @@ enum Sequent {
         post: ConstraintId,
     },
 
-    /// Sequent of the form `C ∧ ¬D → false`
-    ///
-    /// In theory, this is equivalent to a `SingleImplication`. However, the two handle provenance
-    /// differently. A `SingleImplication` is used to add new positive facts, and we only allow
-    /// that to happen for certain combinations of provenance. (For example, we don't let an
-    /// `Evidence` constraint imply a `Validity` constraint.)
-    ///
-    /// Contradictions, on the other hand, apply no matter the provenance. So there are situations
-    /// where, given `C`, we don't want to add `D` (for provenance reasons), but we _do_ want to
-    /// verify that we haven't already proven `¬D`.
-    ImplicationContradiction {
-        ante: ConstraintId,
-        post: ConstraintId,
-    },
-
     /// Sequent of the form `C₁ ∧ C₂ → D`
     ///
     /// This indicates that if `C₁` and `C₂` are both true, then `D` is guaranteed to be true as
@@ -5346,18 +5335,8 @@ impl SequentMap {
             return;
         }
 
-        // If either antecedent implies the consequent on its own, this new sequent is redundant,
-        // as long as it doesn't discard or manufacture evidence.
-        let post_data = storage.constraint_data(post);
-        let ante1_data = storage.constraint_data(ante1);
-        let ante2_data = storage.constraint_data(ante2);
-        if ((ante1_data.bounds.has_same_provenance(post_data.bounds)
-            || post_data.is_bound_projection_of(db, ante1_data))
-            && ante1.implies(db, env, storage, post))
-            || ((ante2_data.bounds.has_same_provenance(post_data.bounds)
-                || post_data.is_bound_projection_of(db, ante2_data))
-                && ante2.implies(db, env, storage, post))
-        {
+        // If either antecedent implies the consequent on its own, this new sequent is redundant.
+        if ante1.implies(db, env, storage, post) || ante2.implies(db, env, storage, post) {
             return;
         }
 
@@ -5365,30 +5344,8 @@ impl SequentMap {
             .push(Sequent::PairImplication { ante1, ante2, post });
     }
 
-    fn add_single_implication<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &ConstraintSetStorage<'db>,
-        ante: ConstraintId,
-        post: ConstraintId,
-    ) {
+    fn add_single_implication(&mut self, ante: ConstraintId, post: ConstraintId) {
         if ante == post {
-            return;
-        }
-
-        let antecedent = storage.constraint_data(ante);
-        let consequent = storage.constraint_data(post);
-        // Consequences on another type variable already inherit the provenance of their
-        // contributing bounds; comparing their unrelated bound positions would discard valid
-        // implications.
-        if antecedent
-            .typevar
-            .is_same_typevar_as(db, consequent.typevar)
-            && !antecedent.bounds.has_same_provenance(consequent.bounds)
-            && !consequent.is_bound_projection_of(db, antecedent)
-        {
-            self.sequents
-                .push(Sequent::ImplicationContradiction { ante, post });
             return;
         }
 
@@ -5533,7 +5490,7 @@ impl SequentMap {
                             .with_source_provenance(constraint_data.bounds),
                     );
                     if interior.if_true != ALWAYS_FALSE {
-                        self.add_single_implication(db, storage, constraint, derived);
+                        self.add_single_implication(constraint, derived);
                         node = interior.if_true;
                     } else {
                         self.add_pair_impossibility(constraint, derived);
@@ -6355,7 +6312,7 @@ impl SequentMap {
                 right = %right_constraint.display(db, env, storage),
                 "left implies right",
             );
-            self.add_single_implication(db, storage, left_constraint, right_constraint);
+            self.add_single_implication(left_constraint, right_constraint);
         }
         if storage.cached_constraint_implies(db, env, right_constraint, left_constraint) {
             tracing::trace!(
@@ -6364,7 +6321,7 @@ impl SequentMap {
                 right = %right_constraint.display(db, env, storage),
                 "right implies left",
             );
-            self.add_single_implication(db, storage, right_constraint, left_constraint);
+            self.add_single_implication(right_constraint, left_constraint);
         }
 
         match left_constraint.intersect(db, env, storage, right_constraint) {
@@ -6386,8 +6343,8 @@ impl SequentMap {
                     right_constraint,
                     intersection_constraint,
                 );
-                self.add_single_implication(db, storage, intersection_constraint, left_constraint);
-                self.add_single_implication(db, storage, intersection_constraint, right_constraint);
+                self.add_single_implication(intersection_constraint, left_constraint);
+                self.add_single_implication(intersection_constraint, right_constraint);
             }
 
             // The sequent map only needs to include constraints that might appear in a BDD. If the
@@ -6458,16 +6415,6 @@ impl SequentMap {
                             "{} → {}",
                             ante.display(db, env, storage),
                             post.display(db, env, storage)
-                        )?;
-                    }
-
-                    Sequent::ImplicationContradiction { ante, post } => {
-                        maybe_write_prefix(f)?;
-                        write!(
-                            f,
-                            "{} ∧ ¬{} → false",
-                            ante.display(db, env, storage),
-                            post.display(db, env, storage),
                         )?;
                     }
                 }
@@ -7395,9 +7342,6 @@ impl PathAssignments {
                 self.check_single_implication(db, env, storage, ante, post);
                 Ok(())
             }
-            Sequent::ImplicationContradiction { ante, post } => {
-                self.check_implication_contradiction(db, env, storage, ante, post)
-            }
         }
     }
 
@@ -7512,33 +7456,6 @@ impl PathAssignments {
             );
         }
     }
-
-    fn check_implication_contradiction<'db>(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &ConstraintSetStorage<'db>,
-        ante: ConstraintId,
-        post: ConstraintId,
-    ) -> Result<(), PathAssignmentConflict> {
-        if self.assignment_holds(ante.when_true()) && self.assignment_holds(post.when_false()) {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::PathAssignment",
-                ante = %ante.display(db, env, storage),
-                post = %post.display(db, env, storage),
-                facts = %format_args!(
-                    "[{}]",
-                    self.assignments.iter().map(|(assignment, _)| {
-                        assignment.display(db, env, storage)
-                    }).format(", "),
-                ),
-                "found contradiction",
-            );
-            return Err(PathAssignmentConflict);
-        }
-
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -7645,10 +7562,13 @@ mod tests {
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
     use crate::types::generics::ApplySpecialization;
+    use crate::types::type_alias::TypeAliasType;
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
     };
-    use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
+    use crate::types::{
+        BoundTypeVarInstance, KnownClass, KnownInstanceType, SubclassOfType, TypeVarVariance,
+    };
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
     use ruff_python_ast::name::Name;
@@ -8408,6 +8328,36 @@ mod tests {
             PathBoundSolution::Solved(Type::Never).as_type(),
             Some(Type::Never)
         );
+    }
+
+    #[test]
+    fn default_solve_preserves_single_lower_type_alias() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type Scalar = int")?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let alias_ty = global_symbol(db, file, "Scalar").place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            alias_ty
+        else {
+            anyhow::bail!("expected `Scalar` to be a type alias");
+        };
+        let alias = Type::TypeAlias(TypeAliasType::PEP695(alias));
+        let t = create_typevar(db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let path_bound = PathBound::exact(t, alias);
+
+        assert_eq!(
+            PathBounds::preliminary_solve(db, &env, &builder, &path_bound),
+            PathBoundSolution::Solved(alias)
+        );
+        assert_eq!(
+            PathBounds::default_solve(db, &env, &builder, &path_bound),
+            PathBoundSolution::Solved(alias)
+        );
+        Ok(())
     }
 
     #[test]
