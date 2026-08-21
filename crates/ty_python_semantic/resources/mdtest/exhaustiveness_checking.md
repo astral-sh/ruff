@@ -619,37 +619,40 @@ python-version = "3.11"
 ```
 
 ```py
-from typing import Generic, TypeVarTuple
+from typing import Generic, TypeVarTuple, assert_never
 
 Ts = TypeVarTuple("Ts")
 
 class Variadic(Generic[*Ts]): ...
 
-def symbolic(value: Variadic[*Ts]) -> int:
+def symbolic(value: Variadic[*Ts]) -> None:
     match value:
         case Variadic():
             reveal_type(value)  # revealed: Variadic[*tuple[*Ts@symbolic]]
-            return 1
+        case _:
+            assert_never(value)
 ```
 
 The same pattern is exhaustive when the type variable tuple has an empty specialization.
 
 ```py
-def empty(value: Variadic[()]) -> int:
+def empty(value: Variadic[()]) -> None:
     match value:
         case Variadic():
             reveal_type(value)  # revealed: Variadic[()]
-            return 1
+        case _:
+            assert_never(value)
 ```
 
 A nonempty specialization must also remain reachable and exhaustive.
 
 ```py
-def nonempty(value: Variadic[int]) -> int:
+def nonempty(value: Variadic[int]) -> None:
     match value:
         case Variadic():
             reveal_type(value)  # revealed: Variadic[int]
-            return 1
+        case _:
+            assert_never(value)
 ```
 
 ## More `match` pattern types
