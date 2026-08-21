@@ -2076,13 +2076,12 @@ mod resolve_definition {
     use ruff_db::system::SystemPath;
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
-    use ruff_python_stdlib::sys::is_builtin_module;
     use ruff_text_size::TextRange;
     use rustc_hash::FxHashSet;
     use tracing::trace;
     use ty_module_resolver::{
-        ImportingFile, ModuleName, file_to_module, resolve_module, resolve_module_for_import_from,
-        resolve_real_module,
+        ImportingFile, ModuleName, resolve_module, resolve_module_for_import_from,
+        stub_file_to_real_module,
     };
 
     use crate::Db;
@@ -2523,25 +2522,7 @@ mod resolve_definition {
 
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
         let resolver_file = stub_file_for_module_lookup.resolver_file(db);
-        let stub_module = file_to_module(db, resolver_file)?;
-        trace!("Found stub module: {}", stub_module.name(db));
-        // We need to pass an importing file to `resolve_real_module` which is a bit odd
-        // here because there isn't really an importing file. However this `resolve_real_module`
-        // can be understood as essentially `import .`, which is also what `file_to_module` is,
-        // so this is in fact exactly the file we want to consider the importer.
-        //
-        // ... unless we have a builtin module. i.e., A module embedded
-        // into the interpreter. In which case, all we have are stubs.
-        // `resolve_real_module` will always return `None` for this case, but
-        // it will emit false positive logs. And this saves us some work.
-        if is_builtin_module(stub_module.python_version(db).minor, stub_module.name(db)) {
-            return None;
-        }
-        let real_module = resolve_real_module(
-            db,
-            ImportingFile::ResolverFile(resolver_file),
-            stub_module.name(db),
-        )?;
+        let real_module = stub_file_to_real_module(db, resolver_file)?;
         trace!("Found real module: {}", real_module.name(db));
         let real_parse_file = ProgramFile::new(db, real_module.file(db)?, env.program(db));
         let real_file = real_parse_file.file(db);

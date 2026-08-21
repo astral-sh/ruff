@@ -3,6 +3,7 @@ This module principally provides several routines for resolving a particular mod
 name to a `Module`:
 
 * [`file_to_module`][]: resolves the module `.<self>` (often as the first step in resolving `.`)
+* [`stub_file_to_real_module`][]: resolves the runtime module corresponding to a stub file
 * [`resolve_module`][]: resolves an absolute module name
 
 You may notice that we actually provide `resolve_(real)_(shadowable)_module_(confident)`.
@@ -363,6 +364,27 @@ pub fn file_to_module<'db>(
             relative_desperate_search_paths(db, resolver_file).iter(),
         )
     })
+}
+
+/// Resolves the runtime module corresponding to a stub file.
+///
+/// Modules that are only available as stubs, including built-in modules, return `None`.
+pub fn stub_file_to_real_module<'db>(
+    db: &'db dyn Db,
+    resolver_file: ResolverFile<'db>,
+) -> Option<Module<'db>> {
+    debug_assert!(resolver_file.file(db).is_stub(db));
+
+    let module = file_to_module(db, resolver_file)?;
+    if ruff_python_stdlib::sys::is_builtin_module(module.python_version(db).minor, module.name(db))
+    {
+        return None;
+    }
+    resolve_real_module(
+        db,
+        ImportingFile::ResolverFile(resolver_file),
+        module.name(db),
+    )
 }
 
 fn file_to_module_impl<'db, 'a>(
