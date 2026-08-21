@@ -28,7 +28,8 @@ use crate::types::tuple::{
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -2045,10 +2046,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target_type.exact_tuple_instance_spec(db),
         ) {
             let is_unrestricted = |tuple: &TupleSpec<'db>| {
-                matches!(tuple, TupleSpec::Variable(tuple)
-                    if tuple.prefix_elements().is_empty()
-                        && tuple.suffix_elements().is_empty()
-                        && matches!(tuple.variable(), VariableSegment::Homogeneous(Type::Dynamic(_))))
+                if let TupleSpec::Variable(tuple) = tuple
+                    && tuple.prefix_elements().is_empty()
+                    && tuple.suffix_elements().is_empty()
+                    && let VariableSegment::Homogeneous(element) = tuple.variable()
+                {
+                    // Follow element aliases, stopping at the first non-alias type. A non-dynamic
+                    // type or an alias cycle rules out this unrestricted materialization family.
+                    !any_over_type_expanding_aliases(db, self.env, element, |ty| {
+                        !matches!(ty, Type::TypeAlias(_) | Type::Dynamic(_))
+                    })
+                } else {
+                    false
+                }
             };
             // Top preserves family inclusion, Bottom reverses it, and Bottom-to-Top needs
             // only an overlap, so either unrestricted family is enough in that case.

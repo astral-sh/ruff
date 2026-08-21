@@ -456,6 +456,79 @@ TODO: Handle valid mixed gradual-length tuples without losing their required pre
 elements. For example, `Box[tuple[int, str]]` should be a subtype of
 `Top[Box[tuple[int, *tuple[Any, ...]]]]`.
 
+## Gradual tuple length with aliased elements
+
+When `Dynamic` aliases `Any`, `tuple[Dynamic, ...]` has the same gradual-length choices as
+`tuple[Any, ...]`. These choices are preserved when the tuple is an invariant type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, TypeAliasType
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+type Dynamic = Any
+
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[Dynamic, ...]]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Dynamic, ...]]], list[tuple[int]]))
+static_assert(not is_disjoint_from(list[tuple[int]], Top[list[tuple[Dynamic, ...]]]))
+static_assert(not is_disjoint_from(Top[list[tuple[Dynamic, ...]]], list[tuple[int]]))
+```
+
+Alias chains, nested generic aliases, and aliases created with `TypeAliasType` preserve the same
+gradual-length choice.
+
+```py
+type IndirectDynamic = Dynamic
+type Identity[T] = T
+
+CalledDynamic = TypeAliasType("CalledDynamic", Any)
+
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[IndirectDynamic, ...]]]))
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[Identity[Identity[Any]], ...]]]))
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[CalledDynamic, ...]]]))
+static_assert(is_subtype_of(Bottom[list[tuple[CalledDynamic, ...]]], list[tuple[int]]))
+```
+
+An alias of a fully static element type does not make the tuple's length gradual.
+
+```py
+type Static = object
+
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Static, ...]]]))
+static_assert(is_disjoint_from(list[tuple[int]], Top[list[tuple[Static, ...]]]))
+```
+
+An unused dynamic type argument, or `Any` within a container or union, does not make the alias
+itself dynamic.
+
+```py
+type Constant[T] = object
+type Container = list[Any]
+type Recursive = list[Recursive] | Any
+
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Constant[Any], ...]]]))
+static_assert(is_disjoint_from(list[tuple[int]], Top[list[tuple[Constant[Any], ...]]]))
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Container, ...]]]))
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Recursive, ...]]]))
+```
+
+An alias cycle does not establish that the element is dynamic. Comparing these tuple specializations
+terminates without treating either alias as `Any`.
+
+```py
+Loop = TypeAliasType("Loop", "Loop")
+First = TypeAliasType("First", "Second")
+Second = TypeAliasType("Second", First)
+
+static_assert(is_disjoint_from(list[tuple[int]], list[tuple[Loop, ...]]))
+static_assert(is_disjoint_from(list[tuple[int]], list[tuple[First, ...]]))
+```
+
 ## Union
 
 All positions in a union are covariant.
