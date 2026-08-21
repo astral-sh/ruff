@@ -29,7 +29,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155", category = "style")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
 pub(crate) struct UselessMetaclassType;
 
 impl AlwaysFixableViolation for UselessMetaclassType {

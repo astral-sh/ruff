@@ -69,7 +69,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [The documentation]: https://docs.python.org/3/library/logging.html#logging.exception
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0", category = "pedantic")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct LogExceptionOutsideExceptHandler;
 
 impl Violation for LogExceptionOutsideExceptHandler {

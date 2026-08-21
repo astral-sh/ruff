@@ -40,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// print(var)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253", category = "restriction")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Restriction)]
 pub(crate) struct GlobalStatement {
     name: String,
 }

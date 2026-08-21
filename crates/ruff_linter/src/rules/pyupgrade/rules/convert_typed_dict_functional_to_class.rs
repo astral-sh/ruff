@@ -63,7 +63,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [Python keywords]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 /// [Dunder names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Pedantic)]
 pub(crate) struct ConvertTypedDictFunctionalToClass {
     name: String,
 }

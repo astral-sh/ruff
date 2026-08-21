@@ -57,7 +57,7 @@ use ruff_text_size::Ranged;
 ///
 /// No fix is offered if the suffix `"."` is given, since the intent is unclear.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0", category = "correctness")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Correctness)]
 pub(crate) struct InvalidPathlibWithSuffix {
     single_dot: bool,
 }

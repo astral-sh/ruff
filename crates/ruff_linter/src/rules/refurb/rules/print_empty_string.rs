@@ -38,7 +38,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0", category = "complexity")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct PrintEmptyString {
     reason: Reason,
 }

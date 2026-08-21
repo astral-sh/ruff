@@ -38,7 +38,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Options
 /// - `lint.ruff.parenthesize-tuple-in-subscript`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.7", category = "formatting")]
+#[violation_metadata(preview_since = "0.5.7", category = Category::Formatting)]
 pub(crate) struct IncorrectlyParenthesizedTupleInSubscript {
     prefer_parentheses: bool,
 }

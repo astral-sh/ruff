@@ -41,7 +41,7 @@ use crate::rules::pyflakes::cformat::CFormatSummary;
 ///
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.252", category = "correctness")]
+#[violation_metadata(stable_since = "v0.0.252", category = Category::Correctness)]
 pub(crate) struct LoggingTooFewArgs;
 
 impl Violation for LoggingTooFewArgs {
@@ -83,7 +83,7 @@ impl Violation for LoggingTooFewArgs {
 ///
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.252", category = "correctness")]
+#[violation_metadata(stable_since = "v0.0.252", category = Category::Correctness)]
 pub(crate) struct LoggingTooManyArgs;
 
 impl Violation for LoggingTooManyArgs {

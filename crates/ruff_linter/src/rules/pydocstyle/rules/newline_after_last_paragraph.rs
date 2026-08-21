@@ -48,7 +48,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.68", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.68", category = Category::Pedantic)]
 pub(crate) struct NewLineAfterLastParagraph;
 
 impl AlwaysFixableViolation for NewLineAfterLastParagraph {

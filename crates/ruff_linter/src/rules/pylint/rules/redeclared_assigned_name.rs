@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 ///
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0", category = "correctness")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct RedeclaredAssignedName {
     name: String,
 }

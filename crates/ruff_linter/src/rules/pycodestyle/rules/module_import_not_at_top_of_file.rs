@@ -48,7 +48,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct ModuleImportNotAtTopOfFile {
     source_type: PySourceType,
 }

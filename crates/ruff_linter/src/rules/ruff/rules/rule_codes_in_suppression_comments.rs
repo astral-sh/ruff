@@ -25,7 +25,7 @@ use crate::AlwaysFixableViolation;
 /// import os  # ruff: ignore[unused-import]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.22", category = "pedantic")]
+#[violation_metadata(preview_since = "0.15.22", category = Category::Pedantic)]
 pub(crate) struct RuleCodesInSuppressionComments;
 
 impl AlwaysFixableViolation for RuleCodesInSuppressionComments {

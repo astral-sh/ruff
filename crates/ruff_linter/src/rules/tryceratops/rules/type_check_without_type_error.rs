@@ -36,7 +36,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `TypeError`](https://docs.python.org/3/library/exceptions.html#TypeError)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.230", category = "style")]
+#[violation_metadata(stable_since = "v0.0.230", category = Category::Style)]
 pub(crate) struct TypeCheckWithoutTypeError;
 
 impl Violation for TypeCheckWithoutTypeError {

@@ -35,7 +35,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0", category = "style")]
+#[violation_metadata(stable_since = "0.9.0", category = Category::Style)]
 pub(crate) struct BooleanChainedComparison;
 
 impl AlwaysFixableViolation for BooleanChainedComparison {

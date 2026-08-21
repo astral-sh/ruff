@@ -36,7 +36,7 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.0", category = "pedantic")]
+#[violation_metadata(preview_since = "v0.4.0", category = Category::Pedantic)]
 pub(crate) struct UnusedAsync {
     name: String,
 }

@@ -47,7 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.278", category = "complexity")]
+#[violation_metadata(stable_since = "v0.0.278", category = Category::Complexity)]
 pub(crate) struct UnnecessaryLiteralUnion {
     members: Vec<String>,
 }

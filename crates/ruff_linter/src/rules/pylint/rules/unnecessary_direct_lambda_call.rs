@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Lambdas](https://docs.python.org/3/reference/expressions.html#lambda)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.153", category = "complexity")]
+#[violation_metadata(stable_since = "v0.0.153", category = Category::Complexity)]
 pub(crate) struct UnnecessaryDirectLambdaCall;
 
 impl Violation for UnnecessaryDirectLambdaCall {

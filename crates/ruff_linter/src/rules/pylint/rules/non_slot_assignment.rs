@@ -47,7 +47,7 @@ use crate::checkers::ast::Checker;
 ///         pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.1.15", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.1.15", category = Category::Pedantic)]
 pub(crate) struct NonSlotAssignment {
     name: String,
 }

@@ -32,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 3120]: https://peps.python.org/pep-3120/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155", category = "complexity")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Complexity)]
 pub(crate) struct UTF8EncodingDeclaration;
 
 impl AlwaysFixableViolation for UTF8EncodingDeclaration {

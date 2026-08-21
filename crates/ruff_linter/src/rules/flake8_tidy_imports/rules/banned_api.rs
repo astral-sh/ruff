@@ -25,7 +25,7 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-api`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201", category = "restriction")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Restriction)]
 pub(crate) struct BannedApi {
     name: String,
     message: String,

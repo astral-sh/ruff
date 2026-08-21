@@ -36,7 +36,7 @@ use crate::checkers::ast::Checker;
 ///     age: int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Pedantic)]
 pub(crate) struct CollectionsNamedTuple;
 
 impl Violation for CollectionsNamedTuple {

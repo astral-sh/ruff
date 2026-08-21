@@ -64,7 +64,7 @@ use crate::rules::pydocstyle::settings::Convention;
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.1", category = "pedantic")]
+#[violation_metadata(preview_since = "0.14.1", category = Category::Pedantic)]
 pub(crate) struct DocstringExtraneousParameter {
     id: String,
 }
@@ -125,7 +125,7 @@ impl Violation for DocstringExtraneousParameter {
 /// - `lint.pydocstyle.convention`
 /// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.6", category = "pedantic")]
+#[violation_metadata(preview_since = "0.5.6", category = Category::Pedantic)]
 pub(crate) struct DocstringMissingReturns;
 
 impl Violation for DocstringMissingReturns {
@@ -182,7 +182,7 @@ impl Violation for DocstringMissingReturns {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.6", category = "pedantic")]
+#[violation_metadata(preview_since = "0.5.6", category = Category::Pedantic)]
 pub(crate) struct DocstringExtraneousReturns;
 
 impl Violation for DocstringExtraneousReturns {
@@ -240,7 +240,7 @@ impl Violation for DocstringExtraneousReturns {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.7", category = "pedantic")]
+#[violation_metadata(preview_since = "0.5.7", category = Category::Pedantic)]
 pub(crate) struct DocstringMissingYields;
 
 impl Violation for DocstringMissingYields {
@@ -297,7 +297,7 @@ impl Violation for DocstringMissingYields {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.7", category = "pedantic")]
+#[violation_metadata(preview_since = "0.5.7", category = Category::Pedantic)]
 pub(crate) struct DocstringExtraneousYields;
 
 impl Violation for DocstringExtraneousYields {
@@ -374,7 +374,7 @@ impl Violation for DocstringExtraneousYields {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.5", category = "pedantic")]
+#[violation_metadata(preview_since = "0.5.5", category = Category::Pedantic)]
 pub(crate) struct DocstringMissingException {
     id: String,
 }
@@ -447,7 +447,7 @@ impl Violation for DocstringMissingException {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.5", category = "pedantic")]
+#[violation_metadata(preview_since = "0.5.5", category = Category::Pedantic)]
 pub(crate) struct DocstringExtraneousException {
     ids: Vec<String>,
 }

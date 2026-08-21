@@ -20,7 +20,7 @@ use crate::settings::LinterSettings;
 /// - `lint.flake8-copyright.min-file-size`
 /// - `lint.flake8-copyright.notice-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0", category = "pedantic")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct MissingCopyrightNotice;
 
 impl Violation for MissingCopyrightNotice {

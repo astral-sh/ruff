@@ -69,7 +69,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0", category = "suspicious")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Suspicious)]
 pub(crate) struct ExcInfoOutsideExceptHandler;
 
 impl Violation for ExcInfoOutsideExceptHandler {

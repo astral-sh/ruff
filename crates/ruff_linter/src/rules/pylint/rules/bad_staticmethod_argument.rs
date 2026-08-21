@@ -42,7 +42,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0", category = "suspicious")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct BadStaticmethodArgument {
     argument_name: String,
 }

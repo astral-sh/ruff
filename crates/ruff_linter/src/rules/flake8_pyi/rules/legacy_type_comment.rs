@@ -35,7 +35,7 @@ use crate::preview::is_legacy_type_comment_in_non_stub_enabled;
 /// x: int = 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.254", category = "suspicious")]
+#[violation_metadata(stable_since = "v0.0.254", category = Category::Suspicious)]
 pub(crate) struct LegacyTypeComment;
 
 impl Violation for LegacyTypeComment {

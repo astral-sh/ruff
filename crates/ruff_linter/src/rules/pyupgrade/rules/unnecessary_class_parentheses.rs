@@ -30,7 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// This rule's fix is marked as unsafe if it would delete any comments
 /// within the parentheses range.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.273", category = "style")]
+#[violation_metadata(stable_since = "v0.0.273", category = Category::Style)]
 pub(crate) struct UnnecessaryClassParentheses;
 
 impl AlwaysFixableViolation for UnnecessaryClassParentheses {

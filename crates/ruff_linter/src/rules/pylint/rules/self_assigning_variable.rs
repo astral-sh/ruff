@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// country = "Poland"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281", category = "suspicious")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct SelfAssigningVariable {
     name: String,
 }

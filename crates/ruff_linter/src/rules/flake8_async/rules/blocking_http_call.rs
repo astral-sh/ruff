@@ -38,7 +38,7 @@ use crate::checkers::ast::Checker;
 ///             ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0", category = "suspicious")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
 pub(crate) struct BlockingHttpCallInAsyncFunction;
 
 impl Violation for BlockingHttpCallInAsyncFunction {

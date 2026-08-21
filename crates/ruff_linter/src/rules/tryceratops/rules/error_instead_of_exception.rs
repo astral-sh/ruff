@@ -56,7 +56,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
 pub(crate) struct ErrorInsteadOfException;
 
 impl Violation for ErrorInsteadOfException {

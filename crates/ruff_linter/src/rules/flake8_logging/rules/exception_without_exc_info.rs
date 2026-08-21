@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Pedantic)]
 pub(crate) struct ExceptionWithoutExcInfo;
 
 impl Violation for ExceptionWithoutExcInfo {

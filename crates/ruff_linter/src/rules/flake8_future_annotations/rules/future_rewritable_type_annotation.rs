@@ -68,7 +68,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269", category = "style")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Style)]
 pub(crate) struct FutureRewritableTypeAnnotation {
     name: String,
 }

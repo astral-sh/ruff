@@ -38,7 +38,7 @@ use crate::Violation;
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Pedantic)]
 pub(crate) struct OsPathJoin {
     pub(crate) module: String,
     pub(crate) joiner: Joiner,
@@ -110,7 +110,7 @@ pub(crate) enum Joiner {
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231", category = "pedantic")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Pedantic)]
 pub(crate) struct OsPathSplitext;
 
 impl Violation for OsPathSplitext {
@@ -147,7 +147,7 @@ impl Violation for OsPathSplitext {
 /// - [Python documentation: `Pathlib`](https://docs.python.org/3/library/pathlib.html)
 /// - [Path repository](https://github.com/jaraco/path)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231", category = "suspicious")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Suspicious)]
 pub(crate) struct PyPath;
 
 impl Violation for PyPath {
@@ -206,7 +206,7 @@ impl Violation for PyPath {
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0", category = "pedantic")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Pedantic)]
 pub(crate) struct OsListdir;
 
 impl Violation for OsListdir {
