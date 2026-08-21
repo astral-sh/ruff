@@ -584,7 +584,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 if matches!(target.variable(), VariableSegment::TypeVarTuple(_)) {
-                    return self.never();
+                    // A fully gradual tuple can materialize to any specialization of the target
+                    // pack. Fixed source elements still constrain its length and cannot be ignored.
+                    return ConstraintSet::from_bool(
+                        self.constraints,
+                        self.is_eager_assignability()
+                            && source.prefix_elements().is_empty()
+                            && source.suffix_elements().is_empty()
+                            && matches!(
+                                source.variable(),
+                                VariableSegment::Homogeneous(Type::Dynamic(_))
+                            ),
+                    );
                 }
 
                 // When prenormalizing below, we assume that a dynamic variable-length portion of
