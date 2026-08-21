@@ -482,6 +482,33 @@ fn divergent_type() {
 }
 
 #[test]
+fn unrestricted_tuple_materialization_absorbs_divergent_approximations() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_of = |tuple| KnownClass::List.to_specialized_instance(db, &env, &[tuple]);
+    let approximation = |element| list_of(Type::heterogeneous_tuple(db, &env, [element]));
+    let top = list_of(Type::homogeneous_tuple(db, &env, Type::any())).top_materialization(db, &env);
+
+    // This fixed top absorbs every exact-tuple approximation, including a marker nested
+    // more deeply in a later iteration. Removing the marker here therefore converges.
+    let first = approximation(div);
+    for candidate in [first, approximation(first)] {
+        assert_eq!(UnionType::from_elements(db, &env, [candidate, top]), top);
+        assert_eq!(UnionType::from_elements(db, &env, [top, candidate]), top);
+    }
+
+    // An unresolved marker is not itself an unrestricted gradual element type. Its
+    // homogeneous tuple must not acquire the same family as `tuple[Any, ...]`.
+    let divergent_top =
+        list_of(Type::homogeneous_tuple(db, &env, div)).top_materialization(db, &env);
+    let empty = list_of(Type::empty_tuple(db, &env));
+    assert!(!empty.is_subtype_of(db, &env, divergent_top));
+    assert!(!empty.is_redundant_with(db, &env, divergent_top));
+}
+
+#[test]
 fn type_alias_variance() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;
