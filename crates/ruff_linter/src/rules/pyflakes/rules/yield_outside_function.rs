@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_parser::semantic_errors::YieldOutsideFunctionKind;
 
 use crate::Violation;
+use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum DeferralKeyword {

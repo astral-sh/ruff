@@ -12,6 +12,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix};
 
 /// ## What it does

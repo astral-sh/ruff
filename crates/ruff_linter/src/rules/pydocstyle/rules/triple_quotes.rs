@@ -3,6 +3,7 @@ use ruff_python_ast::str::Quote;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

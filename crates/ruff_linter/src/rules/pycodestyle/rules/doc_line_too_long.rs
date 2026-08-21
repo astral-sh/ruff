@@ -4,6 +4,7 @@ use ruff_source_file::Line;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
 

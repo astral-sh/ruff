@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, ExceptHandler};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `except` blocks that handle all exceptions, but are not the last

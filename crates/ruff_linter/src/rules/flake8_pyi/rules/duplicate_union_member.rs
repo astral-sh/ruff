@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::generate_union_fix;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does

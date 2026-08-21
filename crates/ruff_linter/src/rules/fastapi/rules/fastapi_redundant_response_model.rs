@@ -4,6 +4,7 @@ use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 use crate::{AlwaysFixableViolation, Fix};

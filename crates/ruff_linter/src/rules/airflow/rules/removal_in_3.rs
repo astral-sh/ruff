@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::{
     Replacement, generate_import_edit, generate_remove_and_runtime_import_edit,
     in_airflow_task_function, is_airflow_builtin_or_provider, is_airflow_task,

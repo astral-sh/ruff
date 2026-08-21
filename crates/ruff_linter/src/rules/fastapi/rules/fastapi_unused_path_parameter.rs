@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::Fix;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 use crate::{FixAvailability, Violation};

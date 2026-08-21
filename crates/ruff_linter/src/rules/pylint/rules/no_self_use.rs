@@ -8,6 +8,7 @@ use ruff_python_semantic::{
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_variable;
 
 /// ## What it does

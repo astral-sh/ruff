@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Line;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::LintContext};
 
 /// ## What it does

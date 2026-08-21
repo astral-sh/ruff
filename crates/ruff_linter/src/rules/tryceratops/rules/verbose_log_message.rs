@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 
 /// ## What it does

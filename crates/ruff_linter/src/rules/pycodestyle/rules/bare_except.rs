@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for bare `except` catches in `try`-`except` statements.

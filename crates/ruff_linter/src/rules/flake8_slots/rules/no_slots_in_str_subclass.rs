@@ -5,6 +5,7 @@ use ruff_python_semantic::{SemanticModel, analyze::class::is_enumeration};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_slots::helpers::has_slots;
 
 /// ## What it does

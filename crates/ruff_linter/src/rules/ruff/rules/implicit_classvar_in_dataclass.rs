@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does

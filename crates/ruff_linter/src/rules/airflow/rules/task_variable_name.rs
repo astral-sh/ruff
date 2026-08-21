@@ -1,4 +1,5 @@
 use crate::Violation;
+use crate::codes::Category;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;

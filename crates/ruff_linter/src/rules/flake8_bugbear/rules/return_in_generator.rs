@@ -5,6 +5,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 
 /// ## What it does

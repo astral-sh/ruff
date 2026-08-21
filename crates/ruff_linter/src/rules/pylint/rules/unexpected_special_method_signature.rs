@@ -8,6 +8,7 @@ use ruff_python_semantic::analyze::visibility::is_staticmethod;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ExpectedParams {

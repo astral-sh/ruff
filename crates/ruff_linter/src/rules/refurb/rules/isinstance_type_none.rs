@@ -4,6 +4,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::refurb::helpers::replace_with_identity_check;
 use crate::{FixAvailability, Violation};
 

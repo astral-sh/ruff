@@ -1,3 +1,4 @@
+use crate::codes::Category;
 use crate::fix::edits::fresh_binding_name;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};

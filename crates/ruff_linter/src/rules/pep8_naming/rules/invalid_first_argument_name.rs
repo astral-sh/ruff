@@ -10,6 +10,7 @@ use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::renamer::{Renamer, ShadowedKind};
 use crate::{Fix, Violation};

@@ -4,6 +4,7 @@ use ruff_python_semantic::{Scope, ScopeKind};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for functions that include too many local variables.

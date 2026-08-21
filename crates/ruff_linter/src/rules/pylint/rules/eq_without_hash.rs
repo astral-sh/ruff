@@ -10,6 +10,7 @@ use std::ops::BitOr;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for classes that implement `__eq__` but not `__hash__`.

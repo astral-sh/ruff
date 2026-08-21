@@ -8,6 +8,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
 use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 

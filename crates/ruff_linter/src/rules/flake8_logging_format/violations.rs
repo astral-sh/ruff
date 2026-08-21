@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Violation};
 
 /// ## What it does

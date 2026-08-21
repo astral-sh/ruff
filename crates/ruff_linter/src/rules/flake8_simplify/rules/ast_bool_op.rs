@@ -14,6 +14,7 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 

@@ -9,6 +9,7 @@ use ruff_python_ast::{self as ast, Expr, OperatorPrecedence};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::cst::helpers::space;
 use crate::cst::matchers::{
     match_call_mut, match_formatted_string, match_formatted_string_expression, transform_expression,

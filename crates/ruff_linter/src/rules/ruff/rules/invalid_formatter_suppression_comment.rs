@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::delete_comment;
 use crate::{AlwaysFixableViolation, Fix};
 

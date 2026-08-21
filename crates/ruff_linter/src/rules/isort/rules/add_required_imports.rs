@@ -8,6 +8,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::importer::Importer;
 use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Fix};

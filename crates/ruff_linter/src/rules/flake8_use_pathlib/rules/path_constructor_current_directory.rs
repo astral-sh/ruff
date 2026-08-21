@@ -7,6 +7,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::flake8_use_pathlib::helpers::is_pure_path_subclass_with_preview;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};

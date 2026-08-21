@@ -6,6 +6,7 @@ use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
+use crate::codes::Category;
 use crate::{checkers::ast::Checker, settings::LinterSettings};
 
 /// ## What it does

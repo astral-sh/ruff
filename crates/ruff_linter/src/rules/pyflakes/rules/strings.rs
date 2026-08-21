@@ -11,6 +11,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix, FixAvailability, Violation};
 
 use crate::rules::pyflakes::cformat::CFormatSummary;

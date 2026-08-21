@@ -3,6 +3,7 @@ use ruff_python_ast::Stmt;
 use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
+use crate::codes::Category;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::num_statements;

@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::visibility::is_overload;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 
 /// ## What it does

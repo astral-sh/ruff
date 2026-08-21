@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

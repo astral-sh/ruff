@@ -7,6 +7,7 @@ use ruff_python_stdlib::typing::{is_pep_593_generic_type, is_standard_library_li
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};

@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::noqa::{self, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::{Edit, Fix, FixAvailability, Violation};
 

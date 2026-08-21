@@ -6,6 +6,7 @@ use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::preview::is_up024_precise_highlighting_enabled;
 use crate::{AlwaysFixableViolation, Edit, Fix};

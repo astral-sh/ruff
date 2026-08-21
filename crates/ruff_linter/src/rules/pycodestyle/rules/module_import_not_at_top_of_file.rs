@@ -4,6 +4,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_e402_fix_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

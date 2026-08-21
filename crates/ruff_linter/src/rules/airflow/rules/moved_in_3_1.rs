@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::{
     INTERNAL_MODULE_WARNING, Replacement, generate_import_edit,
     generate_remove_and_runtime_import_edit, is_guarded_by_try_except,

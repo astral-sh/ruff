@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::Violation;
+use crate::codes::Category;
 
 use crate::checkers::ast::Checker;
 

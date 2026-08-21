@@ -6,6 +6,7 @@ use crate::AlwaysFixableViolation;
 use crate::Edit;
 use crate::Fix;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 
 use super::{LogicalLine, Whitespace};
 

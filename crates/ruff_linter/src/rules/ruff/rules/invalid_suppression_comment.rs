@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
+use crate::codes::Category;
 use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
 
 /// ## What it does

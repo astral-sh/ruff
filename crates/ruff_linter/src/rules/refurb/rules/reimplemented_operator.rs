@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::{ImportRequest, Importer};
 use crate::{Edit, Fix, FixAvailability, Violation};
 

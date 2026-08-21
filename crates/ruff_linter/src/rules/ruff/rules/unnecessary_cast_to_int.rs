@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::rules::unnecessary_round::{
     InferredType, NdigitsValue, RoundedValue, rounded_and_ndigits,
 };

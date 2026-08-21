@@ -9,6 +9,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::settings::LinterSettings;
 
 /// ## What it does

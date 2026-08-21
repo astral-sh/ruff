@@ -7,6 +7,7 @@ use ruff_python_semantic::{Binding, BindingKind, GeneratorKind, ScopeKind, Seman
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does

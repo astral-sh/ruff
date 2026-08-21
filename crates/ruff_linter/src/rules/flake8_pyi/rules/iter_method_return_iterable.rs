@@ -6,6 +6,7 @@ use ruff_python_semantic::{Definition, Member, MemberKind};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `__iter__` methods in stubs that return `Iterable[T]` instead

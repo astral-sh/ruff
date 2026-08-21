@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::rules::sequence_sorting::{
     CommentComplexity, MultilineStringSequenceValue, SequenceKind, SortClassification,
     SortingStyle, sort_single_line_elements_sequence,

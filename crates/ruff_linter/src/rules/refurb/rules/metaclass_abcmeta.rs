@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};

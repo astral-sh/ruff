@@ -9,6 +9,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::delete_stmt;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

@@ -4,6 +4,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for useless `if`-`else` conditions with identical arms.

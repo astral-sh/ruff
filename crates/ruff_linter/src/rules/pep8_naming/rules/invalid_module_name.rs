@@ -9,6 +9,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::package::PackageRoot;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 

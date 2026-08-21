@@ -4,6 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::codes::Category;
 use crate::{
     FixAvailability, Locator, Violation, checkers::ast::LintContext, codes::Rule, noqa::Directive,
     suppression::Suppressions,

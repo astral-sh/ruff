@@ -8,6 +8,7 @@ use ruff_python_ast::{
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::pyupgrade::rules::pep695::{
     DisplayTypeVars, TypeParamKind, TypeVar, expr_name_to_type_var, find_generic,

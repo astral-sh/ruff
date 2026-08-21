@@ -8,6 +8,7 @@ use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::fastapi::rules::is_fastapi_route;
 

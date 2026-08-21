@@ -5,6 +5,7 @@ use ruff_notebook::CellOffsets;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix, checkers::ast::LintContext};
 
 /// ## What it does

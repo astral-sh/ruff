@@ -5,6 +5,7 @@ use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

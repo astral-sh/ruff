@@ -5,6 +5,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for a shebang directive that is not at the beginning of the file.

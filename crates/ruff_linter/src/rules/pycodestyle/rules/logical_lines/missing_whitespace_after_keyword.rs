@@ -3,6 +3,7 @@ use ruff_python_ast::token::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

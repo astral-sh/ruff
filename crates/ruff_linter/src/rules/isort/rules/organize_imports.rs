@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::line_width::LineWidthBuilder;
 use crate::package::PackageRoot;
 use crate::rules::isort::block::Block;

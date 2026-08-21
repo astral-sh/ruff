@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::rules::flake8_return::has_conditional_body;
 use crate::{AlwaysFixableViolation, Edit, Fix};

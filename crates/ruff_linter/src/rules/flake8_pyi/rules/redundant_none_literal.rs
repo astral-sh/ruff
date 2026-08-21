@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does

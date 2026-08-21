@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 

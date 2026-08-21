@@ -6,6 +6,7 @@ use toml::de::DeTable;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::codes::Category;
 use crate::{FixAvailability, Violation, checkers::ast::LintContext};
 
 /// ## What it does

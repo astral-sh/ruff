@@ -7,6 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::TomlSourceType;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
+use crate::codes::Category;
 use crate::{
     AlwaysFixableViolation, checkers::ast::LintContext, codes::Rule,
     preview::is_human_readable_names_enabled, rule_redirects::get_redirect_target,

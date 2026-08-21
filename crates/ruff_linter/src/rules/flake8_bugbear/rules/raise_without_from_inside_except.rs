@@ -7,6 +7,7 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `raise` statements in exception handlers that lack a `from`
