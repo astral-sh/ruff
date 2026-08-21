@@ -3645,7 +3645,7 @@ the variable they are assigned to.
 
 
 Constructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,
-`TypedDict`, and `TypeAliasType` all take a name argument that is
+`TypedDict`, `TypeAliasType`, and `Sentinel` all take a name argument that is
 normally expected to match the assigned variable. A mismatch is usually a
 typo and makes later diagnostics harder to understand.
 
@@ -3660,12 +3660,13 @@ continue understanding the resulting type.
 
 ```python
 from typing import NewType, ParamSpec, TypeVar
-from typing_extensions import TypedDict
+from typing_extensions import Sentinel, TypedDict
 
 T = TypeVar("U")  # error: [mismatched-type-name]
 P = ParamSpec("Q")  # error: [mismatched-type-name]
 UserId = NewType("Id", int)  # error: [mismatched-type-name]
 Movie = TypedDict("Film", {"title": str})  # error: [mismatched-type-name]
+Missing = Sentinel("NotGiven")  # error: [mismatched-type-name]
 ```
 
 ## `missing-argument`
