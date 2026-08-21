@@ -348,9 +348,10 @@ additional things to watch out for are:
 
 - Rules that apply to third-party libraries
 
-    This is another case where we have many existing exceptions for widely-used third-party
-    libraries, but this niche should be filled by plugins in the near future. Most Ruff rules should
-    apply to Python language features or to functionality from the standard library.
+    Most Ruff rules should be helpful for large numbers of Python developers. This means that rules
+    should generally apply to Python language features or functionality from the standard library.
+    However, rules for widely-used third-party libraries can also meet this bar and be good
+    candidates for inclusion in Ruff.
 
 - Rules that require additional configuration
 
