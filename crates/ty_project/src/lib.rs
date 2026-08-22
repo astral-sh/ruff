@@ -33,6 +33,7 @@ use ty_python_core::program::{Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
 
+pub mod baseline;
 mod db;
 mod files;
 pub mod glob;
@@ -360,11 +361,7 @@ impl Project {
             name = self.name(db)
         );
 
-        let mut diagnostics: Vec<Diagnostic> = self
-            .settings_diagnostics(db)
-            .iter()
-            .map(OptionDiagnostic::to_diagnostic)
-            .collect();
+        let mut diagnostics = self.check_settings(db);
 
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
@@ -646,10 +643,13 @@ impl Project {
 
     /// Check if the project's settings have any issues
     pub fn check_settings(&self, db: &dyn Db) -> Vec<Diagnostic> {
-        self.settings_diagnostics(db)
+        let mut diagnostics: Vec<_> = self
+            .settings_diagnostics(db)
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
-            .collect()
+            .collect();
+        diagnostics.extend(baseline::settings_diagnostic(db));
+        diagnostics
     }
 }
 
@@ -778,7 +778,10 @@ pub(crate) fn check_file_impl(
             diagnostics.extend(settings_diagnostics.iter().cloned());
             Ok(diagnostics.into_boxed_slice())
         }) {
-            Ok(result) => result,
+            Ok(result) => result.map(|mut diagnostics| {
+                baseline::demote_diagnostics(*db, source_file, &mut diagnostics);
+                diagnostics
+            }),
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }

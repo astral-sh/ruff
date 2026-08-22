@@ -309,7 +309,7 @@ enum SarifLevel {
 impl From<Severity> for SarifLevel {
     fn from(value: Severity) -> Self {
         match value {
-            Severity::Info => SarifLevel::Note,
+            Severity::Hint | Severity::Info => SarifLevel::Note,
             Severity::Warning => SarifLevel::Warning,
             Severity::Error | Severity::Fatal => SarifLevel::Error,
         }

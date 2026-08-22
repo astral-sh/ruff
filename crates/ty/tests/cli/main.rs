@@ -1,4 +1,5 @@
 mod analysis_options;
+mod baseline;
 mod config_option;
 mod exit_code;
 mod file_selection;
