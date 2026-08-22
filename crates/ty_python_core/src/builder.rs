@@ -5156,14 +5156,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // An annotated assignment assigning the collection object to a new binding.
                     ruff_python_ast::Stmt::AnnAssign(_) => true,
 
-                    // A bound-method call on the collection object.
+                    // A bound method on the collection, or a function that receives it.
                     ruff_python_ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
                         match value.as_ref() {
                             ast::Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
-                                ruff_python_ast::Expr::Attribute(ast::ExprAttribute {
-                                    value,
-                                    ..
-                                }) => ExpressionNodeKey::from(value) == *use_expression,
+                                ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+                                    ExpressionNodeKey::from(value) == *use_expression
+                                }
+                                ast::Expr::Name(_) => true,
                                 _ => false,
                             },
                             _ => false,
