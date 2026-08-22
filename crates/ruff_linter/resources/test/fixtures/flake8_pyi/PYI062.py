@@ -31,3 +31,11 @@ n: Literal["No", "duplicates", "here", 1, "1"]
 Literal[Literal[1]]  # no duplicate
 Literal[Literal[Literal[1], Literal[1]]]  # once
 Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
+
+
+# https://github.com/astral-sh/ruff/pull/27714
+# Dynamic (non-literal) duplicate members: only reachable for a syntactically-invalid `Literal`,
+# but `items[0]` evaluates `__getitem__` each time, so removing a "duplicate" may change behavior.
+# The diagnostic is still raised, but its fix must be marked unsafe.
+Literal[items[0], items[0]]  # once, unsafe fix
+Literal[foo(), foo()]  # once, unsafe fix
