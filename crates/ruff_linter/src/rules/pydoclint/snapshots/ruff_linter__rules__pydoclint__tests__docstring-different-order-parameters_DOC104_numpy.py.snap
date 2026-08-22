@@ -1,0 +1,72 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC104 Arguments are the same in the docstring and the function signature, but are in a different order.
+  --> DOC104_numpy.py:3:5
+   |
+ 1 |   # DOC104
+ 2 |   def add_with_violation(a, b) -> int:
+ 3 | /     """
+ 4 | |     Adds two numbers and returns the result.
+ 5 | |
+ 6 | |     Parameters
+ 7 | |     ----------
+ 8 | |     b : int
+ 9 | |         The second number to add.
+10 | |     a :int
+11 | |         The first number to add.
+12 | |
+13 | |     Returns
+14 | |     -------
+15 | |     int
+16 | |         The sum of the two numbers.
+17 | |     """
+   | |_______^
+18 |       return a + b
+   |
+help: Arrange the arguments in the same order as in the function signature
+
+DOC104 Arguments are the same in the docstring and the function signature, but are in a different order.
+  --> DOC104_numpy.py:45:9
+   |
+43 |       # DOC104
+44 |       def add_numbers_incorrect(self, a, b) -> int:
+45 | /         """
+46 | |         Adds two numbers and returns the result.
+47 | |
+48 | |         Parameters
+49 | |         ----------
+50 | |         b : int
+51 | |             The second number to add.
+52 | |         a : int
+53 | |             The first number to add.
+54 | |
+55 | |         Returns
+56 | |         -------
+57 | |         int
+58 | |             The sum of the two numbers.
+59 | |         """
+   | |___________^
+60 |           return a + b
+   |
+help: Arrange the arguments in the same order as in the function signature
+
+DOC104 Arguments are the same in the docstring and the function signature, but are in a different order.
+   --> DOC104_numpy.py:96:9
+    |
+ 94 |       # DOC104
+ 95 |       def nested(a, b):
+ 96 | /         """
+ 97 | |         Do something nested.
+ 98 | |
+ 99 | |         Parameters
+100 | |         ----------
+101 | |         b : int
+102 | |             Another number.
+103 | |         a : int
+104 | |             Some number.
+105 | |         """
+    | |___________^
+106 |           print('Do something')
+    |
+help: Arrange the arguments in the same order as in the function signature
