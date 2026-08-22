@@ -401,6 +401,62 @@ def accepts_dog(value: Dog) -> None: ...
 consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
 ```
 
+### Failed overloaded constructor inference
+
+When several constructor overloads accept the same argument shape, an expected specialization does
+not depend on choosing between them. A failed call retains that specialization and reports only its
+overload error.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Consumer[T]:
+    callback: Callable[[T], None]
+
+    @overload
+    def __init__(self, callback: Callable[[T], None]) -> None: ...
+    @overload
+    def __init__(self, callback: Callable[[T], int]) -> None: ...
+    def __init__(self, callback: object) -> None: ...
+
+def accepts_dog(value: Dog) -> None: ...
+
+consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [no-matching-overload]
+```
+
+Without an expected specialization, an unresolved type parameter falls back to `Unknown`:
+
+```py
+# error: [no-matching-overload]
+reveal_type(Consumer(1))  # revealed: Consumer[Unknown]
+```
+
+### Failed overloaded constructors preserve default type arguments
+
+If an overloaded constructor cannot infer a class type parameter, the result uses its declared
+default instead of exposing the unresolved parameter. Explicit type arguments remain unchanged.
+
+```py
+from typing import overload
+
+class Consumer[T = str]:
+    @overload
+    def __init__(self, value: int) -> None: ...
+    @overload
+    def __init__(self, value: bytes) -> None: ...
+    def __init__(self, value: object) -> None: ...
+
+# error: [no-matching-overload]
+reveal_type(Consumer(None))  # revealed: Consumer[str]
+
+# error: [no-matching-overload]
+reveal_type(Consumer[int](None))  # revealed: Consumer[int]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
