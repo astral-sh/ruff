@@ -54,6 +54,7 @@ pub use types::{
 };
 
 mod db;
+mod definition_resolution;
 mod dunder_all;
 mod fixes;
 pub mod lint;

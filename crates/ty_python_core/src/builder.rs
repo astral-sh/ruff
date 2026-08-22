@@ -11,6 +11,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::statement_visitor::{self, StatementVisitor};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
@@ -228,6 +229,7 @@ impl ConditionFlowSnapshot {
     }
 }
 
+#[expect(clippy::struct_excessive_bools)]
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -251,8 +253,24 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
+    /// Whether the module contains a `from __future__ import annotations` import.
+    ///
+    /// This must be pre-computed in order to initialize the correct state for
+    /// determining place load deferredness before we walk the AST. That is what
+    /// allows earlier annotation loads to account for a later import (matching
+    /// type inference's permissive misplaced import policy).
+    ///
+    /// Conversely, `has_future_annotations` must be updated on-the-fly so that
+    /// syntax checking can behave differently before versus after the import.
+    has_future_annotations_for_place_loads: bool,
     /// Whether we are currently visiting an `if TYPE_CHECKING` block.
     in_type_checking_block: bool,
+    /// Whether place loads in the current expression use all bindings reachable
+    /// in its scope.
+    ///
+    /// `None` means that we can't (easily) determine whether to use either
+    /// point-in-time or all reachable bindings.
+    place_load_is_deferred: Option<bool>,
 
     // Used for checking semantic syntax errors
     resolver_environment: ResolverEnvironment<'db>,
@@ -272,6 +290,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: ExpressionsScopeMapBuilder,
+    deferred_place_loads: FxHashSet<ExpressionNodeKey>,
+    unclassified_place_loads: FxHashSet<ExpressionNodeKey>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
@@ -304,6 +324,42 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
 }
 
+fn module_has_future_annotations(module: &ParsedModuleRef) -> bool {
+    // We intentionally don't enforce the rules about the location of `__future__` imports here.
+    // The syntax checker reports a misplaced import, but type checking still follows the user's
+    // apparent intent and treats it as applying to the module.
+    let mut finder = FutureAnnotationsFinder(false);
+    finder.visit_body(module.suite());
+    finder.0
+}
+
+/// Finds `from __future__ import annotations` statements anywhere in a module.
+struct FutureAnnotationsFinder(bool);
+
+impl<'ast> StatementVisitor<'ast> for FutureAnnotationsFinder {
+    fn visit_stmt(&mut self, statement: &'ast ast::Stmt) {
+        if self.0 {
+            return;
+        }
+        if let ast::Stmt::ImportFrom(import) = statement
+            && imports_future_annotations(import)
+        {
+            self.0 = true;
+        } else {
+            statement_visitor::walk_stmt(self, statement);
+        }
+    }
+}
+
+fn imports_future_annotations(import: &ast::StmtImportFrom) -> bool {
+    !import.is_lazy
+        && import.module.as_deref() == Some("__future__")
+        && import
+            .names
+            .iter()
+            .any(|alias| alias.name.id == "annotations")
+}
+
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     pub(super) fn new(
         db: &'db dyn Db,
@@ -323,7 +379,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             exception_context_stack_manager: ExceptionContextStackManager::default(),
 
             has_future_annotations: false,
+            has_future_annotations_for_place_loads: module_has_future_annotations(module_ref),
             in_type_checking_block: false,
+            place_load_is_deferred: Some(false),
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
@@ -332,6 +390,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: IndexVec::new(),
 
             scopes_by_expression: ExpressionsScopeMapBuilder::new(),
+            deferred_place_loads: FxHashSet::default(),
+            unclassified_place_loads: FxHashSet::default(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
@@ -373,6 +433,36 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_stack
             .last_mut()
             .expect("SemanticIndexBuilder should have created a root scope")
+    }
+
+    fn annotations_use_deferred_place_loads(&self) -> bool {
+        self.source_type.is_stub()
+            || self.has_future_annotations_for_place_loads
+            || self.python_version >= PythonVersion::PY314
+    }
+
+    fn with_place_load_deferredness<T>(
+        &mut self,
+        is_deferred: Option<bool>,
+        visit: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous = std::mem::replace(&mut self.place_load_is_deferred, is_deferred);
+        let result = visit(self);
+        self.place_load_is_deferred = previous;
+        result
+    }
+
+    fn record_place_load_deferredness(&mut self, expression: ast::ExprRef<'_>) {
+        match self.place_load_is_deferred {
+            Some(false) => {}
+            Some(true) => {
+                self.deferred_place_loads.insert(expression.into());
+            }
+            None if !self.source_type.is_stub() => {
+                self.unclassified_place_loads.insert(expression.into());
+            }
+            None => {}
+        }
     }
 
     fn current_scope(&self) -> FileScopeId {
@@ -2872,10 +2962,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.mark_place_bound(symbol.into());
                 self.mark_place_declared(symbol.into());
                 if let Some(bounds) = bound {
-                    self.visit_expr(bounds);
+                    self.with_place_load_deferredness(Some(true), |builder| {
+                        builder.visit_expr(bounds);
+                    });
                 }
                 if let Some(default) = default {
-                    self.visit_expr(default);
+                    self.with_place_load_deferredness(Some(true), |builder| {
+                        builder.visit_expr(default);
+                    });
                 }
                 match type_param {
                     ast::TypeParam::TypeVar(node) => self.add_definition(symbol.into(), node),
@@ -2934,6 +3028,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.push_scope(scope);
         let comprehension_scope = self.current_scope();
+        // Generator bodies use point-in-time bindings for their locals but all reachable bindings
+        // for enclosing names. Deferred comprehensions have the same split. Neither mode
+        // represents both.
+        let nested_deferredness = match self.place_load_is_deferred {
+            Some(false) if !matches!(scope, NodeWithScopeRef::GeneratorExpression(_)) => {
+                Some(false)
+            }
+            _ => None,
+        };
+        let outer_deferredness =
+            std::mem::replace(&mut self.place_load_is_deferred, nested_deferredness);
 
         if generators.iter().any(|generator| generator.is_async) {
             self.async_comprehensions.insert(comprehension_scope);
@@ -2980,6 +3085,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.flow_merge(filtered_out_path);
         }
         self.record_exception_checkpoint_if(loopback_can_raise);
+        self.place_load_is_deferred = outer_deferredness;
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);
         self.record_exception_checkpoint();
@@ -3234,6 +3340,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
+            deferred_place_loads: FrozenSet::from(self.deferred_place_loads),
+            unclassified_place_loads: FrozenSet::from(self.unclassified_place_loads),
+            place_loads_are_unclassified_by_default: self.source_type.is_stub(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps: self
                 .use_def_maps
@@ -3442,7 +3551,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .iter_non_variadic_params()
                     .filter_map(|param| param.default.as_deref())
                 {
-                    self.visit_expr(default);
+                    self.with_place_load_deferredness(
+                        Some(self.source_type.is_stub()),
+                        |builder| {
+                            builder.visit_expr(default);
+                        },
+                    );
                 }
 
                 let nested_bindings = self.with_type_params(
@@ -3541,7 +3655,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     class.type_params.as_deref(),
                     |builder| {
                         if let Some(arguments) = &class.arguments {
-                            builder.visit_arguments(arguments);
+                            builder.with_place_load_deferredness(
+                                Some(builder.source_type.is_stub()),
+                                |builder| builder.visit_arguments(arguments),
+                            );
                         }
 
                         builder.push_scope(NodeWithScopeRef::Class(class));
@@ -3581,7 +3698,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     type_alias.type_params.as_deref(),
                     |builder| {
                         builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
-                        builder.visit_expr(&type_alias.value);
+                        builder.with_place_load_deferredness(
+                            Some(builder.source_type.is_stub()),
+                            |builder| builder.visit_expr(&type_alias.value),
+                        );
                         builder.pop_scope()
                     },
                 );
@@ -3617,6 +3737,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Stmt::ImportFrom(node) => {
                 self.record_exception_checkpoint();
+
+                // Look for eager imports `from __future__ import annotations`, ignore `as ...`
+                // We intentionally don't enforce the rules about location of `__future__`
+                // imports here, we assume the user's intent was to apply the `__future__`
+                // import, so we still check using it (and will also emit a diagnostic about a
+                // miss-placed `__future__` import.)
+                self.has_future_annotations |= imports_future_annotations(node);
 
                 // If we see:
                 //
@@ -3814,15 +3941,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         (&alias.name.id, is_self_import)
                     };
 
-                    // Look for eager imports `from __future__ import annotations`, ignore `as ...`
-                    // We intentionally don't enforce the rules about location of `__future__`
-                    // imports here, we assume the user's intent was to apply the `__future__`
-                    // import, so we still check using it (and will also emit a diagnostic about a
-                    // miss-placed `__future__` import.)
-                    self.has_future_annotations |= !node.is_lazy
-                        && alias.name.id == "annotations"
-                        && node.module.as_deref() == Some("__future__");
-
                     let symbol = self.add_symbol(symbol_name.clone());
 
                     self.add_definition(
@@ -3928,7 +4046,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // not discard the declared type. The value is still bound only after the RHS
                 // completes, so a handler can observe an earlier binding (or an unbound name).
                 let pending = self.begin_annotated_assignment(node);
-                self.visit_expr(&node.annotation);
+                self.visit_annotation(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                     if self.is_method_or_eagerly_executed_in_method().is_some() {
@@ -5256,6 +5374,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             .record_multi_use(member_places.into_iter().flatten(), use_id);
     }
 
+    fn visit_annotation(&mut self, expression: &'ast ast::Expr) {
+        self.with_place_load_deferredness(
+            Some(self.annotations_use_deferred_place_loads()),
+            |builder| builder.visit_expr(expression),
+        );
+    }
+
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
@@ -5266,6 +5391,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
+                if ctx.is_load() {
+                    self.record_place_load_deferredness(ast::ExprRef::from(expr));
+                }
+
                 // Record place effects after walking the expression. For names, this is
                 // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
                 // child evaluation can introduce bindings (for example via walrus operators),
@@ -5372,11 +5501,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if let Some(parameters) = &lambda.parameters {
                     // The default value of the parameters needs to be evaluated in the
                     // enclosing scope.
+                    let defaults_are_deferred = if self.source_type.is_stub() {
+                        Some(true)
+                    } else {
+                        self.place_load_is_deferred
+                    };
                     for default in parameters
                         .iter_non_variadic_params()
                         .filter_map(|param| param.default.as_deref())
                     {
-                        self.visit_expr(default);
+                        self.with_place_load_deferredness(defaults_are_deferred, |builder| {
+                            builder.visit_expr(default);
+                        });
                     }
                     self.visit_parameters(parameters);
                 }
@@ -5387,7 +5523,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.declare_lambda_parameters(parameters, lambda);
                 }
 
-                self.visit_expr(lambda.body.as_ref());
+                // The body is evaluated when the lambda is called, not when it is created.
+                self.with_place_load_deferredness(Some(false), |builder| {
+                    builder.visit_expr(lambda.body.as_ref());
+                });
                 self.pop_scope();
             }
             ast::Expr::If(node) => self.visit_if_expression(node),

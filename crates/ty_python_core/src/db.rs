@@ -156,6 +156,11 @@ pub(crate) mod tests {
             self
         }
 
+        pub(crate) fn with_python_version(mut self, python_version: PythonVersion) -> Self {
+            self.python_version = python_version;
+            self
+        }
+
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
             let mut db = TestDb::new();
 
