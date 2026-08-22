@@ -70,6 +70,7 @@ impl TestDb {
             search_paths: SearchPathSettings::new(vec![src_root])
                 .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings"),
+            python_executable: None,
         };
         program_settings.search_paths.try_register_static_roots(&db);
         db.program_settings = program_settings;

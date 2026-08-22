@@ -302,6 +302,7 @@ fn run_test(
         }
         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Failed to resolve search path settings"),
+        python_executable: None,
     };
 
     db.update_program(settings);

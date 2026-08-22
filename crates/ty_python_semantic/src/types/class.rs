@@ -802,6 +802,24 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns whether this class is a subclass of `unittest.TestCase`.
+    pub fn is_unittest_test_case(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Static(class) => {
+                let env = ProgramEnvironment::from_scope(class.body_scope(db));
+                let Some(test_case) = KnownClass::UnittestTestCase.try_to_class_literal(db, &env)
+                else {
+                    return false;
+                };
+                class.is_subclass_of(db, None, test_case.default_specialization(db))
+            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicTypedDict(_)
+            | Self::DynamicEnum(_) => false,
+        }
+    }
+
     /// Returns whether this class is `builtins.tuple` exactly
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         self.as_static().is_some_and(|class| class.is_tuple(db))

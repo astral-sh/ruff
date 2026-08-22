@@ -150,6 +150,8 @@ pub enum KnownClass {
     Path,
     // functools
     FunctoolsPartial,
+    // unittest
+    UnittestTestCase,
     // ty_extensions
     ConstraintSet,
     ConstraintSetSolution,
@@ -418,6 +420,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
             | Self::Path
+            | Self::UnittestTestCase
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
             | Self::PydanticBaseModel
@@ -546,6 +549,7 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
+            | KnownClass::UnittestTestCase
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -664,6 +668,7 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
+            | KnownClass::UnittestTestCase
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticRootModel
@@ -782,6 +787,7 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
+            | KnownClass::UnittestTestCase
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -909,6 +915,7 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::FunctoolsPartial
+            | Self::UnittestTestCase
             | Self::Mapping
             | Self::MutableMapping
             | Self::Sequence
@@ -1031,6 +1038,7 @@ impl KnownClass {
             | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
+            | KnownClass::UnittestTestCase
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -1161,6 +1169,7 @@ impl KnownClass {
             Self::Template => "Template",
             Self::Path => "Path",
             Self::FunctoolsPartial => "partial",
+            Self::UnittestTestCase => "TestCase",
             Self::ProtocolMeta => "_ProtocolMeta",
             Self::PydanticBaseModel => "BaseModel",
             Self::PydanticBaseSettings => "BaseSettings",
@@ -1590,6 +1599,7 @@ impl KnownClass {
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
+            Self::UnittestTestCase => KnownModule::UnittestCase,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
             Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
@@ -1711,6 +1721,7 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::FunctoolsPartial
+            | Self::UnittestTestCase
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -1827,6 +1838,7 @@ impl KnownClass {
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
             "partial" => &[Self::FunctoolsPartial],
+            "TestCase" => &[Self::UnittestTestCase],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             "_TypedDict" => &[Self::ExtensionTypedDictFallback],
             "BaseModel" => &[Self::PydanticBaseModel],
@@ -1938,6 +1950,7 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::FunctoolsPartial
+            | Self::UnittestTestCase
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -2315,6 +2328,7 @@ mod tests {
         let mut current_version = program.python_version(&db);
         let python_platform = program.python_platform(&db).clone();
         let search_paths = program.search_paths(&db).clone();
+        let python_executable = program.python_executable(&db).clone();
 
         for (class, version_added) in classes {
             if version_added != current_version {
@@ -2325,6 +2339,7 @@ mod tests {
                     },
                     python_platform: python_platform.clone(),
                     search_paths: search_paths.clone(),
+                    python_executable: python_executable.clone(),
                 };
                 program = Program::from_settings(&db, &settings);
                 current_version = version_added;
