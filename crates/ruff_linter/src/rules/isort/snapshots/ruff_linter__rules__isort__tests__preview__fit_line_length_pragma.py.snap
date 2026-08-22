@@ -1,0 +1,25 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> fit_line_length_pragma.py:3:1
+  |
+1 |   # The next import fits on one line once the pragma comment is excluded from the width;
+2 |   # in preview it should not be wrapped (the `# noqa` must stay effective).
+3 | / from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import x  # noqa: TID251
+4 | | # The next import exceeds the line length even without the pragma comment;
+5 | | # it must still be wrapped.
+6 | | from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # noqa: TID251
+  | |_________________________________________________________________________________________^
+help: Organize imports
+   |
+3  | from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import x  # noqa: TID251
+4  +
+5  | # The next import exceeds the line length even without the pragma comment;
+6  | # it must still be wrapped.
+   - from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # noqa: TID251
+7  + from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import (
+8  +     x,  # noqa: TID251
+9  + )
+10 |
+   |
