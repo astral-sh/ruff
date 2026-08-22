@@ -1238,35 +1238,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Returns the statement-defined class literal and specialization for this class, with an additional
-    /// specialization applied if the class is generic.
-    pub(crate) fn static_class_literal_specialized(
-        self,
-        db: &'db dyn Db,
-        additional_specialization: Option<Specialization<'db>>,
-    ) -> Option<(StaticClassLiteral<'db>, Option<Specialization<'db>>)> {
-        match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => Some((class, None)),
-            Self::NonGeneric(
-                ClassLiteral::Dynamic(_)
-                | ClassLiteral::DynamicNamedTuple(_)
-                | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
-            ) => None,
-            Self::Generic(generic) => {
-                let origin = generic.origin(db);
-                Some((
-                    origin,
-                    Some(
-                        generic
-                            .specialization(db)
-                            .apply_optional_specialization(db, additional_specialization),
-                    ),
-                ))
-            }
-        }
-    }
-
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
         self.class_literal(db).name(db)
     }

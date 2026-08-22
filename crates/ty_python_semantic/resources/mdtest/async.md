@@ -267,3 +267,79 @@ async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, o
     y = await x
     reveal_type(y)  # revealed: A & B
 ```
+
+## Regression test: awaiting optional generic values
+
+An early version of <https://github.com/astral-sh/ruff/pull/27598> caused synthesized generic type
+variables to "leak" out into revealed types in examples such as the following snippet that involve
+type variables in unions with `None`. This is a regression test for that issue:
+
+```py
+import asyncio
+from typing import TypeVar
+
+T = TypeVar("T")
+
+async def awaited_value(value: T | None) -> T | None:
+    result = await asyncio.sleep(0, value)
+    reveal_type(result)  # revealed: None | T@awaited_value
+    return result
+
+async def awaited_assignment(value: T | None) -> None:
+    result: T | None = await asyncio.sleep(0, value)
+```
+
+Narrowing an awaited optional generic value also preserves the type variable's bound, allowing its
+attributes, indexing methods, and compatible function parameters to be used.
+
+```py
+class Resource:
+    def use(self) -> None: ...
+    def __getitem__(self, index: int) -> int:
+        return index
+
+R = TypeVar("R", bound=Resource)
+
+def accept(value: R) -> None: ...
+async def awaited_operations(value: R | None) -> None:
+    result = await asyncio.sleep(0, value)
+    if result is not None:
+        reveal_type(result)  # revealed: R@awaited_operations
+        result.use()
+        result[0]
+        accept(result)
+```
+
+## Regression test: custom awaitable iterators
+
+An early version of the generator type-argument inference introduced by
+<https://github.com/astral-sh/ruff/pull/27598> incorrectly assumed that an iterator with no declared
+return type would return `None`. The `__await__` method is allowed to return `Iterator` rather than
+`Generator`, but `Iterator` does not expose the eventual return value carried by `StopIteration`.
+Such an `await` must therefore be accepted, and its result must be inferred as `Unknown` rather than
+assumed to be `None`.
+
+```py
+from collections.abc import Iterable, Iterator
+
+class CustomAwaitable:
+    def __await__(self) -> Iterator[None]:
+        yield
+
+async def main(value: CustomAwaitable) -> None:
+    result = await value
+    reveal_type(result)  # revealed: Unknown
+```
+
+Accepting an iterator with an unknown return value must not relax the requirement that `__await__`
+returns an iterator. An `Iterable` without an iterator's `__next__` method is not a valid return
+type, so awaiting the following object must produce `invalid-await`.
+
+```py
+class InvalidAwaitable:
+    def __await__(self) -> Iterable[int]:
+        return [1]
+
+async def invalid(value: InvalidAwaitable) -> None:
+    await value  # error: [invalid-await]
+```

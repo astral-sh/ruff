@@ -5219,7 +5219,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let file_scope_id = self.scope().file_scope_id(self.db());
                     let context_ty = if file_scope_id.is_generator_function(self.index) {
                         return_ty
-                            .generator_return_type(db, env)
+                            .generator_types(db, env)
+                            .map(|types| types.return_ty.unwrap_or_else(|| Type::none(db, env)))
                             .unwrap_or(return_ty)
                     } else {
                         return_ty
@@ -9601,31 +9602,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .return_ty;
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
-        let Some(generator_type_params) = declared_return_ty.generator_types(db, env) else {
+        let generator_type_params = if enclosing_function
+            .node(db, self.file(), self.module())
+            .is_async
+        {
+            declared_return_ty
+                .async_generator_types(db, env)
+                .map(|types| (types.yield_ty, types.send_ty))
+        } else {
+            declared_return_ty
+                .generator_types(db, env)
+                .map(|types| (types.yield_ty, types.send_ty))
+        };
+
+        let Some((expected_yield_ty, send_ty)) = generator_type_params else {
             let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
 
-        let expected_yield_ty = generator_type_params.yield_ty;
-        let tcx = TypeContext::new(expected_yield_ty);
+        let tcx = TypeContext::new(Some(expected_yield_ty));
+
         let yielded_ty = self
             .infer_optional_expression(value.as_deref(), tcx)
             .unwrap_or_else(|| Type::none(db, env));
+
         let diagnostic_node: AnyNodeRef = value
             .as_deref()
             .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
 
-        if let Some(expected_yield_ty) = expected_yield_ty {
-            self.validate_generator_yield_type(
-                diagnostic_node,
-                YieldKind::Yield,
-                return_type_span,
-                expected_yield_ty,
-                yielded_ty,
-            );
-        }
+        self.validate_generator_yield_type(
+            diagnostic_node,
+            YieldKind::Yield,
+            return_type_span,
+            expected_yield_ty,
+            yielded_ty,
+        );
 
-        generator_type_params.send_ty.unwrap_or_else(Type::unknown)
+        send_ty
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -9655,9 +9668,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
-        let tcx = TypeContext::new(outer_expected.yield_ty.map(|yielded_ty| {
-            KnownClass::Iterable.to_specialized_instance(db, env, &[yielded_ty])
-        }));
+        let tcx = TypeContext::new(Some(KnownClass::Iterable.to_specialized_instance(
+            db,
+            env,
+            &[outer_expected.yield_ty],
+        )));
         let iterable_type = self.infer_expression(value, tcx);
 
         let known_inner_yield_type = match iterable_type.try_iterate(db, env) {
@@ -9668,36 +9683,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        if let Some(outer_yield_ty) = outer_expected.yield_ty
-            && let Some(known_inner_yield_type) = known_inner_yield_type
-        {
+        if let Some(known_inner_yield_type) = known_inner_yield_type {
             self.validate_generator_yield_type(
                 &**value,
                 YieldKind::YieldFrom,
                 return_type_span.clone(),
-                outer_yield_ty,
+                outer_expected.yield_ty,
                 known_inner_yield_type,
             );
         }
 
-        if let Some(outer_send_ty) = outer_expected.send_ty {
-            let inner_send_ty = iterable_type
-                .generator_send_type(db, env)
-                .unwrap_or_else(|| Type::none(db, env));
-            if !outer_send_ty.is_assignable_to(db, env, inner_send_ty) {
-                report_invalid_generator_yield_type(
-                    &self.context,
-                    value.as_ref(),
-                    return_type_span,
-                    outer_send_ty,
-                    inner_send_ty,
-                    GeneratorMismatchKind::SendType,
-                );
-            }
+        let inner_generator_types = iterable_type.generator_types(db, env);
+        let inner_send_ty = inner_generator_types
+            .map(|types| types.send_ty)
+            .unwrap_or_else(|| Type::none(db, env));
+
+        if !outer_expected
+            .send_ty
+            .is_assignable_to(db, env, inner_send_ty)
+        {
+            report_invalid_generator_yield_type(
+                &self.context,
+                value.as_ref(),
+                return_type_span,
+                outer_expected.send_ty,
+                inner_send_ty,
+                GeneratorMismatchKind::SendType,
+            );
         }
 
-        iterable_type
-            .generator_return_type(db, env)
+        inner_generator_types
+            .and_then(|types| types.return_ty)
             .unwrap_or_else(Type::unknown)
     }
 
