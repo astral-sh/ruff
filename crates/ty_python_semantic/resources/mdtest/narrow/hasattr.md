@@ -98,3 +98,12 @@ def f(x: object):
         # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
         reveal_type(x.foo)  # revealed: Unknown
 ```
+
+A bound method can be assigned to an attribute after a check confirms that the attribute is absent.
+
+```py
+class Base:
+    def __init__(self):
+        if not hasattr(self, "x"):
+            self.x = self.__str__
+```
