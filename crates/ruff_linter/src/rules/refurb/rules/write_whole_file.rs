@@ -4,12 +4,14 @@ use ruff_python_ast::{
     self as ast, Expr, Stmt,
     visitor::{self, Visitor},
 };
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, OpenArgument, OpenMode, find_file_opens};
 use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
@@ -35,7 +37,11 @@ use crate::{FixAvailability, Locator, Violation};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the
+/// original expression, or if the value passed to `write` isn't statically known to be of the
+/// type required by the file's open mode (`str` for text mode, `bytes` for binary mode). Since
+/// `open(...)` truncates the file before `write` runs, a type mismatch behaves differently before
+/// and after the rewrite.
 ///
 /// ## References
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
@@ -153,7 +159,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                     );
 
                     if let Some(fix) =
-                        generate_fix(self.checker, &open, self.with_stmt, &suggestion)
+                        generate_fix(self.checker, &open, self.with_stmt, &suggestion, content)
                     {
                         diagnostic.set_fix(fix);
                     }
@@ -205,6 +211,7 @@ fn generate_fix(
     open: &FileOpen,
     with_stmt: &ast::StmtWith,
     suggestion: &str,
+    content: &Expr,
 ) -> Option<Fix> {
     if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)])) {
         return None;
@@ -231,15 +238,57 @@ fn generate_fix(
 
     let replacement = format!("{target}.{suggestion}");
 
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    // `open(..., "w")` truncates the file before `write()` runs, so a type mismatch leaves the
+    // original untouched under the rewritten form but empty under the original. Only safe when
+    // the argument's type is known to match the mode.
+    let type_matches_mode = content_type_matches_mode(content, open.mode, checker.semantic());
+
+    let applicability =
+        if checker.comment_ranges().intersects(with_stmt.range()) || !type_matches_mode {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
     Some(Fix::applicable_edits(
         Edit::range_replacement(replacement, with_stmt.range()),
         [import_edit],
         applicability,
     ))
+}
+
+/// Returns `true` if `content` is known to be a `str` for [`OpenMode::WriteText`], or `bytes`
+/// for [`OpenMode::WriteBytes`]. Uses the same annotation-based binding inference as other rules
+/// (e.g. `bad_str_strip_call`), not simple literal-expression evaluation, so it also recognizes
+/// e.g. a function parameter annotated `x: str`.
+fn content_type_matches_mode(content: &Expr, mode: OpenMode, semantic: &SemanticModel) -> bool {
+    let is_str_or_bytes = |is_str: bool, is_bytes: bool| match mode {
+        OpenMode::WriteText => is_str,
+        OpenMode::WriteBytes => is_bytes,
+        OpenMode::ReadText | OpenMode::ReadBytes => false,
+    };
+
+    match content {
+        Expr::StringLiteral(_) | Expr::FString(_) => is_str_or_bytes(true, false),
+        Expr::BytesLiteral(_) => is_str_or_bytes(false, true),
+        Expr::Name(name) => {
+            let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+                return false;
+            };
+            is_str_or_bytes(
+                typing::is_string(binding, semantic),
+                typing::is_bytes(binding, semantic),
+            )
+        }
+        _ => {
+            let Some(binding_id) = semantic.lookup_attribute(content) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            is_str_or_bytes(
+                typing::is_string(binding, semantic),
+                typing::is_bytes(binding, semantic),
+            )
+        }
+    }
 }
