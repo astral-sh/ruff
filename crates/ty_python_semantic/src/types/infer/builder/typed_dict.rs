@@ -559,14 +559,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && !has_gradual_class_context
             && arguments.keywords.iter().all(|keyword| {
                 let permits_field_inference = |name: &str| {
-                    typed_dict.item(db, name).is_none_or(|field| {
-                        !contains_generic_typed_dict(
-                            db,
-                            env,
-                            field.declared_ty,
-                            &ActiveRecursionDetector::default(),
-                        )
-                    })
+                    typed_dict.item(db, name).map_or_else(
+                        // The synthesized initializer accepts hidden items on open TypedDicts,
+                        // but explicitly provided unknown keys still need constructor validation.
+                        || typed_dict.explicit_extra_items(db).is_some(),
+                        |field| {
+                            !contains_generic_typed_dict(
+                                db,
+                                env,
+                                field.declared_ty,
+                                &ActiveRecursionDetector::default(),
+                            )
+                        },
+                    )
                 };
 
                 if let Some(name) = keyword.arg.as_ref() {
