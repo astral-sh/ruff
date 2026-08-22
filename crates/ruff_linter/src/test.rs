@@ -131,7 +131,7 @@ pub(crate) fn test_path(
     let path = test_resource_path("fixtures").join(path);
     let source_type = ruff_python_ast::SourceType::Python(PySourceType::from(&path));
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
-    Ok(test_contents(&source_kind, &path, settings).0)
+    Ok(test_contents(&source_kind, &path, settings, false).0)
 }
 
 /// Run the configuration TOML linter on a file in the `resources/test/fixtures` directory.
@@ -192,7 +192,7 @@ pub(crate) fn assert_notebook_path(
     let source_notebook = Notebook::from_path(path.as_ref())?;
 
     let source_kind = SourceKind::ipy_notebook(source_notebook);
-    let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
+    let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings, true);
     let expected_notebook = Notebook::from_path(expected.as_ref())?;
     let linted_notebook = transformed.into_owned().expect_ipy_notebook();
 
@@ -224,6 +224,7 @@ pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic
         },
         path,
         settings,
+        true,
     )
     .0
 }
@@ -242,10 +243,15 @@ pub(crate) fn max_iterations() -> usize {
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that fixes converge after a fixed number of iterations.
+///
+/// Set `include_all_syntax_errors` to `false` only for temporary compatibility
+/// with existing tests. That retains ordinary parse errors, but omits semantic
+/// and target-version syntax errors.
 pub fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
     settings: &LinterSettings,
+    include_all_syntax_errors: bool,
 ) -> (Vec<Diagnostic>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
@@ -376,54 +382,65 @@ Source with applied fixes:
     )
     .finish();
 
+    let mut messages = messages;
+    if !include_all_syntax_errors {
+        // Preserve the old diagnostic selection and ordering.
+        messages.retain(|message| message.secondary_code().is_some());
+        messages.extend(parsed.errors().iter().map(|parse_error| {
+            Diagnostic::invalid_syntax(source_code.clone(), &parse_error.error, parse_error)
+        }));
+    }
+
     let messages = messages
         .into_iter()
-        .filter_map(|msg| Some((msg.secondary_code()?.to_string(), msg)))
-        .map(|(code, mut diagnostic)| {
-            let rule = Rule::from_code(&code).unwrap();
-            let fixable = diagnostic.fix().is_some_and(|fix| {
-                matches!(
-                    fix.applicability(),
-                    Applicability::Safe | Applicability::Unsafe
-                )
-            });
+        .map(|mut diagnostic| {
+            if let Some(code) = diagnostic.secondary_code() {
+                let rule = Rule::from_code(code).unwrap();
+                let fixable = diagnostic.fix().is_some_and(|fix| {
+                    matches!(
+                        fix.applicability(),
+                        Applicability::Safe | Applicability::Unsafe
+                    )
+                });
 
-            match (fixable, rule.fixable()) {
-                (true, FixAvailability::Sometimes | FixAvailability::Always)
-                | (false, FixAvailability::None | FixAvailability::Sometimes) => {
-                    // Ok
-                }
-                (true, FixAvailability::None) => {
-                    panic!(
-                        "Rule {rule:?} is marked as non-fixable but it created a fix.
+                match (fixable, rule.fixable()) {
+                    (true, FixAvailability::Sometimes | FixAvailability::Always)
+                    | (false, FixAvailability::None | FixAvailability::Sometimes) => {
+                        // Ok
+                    }
+                    (true, FixAvailability::None) => {
+                        panic!(
+                            "Rule {rule:?} is marked as non-fixable but it created a fix.
 Change the `Violation::FIX_AVAILABILITY` to either \
 `FixAvailability::Sometimes` or `FixAvailability::Always`"
-                    );
-                }
-                (false, FixAvailability::Always) if source_has_errors => {
-                    // Ok
-                }
-                (false, FixAvailability::Always) => {
-                    panic!(
-                        "\
+                        );
+                    }
+                    (false, FixAvailability::Always) if source_has_errors => {
+                        // Ok
+                    }
+                    (false, FixAvailability::Always) => {
+                        panic!(
+                            "\
 Rule {rule:?} is marked to always-fixable but the diagnostic has no fix.
 Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to either \
 `FixAvailability::Sometimes` or `FixAvailability::None`"
-                    )
+                        )
+                    }
+                }
+
+                assert!(
+                    !(fixable && diagnostic.first_help_text().is_none()),
+                    "Diagnostic emitted by {rule:?} is fixable but \
+                `Violation::fix_title` returns `None`"
+                );
+
+                // Not strictly necessary but adds some coverage for this code path by overriding
+                // the noqa offset.
+                if let Some(range) = diagnostic.range() {
+                    diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
                 }
             }
 
-            assert!(
-                !(fixable && diagnostic.first_help_text().is_none()),
-                "Diagnostic emitted by {rule:?} is fixable but \
-                `Violation::fix_title` returns `None`"
-            );
-
-            // Not strictly necessary but adds some coverage for this code path by overriding the
-            // noqa offset and the source file
-            if let Some(range) = diagnostic.range() {
-                diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
-            }
             // This part actually is necessary to avoid long relative paths in snapshots.
             for annotation in diagnostic.annotations_mut() {
                 if let Some(range) = annotation.get_span().range() {
@@ -440,9 +457,6 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
 
             diagnostic
         })
-        .chain(parsed.errors().iter().map(|parse_error| {
-            Diagnostic::invalid_syntax(source_code.clone(), &parse_error.error, parse_error)
-        }))
         .sorted_by(Diagnostic::ruff_start_ordering)
         .collect();
     (messages, transformed)

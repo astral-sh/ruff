@@ -147,7 +147,7 @@ mod tests {
         let settings =
             settings::LinterSettings::for_rules(vec![Rule::UselessFinally, Rule::NeedlessElse]);
 
-        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings, true);
         assert_diagnostics!(diagnostics);
 
         insta::assert_snapshot!(transformed.source_code());
@@ -169,7 +169,7 @@ mod tests {
             Rule::SuppressibleException,
         ]);
 
-        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings, true);
         assert_diagnostics!(diagnostics);
 
         insta::assert_snapshot!(transformed.source_code());
@@ -191,7 +191,7 @@ mod tests {
             Rule::SuppressibleException,
         ]);
 
-        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings, true);
         assert_diagnostics!(diagnostics);
 
         insta::assert_snapshot!(transformed.source_code());
@@ -211,7 +211,7 @@ mod tests {
         let settings =
             settings::LinterSettings::for_rules(vec![Rule::NeedlessElse, Rule::UnnecessaryIf]);
 
-        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings, true);
         assert_diagnostics!(diagnostics);
 
         insta::assert_snapshot!(transformed.source_code());
@@ -232,7 +232,7 @@ mod tests {
         let settings =
             settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnnecessaryIf]);
 
-        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings, true);
         assert_diagnostics!(diagnostics);
 
         insta::assert_snapshot!(transformed.source_code());

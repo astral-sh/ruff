@@ -219,6 +219,7 @@ value: Literal[f\"\"\"{(\r\n1\r\n)=}\"\"\"] | Literal[f\"\"\"{(\n1\n)=}\"\"\"]\n
             },
             path,
             &settings::LinterSettings::for_rule(Rule::DuplicateUnionMember),
+            true,
         )
         .0;
 

@@ -1478,7 +1478,7 @@ mod tests {
         }
 
         let source_kind = source_kind.updated(fixed, &source_map);
-        let (diagnostics, _) = test_contents(&source_kind, path, settings);
+        let (diagnostics, _) = test_contents(&source_kind, path, settings, true);
         if !diagnostics.is_empty() {
             writeln!(
                 output,
