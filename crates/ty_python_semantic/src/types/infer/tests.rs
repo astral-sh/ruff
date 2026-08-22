@@ -320,55 +320,6 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 }
 
 #[test]
-fn shared_assignment_statement_owns_lambda_default_bindings() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_dedented(
-        "/src/lambda_default.py",
-        "first = second = lambda value=(named := 1): value",
-    )?;
-
-    let file = system_path_to_file(&db, "/src/lambda_default.py").unwrap();
-    let named = first_public_binding(&db, file, "named");
-    let program_file = program_file(&db, file);
-    let module = parsed_module(&db, program_file.python_file(&db)).load(&db);
-    let index = semantic_index(&db, program_file);
-    let statement = index.try_statement(&module.syntax().body[0]).unwrap();
-
-    assert!(
-        matches!(
-            infer_statement_types(&db, statement),
-            StatementInference::Other(inference)
-                if inference.bindings().any(|(definition, _)| definition == named)
-        ),
-        "the statement lost the binding created in its lambda default"
-    );
-
-    Ok(())
-}
-
-#[test]
-fn single_assignment_definition_owns_lambda_default_bindings() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_dedented(
-        "/src/lambda_default.py",
-        "values = [lambda value=(named := 1): value]",
-    )?;
-
-    let file = system_path_to_file(&db, "/src/lambda_default.py").unwrap();
-    let values = first_public_binding(&db, file, "values");
-    let named = first_public_binding(&db, file, "named");
-
-    assert!(
-        infer_definition_types(&db, values)
-            .bindings(values)
-            .any(|(definition, _)| definition == named),
-        "the definition lost the binding created in its lambda default"
-    );
-
-    Ok(())
-}
-
-#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(

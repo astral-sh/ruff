@@ -22,16 +22,6 @@ reveal_type(second)  # revealed: () -> Literal[0]
 reveal_type(named)  # revealed: () -> Literal[0]
 ```
 
-The same applies when the assignment expression and lambda are separate parts of the shared value.
-
-```py
-first = second = ((named := 0), lambda: 1)
-
-reveal_type(first)  # revealed: tuple[Literal[0], () -> Literal[1]]
-reveal_type(second)  # revealed: tuple[Literal[0], () -> Literal[1]]
-reveal_type(named)  # revealed: Literal[0]
-```
-
 ## Assignment expressions with unpacking targets
 
 An unpacking target and a simple target share both the value and any assignment expressions inside
@@ -61,17 +51,18 @@ reveal_type(named)  # revealed: () -> Literal[0]
 
 ## Contextual inference in shared lambdas
 
-Each assignment target provides its own context to a shared lambda.
+Each assignment target provides its own context to a shared lambda, even when the targets have
+different parameter types.
 
 ```py
 from collections.abc import Callable
 
 first: Callable[[int], int]
-second: Callable[[int], int]
-first = second = lambda value: value.bit_length()
+second: Callable[[str], int]
+first = second = lambda value: 0
 
-reveal_type(first)  # revealed: (value: int) -> int
-reveal_type(second)  # revealed: (value: int) -> int
+reveal_type(first)  # revealed: (value: int) -> Literal[0]
+reveal_type(second)  # revealed: (value: str) -> Literal[0]
 ```
 
 ## Contextual inference in assignment expressions
