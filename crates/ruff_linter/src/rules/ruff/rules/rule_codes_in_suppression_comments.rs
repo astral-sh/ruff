@@ -26,7 +26,7 @@ use crate::codes::Category;
 /// import os  # ruff: ignore[unused-import]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.22", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.15.22", category = Category::Style)]
 pub(crate) struct RuleCodesInSuppressionComments;
 
 impl AlwaysFixableViolation for RuleCodesInSuppressionComments {

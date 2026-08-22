@@ -40,7 +40,7 @@ use crate::codes::Category;
 /// The rule's fix is marked as safe, unless the replacement range contains comments
 /// that would be removed.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.3", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.15.3", category = Category::Complexity)]
 pub(crate) struct SwapWithTemporaryVariable<'a> {
     first: &'a Name,
     second: &'a Name,

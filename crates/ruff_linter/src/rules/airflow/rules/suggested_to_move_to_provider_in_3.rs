@@ -52,7 +52,7 @@ use ruff_text_size::TextRange;
 /// )
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Suspicious)]
 pub(crate) struct Airflow3SuggestedToMoveToProvider<'a> {
     deprecated: QualifiedName<'a>,
     replacement: ProviderReplacement,

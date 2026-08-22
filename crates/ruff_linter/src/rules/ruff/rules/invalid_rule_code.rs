@@ -62,7 +62,7 @@ impl InvalidRuleCodeKind {
 ///
 /// - `lint.external`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Correctness)]
 pub(crate) struct InvalidRuleCode {
     pub(crate) rule_code: String,
     pub(crate) kind: InvalidRuleCodeKind,

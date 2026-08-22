@@ -38,7 +38,7 @@ use crate::codes::Category;
 ///         response = await client.get(...)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct BlockingHttpCallHttpxInAsyncFunction {
     name: String,
     call: String,
