@@ -20,6 +20,7 @@ doctest = false
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
 ruff_diagnostics = { workspace = true }
+ruff_notebook = { workspace = true }
 ruff_ranged_value = { workspace = true }
 ty_combine = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
@@ -42,6 +43,7 @@ rayon = { workspace = true }
 salsa = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+similar = { workspace = true }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
 tracing-flame = { workspace = true }
 tracing-subscriber = { workspace = true }
