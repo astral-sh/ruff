@@ -44,4 +44,35 @@ mod tests {
         });
         Ok(())
     }
+
+    #[test_case(Path::new("tests/test_thing.py"))]
+    #[test_case(Path::new("tests/test_more/test_other_thing.py"))]
+    fn pytest_tests_directory(filename: &Path) -> Result<()> {
+        let project_root = test_resource_path("fixtures/flake8_no_pep420/test_pass_pytest");
+        let diagnostics = test_path(
+            Path::new("flake8_no_pep420/test_pass_pytest").join(filename),
+            &LinterSettings {
+                project_root,
+                ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage)
+            },
+        )?;
+
+        assert!(diagnostics.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn nested_tests_directory() -> Result<()> {
+        let project_root = test_resource_path("fixtures/flake8_no_pep420/test_pass_pytest");
+        let diagnostics = test_path(
+            Path::new("flake8_no_pep420/test_pass_pytest/package/tests/test_nested.py"),
+            &LinterSettings {
+                project_root,
+                ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage)
+            },
+        )?;
+
+        assert_eq!(diagnostics.len(), 1);
+        Ok(())
+    }
 }
