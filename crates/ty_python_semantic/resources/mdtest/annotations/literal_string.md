@@ -97,6 +97,25 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |         Did you mean `Literal`?
 ```
 
+Aliases containing multiple literal values are also valid `Literal` arguments.
+
+```py
+MultipleValues = Literal["a", "b"]
+
+# snapshot: invalid-type-form
+multiple_values: "LiteralString[MultipleValues]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:10:19
+   |
+10 | multiple_values: "LiteralString[MultipleValues]"
+   |                   -------------^^^^^^^^^^^^^^^^
+   |                   |
+   |                   Did you mean `Literal`?
+```
+
 Ordinary variables are not valid `Literal` arguments, even if their values are strings.
 
 ```py
@@ -108,9 +127,9 @@ variable: "LiteralString[value]"
 
 ```snapshot
 error[invalid-type-form]: `LiteralString` expects no type parameter
-  --> src/mdtest_snippet.py:10:12
+  --> src/mdtest_snippet.py:14:12
    |
-10 | variable: "LiteralString[value]"
+14 | variable: "LiteralString[value]"
    |            ^^^^^^^^^^^^^^^^^^^^
 ```
 
