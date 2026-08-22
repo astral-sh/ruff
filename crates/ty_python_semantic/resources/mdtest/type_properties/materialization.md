@@ -874,6 +874,50 @@ def contravariant(top: Top[ContravariantCallable], bottom: Bottom[ContravariantC
     reveal_type(bottom)  # revealed: (GenericContravariant[Never], /) -> None
 ```
 
+## Variadic generic arguments containing `Never`
+
+Top and bottom materialization replace an `Any` argument with `object` or `Never` according to the
+variance of a type variable tuple. Other arguments, including `Never`, are preserved. Invariant type
+variable tuples retain their unevaluated materializations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Never
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Covariant[*Ts]:
+    def get(self) -> tuple[*Ts]:
+        raise NotImplementedError
+
+class Contravariant[*Ts]:
+    def put(self, value: tuple[*Ts]) -> None: ...
+
+class Invariant[*Ts]:
+    values: tuple[*Ts]
+
+static_assert(is_equivalent_to(Top[Covariant[Any, Never]], Covariant[object, Never]))
+static_assert(is_equivalent_to(Bottom[Covariant[Any, Never]], Covariant[Never, Never]))
+static_assert(is_equivalent_to(Top[Contravariant[Any, Never]], Contravariant[Never, Never]))
+static_assert(is_equivalent_to(Bottom[Contravariant[Any, Never]], Contravariant[object, Never]))
+
+def check(top: Top[Invariant[Any, Never]], bottom: Bottom[Invariant[Any, Never]]) -> None:
+    reveal_type(top)  # revealed: Top[Invariant[Any, Never]]
+    reveal_type(bottom)  # revealed: Bottom[Invariant[Any, Never]]
+```
+
+An unbounded sequence of `Never` elements can only contain zero elements, so materializing an
+unbounded gradual pack normalizes it to an empty sequence.
+
+```py
+static_assert(is_equivalent_to(Bottom[Covariant[*tuple[Any, ...]]], Covariant[()]))
+static_assert(is_equivalent_to(Top[Contravariant[*tuple[Any, ...]]], Contravariant[()]))
+```
+
 ## Bounded generic type parameters
 
 Top materialization of a covariant generic uses the type parameter's declared upper bound. Bottom
