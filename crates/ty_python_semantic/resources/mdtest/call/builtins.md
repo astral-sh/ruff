@@ -420,6 +420,18 @@ def _(xs: Unknown):
     reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
 ```
 
+## Joining sorted strings
+
+The `LiteralString` overload of `str.join` cannot accept an arbitrary `list[str]`. If inference of
+`sorted` fails under that context, its recovery type must not make the outer call ambiguous.
+
+```py
+def _(items: list[str]):
+    reveal_type(",".join(sorted(items, key=lambda item: item)))  # revealed: str
+    reveal_type(",".join(sorted(items, key=len)))  # revealed: str
+    reveal_type(",".join(sorted(items)))  # revealed: str
+```
+
 ## Mapping methods accept arbitrary object types
 
 ```toml

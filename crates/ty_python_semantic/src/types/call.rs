@@ -9,7 +9,7 @@ use ruff_python_ast as ast;
 
 mod arguments;
 pub(crate) mod bind;
-pub(super) use arguments::{Argument, CallArguments};
+pub(super) use arguments::{Argument, CallArgumentType, CallArguments};
 pub(super) use bind::{
     Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
 };

@@ -916,6 +916,9 @@ struct ScopeInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
+    /// Generic or overloaded calls that failed to match their arguments.
+    failed_calls: FrozenSet<ExpressionNodeKey>,
+
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
@@ -1323,6 +1326,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
+    /// Generic or overloaded calls that failed to match their arguments.
+    failed_calls: FrozenSet<ExpressionNodeKey>,
+
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
@@ -1703,6 +1709,9 @@ struct ExpressionInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
+    /// Generic or overloaded calls that failed to match their arguments.
+    failed_calls: FrozenSet<ExpressionNodeKey>,
+
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
@@ -1877,6 +1886,9 @@ struct StatementInferenceInnerExtra<'db> {
 
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
+
+    /// Generic or overloaded calls that failed to match their arguments.
+    failed_calls: FrozenSet<ExpressionNodeKey>,
 
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
