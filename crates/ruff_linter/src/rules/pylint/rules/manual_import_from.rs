@@ -91,7 +91,7 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
             names: vec![Alias {
                 name: asname.clone(),
                 asname: None,
-                range: TextRange::default(),
+                range_end: asname.end(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }],
             level: 0,

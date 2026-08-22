@@ -2857,14 +2857,41 @@ pub struct Keyword {
     pub value: Expr,
 }
 
+/// An import alias whose start offset is derived from its name.
+///
+/// The alias and its name must start at the same offset, including during error
+/// recovery.
+///
 /// See also [alias](https://docs.python.org/3/library/ast.html#ast.alias)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Alias {
-    pub range: TextRange,
+    pub range_end: TextSize,
     pub node_index: AtomicNodeIndex,
     pub name: Identifier,
     pub asname: Option<Identifier>,
+}
+
+impl Ranged for Alias {
+    fn range(&self) -> TextRange {
+        TextRange::new(self.name.start(), self.range_end)
+    }
+}
+
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "`range_end` is represented by the reconstructed `range` field"
+)]
+impl fmt::Debug for Alias {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Alias")
+            .field("range", &self.range())
+            .field("node_index", &self.node_index)
+            .field("name", &self.name)
+            .field("asname", &self.asname)
+            .finish()
+    }
 }
 
 /// See also [withitem](https://docs.python.org/3/library/ast.html#ast.withitem)
@@ -3118,7 +3145,7 @@ impl<'a> AnyParameterRef<'a> {
 impl Ranged for AnyParameterRef<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::NonVariadic(param) => param.range,
+            Self::NonVariadic(param) => param.range(),
             Self::Variadic(param) => param.range,
         }
     }
@@ -3442,14 +3469,39 @@ impl FusedIterator for ParametersSourceOrderIterator<'_> {}
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
 /// Used by `Arguments` original type.
 ///
+/// Its start offset is derived from `parameter`, so both nodes must start at the
+/// same offset, including during error recovery.
+///
 /// NOTE: This type is different from original Python AST.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ParameterWithDefault {
-    pub range: TextRange,
+    pub range_end: TextSize,
     pub node_index: AtomicNodeIndex,
     pub parameter: Parameter,
     pub default: Option<Box<Expr>>,
+}
+
+impl Ranged for ParameterWithDefault {
+    fn range(&self) -> TextRange {
+        TextRange::new(self.parameter.start(), self.range_end)
+    }
+}
+
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "`range_end` is represented by the reconstructed `range` field"
+)]
+impl fmt::Debug for ParameterWithDefault {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ParameterWithDefault")
+            .field("range", &self.range())
+            .field("node_index", &self.node_index)
+            .field("parameter", &self.parameter)
+            .field("default", &self.default)
+            .finish()
+    }
 }
 
 impl ParameterWithDefault {
@@ -3933,7 +3985,7 @@ impl From<bool> for Singleton {
 #[cfg(test)]
 mod tests {
     use crate::generated::*;
-    use crate::{Arguments, Mod, Parameters};
+    use crate::{Alias, Arguments, Mod, ParameterWithDefault, Parameters};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
@@ -3945,7 +3997,9 @@ mod tests {
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
+        assert_eq!(std::mem::size_of::<ParameterWithDefault>(), 72);
         assert_eq!(std::mem::size_of::<Arguments>(), 40);
+        assert_eq!(std::mem::size_of::<Alias>(), 72);
         assert_eq!(std::mem::size_of::<Expr>(), 64);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);

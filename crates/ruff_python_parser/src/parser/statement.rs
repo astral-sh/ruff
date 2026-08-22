@@ -783,7 +783,7 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 },
                 asname: None,
-                range,
+                range_end: range.end(),
                 node_index: AtomicNodeIndex::NONE,
             };
         }
@@ -792,6 +792,7 @@ impl<'src> Parser<'src> {
             ImportStyle::Import => self.parse_dotted_name(),
             ImportStyle::ImportFrom => self.parse_identifier(),
         };
+        debug_assert_eq!(start, name.start());
 
         let asname = if self.eat(TokenKind::As) {
             if self.at_name_or_soft_keyword() {
@@ -815,7 +816,7 @@ impl<'src> Parser<'src> {
         };
 
         ast::Alias {
-            range: self.node_range(start),
+            range_end: self.node_range(start).end(),
             name,
             asname,
             node_index: AtomicNodeIndex::NONE,
@@ -3254,6 +3255,7 @@ impl<'src> Parser<'src> {
         function_kind: FunctionKind,
     ) -> ast::ParameterWithDefault {
         let parameter = self.parse_parameter(start, function_kind, AllowStarAnnotation::No);
+        debug_assert_eq!(start, parameter.start());
 
         let default = if self.eat(TokenKind::Equal) {
             if self.at_expr() {
@@ -3283,7 +3285,7 @@ impl<'src> Parser<'src> {
         };
 
         ast::ParameterWithDefault {
-            range: self.node_range(start),
+            range_end: self.node_range(start).end(),
             parameter,
             default,
             node_index: AtomicNodeIndex::NONE,

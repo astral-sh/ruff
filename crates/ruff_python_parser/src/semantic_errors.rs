@@ -154,7 +154,7 @@ impl SemanticSyntaxChecker {
                                 SemanticSyntaxErrorKind::FutureFeatureNotDefined(
                                     name.name.to_string(),
                                 ),
-                                name.range,
+                                name.range(),
                             );
                         }
                     }
