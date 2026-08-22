@@ -208,6 +208,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         vars: vec![],
         semantic: checker.semantic(),
         any_skipped: false,
+        has_unpacked_kwargs: false,
     };
     visitor.visit_expr(slice);
 
@@ -231,7 +232,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     // ```
     //
     // just because we can't confirm that `SomethingElse` is a `TypeVar`
-    if !visitor.any_skipped {
+    if !visitor.any_skipped && !visitor.has_unpacked_kwargs {
         let Some(type_vars) = check_type_vars(visitor.vars, checker) else {
             diagnostic.defuse();
             return;
