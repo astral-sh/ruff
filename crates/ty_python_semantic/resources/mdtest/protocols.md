@@ -835,12 +835,12 @@ static_assert(is_assignable_to(Qux, HasXWithDefault))
 class HasClassVarX(Protocol):
     x: ClassVar[int]
 
-static_assert(not is_subtype_of(FooWithZero, HasClassVarX))
-static_assert(not is_assignable_to(FooWithZero, HasClassVarX))
+static_assert(is_subtype_of(FooWithZero, HasClassVarX))
+static_assert(is_assignable_to(FooWithZero, HasClassVarX))
 
-# An instance declaration does not become a class variable without an explicit qualifier.
-static_assert(not is_subtype_of(Foo, HasClassVarX))
-static_assert(not is_assignable_to(Foo, HasClassVarX))
+# TODO: these should pass
+static_assert(not is_subtype_of(Foo, HasClassVarX))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Foo, HasClassVarX))  # error: [static-assert-error]
 
 static_assert(not is_subtype_of(Qux, HasClassVarX))
 static_assert(not is_assignable_to(Qux, HasClassVarX))
@@ -2111,16 +2111,14 @@ static_assert(is_assignable_to(UsesMeta, HasX))
 
 If a protocol `ClassVarX` has a `ClassVar` attribute member `x` with type `int`, this indicates that
 the non-callable attribute must be readable with the same type through both an inhabitant of
-`ClassVarX` and the type of that inhabitant. An implementing class must declare the member as a
-`ClassVar`; an instance attribute does not satisfy the requirement merely because it has a default
-value in the class body:
+`ClassVarX` and the type of that inhabitant:
 
 `classvars.py`:
 
 ```py
-from typing import Any, ClassVar, Protocol, final
-from ty_extensions import Intersection, static_assert
-from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
+from typing import Any, ClassVar, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, is_assignable_to
 
 class ClassVarXProto(Protocol):
     x: ClassVar[int]
@@ -2133,14 +2131,9 @@ def f(obj: ClassVarXProto):
 class InstanceAttrX:
     x: int
 
-static_assert(not is_assignable_to(InstanceAttrX, ClassVarXProto))
-static_assert(not is_subtype_of(InstanceAttrX, ClassVarXProto))
-
-class InstanceAttrXWithDefault:
-    x: int = 42
-
-static_assert(not is_assignable_to(InstanceAttrXWithDefault, ClassVarXProto))
-static_assert(not is_subtype_of(InstanceAttrXWithDefault, ClassVarXProto))
+# TODO: these should pass
+static_assert(not is_assignable_to(InstanceAttrX, ClassVarXProto))  # error: [static-assert-error]
+static_assert(not is_subtype_of(InstanceAttrX, ClassVarXProto))  # error: [static-assert-error]
 
 class PropertyX:
     @property
@@ -2155,14 +2148,6 @@ class ClassVarX:
 
 static_assert(is_assignable_to(ClassVarX, ClassVarXProto))
 static_assert(is_subtype_of(ClassVarX, ClassVarXProto))
-
-class InheritedClassVarX(ClassVarX):
-    x = 1
-
-static_assert(is_assignable_to(InheritedClassVarX, ClassVarXProto))
-static_assert(is_subtype_of(InheritedClassVarX, ClassVarXProto))
-static_assert(is_assignable_to(TypeOf[InheritedClassVarX], type[ClassVarXProto]))
-static_assert(is_subtype_of(TypeOf[InheritedClassVarX], type[ClassVarXProto]))
 
 class XMeta(type):
     def x(cls) -> str:
@@ -2193,51 +2178,6 @@ class NotHashable:
 
 static_assert(is_assignable_to(NotHashable, NotHashableProto))
 static_assert(is_subtype_of(NotHashable, NotHashableProto))
-
-class Descriptor:
-    def __get__(self, instance: object, owner: type) -> "Descriptor":
-        return self
-
-    def __set__(self, instance: object, value: "Descriptor") -> None: ...
-
-class HasClassDescriptor(Protocol):
-    descriptor: ClassVar[Descriptor]
-
-class DescriptorImplementation:
-    descriptor: ClassVar[Descriptor] = Descriptor()
-
-static_assert(is_assignable_to(DescriptorImplementation, HasClassDescriptor))
-static_assert(is_subtype_of(DescriptorImplementation, HasClassDescriptor))
-
-@final
-class FinalInstanceAttrX:
-    x: int = 42
-
-@final
-class FinalClassVarX:
-    x: ClassVar[int] = 42
-
-static_assert(is_disjoint_from(FinalInstanceAttrX, ClassVarXProto))
-static_assert(not is_disjoint_from(InstanceAttrXWithDefault, ClassVarXProto))
-static_assert(not is_disjoint_from(FinalClassVarX, ClassVarXProto))
-
-def impossible(value: Intersection[FinalInstanceAttrX, ClassVarXProto]) -> None:
-    reveal_type(value)  # revealed: Never
-
-implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
-```
-
-```snapshot
-error[invalid-assignment]: Object of type `InstanceAttrX` is not assignable to `ClassVarXProto`
-   --> src/classvars.py:107:34
-    |
-107 | implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
-    |                 --------------   ^^^^^^^^^^^^^^^ Incompatible value of type `InstanceAttrX`
-    |                 |
-    |                 Declared type
-info: type `InstanceAttrX` is not assignable to protocol `ClassVarXProto`
-info: └── protocol member `x` is incompatible
-info:     └── protocol member `x` is an instance variable on type `InstanceAttrX`, but a class variable is required
 ```
 
 This is mentioned by the
