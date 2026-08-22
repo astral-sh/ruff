@@ -50,10 +50,9 @@ use crate::Db;
 use crate::types::function::{FunctionType, KnownFunction};
 use crate::types::infer::{function_known_decorators, infer_definition_types, original_class_type};
 use crate::types::signatures::Parameter as SignatureParameter;
-use crate::types::{
-    ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, Type, definition_expression_type,
-    extract_fixed_length_iterable_element_types,
-};
+use crate::types::{ClassBase, ClassLiteral, ProgramEnvironment, Type};
+
+use self::parametrization::{Parametrization, parametrizations};
 
 #[cfg_attr(
     not(test),
@@ -248,9 +247,7 @@ impl<'db> FixtureRequest<'db> {
             && directly_parametrized(
                 db,
                 function_definition,
-                function,
                 class_scope,
-                &module,
                 index,
                 parameter_name.as_str(),
             )
@@ -648,22 +645,14 @@ fn is_unittest_test_case(db: &dyn Db, file: ProgramFile<'_>, class_scope: FileSc
 fn directly_parametrized<'db>(
     db: &'db dyn Db,
     function_definition: Definition<'db>,
-    function: &ast::StmtFunctionDef,
     class_scope: Option<FileScopeId>,
-    module: &ParsedModuleRef,
     index: &ty_python_core::SemanticIndex<'_>,
     parameter_name: &str,
 ) -> bool {
-    let decorators = function_known_decorators(db, function_definition);
-    if function.decorator_list.iter().any(|decorator| {
-        mark_excludes_fixture(
-            db,
-            function_definition,
-            &decorator.expression,
-            parameter_name,
-            |expression| decorators.expression_type(expression),
-        )
-    }) {
+    if parametrizations(db, function_definition)
+        .iter()
+        .any(|parametrization| parametrization_excludes_fixture(parametrization, parameter_name))
+    {
         return true;
     }
 
@@ -674,59 +663,27 @@ fn directly_parametrized<'db>(
     .any(|class_scope| {
         let class_ref = index.scope(class_scope).node().expect_class();
         let definition = index.expect_single_definition(class_ref);
-        class_ref
-            .node(module)
-            .decorator_list
+        parametrizations(db, definition)
             .iter()
-            .any(|decorator| {
-                mark_excludes_fixture(
-                    db,
-                    definition,
-                    &decorator.expression,
-                    parameter_name,
-                    |expression| Some(definition_expression_type(db, definition, expression)),
-                )
+            .any(|parametrization| {
+                parametrization_excludes_fixture(parametrization, parameter_name)
             })
     })
 }
 
 /// Returns whether a static mark supplies this parameter directly or cannot be interpreted.
-fn mark_excludes_fixture<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    expression: &ast::Expr,
+fn parametrization_excludes_fixture(
+    parametrization: &Parametrization,
     parameter_name: &str,
-    expression_type: impl Fn(&ast::Expr) -> Option<Type<'db>>,
 ) -> bool {
-    let Some(call) = expression.as_call_expr() else {
-        return false;
-    };
-    if !expression_type(&call.func)
-        .is_some_and(|ty| ty.is_instance_of(db, KnownClass::PytestParametrizeMarkDecorator))
-    {
-        return false;
-    }
-
-    let Some(names) = call
-        .arguments
-        .find_argument_value("argnames", 0)
-        .and_then(|argnames| {
-            statically_known_parametrize_names(db, definition, argnames, &expression_type)
-        })
-    else {
+    let Some((_, names)) = parametrization.argnames().known() else {
         return true;
     };
-    if !names.contains(&parameter_name) {
+    if !names.iter().any(|name| name.name() == parameter_name) {
         return false;
     }
 
-    is_indirect(
-        db,
-        definition,
-        &call.arguments,
-        parameter_name,
-        &expression_type,
-    ) != Some(true)
+    parametrization.indirect().is_indirect(parameter_name) != Some(true)
 }
 
 /// Returns whether a type is an instance of `class_name` from one of `modules`.
@@ -753,58 +710,6 @@ fn is_known_class_instance(
         && file_to_module(db, class.program_file(db).resolver_file(db))
             .and_then(|module| module.known(db))
             .is_some_and(|module| modules.contains(&module))
-}
-
-/// Returns how `parameter_name` is configured by the `indirect` argument.
-///
-/// `Some(true)` means the parameter is definitely indirect, `Some(false)` means it is definitely
-/// direct, and `None` preserves uncertainty when the argument cannot be interpreted statically.
-fn is_indirect<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    arguments: &ast::Arguments,
-    parameter_name: &str,
-    expression_type: &impl Fn(&ast::Expr) -> Option<Type<'db>>,
-) -> Option<bool> {
-    let Some(expression) = arguments.find_argument_value("indirect", 2) else {
-        return Some(false);
-    };
-    let ty = expression_type(expression)?;
-    if ty == Type::bool_literal(true) {
-        return Some(true);
-    }
-    if ty == Type::bool_literal(false) {
-        return Some(false);
-    }
-    statically_known_parametrize_names(db, definition, expression, expression_type)
-        .map(|names| names.contains(&parameter_name))
-}
-
-/// Returns statically known pytest parametrization names from a string or fixed-length iterable.
-fn statically_known_parametrize_names<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    expression: &ast::Expr,
-    expression_type: &impl Fn(&ast::Expr) -> Option<Type<'db>>,
-) -> Option<Vec<&'db str>> {
-    let ty = expression_type(expression)?;
-    if let Some(string) = ty.as_string_literal() {
-        return Some(
-            string
-                .value(db)
-                .split(|character: char| character == ',' || character.is_whitespace())
-                .filter(|name| !name.is_empty())
-                .collect(),
-        );
-    }
-
-    let environment = ProgramEnvironment::from_file(definition.program_file(db));
-    extract_fixed_length_iterable_element_types(db, &environment, expression, |element| {
-        expression_type(element).unwrap_or_else(Type::unknown)
-    })?
-    .iter()
-    .map(|element| element.as_string_literal().map(|string| string.value(db)))
-    .collect()
 }
 
 #[cfg(test)]
@@ -1369,7 +1274,7 @@ class TestExample:
     }
 
     #[test]
-    fn excludes_direct_parameters_and_keeps_indirect_parameters() {
+    fn classifies_parametrized_fixture_requests() {
         let test = PytestTestCase::new(
             "/src/test_example.py",
             r#"
@@ -1391,6 +1296,9 @@ def test_indirect(value): ...
 @pytest.mark.parametrize("value, other", [(1, 2)], indirect=["value"])
 def test_mixed(value, other): ...
 
+@pytest.mark.parametrize("other", [1])
+def test_different_parameter(value, other): ...
+
 @aliased_mark.parametrize("value", [1])
 def test_aliased_direct(value): ...
 
@@ -1406,21 +1314,53 @@ def test_bare_aliased_direct(value): ...
 class TestParametrized:
     def test_value(self, value): ...
 
+@pytest.mark.parametrize("value", [1], indirect=True)
+class TestIndirectParametrized:
+    def test_value(self, value): ...
+
 @pytest.mark.parametrize("value", [1])
 class TestOuter:
     class TestInner:
         def test_value(self, value): ...
+
+dynamic_names: str
+dynamic_indirect: bool
+
+@pytest.mark.parametrize(argvalues=[1])
+def test_missing_names(value): ...
+
+@pytest.mark.parametrize(dynamic_names, [1])
+def test_unknown_names(value): ...
+
+@pytest.mark.parametrize("value", [1], indirect=dynamic_indirect)
+def test_unknown_indirect(value): ...
+
+@pytest.mark.parametrize(dynamic_names, [1])
+class TestUnknownParametrization:
+    def test_value(self, value): ...
+
+def ordinary_decorator(function): ...
+
+@ordinary_decorator
+def test_unrelated_decorator(value): ...
 "#,
         );
 
         let test_direct = test.function("test_direct");
         let test_indirect = test.function("test_indirect");
         let test_mixed = test.function("test_mixed");
+        let test_different_parameter = test.function("test_different_parameter");
         let test_aliased_direct = test.function("test_aliased_direct");
         let test_aliased_indirect = test.function("test_aliased_indirect");
         let test_bare_aliased_direct = test.function("test_bare_aliased_direct");
         let test_class_parametrized = test.function("TestParametrized.test_value");
+        let test_class_indirect = test.function("TestIndirectParametrized.test_value");
         let test_outer_class_parametrized = test.function("TestOuter.TestInner.test_value");
+        let test_missing_names = test.function("test_missing_names");
+        let test_unknown_names = test.function("test_unknown_names");
+        let test_unknown_indirect = test.function("test_unknown_indirect");
+        let test_unknown_class = test.function("TestUnknownParametrization.test_value");
+        let test_unrelated_decorator = test.function("test_unrelated_decorator");
 
         assert_snapshot!(test_direct.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
 
@@ -1451,6 +1391,7 @@ class TestOuter:
         ");
 
         assert_snapshot!(test_mixed.fixture_resolution("other"), @"No fixture resolved for parameter `other`");
+        assert_eq!(test_different_parameter.fixture_count("value"), 1);
         assert_snapshot!(test_aliased_direct.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
 
         assert_snapshot!(test_bare_aliased_direct.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
@@ -1469,7 +1410,13 @@ class TestOuter:
         ");
 
         assert_snapshot!(test_class_parametrized.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
+        assert_eq!(test_class_indirect.fixture_count("value"), 1);
         assert_snapshot!(test_outer_class_parametrized.fixture_resolution("value"), @"No fixture resolved for parameter `value`");
+        assert_eq!(test_missing_names.fixture_count("value"), 0);
+        assert_eq!(test_unknown_names.fixture_count("value"), 0);
+        assert_eq!(test_unknown_indirect.fixture_count("value"), 0);
+        assert_eq!(test_unknown_class.fixture_count("value"), 0);
+        assert_eq!(test_unrelated_decorator.fixture_count("value"), 1);
     }
 
     #[test]
@@ -1583,6 +1530,12 @@ def test_use(value): ...
                     index.expect_single_definition(parameter)
                 }
             }
+        }
+
+        fn fixture_count(&self, parameter_name: &str) -> usize {
+            let db = &self.test.db;
+            let parameter = self.parameter_definition(parameter_name);
+            fixture_bindings_for_parameter(db, parameter).len()
         }
     }
 
