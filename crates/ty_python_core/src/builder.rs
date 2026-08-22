@@ -29,7 +29,7 @@ use crate::ast_ids::node_key::ExpressionNodeKey;
 use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
-    AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
+    AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef, BindingsOwner,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
     DefinitionNodeKey, DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef,
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
@@ -1406,13 +1406,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
         match self.current_assignment() {
-            Some(CurrentAssignment::Assign { node, unpack }) => {
+            Some(CurrentAssignment::Assign {
+                node,
+                unpack,
+                owner,
+            }) => {
                 let assignment = self.add_definition(
                     place_id,
                     AssignmentDefinitionNodeRef {
                         unpack,
                         value: &node.value,
                         target: expr,
+                        owner,
                     },
                 );
 
@@ -3909,7 +3914,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if let [target] = &node.targets[..]
                     && target.is_name_expr()
                 {
-                    self.push_assignment(CurrentAssignment::Assign { node, unpack: None });
+                    self.push_assignment(CurrentAssignment::Assign {
+                        node,
+                        unpack: None,
+                        owner: BindingsOwner::Definition,
+                    });
                     self.visit_expr(target);
                     self.pop_assignment();
 
@@ -5778,6 +5787,7 @@ enum CurrentAssignment<'ast, 'db> {
     Assign {
         node: &'ast ast::StmtAssign,
         unpack: Option<Unpack<'db>>,
+        owner: BindingsOwner,
     },
     AnnAssign {
         node: &'ast ast::StmtAnnAssign,
@@ -5875,7 +5885,11 @@ impl<'ast> Unpackable<'ast> {
     ) -> CurrentAssignment<'ast, 'db> {
         let positioned = unpack.map(|unpack| (UnpackPosition::First, unpack));
         match self {
-            Unpackable::Assign(stmt) => CurrentAssignment::Assign { node: stmt, unpack },
+            Unpackable::Assign(stmt) => CurrentAssignment::Assign {
+                node: stmt,
+                unpack,
+                owner: BindingsOwner::Statement,
+            },
             Unpackable::For(stmt) => CurrentAssignment::For {
                 node: stmt,
                 unpack: positioned,

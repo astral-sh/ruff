@@ -127,11 +127,11 @@ use crate::types::{
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{
-    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
-    Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
-    ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    NestedBindingExecution, NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind,
-    WithItemDefinitionKind,
+    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, BindingsOwner,
+    ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
+    ExceptHandlerDefinitionKind, ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind,
+    LoopHeaderDefinitionKind, NestedBindingExecution, NestedBindingsDefinitionKind,
+    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -676,6 +676,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
+        self.extend_expression_without_bindings(inference);
+
+        if let Some(extra) = &inference.extra
+            && !matches!(self.region, InferenceRegion::Scope(..))
+        {
+            self.bindings.extend(extra.bindings.iter().copied());
+        }
+    }
+
+    /// Merges expression results without claiming bindings owned by their enclosing statement.
+    fn extend_expression_without_bindings(&mut self, inference: &ExpressionInference<'db>) {
         self.expressions
             .extend(inference.expressions.iter().copied());
 
@@ -700,10 +711,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .entry(*collection_def)
                     .and_modify(|this| this.extend(constraints))
                     .or_insert(constraints.clone());
-            }
-
-            if !matches!(self.region, InferenceRegion::Scope(..)) {
-                self.bindings.extend(extra.bindings.iter().copied());
             }
         }
     }
@@ -2870,17 +2877,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = assignment;
 
+        if let [ast::Expr::Name(name)] = targets.as_slice() {
+            self.infer_definition(name);
+            return;
+        }
+
+        let shared_value = self.index.expression(value.as_ref());
+
+        if !matches!(self.region, InferenceRegion::Scope(..)) {
+            // The statement owns every binding created while evaluating its shared value,
+            // including assignment expressions in lambda defaults.
+            let inference = infer_expression_types(self.db(), shared_value, TypeContext::default());
+            if let Some(extra) = &inference.extra {
+                self.bindings.extend(extra.bindings.iter().copied());
+            }
+        }
+
         for target in targets {
             if let Some(unpack) = self.index.try_unpack(target) {
-                // Infer the standalone expression here to include its diagnostics in this region.
-                self.infer_standalone_expression(value, TypeContext::default());
+                let inference =
+                    infer_expression_types(self.db(), shared_value, TypeContext::default());
+                self.extend_expression_without_bindings(inference);
 
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 self.context.extend(unpacked.diagnostics());
                 self.infer_unpacked_assignment_target(target, value, unpacked);
             } else {
                 self.infer_target(target, value, &|builder, tcx| {
-                    builder.infer_standalone_expression(value, tcx)
+                    let inference = infer_expression_types(builder.db(), shared_value, tcx);
+                    builder.extend_expression_without_bindings(inference);
+                    inference.expression_type(value.as_ref())
                 });
             }
         }
@@ -3376,7 +3402,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
-                    self.infer_standalone_expression_impl(value, standalone_expression, tcx)
+                    let inference = infer_expression_types(self.db(), standalone_expression, tcx);
+                    match assignment.owner() {
+                        BindingsOwner::Definition => {
+                            self.extend_expression(inference);
+                        }
+                        BindingsOwner::Statement => {
+                            self.extend_expression_without_bindings(inference);
+                        }
+                    }
+                    inference.expression_type(value)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
