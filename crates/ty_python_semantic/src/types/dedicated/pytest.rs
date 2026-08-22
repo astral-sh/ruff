@@ -55,6 +55,15 @@ use crate::types::{
     extract_fixed_length_iterable_element_types,
 };
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "parts of the shared model are reserved for the type-inference consumer"
+    )
+)]
+pub(crate) mod parametrization;
+
 /// Resolves pytest fixtures requested by `parameter`.
 ///
 /// This function can be used to resolve either a fixture requested by a test
