@@ -74,23 +74,6 @@ impl Violation for MultipleWithStatements {
     }
 }
 
-/// Returns a boolean indicating whether it's an async with statement, the items
-/// and body.
-fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
-    let [
-        Stmt::With(ast::StmtWith {
-            is_async,
-            items,
-            body,
-            ..
-        }),
-    ] = body
-    else {
-        return None;
-    };
-    Some((*is_async, items, body))
-}
-
 /// Check if `with_items` contains a single item which should not necessarily be
 /// grouped with other items.
 ///
@@ -123,6 +106,20 @@ fn explicit_with_items(checker: &Checker, with_items: &[WithItem]) -> bool {
         })
 }
 
+/// Returns the nested `with` when it is the sole body statement and can be
+/// merged with `outer` (same async/sync, neither side an exempt standalone
+/// manager).
+fn mergeable_child<'a>(checker: &Checker, outer: &'a ast::StmtWith) -> Option<&'a ast::StmtWith> {
+    let [Stmt::With(inner)] = outer.body.as_slice() else {
+        return None;
+    };
+
+    (outer.is_async == inner.is_async
+        && !explicit_with_items(checker, &outer.items)
+        && !explicit_with_items(checker, &inner.items))
+    .then_some(inner)
+}
+
 /// SIM117
 pub(crate) fn multiple_with_statements(
     checker: &Checker,
@@ -148,63 +145,66 @@ pub(crate) fn multiple_with_statements(
     //     with B(), C():
     //         print("hello")
     // ```
-    if let Some(Stmt::With(ast::StmtWith { body, .. })) = with_parent {
-        if body.len() == 1 {
+    //
+    // Only defer to the parent when it can actually combine with this statement.
+    // Differing async/sync (or an exempt standalone manager) means the parent will
+    // not emit SIM117 for this nesting, so we must still check here — e.g.:
+    // ```python
+    // with sync_cm():
+    //     async with async_cm1():
+    //         async with async_cm2():
+    //             ...
+    // ```
+    if let Some(Stmt::With(parent_with)) = with_parent {
+        // Parent will report SIM117 for this nesting; fix top-to-bottom.
+        if mergeable_child(checker, parent_with).is_some() {
             return;
         }
     }
 
-    if let Some((is_async, items, _body)) = next_with(&with_stmt.body) {
-        if is_async != with_stmt.is_async {
-            // One of the statements is an async with, while the other is not,
-            // we can't merge those statements.
-            return;
-        }
+    let Some(inner) = mergeable_child(checker, with_stmt) else {
+        return;
+    };
 
-        if explicit_with_items(checker, &with_stmt.items) || explicit_with_items(checker, items) {
-            return;
-        }
+    let Some(colon) = inner.items.last().and_then(|item| {
+        SimpleTokenizer::starts_at(item.end(), checker.locator().contents())
+            .skip_trivia()
+            .find(|token| token.kind == SimpleTokenKind::Colon)
+    }) else {
+        return;
+    };
 
-        let Some(colon) = items.last().and_then(|item| {
-            SimpleTokenizer::starts_at(item.end(), checker.locator().contents())
-                .skip_trivia()
-                .find(|token| token.kind == SimpleTokenKind::Colon)
-        }) else {
-            return;
-        };
-
-        let mut diagnostic = checker.report_diagnostic(
-            MultipleWithStatements,
-            TextRange::new(with_stmt.start(), colon.end()),
-        );
-        if !checker
-            .comment_ranges()
-            .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
-        {
-            diagnostic.try_set_optional_fix(|| {
-                match fix_with::fix_multiple_with_statements(
-                    checker.locator(),
-                    checker.stylist(),
-                    with_stmt,
-                ) {
-                    Ok(edit) => {
-                        if edit.content().is_none_or(|content| {
-                            fits(
-                                content,
-                                with_stmt.into(),
-                                checker.locator(),
-                                checker.settings().pycodestyle.max_line_length,
-                                checker.settings().tab_size,
-                            )
-                        }) {
-                            Ok(Some(Fix::safe_edit(edit)))
-                        } else {
-                            Ok(None)
-                        }
+    let mut diagnostic = checker.report_diagnostic(
+        MultipleWithStatements,
+        TextRange::new(with_stmt.start(), colon.end()),
+    );
+    if !checker
+        .comment_ranges()
+        .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
+    {
+        diagnostic.try_set_optional_fix(|| {
+            match fix_with::fix_multiple_with_statements(
+                checker.locator(),
+                checker.stylist(),
+                with_stmt,
+            ) {
+                Ok(edit) => {
+                    if edit.content().is_none_or(|content| {
+                        fits(
+                            content,
+                            with_stmt.into(),
+                            checker.locator(),
+                            checker.settings().pycodestyle.max_line_length,
+                            checker.settings().tab_size,
+                        )
+                    }) {
+                        Ok(Some(Fix::safe_edit(edit)))
+                    } else {
+                        Ok(None)
                     }
-                    Err(err) => bail!("Failed to collapse `with`: {err}"),
                 }
-            });
-        }
+                Err(err) => bail!("Failed to collapse `with`: {err}"),
+            }
+        });
     }
 }
