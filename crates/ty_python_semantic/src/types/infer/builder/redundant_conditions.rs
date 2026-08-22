@@ -15,7 +15,7 @@ use ty_python_core::{
 use crate::{
     Db, ImportAliasResolution, SemanticModel, definitions_for_expression,
     types::{
-        KnownClass, Type,
+        KnownClass, LintDiagnosticGuard, Type,
         diagnostic::{REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT},
         infer::{InferenceFlags, TypeInferenceBuilder},
         infer_definition_types,
@@ -33,14 +33,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             || self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT)
     }
 
-    pub(super) fn check_condition_redundancy(
-        &self,
+    pub(super) fn check_condition_redundancy<'a>(
+        &'a self,
         test: &ast::Expr,
         test_type: Type<'db>,
         test_truthiness: Truthiness,
-    ) {
+    ) -> Option<LintDiagnosticGuard<'a, 'a>> {
         if test_truthiness == Truthiness::Ambiguous && !test.is_bool_op_expr() {
-            return;
+            return None;
         }
 
         let db = self.db();
@@ -50,13 +50,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match test {
             // If they literally have `if False:` in the source code, it's almost certainly deliberate;
             // don't report it as a redundant condition. It's probably there fore debugging or something.
-            ast::Expr::BooleanLiteral(_) => return,
+            ast::Expr::BooleanLiteral(_) => return None,
 
             // Same for `if 0:`
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(_),
                 ..
-            }) => return,
+            }) => return None,
 
             // Python checks the truthiness of all but the final `and`/`or` operand to decide
             // whether to short-circuit. If evaluation reaches the final operand, its value is
@@ -88,7 +88,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 if !test_type.is_assignable_to(db, env, int_instance) {
-                    return;
+                    return None;
                 }
             }
 
@@ -126,14 +126,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .expression_type(original_operand)
                     .is_assignable_to(db, env, int_instance)
                 {
-                    return;
+                    return None;
                 }
             }
             _ => {}
         }
 
         if test_truthiness == Truthiness::Ambiguous {
-            return;
+            return None;
         }
 
         let rule = if test_type.is_assignable_to(db, env, int_instance) {
@@ -144,15 +144,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     test.range(),
                 )
             {
-                return;
+                return None;
             }
             if !self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT) {
-                return;
+                return None;
+            }
+            &REDUNDANT_CONDITION_STRICT
+        } else if any_over_expr(test, ast::Expr::is_named_expr) {
+            if !self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT) {
+                return None;
             }
             &REDUNDANT_CONDITION_STRICT
         } else {
             if !self.context.is_lint_enabled(&REDUNDANT_CONDITION) {
-                return;
+                return None;
             }
             &REDUNDANT_CONDITION
         };
@@ -164,209 +169,206 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.expression_type(expr)
             })
         }) {
-            return;
+            return None;
         }
 
         match test_truthiness {
             Truthiness::AlwaysTrue => {
-                if let Some(builder) = self.context.report_lint(rule, test) {
-                    if let Type::FunctionLiteral(function) = test_type {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Function `{}` is always truthy",
-                            function.name(db)
-                        ));
+                let builder = self.context.report_lint(rule, test)?;
+                if let Type::FunctionLiteral(function) = test_type {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Function `{}` is always truthy",
+                        function.name(db)
+                    ));
 
-                        // Add a suggestion and fix that they might have meant to call (and possibly
-                        // also await) this function.
-                        //
-                        // It's true that calling the function might not actually fix this diagnostic
-                        // if the function returns something that is always truthy. They still probably
-                        // meant to call the function, though, so it's still a useful suggestion/fix!
+                    // Add a suggestion and fix that they might have meant to call (and possibly
+                    // also await) this function.
+                    //
+                    // It's true that calling the function might not actually fix this diagnostic
+                    // if the function returns something that is always truthy. They still probably
+                    // meant to call the function, though, so it's still a useful suggestion/fix!
 
-                        // We specifically test assignability to `CoroutineType` here because (unlike
-                        // arbitrary other awaitables) we know that `CoroutineType` is always truthy.
-                        let coroutine = KnownClass::CoroutineType.to_instance(db, env);
-                        if function.signature(db).iter().all(|signature| {
-                            signature.return_ty.is_assignable_to(db, env, coroutine)
-                        }) && self.can_await_here()
-                        {
-                            diagnostic.set_primary_annotation_message(
-                                "Did you mean to await and call this function?",
-                            );
-                            if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-                                && !function.signature(db).has_parameters()
-                            {
-                                let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
-                                    Fix::unsafe_edits(
-                                        Edit::insertion("await (".to_string(), test.start()),
-                                        [Edit::insertion("())".to_string(), test.end())],
-                                    )
-                                } else {
-                                    Fix::unsafe_edits(
-                                        Edit::insertion("await ".to_string(), test.start()),
-                                        [Edit::insertion("()".to_string(), test.end())],
-                                    )
-                                };
-                                diagnostic.set_fix(fix);
-                            }
-                        } else {
-                            diagnostic.set_primary_annotation_message(
-                                "Did you mean to call this function?",
-                            );
-                            if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-                                && !function.signature(db).has_parameters()
-                            {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                                    "()".to_string(),
-                                    test.end(),
-                                )));
-                            }
-                        }
-                    } else if let Some(tuple_spec) = test_type.tuple_instance_spec(db, env) {
-                        let message = match tuple_spec.len() {
-                            TupleLength::Fixed(size) => {
-                                format!("A {size}-element tuple is always truthy")
-                            }
-                            TupleLength::Variable(min, _) => {
-                                format!(
-                                    "A tuple with >={min} element{maybe_s} is always truthy",
-                                    maybe_s = if min == 1 { "" } else { "s" }
-                                )
-                            }
-                        };
-                        let mut diagnostic = builder.into_diagnostic(&message);
-                        diagnostic.set_concise_message(format_args!(
-                            "Object of type `{}` is always truthy",
-                            test_type.display(db, env)
-                        ));
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Inferred type is `{}`",
-                            test_type.display(db, env)
-                        ));
-                    } else if test_type.as_nominal_instance().is_some_and(|instance| {
-                        instance
-                            .class(db, env)
-                            .is_known(db, KnownClass::GeneratorType)
-                    }) {
-                        let mut diagnostic =
-                            builder.into_diagnostic("A generator is always truthy");
-                        diagnostic.set_concise_message(format_args!(
-                            "Object of type `{}` is always truthy",
-                            test_type.display(db, env)
-                        ));
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Inferred type is `{}`",
-                            test_type.display(db, env)
-                        ));
-                        diagnostic.help("Did you mean to collect the generator into a tuple?");
-                        diagnostic.set_fix(Fix::display_only_edits(
-                            Edit::insertion("tuple(".to_string(), test.start()),
-                            [Edit::insertion(")".to_string(), test.end())],
-                        ));
-                    } else if test_type.is_string_literal()
-                        || test_type.as_union().is_some_and(|union| {
-                            union.elements(db).iter().all(Type::is_string_literal)
-                        })
+                    // We specifically test assignability to `CoroutineType` here because (unlike
+                    // arbitrary other awaitables) we know that `CoroutineType` is always truthy.
+                    let coroutine = KnownClass::CoroutineType.to_instance(db, env);
+                    if function
+                        .signature(db)
+                        .iter()
+                        .all(|signature| signature.return_ty.is_assignable_to(db, env, coroutine))
+                        && self.can_await_here()
                     {
-                        let mut diagnostic =
-                            builder.into_diagnostic("A nonempty string is always truthy");
-                        diagnostic.set_concise_message(format_args!(
-                            "Object of type `{}` is always truthy",
-                            test_type.display(db, env)
-                        ));
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Inferred type is `{}`",
-                            test_type.display(db, env)
-                        ));
-                    } else if test_type.is_subtype_of(
-                        db,
-                        env,
-                        KnownClass::Bool.to_instance(db, env),
-                    ) {
-                        let message = "Condition is always true";
-                        let mut diagnostic = builder.into_diagnostic(message);
-                        diagnostic.set_concise_message(message);
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Inferred type is `{}`",
-                            test_type.display(db, env)
-                        ));
-                    } else {
-                        let mut diagnostic = builder.into_diagnostic("Condition is always truthy");
-                        diagnostic.set_concise_message(format_args!(
-                            "Object of type `{}` is always truthy",
-                            test_type.display(db, env)
-                        ));
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Inferred type is `{}`",
-                            test_type.display(db, env)
-                        ));
-                        if test_type.try_await(db, env).is_ok() && self.can_await_here() {
-                            diagnostic.help("Did you mean to `await` this expression?");
-
+                        diagnostic.set_primary_annotation_message(
+                            "Did you mean to await and call this function?",
+                        );
+                        if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+                            && !function.signature(db).has_parameters()
+                        {
                             let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
                                 Fix::unsafe_edits(
                                     Edit::insertion("await (".to_string(), test.start()),
-                                    [Edit::insertion(")".to_string(), test.end())],
+                                    [Edit::insertion("())".to_string(), test.end())],
                                 )
                             } else {
-                                Fix::unsafe_edit(Edit::insertion(
-                                    "await ".to_string(),
-                                    test.start(),
-                                ))
+                                Fix::unsafe_edits(
+                                    Edit::insertion("await ".to_string(), test.start()),
+                                    [Edit::insertion("()".to_string(), test.end())],
+                                )
                             };
-
                             diagnostic.set_fix(fix);
                         }
+                    } else {
+                        diagnostic
+                            .set_primary_annotation_message("Did you mean to call this function?");
+                        if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+                            && !function.signature(db).has_parameters()
+                        {
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                                "()".to_string(),
+                                test.end(),
+                            )));
+                        }
                     }
+                    Some(diagnostic)
+                } else if let Some(tuple_spec) = test_type.tuple_instance_spec(db, env) {
+                    let mut diagnostic = match tuple_spec.len() {
+                        TupleLength::Fixed(size) => builder.into_diagnostic(format_args!(
+                            "A {size}-element tuple is always truthy"
+                        )),
+                        TupleLength::Variable(min, _) => builder.into_diagnostic(format_args!(
+                            "A tuple with >={min} element{maybe_s} is always truthy",
+                            maybe_s = if min == 1 { "" } else { "s" }
+                        )),
+                    };
+                    diagnostic.set_concise_message(format_args!(
+                        "Object of type `{}` is always truthy",
+                        test_type.display(db, env)
+                    ));
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Inferred type is `{}`",
+                        test_type.display(db, env)
+                    ));
+                    Some(diagnostic)
+                } else if test_type.as_nominal_instance().is_some_and(|instance| {
+                    instance
+                        .class(db, env)
+                        .is_known(db, KnownClass::GeneratorType)
+                }) {
+                    let mut diagnostic = builder.into_diagnostic("A generator is always truthy");
+                    diagnostic.set_concise_message(format_args!(
+                        "Object of type `{}` is always truthy",
+                        test_type.display(db, env)
+                    ));
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Inferred type is `{}`",
+                        test_type.display(db, env)
+                    ));
+                    diagnostic.help("Did you mean to collect the generator into a tuple?");
+                    diagnostic.set_fix(Fix::display_only_edits(
+                        Edit::insertion("tuple(".to_string(), test.start()),
+                        [Edit::insertion(")".to_string(), test.end())],
+                    ));
+                    Some(diagnostic)
+                } else if test_type.is_string_literal()
+                    || test_type
+                        .as_union()
+                        .is_some_and(|union| union.elements(db).iter().all(Type::is_string_literal))
+                {
+                    let mut diagnostic =
+                        builder.into_diagnostic("A nonempty string is always truthy");
+                    diagnostic.set_concise_message(format_args!(
+                        "Object of type `{}` is always truthy",
+                        test_type.display(db, env)
+                    ));
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Inferred type is `{}`",
+                        test_type.display(db, env)
+                    ));
+                    Some(diagnostic)
+                } else if test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env)) {
+                    let message = "Condition is always true";
+                    let mut diagnostic = builder.into_diagnostic(message);
+                    diagnostic.set_concise_message(message);
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Inferred type is `{}`",
+                        test_type.display(db, env)
+                    ));
+                    Some(diagnostic)
+                } else {
+                    let mut diagnostic = builder.into_diagnostic("Condition is always truthy");
+                    diagnostic.set_concise_message(format_args!(
+                        "Object of type `{}` is always truthy",
+                        test_type.display(db, env)
+                    ));
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Inferred type is `{}`",
+                        test_type.display(db, env)
+                    ));
+                    if test_type.try_await(db, env).is_ok() && self.can_await_here() {
+                        diagnostic.help("Did you mean to `await` this expression?");
+
+                        let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
+                            Fix::unsafe_edits(
+                                Edit::insertion("await (".to_string(), test.start()),
+                                [Edit::insertion(")".to_string(), test.end())],
+                            )
+                        } else {
+                            Fix::unsafe_edit(Edit::insertion("await ".to_string(), test.start()))
+                        };
+
+                        diagnostic.set_fix(fix);
+                    }
+                    Some(diagnostic)
                 }
             }
             Truthiness::AlwaysFalse => {
-                if let Some(builder) = self.context.report_lint(rule, test) {
-                    if test_type.is_none(db) {
-                        builder.into_diagnostic("`None` is always falsy");
-                    } else if let Some(tuple) = test_type.tuple_instance_spec(db, env)
-                        && tuple.len() == TupleLength::Fixed(0)
-                    {
-                        let message = "An empty tuple is always falsy";
-                        let mut diagnostic = builder.into_diagnostic(message);
-                        diagnostic.set_concise_message(message);
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Inferred type is `{}`",
-                            test_type.display(db, env)
-                        ));
-                    } else if test_type.is_string_literal() {
-                        let message = "An empty string is always falsy";
-                        let mut diagnostic = builder.into_diagnostic(message);
-                        diagnostic.set_concise_message(message);
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Inferred type is `{}`",
-                            test_type.display(db, env)
-                        ));
+                let builder = self.context.report_lint(rule, test)?;
+                if test_type.is_none(db) {
+                    Some(builder.into_diagnostic("`None` is always falsy"))
+                } else if let Some(tuple) = test_type.tuple_instance_spec(db, env)
+                    && tuple.len() == TupleLength::Fixed(0)
+                {
+                    let message = "An empty tuple is always falsy";
+                    let mut diagnostic = builder.into_diagnostic(message);
+                    diagnostic.set_concise_message(message);
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Inferred type is `{}`",
+                        test_type.display(db, env)
+                    ));
+                    Some(diagnostic)
+                } else if test_type.is_string_literal() {
+                    let message = "An empty string is always falsy";
+                    let mut diagnostic = builder.into_diagnostic(message);
+                    diagnostic.set_concise_message(message);
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Inferred type is `{}`",
+                        test_type.display(db, env)
+                    ));
+                    Some(diagnostic)
+                } else {
+                    let is_bool =
+                        test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env));
+                    let message = if is_bool {
+                        "Condition is always false"
                     } else {
-                        let is_bool =
-                            test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env));
-                        let message = if is_bool {
-                            "Condition is always false"
-                        } else {
-                            "Condition is always falsy"
-                        };
-                        let mut diagnostic = builder.into_diagnostic(message);
-                        if is_bool {
-                            diagnostic.set_concise_message(message);
-                        } else {
-                            diagnostic.set_concise_message(format_args!(
-                                "Object of type `{}` is always falsy",
-                                test_type.display(db, env)
-                            ));
-                        }
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Inferred type is `{}`",
+                        "Condition is always falsy"
+                    };
+                    let mut diagnostic = builder.into_diagnostic(message);
+                    if is_bool {
+                        diagnostic.set_concise_message(message);
+                    } else {
+                        diagnostic.set_concise_message(format_args!(
+                            "Object of type `{}` is always falsy",
                             test_type.display(db, env)
                         ));
                     }
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Inferred type is `{}`",
+                        test_type.display(db, env)
+                    ));
+                    Some(diagnostic)
                 }
             }
-            Truthiness::Ambiguous => {}
+            Truthiness::Ambiguous => None,
         }
     }
 
@@ -433,26 +435,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let test_type = self.expression_type(test);
             let test_truthiness = test_type.bool(db, env);
+            let is_integer_test =
+                || test_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env));
 
             match test_truthiness {
                 Truthiness::Ambiguous => {
                     self.check_condition_redundancy(test, test_type, test_truthiness);
                 }
                 Truthiness::AlwaysFalse => {
-                    if !self.is_deliberately_unreachable_suite(body) {
+                    if !(is_integer_test() && self.is_deliberately_unreachable_suite(body)) {
                         self.check_condition_redundancy(test, test_type, test_truthiness);
                     }
                 }
                 Truthiness::AlwaysTrue => match elif_else_clauses.as_slice() {
                     [single] => {
                         if !(single.test.is_none()
+                            && is_integer_test()
                             && self.is_deliberately_unreachable_suite(&single.body))
                         {
                             self.check_condition_redundancy(test, test_type, test_truthiness);
                         }
                     }
                     [] => {
-                        if !self.is_deliberately_unreachable_suite(&suite[i + 1..]) {
+                        if !(is_integer_test()
+                            && self.is_deliberately_unreachable_suite(&suite[i + 1..]))
+                        {
                             self.check_condition_redundancy(test, test_type, test_truthiness);
                         }
                     }
@@ -478,20 +485,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match test_truthiness {
                     Truthiness::Ambiguous => {}
                     Truthiness::AlwaysFalse => {
-                        if self.is_deliberately_unreachable_suite(body) {
+                        if is_integer_test() && self.is_deliberately_unreachable_suite(body) {
                             continue;
                         }
                     }
                     Truthiness::AlwaysTrue => match elif_else_clauses.get(elif_i + 1) {
                         Some(clause) => {
                             if clause.test.is_none()
+                                && is_integer_test()
                                 && self.is_deliberately_unreachable_suite(&clause.body)
                             {
                                 continue;
                             }
                         }
                         None => {
-                            if self.is_deliberately_unreachable_suite(&suite[i + 1..]) {
+                            if is_integer_test()
+                                && self.is_deliberately_unreachable_suite(&suite[i + 1..])
+                            {
                                 continue;
                             }
                         }
@@ -504,38 +514,48 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     fn is_deliberately_unreachable_suite(&self, suite: &[ast::Stmt]) -> bool {
-        if suite.iter().all(|stmt| {
-            stmt.as_expr_stmt()
-                .is_some_and(|stmt_expr| stmt_expr.value.is_string_literal_expr())
-        }) {
-            return false;
-        }
+        fn is_deliberately_unreachable_inner<'db>(
+            builder: &TypeInferenceBuilder<'db, '_>,
+            suite: &[ast::Stmt],
+            not_implemented: Type<'db>,
+        ) -> bool {
+            let db = builder.db();
+            let env = builder.program_environment();
 
-        let db = self.db();
-        let env = self.program_environment();
-
-        let not_implemented = KnownClass::NotImplementedType.to_instance(db, env);
-
-        suite.iter().all(|stmt| match stmt {
-            ast::Stmt::Raise(_) => true,
-            ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
-                self.expression_type(test).bool(db, env).may_be_false()
-            }
-            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => match &**value {
-                ast::Expr::StringLiteral(..) => true,
-                ast::Expr::Call(..) => {
-                    self.expression_type(value)
-                        .is_equivalent_to(db, env, Type::Never)
+            suite.last().is_some_and(|stmt| match stmt {
+                ast::Stmt::Raise(_) => true,
+                ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
+                    builder.expression_type(test).bool(db, env).may_be_false()
+                }
+                ast::Stmt::Expr(ast::StmtExpr { value, .. }) if value.is_call_expr() => builder
+                    .expression_type(value)
+                    .is_equivalent_to(db, env, Type::Never),
+                ast::Stmt::Return(ast::StmtReturn {
+                    value: Some(expr), ..
+                }) => builder
+                    .expression_type(expr)
+                    .is_assignable_to(db, env, not_implemented),
+                ast::Stmt::If(ast::StmtIf {
+                    elif_else_clauses, ..
+                }) => {
+                    elif_else_clauses
+                        .last()
+                        .is_some_and(|last_clause| last_clause.test.is_none())
+                        && elif_else_clauses.iter().all(|clause| {
+                            is_deliberately_unreachable_inner(
+                                builder,
+                                &clause.body,
+                                not_implemented,
+                            )
+                        })
                 }
                 _ => false,
-            },
-            ast::Stmt::Return(ast::StmtReturn {
-                value: Some(expr), ..
-            }) => self
-                .expression_type(expr)
-                .is_assignable_to(db, env, not_implemented),
-            _ => false,
-        })
+            })
+        }
+
+        let not_implemented =
+            KnownClass::NotImplementedType.to_instance(self.db(), self.program_environment());
+        is_deliberately_unreachable_inner(self, suite, not_implemented)
     }
 }
 

@@ -517,21 +517,21 @@ Assignment expressions need parentheses so the assignment still happens before a
 
 ```py
 async def inspect_named_awaitable():
-    if value := coroutine():  # snapshot: redundant-condition
+    if value := coroutine():  # snapshot: redundant-condition-strict
         pass
 ```
 
 ```snapshot
-warning[redundant-condition]: Condition is always truthy
+error[redundant-condition-strict]: Condition is always truthy
   --> src/mdtest_snippet.py:40:8
    |
-40 |     if value := coroutine():  # snapshot: redundant-condition
+40 |     if value := coroutine():  # snapshot: redundant-condition-strict
    |        ^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
    |
 39 | async def inspect_named_awaitable():
-   -     if value := coroutine():  # snapshot: redundant-condition
-40 +     if await (value := coroutine()):  # snapshot: redundant-condition
+   -     if value := coroutine():  # snapshot: redundant-condition-strict
+40 +     if await (value := coroutine()):  # snapshot: redundant-condition-strict
 41 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
@@ -1411,6 +1411,19 @@ def f10(x: str):
     # always False, but no diagnostic emitted: the block only contains `raise` statements
     if not (isinstance(x, str) and isinstance(x, str)):
         raise TypeError
+
+def coinflip() -> bool:
+    return True
+
+def f11(x: str):
+    # always True, but no diagnostic emitted: every control flow path can be easily determined
+    # to end in a terminal statement
+    if not isinstance(x, str):
+        if coinflip():
+            message = "seems bad"
+            raise TypeError(message)
+        else:
+            assert False, "oh no"
 ```
 
 We also avoid emitting the diagnostic if the exhaustiveness check just follows the if check, and is
@@ -1491,24 +1504,32 @@ class Foo:
         return self
 ```
 
-## Suites containing only string literals
+## Tests that include walrus expressions
 
-A standalone string following an `if` statement does not assert exhaustiveness:
+Walrus expressions can have side effects, so an always-true walrus expression may not always be
+redundant. Examples of this can be found in CPython's scripts, where deliberately true walrus
+expressions are used to continue the boolean-expression chain:
+- <https://github.com/python/cpython/blob/f74cdf80a120649e4c353430da8cbd1305c00993/Tools/peg_generator/pegen/grammar_parser.py#L152-L168>
+- <https://github.com/python/cpython/blob/f74cdf80a120649e4c353430da8cbd1305c00993/Tools/peg_generator/pegen/grammar_parser.py#L152-L168>
+
+It is arguably always possible to write this kind of code in a clearer, more obvious way, so we
+still emit a diagnostic on code like this, even though it may be deliberate. However, we use the
+`redundant-condition-strict` rule for these patterns, so that the rule that is enabled by default
+is unopinionated:
 
 ```py
-def trailing_string():
-    if 1 == 1:  # error: [redundant-condition-strict]
-        pass
+def coinflip1() -> bool:
+    return True
 
-    "This does not assert exhaustiveness."
-```
+def coinflip2() -> bool:
+    return True
 
-A standalone string in an `else` block does not assert exhaustiveness either:
+foo = ("foo",)
 
-```py
-def else_string():
-    if 1 == 1:  # error: [redundant-condition-strict]
-        pass
-    else:
-        "This does not assert exhaustiveness."
+# the always-truthy item is a `tuple[Literal["bar"]]`,
+# so this would normally trigger `redundant-condition`,
+# but the presence of the walrus expression means we use
+# the disabled-by-default error code.
+if coinflip1() and (foo := ("bar",)) and coinflip2():  # error: [redundant-condition-strict]
+    ...
 ```

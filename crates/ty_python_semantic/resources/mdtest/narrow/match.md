@@ -3871,7 +3871,7 @@ def _(x: object):
             reveal_type(x)  #  revealed: int
         case False if x:
             reveal_type(x)  #  revealed: Never
-        case "foo" if x := "bar":  # error: [redundant-condition] "always truthy"
+        case "foo" if x := "bar":
             reveal_type(x)  # revealed: Literal["bar"]
 ```
 
@@ -3892,7 +3892,6 @@ match x:
         pass
     case False if x and reveal_type(x):  #  revealed: Never
         pass
-    # error: [redundant-condition] "always truthy"
     # error: [redundant-condition] "always truthy"
     case "foo" if (x := "bar") and reveal_type(x):  #  revealed: Literal["bar"]
         pass
