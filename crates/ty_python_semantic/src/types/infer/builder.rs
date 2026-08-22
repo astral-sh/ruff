@@ -5174,18 +5174,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_body(body);
         self.infer_body(orelse);
 
-        if !self.should_check_condition_redundancy() {
-            return;
-        }
-
-        // Avoid false positives for `while 1:` and `while `True:`
-        match &**test {
-            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => {}
-            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(int),
-                ..
-            }) if *int == 1 => {}
-            _ => self.check_condition_redundancy(test, test_ty, test_truthiness),
+        if self.should_check_condition_redundancy() {
+            self.check_condition_redundancy(test, test_ty, test_truthiness);
         }
     }
 

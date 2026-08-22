@@ -48,6 +48,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let int_instance = KnownClass::Int.to_instance(db, env);
 
         match test {
+            // If they literally have `if False:` in the source code, it's almost certainly deliberate;
+            // don't report it as a redundant condition. It's probably there fore debugging or something.
+            ast::Expr::BooleanLiteral(_) => return,
+
+            // Same for `if 0:`
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(_),
+                ..
+            }) => return,
+
             // Python checks the truthiness of all but the final `and`/`or` operand to decide
             // whether to short-circuit. If evaluation reaches the final operand, its value is
             // simply returned. Accordingly, `infer_boolean_expression` passes the earlier
@@ -165,15 +175,46 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Function `{}` is always truthy",
                             function.name(db)
                         ));
-                        let signatures = function.signature(db);
-                        if signatures.iter().all(|signature| {
-                            signature.return_ty.bool(db, env) == Truthiness::Ambiguous
-                        }) {
+
+                        // Add a suggestion and fix that they might have meant to call (and possibly
+                        // also await) this function.
+                        //
+                        // It's true that calling the function might not actually fix this diagnostic
+                        // if the function returns something that is always truthy. They still probably
+                        // meant to call the function, though, so it's still a useful suggestion/fix!
+
+                        // We specifically test assignability to `CoroutineType` here because (unlike
+                        // arbitrary other awaitables) we know that `CoroutineType` is always truthy.
+                        let coroutine = KnownClass::CoroutineType.to_instance(db, env);
+                        if function.signature(db).iter().all(|signature| {
+                            signature.return_ty.is_assignable_to(db, env, coroutine)
+                        }) && self.can_await_here()
+                        {
+                            diagnostic.set_primary_annotation_message(
+                                "Did you mean to await and call this function?",
+                            );
+                            if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+                                && !function.signature(db).has_parameters()
+                            {
+                                let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
+                                    Fix::unsafe_edits(
+                                        Edit::insertion("await (".to_string(), test.start()),
+                                        [Edit::insertion("())".to_string(), test.end())],
+                                    )
+                                } else {
+                                    Fix::unsafe_edits(
+                                        Edit::insertion("await ".to_string(), test.start()),
+                                        [Edit::insertion("()".to_string(), test.end())],
+                                    )
+                                };
+                                diagnostic.set_fix(fix);
+                            }
+                        } else {
                             diagnostic.set_primary_annotation_message(
                                 "Did you mean to call this function?",
                             );
                             if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-                                && !signatures.has_parameters()
+                                && !function.signature(db).has_parameters()
                             {
                                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                                     "()".to_string(),
@@ -510,16 +551,24 @@ fn is_special_cased_condition_expression<'db>(
         ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => match &**attr {
             "TYPE_CHECKING" => return true,
             "name" => {
-                if let Type::ModuleLiteral(module) = expression_type(value)
+                let value_type = expression_type(value);
+                if let Type::ModuleLiteral(module) = value_type
                     && module.module(db).is_known(db, KnownModule::Os)
                 {
                     return true;
                 }
+                if value_type.is_never() {
+                    return true;
+                }
             }
             "version_info" | "platform" => {
-                if let Type::ModuleLiteral(module) = expression_type(value)
+                let value_type = expression_type(value);
+                if let Type::ModuleLiteral(module) = value_type
                     && module.module(db).is_known(db, KnownModule::Sys)
                 {
+                    return true;
+                }
+                if value_type.is_never() {
                     return true;
                 }
             }
