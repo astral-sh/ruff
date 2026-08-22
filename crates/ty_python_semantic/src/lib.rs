@@ -34,8 +34,7 @@ use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, attribute_scopes,
-    semantic_index,
+    BindingWithConstraintsIterator, FileScopeId, attribute_scopes, semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
@@ -146,29 +145,6 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = index.use_def_map(function_scope_id);
         Some((use_def.reachable_member_bindings(member), function_scope_id))
-    })
-}
-
-/// Returns all attribute declarations (and their method scope IDs) with a symbol name matching
-/// the one given for a specific class body scope.
-///
-/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
-/// introduces a direct dependency on that file's AST.
-pub(crate) fn attribute_declarations<'db, 's>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    name: &'s str,
-) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let index = semantic_index(db, class_body_scope.program_file(db));
-
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = index.use_def_map(function_scope_id);
-        Some((
-            use_def.reachable_member_declarations(member),
-            function_scope_id,
-        ))
     })
 }
 
