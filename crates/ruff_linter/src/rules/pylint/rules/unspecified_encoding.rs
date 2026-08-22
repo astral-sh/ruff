@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::add_argument;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -54,7 +55,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.1")]
+#[violation_metadata(preview_since = "v0.1.1", category = Category::Pedantic)]
 pub(crate) struct UnspecifiedEncoding {
     function_name: String,
     mode: ModeArgument,

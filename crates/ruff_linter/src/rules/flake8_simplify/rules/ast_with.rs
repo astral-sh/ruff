@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use super::fix_with;
 use crate::Fix;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::fits;
 use crate::{FixAvailability, Violation};
 
@@ -56,7 +57,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Complexity)]
 pub(crate) struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {

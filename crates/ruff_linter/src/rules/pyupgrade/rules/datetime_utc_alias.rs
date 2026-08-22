@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -38,7 +39,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `datetime.UTC`](https://docs.python.org/3/library/datetime.html#datetime.UTC)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.192")]
+#[violation_metadata(stable_since = "v0.0.192", category = Category::Style)]
 pub(crate) struct DatetimeTimezoneUTC;
 
 impl Violation for DatetimeTimezoneUTC {

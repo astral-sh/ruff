@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -51,7 +52,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     print(i)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Performance)]
 pub(crate) struct UnnecessaryListCast;
 
 impl AlwaysFixableViolation for UnnecessaryListCast {

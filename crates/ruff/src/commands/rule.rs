@@ -7,7 +7,7 @@ use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
-use ruff_linter::codes::RuleStatus;
+use ruff_linter::codes::{Category, RuleStatus};
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
@@ -25,6 +25,7 @@ struct Explanation<'a> {
     explanation: Option<&'a str>,
     preview: bool,
     status: RuleStatus,
+    category: Category,
     source_location: SourceLocation,
 }
 
@@ -44,6 +45,7 @@ impl<'a> Explanation<'a> {
             explanation: rule.explanation(),
             preview: rule.is_preview(),
             status: rule.status(),
+            category: rule.category(),
             source_location: SourceLocation {
                 file: rule.file(),
                 line: rule.line(),

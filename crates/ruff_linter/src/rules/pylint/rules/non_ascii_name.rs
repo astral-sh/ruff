@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for the use of non-ASCII characters in variable names.
@@ -26,7 +27,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 672]: https://peps.python.org/pep-0672/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Pedantic)]
 pub(crate) struct NonAsciiName {
     name: String,
     kind: Kind,

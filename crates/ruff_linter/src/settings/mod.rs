@@ -939,3 +939,45 @@ impl Display for TargetVersion {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::RuleSelector;
+    use crate::codes::Category;
+    use crate::registry::RuleSet;
+    use crate::rule_selector::PreviewOptions;
+    use crate::settings::types::PreviewMode;
+
+    use super::DEFAULT_SELECTORS;
+
+    #[test]
+    fn preview_default_rules() {
+        let stable_defaults = DEFAULT_SELECTORS
+            .iter()
+            .flat_map(|selector| selector.rules(&PreviewOptions::default()))
+            .collect::<RuleSet>();
+
+        let preview_options = PreviewOptions {
+            mode: PreviewMode::Enabled,
+            require_explicit: false,
+        };
+        let preview_defaults = Category::default_categories()
+            .map(RuleSelector::Category)
+            .iter()
+            .flat_map(|selector| selector.rules(&preview_options))
+            .collect::<RuleSet>();
+
+        let added = preview_defaults.clone().subtract(&stable_defaults);
+        let removed = stable_defaults.subtract(&preview_defaults);
+
+        let snapshot = format!("Added in preview:\n{added}\n\nRemoved in preview:\n{removed}");
+
+        insta::assert_snapshot!(snapshot, @"
+        Added in preview:
+        []
+
+        Removed in preview:
+        []
+        ");
+    }
+}

@@ -168,13 +168,13 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 quote!(#(#attrs)*)
             };
             prefix_into_iter_match_arms.extend(quote! {
-                #attrs #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
+                #attrs #linter::#prefix_ident => [#(#rule_paths,)*].iter().copied(),
             });
         }
 
         output.extend(quote! {
             impl #linter {
-                pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
+                pub(crate) fn rules(&self) -> ::std::iter::Copied<::std::slice::Iter<'static, Rule>> {
                     match self { #prefix_into_iter_match_arms }
                 }
             }
@@ -190,9 +190,9 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 })
             }
 
-            pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
+            pub(crate) fn rules(&self) -> ::std::iter::Copied<::std::slice::Iter<'static, Rule>> {
                 match self {
-                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.clone().rules(),)*
+                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.rules(),)*
                 }
             }
         }
@@ -347,7 +347,7 @@ fn generate_iter_impl(
             quote!(#(#attrs)* Rule::#rule_name)
         });
         linter_rules_match_arms.extend(quote! {
-            Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
+            Linter::#linter => [#(#rule_paths,)*].iter().copied(),
         });
         let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
             let rule_name = path.segments.last().unwrap();
@@ -361,7 +361,7 @@ fn generate_iter_impl(
     quote! {
         impl Linter {
             /// Rules not in the preview.
-            pub(crate) fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
+            pub(crate) fn rules(self: &Linter) -> ::std::iter::Copied<::std::slice::Iter<'static, Rule>> {
                 match self {
                     #linter_rules_match_arms
                 }
@@ -394,6 +394,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
     let mut rule_status_match_arms = quote!();
+    let mut rule_category_match_arms = quote!();
     let mut rule_file_match_arms = quote!();
     let mut rule_line_match_arms = quote!();
     let mut rule_parse_match_arms = quote!();
@@ -417,6 +418,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
         rule_status_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::status(),},
+        );
+        rule_category_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::category(),},
         );
         rule_file_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::file(),},
@@ -463,6 +467,10 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             pub fn status(&self) -> crate::codes::RuleStatus {
                 match self { #rule_status_match_arms }
+            }
+
+            pub fn category(&self) -> crate::codes::Category {
+                match self { #rule_category_match_arms }
             }
 
             pub fn file(&self) -> &'static str {

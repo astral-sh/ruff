@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 
@@ -51,7 +52,7 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 ///     _ = obj.attribute
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.100")]
+#[violation_metadata(stable_since = "v0.0.100", category = Category::Suspicious)]
 pub(crate) struct UselessExpression {
     kind: Kind,
 }
