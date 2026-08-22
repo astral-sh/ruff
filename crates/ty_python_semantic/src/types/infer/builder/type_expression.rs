@@ -2614,35 +2614,55 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             SpecialFormType::LiteralString => {
                 let arguments = self.infer_expression(arguments_slice, TypeContext::default());
-
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag =
                         builder.into_diagnostic("`LiteralString` expects no type parameter");
 
-                    let arguments_as_tuple = arguments.exact_tuple_instance_spec(db);
+                    let argument_elements = if self.in_string_annotation() {
+                        let argument_expressions = match arguments_slice {
+                            ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
+                            _ => std::slice::from_ref(arguments_slice),
+                        };
+                        let mut builder = self.speculate_without_diagnostics();
+                        argument_expressions
+                            .iter()
+                            .map(|argument| {
+                                builder
+                                    .infer_literal_parameter_type(argument)
+                                    .unwrap_or(Type::unknown())
+                            })
+                            .collect::<Vec<_>>()
+                    } else {
+                        let arguments_as_tuple = arguments.exact_tuple_instance_spec(db);
+                        arguments_as_tuple.as_ref().map_or_else(
+                            || vec![arguments],
+                            |tuple| tuple.iter_element_types(db).collect(),
+                        )
+                    };
 
-                    let argument_elements = arguments_as_tuple.as_ref().map_or_else(
-                        || vec![arguments],
-                        |tuple| tuple.iter_element_types(db).collect(),
-                    );
-                    let mut argument_elements = argument_elements.into_iter();
+                    let probably_meant_literal = argument_elements.into_iter().all(|ty| {
+                        let elements = match ty {
+                            Type::Union(union) => union.elements(db),
+                            _ => std::slice::from_ref(&ty),
+                        };
 
-                    let probably_meant_literal = argument_elements.all(|ty| match ty {
-                        Type::LiteralValue(literal)
-                            if matches!(
-                                literal.kind(),
-                                LiteralValueTypeKind::String(_)
-                                    | LiteralValueTypeKind::Bytes(_)
-                                    | LiteralValueTypeKind::Enum(_)
-                                    | LiteralValueTypeKind::Bool(_)
-                            ) =>
-                        {
-                            true
-                        }
-                        Type::NominalInstance(instance) => {
-                            instance.has_known_class(db, KnownClass::NoneType)
-                        }
-                        _ => false,
+                        elements.iter().all(|ty| match ty {
+                            Type::LiteralValue(literal)
+                                if matches!(
+                                    literal.kind(),
+                                    LiteralValueTypeKind::String(_)
+                                        | LiteralValueTypeKind::Bytes(_)
+                                        | LiteralValueTypeKind::Enum(_)
+                                        | LiteralValueTypeKind::Bool(_)
+                                ) =>
+                            {
+                                true
+                            }
+                            Type::NominalInstance(instance) => {
+                                instance.has_known_class(db, KnownClass::NoneType)
+                            }
+                            _ => false,
+                        })
                     });
 
                     if probably_meant_literal {

@@ -154,6 +154,66 @@ from typing_extensions import LiteralString
 class C(LiteralString): ...  # error: [invalid-base]
 ```
 
+### Literal suggestions in string annotations
+
+A literal alias is valid as a `Literal` argument, so a parameterized `LiteralString` with a literal
+alias suggests `Literal`.
+
+```py
+from typing_extensions import Literal, LiteralString
+
+Alias = Literal["value"]
+
+# snapshot: invalid-type-form
+alias: "LiteralString[Alias]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:6:9
+  |
+6 | alias: "LiteralString[Alias]"
+  |         -------------^^^^^^^
+  |         |
+  |         Did you mean `Literal`?
+```
+
+Aliases containing multiple literal values are also valid `Literal` arguments.
+
+```py
+MultipleValues = Literal["a", "b"]
+
+# snapshot: invalid-type-form
+multiple_values: "LiteralString[MultipleValues]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:10:19
+   |
+10 | multiple_values: "LiteralString[MultipleValues]"
+   |                   -------------^^^^^^^^^^^^^^^^
+   |                   |
+   |                   Did you mean `Literal`?
+```
+
+Ordinary variables are not valid `Literal` arguments, even if their values are strings.
+
+```py
+value = "value"
+
+# snapshot: invalid-type-form
+variable: "LiteralString[value]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:14:12
+   |
+14 | variable: "LiteralString[value]"
+   |            ^^^^^^^^^^^^^^^^^^^^
+```
+
 ## Inference
 
 ### Common operations
