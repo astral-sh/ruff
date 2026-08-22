@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/daily_fuzz.yaml"
+      - "scripts/install-mold.sh"
 
 permissions:
   contents: read
@@ -44,7 +45,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+        run: bash scripts/install-mold.sh
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
