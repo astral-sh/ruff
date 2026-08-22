@@ -47,6 +47,108 @@ class Foo: ...
 reveal_type(get_foo())  # revealed: Foo
 ```
 
+## Deferred annotations exclude superseded bindings
+
+A deferred annotation can refer to the binding visible at its definition or a later binding, but not
+a binding that was already shadowed.
+
+```py
+from __future__ import annotations
+
+Target = bytes
+Target = int
+
+def use(value: Target) -> None: ...
+
+Target = str
+
+reveal_type(use)  # revealed: def use(value: int | str) -> None
+```
+
+## Deferred attribute annotations fall back after deleting a local root
+
+Deleting a class-local root allows a deferred attribute annotation to resolve a whole-place binding
+from the enclosing function instead of treating the deleted local binding as visible.
+
+```py
+from __future__ import annotations
+
+class Namespace:
+    Value: type[int] | type[str]
+
+namespace = Namespace
+
+def outer() -> None:
+    namespace.Value = str
+
+    class Holder:
+        namespace = Namespace
+        del namespace
+        value: namespace.Value
+
+    reveal_type(Holder.value)  # revealed: str
+```
+
+## Deferred annotations preserve conditional current bindings
+
+A deferred annotation includes every binding visible after a conditional and any later binding, but
+still excludes a binding shadowed by both branches.
+
+```py
+from __future__ import annotations
+
+def condition() -> bool:
+    return True
+
+Target = bytes
+
+if condition():
+    Target = int
+else:
+    Target = str
+
+def use(value: Target) -> None: ...
+
+Target = bytearray
+
+reveal_type(use)  # revealed: def use(value: int | str | bytearray) -> None
+```
+
+## Declaration-only deferred annotations exclude superseded bindings
+
+A deferred annotation without an accompanying assignment also ignores an already shadowed type.
+
+```py
+from __future__ import annotations
+
+Target = bytes
+Target = int
+value: Target
+
+Target = str
+
+# error: [invalid-assignment]
+value = b"wrong"
+```
+
+## Deferred annotations resolve bindings after a deletion
+
+Deleting a name before a deferred annotation does not prevent the annotation from resolving a later
+binding.
+
+```py
+from __future__ import annotations
+
+Target = bytes
+del Target
+
+def use(value: Target) -> None: ...
+
+Target = str
+
+reveal_type(use)  # revealed: def use(value: str) -> None
+```
+
 ## Deferred self-reference annotations in a class definition
 
 ```toml
