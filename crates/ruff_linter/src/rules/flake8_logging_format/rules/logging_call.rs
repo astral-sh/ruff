@@ -1,5 +1,6 @@
 use ruff_python_ast::InterpolatedStringElement;
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator, StringFlags};
+use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::{self as ast, Arguments, AtomicNodeIndex, Expr, Keyword, Operator};
 
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -12,7 +13,7 @@ use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
-use crate::{Edit, Fix};
+use crate::{Applicability, Edit, Fix};
 
 fn logging_f_string(
     checker: &Checker,
@@ -35,20 +36,19 @@ fn logging_f_string(
         return;
     }
 
+    // The interpolated values become positional arguments
+    // that follow the message, so the message itself has to be positional too.
+    // Rewriting `logging.warning(msg=f"{x}")` in place would produce
+    // `logging.warning(msg="%s", x)`, which is a syntax error,
+    // and passing a tuple instead (`msg=("%s", x)`) would log the tuple
+    // rather than the formatted message, since `%`-formatting only runs when
+    // `args` is non-empty.
+    if arguments.find_keyword("msg").is_some() {
+        return;
+    }
+
     let mut format_string = String::new();
     let mut args: Vec<&str> = Vec::new();
-
-    // Try to reuse the first part's quote style when building the replacement.
-    // Default to double quotes if we can't determine it.
-    let quote_str = f_string
-        .value
-        .iter()
-        .map(|part| match part {
-            ast::FStringPart::Literal(literal) => literal.flags.quote_str(),
-            ast::FStringPart::FString(f) => f.flags.quote_str(),
-        })
-        .next()
-        .unwrap_or("\"");
 
     for part in &f_string.value {
         match part {
@@ -72,7 +72,12 @@ fn logging_f_string(
                             format_string.push_str(lit.value.as_ref());
                         }
                         InterpolatedStringElement::Interpolation(interpolated) => {
-                            if interpolated.format_spec.is_some()
+                            // A self-documenting interpolation such as `f"{x=}"` renders `x=`
+                            // followed by `repr(x)`, whereas `%s` renders `str(x)`. Those differ
+                            // for most types -- `f"{s=}"` on a string shows the surrounding
+                            // quotes -- so there is no faithful `%`-style equivalent.
+                            if interpolated.debug_text.is_some()
+                                || interpolated.format_spec.is_some()
                                 || !matches!(
                                     interpolated.conversion,
                                     ruff_python_ast::ConversionFlag::None
@@ -98,15 +103,45 @@ fn logging_f_string(
         return;
     }
 
-    let replacement = format!(
-        "{q}{format_string}{q}, {args}",
-        q = quote_str,
-        format_string = format_string,
-        args = args.join(", ")
-    );
+    // Emit the format string through the code generator rather than pasting the collected text
+    // between quotes. The literal parts gathered above are *decoded*, so a source `f"\n{x}"`
+    // leaves a real newline in `format_string`, and re-emitting that verbatim produced an
+    // unterminated literal. The generator escapes the contents for a plain (non-raw) literal,
+    // which also stops raw-prefixed sources such as `fr"\'{x}"` from losing their backslash.
+    let format_string = checker
+        .generator()
+        .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
+            value: ast::StringLiteralValue::single(ast::StringLiteral {
+                value: Box::from(format_string),
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+                flags: checker.default_string_flags(),
+            }),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+        }));
 
-    let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
-    diagnostic.set_fix(fix);
+    // Replace any enclosing parentheses along with the f-string.
+    // Rewriting only the f-string in `logging.warning((f"{x}"))`
+    // would leave the parentheses wrapped around the new argument
+    // list, silently turning the message into a tuple.
+    let target =
+        parenthesized_range(msg.into(), arguments.into(), checker.tokens()).unwrap_or(msg.range());
+
+    let replacement = format!("{format_string}, {}", args.join(", "));
+
+    // Everything in the replaced range is discarded, so a comment
+    // written between the parentheses and the message would be lost.
+    let applicability = if checker.comment_ranges().intersects(target) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(replacement, target),
+        applicability,
+    ));
 }
 
 /// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`
