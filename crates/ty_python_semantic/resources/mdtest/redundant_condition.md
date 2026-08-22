@@ -386,7 +386,7 @@ warning[redundant-condition]: Function `coroutine` is always truthy
   --> src/mdtest_snippet.py:13:8
    |
 13 |     if coroutine:  # snapshot: redundant-condition
-   |        ^^^^^^^^^ Did you mean to await and call this function?
+   |        ^^^^^^^^^ Did you mean to `await` and call this function?
    |
 12 | async def inspect_async_function():
    -     if coroutine:  # snapshot: redundant-condition
@@ -434,7 +434,7 @@ warning[redundant-condition]: Function `always_truthy_coro` is always truthy
   --> src/mdtest_snippet.py:26:8
    |
 26 |     if always_truthy_coro:  # snapshot: redundant-condition
-   |        ^^^^^^^^^^^^^^^^^^ Did you mean to await and call this function?
+   |        ^^^^^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
    |
 25 | async def foo():
    -     if always_truthy_coro:  # snapshot: redundant-condition
@@ -442,6 +442,51 @@ warning[redundant-condition]: Function `always_truthy_coro` is always truthy
 27 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
+```
+
+If a function has parameters, we still offer a "fix", but we do not attempt to make the fix valid --
+it's just to show the user visually what kind of edit we're suggesting that they make. The fix is
+"display-only" to indicate that it's almost certainly incorrect:
+
+```py
+def wut(x): ...
+
+if wut:  # snapshot: redundant-condition
+    pass
+
+async def wuttt(x): ...
+async def bar():
+    if wuttt:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Function `wut` is always truthy
+  --> src/mdtest_snippet.py:30:4
+   |
+30 | if wut:  # snapshot: redundant-condition
+   |    ^^^ Did you mean to call this function?
+   |
+29 |
+   - if wut:  # snapshot: redundant-condition
+30 + if wut(...):  # snapshot: redundant-condition
+31 |     pass
+   |
+note: This is a display-only fix and is likely to be incorrect
+
+
+warning[redundant-condition]: Function `wuttt` is always truthy
+  --> src/mdtest_snippet.py:35:8
+   |
+35 |     if wuttt:  # snapshot: redundant-condition
+   |        ^^^^^ Did you mean to `await` and call this function?
+   |
+34 | async def bar():
+   -     if wuttt:  # snapshot: redundant-condition
+35 +     if await wuttt(...):  # snapshot: redundant-condition
+36 |         pass
+   |
+note: This is a display-only fix and is likely to be incorrect
 ```
 
 An awaitable in a synchronous function or a lambda still produces a diagnostic, but suggesting
@@ -458,16 +503,16 @@ async def inspect_lambda_awaitable():
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:29:8
+  --> src/mdtest_snippet.py:38:8
    |
-29 |     if coroutine():  # snapshot: redundant-condition
+38 |     if coroutine():  # snapshot: redundant-condition
    |        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:33:28
+  --> src/mdtest_snippet.py:42:28
    |
-33 |     return lambda: True if coroutine() else False  # snapshot: redundant-condition
+42 |     return lambda: True if coroutine() else False  # snapshot: redundant-condition
    |                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 ```
 
@@ -484,31 +529,31 @@ def inspect_generator_awaitable():
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:35:44
+  --> src/mdtest_snippet.py:44:44
    |
-35 |     return [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
+44 |     return [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
    |                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
    |
-34 | async def inspect_comprehension_awaitable():
+43 | async def inspect_comprehension_awaitable():
    -     return [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
-35 +     return [value for value in range(1) if await coroutine()]  # snapshot: redundant-condition
-36 |
+44 +     return [value for value in range(1) if await coroutine()]  # snapshot: redundant-condition
+45 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:38:44
+  --> src/mdtest_snippet.py:47:44
    |
-38 |     return (value for value in range(1) if coroutine())  # snapshot: redundant-condition
+47 |     return (value for value in range(1) if coroutine())  # snapshot: redundant-condition
    |                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
    |
-37 | def inspect_generator_awaitable():
+46 | def inspect_generator_awaitable():
    -     return (value for value in range(1) if coroutine())  # snapshot: redundant-condition
-38 +     return (value for value in range(1) if await coroutine())  # snapshot: redundant-condition
-39 | async def inspect_named_awaitable():
+47 +     return (value for value in range(1) if await coroutine())  # snapshot: redundant-condition
+48 | async def inspect_named_awaitable():
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -523,16 +568,16 @@ async def inspect_named_awaitable():
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always truthy
-  --> src/mdtest_snippet.py:40:8
+  --> src/mdtest_snippet.py:49:8
    |
-40 |     if value := coroutine():  # snapshot: redundant-condition-strict
+49 |     if value := coroutine():  # snapshot: redundant-condition-strict
    |        ^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
    |
-39 | async def inspect_named_awaitable():
+48 | async def inspect_named_awaitable():
    -     if value := coroutine():  # snapshot: redundant-condition-strict
-40 +     if await (value := coroutine()):  # snapshot: redundant-condition-strict
-41 |         pass
+49 +     if await (value := coroutine()):  # snapshot: redundant-condition-strict
+50 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -557,31 +602,31 @@ async def inspect_awaitable_operations(value: AwaitableOperations):
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:50:8
+  --> src/mdtest_snippet.py:59:8
    |
-50 |     if -value:  # snapshot: redundant-condition
+59 |     if -value:  # snapshot: redundant-condition
    |        ^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
 help: Did you mean to `await` this expression?
    |
-49 | async def inspect_awaitable_operations(value: AwaitableOperations):
+58 | async def inspect_awaitable_operations(value: AwaitableOperations):
    -     if -value:  # snapshot: redundant-condition
-50 +     if await (-value):  # snapshot: redundant-condition
-51 |         pass
+59 +     if await (-value):  # snapshot: redundant-condition
+60 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:53:8
+  --> src/mdtest_snippet.py:62:8
    |
-53 |     if value + value:  # snapshot: redundant-condition
+62 |     if value + value:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
 help: Did you mean to `await` this expression?
    |
-52 |
+61 |
    -     if value + value:  # snapshot: redundant-condition
-53 +     if await (value + value):  # snapshot: redundant-condition
-54 |         pass
+62 +     if await (value + value):  # snapshot: redundant-condition
+63 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -596,16 +641,16 @@ async def inspect_conditional_awaitable(flag: bool):
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:56:8
+  --> src/mdtest_snippet.py:65:8
    |
-56 |     if coroutine() if flag else coroutine():  # snapshot: redundant-condition
+65 |     if coroutine() if flag else coroutine():  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
    |
-55 | async def inspect_conditional_awaitable(flag: bool):
+64 | async def inspect_conditional_awaitable(flag: bool):
    -     if coroutine() if flag else coroutine():  # snapshot: redundant-condition
-56 +     if await (coroutine() if flag else coroutine()):  # snapshot: redundant-condition
-57 |         pass
+65 +     if await (coroutine() if flag else coroutine()):  # snapshot: redundant-condition
+66 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -626,16 +671,16 @@ async def inspect_nested_awaitable():
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:65:8
+  --> src/mdtest_snippet.py:74:8
    |
-65 |     if await nested_coroutine():  # snapshot: redundant-condition
+74 |     if await nested_coroutine():  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
 help: Did you mean to `await` this expression?
    |
-64 | async def inspect_nested_awaitable():
+73 | async def inspect_nested_awaitable():
    -     if await nested_coroutine():  # snapshot: redundant-condition
-65 +     if await (await nested_coroutine()):  # snapshot: redundant-condition
-66 |         pass
+74 +     if await (await nested_coroutine()):  # snapshot: redundant-condition
+75 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -691,100 +736,100 @@ class AnnotatedHolder:
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:72:38
+  --> src/mdtest_snippet.py:81:38
    |
-72 |     type Alias = Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
+81 |     type Alias = Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
    |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:74:42
+  --> src/mdtest_snippet.py:83:42
    |
-74 |     class Generic[T: Annotated[int, 1 if coroutine() else 0]]:  # snapshot: redundant-condition
+83 |     class Generic[T: Annotated[int, 1 if coroutine() else 0]]:  # snapshot: redundant-condition
    |                                          ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:77:40
+  --> src/mdtest_snippet.py:86:40
    |
-77 |     def generic[T: Annotated[int, 1 if coroutine() else 0]]():  # snapshot: redundant-condition
+86 |     def generic[T: Annotated[int, 1 if coroutine() else 0]]():  # snapshot: redundant-condition
    |                                        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:80:46
+  --> src/mdtest_snippet.py:89:46
    |
-80 |     type GenericAlias[T: Annotated[int, 1 if coroutine() else 0]] = list[T]  # snapshot: redundant-condition
+89 |     type GenericAlias[T: Annotated[int, 1 if coroutine() else 0]] = list[T]  # snapshot: redundant-condition
    |                                              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:82:34
+  --> src/mdtest_snippet.py:91:34
    |
-82 |     class GenericBase[T](Base if coroutine() else Base):  # snapshot: redundant-condition
+91 |     class GenericBase[T](Base if coroutine() else Base):  # snapshot: redundant-condition
    |                                  ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:85:43
+  --> src/mdtest_snippet.py:94:43
    |
-85 |     def nested(value: Annotated[int, 1 if coroutine() else 0]):  # snapshot: redundant-condition
+94 |     def nested(value: Annotated[int, 1 if coroutine() else 0]):  # snapshot: redundant-condition
    |                                           ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:88:43
+  --> src/mdtest_snippet.py:97:43
    |
-88 |     def returned() -> Annotated[int, 1 if coroutine() else 0]:  # snapshot: redundant-condition
+97 |     def returned() -> Annotated[int, 1 if coroutine() else 0]:  # snapshot: redundant-condition
    |                                           ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:91:35
-   |
-91 |     variable: Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
-   |                                   ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
-
-
-warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:93:72
-   |
-93 |     list_comprehension: Annotated[int, [value for value in range(1) if coroutine()]]  # snapshot: redundant-condition
-   |                                                                        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
-
-
-warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:94:71
-   |
-94 |     set_comprehension: Annotated[int, {value for value in range(1) if coroutine()}]  # snapshot: redundant-condition
-   |                                                                       ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
-
-
-warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:95:79
-   |
-95 |     dict_comprehension: Annotated[int, {value: value for value in range(1) if coroutine()}]  # snapshot: redundant-condition
-   |                                                                               ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
-
-
-warning[redundant-condition]: Condition is always truthy
-  --> src/mdtest_snippet.py:98:61
-   |
-98 |         value: Annotated[int, [item for item in range(1) if coroutine()]],  # snapshot: redundant-condition
-   |                                                             ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
-
-
-warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:103:46
+   --> src/mdtest_snippet.py:100:35
     |
-103 |         int, [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
+100 |     variable: Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
+    |                                   ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+
+
+warning[redundant-condition]: Condition is always truthy
+   --> src/mdtest_snippet.py:102:72
+    |
+102 |     list_comprehension: Annotated[int, [value for value in range(1) if coroutine()]]  # snapshot: redundant-condition
+    |                                                                        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+
+
+warning[redundant-condition]: Condition is always truthy
+   --> src/mdtest_snippet.py:103:71
+    |
+103 |     set_comprehension: Annotated[int, {value for value in range(1) if coroutine()}]  # snapshot: redundant-condition
+    |                                                                       ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+
+
+warning[redundant-condition]: Condition is always truthy
+   --> src/mdtest_snippet.py:104:79
+    |
+104 |     dict_comprehension: Annotated[int, {value: value for value in range(1) if coroutine()}]  # snapshot: redundant-condition
+    |                                                                               ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+
+
+warning[redundant-condition]: Condition is always truthy
+   --> src/mdtest_snippet.py:107:61
+    |
+107 |         value: Annotated[int, [item for item in range(1) if coroutine()]],  # snapshot: redundant-condition
+    |                                                             ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+
+
+warning[redundant-condition]: Condition is always truthy
+   --> src/mdtest_snippet.py:112:46
+    |
+112 |         int, [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
     |                                              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 
 
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:109:41
+   --> src/mdtest_snippet.py:118:41
     |
-109 |         self.value: Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
+118 |         self.value: Annotated[int, 1 if coroutine() else 0]  # snapshot: redundant-condition
     |                                         ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 ```
 
@@ -799,31 +844,31 @@ async def inspect_generator_annotations():
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:111:60
+   --> src/mdtest_snippet.py:120:60
     |
-111 |     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
+120 |     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
     |                                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
     |
-110 | async def inspect_generator_annotations():
+119 | async def inspect_generator_annotations():
     -     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
-111 +     direct: Annotated[int, (value for value in range(1) if await coroutine())]  # snapshot: redundant-condition
-112 |     nested: Annotated[int, ([value for value in range(1) if coroutine()] for _ in range(1))]  # snapshot: redundant-condition
+120 +     direct: Annotated[int, (value for value in range(1) if await coroutine())]  # snapshot: redundant-condition
+121 |     nested: Annotated[int, ([value for value in range(1) if coroutine()] for _ in range(1))]  # snapshot: redundant-condition
     |
 note: This is an unsafe fix and may change runtime behavior
 
 
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:112:61
+   --> src/mdtest_snippet.py:121:61
     |
-112 |     nested: Annotated[int, ([value for value in range(1) if coroutine()] for _ in range(1))]  # snapshot: redundant-condition
+121 |     nested: Annotated[int, ([value for value in range(1) if coroutine()] for _ in range(1))]  # snapshot: redundant-condition
     |                                                             ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
     |
-111 |     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
+120 |     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
     -     nested: Annotated[int, ([value for value in range(1) if coroutine()] for _ in range(1))]  # snapshot: redundant-condition
-112 +     nested: Annotated[int, ([value for value in range(1) if await coroutine()] for _ in range(1))]  # snapshot: redundant-condition
-113 | async def inspect_allowed_definition_awaitables():
+121 +     nested: Annotated[int, ([value for value in range(1) if await coroutine()] for _ in range(1))]  # snapshot: redundant-condition
+122 | async def inspect_allowed_definition_awaitables():
     |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -842,31 +887,31 @@ async def inspect_allowed_definition_awaitables():
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:114:34
+   --> src/mdtest_snippet.py:123:34
     |
-114 |     class NongenericBase(Base if coroutine() else Base):  # snapshot: redundant-condition
+123 |     class NongenericBase(Base if coroutine() else Base):  # snapshot: redundant-condition
     |                                  ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
     |
-113 | async def inspect_allowed_definition_awaitables():
+122 | async def inspect_allowed_definition_awaitables():
     -     class NongenericBase(Base if coroutine() else Base):  # snapshot: redundant-condition
-114 +     class NongenericBase(Base if await coroutine() else Base):  # snapshot: redundant-condition
-115 |         pass
+123 +     class NongenericBase(Base if await coroutine() else Base):  # snapshot: redundant-condition
+124 |         pass
     |
 note: This is an unsafe fix and may change runtime behavior
 
 
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:117:46
+   --> src/mdtest_snippet.py:126:46
     |
-117 |     def generic_default[T](value: int = 1 if coroutine() else 0):  # snapshot: redundant-condition
+126 |     def generic_default[T](value: int = 1 if coroutine() else 0):  # snapshot: redundant-condition
     |                                              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
     |
-116 |
+125 |
     -     def generic_default[T](value: int = 1 if coroutine() else 0):  # snapshot: redundant-condition
-117 +     def generic_default[T](value: int = 1 if await coroutine() else 0):  # snapshot: redundant-condition
-118 |         pass
+126 +     def generic_default[T](value: int = 1 if await coroutine() else 0):  # snapshot: redundant-condition
+127 |         pass
     |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -882,31 +927,31 @@ async def inspect_runtime_type_expressions():
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:120:38
+   --> src/mdtest_snippet.py:129:38
     |
-120 |     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
+129 |     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
     |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
     |
-119 | async def inspect_runtime_type_expressions():
+128 | async def inspect_runtime_type_expressions():
     -     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
-120 +     alias = list[Annotated[int, 1 if await coroutine() else 0]]  # snapshot: redundant-condition
-121 |     value: int = 1 if coroutine() else 0  # snapshot: redundant-condition
+129 +     alias = list[Annotated[int, 1 if await coroutine() else 0]]  # snapshot: redundant-condition
+130 |     value: int = 1 if coroutine() else 0  # snapshot: redundant-condition
     |
 note: This is an unsafe fix and may change runtime behavior
 
 
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:121:23
+   --> src/mdtest_snippet.py:130:23
     |
-121 |     value: int = 1 if coroutine() else 0  # snapshot: redundant-condition
+130 |     value: int = 1 if coroutine() else 0  # snapshot: redundant-condition
     |                       ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
     |
-120 |     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
+129 |     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
     -     value: int = 1 if coroutine() else 0  # snapshot: redundant-condition
-121 +     value: int = 1 if await coroutine() else 0  # snapshot: redundant-condition
-122 | async def inspect_compound_awaitable(flag: bool):
+130 +     value: int = 1 if await coroutine() else 0  # snapshot: redundant-condition
+131 | async def inspect_compound_awaitable(flag: bool):
     |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -922,16 +967,16 @@ async def inspect_compound_awaitable(flag: bool):
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:123:17
+   --> src/mdtest_snippet.py:132:17
     |
-123 |     if flag and coroutine():  # snapshot: redundant-condition
+132 |     if flag and coroutine():  # snapshot: redundant-condition
     |                 ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 help: Did you mean to `await` this expression?
     |
-122 | async def inspect_compound_awaitable(flag: bool):
+131 | async def inspect_compound_awaitable(flag: bool):
     -     if flag and coroutine():  # snapshot: redundant-condition
-123 +     if flag and await coroutine():  # snapshot: redundant-condition
-124 |         pass
+132 +     if flag and await coroutine():  # snapshot: redundant-condition
+133 |         pass
     |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -946,9 +991,9 @@ if coroutine():  # snapshot: redundant-condition
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:125:4
+   --> src/mdtest_snippet.py:134:4
     |
-125 | if coroutine():  # snapshot: redundant-condition
+134 | if coroutine():  # snapshot: redundant-condition
     |    ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 ```
 
@@ -1037,6 +1082,14 @@ error[redundant-condition-strict]: Condition is always true
 13 |     elif 1 == 1:  # snapshot: redundant-condition-strict
    |          ^^^^^^ Inferred type is `Literal[True]`
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+12 |         pass
+   -     elif 1 == 1:  # snapshot: redundant-condition-strict
+13 +     else:  # snapshot: redundant-condition-strict
+14 +         assert 1 == 1
+15 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 
 error[redundant-condition-strict]: Condition is always false
@@ -1091,6 +1144,198 @@ def compound_truthy(x: str):
     match x:
         case str() if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
             pass
+```
+
+## Replacing a redundant final `elif` with an assertion
+
+When a final `elif` condition is always true, an `else` branch containing the same condition as a
+defensive assertion makes the exhaustiveness check explicit without repeating the condition as a
+branch:
+
+```py
+def exhaustive(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif isinstance(value, int):  # snapshot: redundant-condition-strict
+        print(value)
+        print(value + 1)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:4:10
+  |
+4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+3 |         print(value)
+  -     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+4 +     else:  # snapshot: redundant-condition-strict
+5 +         assert isinstance(value, int)
+6 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+The assertion uses the existing indentation of the branch body, including unconventional
+indentation:
+
+```py
+# fmt: off
+def unconventional_indentation(value: str | int):
+  if isinstance(value, str):
+    print(value)
+  elif isinstance(value, int):  # snapshot: redundant-condition-strict
+    print(value)
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:11:8
+   |
+11 |   elif isinstance(value, int):  # snapshot: redundant-condition-strict
+   |        ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+10 |     print(value)
+   -   elif isinstance(value, int):  # snapshot: redundant-condition-strict
+11 +   else:  # snapshot: redundant-condition-strict
+12 +     assert isinstance(value, int)
+13 |     print(value)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Comments inside a parenthesized condition, after the branch header, and before its first statement
+are all preserved:
+
+```py
+def commented_condition(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif (
+        # Explain the defensive runtime check.
+        isinstance(value, int)  # snapshot: redundant-condition-strict
+    ):  # Preserve this header comment.
+        # Preserve this body comment.
+        print(value)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:19:9
+   |
+19 |         isinstance(value, int)  # snapshot: redundant-condition-strict
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+16 |         print(value)
+   -     elif (
+17 +     else:  # Preserve this header comment.
+18 +         # Preserve this body comment.
+19 +         assert (
+20 |         # Explain the defensive runtime check.
+21 |         isinstance(value, int)  # snapshot: redundant-condition-strict
+   -     ):  # Preserve this header comment.
+   -         # Preserve this body comment.
+22 +     )
+23 |         print(value)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+An unparenthesized assignment expression is valid in an `elif` condition but must be parenthesized
+when moved into an assertion:
+
+```py
+def assignment_expression(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
+        print(matched)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:26:10
+   |
+26 |     elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+25 |         print(value)
+   -     elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
+26 +     else:  # snapshot: redundant-condition-strict
+27 +         assert (matched := isinstance(value, int))
+28 |         print(matched)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+If the branch body begins on the same line as its header, inserting a separate assertion would
+require rewriting the body, so no autofix is offered:
+
+```py
+# fmt: off
+def inline_branch(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif isinstance(value, int): print(value)  # snapshot: redundant-condition-strict
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:32:10
+   |
+32 |     elif isinstance(value, int): print(value)  # snapshot: redundant-condition-strict
+   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+A multiline header also receives no autofix when its body begins on the same line as its closing
+colon:
+
+```py
+# fmt: off
+def multiline_inline_branch(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif (
+        isinstance(value, int)  # snapshot: redundant-condition-strict
+    ): print(value)
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:39:9
+   |
+39 |         isinstance(value, int)  # snapshot: redundant-condition-strict
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+Parser recovery can produce an `elif` branch with no statements. The redundant condition is still
+reported, but no autofix is offered for the incomplete branch:
+
+```py
+def empty_branch(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    # error: [invalid-syntax] "Expected an indented block after `elif` clause"
+    elif isinstance(value, int):  # snapshot: redundant-condition-strict
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:46:10
+   |
+46 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 ```
 
 ## Infinite `while` loops
@@ -1510,13 +1755,14 @@ class Foo:
 Walrus expressions can have side effects, so an always-true walrus expression may not always be
 redundant. Examples of this can be found in CPython's scripts, where deliberately true walrus
 expressions are used to continue the boolean-expression chain:
+
 - <https://github.com/python/cpython/blob/f74cdf80a120649e4c353430da8cbd1305c00993/Tools/peg_generator/pegen/grammar_parser.py#L152-L168>
 - <https://github.com/python/cpython/blob/f74cdf80a120649e4c353430da8cbd1305c00993/Tools/peg_generator/pegen/grammar_parser.py#L152-L168>
 
 It is arguably always possible to write this kind of code in a clearer, more obvious way, so we
 still emit a diagnostic on code like this, even though it may be deliberate. However, we use the
-`redundant-condition-strict` rule for these patterns, so that the rule that is enabled by default
-is unopinionated:
+`redundant-condition-strict` rule for these patterns, so that the rule that is enabled by default is
+unopinionated:
 
 ```py
 def coinflip1() -> bool:

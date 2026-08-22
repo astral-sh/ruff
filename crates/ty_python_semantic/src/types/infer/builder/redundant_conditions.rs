@@ -3,8 +3,10 @@
 
 use ruff_db::{parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_python_ast::{self as ast, helpers::any_over_expr};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, helpers::any_over_expr, token::parenthesized_range};
+use ruff_python_trivia::indentation_at_offset;
+use ruff_source_file::{LineRanges, find_newline};
+use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
     Truthiness,
@@ -24,6 +26,9 @@ use crate::{
 };
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Returns whether the current file should be checked for either redundant-condition rule.
+    ///
+    /// Avoids analyzing excluded files or checking conditions when both rules are disabled.
     pub(super) fn should_check_condition_redundancy(&self) -> bool {
         if !self.db().should_check_file(self.file()) {
             return false;
@@ -33,6 +38,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             || self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT)
     }
 
+    /// Reports an unintentionally always-truthy or always-falsy condition.
+    ///
+    /// Whether `redundant-condition` or `redundant-condition-strict` is used depends on two
+    /// things:
+    /// - The inferred type of the condition. If the type is assignable to `int`, including `bool`,
+    ///   `redundant-condition-strict` is used. Otherwise, `redundant-condition` is used.
+    /// - Whether any walrus expressions appear inside the condition. Walrus expressions can have
+    ///   side effects, so these are always reported under `redundant-condition-strict` to avoid
+    ///   the enabled-by-default rule being overly opinionated.
+    ///
+    /// Many exemptions are applied to the rule to avoid reporting deliberate uses of always-true
+    /// or always-false conditions:
+    /// - We exempt conditions where any sub-expression is inferred as being `sys.version_info`,
+    ///   `sys.platform`, `os.name`, or `typing.TYPE_CHECKING`. This detection is recursive: if
+    ///   any subexpression of the condition is a name or attribute expression, we examine the
+    ///   definitions of that name or attribute to see if any subexpresions of those definitions
+    ///   is one of those special-cased symbols.
+    /// - We exempt conditions using AST literals such as `if True:`, `if 1`, `if 0` and `if False`.
+    ///   If one of these is being employed, it's almost certain that the condition is deliberately
+    ///   always true or always false.
+    /// - We exempt conditions that are part of a suite that is deliberately unreachable, such as
+    ///   a defensive exit or exhaustiveness check. This is determined by examining the final
+    ///   statement of the suite for a `raise`, a potentially failing assertion, a call returning
+    ///   `Never`, or `return NotImplemented`. If the final statement is an `if` with an `else`
+    ///   clause, we also allow the suite to be recognized as deliberately unreachable if all of
+    ///   the `if`, `elif` and `else` clauses end in terminal statements, recursively.
+    ///
+    /// Returns the diagnostic guard when the complete condition is reported so callers can attach
+    /// additional help or fixes before the guard publishes the diagnostic on drop.
     pub(super) fn check_condition_redundancy<'a>(
         &'a self,
         test: &ast::Expr,
@@ -176,9 +210,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
+        let annotate_inferred_type = |diagnostic: &mut LintDiagnosticGuard| {
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Inferred type is `{}`",
+                test_type.display(db, env)
+            ));
+        };
+
         match test_truthiness {
             Truthiness::AlwaysTrue => {
                 let builder = self.context.report_lint(rule, test)?;
+
+                let describe_always_truthy_object = |diagnostic: &mut LintDiagnosticGuard| {
+                    diagnostic.set_concise_message(format_args!(
+                        "Object of type `{}` is always truthy",
+                        test_type.display(db, env)
+                    ));
+                    annotate_inferred_type(diagnostic);
+                };
+
+                // We special-case function literals here specifically because this is such a common error.
+                // While it's true that we could special-case other always-truthy callables (such as methods) too,
+                // empirically these just don't show up nearly as much in the ecosystem report.
+                // We'll still emit a diagnostic for these, it just won't have the same helpful suggestion/fix
+                // that we provide for function literals -- but that's okay.
                 if let Type::FunctionLiteral(function) = test_type {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Function `{}` is always truthy",
@@ -195,43 +250,57 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // We specifically test assignability to `CoroutineType` here because (unlike
                     // arbitrary other awaitables) we know that `CoroutineType` is always truthy.
                     let coroutine = KnownClass::CoroutineType.to_instance(db, env);
-                    if function
-                        .signature(db)
-                        .iter()
-                        .all(|signature| signature.return_ty.is_assignable_to(db, env, coroutine))
-                        && self.can_await_here()
-                    {
+                    let is_awaitable_coro_function = self.can_await_here()
+                        && function.signature(db).iter().any(|signature| {
+                            signature.return_ty.is_assignable_to(db, env, coroutine)
+                        });
+
+                    if is_awaitable_coro_function {
                         diagnostic.set_primary_annotation_message(
-                            "Did you mean to await and call this function?",
+                            "Did you mean to `await` and call this function?",
                         );
-                        if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-                            && !function.signature(db).has_parameters()
-                        {
-                            let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
-                                Fix::unsafe_edits(
-                                    Edit::insertion("await (".to_string(), test.start()),
-                                    [Edit::insertion("())".to_string(), test.end())],
-                                )
-                            } else {
-                                Fix::unsafe_edits(
-                                    Edit::insertion("await ".to_string(), test.start()),
-                                    [Edit::insertion("()".to_string(), test.end())],
-                                )
-                            };
-                            diagnostic.set_fix(fix);
-                        }
                     } else {
                         diagnostic
                             .set_primary_annotation_message("Did you mean to call this function?");
-                        if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-                            && !function.signature(db).has_parameters()
-                        {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                                "()".to_string(),
-                                test.end(),
-                            )));
-                        }
                     }
+
+                    if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                        let has_parameters = function.signature(db).has_parameters();
+
+                        let fix = if is_awaitable_coro_function {
+                            let (first, second, applicability) =
+                                if test.precedence() <= ast::OperatorPrecedence::Await {
+                                    if has_parameters {
+                                        ("await (", "(...))", Applicability::DisplayOnly)
+                                    } else {
+                                        ("await (", "())", Applicability::Unsafe)
+                                    }
+                                } else {
+                                    if has_parameters {
+                                        ("await ", "(...)", Applicability::DisplayOnly)
+                                    } else {
+                                        ("await ", "()", Applicability::Unsafe)
+                                    }
+                                };
+                            Fix::applicable_edits(
+                                Edit::insertion(first.to_string(), test.start()),
+                                [Edit::insertion(second.to_string(), test.end())],
+                                applicability,
+                            )
+                        } else {
+                            let (edit, applicability) = if has_parameters {
+                                ("(...)", Applicability::DisplayOnly)
+                            } else {
+                                ("()", Applicability::Unsafe)
+                            };
+                            Fix::applicable_edit(
+                                Edit::insertion(edit.to_string(), test.end()),
+                                applicability,
+                            )
+                        };
+                        diagnostic.set_fix(fix);
+                    }
+
                     Some(diagnostic)
                 } else if let Some(tuple_spec) = test_type.tuple_instance_spec(db, env) {
                     let mut diagnostic = match tuple_spec.len() {
@@ -243,14 +312,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             maybe_s = if min == 1 { "" } else { "s" }
                         )),
                     };
-                    diagnostic.set_concise_message(format_args!(
-                        "Object of type `{}` is always truthy",
-                        test_type.display(db, env)
-                    ));
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Inferred type is `{}`",
-                        test_type.display(db, env)
-                    ));
+                    describe_always_truthy_object(&mut diagnostic);
                     Some(diagnostic)
                 } else if test_type.as_nominal_instance().is_some_and(|instance| {
                     instance
@@ -258,14 +320,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .is_known(db, KnownClass::GeneratorType)
                 }) {
                     let mut diagnostic = builder.into_diagnostic("A generator is always truthy");
-                    diagnostic.set_concise_message(format_args!(
-                        "Object of type `{}` is always truthy",
-                        test_type.display(db, env)
-                    ));
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Inferred type is `{}`",
-                        test_type.display(db, env)
-                    ));
+                    describe_always_truthy_object(&mut diagnostic);
                     diagnostic.help("Did you mean to collect the generator into a tuple?");
                     diagnostic.set_fix(Fix::display_only_edits(
                         Edit::insertion("tuple(".to_string(), test.start()),
@@ -279,14 +334,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     let mut diagnostic =
                         builder.into_diagnostic("A nonempty string is always truthy");
-                    diagnostic.set_concise_message(format_args!(
-                        "Object of type `{}` is always truthy",
-                        test_type.display(db, env)
-                    ));
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Inferred type is `{}`",
-                        test_type.display(db, env)
-                    ));
+                    describe_always_truthy_object(&mut diagnostic);
                     Some(diagnostic)
                 } else if test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env)) {
                     let message = "Condition is always true";
@@ -296,10 +344,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         "Condition `{}` is always true",
                         &source[test.range()]
                     ));
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Inferred type is `{}`",
-                        test_type.display(db, env)
-                    ));
+                    annotate_inferred_type(&mut diagnostic);
                     Some(diagnostic)
                 } else {
                     let mut diagnostic = builder.into_diagnostic("Condition is always truthy");
@@ -307,10 +352,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         "Object of type `{}` is always truthy",
                         test_type.display(db, env)
                     ));
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Inferred type is `{}`",
-                        test_type.display(db, env)
-                    ));
+                    annotate_inferred_type(&mut diagnostic);
                     if test_type.try_await(db, env).is_ok() && self.can_await_here() {
                         diagnostic.help("Did you mean to `await` this expression?");
 
@@ -338,19 +380,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let message = "An empty tuple is always falsy";
                     let mut diagnostic = builder.into_diagnostic(message);
                     diagnostic.set_concise_message(message);
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Inferred type is `{}`",
-                        test_type.display(db, env)
-                    ));
+                    annotate_inferred_type(&mut diagnostic);
                     Some(diagnostic)
                 } else if test_type.is_string_literal() {
                     let message = "An empty string is always falsy";
                     let mut diagnostic = builder.into_diagnostic(message);
                     diagnostic.set_concise_message(message);
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Inferred type is `{}`",
-                        test_type.display(db, env)
-                    ));
+                    annotate_inferred_type(&mut diagnostic);
                     Some(diagnostic)
                 } else {
                     let is_bool =
@@ -373,10 +409,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             test_type.display(db, env)
                         ));
                     }
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Inferred type is `{}`",
-                        test_type.display(db, env)
-                    ));
+                    annotate_inferred_type(&mut diagnostic);
                     Some(diagnostic)
                 }
             }
@@ -384,6 +417,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Returns `true` if adding `await` at the current expression would produce valid Python.
+    ///
+    /// Accounts for asynchronous functions, notebook cells, annotation restrictions, enclosing
+    /// scopes, and the different scoping behavior of comprehensions and generator expressions.
     fn can_await_here(&self) -> bool {
         // Python forbids `await` in annotation nodes.
         if self
@@ -430,6 +467,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         false
     }
 
+    /// Checks the direct `if` and `elif` conditions after a suite's statements have been inferred.
+    ///
+    /// Suppresses conditions guarding deliberately unreachable branches or trailing defensive
+    /// exits, and adds an assertion-based autofix when a final `elif` is unnecessarily always true.
     pub(super) fn check_suite_for_redundant_if_statements(&self, suite: &[ast::Stmt]) {
         let db = self.db();
         let env = self.program_environment();
@@ -529,6 +570,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         "Replace this `elif` with an `else` branch \
                                         that asserts the condition to be `True`",
                                     );
+                                    if let Some(fix) =
+                                        self.replace_redundant_elif_with_assertion(elif_else, test)
+                                    {
+                                        diagnostic.set_fix(fix);
+                                    }
                                 }
                             }
                         }
@@ -538,6 +584,76 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Replaces an always-true final `elif` with an `else` branch and a defensive assertion.
+    ///
+    /// Preserves the original condition, comments, branch indentation, and file-wide line-ending
+    /// style. Bare assignment expressions are parenthesized so they remain valid assertion tests.
+    /// Returns `None` when the branch has no body, its first statement cannot accommodate a new
+    /// indented assertion, or rewriting the header would discard a comment.
+    ///
+    /// The fix is unsafe because an incorrect static assumption can cause the new assertion to
+    /// fail at runtime, and optimized Python execution may remove the assertion entirely.
+    fn replace_redundant_elif_with_assertion(
+        &self,
+        clause: &ast::ElifElseClause,
+        test: &ast::Expr,
+    ) -> Option<Fix> {
+        let first_statement = clause.body.first()?;
+        let source = source_text(self.db(), self.file());
+
+        if source.line_start(first_statement.start()) == source.line_start(clause.start()) {
+            return None;
+        }
+
+        let indentation = indentation_at_offset(first_statement.start(), &source)?;
+        let parenthesized_test_range =
+            parenthesized_range(test.into(), clause.into(), self.module().tokens());
+        let test_range = parenthesized_test_range.unwrap_or(test.range());
+        let header_prefix_range = TextRange::new(clause.start(), test_range.start());
+
+        // Ruff caches `CommentRanges` in its indexer, but ty does not. Constructing
+        // `CommentRanges` here would scan and index every comment in the file just to check
+        // this small range, so inspect the existing tokens directly instead.
+        if self
+            .module()
+            .tokens()
+            .in_range(header_prefix_range)
+            .iter()
+            .any(|token| token.kind().is_comment())
+        {
+            return None;
+        }
+
+        let condition = &source[test_range];
+        let assertion_condition = if test.is_named_expr() && parenthesized_test_range.is_none() {
+            format!("({condition})")
+        } else {
+            condition.to_string()
+        };
+        let line_ending = find_newline(&source)
+            .map(|(_, ending)| ending)
+            .unwrap_or_default()
+            .as_str();
+
+        Some(Fix::unsafe_edits(
+            Edit::range_replacement(
+                "else".to_string(),
+                TextRange::new(clause.start(), test_range.end()),
+            ),
+            [Edit::insertion(
+                format!("assert {assertion_condition}{line_ending}{indentation}"),
+                first_statement.start(),
+            )],
+        ))
+    }
+
+    /// Return `true` if `suite` is a sequence of statements that acts as a defensive exit
+    /// or exhaustiveness check.
+    ///
+    /// Concretely, we examine the final statement for a `raise`, a potentially failing
+    /// assertion, a call returning `Never`, `return NotImplemented`, or a nested conditional
+    /// with an explicit `else`. Earlier setup statements do not prevent the suite from being
+    /// recognized.
     fn is_deliberately_unreachable_suite(&self, suite: &[ast::Stmt]) -> bool {
         fn is_deliberately_unreachable_inner<'db>(
             builder: &TypeInferenceBuilder<'db, '_>,
@@ -584,7 +700,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 }
 
-/// Recognizes environment-dependent conditions, including constants reached through aliases.
+/// Return `true` if any subexpression in `expression` is recognized as "tainted" by being defined
+/// (directly or indirectly) with respect to `sys.version_info`, `sys.platform`, `os.name`, or
+/// `typing.TYPE_CHECKING`.
+///
+/// See the docstring of [`TypeInferenceBuilder::check_condition_redundancy`] for more details.
 fn is_special_cased_condition_expression<'db>(
     db: &'db dyn Db,
     model: &SemanticModel<'db>,
@@ -626,6 +746,11 @@ fn is_special_cased_condition_expression<'db>(
         return false;
     }
 
+    // We don't recurse through definitions in a flow-sensitive way, but there isn't really any need to.
+    // The main objective here is to avoid false positives. Flow-sensitive definitions of variables/attributes
+    // where some paths define the place in terms of `sys.version_info` but other paths don't are pretty rare.
+    // It's okay to have a small number of false negatives for these very rare edge cases. Attempting to
+    // recurse through definitions in a flow-sensitive way would be significantly more complicated.
     definitions_for_expression(
         model,
         expression.into(),
@@ -637,7 +762,13 @@ fn is_special_cased_condition_expression<'db>(
     .any(|definition| definition_contains_special_cased_condition(db, definition))
 }
 
-/// Follows assignment aliases without making callers depend directly on another file's AST.
+/// Determines whether a definition originates from an environment-dependent guard.
+///
+/// Follows aliases recursively and recognizes stub declarations for `sys.version_info`,
+/// `sys.platform`, `os.name`, and `typing.TYPE_CHECKING`.
+///
+/// This Salsa-tracked query reads the definition's AST behind its own incremental boundary, so
+/// callers do not depend directly on another file's syntax tree. Cyclic aliases recover as `false`.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| false,
