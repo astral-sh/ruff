@@ -375,6 +375,56 @@ class Factory[T]:
 reveal_type(C[Factory[int]]())  # revealed: int
 ```
 
+### Growing generic constructor specializations
+
+A recursive constructor can keep growing its arguments without repeating an exact receiver type. We
+bound constructor expansion and use the gradual fallback when it reaches the limit. Finite chains
+beyond the limit also use this fallback.
+
+```py
+class C[T]:
+    __new__: type["C[list[T]]"]
+
+C[int]()
+C[tuple[int, str]]()
+C[int | str]()
+```
+
+Growth can also pass through a class that forwards construction to its type argument:
+
+```py
+class Wrapper[T]:
+    __new__: type[T]
+
+class Factory[T]:
+    __new__: type[Wrapper["Factory[list[T]]"]]
+
+Wrapper[Factory[int]]()
+```
+
+Swapping arguments can hide the growth until the constructor has been expanded more than once:
+
+```py
+class Swap[T, U]:
+    __new__: type["Swap[U, list[T]]"]
+
+Swap[int, str]()
+```
+
+### Recursive aliases in constructor arguments
+
+Unfolding a recursive alias can also keep introducing new constructor specializations. These chains
+use the same bounded-expansion fallback:
+
+```py
+class C[T]:
+    __new__: type[T]
+
+type Recursive[T] = C[Recursive[list[T]]]
+
+C[Recursive[int]]()
+```
+
 ### Descriptor-sensitive constructor receivers
 
 An exact class object and a value of `type[C]` can select different descriptor overloads. This

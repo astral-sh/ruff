@@ -651,6 +651,11 @@ impl<T> Default for ActiveRecursionDetector<T> {
 }
 
 impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
+    /// The number of active visits, excluding visits that encountered an existing key.
+    pub(super) fn depth(&self) -> usize {
+        self.seen.borrow().len()
+    }
+
     pub(crate) fn visit<R>(
         &self,
         item: &T,
@@ -687,7 +692,9 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 mod tests {
     use std::assert_matches;
 
-    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
+    use super::{
+        ActiveRecursionDetector, CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity,
+    };
     use crate::ProgramEnvironment;
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
@@ -931,5 +938,26 @@ class RecursivePropertySetter[T](Protocol):
             panic!("the second identity should be ready after the pending visit is finished");
         };
         assert_eq!(seen, 2);
+    }
+
+    #[test]
+    fn tracks_active_recursion_depth() {
+        let detector = ActiveRecursionDetector::default();
+        assert_eq!(detector.depth(), 0);
+
+        let depth = detector.visit(
+            &1,
+            || 0,
+            || {
+                assert_eq!(detector.depth(), 1);
+                assert_eq!(detector.visit(&2, || 0, || detector.depth()), 2);
+                assert_eq!(detector.depth(), 1);
+                assert_eq!(detector.visit(&1, || detector.depth(), || 0), 1);
+                detector.depth()
+            },
+        );
+
+        assert_eq!(depth, 1);
+        assert_eq!(detector.depth(), 0);
     }
 }
