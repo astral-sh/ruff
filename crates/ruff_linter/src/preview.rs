@@ -26,6 +26,11 @@ pub(crate) const fn is_s103_extended_dangerous_bits_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/11292
+pub(crate) const fn is_useless_string_expression_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/21382
 pub(crate) const fn is_custom_exception_checking_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
