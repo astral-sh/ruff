@@ -185,8 +185,11 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 range: _,
                 node_index: _,
             }) => {
-                self.counter_stack.push(Vec::with_capacity(cases.len()));
+                // Visit the subject before pushing the branch counters as it
+                // is evaluated unconditionally. Visiting it with an empty
+                // counter frame on the stack would panic (#26624).
                 self.visit_expr(subject);
+                self.counter_stack.push(Vec::with_capacity(cases.len()));
                 for match_case in cases {
                     self.counter_stack.last_mut().unwrap().push(0);
                     self.visit_match_case(match_case);
