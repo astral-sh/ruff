@@ -1,0 +1,152 @@
+---
+source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+---
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:9:5
+   |
+ 7 |   # Module docstring position: fix is unsafe.
+ 8 |   (
+ 9 | /     "docstring"
+10 | |     + "?"
+   | |_________^
+11 |   )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+9  |     "docstring"
+   -     + "?"
+10 +      "?"
+11 | )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:16:5
+   |
+14 |   x = 1
+15 |   (
+16 | /     "not"
+17 | |     + " a docstring"
+   | |____________________^
+18 |   )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+16 |     "not"
+   -     + " a docstring"
+17 +      " a docstring"
+18 | )
+   |
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:24:9
+   |
+22 |       # Function docstring position: fix is unsafe.
+23 |       (
+24 | /         "docstring"
+25 | |         + "?"
+   | |_____________^
+26 |       )
+27 |       return __doc__
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+24 |         "docstring"
+   -         + "?"
+25 +          "?"
+26 |     )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:33:9
+   |
+31 |       # Class docstring position: fix is unsafe.
+32 |       (
+33 | /         "docstring"
+34 | |         + "?"
+   | |_____________^
+35 |       )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+33 |         "docstring"
+   -         + "?"
+34 +          "?"
+35 |     )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:40:13
+   |
+38 |           # Method docstring position: fix is unsafe.
+39 |           (
+40 | /             "docstring"
+41 | |             + "?"
+   | |_________________^
+42 |           )
+43 |           return self.__doc__
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+40 |             "docstring"
+   -             + "?"
+41 +              "?"
+42 |         )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:49:9
+   |
+47 |       # F-strings cannot be docstrings: fix is safe.
+48 |       (
+49 | /         f"not"
+50 | |         + " a docstring"
+   | |________________________^
+51 |       )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+49 |         f"not"
+   -         + " a docstring"
+50 +          " a docstring"
+51 |     )
+   |
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:57:9
+   |
+55 |       # Byte strings cannot be docstrings: fix is safe.
+56 |       (
+57 | /         b"not"
+58 | |         + b" a docstring"
+   | |_________________________^
+59 |       )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+57 |         b"not"
+   -         + b" a docstring"
+58 +          b" a docstring"
+59 |     )
+   |
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:66:9
+   |
+64 |       # expression.
+65 |       print(
+66 | /         "not"
+67 | |         + " a docstring"
+   | |________________________^
+68 |       )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+66 |         "not"
+   -         + " a docstring"
+67 +          " a docstring"
+68 |     )
+   |
