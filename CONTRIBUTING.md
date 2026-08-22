@@ -74,10 +74,15 @@ cargo install --locked cargo-insta
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
-You can optionally install hooks to automatically run the validation checks
-when making a commit:
+`prek` manages the pinned Node.js version used by JavaScript hooks. Set the following npm options in
+your shell before running `prek` or committing with installed hooks. They disable lifecycle scripts
+and require newly resolved npm versions to be at least seven days old.
+
+You can optionally install hooks to automatically run the validation checks when making a commit:
 
 ```shell
+export npm_config_ignore_scripts=true
+export npm_config_min_release_age=7
 uv run --only-group dev --locked prek install
 ```
 

@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import subprocess
 
@@ -70,7 +71,6 @@ MEMBER_TEMPLATE = """{GENERATED_HEADER}
 
 
 REPO_URL = "https://github.com/astral-sh/ruff"
-PRETTIER_VERSION = "3.8.3"
 
 
 def replace_generated_section(readme: str, generated_content: str) -> str:
@@ -198,9 +198,28 @@ def main() -> None:
         print(f"Generated README for {name}")
 
     # Format all generated READMEs once at the end.
+    env = os.environ.copy()
+    env.pop("NPM_CONFIG_IGNORE_SCRIPTS", None)
+    env.pop("NPM_CONFIG_MIN_RELEASE_AGE", None)
+    env["npm_config_ignore_scripts"] = "true"
+    env["npm_config_min_release_age"] = "7"
     subprocess.run(
-        ["npx", "--yes", f"prettier@{PRETTIER_VERSION}", "--write"]
-        + [str(path) for path in generated_paths],
+        [
+            "uv",
+            "run",
+            "--only-group",
+            "dev",
+            "--locked",
+            "prek",
+            "exec",
+            "prettier-readmes",
+            "--",
+            "prettier",
+            "--write",
+            *map(str, generated_paths),
+        ],
+        cwd=workspace_root,
+        env=env,
         check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
