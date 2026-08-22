@@ -264,7 +264,7 @@ help: Use `Self` as return type
 334 +     def __new__(cls) -> typing.Self: ...
 335 |     def __enter__(self: Generic1) -> Generic1: ...
     |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PYI034 [*] `__enter__` methods in classes like `Generic1` usually return `self` at runtime
    --> PYI034.py:335:9
@@ -280,7 +280,7 @@ help: Use `Self` as return type
 335 +     def __enter__(self) -> typing.Self: ...
 336 |
     |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PYI034 [*] `__new__` methods in classes like `Generic2` usually return `self` at runtime
    --> PYI034.py:345:9
@@ -297,7 +297,7 @@ help: Use `Self` as return type
 345 +     def __new__(cls) -> typing.Self: ...
 346 |     def __enter__(self: Generic2) -> Generic2: ...
     |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PYI034 [*] `__enter__` methods in classes like `Generic2` usually return `self` at runtime
    --> PYI034.py:346:9
@@ -316,7 +316,7 @@ help: Use `Self` as return type
 346 +     def __enter__(self) -> typing.Self: ...
 347 |
     |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PYI034 [*] `__new__` methods in classes like `Generic3` usually return `self` at runtime
    --> PYI034.py:349:9
@@ -333,7 +333,7 @@ help: Use `Self` as return type
 349 +     def __new__(cls) -> typing.Self: ...
 350 |     def __enter__(self: Generic3) -> Generic3: ...
     |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PYI034 [*] `__enter__` methods in classes like `Generic3` usually return `self` at runtime
    --> PYI034.py:350:9
@@ -352,7 +352,7 @@ help: Use `Self` as return type
 350 +     def __enter__(self) -> typing.Self: ...
 351 |
     |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PYI034 [*] `__new__` methods in classes like `Generic4` usually return `self` at runtime
    --> PYI034.py:353:9
@@ -369,7 +369,7 @@ help: Use `Self` as return type
 353 +     def __new__(cls) -> typing.Self: ...
 354 |     def __enter__(self: Generic4) -> Generic4: ...
     |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PYI034 [*] `__enter__` methods in classes like `Generic4` usually return `self` at runtime
    --> PYI034.py:354:9
@@ -388,7 +388,7 @@ help: Use `Self` as return type
 354 +     def __enter__(self) -> typing.Self: ...
 355 |
     |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 PYI034 [*] `__new__` methods in classes like `Generic5` usually return `self` at runtime
    --> PYI034.py:359:9

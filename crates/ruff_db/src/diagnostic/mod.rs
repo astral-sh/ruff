@@ -1444,7 +1444,7 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
-    /// The lowest applicability that should be shown when reporting diagnostics.
+    /// The lowest applicability considered available for automatic fixing.
     fix_applicability: Applicability,
 
     cancellation_token: Option<CancellationToken>,
@@ -1556,12 +1556,10 @@ impl DisplayDiagnosticConfig {
         }
     }
 
-    /// Set the lowest fix applicability that should be shown.
+    /// Set the lowest applicability considered available for automatic fixing.
     ///
-    /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
-    /// availability for unsafe or display-only fixes.
-    ///
-    /// Note that this option is currently ignored when `hide_severity` is false.
+    /// This controls fix availability indicators. Full output shows all suggested fix diffs
+    /// regardless of applicability.
     pub fn with_fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             fix_applicability: applicability,
