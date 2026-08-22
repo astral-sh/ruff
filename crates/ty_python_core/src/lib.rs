@@ -345,6 +345,9 @@ pub struct SemanticIndex<'db> {
     /// Set of all asynchronous comprehensions in this file.
     async_comprehensions: FrozenSet<FileScopeId>,
 
+    /// Set of all scopes whose defining nodes appear in syntactic annotations.
+    scopes_defined_in_annotations: FrozenSet<FileScopeId>,
+
     /// Narrowing alias metadata for predicate leaf names.
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.
@@ -551,6 +554,25 @@ impl<'db> SemanticIndex<'db> {
             self.use_def_map(scope_id)
                 .is_range_in_type_checking_block(range)
         })
+    }
+
+    /// Returns whether `range` belongs to an assertion test or occurs inside a compound condition.
+    /// This is useful information for the `redundant-condition-strict` rule, which is suppressed
+    /// in these contexts.
+    ///
+    /// An assertion test and all its subexpressions match. For `if`, `elif`, `while` and
+    /// `match`-guard tests using `not`, `and`, or `or`, only proper subexpressions match, so
+    /// callers can still check the overall condition's truthiness.
+    ///
+    /// Only tests recorded in `scope_id` are considered; an outer statement's context does not
+    /// extend into a lambda or another nested scope.
+    pub fn is_assertion_test_or_compound_condition_subexpression(
+        &self,
+        scope_id: FileScopeId,
+        range: TextRange,
+    ) -> bool {
+        self.use_def_map(scope_id)
+            .is_assertion_test_or_compound_condition_subexpression(range)
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
@@ -952,6 +974,10 @@ impl Truthiness {
 
     pub const fn may_be_true(self) -> bool {
         !self.is_always_false()
+    }
+
+    pub const fn may_be_false(self) -> bool {
+        !self.is_always_true()
     }
 
     pub const fn is_always_true(self) -> bool {

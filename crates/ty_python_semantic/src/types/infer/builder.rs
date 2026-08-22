@@ -160,6 +160,7 @@ mod named_tuple;
 mod new_class;
 mod paramspec_validation;
 mod post_inference;
+mod redundant_conditions;
 mod subscript;
 mod type_call;
 mod type_expression;
@@ -1403,7 +1404,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
-                self.infer_function_annotations(definition, function.node(self.module()));
+                let function = function.node(self.module());
+                self.with_annotation_context(|builder| {
+                    builder.infer_function_annotations(definition, function);
+                });
             }
             DefinitionKind::Class(class) => {
                 self.infer_class_deferred(definition, class.node(self.module()));
@@ -1438,6 +1442,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_type_expression(expression.node_ref(self.db()).node(self.module()));
             }
         }
+    }
+
+    /// Run inference while visiting a syntactic annotation and restore the surrounding context.
+    fn with_annotation_context<T>(&mut self, infer: impl FnOnce(&mut Self) -> T) -> T {
+        let previously_in_annotation = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_ANNOTATION, true);
+        let result = infer(self);
+        self.context
+            .inference_flags
+            .set(InferenceFlags::IN_ANNOTATION, previously_in_annotation);
+        result
     }
 
     /// Add a binding for the given definition.
@@ -2071,6 +2088,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_body(&mut self, suite: &[ast::Stmt]) {
         let db = self.db();
+        let env = self.program_environment();
+
         for statement in suite {
             self.infer_maybe_standalone_statement(statement);
 
@@ -2087,11 +2106,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         builder.into_diagnostic(format_args!(
                             "Object of type `{}` is not awaited",
-                            ty.display(db, self.program_environment()),
+                            ty.display(db, env),
                         ));
                     }
                 }
             }
+        }
+
+        if self.should_check_condition_redundancy() {
+            self.check_suite_for_redundant_if_statements(suite);
         }
     }
 
@@ -2670,8 +2693,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(guard) = guard.as_deref() {
                 let guard_ty = self.infer_standalone_expression(guard, TypeContext::default());
 
-                if let Err(err) = guard_ty.try_bool(db, self.program_environment()) {
-                    err.report_diagnostic(&self.context, guard);
+                let truthiness = guard_ty
+                    .try_bool(db, self.program_environment())
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, guard);
+                        err.fallback_truthiness()
+                    });
+
+                if self.should_check_condition_redundancy() {
+                    self.check_condition_redundancy(guard, guard_ty, truthiness);
                 }
             }
 
@@ -4192,10 +4222,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 target,
                 simple: _,
             } = assignment;
-            let annotated = self.infer_annotation_expression(
-                annotation,
-                DeferredExpressionState::from(self.defer_annotations()),
-            );
+            let deferred_state = DeferredExpressionState::from(self.defer_annotations());
+            let annotated = self.with_annotation_context(|builder| {
+                builder.infer_annotation_expression(annotation, deferred_state)
+            });
 
             if !annotated.qualifiers.is_empty() {
                 for qualifier in TypeQualifier::iter() {
@@ -4379,10 +4409,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
         self.setup_dataclass_field_specifiers();
-        let declared = self.infer_annotation_expression_allow_pep_613(
-            annotation,
-            DeferredExpressionState::from(self.defer_annotations()),
-        );
+        let deferred_state = DeferredExpressionState::from(self.defer_annotations());
+        let declared = self.with_annotation_context(|builder| {
+            builder.infer_annotation_expression_allow_pep_613(annotation, deferred_state)
+        });
         self.dataclass_field_specifiers.clear();
 
         declared
@@ -5170,12 +5200,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
-        if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
-            err.report_diagnostic(&self.context, &**test);
-        }
+        let test_truthiness = test_ty
+            .try_bool(db, self.program_environment())
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, &**test);
+                err.fallback_truthiness()
+            });
 
         self.infer_body(body);
         self.infer_body(orelse);
+
+        if self.should_check_condition_redundancy() {
+            self.check_condition_redundancy(test, test_ty, test_truthiness);
+        }
     }
 
     fn infer_assert_statement(&mut self, assert: &ast::StmtAssert) {
@@ -5189,8 +5226,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
-        if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
-            err.report_diagnostic(&self.context, &**test);
+        let truthiness = test_ty
+            .try_bool(db, self.program_environment())
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, &**test);
+                err.fallback_truthiness()
+            });
+
+        if self.should_check_condition_redundancy() {
+            self.check_condition_redundancy(test, test_ty, truthiness);
         }
 
         self.infer_optional_expression(msg.as_deref(), TypeContext::default());
@@ -8348,11 +8392,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .homogeneous_element_type(db, env)
         });
 
+        let should_check_condition_redundancy = self.should_check_condition_redundancy();
+
         for expr in ifs {
             let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
 
-            if let Err(err) = test_ty.try_bool(db, env) {
+            let truthiness = test_ty.try_bool(db, env).unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, expr);
+                err.fallback_truthiness()
+            });
+
+            if should_check_condition_redundancy {
+                self.check_condition_redundancy(expr, test_ty, truthiness);
             }
         }
     }
@@ -8498,10 +8549,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 (body_ty, orelse_ty)
             };
 
-        match test_ty.try_bool(db, env).unwrap_or_else(|err| {
+        let truthiness = test_ty.try_bool(db, env).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, &**test);
             err.fallback_truthiness()
-        }) {
+        });
+
+        if self.should_check_condition_redundancy() {
+            self.check_condition_redundancy(test, test_ty, truthiness);
+        }
+
+        match truthiness {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
             Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
@@ -10848,16 +10905,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ))
             }
 
-            (ast::UnaryOp::Not, ty) => Type::from_truthiness(
-                db,
-                env,
-                ty.try_bool(db, env)
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, unary);
-                        err.fallback_truthiness()
-                    })
-                    .negate(),
-            ),
+            (ast::UnaryOp::Not, ty) => {
+                let original_truthiness = ty.try_bool(db, env).unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, unary);
+                    err.fallback_truthiness()
+                });
+
+                // If `debug_assertions` is enabled, avoid diagnostics for `not obj` where `obj` is inferred as
+                // a `ConstraintSet` instance. Otherwise there are a huge number of `redundant-condition`
+                // diagnostics in our test suite for `static_assert(not is_assignable_to(foo, bar))` etc.
+                if self.should_check_condition_redundancy()
+                    && !matches!(ty, Type::KnownInstance(KnownInstanceType::ConstraintSet(_)))
+                {
+                    self.check_condition_redundancy(&unary.operand, ty, original_truthiness);
+                }
+
+                Type::from_truthiness(db, env, original_truthiness.negate())
+            }
             // Handle constrained TypeVars specially: check each constraint individually.
             //
             // TODO: We expect to replace this with more general support once we migrate to the new
@@ -11015,6 +11079,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bool_op: &ast::ExprBoolOp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+
         let ast::ExprBoolOp {
             range: _,
             node_index: _,
@@ -11025,7 +11092,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accumulating prior types cannot affect inference.
         let track_peer_types = is_empty_collection_type_context(tcx)
             && values.iter().skip(1).any(is_collection_literal);
-        self.infer_chained_boolean_types(
+        let result = self.infer_chained_boolean_types(
             *op,
             track_peer_types,
             values.iter().enumerate(),
@@ -11042,7 +11109,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 (ty, value.range())
             },
-        )
+        );
+
+        if self.should_check_condition_redundancy() {
+            for value in &values[..values.len() - 1] {
+                let ty = self.expression_type(value);
+                self.check_condition_redundancy(value, ty, ty.bool(db, env));
+            }
+        }
+
+        result
     }
 
     /// Computes the output of a chain of (one) boolean operation, consuming as input an iterator

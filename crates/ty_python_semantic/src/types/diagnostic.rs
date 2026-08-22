@@ -178,6 +178,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
+    registry.register_lint(&REDUNDANT_CONDITION);
+    registry.register_lint(&REDUNDANT_CONDITION_STRICT);
 
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
@@ -1332,6 +1334,24 @@ declare_lint! {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/redundant-condition.md")]
+    pub(crate) static REDUNDANT_CONDITION = {
+        summary: "detects conditions that are always truthy or always falsey",
+        status: LintStatus::stable("0.0.74"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/redundant-condition-strict.md")]
+    pub(crate) static REDUNDANT_CONDITION_STRICT = {
+        summary: "detects conditions that are always truthy or always falsey (strict)",
+        status: LintStatus::stable("0.0.74"),
+        default_level: Level::Ignore,
     }
 }
 

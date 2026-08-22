@@ -25,7 +25,8 @@ use ty_python_semantic::types::ide_support::{
 use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, ProgramEnvironment, SemanticModel,
-    TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
+    TypeQualifiers, definitions_for_expression, definitions_for_imported_symbol,
+    definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -1361,26 +1362,6 @@ fn property_getter_definitions<'db>(
         }
     }
     None
-}
-
-/// Shared helper to get definitions for an expr (that is presumably a name/attr)
-fn definitions_for_expression<'db>(
-    model: &SemanticModel<'db>,
-    expression: ruff_python_ast::ExprRef<'_>,
-    alias_resolution: ImportAliasResolution,
-) -> Option<Vec<ResolvedDefinition<'db>>> {
-    match expression {
-        ast::ExprRef::Name(name) => Some(definitions_for_name(
-            model,
-            name.id.as_str(),
-            expression.into(),
-            alias_resolution,
-        )),
-        ast::ExprRef::Attribute(attribute) => Some(ty_python_semantic::definitions_for_attribute(
-            model, attribute,
-        )),
-        _ => None,
-    }
 }
 
 fn definitions_for_callable<'db>(

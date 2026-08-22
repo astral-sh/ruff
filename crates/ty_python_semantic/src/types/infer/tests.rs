@@ -336,7 +336,14 @@ fn not_literal_string() -> anyhow::Result<()> {
     );
     db.write_dedented("src/a.py", &content)?;
 
-    assert_file_diagnostics(&db, "src/a.py", &[]);
+    assert_file_diagnostics(
+        &db,
+        "src/a.py",
+        &[
+            "An empty string is always falsy",
+            "An empty string is always falsy",
+        ],
+    );
 
     Ok(())
 }

@@ -44,8 +44,8 @@ pub use ty_site_packages::{
 pub use types::ide_support::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
     contains_identifier, definitions_for_attribute, definitions_for_bin_op,
-    definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
-    map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
+    definitions_for_expression, definitions_for_imported_symbol, definitions_for_name,
+    definitions_for_unary_op, map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
     type_hierarchy_supertypes,
 };
 pub use types::{

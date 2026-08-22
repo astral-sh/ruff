@@ -11,12 +11,16 @@ def _(flag: bool):
 
 ```py
 reveal_type(1 if True else 2)  # revealed: Literal[1]
+# error: [redundant-condition] "always truthy"
 reveal_type(1 if "not empty" else 2)  # revealed: Literal[1]
+# error: [redundant-condition] "always truthy"
 reveal_type(1 if (1,) else 2)  # revealed: Literal[1]
 reveal_type(1 if 1 else 2)  # revealed: Literal[1]
 
 reveal_type(1 if False else 2)  # revealed: Literal[2]
+# error: [redundant-condition] "always falsy"
 reveal_type(1 if None else 2)  # revealed: Literal[2]
+# error: [redundant-condition] "always falsy"
 reveal_type(1 if "" else 2)  # revealed: Literal[2]
 reveal_type(1 if 0 else 2)  # revealed: Literal[2]
 ```

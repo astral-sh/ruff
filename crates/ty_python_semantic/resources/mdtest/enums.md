@@ -3422,6 +3422,7 @@ def color_value_without_red_and_with_restricted_typevar(
 def color_truthy_without_red(color: Color) -> int:
     if color is Color.RED:
         raise ValueError()
+    # error: [redundant-condition] "always truthy"
     if color:
         return 1
 

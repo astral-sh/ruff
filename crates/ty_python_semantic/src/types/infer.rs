@@ -2002,7 +2002,7 @@ impl<'db> StatementInferenceInner<'db> {
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub(crate) struct InferenceFlags: u16 {
+    pub(crate) struct InferenceFlags: u32 {
         /// Whether to allow `ParamSpec` in type expressions.
         ///
         /// In most contexts inside type expressions, bare `ParamSpec`s are not allowed.
@@ -2060,6 +2060,9 @@ bitflags::bitflags! {
 
         /// Whether the current method's explicit receiver annotation is incompatible with `Self`.
         const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 15;
+
+        /// Whether the visitor is currently inside a syntactic annotation.
+        const IN_ANNOTATION = 1 << 16;
     }
 }
 

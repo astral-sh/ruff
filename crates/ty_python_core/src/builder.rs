@@ -228,6 +228,10 @@ impl ConditionFlowSnapshot {
     }
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "visitor state flags should eventually be consolidated into a bitflag"
+)]
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -253,6 +257,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     has_future_annotations: bool,
     /// Whether we are currently visiting an `if TYPE_CHECKING` block.
     in_type_checking_block: bool,
+    /// Whether we are currently visiting a syntactic annotation.
+    in_annotation: bool,
 
     // Used for checking semantic syntax errors
     resolver_environment: ResolverEnvironment<'db>,
@@ -291,6 +297,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     generator_functions: FxHashSet<FileScopeId>,
     /// Hashset of all [`FileScopeId`]s that correspond to asynchronous comprehensions.
     async_comprehensions: FxHashSet<FileScopeId>,
+    /// Hashset of all [`FileScopeId`]s whose defining nodes appear in syntactic annotations.
+    scopes_defined_in_annotations: FxHashSet<FileScopeId>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
@@ -324,6 +332,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             has_future_annotations: false,
             in_type_checking_block: false,
+            in_annotation: false,
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
@@ -346,6 +355,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
             async_comprehensions: FxHashSet::default(),
+            scopes_defined_in_annotations: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
 
@@ -516,6 +526,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.exception_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
+        if self.in_annotation {
+            self.scopes_defined_in_annotations.insert(file_scope_id);
+        }
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
             .push(Box::new(UseDefMapBuilder::new(scope_kind)));
@@ -2192,6 +2205,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    /// Records an `if`, `elif`, `while` or `match` guard test that uses `not`, `and`, or `or`.
+    fn record_compound_condition_test(&mut self, test: &ast::Expr) {
+        if matches!(
+            test,
+            ast::Expr::BoolOp(_)
+                | ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    ..
+                })
+        ) {
+            self.current_use_def_map_mut()
+                .record_compound_condition_test(test.range());
+        }
+    }
+
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
     /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
@@ -3254,6 +3282,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
             async_comprehensions: FrozenSet::from(self.async_comprehensions),
+            scopes_defined_in_annotations: FrozenSet::from(self.scopes_defined_in_annotations),
             narrowing_alias_predicates: FrozenMap::from(self.alias_predicates),
         }
     }
@@ -3866,6 +3895,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // `msg` branch back into the following flow, since there is no way of getting out
                 // of that branch. Code after the assertion starts from the condition's truthy flow.
 
+                self.current_use_def_map_mut()
+                    .record_assertion_test(test.range());
                 self.visit_expr(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test);
@@ -3937,7 +3968,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // not discard the declared type. The value is still bound only after the RHS
                 // completes, so a handler can observe an earlier binding (or an unbound name).
                 let pending = self.begin_annotated_assignment(node);
-                self.visit_expr(&node.annotation);
+                self.visit_annotation(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                     if self.is_method_or_eagerly_executed_in_method().is_some() {
@@ -4039,6 +4070,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
+                self.record_compound_condition_test(&node.test);
                 self.visit_expr(&node.test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
@@ -4093,6 +4125,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     let next_falsy = if let Some(elif_test) = clause_test {
+                        self.record_compound_condition_test(elif_test);
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
@@ -4176,6 +4209,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
+                self.record_compound_condition_test(test);
                 self.visit_expr(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 
@@ -4521,6 +4555,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let mut previous_pattern: Option<PatternPredicate<'_>> = None;
 
                 for (i, case) in cases.iter().enumerate() {
+                    if let Some(guard) = case.guard.as_deref() {
+                        self.record_compound_condition_test(guard);
+                    }
                     let match_pattern_predicate = self.create_pattern_predicate(
                         subject_expr,
                         &case.pattern,
@@ -5136,6 +5173,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 }
 
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
+    fn visit_annotation(&mut self, expression: &'ast ast::Expr) {
+        let previously_in_annotation = std::mem::replace(&mut self.in_annotation, true);
+        self.visit_expr(expression);
+        self.in_annotation = previously_in_annotation;
+    }
+
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.push_statement(CurrentStatement::default());
         self.visit_stmt_impl(stmt);
