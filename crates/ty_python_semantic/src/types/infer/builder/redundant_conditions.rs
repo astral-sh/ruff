@@ -2,7 +2,7 @@
 //! always-true or always-false.
 
 use ruff_db::{parsed::parsed_module, source::source_text};
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ruff_text_size::Ranged;
 use ty_module_resolver::{KnownModule, file_to_module};
@@ -136,7 +136,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
-        let rule = if test_type.is_assignable_to(db, env, int_instance) {
+        let is_int = test_type.is_assignable_to(db, env, int_instance);
+
+        let rule = if is_int {
             if self
                 .index
                 .is_assertion_test_or_compound_condition_subexpression(
@@ -164,11 +166,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let model = SemanticModel::new(db, self.program_file());
 
-        if any_over_expr(test, |expression| {
-            is_special_cased_condition_expression(db, &model, expression, |expr| {
-                self.expression_type(expr)
+        if is_int
+            && any_over_expr(test, |expression| {
+                is_special_cased_condition_expression(db, &model, expression, |expr| {
+                    self.expression_type(expr)
+                })
             })
-        }) {
+        {
             return None;
         }
 
@@ -287,7 +291,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else if test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env)) {
                     let message = "Condition is always true";
                     let mut diagnostic = builder.into_diagnostic(message);
-                    diagnostic.set_concise_message(message);
+                    let source = source_text(db, self.file());
+                    diagnostic.set_concise_message(format_args!(
+                        "Condition `{}` is always true",
+                        &source[test.range()]
+                    ));
                     diagnostic.set_primary_annotation_message(format_args!(
                         "Inferred type is `{}`",
                         test_type.display(db, env)
@@ -354,7 +362,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     };
                     let mut diagnostic = builder.into_diagnostic(message);
                     if is_bool {
-                        diagnostic.set_concise_message(message);
+                        let source = source_text(db, self.file());
+                        diagnostic.set_concise_message(format_args!(
+                            "Condition `{}` is always false",
+                            &source[test.range()]
+                        ));
                     } else {
                         diagnostic.set_concise_message(format_args!(
                             "Object of type `{}` is always falsy",
@@ -483,32 +495,45 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let test_truthiness = test_type.bool(db, env);
 
                 match test_truthiness {
-                    Truthiness::Ambiguous => {}
+                    Truthiness::Ambiguous => {
+                        self.check_condition_redundancy(test, test_type, test_truthiness);
+                    }
                     Truthiness::AlwaysFalse => {
-                        if is_integer_test() && self.is_deliberately_unreachable_suite(body) {
-                            continue;
+                        if !(is_integer_test() && self.is_deliberately_unreachable_suite(body)) {
+                            self.check_condition_redundancy(test, test_type, test_truthiness);
                         }
                     }
                     Truthiness::AlwaysTrue => match elif_else_clauses.get(elif_i + 1) {
                         Some(clause) => {
-                            if clause.test.is_none()
+                            if !(clause.test.is_none()
                                 && is_integer_test()
-                                && self.is_deliberately_unreachable_suite(&clause.body)
+                                && self.is_deliberately_unreachable_suite(&clause.body))
                             {
-                                continue;
+                                self.check_condition_redundancy(test, test_type, test_truthiness);
                             }
                         }
                         None => {
-                            if is_integer_test()
-                                && self.is_deliberately_unreachable_suite(&suite[i + 1..])
+                            if !(is_integer_test()
+                                && self.is_deliberately_unreachable_suite(&suite[i + 1..]))
                             {
-                                continue;
+                                let possible_diagnostic = self.check_condition_redundancy(
+                                    test,
+                                    test_type,
+                                    test_truthiness,
+                                );
+                                if let Some(mut diagnostic) = possible_diagnostic
+                                    && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
+                                    && is_integer_test()
+                                {
+                                    diagnostic.help(
+                                        "Replace this `elif` with an `else` branch \
+                                        that asserts the condition to be `True`",
+                                    );
+                                }
                             }
                         }
                     },
                 }
-
-                self.check_condition_redundancy(test, test_type, test_truthiness);
             }
         }
     }

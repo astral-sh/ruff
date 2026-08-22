@@ -1036,6 +1036,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 13 |     elif 1 == 1:  # snapshot: redundant-condition-strict
    |          ^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 
 
 error[redundant-condition-strict]: Condition is always false
@@ -1050,28 +1051,28 @@ inferred as an instance of `bool`:
 
 ```py
 def negated_conditions():
-    if not 1 > 2:  # error: [redundant-condition-strict] "Condition is always true"
+    if not 1 > 2:  # error: [redundant-condition-strict] "Condition `not 1 > 2` is always true"
         pass
 
-    if not 1 < 2:  # error: [redundant-condition-strict] "Condition is always false"
+    if not 1 < 2:  # error: [redundant-condition-strict] "Condition `not 1 < 2` is always false"
         pass
 
-    if not 0 == 1:  # error: [redundant-condition-strict] "Condition is always true"
+    if not 0 == 1:  # error: [redundant-condition-strict] "Condition `not 0 == 1` is always true"
         pass
 
-    if not 1 == 1:  # error: [redundant-condition-strict] "Condition is always false"
+    if not 1 == 1:  # error: [redundant-condition-strict] "Condition `not 1 == 1` is always false"
         pass
 
-    if not not 1 == 1:  # error: [redundant-condition-strict] "Condition is always true"
+    if not not 1 == 1:  # error: [redundant-condition-strict] "Condition `not not 1 == 1` is always true"
         pass
 
 def negated_conditional_contexts(flag: bool):
     if flag:
         pass
-    elif not 1 == 0:  # error: [redundant-condition-strict] "Condition is always true"
+    elif not 1 == 0:  # error: [redundant-condition-strict] "Condition `not 1 == 0` is always true"
         pass
 
-    while not 1 == 0:  # error: [redundant-condition-strict] "Condition is always true"
+    while not 1 == 0:  # error: [redundant-condition-strict] "Condition `not 1 == 0` is always true"
         break
 ```
 
