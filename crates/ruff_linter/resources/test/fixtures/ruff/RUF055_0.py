@@ -103,3 +103,31 @@ re.sub(r'''abc''', "", s)
 # str.split("") raises ValueError while re.split("", s) succeeds
 re.split("", s)
 re.split(r"", s)
+
+# https://github.com/astral-sh/ruff/issues/27024
+# `bytes` patterns: the fix is only SAFE when the target is provably a string/bytes
+# literal, because a `bytes` pattern also accepts buffer-protocol objects (memoryview,
+# ...) for which `in`/`.startswith` change behavior or raise.
+def bytes_target(buf):
+    if re.search(b"ab", buf):  # unsafe: `buf` has an unknown type (could be a memoryview)
+        pass
+    if re.search(b"ab", memoryview(b"abc")):  # unsafe: membership on memoryview != subsequence
+        pass
+    if re.match(b"ab", buf):  # unsafe: memoryview has no `.startswith`
+        pass
+
+
+if re.search(b"ab", b"abc"):  # safe: bytes-literal target
+    pass
+
+
+b_literal = b"abc"
+if re.search(b"ab", b_literal):  # safe: `b_literal` resolves to a bytes literal
+    pass
+
+
+# Cross-kind: a `bytes` pattern with a `str`-literal target. `re.fullmatch(b"ab", "ab")`
+# raises `TypeError` at runtime, whereas the generated `"ab" == b"ab"` returns `False`, so
+# the fix must be marked unsafe.
+if re.fullmatch(b"ab", "ab"):  # unsafe: bytes pattern, str-literal target
+    pass

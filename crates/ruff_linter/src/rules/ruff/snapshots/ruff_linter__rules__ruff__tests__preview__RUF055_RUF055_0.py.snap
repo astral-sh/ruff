@@ -256,3 +256,108 @@ help: Replace with `s.replace(r'''abc''', "")`
 100 + s.replace(r'''abc''', "")
 101 |
     |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:112:8
+    |
+110 | # ...) for which `in`/`.startswith` change behavior or raise.
+111 | def bytes_target(buf):
+112 |     if re.search(b"ab", buf):  # unsafe: `buf` has an unknown type (could be a memoryview)
+    |        ^^^^^^^^^^^^^^^^^^^^^
+113 |         pass
+114 |     if re.search(b"ab", memoryview(b"abc")):  # unsafe: membership on memoryview != subsequence
+    |
+help: Replace with `b"ab" in buf`
+    |
+111 | def bytes_target(buf):
+    -     if re.search(b"ab", buf):  # unsafe: `buf` has an unknown type (could be a memoryview)
+112 +     if b"ab" in buf:  # unsafe: `buf` has an unknown type (could be a memoryview)
+113 |         pass
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:114:8
+    |
+112 |     if re.search(b"ab", buf):  # unsafe: `buf` has an unknown type (could be a memoryview)
+113 |         pass
+114 |     if re.search(b"ab", memoryview(b"abc")):  # unsafe: membership on memoryview != subsequence
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+115 |         pass
+116 |     if re.match(b"ab", buf):  # unsafe: memoryview has no `.startswith`
+    |
+help: Replace with `b"ab" in memoryview(b"abc")`
+    |
+113 |         pass
+    -     if re.search(b"ab", memoryview(b"abc")):  # unsafe: membership on memoryview != subsequence
+114 +     if b"ab" in memoryview(b"abc"):  # unsafe: membership on memoryview != subsequence
+115 |         pass
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:116:8
+    |
+114 |     if re.search(b"ab", memoryview(b"abc")):  # unsafe: membership on memoryview != subsequence
+115 |         pass
+116 |     if re.match(b"ab", buf):  # unsafe: memoryview has no `.startswith`
+    |        ^^^^^^^^^^^^^^^^^^^^
+117 |         pass
+    |
+help: Replace with `buf.startswith(b"ab")`
+    |
+115 |         pass
+    -     if re.match(b"ab", buf):  # unsafe: memoryview has no `.startswith`
+116 +     if buf.startswith(b"ab"):  # unsafe: memoryview has no `.startswith`
+117 |         pass
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:120:4
+    |
+120 | if re.search(b"ab", b"abc"):  # safe: bytes-literal target
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+121 |     pass
+    |
+help: Replace with `b"ab" in b"abc"`
+    |
+119 |
+    - if re.search(b"ab", b"abc"):  # safe: bytes-literal target
+120 + if b"ab" in b"abc":  # safe: bytes-literal target
+121 |     pass
+    |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:125:4
+    |
+124 | b_literal = b"abc"
+125 | if re.search(b"ab", b_literal):  # safe: `b_literal` resolves to a bytes literal
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+126 |     pass
+    |
+help: Replace with `b"ab" in b_literal`
+    |
+124 | b_literal = b"abc"
+    - if re.search(b"ab", b_literal):  # safe: `b_literal` resolves to a bytes literal
+125 + if b"ab" in b_literal:  # safe: `b_literal` resolves to a bytes literal
+126 |     pass
+    |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:132:4
+    |
+130 | # raises `TypeError` at runtime, whereas the generated `"ab" == b"ab"` returns `False`, so
+131 | # the fix must be marked unsafe.
+132 | if re.fullmatch(b"ab", "ab"):  # unsafe: bytes pattern, str-literal target
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+133 |     pass
+    |
+help: Replace with `"ab" == b"ab"`
+    |
+131 | # the fix must be marked unsafe.
+    - if re.fullmatch(b"ab", "ab"):  # unsafe: bytes pattern, str-literal target
+132 + if "ab" == b"ab":  # unsafe: bytes pattern, str-literal target
+133 |     pass
+    |
+note: This is an unsafe fix and may change runtime behavior
