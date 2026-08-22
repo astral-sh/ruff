@@ -488,29 +488,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let test_type = self.expression_type(test);
             let test_truthiness = test_type.bool(db, env);
-            let is_integer_test =
-                || test_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env));
+
+            // Checking if the suite is deliberately unreachable could potentially be expensive.
+            // It's only relevant for the strict check, so we only do the check if:
+            // 1. The strict check is enabled, and
+            // 2. The test type is assignable to int (including bool), meaning it would actually
+            //    trigger the strict check rather than the normal check.
+            let should_check_if_suite_deliberately_unreachable = || {
+                self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT)
+                    && test_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env))
+            };
 
             match test_truthiness {
                 Truthiness::Ambiguous => {
                     self.check_condition_redundancy(test, test_type, test_truthiness);
                 }
                 Truthiness::AlwaysFalse => {
-                    if !(is_integer_test() && self.is_deliberately_unreachable_suite(body)) {
+                    if !(should_check_if_suite_deliberately_unreachable()
+                        && self.is_deliberately_unreachable_suite(body))
+                    {
                         self.check_condition_redundancy(test, test_type, test_truthiness);
                     }
                 }
                 Truthiness::AlwaysTrue => match elif_else_clauses.as_slice() {
                     [single] => {
                         if !(single.test.is_none()
-                            && is_integer_test()
+                            && should_check_if_suite_deliberately_unreachable()
                             && self.is_deliberately_unreachable_suite(&single.body))
                         {
                             self.check_condition_redundancy(test, test_type, test_truthiness);
                         }
                     }
                     [] => {
-                        if !(is_integer_test()
+                        if !(should_check_if_suite_deliberately_unreachable()
                             && self.is_deliberately_unreachable_suite(&suite[i + 1..]))
                         {
                             self.check_condition_redundancy(test, test_type, test_truthiness);
@@ -540,21 +550,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.check_condition_redundancy(test, test_type, test_truthiness);
                     }
                     Truthiness::AlwaysFalse => {
-                        if !(is_integer_test() && self.is_deliberately_unreachable_suite(body)) {
+                        if !(should_check_if_suite_deliberately_unreachable()
+                            && self.is_deliberately_unreachable_suite(body))
+                        {
                             self.check_condition_redundancy(test, test_type, test_truthiness);
                         }
                     }
                     Truthiness::AlwaysTrue => match elif_else_clauses.get(elif_i + 1) {
                         Some(clause) => {
                             if !(clause.test.is_none()
-                                && is_integer_test()
+                                && should_check_if_suite_deliberately_unreachable()
                                 && self.is_deliberately_unreachable_suite(&clause.body))
                             {
                                 self.check_condition_redundancy(test, test_type, test_truthiness);
                             }
                         }
                         None => {
-                            if !(is_integer_test()
+                            if !(should_check_if_suite_deliberately_unreachable()
                                 && self.is_deliberately_unreachable_suite(&suite[i + 1..]))
                             {
                                 let possible_diagnostic = self.check_condition_redundancy(
@@ -564,7 +576,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 );
                                 if let Some(mut diagnostic) = possible_diagnostic
                                     && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
-                                    && is_integer_test()
+                                    && should_check_if_suite_deliberately_unreachable()
                                 {
                                     diagnostic.help(
                                         "Replace this `elif` with an `else` branch \
