@@ -246,6 +246,14 @@ for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
         case _:
             pass
 
+# The `if` test is evaluated unconditionally, so using the group there and
+# again in one of the (mutually exclusive) branches is still a reuse.
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    if len(list(section_items)) > 1:
+        pass
+    else:
+        collect_shop_items(shopper, section_items)  # B031
+
 # Let's redefine the `groupby` function to make sure we pick up the correct one.
 # NOTE: This should always be at the end of the file.
 def groupby(data, key=None):

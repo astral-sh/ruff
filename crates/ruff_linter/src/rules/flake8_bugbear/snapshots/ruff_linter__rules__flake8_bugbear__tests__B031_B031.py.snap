@@ -277,3 +277,14 @@ B031 Using the generator returned from `itertools.groupby()` more than once will
 246 |         case _:
 247 |             pass
     |
+
+B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+   --> B031.py:255:37
+    |
+253 |         pass
+254 |     else:
+255 |         collect_shop_items(shopper, section_items)  # B031
+    |                                     ^^^^^^^^^^^^^
+256 |
+257 | # Let's redefine the `groupby` function to make sure we pick up the correct one.
+    |

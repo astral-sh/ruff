@@ -158,13 +158,16 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 range: _,
                 node_index: _,
             }) => {
+                // Visit the test before pushing the branch counters as it
+                // is evaluated unconditionally.
+                self.visit_expr(test);
+
                 // base if plus branches
                 let mut if_stack = Vec::with_capacity(1 + elif_else_clauses.len());
                 // Initialize the vector with the count for the if branch.
                 if_stack.push(0);
                 self.counter_stack.push(if_stack);
 
-                self.visit_expr(test);
                 self.visit_body(body);
 
                 for clause in elif_else_clauses {
@@ -186,8 +189,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 node_index: _,
             }) => {
                 // Visit the subject before pushing the branch counters as it
-                // is evaluated unconditionally. Visiting it with an empty
-                // counter frame on the stack would panic (#26624).
+                // is evaluated unconditionally.
                 self.visit_expr(subject);
                 self.counter_stack.push(Vec::with_capacity(cases.len()));
                 for match_case in cases {
