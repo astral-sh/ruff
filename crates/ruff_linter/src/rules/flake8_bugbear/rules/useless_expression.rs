@@ -87,8 +87,9 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
     }
 
     if checker.source_type.is_ipynb()
+        && checker.semantic().at_top_level()
         && at_last_top_level_expression_in_cell(
-            checker.semantic(),
+            checker.semantic().current_statement().end(),
             checker.locator(),
             checker.cell_offsets(),
         )
