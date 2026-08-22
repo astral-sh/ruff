@@ -86,3 +86,17 @@ operating_system._exit(1)
 from enum import Enum
 
 Enum._missing_(1)  # OK
+
+import sys
+sys._getframe()
+sys._is_gil_enabled()
+
+import __future__
+_ = __future__._Feature
+
+import ctypes
+_ = ctypes._CFuncPtr
+
+import ssl
+ssl._create_unverified_context()
+
