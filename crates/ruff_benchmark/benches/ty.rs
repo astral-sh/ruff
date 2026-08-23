@@ -13,8 +13,8 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
-use ruff_ranged_value::RangedValue;
-use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
+use ruff_ranged_value::{RangedValue, ValueSource};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options, Rules};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
@@ -1485,6 +1485,7 @@ struct ProjectBenchmark<'a> {
     fs: MemoryFileSystem,
     max_diagnostics: usize,
     freeze_inputs: bool,
+    rules: Option<Rules>,
 }
 
 impl<'a> ProjectBenchmark<'a> {
@@ -1499,6 +1500,7 @@ impl<'a> ProjectBenchmark<'a> {
             fs,
             max_diagnostics,
             freeze_inputs: false,
+            rules: None,
         }
     }
 
@@ -1519,6 +1521,7 @@ impl<'a> ProjectBenchmark<'a> {
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
+            rules: self.rules.clone(),
             ..Options::default()
         });
 
@@ -1619,6 +1622,17 @@ fn attrs(criterion: &mut Criterion) {
     // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
     let frozen_benchmark = benchmark.freeze_inputs();
     bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
+
+    let all_rules_benchmark = ProjectBenchmark {
+        freeze_inputs: false,
+        rules: Options::from_toml_str("rules.all = 'error'", ValueSource::Cli)
+            .expect("valid rule configuration")
+            .rules,
+        max_diagnostics: 100,
+        ..frozen_benchmark
+    };
+
+    bench_project_named(&all_rules_benchmark, criterion, "attrs (all rules)");
 }
 
 fn anyio(criterion: &mut Criterion) {
