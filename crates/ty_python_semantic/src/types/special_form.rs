@@ -148,7 +148,6 @@ impl SpecialFormType {
             | Self::TypeForm
             | Self::TypingSelf
             | Self::TypingCallable
-            | Self::CollectionsAbcCallable
             | Self::Concatenate
             | Self::Unpack
             | Self::TypeAlias
@@ -175,7 +174,7 @@ impl SpecialFormType {
             // as being valid.
             Self::Protocol => KnownClass::ProtocolMeta,
 
-            Self::Generic | Self::Any => KnownClass::Type,
+            Self::Generic | Self::Any | Self::CollectionsAbcCallable => KnownClass::Type,
 
             Self::LegacyStdlibAlias(_) => KnownClass::StdlibAlias,
 
