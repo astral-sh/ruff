@@ -4960,7 +4960,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .ignore_possibly_undefined()
                 .is_none_or(|attribute_type| match (comparison, is_positive) {
                     (NominalAttributeComparison::Equality, true) => {
-                        !is_supported_tag_literal_annotation(db, attribute_type)
+                        !is_supported_tag_literal_or_union(db, attribute_type)
                             || !attribute_type.is_disjoint_from(db, &self.env, rhs_type)
                     }
                     (NominalAttributeComparison::Equality, false) => {
@@ -5162,17 +5162,16 @@ fn is_supported_tag_literal(ty: Type) -> bool {
     )
 }
 
-/// Return true if the given type is a literal type with one or more supported literal values of
-/// the same kind, e.g. `Literal["A", "B"]`. These types are represented as a `Type::Union(_)`.
-fn is_supported_tag_literal_annotation(db: &dyn Db, ty: Type) -> bool {
+/// Return true if the given type is a literal type with one or more supported literal values,
+/// e.g. `Literal[1, "A", "B"]`. These types are represented as `Type::Union(_)`.
+fn is_supported_tag_literal_or_union(db: &dyn Db, ty: Type) -> bool {
     match ty {
-        Type::LiteralValue(_) => is_supported_tag_literal(ty),
         Type::Union(union) => union
             .elements(db)
             .iter()
             .copied()
             .all(is_supported_tag_literal),
-        _ => false,
+        _ => is_supported_tag_literal(ty),
     }
 }
 
@@ -5191,7 +5190,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         typeddict
             .items(db)
             .get(field_name)
-            .is_none_or(|field| is_supported_tag_literal_annotation(db, field.declared_ty))
+            .is_none_or(|field| is_supported_tag_literal_or_union(db, field.declared_ty))
     };
 
     match ty {
@@ -5297,7 +5296,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     union.elements(db).iter().all(|elem| {
         elem.tuple_instance_spec(db, env)
             .and_then(|spec| spec.py_index(db, env, index).ok())
-            .is_none_or(|ty| is_supported_tag_literal_annotation(db, ty))
+            .is_none_or(|ty| is_supported_tag_literal_or_union(db, ty))
     })
 }
 

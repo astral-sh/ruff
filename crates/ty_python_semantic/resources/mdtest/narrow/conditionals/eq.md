@@ -2605,9 +2605,9 @@ class B:
     tag: Literal["b"]
     field_b: str
 
-class X1:
-    tag: Literal["x", 1]
-    field_x1: str
+class C1:
+    tag: Literal["c", 1]
+    field_c1: str
 
 class Marker(Protocol):
     marked: bool
@@ -2624,11 +2624,11 @@ class TaggedB(Protocol):
     @property
     def tag(self) -> Literal["b"]: ...
 
-class TaggedXY(Protocol):
-    field_x1: str
+class TaggedC1(Protocol):
+    field_c1: str
 
     @property
-    def tag(self) -> Literal["x", 1]: ...
+    def tag(self) -> Literal["c", 1]: ...
 
 class Container:
     value: A | B | None
@@ -2651,20 +2651,33 @@ def _(x: A | B):
     else:
         reveal_type(x)  # revealed: A
 
-def multiple_tags(x: A | B | X1):
-    if x.tag == "x":
-        reveal_type(x)  # revealed: X1
-        reveal_type(x.field_x1)  # revealed: str
-    elif x.tag == 1:
-        reveal_type(x)  # revealed: X1
+def multiple_tags(x: A | C1):
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+        reveal_type(x.field_a)  # revealed: int
     else:
-        reveal_type(x)  # revealed: A | B
+        reveal_type(x)  # revealed: C1
+        reveal_type(x.field_c1)  # revealed: str
 
-def exclude_one_of_multiple_tags(x: A | B | X1):
-    if x.tag != "x":
-        reveal_type(x)  # revealed: A | B | X1
+    if "a" == x.tag:
+        reveal_type(x)  # revealed: A
     else:
-        reveal_type(x)  # revealed: X1
+        reveal_type(x)  # revealed: C1
+
+    if x.tag != "a":
+        reveal_type(x)  # revealed: C1
+    else:
+        reveal_type(x)  # revealed: A
+
+    if x.tag == "c":
+        reveal_type(x)  # revealed: C1
+    else:
+        reveal_type(x)  # revealed: A | C1
+
+    if x.tag != "c":
+        reveal_type(x)  # revealed: A | C1
+    else:
+        reveal_type(x)  # revealed: C1
 
 def truthiness_guard(value: A | B | None):
     if not value:
@@ -2704,14 +2717,12 @@ def protocol_union(value: TaggedA | TaggedB):
         reveal_type(value)  # revealed: TaggedB
         reveal_type(value.field_b)  # revealed: str
 
-def protocol_union_multiple_tags(value: TaggedA | TaggedB | TaggedXY):
-    if value.tag == "x":
-        reveal_type(value)  # revealed: XY
-        reveal_type(value.field_x1)  # revealed: str
-    elif value.tag == "y":
-        reveal_type(value)  # revealed: XY
+def protocol_union_multiple_tags(value: TaggedA | TaggedC1):
+    if value.tag == "c":
+        reveal_type(value)  # revealed: TaggedC1
+        reveal_type(value.field_c1)  # revealed: str
     else:
-        reveal_type(value)  # revealed: TaggedA | TaggedB
+        reveal_type(value)  # revealed: TaggedA | TaggedC1
 ```
 
 Enum literals are also supported as attribute tags:
