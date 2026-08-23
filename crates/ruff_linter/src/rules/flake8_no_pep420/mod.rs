@@ -75,4 +75,19 @@ mod tests {
         assert_eq!(diagnostics.len(), 1);
         Ok(())
     }
+
+    #[test]
+    fn pytest_tests_directory_preview() -> Result<()> {
+        let project_root = test_resource_path("fixtures/flake8_no_pep420/test_pass_pytest_preview");
+        let diagnostics = test_path(
+            Path::new("flake8_no_pep420/test_pass_pytest_preview/tests/unit/__init__.py"),
+            &LinterSettings {
+                project_root,
+                ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage).with_preview_mode()
+            },
+        )?;
+
+        assert!(diagnostics.is_empty());
+        Ok(())
+    }
 }

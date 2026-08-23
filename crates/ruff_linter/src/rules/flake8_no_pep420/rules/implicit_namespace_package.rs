@@ -72,6 +72,16 @@ pub(crate) fn implicit_namespace_package(
     allow_nested_roots: bool,
     context: &LintContext,
 ) {
+    // Ignore files under a top-level `tests` directory.
+    if path.strip_prefix(project_root).is_ok_and(|relative| {
+        relative
+            .components()
+            .next()
+            .is_some_and(|component| component.as_os_str() == "tests")
+    }) {
+        return;
+    }
+
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
         && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
@@ -81,13 +91,6 @@ pub(crate) fn implicit_namespace_package(
         && path
             .parent()
             .is_none_or( |parent| parent != project_root)
-        // Ignore files under a top-level `tests` directory.
-        && !path.strip_prefix(project_root).is_ok_and(|relative| {
-            relative
-                .components()
-                .next()
-                .is_some_and(|component| component.as_os_str() == "tests")
-        })
         // Ignore any files that are direct children of a source directory (e.g., `src/manage.py`).
         && !path
             .parent()
