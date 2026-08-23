@@ -1381,7 +1381,11 @@ impl<'db> StaticClassLiteral<'db> {
                     let member =
                         self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, None));
                     let specialization = generic_context.default_specialization(db, self.known(db));
-                    member.map_type(|ty| ty.apply_specialization(db, specialization))
+                    // An inherited method's `Self` bound can still contain this class's type
+                    // variables, so the default arguments must also specialize that bound.
+                    member.map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                    })
                 }
             }
         } else {

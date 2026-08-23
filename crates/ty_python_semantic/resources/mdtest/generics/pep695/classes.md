@@ -809,6 +809,66 @@ reveal_type(PartiallyFixed.fixed)  # revealed: int
 reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
 ```
 
+## Unbound inherited methods
+
+An inherited instance method accessed through an unspecialized generic subclass uses the subclass's
+default type arguments in both its signature and the upper bound of its implicit `Self` parameter.
+The class type variables are not inferred from the receiver passed to the unbound method.
+
+```py
+from typing import Self
+
+class Parent[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def copy(self) -> Self:
+        return self
+
+class Child[U](Parent[U]): ...
+class Grandchild[V](Child[V]): ...
+
+def get_values(parent: Parent[int], child: Child[int], grandchild: Grandchild[int]):
+    reveal_type(Parent.get(parent))  # revealed: Unknown
+    reveal_type(Child.get(child))  # revealed: Unknown
+    reveal_type(Grandchild.get(grandchild))  # revealed: Unknown
+    reveal_type(Child[int].get(child))  # revealed: int
+
+    Child.get(1)  # error: [invalid-argument-type]
+```
+
+Applying default type arguments to the bound of `Self` does not replace `Self` itself: a method
+returning `Self` preserves the concrete receiver type, including its type arguments.
+
+```py
+def copy_values(child: Child[int], grandchild: Grandchild[str]):
+    reveal_type(Child.copy(child))  # revealed: Child[int]
+    reveal_type(Grandchild.copy(grandchild))  # revealed: Grandchild[str]
+```
+
+Default type arguments also propagate through nested specializations in the base class.
+
+```py
+class NestedChild[U](Parent[tuple[int, U]]): ...
+
+def get_nested(child: NestedChild[str]):
+    reveal_type(NestedChild.get(child))  # revealed: tuple[int, Unknown]
+    reveal_type(NestedChild[str].get(child))  # revealed: tuple[int, str]
+```
+
+Declared defaults also constrain the receiver of an unbound inherited method. A receiver with a
+different type argument is rejected, just as it is for an explicitly specialized class.
+
+```py
+class DefaultChild[U = int](Parent[U]): ...
+
+def get_defaults(int_child: DefaultChild[int], str_child: DefaultChild[str]):
+    reveal_type(DefaultChild.get(int_child))  # revealed: int
+    reveal_type(DefaultChild[str].get(str_child))  # revealed: str
+    DefaultChild.get(str_child)  # error: [invalid-argument-type]
+    DefaultChild[int].get(str_child)  # error: [invalid-argument-type]
+```
+
 ## Generic methods
 
 Generic classes can contain methods that are themselves generic. The generic methods can refer to
