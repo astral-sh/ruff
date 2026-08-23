@@ -226,6 +226,18 @@ mod tests {
         "PT020"
     )]
     #[test_case(
+        Rule::PytestDeprecatedYieldFixture,
+        Path::new("PT020_1.py"),
+        Settings::default(),
+        "PT020_1"
+    )]
+    #[test_case(
+        Rule::PytestDeprecatedYieldFixture,
+        Path::new("PT020_2.py"),
+        Settings::default(),
+        "PT020_2"
+    )]
+    #[test_case(
         Rule::PytestFixtureFinalizerCallback,
         Path::new("PT021.py"),
         Settings::default(),

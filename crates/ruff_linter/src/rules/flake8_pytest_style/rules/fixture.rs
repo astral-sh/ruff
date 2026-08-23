@@ -14,8 +14,9 @@ use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
+use crate::importer::ImportRequest;
 use crate::registry::Rule;
-use crate::{AlwaysFixableViolation, Violation};
+use crate::{AlwaysFixableViolation, FixAvailability, Violation};
 use crate::{Edit, Fix};
 
 use crate::rules::flake8_pytest_style::helpers::{
@@ -383,7 +384,8 @@ impl Violation for PytestFixtureParamWithoutValue {
 /// Checks for `pytest.yield_fixture` usage.
 ///
 /// ## Why is this bad?
-/// `pytest.yield_fixture` is deprecated. `pytest.fixture` should be used instead.
+/// `pytest.yield_fixture` has been deprecated since pytest 6.2, and is a plain
+/// alias for `pytest.fixture`. `pytest.fixture` should be used instead.
 ///
 /// ## Example
 /// ```python
@@ -409,16 +411,28 @@ impl Violation for PytestFixtureParamWithoutValue {
 ///     obj.cleanup()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe. The pytest documentation describes
+/// `pytest.yield_fixture` as an alias that "has been so for a very long time,
+/// so it can be searched/replaced safely"; the only behavioral difference is
+/// the deprecation warning that `pytest.yield_fixture` emits.
+///
 /// ## References
-/// - [`pytest` documentation: `yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
+/// - [`pytest` documentation: the `yield_fixture` function/decorator](https://docs.pytest.org/en/stable/deprecations.html#the-yield-fixture-function-decorator)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestDeprecatedYieldFixture;
 
 impl Violation for PytestDeprecatedYieldFixture {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `pytest.fixture`".to_string())
     }
 }
 
@@ -914,6 +928,19 @@ fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
         let mut diagnostic =
             checker.report_diagnostic(PytestDeprecatedYieldFixture, decorator.range());
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+
+        let reference = map_callable(&decorator.expression);
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("pytest", "fixture"),
+                reference.start(),
+                checker.semantic(),
+            )?;
+            Ok(Fix::safe_edits(
+                import_edit,
+                [Edit::range_replacement(binding, reference.range())],
+            ))
+        });
     }
 }
 
