@@ -2179,6 +2179,228 @@ def multiline_conditions(value: int):
     # fmt: on
 ```
 
+## Replacing a redundant final `elif` with an assertion
+
+When a final `elif` condition is always true, an `else` branch containing the same condition as a
+defensive assertion makes the exhaustiveness check explicit without repeating the condition as a
+branch:
+
+```py
+def exhaustive(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif isinstance(value, int):  # snapshot: redundant-condition-strict
+        print(value)
+        print(value + 1)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:4:10
+  |
+4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+3 |         print(value)
+  -     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+4 +     else:  # snapshot: redundant-condition-strict
+5 +         assert isinstance(value, int)
+6 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+The assertion uses the existing indentation of the branch body, including unconventional
+indentation:
+
+```py
+# fmt: off
+def unconventional_indentation(value: str | int):
+  if isinstance(value, str):
+    print(value)
+  elif isinstance(value, int):  # snapshot: redundant-condition-strict
+    print(value)
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:11:8
+   |
+11 |   elif isinstance(value, int):  # snapshot: redundant-condition-strict
+   |        ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+10 |     print(value)
+   -   elif isinstance(value, int):  # snapshot: redundant-condition-strict
+11 +   else:  # snapshot: redundant-condition-strict
+12 +     assert isinstance(value, int)
+13 |     print(value)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Comments inside a parenthesized condition, after the branch header, and before its first statement
+are all preserved:
+
+```py
+def commented_condition(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif (
+        # Explain the defensive runtime check.
+        isinstance(value, int)  # snapshot: redundant-condition-strict
+    ):  # Preserve this header comment.
+        # Preserve this body comment.
+        print(value)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:19:9
+   |
+19 |         isinstance(value, int)  # snapshot: redundant-condition-strict
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+16 |         print(value)
+   -     elif (
+17 +     else:  # Preserve this header comment.
+18 +         # Preserve this body comment.
+19 +         assert (
+20 |         # Explain the defensive runtime check.
+21 |         isinstance(value, int)  # snapshot: redundant-condition-strict
+   -     ):  # Preserve this header comment.
+   -         # Preserve this body comment.
+22 +     )
+23 |         print(value)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+An unparenthesized assignment expression is valid in an `elif` condition but must be parenthesized
+when moved into an assertion:
+
+```py
+def assignment_expression(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
+        print(matched)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:26:10
+   |
+26 |     elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+25 |         print(value)
+   -     elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
+26 +     else:  # snapshot: redundant-condition-strict
+27 +         assert (matched := isinstance(value, int))
+28 |         print(matched)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+If the branch body begins on the same line as its header, inserting a separate assertion would
+require rewriting the body, so no autofix is offered:
+
+```py
+# fmt: off
+def inline_branch(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif isinstance(value, int): print(value)  # snapshot: redundant-condition-strict
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:32:10
+   |
+32 |     elif isinstance(value, int): print(value)  # snapshot: redundant-condition-strict
+   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+A multiline header also receives no autofix when its body begins on the same line as its closing
+colon:
+
+```py
+# fmt: off
+def multiline_inline_branch(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif (
+        isinstance(value, int)  # snapshot: redundant-condition-strict
+    ): print(value)
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:39:9
+   |
+39 |         isinstance(value, int)  # snapshot: redundant-condition-strict
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+Parser recovery can produce an `elif` branch with no statements. The redundant condition is still
+reported, but no autofix is offered for the incomplete branch:
+
+```py
+def empty_branch(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    # error: [invalid-syntax] "Expected an indented block after `elif` clause"
+    elif isinstance(value, int):  # snapshot: redundant-condition-strict
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:46:10
+   |
+46 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+A boolean `elif` following a non-boolean condition still receives the assertion fix. The type of the
+first condition does not determine how later conditions are diagnosed.
+
+```py
+def non_boolean_first_condition(items: list[int], value: int):
+    if items:
+        print(items)
+    elif value is not None:  # snapshot: redundant-condition-strict
+        print(value)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:50:10
+   |
+50 |     elif value is not None:  # snapshot: redundant-condition-strict
+   |          -----^^^^^^^^^^^^
+   |          |
+   |          Has type `int`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+49 |         print(items)
+   -     elif value is not None:  # snapshot: redundant-condition-strict
+50 +     else:  # snapshot: redundant-condition-strict
+51 +         assert value is not None
+52 |         print(value)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
 ## `if` and `while` conditions that use AST literal bools or ints
 
 We maintain a special case for `while` loops, since `while True:` and `while 1:` are common idioms

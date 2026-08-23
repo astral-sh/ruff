@@ -8,9 +8,10 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_source_file::LineRanges;
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, PythonVersion, token::parenthesized_range};
+use ruff_python_trivia::indentation_at_offset;
+use ruff_source_file::{LineRanges, find_newline};
+use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{SearchPath, file_to_module};
 use ty_python_core::{
     Truthiness,
@@ -31,10 +32,14 @@ use crate::{
     },
 };
 
-use super::{RedundantCondition, exemptions::condition_definition_info};
+use super::{ConditionKind, RedundantCondition, exemptions::condition_definition_info};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) fn report_redundant_condition(&self, condition: RedundantCondition<'_, 'db>) {
+    pub(super) fn report_redundant_condition(
+        &self,
+        condition: RedundantCondition<'_, 'db>,
+        final_elif: Option<&ast::ElifElseClause>,
+    ) {
         let RedundantCondition {
             expression: test,
             value_type: test_type,
@@ -126,7 +131,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let Some(builder) = self.context.report_lint(rule, test) else {
             return;
         };
-        let _diagnostic = if is_truthy {
+        let mut diagnostic = if is_truthy {
             let describe_always_truthy_object = |diagnostic: &mut LintDiagnosticGuard| {
                 diagnostic.set_concise_message(format_args!(
                     "Object of type `{}` is always truthy",
@@ -451,6 +456,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 diagnostic
             }
         };
+
+        if let Some(clause) = final_elif
+            && is_truthy
+            && kind == ConditionKind::Boolean
+            && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
+        {
+            diagnostic.help(
+                "Replace this `elif` with an `else` branch \
+                that asserts the condition to be `True`",
+            );
+            if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
+                diagnostic.set_fix(fix);
+            }
+        }
     }
 
     /// Return `Some((expr, expr_ty, expr_length))`, where `expr_ty` is the type of an object
@@ -683,5 +702,68 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         false
+    }
+
+    /// Replaces an always-true final `elif` with an `else` branch and a defensive assertion.
+    ///
+    /// Preserves the original condition, comments, branch indentation, and file-wide line-ending
+    /// style. Bare assignment expressions are parenthesized so they remain valid assertion tests.
+    /// Returns `None` when the branch has no body, its first statement cannot accommodate a new
+    /// indented assertion, or rewriting the header would discard a comment.
+    ///
+    /// The fix is unsafe because an incorrect static assumption can cause the new assertion to
+    /// fail at runtime, and optimized Python execution may remove the assertion entirely.
+    fn replace_redundant_elif_with_assertion(
+        &self,
+        clause: &ast::ElifElseClause,
+        test: &ast::Expr,
+    ) -> Option<Fix> {
+        let first_statement = clause.body.first()?;
+        let source = source_text(self.db(), self.file());
+
+        if source.line_start(first_statement.start()) == source.line_start(clause.start()) {
+            return None;
+        }
+
+        let indentation = indentation_at_offset(first_statement.start(), &source)?;
+        let parenthesized_test_range =
+            parenthesized_range(test.into(), clause.into(), self.module().tokens());
+        let test_range = parenthesized_test_range.unwrap_or(test.range());
+        let header_prefix_range = TextRange::new(clause.start(), test_range.start());
+
+        // Ruff caches `CommentRanges` in its indexer, but ty does not. Constructing
+        // `CommentRanges` here would scan and index every comment in the file just to check
+        // this small range, so inspect the existing tokens directly instead.
+        if self
+            .module()
+            .tokens()
+            .in_range(header_prefix_range)
+            .iter()
+            .any(|token| token.kind().is_comment())
+        {
+            return None;
+        }
+
+        let condition = &source[test_range];
+        let assertion_condition = if test.is_named_expr() && parenthesized_test_range.is_none() {
+            format!("({condition})")
+        } else {
+            condition.to_string()
+        };
+        let line_ending = find_newline(&source)
+            .map(|(_, ending)| ending)
+            .unwrap_or_default()
+            .as_str();
+
+        Some(Fix::unsafe_edits(
+            Edit::range_replacement(
+                "else".to_string(),
+                TextRange::new(clause.start(), test_range.end()),
+            ),
+            [Edit::insertion(
+                format!("assert {assertion_condition}{line_ending}{indentation}"),
+                first_statement.start(),
+            )],
+        ))
     }
 }

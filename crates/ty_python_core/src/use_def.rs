@@ -643,7 +643,7 @@ impl PredicateNarrowingTargets {
 
 /// Fields that are empty in most use-def maps.
 ///
-/// These fields share an allocation to avoid storing five collection headers in every
+/// These fields share an allocation to avoid storing several collection headers in every
 /// [`UseDefMap`]. They are not otherwise semantically related.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct UseDefMapExtra {
