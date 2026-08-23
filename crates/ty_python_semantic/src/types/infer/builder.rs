@@ -9715,9 +9715,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
+        // `yield from x` delegates to `iter(x)`, so the send and return types of the
+        // expression are those of the *iterator*. If `x` is itself a generator (or iterator),
+        // that's `x`. Otherwise, e.g. for an instance of a class whose `__iter__` method is a
+        // generator function, we look at the return type of `x.__iter__()`.
+        let inner_generator_types = iterable_type.generator_types(db, env).or_else(|| {
+            let iterator_type = match iterable_type.try_call_dunder(
+                db,
+                env,
+                "__iter__",
+                CallArguments::none(),
+                TypeContext::default(),
+            ) {
+                Ok(bindings) => Some(bindings.return_type(db, env)),
+                Err(err) => err.return_type(db, env),
+            }?;
+            iterator_type.generator_types(db, env)
+        });
+
         if let Some(outer_send_ty) = outer_expected.send_ty {
-            let inner_send_ty = iterable_type
-                .generator_send_type(db, env)
+            let inner_send_ty = inner_generator_types
+                .and_then(|generator_types| generator_types.send_ty)
                 .unwrap_or_else(|| Type::none(db, env));
             if !outer_send_ty.is_assignable_to(db, env, inner_send_ty) {
                 report_invalid_generator_yield_type(
@@ -9731,8 +9749,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        iterable_type
-            .generator_return_type(db, env)
+        inner_generator_types
+            .and_then(|generator_types| generator_types.return_ty)
             .unwrap_or_else(Type::unknown)
     }
 

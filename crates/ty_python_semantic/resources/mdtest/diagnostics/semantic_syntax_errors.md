@@ -460,6 +460,7 @@ def f[T](x: int) -> (y := 3):
 
 def _():
     # error: [invalid-syntax] "yield expression cannot be used within a generic definition"
+    # error: [invalid-base] "Invalid class base with type `None`"
     class C[T]((yield from [object])):
         pass
 ```

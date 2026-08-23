@@ -24,8 +24,8 @@ def outer_generator():
 
 ## `yield from` with a custom iterable
 
-`yield from` can also be used with custom iterable types. In that case, the type of the `yield from`
-expression cannot be determined
+`yield from` can also be used with custom iterable types. If the iterator returned by `__iter__` is
+not a generator, the type of the `yield from` expression cannot be determined:
 
 ```py
 from typing import Generator, TypeVar, Generic
@@ -67,6 +67,59 @@ def generator() -> Generator[str]:
     # (the more common case), then the `.value` attribute of the `StopIteration` instance
     # would default to `None`.
     reveal_type(result)  # revealed: Unknown
+```
+
+## `yield from` with a custom iterable whose `__iter__` returns a generator
+
+`yield from x` delegates to `iter(x)`. The send and return types of the `yield from` expression are
+therefore determined by the iterator returned by `x.__iter__()`, even if `x` itself is not a
+generator:
+
+```py
+from typing import Generator, Iterator
+
+class Box:
+    def __iter__(self) -> Generator[str, None, int]:
+        yield "hello"
+        return 42
+
+def main() -> Generator[str, None, int]:
+    x = yield from Box()
+    reveal_type(x)  # revealed: int
+
+    y: str = yield from Box()  # error: [invalid-assignment]
+    return x
+```
+
+The send type of the inner generator is also validated against the outer generator's send type:
+
+```py
+class SendBox:
+    def __iter__(self) -> Generator[int, int, None]:
+        x = yield 1
+
+def outer() -> Generator[int, str, None]:
+    # error: [invalid-yield] "Send type `int` does not match annotated send type `str`"
+    yield from SendBox()
+
+def outer_ok() -> Generator[int, int, None]:
+    yield from SendBox()
+```
+
+If `__iter__` returns a plain `Iterator`, the value of the `yield from` expression is `None`, just
+like for a generator annotated as returning an `Iterator`:
+
+```py
+class Plain:
+    def __iter__(self) -> Iterator[str]:
+        yield "a"
+
+def plain() -> Generator[str, None, None]:
+    result = yield from Plain()
+    reveal_type(result)  # revealed: None
+
+    result = yield from ["a", "b"]
+    reveal_type(result)  # revealed: None
 ```
 
 ## `yield from` with a generator that return `types.GeneratorType`

@@ -7335,15 +7335,6 @@ impl<'db> Type<'db> {
             .and_then(|generator_types| generator_types.return_ty)
     }
 
-    fn generator_send_type(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Type<'db>> {
-        self.generator_types(db, env)
-            .and_then(|generator_types| generator_types.send_ty)
-    }
-
     /// Return the instance approximation, discarding whether the projection is exact.
     ///
     /// Use this only when an over-approximation is sound, such as constructor inference or a
