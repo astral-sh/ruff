@@ -32,6 +32,7 @@ specifies ty's implementation of Python's import resolution algorithm.
 */
 
 use std::borrow::Cow;
+use std::fmt;
 use std::iter::FusedIterator;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -651,7 +652,7 @@ fn relative_desperate_search_paths(
 
     None
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading
     /// ty's configuration settings. These shouldn't ever change unless the
@@ -676,6 +677,27 @@ pub struct SearchPaths {
     site_packages: Vec<SearchPath>,
 
     typeshed_versions: TypeshedVersions,
+}
+
+impl fmt::Debug for SearchPaths {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            static_paths,
+            stdlib_path,
+            real_stdlib_path,
+            site_packages,
+            // Omit `typeshed_versions` because its debug representation spans thousands of lines,
+            // making even simple `Type` debug representations impractically large.
+            typeshed_versions: _,
+        } = self;
+
+        f.debug_struct("SearchPaths")
+            .field("static_paths", static_paths)
+            .field("stdlib_path", stdlib_path)
+            .field("real_stdlib_path", real_stdlib_path)
+            .field("site_packages", site_packages)
+            .finish_non_exhaustive()
+    }
 }
 
 impl SearchPaths {
