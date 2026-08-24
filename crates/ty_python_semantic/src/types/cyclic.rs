@@ -387,11 +387,7 @@ impl<'db> SpecializationFlowGraph<'db> {
         }
 
         let root_definition = root.definition(db);
-        if self
-            .inconclusive_definitions
-            .iter()
-            .any(|&source| self.definition_reaches(source, root_definition))
-        {
+        if self.inconclusive_definition_reaches(root_definition) {
             return true;
         }
 
@@ -496,24 +492,44 @@ impl<'db> SpecializationFlowGraph<'db> {
         components
     }
 
+    fn inconclusive_definition_reaches(&self, target: Definition<'db>) -> bool {
+        if self.inconclusive_definitions.is_empty() {
+            return false;
+        }
+
+        let definitions_reaching_target = self.definitions_reaching(target);
+        !self
+            .inconclusive_definitions
+            .is_disjoint(&definitions_reaching_target)
+    }
+
     fn definition_reaches(&self, from: Definition<'db>, to: Definition<'db>) -> bool {
-        let mut pending = vec![from];
+        self.definitions_reaching(to).contains(&from)
+    }
+
+    fn definitions_reaching(&self, target: Definition<'db>) -> FxHashSet<Definition<'db>> {
+        let mut incoming = FxHashMap::<Definition, SmallVec<[Definition; 2]>>::default();
+        for &(source, target) in &self.definition_edges {
+            incoming.entry(target).or_default().push(source);
+        }
+
+        // Start from predecessors rather than the target itself so the result contains only
+        // definitions with a non-empty path to the target. The target itself is included only if
+        // it belongs to a cycle.
+        let mut pending = Vec::new();
+        if let Some(sources) = incoming.get(&target) {
+            pending.extend(sources.iter().copied());
+        }
         let mut visited = FxHashSet::default();
         while let Some(current) = pending.pop() {
             if !visited.insert(current) {
                 continue;
             }
-            for &(source, target) in &self.definition_edges {
-                if source != current {
-                    continue;
-                }
-                if target == to {
-                    return true;
-                }
-                pending.push(target);
+            if let Some(sources) = incoming.get(&current) {
+                pending.extend(sources.iter().copied());
             }
         }
-        false
+        visited
     }
 }
 
