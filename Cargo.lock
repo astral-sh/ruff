@@ -3263,6 +3263,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
+ "colored",
  "ignore",
  "imara-diff",
  "indicatif",
@@ -3270,7 +3271,6 @@ dependencies = [
  "itertools 0.15.0",
  "libcst",
  "markdown",
- "pretty_assertions",
  "rayon",
  "regex",
  "ruff",
