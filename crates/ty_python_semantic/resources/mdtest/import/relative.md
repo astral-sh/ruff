@@ -269,6 +269,123 @@ X: int = 42
 from .parser import X  # error: [unresolved-import]
 ```
 
+## Overlapping search roots, outer root first
+
+When both search roots give a file an importable module name, relative imports use the name from the
+deepest root. This applies to package initializers, source files, and stub files, including source
+files with a sibling stub.
+
+```toml
+[environment]
+extra-paths = ["/src", "/src/nested"]
+```
+
+`nested/package/utils.py`:
+
+```py
+```
+
+`nested/package/__init__.py`:
+
+```py
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'package.utils'>
+```
+
+`nested/package/module.py`:
+
+```py
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'package.utils'>
+```
+
+`nested/package/module.pyi`:
+
+```pyi
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'package.utils'>
+```
+
+## Overlapping search roots, inner root first
+
+The deepest root still determines the module name when it appears before the outer root in the
+search path list.
+
+```toml
+[environment]
+extra-paths = ["/src/nested", "/src"]
+```
+
+`nested/package/utils.py`:
+
+```py
+```
+
+`nested/package/__init__.py`:
+
+```py
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'package.utils'>
+```
+
+`nested/package/module.py`:
+
+```py
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'package.utils'>
+```
+
+`nested/package/module.pyi`:
+
+```pyi
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'package.utils'>
+```
+
+## Shadowed module name under the deepest root
+
+The inner `module.py` is importable as `nested.package.module`. Its shorter name, `package.module`,
+resolves to the outer file instead. Relative imports therefore use the name from the shallower root.
+
+```toml
+[environment]
+extra-paths = ["/src", "/src/nested"]
+```
+
+`package/__init__.py`:
+
+```py
+```
+
+`package/module.py`:
+
+```py
+```
+
+`nested/package/__init__.py`:
+
+```py
+```
+
+`nested/package/utils.py`:
+
+```py
+```
+
+`nested/package/module.py`:
+
+```py
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'nested.package.utils'>
+```
+
 ## Relative imports in `site-packages`
 
 Relative imports in `site-packages` are correctly resolved even when the `site-packages` search path
@@ -305,8 +422,8 @@ class A: ...
 ## Relative imports in a nested editable install
 
 The editable source root is nested inside the project, and the outer directory has the same name as
-the installed package. The file's module name must come from the editable root: `pkg.module`, not
-`pkg.src.pkg.module`.
+the installed package. The editable root exposes `pkg` as a top-level package, so `module.py` has
+the name `pkg.module`, and its relative import finds `pkg.utils`.
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/4371>.
 

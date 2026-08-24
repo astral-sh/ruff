@@ -2088,7 +2088,6 @@ mod tests {
     )]
     use std::assert_matches;
 
-    use anyhow::Context;
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
@@ -3559,76 +3558,6 @@ not_a_directory
                 .path(&db)
                 .as_str()
                 .ends_with("src/a/__init__.py"),
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn file_to_module_prefers_deepest_search_path() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(&[
-                ("nested/package/__init__.py", ""),
-                ("nested/package/module.py", ""),
-                ("nested/package/module.pyi", ""),
-            ])
-            .build();
-        let nested = src.join("nested");
-
-        for src_roots in [vec![src.clone(), nested.clone()], vec![nested.clone(), src]] {
-            let search_paths = SearchPathSettings::new(src_roots).to_search_paths(
-                db.system(),
-                db.vendored(),
-                &FallibleStrategy,
-            )?;
-            db.set_search_paths(search_paths);
-
-            for (filename, expected_name) in [
-                ("__init__.py", "package"),
-                ("module.py", "package.module"),
-                ("module.pyi", "package.module"),
-            ] {
-                let path = nested.join("package").join(filename);
-                let module = path_to_module(&db, &FilePath::from(path.clone()))
-                    .context("File should resolve through the nested root")?;
-                assert_eq!(module.name(&db), expected_name);
-                assert_eq!(
-                    module.search_path(&db).context("Expected a search path")?,
-                    &nested
-                );
-                assert_eq!(
-                    module.file(&db).map(|file| file.path(&db)),
-                    Some(&FilePath::from(path))
-                );
-            }
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn file_to_module_falls_back_from_shadowed_deepest_name() -> anyhow::Result<()> {
-        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(&[
-                ("package/__init__.py", ""),
-                ("package/module.py", ""),
-                ("nested/package/__init__.py", ""),
-                ("nested/package/module.py", ""),
-            ])
-            .build();
-        let search_paths = SearchPathSettings::new(vec![src.clone(), src.join("nested")])
-            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)?;
-        db.set_search_paths(search_paths);
-
-        // `package.module` resolves to the outer file, but the inner file is still
-        // importable as `nested.package.module` through the shallower root.
-        let path = src.join("nested/package/module.py");
-        let module = path_to_module(&db, &FilePath::from(path))
-            .context("File should resolve through the shallower root")?;
-        assert_eq!(module.name(&db), "nested.package.module");
-        assert_eq!(
-            module.search_path(&db).context("Expected a search path")?,
-            &src
         );
 
         Ok(())
