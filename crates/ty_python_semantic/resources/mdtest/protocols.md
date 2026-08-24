@@ -4452,6 +4452,70 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
+## `Self`-returning instance methods in `ParamSpec` protocols
+
+Specializing a protocol's `ParamSpec` preserves the meaning of `Self`: the return type names the
+structural implementation, even when the specialized parameter list is empty.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+class Copier[**P](Protocol):
+    def copy(self, *args: P.args, **kwargs: P.kwargs) -> Self: ...
+
+class Copyable:
+    def copy(self) -> Self:
+        return self
+
+copier: Copier[[]] = Copyable()
+copier_class: type[Copier[[]]] = Copyable
+```
+
+## `Self`-returning class methods in `ParamSpec` protocols
+
+A class method returning `Self` also satisfies a specialized protocol, whether the implementation is
+assigned as an instance or as a class object. The implementation does not need to inherit from the
+protocol.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+class FactoryP[**P](Protocol):
+    @classmethod
+    def bind(cls, *args: P.args, **kwargs: P.kwargs) -> Self: ...
+
+class Factory:
+    @classmethod
+    def bind(cls, value: int) -> Self:
+        return cls()
+
+factory: FactoryP[[int]] = Factory()
+factory_class: type[FactoryP[[int]]] = Factory
+```
+
+A matching parameter list is not enough: returning an unrelated type does not satisfy the protocol's
+`Self` return type.
+
+```py
+class BadFactory:
+    @classmethod
+    def bind(cls, value: int) -> int:
+        return value
+
+bad_factory: FactoryP[[int]] = BadFactory()  # error: [invalid-assignment]
+bad_factory_class: type[FactoryP[[int]]] = BadFactory  # error: [invalid-assignment]
+```
+
 ## Module objects with static-method protocol members
 
 Module objects implement protocols through their public interface. A module-level function can
