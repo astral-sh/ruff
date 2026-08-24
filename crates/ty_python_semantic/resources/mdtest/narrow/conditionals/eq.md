@@ -1314,7 +1314,7 @@ def narrow_final_object_equality(value: A | B, other: A):
         reveal_type(value)  # revealed: A
 ```
 
-Different inherited built-in implementations cannot compare equal:
+Final classes with different inherited built-in equality implementations cannot compare equal:
 
 ```py
 from typing import final
@@ -2462,6 +2462,40 @@ RightElement = NewType("RightElement", NeverEqualTupleElement)
 def tuple_with_erased_element_identity(value: NeverEqualTupleElement) -> None:
     reveal_type((LeftElement(value),) == (RightElement(value),))  # revealed: bool
     reveal_type((LeftElement(value),) != (RightElement(value),))  # revealed: bool
+```
+
+## Comparing sequences with tuples
+
+A `Sequence[object]` can be an empty tuple, so the equality branch remains reachable and we report
+errors inside it:
+
+```py
+from collections.abc import Sequence
+
+def _(value: Sequence[object]):
+    if value == ():
+        reveal_type(value)  # revealed: Sequence[object]
+        1 + "a"  # error: [unsupported-operator]
+```
+
+## Comparing truthy sequences with literals
+
+A truthy sequence can still be a string or bytes object. Comparing a literal on the left with such a
+sequence does not make the equality branch unreachable:
+
+```py
+from collections.abc import Sequence
+
+def _(text: Sequence[str], data: Sequence[int]):
+    if text:
+        reveal_type("x" == text)  # revealed: bool
+        reveal_type("x" != text)  # revealed: bool
+        if "x" == text:
+            1 + "a"  # error: [unsupported-operator]
+
+    if data:
+        reveal_type(b"x" == data)  # revealed: bool
+        reveal_type(b"x" != data)  # revealed: bool
 ```
 
 ## Narrowing with NewTypes
