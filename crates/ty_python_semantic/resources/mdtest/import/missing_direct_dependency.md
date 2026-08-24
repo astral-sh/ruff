@@ -56,8 +56,8 @@ indirect = ["indirect"]
 
 ### Plain and aliased imports
 
-Importing a declared dependency is allowed. Imports of an undeclared distribution are reported,
-including aliases and imports of its submodules.
+Importing a declared dependency is allowed. An undeclared distribution is reported only at its first
+import in each file. Aliases and imports of its submodules do not produce additional diagnostics.
 
 `/.venv/<path-to-site-packages>/direct/__init__.py`:
 
@@ -82,9 +82,9 @@ import direct
 
 # snapshot: missing-direct-dependency
 import indirect
-import indirect as alias  # error: [missing-direct-dependency]
-import indirect.child  # error: [missing-direct-dependency]
-from indirect.child import value  # error: [missing-direct-dependency]
+import indirect as alias
+import indirect.child
+from indirect.child import value
 ```
 
 ```snapshot
@@ -98,8 +98,9 @@ help: Declare `indirect-distribution` in `project.dependencies` or `project.opti
 
 ### From imports and star imports
 
-Each imported name from an undeclared distribution is reported. Star imports also require a direct
-dependency, whether they occur in the same file or another file.
+Importing several names from the same distribution produces one diagnostic. Subsequent imports in
+that file do not repeat it, but importing the distribution in another file produces its own
+diagnostic, including for star imports.
 
 `/.venv/<path-to-site-packages>/indirect/__init__.py`:
 
@@ -111,10 +112,8 @@ second = 2
 `main.py`:
 
 ```py
-# error: [missing-direct-dependency]
-# error: [missing-direct-dependency]
-from indirect import first, second
-from indirect import *  # error: [missing-direct-dependency]
+from indirect import first, second  # error: [missing-direct-dependency]
+from indirect import *
 ```
 
 `star.py`:
@@ -140,8 +139,9 @@ from indirect import *  # error: [missing-direct-dependency]
 
 ### Imports inside functions and classes
 
-Imports in nested scopes require direct dependencies just like imports at module scope. Imports in
-functions and classes are reported independently of imports at module scope.
+Imports in nested scopes require direct dependencies just like imports at module scope. The first
+import in source order receives the diagnostic, even when it occurs in a function or class before a
+module-level import.
 
 `/.venv/<path-to-site-packages>/indirect/__init__.py`:
 
@@ -155,9 +155,9 @@ def use_dependency():
     import indirect  # error: [missing-direct-dependency]
 
 class UsesDependency:
-    import indirect  # error: [missing-direct-dependency]
+    import indirect
 
-import indirect  # error: [missing-direct-dependency]
+import indirect
 ```
 
 `class_first.py`:
@@ -167,9 +167,9 @@ class UsesDependency:
     import indirect  # error: [missing-direct-dependency]
 
 def use_dependency():
-    import indirect  # error: [missing-direct-dependency]
+    import indirect
 
-import indirect  # error: [missing-direct-dependency]
+import indirect
 ```
 
 ### Type-checking and unreachable imports
@@ -291,8 +291,9 @@ from facade import Value
 
 ### Suppressions
 
-An ignored import does not suppress another import in the same file. A multiline `from` import can
-be suppressed on the line that names its module.
+An ignored import does not suppress another import in the same file. Ignore comments on later
+imports still count as used after the file's diagnostic has been reported. A multiline `from` import
+can be suppressed on the line that names its module.
 
 `/.venv/<path-to-site-packages>/indirect/__init__.py`:
 
@@ -310,7 +311,7 @@ from indirect import (  # ty: ignore[missing-direct-dependency]
     value,
 )
 
-from indirect import (  # error: [missing-direct-dependency]
+from indirect import (
     value as another_value,
 )
 ```
@@ -384,8 +385,8 @@ import ns.core
 # error: [missing-direct-dependency] "direct dependency on `other-distribution`"
 from ns import storage, other
 
-import ns.storage  # error: [missing-direct-dependency] "direct dependency on `storage-distribution`"
-from ns.storage import value  # error: [missing-direct-dependency] "direct dependency on `storage-distribution`"
+import ns.storage
+from ns.storage import value
 
 # `ns.storage` is not a module-name prefix of `ns.storage_extra`.
 import ns.storage_extra
@@ -415,7 +416,7 @@ from shared_namespace import local
 import shared_namespace.local
 
 from shared_namespace import external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
-import shared_namespace.external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
+import shared_namespace.external
 ```
 
 ### Shared namespaces with inline stubs
@@ -447,7 +448,7 @@ from shared_namespace import local
 import shared_namespace.local
 
 from shared_namespace import external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
-import shared_namespace.external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
+import shared_namespace.external
 ```
 
 ### Ambiguous ownership
@@ -489,7 +490,7 @@ value = 1
 
 ```py
 import typed  # error: [missing-direct-dependency] "direct dependency on `runtime-distribution`"
-from typed import value  # error: [missing-direct-dependency] "direct dependency on `runtime-distribution`"
+from typed import value
 
 reveal_type(value)  # revealed: int
 ```
