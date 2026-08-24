@@ -3033,8 +3033,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.env,
             self.constraints,
             bound_typevar,
-            bounds.lower,
-            bounds.upper,
+            bounds.lower_bound(),
+            bounds.upper_bound(),
         );
         self.pending.intersect(db, self.constraints, constraint);
     }

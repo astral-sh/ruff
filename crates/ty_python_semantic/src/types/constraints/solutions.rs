@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBound, ConstraintBoundsBuilder, ConstraintId,
-    ConstraintSetStorage, NodeId, PathAssignments, PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
+    PathAssignments, PathBounds, SolutionLimits,
 };
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -113,20 +113,20 @@ impl<'db> SolutionWalker<'db> {
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
                 let typevar = constraint.typevar;
-                let bounds = mappings.entry(typevar).or_default();
-                bounds.add_lower(db, env, constraint.bounds.lower);
-                bounds.add_upper(db, env, constraint.bounds.upper);
+                if let Some(lower) = constraint.bounds.lower {
+                    let bounds = mappings.entry(typevar).or_default();
+                    bounds.add_lower(db, env, lower);
 
-                let lower = constraint.bounds.lower;
-                if lower != ConstraintBound::missing_lower() {
                     if let Type::TypeVar(lower_bound_typevar) = lower.ty() {
                         let bounds = mappings.entry(lower_bound_typevar).or_default();
                         bounds.add_upper(db, env, lower.with_type(Type::TypeVar(typevar)));
                     }
                 }
 
-                let upper = constraint.bounds.upper;
-                if upper != ConstraintBound::missing_upper() {
+                if let Some(upper) = constraint.bounds.upper {
+                    let bounds = mappings.entry(typevar).or_default();
+                    bounds.add_upper(db, env, upper);
+
                     if let Type::TypeVar(upper_bound_typevar) = upper.ty() {
                         let bounds = mappings.entry(upper_bound_typevar).or_default();
                         bounds.add_lower(db, env, upper.with_type(Type::TypeVar(typevar)));
