@@ -118,7 +118,7 @@ pub fn fixture_bindings_for_parameter<'db>(
     db: &'db dyn Db,
     parameter: Definition<'db>,
 ) -> Box<[FixtureBinding<'db>]> {
-    let Some(request) = FixtureRequest::from_parameter(db, parameter) else {
+    let Some(request) = fixture_request_for_parameter(db, parameter) else {
         return Box::default();
     };
 
@@ -200,94 +200,93 @@ struct FixtureRequest<'db> {
     name: Name,
 }
 
-impl<'db> FixtureRequest<'db> {
-    fn from_parameter(db: &'db dyn Db, definition: Definition<'db>) -> Option<Self> {
-        let DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(_)) =
-            definition.kind(db)
-        else {
-            return None;
-        };
+fn fixture_request_for_parameter<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<FixtureRequest<'db>> {
+    let DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(_)) = definition.kind(db)
+    else {
+        return None;
+    };
 
-        let file = definition.program_file(db);
-        let index = semantic_index(db, file);
-        let function_scope = definition.scope(db).file_scope_id(db);
-        let function_ref = index.scope(function_scope).node().as_function()?;
-        let function_definition = index.expect_single_definition(function_ref);
-        let function_type =
-            infer_definition_types(db, function_definition).function_type(function_definition)?;
-        let signature_parameters = function_type.last_definition_signature(db).parameters();
-        let parameter = signature_parameters
-            .iter()
-            .find(|parameter| parameter.definition() == Some(definition))?;
-        let parameter_name = parameter.keyword_name()?;
+    let file = definition.program_file(db);
+    let index = semantic_index(db, file);
+    let function_scope = definition.scope(db).file_scope_id(db);
+    let function_ref = index.scope(function_scope).node().as_function()?;
+    let function_definition = index.expect_single_definition(function_ref);
+    let function_type =
+        infer_definition_types(db, function_definition).function_type(function_definition)?;
+    let signature_parameters = function_type.last_definition_signature(db).parameters();
+    let parameter = signature_parameters
+        .iter()
+        .find(|parameter| parameter.definition() == Some(definition))?;
+    let parameter_name = parameter.keyword_name()?;
 
-        // Match pytest's logic for only injecting fixtures for required
-        // parameters and by keyword:
-        // https://docs.pytest.org/en/9.0.x/how-to/fixtures.html#requesting-fixtures
-        // https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/compat.py#L145-L153
-        if parameter.has_default() {
-            return None;
-        }
-
-        let parent_scope = non_type_parameter_parent(index, function_scope)?;
-        let parent_kind = index.scope(parent_scope).kind();
-        if !matches!(parent_kind, ScopeKind::Module | ScopeKind::Class) {
-            return None;
-        }
-
-        let class_scope = (parent_kind == ScopeKind::Class).then_some(parent_scope);
-        if function_type.has_implicit_receiver(db)
-            && signature_parameters
-                .get_positional(0)
-                .is_some_and(|parameter| parameter.definition() == Some(definition))
-        {
-            return None;
-        }
-
-        let module = parsed_module(db, file.python_file(db)).load(db);
-        let function = function_ref.node(&module);
-        if is_mock_patch_parameter(db, function_definition, function_type, function, definition) {
-            return None;
-        }
-
-        // Check whether the fixture request itself appears in a fixture declaration e.g.
-        //
-        // ```py
-        // @pytest.fixture
-        // def database(): ...
-        //
-        // @pytest.fixture
-        // def service(database): ...  # `database` is a fixture request.
-        // ```
-        let is_fixture_dependency = fixture_declaration(db, function_definition).is_some();
-        if !is_fixture_dependency
-            && (!is_collected_test(db, file, function, class_scope, &module)
-                || class_scope
-                    .is_some_and(|class_scope| is_unittest_test_case(db, file, class_scope)))
-        {
-            return None;
-        }
-
-        if !is_fixture_dependency
-            && directly_parametrized(
-                db,
-                function_definition,
-                function,
-                class_scope,
-                &module,
-                index,
-                parameter_name.as_str(),
-            )
-        {
-            return None;
-        }
-
-        Some(Self {
-            parameter_definition: definition,
-            function_definition,
-            name: parameter_name.clone(),
-        })
+    // Match pytest's logic for only injecting fixtures for required
+    // parameters and by keyword:
+    // https://docs.pytest.org/en/9.0.x/how-to/fixtures.html#requesting-fixtures
+    // https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/compat.py#L145-L153
+    if parameter.has_default() {
+        return None;
     }
+
+    let parent_scope = non_type_parameter_parent(index, function_scope)?;
+    let parent_kind = index.scope(parent_scope).kind();
+    if !matches!(parent_kind, ScopeKind::Module | ScopeKind::Class) {
+        return None;
+    }
+
+    let class_scope = (parent_kind == ScopeKind::Class).then_some(parent_scope);
+    if function_type.has_implicit_receiver(db)
+        && signature_parameters
+            .get_positional(0)
+            .is_some_and(|parameter| parameter.definition() == Some(definition))
+    {
+        return None;
+    }
+
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let function = function_ref.node(&module);
+    if is_mock_patch_parameter(db, function_definition, function_type, function, definition) {
+        return None;
+    }
+
+    // Check whether the fixture request itself appears in a fixture declaration e.g.
+    //
+    // ```py
+    // @pytest.fixture
+    // def database(): ...
+    //
+    // @pytest.fixture
+    // def service(database): ...  # `database` is a fixture request.
+    // ```
+    let is_fixture_dependency = fixture_declaration(db, function_definition).is_some();
+    if !is_fixture_dependency
+        && (!is_collected_test(db, file, function, class_scope, &module)
+            || class_scope.is_some_and(|class_scope| is_unittest_test_case(db, file, class_scope)))
+    {
+        return None;
+    }
+
+    if !is_fixture_dependency
+        && directly_parametrized(
+            db,
+            function_definition,
+            function,
+            class_scope,
+            &module,
+            index,
+            parameter_name.as_str(),
+        )
+    {
+        return None;
+    }
+
+    Some(FixtureRequest {
+        parameter_definition: definition,
+        function_definition,
+        name: parameter_name.clone(),
+    })
 }
 
 /// Returns whether `parameter` is supplied by `unittest.mock.patch`.
