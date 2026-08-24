@@ -1542,6 +1542,59 @@ mod uv_metadata {
     }
 
     #[test]
+    fn imported_script_environment() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_files([
+            ("a.py", "from b import foo\nprint(foo)\n"),
+            (
+                "b.py",
+                r#"
+                # /// script
+                # requires-python = "==3.12.*"
+                # dependencies = []
+                # [tool.ty.environment]
+                # python-version = "3.11"
+                # ///
+                import sys
+                from typing import Literal, assert_type
+
+                foo = 1
+                assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
+                "#,
+            ),
+        ])?;
+
+        // FIXME: Checking a.py can create b.py's environment before synchronization, causing
+        // b.py to use its Python 3.11 fallback instead of the Python 3.12 environment from uv.
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .args(["a.py", "b.py"])
+                .env(EnvVars::TY_UV, "scripts")
+                .env(EnvVars::TY_MAX_PARALLELISM, "1"),
+            @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[type-assertion-failure]: Argument does not have asserted type `tuple[Literal[3], Literal[12]]`
+          --> b.py:12:1
+           |
+        12 | assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
+           | ^^^^^^^^^^^^--------------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           |             |
+           |             Inferred type is `tuple[Literal[3], Literal[11]]`
+        info: `tuple[Literal[3], Literal[12]]` and `tuple[Literal[3], Literal[11]]` are not equivalent types
+
+        Found 1 diagnostic
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn cli_python_selects_script_interpreter_without_replacing_its_environment()
     -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;
