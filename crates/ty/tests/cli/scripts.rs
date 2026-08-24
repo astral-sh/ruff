@@ -1591,6 +1591,27 @@ mod uv_metadata {
         "
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn synchronizes_imported_script_with_one_worker() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_files([
+            ("a.py", "from b import foo\nprint(foo)\n"),
+            (
+                "b.py",
+                r#"
+                # /// script
+                # requires-python = "==3.12.*"
+                # dependencies = []
+                # ///
+                foo = 1
+                "#,
+            ),
+        ])?;
+
         // Starting with the script must not run its importer on the same Rayon worker while
         // initialization is waiting for uv. The importer would wait for that initialization.
         assert_cmd_snapshot!(
