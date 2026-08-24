@@ -6283,6 +6283,19 @@ class SaturatingRightProtocol[T](Protocol):
 # Repeatedly adding the same union element also reaches an exact repetition.
 static_assert(is_subtype_of(SaturatingLeftProtocol[str], SaturatingRightProtocol[str]))
 
+# A nested alias can capture the protocol argument while the recursive reference resets that
+# argument to a constant.
+class CapturedResetLeftProtocol[T](Protocol):
+    type Inner = tuple[T, CapturedResetLeftProtocol[int]]
+    value: Inner
+
+class CapturedResetRightProtocol[T](Protocol):
+    type Inner = tuple[T, CapturedResetRightProtocol[int]]
+    value: Inner
+
+# TODO: These structurally equivalent protocols should be recognized as subtypes.
+static_assert(not is_subtype_of(CapturedResetLeftProtocol[str], CapturedResetRightProtocol[str]))
+
 class FiniteLeft[T](Protocol):
     value: T
 

@@ -1093,6 +1093,15 @@ type PeriodicRight[A, B] = tuple[A, B, PeriodicRight[B, A | int]]
 
 static_assert(is_subtype_of(PeriodicLeft[bytes, str], PeriodicRight[bytes, str]))
 
+# A helper alias can erase an argument before the recursive reference sees it, so the recursive
+# specialization reaches a fixed point after one step.
+type ErasingArgument[T] = int
+type ErasingLeft[T] = tuple[T, ErasingLeft[ErasingArgument[T]]]
+type ErasingRight[T] = tuple[T, ErasingRight[ErasingArgument[T]]]
+
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(ErasingLeft[str], ErasingRight[str]))
+
 # Neither recursive occurrence grows indefinitely by itself, but alternating between them adds
 # another list layer on every cycle.
 type AlternatingLeft[X, Y] = tuple[
