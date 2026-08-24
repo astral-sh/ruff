@@ -230,6 +230,9 @@ A design for a new lint rule in Ruff should include the following components:
     - "See also": if there are other similar or synergistic rules, list them
     - "References": if there are any relevant external references to Python or other documentation, list them
 
+    A few examples of great rule documentation include [`mutable-argument-default` (`B006`)][b006],
+    [`quoted-annotation` (`UP037`)][up037], and [`used-dummy-variable` (`RUF052`)][ruf052].
+
 - An example diagnostic including the proposed name, primary message, and fix title (if applicable)
 
     This is another nice bonus that isn't required for a design proposal but concisely reveals a lot
@@ -1285,6 +1288,9 @@ There are three ways in which an import can be categorized as "first-party":
 By default, `src` is set to the project root, along with `"src"` subdirectory in the project root.
 This ensures that Ruff supports both flat and "src" layouts out of the box.
 
+[b006]: https://docs.astral.sh/ruff/rules/mutable-argument-default/
 [formatter]: https://play.ruff.rs/1265904d-f03c-4d22-aa87-1e6ca16708c2?secondary=Format
 [linter]: https://play.ruff.rs/1265904d-f03c-4d22-aa87-1e6ca16708c2
+[ruf052]: https://docs.astral.sh/ruff/rules/used-dummy-variable/
 [type checker]: https://play.ty.dev/b2d4212e-1243-4d75-a340-ae6ff2e2a6ca
+[up037]: https://docs.astral.sh/ruff/rules/quoted-annotation/
