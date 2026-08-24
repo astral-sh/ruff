@@ -51,7 +51,9 @@ overriding a specific configuration option.</p>
 over all configuration files.</p>
 </dd><dt id="ty-check--config-file"><a href="#ty-check--config-file"><code>--config-file</code></a> <i>path</i></dt><dd><p>The path to a <code>ty.toml</code> file to use for configuration.</p>
 <p>While ty configuration can be included in a <code>pyproject.toml</code> file, it is not allowed in this context.</p>
-<p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.</p>
+<p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-check--diff"><a href="#ty-check--diff"><code>--diff</code></a> <i>revision</i></dt><dd><p>Only report diagnostics introduced since a Git revision.</p>
+<p>The project is checked at the merge base and again at the current working tree. Existing diagnostics are matched across unchanged lines, including lines moved by other edits. If no revision is provided, the remote's default branch is used when available.</p>
+</dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.</p>
 </dd><dt id="ty-check--error-on-warning"><a href="#ty-check--error-on-warning"><code>--error-on-warning</code></a></dt><dd><p>Use exit code 1 if there are any warning-level diagnostics.</p>
 <p>Cannot be used in combination with <code>--exit-zero</code> or <code>--exit-zero-on-warning</code>.</p>
 </dd><dt id="ty-check--exclude"><a href="#ty-check--exclude"><code>--exclude</code></a> <i>exclude</i></dt><dd><p>Glob patterns for files to exclude from type checking.</p>
