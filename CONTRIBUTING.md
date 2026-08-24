@@ -248,8 +248,8 @@ A design for a new lint rule in Ruff should include the following components:
 
 #### Rule naming convention
 
-Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "allow
-${rule}" or "allow ${rule} items", as in the context of suppression comments.
+Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "ignore
+${rule}" or "ignore ${rule} items", as in the context of suppression comments.
 
 For example, `AssertFalse` fits this convention: it flags `assert False` statements, and so a
 suppression comment would be framed as "ignore `assert False`".
@@ -329,7 +329,7 @@ comments should essentially never be reasonable for a `correctness` lint but are
 `suspicious` lints.
 
 The final branch of the flow chart deals with stylistic lints, which are again somewhat subjective
-to differentiate between because changes that make code simpler often also make the code faster and
+to differentiate between changes that make code simpler often also make the code faster and
 more idiomatic. Thus, the question prompts you to consider the _primary_ improvement. Rules that
 primarily make code simpler are `complexity` lints, those that primarily make code faster or use
 less memory are `performance` lints, and those that primarily make code more idiomatic are `style`.
