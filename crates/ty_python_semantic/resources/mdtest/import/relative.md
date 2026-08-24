@@ -301,3 +301,42 @@ from .a import A as A
 ```py
 class A: ...
 ```
+
+## Relative imports in a nested editable install
+
+The editable source root is nested inside the project, and the outer directory has the same name as
+the installed package. The file's module name must come from the editable root: `pkg.module`, not
+`pkg.src.pkg.module`.
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/4371>.
+
+```toml
+[environment]
+python = "/.venv"
+python-version = "3.13"
+```
+
+`/.venv/<path-to-site-packages>/pkg.pth`:
+
+```pth
+/src/pkg/src
+```
+
+`pkg/src/pkg/__init__.py`:
+
+```py
+```
+
+`pkg/src/pkg/utils.py`:
+
+```py
+value: int = 42
+```
+
+`pkg/src/pkg/module.py`:
+
+```py
+from . import utils
+
+reveal_type(utils.value)  # revealed: int
+```

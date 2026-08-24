@@ -333,6 +333,7 @@ pub(crate) fn path_to_module<'db>(
 
 /// Resolves the module for the file with the given id.
 ///
+/// Prefers the deepest enclosing search path whose module name resolves back to the file.
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
 ///
 /// This function can be understood as essentially resolving `import .<self>` in the file itself,
@@ -370,21 +371,48 @@ fn file_to_module_impl<'db, 'a>(
     db: &'db dyn Db,
     resolver_file: ResolverFile<'db>,
     path: SystemOrVendoredPathRef<'a>,
-    mut search_paths: impl Iterator<Item = &'a SearchPath>,
+    search_paths: impl Iterator<Item = &'a SearchPath>,
 ) -> Option<Module<'db>> {
-    let module_name = search_paths.find_map(|candidate: &SearchPath| {
+    let mut best_match: Option<(usize, Module<'db>)> = None;
+
+    for candidate in search_paths {
         let relative_path = match path {
             SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
-        }?;
-        relative_path.to_module_name()
-    })?;
+        };
+        let Some(relative_path) = relative_path else {
+            continue;
+        };
 
-    // Resolve the module name to see if Python would resolve the name to the same path.
-    // If it doesn't, then that means that multiple modules have the same name in different
-    // root paths, but that the module corresponding to `path` is in a lower priority search path,
-    // in which case we ignore it.
-    let module = resolve_module(db, ImportingFile::ResolverFile(resolver_file), &module_name)?;
+        // All matching roots enclose the same file, so a longer prefix is a deeper root.
+        // For example, an editable install at `project/pkg/src` should take precedence
+        // over `project` when naming `project/pkg/src/pkg/module.py`.
+        let root_length = match candidate.as_path() {
+            SystemOrVendoredPathRef::System(root) => root.as_str().len(),
+            SystemOrVendoredPathRef::Vendored(root) => root.as_str().len(),
+        };
+        if best_match.is_some_and(|(best_length, _)| best_length >= root_length) {
+            continue;
+        }
+
+        if let Some(module_name) = relative_path.to_module_name()
+            && let Some(module) = file_to_module_with_name(db, resolver_file, &module_name)
+        {
+            best_match = Some((root_length, module));
+        }
+    }
+
+    best_match.map(|(_, module)| module)
+}
+
+fn file_to_module_with_name<'db>(
+    db: &'db dyn Db,
+    resolver_file: ResolverFile<'db>,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
+    // A containing root can give this file a name that is shadowed by another file.
+    // Only accept the name if resolving it leads back to this file.
+    let module = resolve_module(db, ImportingFile::ResolverFile(resolver_file), module_name)?;
     let module_file = module.file(db)?;
 
     let file: File = resolver_file.file(db);
@@ -398,7 +426,7 @@ fn file_to_module_impl<'db, 'a>(
         // which would make us erroneously believe the `.py` is *not* also this module (breaking things
         // like relative imports). So here we try `resolve_real_module().file` to cover both cases.
         let module =
-            resolve_real_module(db, ImportingFile::ResolverFile(resolver_file), &module_name)?;
+            resolve_real_module(db, ImportingFile::ResolverFile(resolver_file), module_name)?;
         let module_file = module.file(db)?;
         if file_path == module_file.path(db) {
             return Some(module);
@@ -2060,6 +2088,7 @@ mod tests {
     )]
     use std::assert_matches;
 
+    use anyhow::Context;
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
@@ -3530,6 +3559,76 @@ not_a_directory
                 .path(&db)
                 .as_str()
                 .ends_with("src/a/__init__.py"),
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn file_to_module_prefers_deepest_search_path() -> anyhow::Result<()> {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("nested/package/__init__.py", ""),
+                ("nested/package/module.py", ""),
+                ("nested/package/module.pyi", ""),
+            ])
+            .build();
+        let nested = src.join("nested");
+
+        for src_roots in [vec![src.clone(), nested.clone()], vec![nested.clone(), src]] {
+            let search_paths = SearchPathSettings::new(src_roots).to_search_paths(
+                db.system(),
+                db.vendored(),
+                &FallibleStrategy,
+            )?;
+            db.set_search_paths(search_paths);
+
+            for (filename, expected_name) in [
+                ("__init__.py", "package"),
+                ("module.py", "package.module"),
+                ("module.pyi", "package.module"),
+            ] {
+                let path = nested.join("package").join(filename);
+                let module = path_to_module(&db, &FilePath::from(path.clone()))
+                    .context("File should resolve through the nested root")?;
+                assert_eq!(module.name(&db), expected_name);
+                assert_eq!(
+                    module.search_path(&db).context("Expected a search path")?,
+                    &nested
+                );
+                assert_eq!(
+                    module.file(&db).map(|file| file.path(&db)),
+                    Some(&FilePath::from(path))
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn file_to_module_falls_back_from_shadowed_deepest_name() -> anyhow::Result<()> {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("package/__init__.py", ""),
+                ("package/module.py", ""),
+                ("nested/package/__init__.py", ""),
+                ("nested/package/module.py", ""),
+            ])
+            .build();
+        let search_paths = SearchPathSettings::new(vec![src.clone(), src.join("nested")])
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)?;
+        db.set_search_paths(search_paths);
+
+        // `package.module` resolves to the outer file, but the inner file is still
+        // importable as `nested.package.module` through the shallower root.
+        let path = src.join("nested/package/module.py");
+        let module = path_to_module(&db, &FilePath::from(path))
+            .context("File should resolve through the shallower root")?;
+        assert_eq!(module.name(&db), "nested.package.module");
+        assert_eq!(
+            module.search_path(&db).context("Expected a search path")?,
+            &src
         );
 
         Ok(())
