@@ -462,6 +462,36 @@ def _(value: int | str):
             reveal_type(cached)  # revealed: str
 ```
 
+## Cached alias updated when false
+
+A cached condition starts out false and is replaced by the `None` check whenever it is false. A
+later true condition therefore implies that `x` is not `None`, even across loop iterations.
+
+```py
+def _(x: int | None):
+    condition = False
+    for _ in range(2):
+        if not condition:
+            condition = x is not None
+        if condition:
+            reveal_type(x)  # revealed: int
+```
+
+## Cached alias updated when true
+
+The same reasoning applies with the outcomes reversed: a false condition can only come from the
+`None` check, so it rules out `None`.
+
+```py
+def _(x: int | None):
+    condition = True
+    for _ in range(2):
+        if condition:
+            condition = x is None
+        if not condition:
+            reveal_type(x)  # revealed: int
+```
+
 ## Alias reassigned on a loop backedge
 
 A different assignment can reach the condition from an earlier iteration. That assignment does not
@@ -479,6 +509,23 @@ def _(x: int | None, flags: list[bool], other: bool):
             reveal_type(x)  # revealed: int | None
         if other:
             condition = True
+```
+
+## Alias replaced by an independent loop-carried value
+
+When `replace` is false, the value carried from the first iteration makes `condition` true on the
+second iteration even if `x` is `None`. The condition therefore cannot narrow `x`.
+
+```py
+def _(x: int | None, replace: bool):
+    carry = False
+    for _ in range(2):
+        condition = carry
+        if replace:
+            condition = x is not None
+        if condition:
+            reveal_type(x)  # revealed: int | None
+        carry = not condition
 ```
 
 ## Nested scope can preserve alias

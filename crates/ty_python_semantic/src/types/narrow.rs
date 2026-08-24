@@ -1669,7 +1669,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     binding_type(db, definition),
                     definition.place(db),
                 );
-                ty.bool(db, &self.env) == Truthiness::from(!is_positive)
+                // `Never` cannot produce either outcome, even though its truthiness is ambiguous.
+                ty.is_never() || ty.bool(db, &self.env) == Truthiness::from(!is_positive)
             })
     }
 
