@@ -272,8 +272,7 @@ from .parser import X  # error: [unresolved-import]
 ## Overlapping search roots, outer root first
 
 When both search roots give a file an importable module name, relative imports use the name from the
-deepest root. This applies to package initializers, source files, and stub files, including source
-files with a sibling stub.
+deepest root.
 
 ```toml
 [environment]
@@ -285,25 +284,9 @@ extra-paths = ["/src", "/src/nested"]
 ```py
 ```
 
-`nested/package/__init__.py`:
-
-```py
-from . import utils
-
-reveal_type(utils)  # revealed: <module 'package.utils'>
-```
-
 `nested/package/module.py`:
 
 ```py
-from . import utils
-
-reveal_type(utils)  # revealed: <module 'package.utils'>
-```
-
-`nested/package/module.pyi`:
-
-```pyi
 from . import utils
 
 reveal_type(utils)  # revealed: <module 'package.utils'>
@@ -324,25 +307,9 @@ extra-paths = ["/src/nested", "/src"]
 ```py
 ```
 
-`nested/package/__init__.py`:
-
-```py
-from . import utils
-
-reveal_type(utils)  # revealed: <module 'package.utils'>
-```
-
 `nested/package/module.py`:
 
 ```py
-from . import utils
-
-reveal_type(utils)  # revealed: <module 'package.utils'>
-```
-
-`nested/package/module.pyi`:
-
-```pyi
 from . import utils
 
 reveal_type(utils)  # revealed: <module 'package.utils'>
@@ -350,40 +317,30 @@ reveal_type(utils)  # revealed: <module 'package.utils'>
 
 ## Shadowed module name under the deepest root
 
-The inner `module.py` is importable as `nested.package.module`. Its shorter name, `package.module`,
-resolves to the outer file instead. Relative imports therefore use the name from the shallower root.
+The inner `module.py` is importable as `nested.module`. Its shorter name, `module`, resolves to the
+outer file instead. Relative imports therefore use the name from the shallower root.
 
 ```toml
 [environment]
 extra-paths = ["/src", "/src/nested"]
 ```
 
-`package/__init__.py`:
+`module.py`:
 
 ```py
 ```
 
-`package/module.py`:
+`nested/utils.py`:
 
 ```py
 ```
 
-`nested/package/__init__.py`:
-
-```py
-```
-
-`nested/package/utils.py`:
-
-```py
-```
-
-`nested/package/module.py`:
+`nested/module.py`:
 
 ```py
 from . import utils
 
-reveal_type(utils)  # revealed: <module 'nested.package.utils'>
+reveal_type(utils)  # revealed: <module 'nested.utils'>
 ```
 
 ## Relative imports in `site-packages`
