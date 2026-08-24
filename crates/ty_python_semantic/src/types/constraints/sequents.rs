@@ -1302,6 +1302,14 @@ impl<'db> ConcreteLowerBound<'db> {
             return;
         }
 
+        // Gradual assignability is not transitive, so only fully static bounds can contribute
+        // additional range sequents.
+        if !self.bound.is_static_sequent_eligible(db, env)
+            || !other.bound.is_static_sequent_eligible(db, env)
+        {
+            return;
+        }
+
         // `(α ≤ T) ∧ (T ≤ β)` simplifies to `T = α` when `α = β`. For ordinary typevars, only
         // simplify when the materialized bounds are the same `Type`; checking semantic equivalence
         // can recursively expand protocol members. ParamSpec bounds still need the semantic check
@@ -1320,13 +1328,7 @@ impl<'db> ConcreteLowerBound<'db> {
             return;
         }
 
-        // Gradual assignability is not transitive, so only fully static bounds can contribute
-        // additional range sequents.
-        if self.bound.is_static_sequent_eligible(db, env)
-            && other.bound.is_static_sequent_eligible(db, env)
-        {
-            Constraint::add_sequents_for_range(db, env, map, self, other);
-        }
+        Constraint::add_sequents_for_range(db, env, map, self, other);
     }
 
     fn add_sequents_with_concrete_equivalence(
