@@ -29,6 +29,7 @@ ty_static = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["wrap_help"] }
+colored = { workspace = true }
 ignore = { workspace = true }
 imara-diff = { workspace = true }
 indicatif = { workspace = true }

@@ -1,6 +1,9 @@
 //! Run all code and documentation generation steps.
 
+use std::fmt::Write as _;
+
 use anyhow::Result;
+use colored::Colorize;
 use similar::TextDiff;
 
 use crate::{
@@ -58,31 +61,39 @@ pub(crate) fn generated_file_diff(current: &str, generated: &str) -> String {
     let diff = TextDiff::from_lines(current, generated)
         .unified_diff()
         .to_string();
-    let end: usize = diff
-        .split_inclusive('\n')
-        .take(MAX_DIFF_LINES)
-        .map(str::len)
-        .sum();
+    let mut output = String::new();
+    for (index, line) in diff.split_terminator('\n').enumerate() {
+        if index == MAX_DIFF_LINES {
+            let _ = writeln!(output, "… diff truncated after {MAX_DIFF_LINES} lines");
+            break;
+        }
 
-    if end < diff.len() {
-        format!(
-            "{}… diff truncated after {MAX_DIFF_LINES} lines\n",
-            &diff[..end]
-        )
-    } else {
-        diff
+        let line = match line.as_bytes().first() {
+            Some(b'-') => line.red(),
+            Some(b'+') => line.green(),
+            _ => line.normal(),
+        };
+        let _ = writeln!(output, "{line}");
     }
+
+    output
 }
 
 #[cfg(test)]
 mod tests {
+    use colored::Colorize;
+
     use super::generated_file_diff;
 
     #[test]
     fn short_diff() {
         assert_eq!(
             generated_file_diff("unchanged\nold\n", "unchanged\nnew\n"),
-            "@@ -1,2 +1,2 @@\n unchanged\n-old\n+new\n"
+            format!(
+                "@@ -1,2 +1,2 @@\n unchanged\n{}\n{}\n",
+                "-old".red(),
+                "+new".green()
+            )
         );
     }
 
@@ -94,7 +105,7 @@ mod tests {
                 generated_file_diff("", &generated),
                 format!(
                     "@@ -0,0 +1,{line_count} @@\n{}",
-                    "+new\n".repeat(line_count)
+                    format!("{}\n", "+new".green()).repeat(line_count)
                 )
             );
         }
@@ -108,7 +119,7 @@ mod tests {
                 generated_file_diff("", &generated),
                 format!(
                     "@@ -0,0 +1,{line_count} @@\n{}… diff truncated after 100 lines\n",
-                    "+new\n".repeat(99)
+                    format!("{}\n", "+new".green()).repeat(99)
                 )
             );
         }
@@ -119,7 +130,11 @@ mod tests {
         let prefix = "unchanged\n".repeat(150);
         assert_eq!(
             generated_file_diff(&format!("{prefix}old\n"), &format!("{prefix}new\n")),
-            "@@ -148,4 +148,4 @@\n unchanged\n unchanged\n unchanged\n-old\n+new\n"
+            format!(
+                "@@ -148,4 +148,4 @@\n unchanged\n unchanged\n unchanged\n{}\n{}\n",
+                "-old".red(),
+                "+new".green()
+            )
         );
     }
 }
