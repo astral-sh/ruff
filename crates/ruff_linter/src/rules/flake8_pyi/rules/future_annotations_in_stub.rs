@@ -26,7 +26,9 @@ impl Violation for FutureAnnotationsInStub {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`from __future__ import annotations` has no effect in stub files, since type checkers automatically treat stubs as having those semantics".to_string()
+        "`from __future__ import annotations` has no effect in stub files, \
+            since type checkers automatically treat stubs as having those semantics"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

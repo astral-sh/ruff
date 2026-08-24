@@ -43,6 +43,8 @@ def open_new_tab(url: str) -> bool:
     If not possible, then the behavior becomes equivalent to open_new().
     """
 
+def register_standard_browsers() -> None: ...
+
 class BaseBrowser:
     """Parent class for all browsers. Do not use directly."""
 
@@ -116,7 +118,7 @@ if sys.platform == "win32":
 
 if sys.platform == "darwin":
     if sys.version_info < (3, 13):
-        @deprecated("Deprecated since Python 3.11; removed in Python 3.13.")
+        @deprecated("Deprecated; removed in Python 3.13.")
         class MacOSX(BaseBrowser):
             """Launcher class for Aqua browsers on Mac OS X
 

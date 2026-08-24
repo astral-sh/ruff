@@ -1,4 +1,4 @@
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::token::{TokenKind, Tokens, parenthesized_range};
@@ -56,10 +56,11 @@ impl From<TextRange> for FoldingRange {
 /// Returns a list of folding ranges for the given file.
 pub fn folding_ranges(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     range_filter: Option<TextRange>,
 ) -> Vec<FoldingRange> {
     let parsed = parsed_module(db, file).load(db);
+    let file = file.file(db);
     let source = source_text(db, file);
 
     let mut visitor = FoldingRangeVisitor {
@@ -699,11 +700,10 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
             AnyNodeRef::ExprList(_) | AnyNodeRef::ExprListComp(_) | AnyNodeRef::TypeParams(_) => {
                 self.add_delimited_expression_range(node.range(), BRACKETS);
             }
-            AnyNodeRef::ExprTuple(tuple)
-                // Only fold parenthesized tuples.
-                if tuple.parenthesized => {
-                    self.add_delimited_expression_range(node.range(), PARENTHESES);
-                }
+            // Only fold parenthesized tuples.
+            AnyNodeRef::ExprTuple(tuple) if tuple.parenthesized => {
+                self.add_delimited_expression_range(node.range(), PARENTHESES);
+            }
             AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprSetComp(_)
@@ -762,6 +762,7 @@ mod tests {
     use crate::tests::CursorTest;
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
+    use ruff_db::files::File;
 
     #[test]
     fn test_folding_range_class() {
@@ -792,7 +793,6 @@ class MyClass:
         6 | |     def method(self):
         7 | |         return self.value
           | |_________________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:3:24
@@ -801,7 +801,6 @@ class MyClass:
           |  ________________________^
         4 | |         self.value = 1
           | |______________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:6:22
@@ -810,7 +809,6 @@ class MyClass:
           |  ______________________^
         7 | |         return self.value
           | |_________________________^
-          |
         ");
     }
 
@@ -845,7 +843,6 @@ class MyClass:
         7 | |         attribute comment.
         8 | |         """
           | |___________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:3:24
@@ -858,7 +855,6 @@ class MyClass:
         7 | |         attribute comment.
         8 | |         """
           | |___________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:5:9
@@ -868,7 +864,6 @@ class MyClass:
         7 | |         attribute comment.
         8 | |         """
           | |___________^
-          |
         "#);
     }
 
@@ -896,7 +891,6 @@ def main():
         3 | | import sys
         4 | | from typing import List, Dict
           | |_____________________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:6:12
@@ -905,7 +899,6 @@ def main():
           |  ____________^
         7 | |     pass
           | |________^
-          |
         ");
     }
 
@@ -934,7 +927,6 @@ import requests
         2 | / import os
         3 | | import sys
           | |__________^
-          |
 
         info[folding-range]: Folding Range (imports)
          --> main.py:5:1
@@ -943,7 +935,6 @@ import requests
         6 | | import pandas
         7 | | import requests
           | |_______________^
-          |
         ");
     }
 
@@ -978,7 +969,6 @@ from fastapi import FastAPI
         2 | / import os
         3 | | from math import prod
           | |_____________________^
-          |
 
         info[folding-range]: Folding Range (imports)
           --> main.py:12:1
@@ -986,7 +976,6 @@ from fastapi import FastAPI
         12 | / import requests
         13 | | from fastapi import FastAPI
            | |___________________________^
-           |
 
         info[folding-range]: Folding Range
          --> main.py:5:5
@@ -996,7 +985,6 @@ from fastapi import FastAPI
         6 | |     import foo
         7 | |     import bar
           | |______________^
-          |
 
         info[folding-range]: Folding Range (imports)
          --> main.py:6:5
@@ -1004,7 +992,6 @@ from fastapi import FastAPI
         6 | /     import foo
         7 | |     import bar
           | |______________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:8:20
@@ -1014,7 +1001,6 @@ from fastapi import FastAPI
          9 | |     first = None
         10 | |     bar = None
            | |______________^
-           |
         ");
     }
 
@@ -1056,7 +1042,6 @@ class MyClass:
         8 | |
         9 | |     do_something()
           | |__________________^
-          |
 
         info[folding-range]: Folding Range (imports)
          --> main.py:3:5
@@ -1064,7 +1049,6 @@ class MyClass:
         3 | /     import os
         4 | |     import sys
           | |______________^
-          |
 
         info[folding-range]: Folding Range (imports)
          --> main.py:6:5
@@ -1072,7 +1056,6 @@ class MyClass:
         6 | /     import numpy
         7 | |     import pandas
           | |_________________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:12:15
@@ -1082,7 +1065,6 @@ class MyClass:
         13 | |     import typing
         14 | |     import collections
            | |______________________^
-           |
 
         info[folding-range]: Folding Range (imports)
           --> main.py:13:5
@@ -1090,7 +1072,6 @@ class MyClass:
         13 | /     import typing
         14 | |     import collections
            | |______________________^
-           |
         ");
     }
 
@@ -1130,7 +1111,6 @@ else:
           |  ______________^
         3 | |     do_something()
           | |__________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:4:12
@@ -1139,7 +1119,6 @@ else:
           |  ____________^
         5 | |     do_other()
           | |______________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:6:6
@@ -1148,7 +1127,6 @@ else:
           |  ______^
         7 | |     default()
           | |_____________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:9:19
@@ -1157,7 +1135,6 @@ else:
            |  ___________________^
         10 | |     process(item)
            | |_________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:11:6
@@ -1166,7 +1143,6 @@ else:
            |  ______^
         12 | |     okay()
            | |__________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:14:15
@@ -1175,7 +1151,6 @@ else:
            |  _______________^
         15 | |     continue_work()
            | |___________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:16:6
@@ -1184,7 +1159,6 @@ else:
            |  ______^
         17 | |     doit()
            | |__________^
-           |
         ");
     }
 
@@ -1257,7 +1231,6 @@ match value:
         14 | |     ):
         15 | |         return fallback
            | |_______________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:5:3
@@ -1275,7 +1248,6 @@ match value:
         14 | |     ):
         15 | |         return fallback
            | |_______________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:6:12
@@ -1288,7 +1260,6 @@ match value:
         10 | |     ):
         11 | |         return value
            | |____________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:10:7
@@ -1297,7 +1268,6 @@ match value:
            |  _______^
         11 | |         return value
            | |____________________^
-           |
 
         info[folding-range]: Folding Range
          --> main.py:7:10
@@ -1307,7 +1277,6 @@ match value:
         8 | |             value,
         9 | |         ]
           | |________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:12:11
@@ -1318,7 +1287,6 @@ match value:
         14 | |     ):
         15 | |         return fallback
            | |_______________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:14:7
@@ -1327,7 +1295,6 @@ match value:
            |  _______^
         15 | |         return fallback
            | |_______________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:17:18
@@ -1342,7 +1309,6 @@ match value:
         23 | | ):
         24 | |     pass
            | |________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:23:3
@@ -1351,7 +1317,6 @@ match value:
            |  ___^
         24 | |     pass
            | |________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:26:5
@@ -1360,7 +1325,6 @@ match value:
            |  _____^
         27 | |     pass
            | |________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:28:9
@@ -1372,7 +1336,6 @@ match value:
         31 | | ) as error:
         32 | |     raise error
            | |_______________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:31:12
@@ -1381,7 +1344,6 @@ match value:
            |  ____________^
         32 | |     raise error
            | |_______________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:34:13
@@ -1394,7 +1356,6 @@ match value:
         38 | |     }:
         39 | |         handle_mapping()
            | |________________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:35:11
@@ -1406,7 +1367,6 @@ match value:
         38 | |     }:
         39 | |         handle_mapping()
            | |________________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:38:7
@@ -1415,7 +1375,6 @@ match value:
            |  _______^
         39 | |         handle_mapping()
            | |________________________^
-           |
         "#);
     }
 
@@ -1448,7 +1407,6 @@ def foo(x=[
         6 | |     qux = x[0] + 1
         7 | |     return qux
           | |______________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:5:4
@@ -1458,7 +1416,6 @@ def foo(x=[
         6 | |     qux = x[0] + 1
         7 | |     return qux
           | |______________^
-          |
         ");
     }
 
@@ -1483,7 +1440,6 @@ if condition:  # why
           |  _____________________^
         3 | |     do_work()
           | |_____________^
-          |
         ");
     }
 
@@ -1523,7 +1479,6 @@ if condition:
          9 | |             and_maybe_this()
         10 | |             and_maybe_this()
            | |____________________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:3:19
@@ -1538,7 +1493,6 @@ if condition:
          9 | |             and_maybe_this()
         10 | |             and_maybe_this()
            | |____________________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:6:18
@@ -1550,7 +1504,6 @@ if condition:
          9 | |             and_maybe_this()
         10 | |             and_maybe_this()
            | |____________________________^
-           |
         ");
     }
 
@@ -1587,7 +1540,6 @@ else:
         3 | |     process(item)
         4 | |     validate(item)
           | |__________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:5:6
@@ -1597,7 +1549,6 @@ else:
         6 | |     log_success()
         7 | |     notify_complete()
           | |_____________________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:9:17
@@ -1607,7 +1558,6 @@ else:
         10 | |     do_work()
         11 | |     check_status()
            | |__________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:12:6
@@ -1617,7 +1567,6 @@ else:
         13 | |     handle_done()
         14 | |     cleanup_resources()
            | |_______________________^
-           |
         ");
     }
 
@@ -1650,7 +1599,6 @@ finally:
           |  _____^
         3 | |     risky_operation()
           | |_____________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:8:6
@@ -1659,7 +1607,6 @@ finally:
           |  ______^
         9 | |     success_action()
           | |____________________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:10:9
@@ -1668,7 +1615,6 @@ finally:
            |  _________^
         11 | |     cleanup()
            | |_____________^
-           |
 
         info[folding-range]: Folding Range
          --> main.py:4:19
@@ -1677,7 +1623,6 @@ finally:
           |  ___________________^
         5 | |     handle_value_error()
           | |________________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:6:18
@@ -1686,7 +1631,6 @@ finally:
           |  __________________^
         7 | |     handle_type_error()
           | |_______________________^
-          |
         ");
     }
 
@@ -1734,7 +1678,6 @@ my_list_with_trailing_own_line_comment = [
         4 | |     2,
         5 | |     3,
           | |_______^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:8:12
@@ -1744,7 +1687,6 @@ my_list_with_trailing_own_line_comment = [
          9 | |     "a": 1,
         10 | |     "b": 2,
            | |____________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:13:42
@@ -1755,7 +1697,6 @@ my_list_with_trailing_own_line_comment = [
         15 | |     2,
         16 | |     3,  # reason
            | |_________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:19:43
@@ -1767,7 +1708,6 @@ my_list_with_trailing_own_line_comment = [
         22 | |     3,
         23 | |     # comment
            | |______________^
-           |
         "#);
     }
 
@@ -1830,7 +1770,6 @@ type Alias[
         3 | |     first,
         4 | |     second,
           | |____________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:7:11
@@ -1840,7 +1779,6 @@ type Alias[
         8 | |     "a",
         9 | |     "b",
           | |_________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:12:13
@@ -1850,7 +1788,6 @@ type Alias[
         13 | |     first,
         14 | |     second,
            | |____________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:17:17
@@ -1860,7 +1797,6 @@ type Alias[
         18 | |     item
         19 | |     for item in items
            | |______________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:22:17
@@ -1870,7 +1806,6 @@ type Alias[
         23 | |     item
         24 | |     for item in items
            | |______________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:27:16
@@ -1880,7 +1815,6 @@ type Alias[
         28 | |     item
         29 | |     for item in items
            | |______________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:32:17
@@ -1890,7 +1824,6 @@ type Alias[
         33 | |     key: value
         34 | |     for key, value in items
            | |____________________________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:37:12
@@ -1900,7 +1833,6 @@ type Alias[
         38 | |     T,
         39 | |     U,
            | |_______^
-           |
         "#);
     }
 
@@ -1940,7 +1872,6 @@ chained_call = (
           |  ___________________________^
         3 | |     factory
           | |____________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:4:3
@@ -1949,7 +1880,6 @@ chained_call = (
           |  ___^
         5 | |     arg,
           | |_________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:8:34
@@ -1958,7 +1888,6 @@ chained_call = (
           |  __________________________________^
         9 | |     factory
           | |____________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:16:3
@@ -1967,7 +1896,6 @@ chained_call = (
            |  ___^
         17 | |     second,
            | |____________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:12:17
@@ -1976,7 +1904,6 @@ chained_call = (
            |  _________________^
         13 | |     factory
            | |____________^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:14:3
@@ -1985,7 +1912,6 @@ chained_call = (
            |  ___^
         15 | |     first,
            | |___________^
-           |
         ");
     }
 
@@ -2015,7 +1941,6 @@ parenthesized_subscript_value = (
           |  ____________________________^
         3 | |     key
           | |________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:6:34
@@ -2024,7 +1949,6 @@ parenthesized_subscript_value = (
           |  __________________________________^
         7 | |     data
           | |_________^
-          |
 
         ");
     }
@@ -2069,7 +1993,6 @@ multiline t-string
         4 | | multiline string
         5 | | """
           | |___^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:7:19
@@ -2080,7 +2003,6 @@ multiline t-string
          9 | | multiline bytes
         10 | | """
            | |___^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:12:21
@@ -2091,7 +2013,6 @@ multiline t-string
         14 | | multiline f-string
         15 | | """
            | |___^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:17:21
@@ -2102,7 +2023,6 @@ multiline t-string
         19 | | multiline t-string
         20 | | """
            | |___^
-           |
         "#);
     }
 
@@ -2137,7 +2057,6 @@ match value:
         7 | |     case _:
         8 | |         default()
           | |_________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:3:12
@@ -2146,7 +2065,6 @@ match value:
           |  ____________^
         4 | |         one()
           | |_____________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:5:12
@@ -2155,7 +2073,6 @@ match value:
           |  ____________^
         6 | |         two()
           | |_____________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:7:12
@@ -2164,7 +2081,6 @@ match value:
           |  ____________^
         8 | |         default()
           | |_________________^
-          |
         ");
     }
 
@@ -2195,7 +2111,6 @@ def main():
         3 | / import os
         4 | | import sys
           | |__________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:8:12
@@ -2204,7 +2119,6 @@ def main():
           |  ____________^
         9 | |     pass
           | |________^
-          |
 
         info[folding-range]: Folding Range (region)
          --> main.py:2:1
@@ -2214,7 +2128,6 @@ def main():
         4 | | import sys
         5 | | # endregion
           | |___________^
-          |
 
         info[folding-range]: Folding Range (region)
           --> main.py:7:1
@@ -2224,7 +2137,6 @@ def main():
          9 | |     pass
         10 | | # endregion
            | |___________^
-           |
         ");
     }
 
@@ -2255,7 +2167,6 @@ message = f"""
         5 | |     # endregion
         6 | | """
           | |___^
-          |
         "#);
     }
 
@@ -2288,7 +2199,6 @@ def my_function():
         6 | |     """
         7 | |     pass
           | |________^
-          |
 
         info[folding-range]: Folding Range (comment)
          --> main.py:3:5
@@ -2298,7 +2208,6 @@ def my_function():
         5 | |     docstring.
         6 | |     """
           | |_______^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:3:5
@@ -2308,7 +2217,6 @@ def my_function():
         5 | |     docstring.
         6 | |     """
           | |_______^
-          |
         "#);
     }
 
@@ -2358,7 +2266,6 @@ def with_rawstring_doc():
         6 | |     """
         7 | |     pass
           | |________^
-          |
 
         info[folding-range]: Folding Range (comment)
          --> main.py:3:5
@@ -2368,7 +2275,6 @@ def with_rawstring_doc():
         5 | |     used as a docstring.
         6 | |     """
           | |_______^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:3:5
@@ -2378,7 +2284,6 @@ def with_rawstring_doc():
         5 | |     used as a docstring.
         6 | |     """
           | |_______^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:10:24
@@ -2391,7 +2296,6 @@ def with_rawstring_doc():
         14 | |     """
         15 | |     pass
            | |________^
-           |
 
         info[folding-range]: Folding Range (comment)
           --> main.py:11:5
@@ -2401,7 +2305,6 @@ def with_rawstring_doc():
         13 | |     used as a docstring.
         14 | |     """
            | |_______^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:11:5
@@ -2411,7 +2314,6 @@ def with_rawstring_doc():
         13 | |     used as a docstring.
         14 | |     """
            | |_______^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:18:26
@@ -2424,7 +2326,6 @@ def with_rawstring_doc():
         22 | |     """
         23 | |     pass
            | |________^
-           |
 
         info[folding-range]: Folding Range (comment)
           --> main.py:19:5
@@ -2434,7 +2335,6 @@ def with_rawstring_doc():
         21 | |     used as a docstring.
         22 | |     """
            | |_______^
-           |
 
         info[folding-range]: Folding Range
           --> main.py:19:5
@@ -2444,7 +2344,6 @@ def with_rawstring_doc():
         21 | |     used as a docstring.
         22 | |     """
            | |_______^
-           |
         "#);
     }
 
@@ -2478,7 +2377,6 @@ def foo():
           |  ___________^
         7 | |     pass
           | |________^
-          |
 
         info[folding-range]: Folding Range (comment)
          --> main.py:2:1
@@ -2487,7 +2385,6 @@ def foo():
         3 | | # that spans multiple lines
         4 | | # explaining something important
           | |________________________________^
-          |
 
         info[folding-range]: Folding Range (comment)
           --> main.py:9:1
@@ -2495,7 +2392,6 @@ def foo():
          9 | / # Another comment block
         10 | | # with more details
            | |___________________^
-           |
         ",
         );
     }
@@ -2523,7 +2419,6 @@ with open("file.txt") as f:
         3 | |     content = f.read()
         4 | |     process(content)
           | |____________________^
-          |
         "#);
     }
 
@@ -2577,7 +2472,6 @@ with open("file.txt") as f:
         16 | |                         # Don't exceed the overall end date or max_days limit
         17 | |                         c = 30
            | |______________________________^
-           |
 
         info[folding-range]: Folding Range (comment)
          --> main.py:3:21
@@ -2588,7 +2482,6 @@ with open("file.txt") as f:
         6 | |                     into smaller chunks that can be requested individually.
         7 | |                     """
           | |_______________________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:3:21
@@ -2599,7 +2492,6 @@ with open("file.txt") as f:
         6 | |                     into smaller chunks that can be requested individually.
         7 | |                     """
           | |_______________________^
-          |
 
         info[folding-range]: Folding Range
           --> main.py:11:42
@@ -2613,7 +2505,6 @@ with open("file.txt") as f:
         16 | |                         # Don't exceed the overall end date or max_days limit
         17 | |                         c = 30
            | |______________________________^
-           |
 
         info[folding-range]: Folding Range (comment)
           --> main.py:12:1
@@ -2621,7 +2512,6 @@ with open("file.txt") as f:
         12 | /                         # Calculate the end of the current chunk
         13 | |                         # Go to the last day of the current month
            | |_________________________________________________________________^
-           |
         "#);
     }
 
@@ -2655,7 +2545,6 @@ with open("file.txt") as f:
           |  _______________^
         2 | |     pass
           | |________^
-          |
         ");
 
         // So does a single CRLF new-line.
@@ -2670,7 +2559,6 @@ with open("file.txt") as f:
           |  _______________^
         2 | |     pass
           | |________^
-          |
         ");
 
         // And so to does a single CR new-line.
@@ -2685,13 +2573,16 @@ with open("file.txt") as f:
           |  _______________^
         2 | |     pass
           | |________^
-          |
         ");
     }
 
     impl CursorTest {
         fn folding_ranges(&self) -> String {
-            let ranges = folding_ranges(&self.db, self.cursor.file, None);
+            let ranges = folding_ranges(
+                &self.db,
+                self.program_file(self.cursor.file).python_file(&self.db),
+                None,
+            );
 
             if ranges.is_empty() {
                 return "No folding ranges found".to_string();
@@ -2728,7 +2619,6 @@ def my_function():
           |  ___________________^
         4 | |     pass
           | |________^
-          |
         ");
     }
 
@@ -2756,7 +2646,6 @@ def my_function():
           |  ___________________^
         6 | |     pass
           | |________^
-          |
         ");
     }
 
@@ -2785,7 +2674,6 @@ class MyClass:
         4 | |     value: int
         5 | |     name: str
           | |_____________^
-          |
         ");
     }
 
@@ -2812,7 +2700,6 @@ class MyClass:
           |  _______________^
         5 | |     value: int
           | |______________^
-          |
         ");
     }
 
@@ -2838,7 +2725,6 @@ async def my_async_function():
           |  _______________________________^
         4 | |     pass
           | |________^
-          |
         ");
     }
 
@@ -2867,7 +2753,6 @@ def outer_function():
         4 | |     def inner_function():
         5 | |         pass
           | |____________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:4:26
@@ -2876,7 +2761,6 @@ def outer_function():
           |  __________________________^
         5 | |         pass
           | |____________^
-          |
         ");
     }
 
@@ -2905,7 +2789,6 @@ class MyClass:
         4 | |     async def my_async_method(self):
         5 | |         pass
           | |____________^
-          |
 
         info[folding-range]: Folding Range
          --> main.py:4:37
@@ -2914,7 +2797,6 @@ class MyClass:
           |  _____________________________________^
         5 | |         pass
           | |____________^
-          |
         ");
     }
 

@@ -3,8 +3,9 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
-use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
+use crate::metadata::options::OptionDiagnostic;
 use crate::parallel::ParallelIteratorExt;
+use crate::script::Script;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
 pub use db::testing::TestDb;
@@ -22,18 +23,25 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
+pub use script::{ScriptEnvironmentAvailability, ScriptEnvironments};
 use std::backtrace::BacktraceStatus;
 use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+use ty_python_core::ProgramFile;
+use ty_python_core::program::{Program, ProgramSettings};
+pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
+pub use uv::UseUv;
 
 mod db;
 mod files;
 pub mod glob;
 pub mod metadata;
 pub mod parallel;
+mod script;
+mod uv;
 mod walk;
 pub mod watch;
 
@@ -42,7 +50,7 @@ pub mod watch;
 /// ## How is a project different from a program?
 /// There are two (related) motivations:
 ///
-/// 1. Program is defined in `ruff_db` and it can't reference the settings types for the linter and formatter
+/// 1. Program is defined in `ty_python_core` and it can't reference the settings types for the linter and formatter
 ///    without introducing a cyclic dependency. The project is defined in a higher level crate
 ///    where it can reference these setting types.
 /// 2. Running `ruff check` with different target versions results in different programs (settings) but
@@ -76,6 +84,10 @@ pub struct Project {
     /// salsa allocated table for `Project`.
     #[returns(deref)]
     pub settings: Box<Settings>,
+
+    /// The settings used to construct the Python program for this project.
+    #[returns(ref)]
+    pub program_settings: ProgramSettings,
 
     /// The paths that should be included when checking this project.
     ///
@@ -128,6 +140,13 @@ pub trait ProgressReporter: Send + Sync {
     /// Initialize the reporter with the number of files.
     fn set_files(&mut self, files: usize);
 
+    /// Creates an owned progress guard for synchronizing `file`'s standalone-script environment.
+    ///
+    /// Returns `None` when synchronization progress should not be displayed.
+    fn for_script(&self, _db: &dyn Db, _file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+        None
+    }
+
     /// Report the completion of checking a given file along with its diagnostics.
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]);
 
@@ -136,6 +155,14 @@ pub trait ProgressReporter: Send + Sync {
     /// But it's never a file for which [`Self::report_checked_file`] gets called.
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>);
 }
+
+/// An owned progress guard for synchronizing a standalone script's environment.
+///
+/// Creating the guard starts progress reporting and dropping it finishes progress reporting. A
+/// background synchronization may move the guard between threads and outlive the operation that
+/// scheduled it. Implementations must not retain a database because doing so could keep a cancelled
+/// database snapshot alive until synchronization finishes.
+pub trait ScriptSyncProgress: Send {}
 
 /// Reporter that collects all diagnostics into a `Vec`.
 #[derive(Default)]
@@ -173,34 +200,33 @@ impl ProgressReporter for CollectReporter {
 #[salsa::tracked]
 impl Project {
     /// Create a project from resolved metadata and settings.
-    ///
-    /// Program-settings diagnostics are accepted separately so callers do not need to know how to
-    /// convert and merge them into the stored project settings diagnostics.
-    pub(crate) fn from_metadata(
+    fn from_metadata(
         db: &dyn Db,
         metadata: ProjectMetadata,
         settings: Settings,
+        program_settings: ProgramSettings,
         settings_diagnostics: Vec<OptionDiagnostic>,
-        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) -> Self {
-        let diagnostics = Self::settings_diagnostics_with_program_diagnostics(
-            db,
-            settings_diagnostics,
-            program_settings_diagnostics,
-        );
+        program_settings.search_paths.try_register_static_roots(db);
 
-        Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
-            .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
-            .file_set_durability(Durability::LOW)
-            .new(db)
+        Project::builder(
+            Box::new(metadata),
+            Box::new(settings),
+            program_settings,
+            settings_diagnostics,
+        )
+        .durability(Durability::MEDIUM)
+        .open_fileset_durability(Durability::LOW)
+        .file_set_durability(Durability::LOW)
+        .new(db)
     }
 
-    /// Permanently freezes the most heavily read immutable project inputs.
+    /// Permanently freezes the most heavily read immutable project and program inputs.
     ///
     /// This is intentionally not exhaustive.
-    pub(crate) fn freeze(self, db: &mut dyn Db) {
+    fn freeze(self, db: &mut dyn Db) {
         let durability = Durability::NEVER_CHANGE;
+        let program_settings = self.program_settings(db).clone();
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
         let included_paths = self.included_paths_list(db).to_vec();
@@ -214,6 +240,9 @@ impl Project {
         self.set_settings(db)
             .with_durability(durability)
             .to(settings);
+        self.set_program_settings(db)
+            .with_durability(durability)
+            .to(program_settings);
         self.set_included_paths_list(db)
             .with_durability(durability)
             .to(included_paths);
@@ -230,11 +259,23 @@ impl Project {
         IndexedFiles::freeze(db, self);
     }
 
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    pub fn program(self, db: &dyn Db) -> Program<'_> {
+        Program::from_settings(db, self.program_settings(db))
+    }
+
+    pub fn update_program(self, db: &mut dyn Db, settings: ProgramSettings) {
+        if self.program_settings(db) != &settings {
+            settings.search_paths.try_register_static_roots(db);
+            self.set_program_settings(db).to(settings);
+        }
+    }
+
     pub fn root(self, db: &dyn Db) -> &SystemPath {
         self.metadata(db).root()
     }
 
-    pub fn name(self, db: &dyn Db) -> &str {
+    fn name(self, db: &dyn Db) -> &str {
         self.metadata(db).name()
     }
 
@@ -259,7 +300,7 @@ impl Project {
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
-    pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+    fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         matches!(
             ProjectFilesFilter::from_project(db, self)
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),
@@ -268,25 +309,15 @@ impl Project {
     }
 
     /// Reload the project after its metadata or settings have changed.
-    ///
-    /// Program-settings diagnostics are converted and merged here to keep reload behavior
-    /// consistent with initial project creation.
     pub fn reload(
         self,
         db: &mut dyn Db,
         metadata: ProjectMetadata,
         settings: Option<Settings>,
         settings_diagnostics: Vec<OptionDiagnostic>,
-        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) -> ProjectReloadResult {
         tracing::debug!("Reloading project");
         let metadata_changed = &metadata != self.metadata(db);
-        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
-            db,
-            settings_diagnostics,
-            program_settings_diagnostics,
-        );
-
         let root_changed = metadata.root() != self.root(db);
         let (settings_changed, files_changed) = if let Some(settings) = settings
             && self.settings(db) != &settings
@@ -325,38 +356,18 @@ impl Project {
     ///
     /// This is used when a change affects [`ty_python_core::program::ProgramSettings`] without
     /// reloading the full project.
-    pub(crate) fn update_settings_diagnostics(
+    fn update_settings_diagnostics(
         self,
         db: &mut dyn Db,
         settings_diagnostics: Vec<OptionDiagnostic>,
-        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) {
-        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
-            db,
-            settings_diagnostics,
-            program_settings_diagnostics,
-        );
-
         if self.settings_diagnostics(db) != settings_diagnostics {
             self.set_settings_diagnostics(db).to(settings_diagnostics);
         }
     }
 
-    fn settings_diagnostics_with_program_diagnostics(
-        db: &dyn Db,
-        mut settings_diagnostics: Vec<OptionDiagnostic>,
-        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
-    ) -> Vec<OptionDiagnostic> {
-        settings_diagnostics.extend(
-            program_settings_diagnostics
-                .into_iter()
-                .map(|diagnostic| diagnostic.into_diagnostic(db)),
-        );
-        settings_diagnostics
-    }
-
     /// Checks the project and its dependencies according to the project's check mode.
-    pub(crate) fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
+    fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -379,6 +390,7 @@ impl Project {
 
         reporter.report_diagnostics(db, diagnostics);
 
+        let reporter: &dyn ProgressReporter = reporter;
         let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
 
@@ -392,17 +404,35 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
+                let initialization = db
+                    .script_environments()
+                    .initialize_blocking(db, file, reporter);
+                if initialization.is_pending() {
+                    // The CLI watch loop or language server already scheduled this script's first
+                    // synchronization in the background. Until it completes, there is no
+                    // environment that can produce correct diagnostics. Applying the result
+                    // causes the diagnostics to be recomputed.
+                    reporter.report_checked_file(db, file, &[]);
+                    return;
+                }
+                let program_file = db.program_file(file);
 
-                match check_file_impl(db, file) {
+                match check_file_impl(db, program_file) {
                     Ok(diagnostics) => {
                         reporter.report_checked_file(db, file, diagnostics);
 
                         // This is outside `check_file_impl` to avoid that opening or closing
                         // a file invalidates the `check_file_impl` query of every file!
-                        if !open_files.contains(&file) {
+                        // Scripts with invalid settings are never parsed by `check_file_impl`, so
+                        // they have no AST to clear.
+                        if !open_files.contains(&file)
+                            && Script::for_file(db, file)
+                                .is_none_or(|script| script.has_valid_settings(db))
+                        {
+                            let python_file = program_file.python_file(db);
                             // The module has already been parsed by `check_file_impl`.
                             // We only retrieve it here so that we can call `clear` on it.
-                            let parsed = parsed_module(db, file);
+                            let parsed = parsed_module(db, python_file);
 
                             // Drop the AST now that we are done checking this file. It is not currently open,
                             // so it is unlikely to be accessed again soon. If any queries need to access the AST
@@ -455,7 +485,7 @@ impl Project {
         }
     }
 
-    pub fn verbose(self, db: &dyn Db) -> bool {
+    fn verbose(self, db: &dyn Db) -> bool {
         self.verbose_flag(db)
     }
 
@@ -465,7 +495,7 @@ impl Project {
         }
     }
 
-    pub fn force_exclude(self, db: &dyn Db) -> bool {
+    fn force_exclude(self, db: &dyn Db) -> bool {
         self.force_exclude_flag(db)
     }
 
@@ -487,7 +517,7 @@ impl Project {
     }
 
     /// Returns the open files in the project.
-    pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
+    fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
     }
 
@@ -501,7 +531,7 @@ impl Project {
 
     /// Permanently marks the project as never having open files, so reads of the
     /// open-file state record no salsa dependency. Any later write panics.
-    pub fn freeze_open_files(self, db: &mut dyn Db) {
+    fn freeze_open_files(self, db: &mut dyn Db) {
         self.set_open_fileset(db)
             .with_durability(Durability::NEVER_CHANGE)
             .to(FxHashSet::default());
@@ -535,7 +565,7 @@ impl Project {
     ///
     /// This is a no-op if the project files are still lazily indexed.
     #[tracing::instrument(level = "debug", skip(self, db, paths))]
-    pub(crate) fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
+    fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
     where
         I: IntoIterator<Item = P>,
         P: AsRef<SystemPath>,
@@ -584,7 +614,7 @@ impl Project {
         }
     }
 
-    pub fn add_file(self, db: &mut dyn Db, file: File) {
+    fn add_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
             "Adding file `{}` to project `{}`",
             file.path(db),
@@ -601,7 +631,7 @@ impl Project {
     /// Replaces the diagnostics from indexing the project files with `diagnostics`.
     ///
     /// This is a no-op if the project files haven't been indexed yet.
-    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
@@ -634,7 +664,7 @@ impl Project {
         }
     }
 
-    pub fn reload_files(self, db: &mut dyn Db) {
+    fn reload_files(self, db: &mut dyn Db) {
         tracing::debug!("Reloading files for project `{}`", self.name(db));
 
         if !self.file_set(db).is_lazy() {
@@ -652,14 +682,31 @@ impl Project {
     }
 }
 
-pub(crate) fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     if !db.should_check_file(file) {
         return Vec::new();
     }
 
-    check_file_impl(db, file)
+    check_file_impl(db, db.program_file(file))
         .map(<[Diagnostic]>::to_vec)
         .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+}
+
+/// Returns whether semantic checking and semantic diagnostics should run for `file`.
+///
+/// Scripts with invalid configuration still produce configuration diagnostics and retain a program
+/// for editor operations, but their semantic diagnostics must not be reported. Semantic checks are
+/// also skipped until a script's first environment synchronization completes.
+pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
+    if !db.should_check_file(file) {
+        return false;
+    }
+
+    let Some(script) = Script::for_file(db, file) else {
+        return true;
+    };
+
+    script.has_valid_settings(db) && !db.script_environments().is_initialization_pending(db, file)
 }
 
 /// Returns `true` if the file should be checked.
@@ -739,10 +786,35 @@ pub enum ProjectReloadResult {
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+pub(crate) fn check_file_impl(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    let source_file = file.file(db);
     {
         let db = AssertUnwindSafe(db);
-        match catch(&**db, file, || ty_python_semantic::check_file(*db, file)) {
+        match catch(&**db, source_file, || {
+            let script = Script::for_file(*db, source_file);
+            if let Some(script) = script
+                && !script.has_valid_settings(*db)
+            {
+                return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
+            }
+
+            let diagnostics = ty_python_semantic::check_file(*db, file)?;
+            let Some(script) = script else {
+                return Ok(diagnostics);
+            };
+
+            let settings_diagnostics = script.settings_diagnostics(*db);
+            if settings_diagnostics.is_empty() {
+                return Ok(diagnostics);
+            }
+
+            let mut diagnostics = diagnostics.into_vec();
+            diagnostics.extend(settings_diagnostics.iter().cloned());
+            Ok(diagnostics.into_boxed_slice())
+        }) {
             Ok(result) => result,
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
@@ -889,13 +961,13 @@ mod tests {
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ty_python_semantic::Db as _;
     use ty_python_semantic::types::check_types;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let project = ProjectMetadata::new("test", SystemPathBuf::from("/"));
         let mut db = TestDb::new(project);
-        db.init_program().unwrap();
         let path = SystemPath::new("test.py");
 
         db.write_file(path, "x = 10")?;
@@ -907,7 +979,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, file)
+            check_file_impl(&db, db.program_file(file))
                 .as_ref()
                 .unwrap_err()
                 .headline_message()
@@ -916,7 +988,7 @@ mod tests {
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, check_types, file, &events);
+        assert_function_query_was_not_run(&db, check_types, db.program_file(file), &events);
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
@@ -924,7 +996,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, file)
+            check_file_impl(&db, db.program_file(file))
                 .as_ref()
                 .unwrap()
                 .iter()

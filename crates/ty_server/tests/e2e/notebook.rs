@@ -60,6 +60,52 @@ type Style = Literal["italic", "bold", "underline"]"#,
 }
 
 #[test]
+fn pull_diagnostics_for_notebook_cells() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    let first_cell = builder.add_python_cell("value: str = 1\n");
+    let second_cell = builder.add_python_cell("def example():\n    unused = 1\n    return 0\n");
+    let third_cell = builder.add_python_cell("value.upper()\n");
+
+    builder.open(&mut server);
+    server.collect_publish_diagnostic_notifications(3);
+
+    let diagnostics = [first_cell, second_cell, third_cell]
+        .into_iter()
+        .map(|uri| {
+            let id = server.send_request::<lsp_types::DocumentDiagnosticRequest>(
+                lsp_types::DocumentDiagnosticParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    identifier: Some("ty".to_string()),
+                    previous_result_id: None,
+                    work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+                    partial_result_params: lsp_types::PartialResultParams::default(),
+                },
+            );
+
+            match server.await_response::<lsp_types::DocumentDiagnosticRequest>(&id) {
+                lsp_types::DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(
+                    report,
+                ) => report.full_document_diagnostic_report.items,
+                lsp_types::DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(
+                    _,
+                ) => {
+                    panic!("Expected a full diagnostic report")
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn publish_unused_binding_diagnostics_open() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .build()

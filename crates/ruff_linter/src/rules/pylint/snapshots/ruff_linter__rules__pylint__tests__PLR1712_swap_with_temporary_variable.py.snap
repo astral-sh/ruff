@@ -10,7 +10,6 @@ PLR1712 [*] Unnecessary temporary variable
 4 | |     x = y
 5 | |     y = temp
   | |____________^
-  |
 help: Use `x, y = y, x` instead
   |
 2 | def foo(x: int, y: int):
@@ -30,7 +29,6 @@ PLR1712 [*] Unnecessary temporary variable
 12 | |         x = y
 13 | |         y = temp
    | |________________^
-   |
 help: Use `x, y = y, x` instead
    |
 10 |     if x > 5:
@@ -50,7 +48,6 @@ PLR1712 [*] Unnecessary temporary variable
 19 | |     x = y
 20 | |     y = temp
    | |____________^
-   |
 help: Use `x, y = y, x` instead
    |
 17 | def bar(x: int, y: int):

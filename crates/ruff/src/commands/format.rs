@@ -1354,7 +1354,6 @@ mod tests {
           |
         1 | 1
           | ^
-          |
 
         panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
         --> test.py:1:1

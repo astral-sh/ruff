@@ -69,7 +69,6 @@ AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidTransfer` is moved into `
 15 | HiveToDruidOperator()
 16 | HiveToDruidTransfer()
    | ^^^^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDruidOperator` from `airflow.providers.apache.druid.transfers.hive_to_druid` instead.
    |
 7  | from airflow.operators.hive_to_druid import (

@@ -23,7 +23,6 @@ PLR1722 [*] Use `sys.exit()` instead of `quit`
 1 | exit(0)
 2 | quit(0)
   | ^^^^
-  |
 help: Replace `quit` with `sys.exit()`
   |
 1 + import sys

@@ -15,7 +15,6 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
     let _span = workspace_symbols_span.enter();
 
     let project = db.project();
-
     let query = QueryPattern::fuzzy(query);
     let files = project.files(db);
     let files: Vec<_> = files.iter().copied().collect();
@@ -30,7 +29,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
             );
             let _entered = symbols_for_file_span.entered();
 
-            symbols_for_file(db, file)
+            symbols_for_file(db, db.program_file(file))
                 .search(&query)
                 .map(|(_, symbol)| WorkspaceSymbolInfo {
                     symbol: symbol.to_owned(),
@@ -96,7 +95,6 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | def utility_function():
           |     ^^^^^^^^^^^^^^^^
-          |
         info: Function utility_function
         ");
 
@@ -106,7 +104,6 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | class DataModel:
           |       ^^^^^^^^^
-          |
         info: Class DataModel
         ");
 
@@ -116,7 +113,6 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | API_BASE_URL = 'https://api.example.com'
           | ^^^^^^^^^^^^
-          |
         info: Constant API_BASE_URL
         ");
     }
@@ -139,7 +135,6 @@ class Test:
           |
         3 |     def from_path(): ...
           |         ^^^^^^^^^
-          |
         info: Method from_path
         ");
     }
@@ -163,7 +158,6 @@ class Test:
           |
         4 |     def from_path(): ...
           |         ^^^^^^^^^
-          |
         info: Method from_path
         ");
     }
@@ -188,7 +182,6 @@ foo = 1
           |
         5 | foo = 1
           | ^^^
-          |
         info: Variable foo
         ");
         assert_snapshot!(test.workspace_symbols("re"), @"No symbols found");

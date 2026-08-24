@@ -80,7 +80,7 @@ impl FixTable {
             .map(|(code, FixCount { rule_name, count })| (code, *rule_name, *count))
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
+    fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
         self.0.keys()
     }
 
@@ -1032,6 +1032,7 @@ mod tests {
     #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY310)]
     #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
     #[test_case(Path::new("global_parameter.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("nonlocal_parameter.py"), PythonVersion::PY310)]
     #[test_case(Path::new("annotated_global.py"), PythonVersion::PY314)]
     #[test_case(Path::new("lazy_future_import.py"), PythonVersion::PY315)]
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
@@ -1058,7 +1059,7 @@ mod tests {
             },
         );
         insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-                assert_diagnostics!(format!("{snapshot}"), diagnostics);
+                assert_diagnostics!(snapshot, diagnostics);
         });
 
         Ok(())

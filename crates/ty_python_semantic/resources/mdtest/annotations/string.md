@@ -134,6 +134,46 @@ if TYPE_CHECKING:
         def f(x: "int" | "None"): ...
 ```
 
+### Protocol metaclasses
+
+A source protocol's default `_ProtocolMeta` does not supply a string-accepting `__or__` method.
+Partially stringified unions with protocol classes and their subclasses fail at runtime before
+Python 3.14.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class P(Protocol): ...
+class Child(P): ...
+
+def f(
+    # error: [unsupported-operator]
+    x: P | "P",
+    # error: [unsupported-operator]
+    y: "Child" | Child,
+): ...
+```
+
+A custom metaclass can accept strings in `__or__`. Deriving it from `type(Protocol)` also makes it
+compatible with the protocol's runtime metaclass.
+
+```py
+from typing import Any
+
+class Meta(type(Protocol)):
+    def __or__(cls, other: str) -> Any:
+        return other
+
+class Custom(P, metaclass=Meta): ...
+
+def g(x: Custom | "Custom"): ...
+```
+
 ### Python less than 3.14 in a stub file
 
 This error is never emitted on stub files, because they are never executed at runtime:
@@ -307,7 +347,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
   |
 4 | c: """'"int"'""" = 1
   |        ^^^^^ Too many levels of nested string annotations; remove the redundant nested quotes
-  |
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
@@ -315,7 +354,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
   |
 9 | f: "'str | int | bool | Foo | Bar'" = 1
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Nested string annotation is too long; remove the redundant nested quotes
-  |
 ```
 
 ## Parameter
@@ -393,7 +431,6 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |
 43 | m: "yield 1"
    |     ^^^^^^^ Yield expression cannot be used here
-   |
 help: Did you mean `typing.Literal["yield 1"]`?
 
 
@@ -402,29 +439,26 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |
 45 | n: "yield from 1"
    |     ^^^^^^^^^^^^ Yield expression cannot be used here
-   |
 help: Did you mean `typing.Literal["yield from 1"]`?
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:55:5
+  --> src/mdtest_snippet.py:55:10
    |
 55 | t: "list[yield from 1]"
    |     -----^^^^^^^^^^^^-
    |          |
    |          Yield expression cannot be used here
-   |
 help: Did you mean `typing.Literal["list[yield from 1]"]`?
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:57:5
+  --> src/mdtest_snippet.py:57:9
    |
 57 | u: "type]"
    |     ----^
    |         |
    |         Unexpected token at the end of an expression
-   |
 help: Did you mean `typing.Literal["type]"]`?
 ```
 
@@ -467,7 +501,7 @@ str
 
 ```snapshot
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:17:12
+  --> src/mdtest_snippet.py:19:4
    |
 17 |       a1: """
    |  ____________-
@@ -476,11 +510,10 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    | |____^-
    |      |
    |      Unexpected token at the end of an expression
-   |
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:22:12
+  --> src/mdtest_snippet.py:23:6
    |
 22 |       a2: """
    |  ____________-
@@ -488,11 +521,10 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    | |      ^ Unexpected token at the end of an expression
 24 | | str
    | |____-
-   |
 
 
 error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
-  --> src/mdtest_snippet.py:27:12
+  --> src/mdtest_snippet.py:28:12
    |
 27 |       a3: """
    |  ____________-
@@ -500,5 +532,4 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    | |____________^-
    |              |
    |              Unexpected token at the end of an expression
-   |
 ```

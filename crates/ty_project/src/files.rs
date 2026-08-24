@@ -272,6 +272,7 @@ impl Drop for IndexedMut<'_> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::time::{Duration, Instant};
 
     use rustc_hash::FxHashSet;
@@ -352,11 +353,9 @@ mod tests {
             }
             Err(cancelled) => cancelled,
         };
-        assert!(
-            matches!(
-                cancelled.downcast_ref::<salsa::Cancelled>(),
-                Some(salsa::Cancelled::PendingWrite)
-            ),
+        assert_matches!(
+            cancelled.downcast_ref::<salsa::Cancelled>(),
+            Some(salsa::Cancelled::PendingWrite),
             "file indexing did not propagate the salsa cancellation"
         );
 

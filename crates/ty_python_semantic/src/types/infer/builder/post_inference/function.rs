@@ -31,7 +31,8 @@ pub(crate) fn check_function_definition<'db>(
 ) {
     let db = context.db();
 
-    let Some(function_type) = infer_definition_types(db, definition).function_type(definition)
+    let Some(function_type) =
+        infer_definition_types(context.db(), definition).function_type(definition)
     else {
         return;
     };
@@ -59,10 +60,10 @@ fn check_pep695_function_legacy_typevars<'db>(
     let Some(type_params) = node.type_params.as_deref() else {
         return;
     };
-
+    let env = context.program_environment();
     let mut has_legacy_default = false;
     for default in type_params.iter().filter_map(ast::TypeParam::default) {
-        let Some(typevar) = find_over_type(db, file_expression_type(default), false, |ty| {
+        let Some(typevar) = find_over_type(db, env, file_expression_type(default), false, |ty| {
             if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
                 && matches!(
                     typevar.kind(db),
@@ -199,6 +200,8 @@ fn check_legacy_typevar_defaults<'db>(
         return;
     };
 
+    let env = context.program_environment();
+
     let typevars = generic_context
         .variables(db)
         .map(|bound_tvar| bound_tvar.typevar(db));
@@ -216,11 +219,11 @@ fn check_legacy_typevar_defaults<'db>(
             continue;
         }
 
-        let Some(default_ty) = typevar.default_type(db) else {
+        let Some(default_ty) = typevar.default_type(db, env) else {
             continue;
         };
 
-        let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
+        let first_bad_tvar = find_over_type(db, env, default_ty, false, |t| {
             let tvar = match t {
                 Type::TypeVar(tvar) => tvar.typevar(db),
                 Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
@@ -275,11 +278,11 @@ fn check_legacy_typevar_defaults<'db>(
         }
 
         if let Some(typevar_definition) = typevar.definition(db) {
-            let file = typevar_definition.file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    typevar_definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
+                Annotation::secondary(Span::from(typevar_definition.full_range(
+                    db,
+                    &parsed_module(db, typevar_definition.python_file(db)).load(db),
+                )))
                 .message(format_args!("`{typevar_name}` defined here")),
             );
         }
@@ -295,13 +298,14 @@ fn find_typevar_annotation_range<'db>(
     file_expression_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> TextRange {
     let db = context.db();
+    let env = context.program_environment();
     let typevar_id = typevar.identity(db);
 
     node.parameters
         .iter()
         .filter_map(ast::AnyParameterRef::annotation)
         .chain(node.returns.as_deref())
-        .find(|ann| file_expression_type(ann).references_typevar(db, typevar_id))
+        .find(|ann| file_expression_type(ann).references_typevar(db, env, typevar_id))
         .map(Ranged::range)
         .unwrap_or_else(|| node.name.range())
 }
@@ -328,6 +332,8 @@ fn check_legacy_typevar_ordering<'db>(
         return;
     };
 
+    let env = context.program_environment();
+
     let mut state: Option<State<'db>> = None;
 
     for bound_typevar in generic_context.variables(db) {
@@ -344,7 +350,7 @@ fn check_legacy_typevar_ordering<'db>(
             continue;
         }
 
-        let has_default = typevar.default_type(db).is_some();
+        let has_default = typevar.default_type(db, env).is_some();
 
         if let Some(state) = state.as_mut() {
             if !has_default {
@@ -419,10 +425,9 @@ fn check_legacy_typevar_ordering<'db>(
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
-        let file = definition.file(db);
         diagnostic.annotate(
             Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, file).load(db)),
+                definition.full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
             ))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );

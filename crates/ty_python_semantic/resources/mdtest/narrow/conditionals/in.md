@@ -2,10 +2,13 @@
 
 ## `in` for tuples
 
+Broad integer subjects narrow to the integer literals present in the tuple. By default, equality
+narrowing does not add the boolean literals that also compare equal to `0` or `1`.
+
 ```py
 def _(x: int):
     if x in (1, 2, 3):
-        reveal_type(x)  # revealed: Literal[1, 2, 3, True]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
     else:
         reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
@@ -116,6 +119,14 @@ def inline_set(value: Choice):
         reveal_type(value)  # revealed: Literal["c"]
     else:
         reveal_type(value)  # revealed: Literal["a", "b"]
+
+def integer_list(value: int):
+    assert value in [1, 2]
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+def integer_set(value: int):
+    assert value in {0, 2}
+    reveal_type(value)  # revealed: Literal[0, 2]
 
 def literal_locals(value: Choice):
     a = "a"
@@ -251,6 +262,10 @@ def inline_set(x: str):
         reveal_type(x)  # revealed: str
     else:
         reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"]
+
+def integer_list(x: int):
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: int
 
 class Bar: ...
 
@@ -543,7 +558,8 @@ def unrelated_typevar(x: AlwaysEqual, y: U) -> U:
 ## Direct `not in` conditional
 
 ```py
-from typing import Any, Literal, TypeVar
+from enum import Enum
+from typing import Any, Literal, NewType, TypeVar
 
 T = TypeVar("T", Literal[1], Literal[2])
 
@@ -595,6 +611,44 @@ def correlated_typevar(x: T | None, y: T) -> None:
     if x not in (y,):
         reveal_type(x)  # revealed: None
 
+def empty_tuple_slot(x: tuple[()] | None) -> None:
+    if x not in ((),):
+        reveal_type(x)  # revealed: None
+
+def fixed_tuple_slot(x: tuple[Literal[1], Literal["x"]] | None) -> None:
+    if x not in ((1, "x"),):
+        reveal_type(x)  # revealed: None
+
+# We optimistically assume that an unseen runtime subclass does not override `tuple.__eq__`.
+class OpenTupleSubclass(tuple[Literal[1], Literal["x"]]): ...
+
+def tuple_subclass_slot(x: OpenTupleSubclass | None, value: OpenTupleSubclass) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: None
+
+WrappedTuple = NewType("WrappedTuple", tuple[Literal[1], Literal["x"]])
+
+def newtype_tuple_slot(x: WrappedTuple | None, value: WrappedTuple) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: None
+
+class ReflexiveEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+E = TypeVar("E", Literal[ReflexiveEnum.A], Literal[ReflexiveEnum.B])
+
+def reflexive_enum_literal_slot(x: Literal[ReflexiveEnum.A] | None, value: Literal[ReflexiveEnum.A]) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: Never
+
+def reflexive_enum_typevar_slot(x: E | None, value: E) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: Never
+
 def tuple_with_any_slot(x: str | None, missing: Any) -> None:
     if x not in (missing, None):
         reveal_type(x)  # revealed: str
@@ -615,6 +669,21 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
     else:
         reveal_type(x)  # revealed: str | None
+```
+
+## Recursive tuple slots
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Recursive = tuple[Recursive, int]
+
+def recursive_tuple_slot(x: Recursive | None, value: Recursive) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: tuple[Recursive, int] | None
 ```
 
 ## Membership and equality
@@ -698,7 +767,7 @@ def default_equality(x: Token | Literal[1]):
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
-        reveal_type(x)  # revealed: Literal[1, True, "missing"]
+        reveal_type(x)  # revealed: Literal[1, "missing"]
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):
@@ -707,6 +776,15 @@ def custom_equality(x: AlwaysEqual | Literal[1]):
 def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
     if x in values:
         reveal_type(x)  # revealed: Never
+
+def incompatible_tuple_key(
+    key: tuple[str, bool, bool],
+    values: dict[tuple[str, bool], int],
+) -> int | None:
+    if key in values:
+        reveal_type(key)  # revealed: Never
+        return values[key]
+    return None
 ```
 
 ## Custom containment methods
@@ -1094,6 +1172,11 @@ After the `isinstance` check, `values` has type `Iterable[Literal[1]] & tuple[ob
 semantics were checked: the `tuple` component establishes that membership compares against its
 elements, while the `Iterable` component constrains those elements to `Literal[1]`.
 
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
 ```py
 from collections.abc import Iterable
 from typing import Literal, final
@@ -1213,8 +1296,12 @@ def _(x: bool | str):
 
 ## LiteralString
 
+Known literal-origin strings can safely narrow to the matching members of a literal tuple.
+
 ```py
+from typing import Literal
 from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
 
 def _(x: LiteralString):
     if x in ("a", "b", "c"):
@@ -1227,6 +1314,24 @@ def _(x: LiteralString | int):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: (LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]) | int
+```
+
+A string without literal origin can match a tuple member without gaining that member's origin.
+
+```py
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    if value in ("hello",):
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+An excluded value cannot appear in a tuple when the candidate already has known literal origin.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    reveal_type(value in ("hello",))  # revealed: Literal[False]
+
+    if value in ("hello",):
+        reveal_type(value)  # revealed: Never
 ```
 
 ## enums

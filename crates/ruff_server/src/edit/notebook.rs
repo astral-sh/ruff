@@ -63,25 +63,32 @@ impl NotebookDocument {
         let cells = self
             .cells
             .iter()
-            .map(|cell| match cell.kind {
-                NotebookCellKind::Code => ruff_notebook::Cell::Code(ruff_notebook::CodeCell {
-                    execution_count: None,
-                    id: None,
-                    metadata: CellMetadata::default(),
-                    outputs: vec![],
-                    source: ruff_notebook::SourceValue::String(
-                        cell.document.contents().to_string(),
-                    ),
-                }),
+            .filter_map(|cell| match cell.kind {
+                NotebookCellKind::Code => {
+                    Some(ruff_notebook::Cell::Code(ruff_notebook::CodeCell {
+                        execution_count: None,
+                        id: None,
+                        metadata: CellMetadata::default(),
+                        outputs: vec![],
+                        source: ruff_notebook::SourceValue::String(
+                            cell.document.contents().to_string(),
+                        ),
+                    }))
+                }
                 NotebookCellKind::Markup => {
-                    ruff_notebook::Cell::Markdown(ruff_notebook::MarkdownCell {
+                    Some(ruff_notebook::Cell::Markdown(ruff_notebook::MarkdownCell {
                         attachments: None,
                         id: None,
                         metadata: CellMetadata::default(),
                         source: ruff_notebook::SourceValue::String(
                             cell.document.contents().to_string(),
                         ),
-                    })
+                    }))
+                }
+                NotebookCellKind::Custom(_) => {
+                    // Ignore unsupported cell kinds. This arm should never be reached unless a
+                    // client sends a value which is not mentioned/supported in the LSP.
+                    None
                 }
             })
             .collect();
@@ -92,8 +99,12 @@ impl NotebookDocument {
             nbformat_minor: 5,
         };
 
-        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false)
-            .unwrap_or_else(|err| panic!("Server notebook document could not be converted to Ruff's notebook document format: {err}"))
+        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false).unwrap_or_else(|err| {
+            panic!(
+                "Server notebook document could not be converted to Ruff's \
+                notebook document format: {err}"
+            )
+        })
     }
 
     pub(crate) fn update(
@@ -232,11 +243,7 @@ impl NotebookDocument {
 }
 
 impl NotebookCell {
-    pub(crate) fn new(
-        cell: lsp_types::NotebookCell,
-        contents: String,
-        version: DocumentVersion,
-    ) -> Self {
+    fn new(cell: lsp_types::NotebookCell, contents: String, version: DocumentVersion) -> Self {
         Self {
             uri: cell.document,
             kind: cell.kind,

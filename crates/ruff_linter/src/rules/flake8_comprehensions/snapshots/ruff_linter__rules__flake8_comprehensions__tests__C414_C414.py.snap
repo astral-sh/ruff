@@ -460,7 +460,6 @@ C414 [*] Unnecessary `list()` call within `sorted()`
 46 | |     key=lambda xxxxx: xxxxx or "",
 47 | | )
    | |_^
-   |
 help: Remove the inner `list()` call
    |
 44 | xxxxxxxxxxx_xxxxx_xxxxx = sorted(

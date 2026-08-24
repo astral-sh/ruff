@@ -280,7 +280,6 @@ AIR301 `appbuilder` is removed in Airflow 3.0
 107 |
 108 | FabAuthManager(None)
     |               ^^^^^^
-    |
 help: The constructor takes no parameter now
 
 AIR301 [*] `default_var` is removed in Airflow 3.0

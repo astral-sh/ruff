@@ -212,7 +212,7 @@ impl Ranged for StarmapCandidate<'_> {
 
 impl StarmapCandidate<'_> {
     /// Return the generated element for the candidate.
-    pub(crate) fn element(&self) -> &Expr {
+    fn element(&self) -> &Expr {
         match self {
             Self::Generator(generator) => generator.elt.as_ref(),
             Self::ListComp(list_comp) => list_comp.elt.as_ref(),
@@ -221,7 +221,7 @@ impl StarmapCandidate<'_> {
     }
 
     /// Return the generator comprehensions for the candidate.
-    pub(crate) fn generators(&self) -> &[ast::Comprehension] {
+    fn generators(&self) -> &[ast::Comprehension] {
         match self {
             Self::Generator(generator) => generator.generators.as_slice(),
             Self::ListComp(list_comp) => list_comp.generators.as_slice(),
@@ -230,7 +230,7 @@ impl StarmapCandidate<'_> {
     }
 
     /// Try to produce a fix suggestion transforming this node into a call to `starmap`.
-    pub(crate) fn try_make_suggestion(
+    fn try_make_suggestion(
         &self,
         name: Name,
         iter: &Expr,
@@ -324,7 +324,7 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
 }
@@ -345,7 +345,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
 }

@@ -63,11 +63,11 @@ impl FormatType {
                 self,
                 FormatType::Unknown | FormatType::String | FormatType::Repr
             ),
-            PythonType::Number(NumberLike::Complex | NumberLike::Bool) => matches!(
+            PythonType::Number(NumberLike::Complex) => matches!(
                 self,
                 FormatType::Unknown | FormatType::String | FormatType::Repr
             ),
-            PythonType::Number(NumberLike::Integer) => matches!(
+            PythonType::Number(NumberLike::Integer | NumberLike::Bool) => matches!(
                 self,
                 FormatType::Unknown
                     | FormatType::String

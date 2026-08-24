@@ -65,16 +65,17 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
         match (self.expression.full_display(), self.all_hashable) {
             (Some(expression), false) => {
                 format!(
-                    "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
+                    "Consider merging multiple comparisons: `{expression}`. \
+                    Use a `set` if the elements are hashable."
                 )
             }
             (Some(expression), true) => {
                 format!("Consider merging multiple comparisons: `{expression}`.")
             }
-            (None, false) => {
-                "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
-                    .to_string()
-            }
+            (None, false) => "\
+                Consider merging multiple comparisons. \
+                    Use a `set` if the elements are hashable."
+                .to_string(),
             (None, true) => "Consider merging multiple comparisons.".to_string(),
         }
     }

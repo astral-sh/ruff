@@ -7,6 +7,7 @@ mod python_environment;
 mod rule;
 mod rule_selection;
 mod scripts;
+mod server;
 mod uv_workspace;
 
 use anyhow::Context as _;
@@ -51,13 +52,12 @@ fn test_quiet_output() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[invalid-assignment]: Object of type `Literal["foo"]` is not assignable to `int`
-     --> test.py:1:4
+     --> test.py:1:10
       |
     1 | x: int = 'foo'
       |    ---   ^^^^^ Incompatible value of type `Literal["foo"]`
       |    |
       |    Declared type
-      |
 
     Found 1 diagnostic
 
@@ -132,7 +132,6 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -153,7 +152,6 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -186,7 +184,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -204,7 +201,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -222,7 +218,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -283,7 +278,6 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
       |
     2 | from utils import add
       |      ^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -396,7 +390,6 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
@@ -404,7 +397,6 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     7 | prin(x)
       | ^^^^
-      |
     info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
@@ -437,7 +429,6 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     warning[unresolved-reference]: Name `prin` used when not defined
@@ -445,7 +436,6 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     7 | prin(x)
       | ^^^^
-      |
     info: rule `unresolved-reference` was selected in the configuration file
 
     Found 2 diagnostics
@@ -494,7 +484,6 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     2 | from main2 import z  # error: unresolved-import
       |      ^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -505,7 +494,6 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -530,7 +518,6 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     2 | from main2 import z  # error: unresolved-import
       |      ^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -541,7 +528,6 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -602,7 +588,6 @@ fn check_file_without_extension() -> anyhow::Result<()> {
       |
     1 | a = b
       |     ^
-      |
 
     Found 1 diagnostic
 
@@ -841,7 +826,6 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
       |
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
-      |
 
     Found 1 diagnostic
 
@@ -999,11 +983,28 @@ impl CliTest {
     }
 
     pub(crate) fn command(&self) -> Command {
+        self.command_with_subcommand("check")
+    }
+
+    fn command_with_subcommand(&self, subcommand: &str) -> Command {
         let mut command = Command::new(&self.ty_binary_path);
-        command.current_dir(&self.project_dir).arg("check");
+        command.current_dir(&self.project_dir).arg(subcommand);
 
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();
+        // Point user config discovery at a test-local directory to avoid picking up host config.
+        command.env(
+            user_config_directory_env_var(),
+            self.user_config_directory(),
+        );
+
+        command
+    }
+
+    pub(crate) fn command_inheriting_environment(&self) -> Command {
+        let mut command = Command::new(&self.ty_binary_path);
+        command.current_dir(&self.project_dir).arg("check");
+
         // Point user config discovery at a test-local directory to avoid picking up host config.
         command.env(
             user_config_directory_env_var(),

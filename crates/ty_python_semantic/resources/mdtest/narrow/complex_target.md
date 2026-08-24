@@ -7,7 +7,7 @@ We support type narrowing for attributes and subscripts.
 ### Basic
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class C:
     x: int | None = None

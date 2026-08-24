@@ -620,6 +620,24 @@ f3(1)
 f3("a", "b")
 ```
 
+### Preserve an unpacked required suffix
+
+A `ParamSpec` preserves a named positional prefix and the required suffix of an unpacked variadic
+parameter when inferring a callback signature.
+
+```py
+from typing import Callable
+
+def preserve[**P](callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+# TODO: Preserve the unpacked tuple instead of exposing synthetic comparison parameters.
+# Should reveal `(name: int, *args: *tuple[*tuple[int, ...], int]) -> None`.
+reveal_type(preserve(named_prefix_and_suffix))  # revealed: (name: int, *args: int, int, /) -> None
+```
+
 ### Return type change using the same `ParamSpec` multiple times
 
 ```py
@@ -1102,11 +1120,10 @@ def unwrap_awaitable(function: Callable[P, Awaitable[R]], /) -> Callable[P, R]:
 async def unwrapped(value: int) -> int: ...
 @overload
 async def unwrapped(value: str) -> str: ...
-@unwrap_awaitable
 async def unwrapped(value: int | str) -> int | str:
     raise NotImplementedError
 
-reveal_type(unwrapped(1))  # revealed: int | str
+reveal_type(unwrap_awaitable(unwrapped)(1))  # revealed: int | str
 ```
 
 The selected decorator overload can use an `Awaitable` return type.
@@ -1458,7 +1475,7 @@ reveal_type(identity(1))  # revealed: Literal[1]
 reveal_type(identity("hello"))  # revealed: Literal["hello"]
 
 reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
-reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float]
+reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float*]
 ```
 
 ### Chained decorators with generic functions

@@ -301,7 +301,6 @@ E203 [*] Whitespace before ':'
 204 | #: E203:1:13
 205 | t"{ham[lower + 1  :, "columnname"]}"
     |                 ^^
-    |
 help: Remove whitespace before ':'
     |
 204 | #: E203:1:13

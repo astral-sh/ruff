@@ -24,7 +24,7 @@ impl fmt::Display for CallKind {
 }
 
 impl CallKind {
-    pub(crate) fn from_name(name: &str) -> Option<Self> {
+    fn from_name(name: &str) -> Option<Self> {
         match name {
             "isinstance" => Some(CallKind::Isinstance),
             "issubclass" => Some(CallKind::Issubclass),

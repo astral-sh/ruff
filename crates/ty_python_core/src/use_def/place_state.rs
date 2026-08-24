@@ -50,7 +50,8 @@ use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
-/// A newtype-index for a definition in a particular scope.
+/// An index into a scope's use-def history. A combined definition can have separate declaration
+/// and binding entries when they take effect at different points in control flow.
 #[newtype_index]
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedDefinitionId;
@@ -105,7 +106,7 @@ pub(crate) enum FutureDefinitions {
 }
 
 impl PreviousDefinitions {
-    pub(super) fn are_shadowed(self) -> bool {
+    fn are_shadowed(self) -> bool {
         matches!(self, PreviousDefinitions::AreShadowed)
     }
 }
@@ -159,7 +160,7 @@ impl Declarations {
     }
 
     /// Add given reachability constraint to all live declarations.
-    pub(super) fn record_reachability_constraint(
+    fn record_reachability_constraint(
         &mut self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
@@ -386,7 +387,7 @@ impl Bindings {
     }
 
     /// Add given constraint to all live bindings.
-    pub(super) fn record_narrowing_constraint(
+    fn record_narrowing_constraint(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
@@ -398,7 +399,7 @@ impl Bindings {
     }
 
     /// Add given reachability constraint to all live bindings.
-    pub(super) fn record_reachability_constraint(
+    fn record_reachability_constraint(
         &mut self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
@@ -621,7 +622,7 @@ mod tests {
     }
 
     #[track_caller]
-    pub(crate) fn assert_declarations(place: &PlaceState, expected: &[&str]) {
+    fn assert_declarations(place: &PlaceState, expected: &[&str]) {
         let actual = place
             .declarations()
             .iter()

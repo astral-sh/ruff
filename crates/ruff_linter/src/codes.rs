@@ -79,7 +79,7 @@ impl serde::Serialize for NoqaCode {
 }
 
 #[derive(Debug, Copy, Clone, Serialize)]
-pub enum RuleGroup {
+pub enum RuleStatus {
     /// The rule is stable since the provided Ruff version.
     Stable { since: &'static str },
     /// The rule has been unstable since the provided Ruff version, and preview mode must be enabled
@@ -93,7 +93,7 @@ pub enum RuleGroup {
 }
 
 #[ruff_macros::map_codes]
-pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
+pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
     #[expect(clippy::enum_glob_use)]
     use Linter::*;
 
@@ -588,6 +588,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "045") => rules::pyupgrade::rules::NonPEP604AnnotationOptional,
         (Pyupgrade, "046") => rules::pyupgrade::rules::NonPEP695GenericClass,
         (Pyupgrade, "047") => rules::pyupgrade::rules::NonPEP695GenericFunction,
+        (Pyupgrade, "048") => rules::pyupgrade::rules::WhileOne,
         (Pyupgrade, "049") => rules::pyupgrade::rules::PrivateTypeParameter,
         (Pyupgrade, "050") => rules::pyupgrade::rules::UselessClassMetaclassType,
         (Pyupgrade, "051") => rules::pyupgrade::rules::DeprecatedAbcDecorator,
@@ -956,7 +957,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "113") => rules::flake8_use_pathlib::rules::OsPathIsfile,
         (Flake8UsePathlib, "114") => rules::flake8_use_pathlib::rules::OsPathIslink,
         (Flake8UsePathlib, "115") => rules::flake8_use_pathlib::rules::OsReadlink,
-        (Flake8UsePathlib, "116") => rules::flake8_use_pathlib::violations::OsStat,
+        (Flake8UsePathlib, "116") => rules::flake8_use_pathlib::rules::OsStat,
         (Flake8UsePathlib, "117") => rules::flake8_use_pathlib::rules::OsPathIsabs,
         (Flake8UsePathlib, "118") => rules::flake8_use_pathlib::violations::OsPathJoin,
         (Flake8UsePathlib, "119") => rules::flake8_use_pathlib::rules::OsPathBasename,

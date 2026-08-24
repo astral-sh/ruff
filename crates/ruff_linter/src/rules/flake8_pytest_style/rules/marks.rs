@@ -158,7 +158,7 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
         Expr::Call(ast::ExprCall {
             func: _,
             arguments,
-            range: _,
+            range_start: _,
             node_index: _,
         }) => {
             if !checker.settings().flake8_pytest_style.mark_parentheses

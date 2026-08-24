@@ -63,7 +63,7 @@ the gradual guarantee and leads to cascading errors when an object is inferred a
 `Unknown` due to a missing import or similar.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(x: Any, y: Unknown, z: Any | str | int):
     a = cast(dict[str, Any], x)
@@ -97,6 +97,20 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)
 ```
 
+## Redundant casts of tuple classes with unknown elements
+
+A tuple class with an `Unknown` element is not fully static, even when its other element is `object`
+and their union simplifies to `object`. A cast involving that tuple class must not be reported as
+redundant.
+
+```py
+from typing import cast
+from ty_extensions._internal import Unknown
+
+def cast_gradual_tuple_class(value: type[tuple[object, Unknown]]) -> None:
+    cast(type[tuple[object, Unknown]], value)
+```
+
 ## Diagnostic snapshots
 
 ```py
@@ -113,7 +127,6 @@ warning[redundant-cast]: Value is already of type `int`
   |
 5 | cast(int, secrets.randbelow(10))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the redundant `cast`
   |
 4 | # snapshot: redundant-cast
@@ -134,7 +147,6 @@ warning[redundant-cast]: Value is already of type `int`
   |
 7 | cast(val=secrets.randbelow(10), typ=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the redundant `cast`
   |
 6 | # snapshot: redundant-cast
@@ -156,7 +168,6 @@ warning[redundant-cast]: Value is already of type `int`
    |
 10 |     return cast(int, x + y) * z
    |            ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
    |
 9  |     # snapshot: redundant-cast
@@ -178,7 +189,6 @@ warning[redundant-cast]: Value is already of type `int`
    |
 13 |     return -cast(int, x + y)
    |             ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
    |
 12 |     # snapshot: redundant-cast
@@ -200,7 +210,6 @@ warning[redundant-cast]: Value is already of type `int`
    |
 16 |     print(cast(int, x + y))
    |           ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
    |
 15 |     # snapshot: redundant-cast

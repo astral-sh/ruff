@@ -10,7 +10,9 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::is_dunder_operator_method;
+use crate::rules::pylint::helpers::{
+    is_dunder_operator_method, is_underscore_prefixed_public_member,
+};
 
 /// ## What it does
 /// Checks for accesses on "private" class members.
@@ -104,7 +106,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 
     // Allow some public functions whose names start with an underscore, like `os._exit()`.
     if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
-        if matches!(qualified_name.segments(), ["os", "_exit"]) {
+        if is_underscore_prefixed_public_member(&qualified_name) {
             return;
         }
     }

@@ -55,6 +55,11 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
+        requests::GotoImplementationRequestHandler::METHOD => background_document_request_task::<
+            requests::GotoImplementationRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
         requests::GotoDefinitionRequestHandler::METHOD => background_document_request_task::<
             requests::GotoDefinitionRequestHandler,
         >(req, BackgroundSchedule::Worker),
@@ -488,8 +493,11 @@ where
                 anyhow::anyhow!("JSON parsing failure:\n{json_err}")
             }
             server::ExtractError::MethodMismatch(_) => {
-                unreachable!("A method mismatch should not be possible here unless you've used a different handler (`Req`) \
-                    than the one whose method name was matched against earlier.")
+                unreachable!(
+                    "A method mismatch should not be possible here \
+                    unless you've used a different handler (`Req`) \
+                    than the one whose method name was matched against earlier."
+                )
             }
         })
         .with_failure_code(server::ErrorCode::InvalidParams)
@@ -537,8 +545,11 @@ where
                     anyhow::anyhow!("JSON parsing failure:\n{json_err}")
                 }
                 server::ExtractError::MethodMismatch(_) => {
-                    unreachable!("A method mismatch should not be possible here unless you've used a different handler (`N`) \
-                        than the one whose method name was matched against earlier.")
+                    unreachable!(
+                        "A method mismatch should not be possible here \
+                        unless you've used a different handler (`N`) \
+                        than the one whose method name was matched against earlier."
+                    )
                 }
             })
             .with_failure_code(server::ErrorCode::InvalidParams)?,
@@ -562,7 +573,7 @@ impl<T, E: Into<anyhow::Error>> LSPResult<T> for core::result::Result<T, E> {
 }
 
 impl Error {
-    pub(crate) fn new(err: anyhow::Error, code: server::ErrorCode) -> Self {
+    fn new(err: anyhow::Error, code: server::ErrorCode) -> Self {
         Self { code, error: err }
     }
 }

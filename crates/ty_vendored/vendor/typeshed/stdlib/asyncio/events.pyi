@@ -226,7 +226,8 @@ class AbstractEventLoop:
     @abstractmethod
     def create_future(self) -> Future[Any]: ...
     # Tasks methods
-    if sys.version_info >= (3, 14):
+    # `eager_start` is supported as an arbitrary kwarg starting in 3.13.3.
+    if sys.version_info >= (3, 13):
         @abstractmethod
         def create_task(
             self,
@@ -993,10 +994,10 @@ else:
         def new_event_loop(self) -> AbstractEventLoop: ...
         # Child processes handling (Unix only).
         @abstractmethod
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+        @deprecated("Deprecated; removed in Python 3.14.")
         def get_child_watcher(self) -> AbstractChildWatcher: ...
         @abstractmethod
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+        @deprecated("Deprecated; removed in Python 3.14.")
         def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
 
     AbstractEventLoopPolicy = _AbstractEventLoopPolicy
@@ -1071,11 +1072,11 @@ if sys.version_info >= (3, 14):
         If policy is None, the default policy is restored.
         """
 
-@deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+@deprecated("Deprecated; will be removed in Python 3.16.")
 def get_event_loop_policy() -> _AbstractEventLoopPolicy:
     """Get the current event loop policy."""
 
-@deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+@deprecated("Deprecated; will be removed in Python 3.16.")
 def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
     """Set the current event loop policy.
 
@@ -1089,11 +1090,11 @@ def new_event_loop() -> AbstractEventLoop:
     """Equivalent to calling get_event_loop_policy().new_event_loop()."""
 
 if sys.version_info < (3, 14):
-    @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+    @deprecated("Deprecated; removed in Python 3.14.")
     def get_child_watcher() -> AbstractChildWatcher:
         """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
 
-    @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+    @deprecated("Deprecated; removed in Python 3.14.")
     def set_child_watcher(watcher: AbstractChildWatcher) -> None:
         """Equivalent to calling
         get_event_loop_policy().set_child_watcher(watcher).

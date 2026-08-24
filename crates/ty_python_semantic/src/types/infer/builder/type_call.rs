@@ -12,7 +12,7 @@ use crate::types::infer::builder::{
     },
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
-use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
+use ruff_python_ast as ast;
 use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -31,6 +31,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
+        let env = self.program_environment();
         let db = self.db();
 
         let ast::Arguments {
@@ -49,7 +50,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let arg_type = self.infer_expression(single, TypeContext::default());
 
                 return if keywords.is_empty() {
-                    arg_type.dunder_class(db)
+                    arg_type.dunder_class(db, env)
                 } else {
                     if keywords.iter().any(|keyword| keyword.arg.is_some())
                         && let Some(builder) =
@@ -173,11 +174,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
         if !matches!(namespace_type, Type::TypedDict(_))
-            && !namespace_type.is_assignable_to(
-                db,
-                KnownClass::Dict
-                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
-            )
+            && {
+                !namespace_type.is_assignable_to(
+                    db,
+                    env,
+                    KnownClass::Dict.to_specialized_instance(
+                        db,
+                        env,
+                        &[KnownClass::Str.to_instance(db, env), Type::any()],
+                    ),
+                )
+            }
             && let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
@@ -186,7 +193,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .into_diagnostic("Invalid argument to parameter 3 (`namespace`) of `type()`");
             diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `dict[str, Any]`, found `{}`",
-                namespace_type.display(db)
+                namespace_type.display(db, env)
             ));
         }
 
@@ -194,14 +201,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name = if let Some(literal) = name_type.as_string_literal() {
             literal.value(db)
         } else {
-            if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+            if !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
             {
                 let mut diagnostic =
                     builder.into_diagnostic("Invalid argument to parameter 1 (`name`) of `type()`");
                 diagnostic.set_primary_annotation_message(format_args!(
                     "Expected `str`, found `{}`",
-                    name_type.display(db)
+                    name_type.display(db, env)
                 ));
             }
             "<unknown>"
@@ -224,22 +231,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Create the anchor for identifying this dynamic class.
         // - For assigned `type()` calls, the Definition uniquely identifies the class,
         //   and bases inference is deferred.
-        // - For dangling calls, compute a relative offset from the scope's node index,
+        // - For dangling calls, locate the call relative to the enclosing scope,
         //   and store the explicit bases directly (since they were inferred eagerly).
         let anchor = if let Some(def) = definition {
             // Register for deferred inference to infer bases and validate later.
             self.deferred.insert(def);
             DynamicClassAnchor::Definition(def)
         } else {
-            let call_node_index = call_expr.node_index().load();
-            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-            let anchor_u32 = scope_anchor
-                .as_u32()
-                .expect("scope anchor should not be NodeIndex::NONE");
-            let call_u32 = call_node_index
-                .as_u32()
-                .expect("call node should not be NodeIndex::NONE");
-
             // Use [Unknown] as fallback if bases extraction failed (e.g., not a tuple).
             let anchor_bases = explicit_bases
                 .clone()
@@ -247,7 +245,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             DynamicClassAnchor::ScopeOffset {
                 scope,
-                offset: call_u32 - anchor_u32,
+                offset: self.dynamic_class_scope_offset(call_expr),
                 explicit_bases: anchor_bases,
             }
         };
@@ -295,9 +293,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     call_expr.into(),
                     dynamic_class.name(db),
                     metaclass1,
-                    base1.display(db),
+                    base1.display(db, env),
                     metaclass2,
-                    base2.display(db),
+                    base2.display(db, env),
                 );
             }
         }
@@ -321,7 +319,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         // Get the already-inferred class type from the initial pass.
-        let inferred_type = definition_expression_type(db, definition, call_expr);
+        let inferred_type = definition_expression_type(self.db(), definition, call_expr);
         let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
             return;
         };

@@ -31,10 +31,9 @@ o: Not[()]
 p: Not[(int,)]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
-    # A `NewType` over `int` is distinct from `Literal[1]` but can refer to the same runtime object,
-    # so neither identity comparison has a definite result.
-    reveal_type(not_one is not 1)  # revealed: bool
-    reveal_type(not_one is 1)  # revealed: bool
+    # Negating a literal rules out every literal with that value.
+    reveal_type(not_one is not 1)  # revealed: Literal[True]
+    reveal_type(not_one is 1)  # revealed: Literal[False]
 
     # But these are both `bool`, rather than `Literal[True]` or `Literal[False]`
     # as there are many runtime objects that inhabit the type `~Literal[1]`
@@ -91,8 +90,8 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, reveal_mro
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -111,7 +110,7 @@ class C(Unknown): ...
 # revealed: (<class 'C'>, Unknown, <class 'object'>)
 reveal_mro(C)
 
-# error: "Special form `ty_extensions.Unknown` expected no type parameter"
+# error: "Special form `ty_extensions._internal.Unknown` expected no type parameter"
 u: Unknown[str]
 ```
 
@@ -293,7 +292,6 @@ error[static-assert-error]: Static assertion error: argument evaluates to `False
   | ^^^^^^^^^^^^^^-----^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 With a custom message:
@@ -311,7 +309,6 @@ error[static-assert-error]: Static assertion error: with a message
   | ^^^^^^^^^^^^^^-----^^^^^^^^^^^^^^^^^^^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 When it evaluates to something falsy:
@@ -329,7 +326,6 @@ error[static-assert-error]: Static assertion error: argument of type `Literal[""
    | ^^^^^^^^^^^^^^--^
    |               |
    |               Inferred type of argument is `Literal[""]`
-   |
 ```
 
 When it evaluates to something that is not statically known to be truthy or falsy:
@@ -347,7 +343,6 @@ error[static-assert-error]: Static assertion error: argument of type `int` has a
    | ^^^^^^^^^^^^^^--------------------^
    |               |
    |               Inferred type of argument is `int`
-   |
 ```
 
 ## Type predicates
@@ -364,7 +359,7 @@ from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never, Union
 
 static_assert(is_equivalent_to(type, type[object]))
-static_assert(is_equivalent_to(tuple[int, Never], Never))
+static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
 static_assert(is_equivalent_to(int | str, Union[int, str]))
 
 static_assert(not is_equivalent_to(int, str))
@@ -431,21 +426,6 @@ static_assert(is_singleton(Literal[True]))
 
 static_assert(not is_singleton(int))
 static_assert(not is_singleton(Literal["a"]))
-```
-
-### Single-valued types
-
-```py
-from ty_extensions import static_assert
-from ty_extensions._internal import is_single_valued
-from typing import Literal
-
-static_assert(is_single_valued(None))
-static_assert(is_single_valued(Literal[True]))
-static_assert(is_single_valued(Literal["a"]))
-
-static_assert(not is_single_valued(int))
-static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 ```
 
 ## `TypeOf`

@@ -19,7 +19,7 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::source::source_text;
 use ruff_db::system::SystemPathBuf;
 use serde::{Deserialize, Serialize};
-use ty_project::{Db as _, ProjectDatabase};
+use ty_project::{Db as _, ProjectDatabase, SemanticDb as _};
 
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
@@ -197,16 +197,12 @@ pub(super) enum LspDiagnostics {
 }
 
 impl LspDiagnostics {
-    /// Returns the diagnostics for a text document.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the diagnostics are for a notebook document.
-    pub(super) fn expect_text_document(self) -> Vec<Diagnostic> {
+    /// Returns the diagnostics for the text document or notebook cell at `uri`.
+    pub(super) fn into_document_diagnostics(self, uri: &Uri) -> Vec<Diagnostic> {
         match self {
             LspDiagnostics::TextDocument(diagnostics) => diagnostics,
-            LspDiagnostics::NotebookDocument(_) => {
-                panic!("Expected a text document diagnostics, but got notebook diagnostics")
+            LspDiagnostics::NotebookDocument(mut diagnostics) => {
+                diagnostics.remove(uri).unwrap_or_default()
             }
         }
     }
@@ -401,7 +397,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = hints(db, file);
+    let unnecessary_hints = hints(db, db.program_file(file));
 
     Some(Diagnostics {
         items: diagnostics,
@@ -647,6 +643,7 @@ pub(crate) struct FullDiagnosticData {
 pub(crate) struct DiagnosticFixData {
     pub(crate) fix_title: String,
     pub(crate) edits: HashMap<Uri, Vec<lsp_types::TextEdit>>,
+    pub(crate) preferred: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -722,6 +719,7 @@ impl DiagnosticData {
                 .map(ToString::to_string)
                 .unwrap_or_else(|| format!("Fix {}", diagnostic.id())),
             edits: lsp_edits,
+            preferred: fix.applies(Applicability::Safe),
         })
     }
 }

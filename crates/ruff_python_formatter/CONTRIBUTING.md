@@ -121,18 +121,6 @@ Available options:
 - `--stats-file`: Use together with `--multi-project`, this writes the similarity index as unicode
     table to the given file.
 
-**Large ecosystem checks** It is also possible to check a large number of repositories. This dataset
-is large (~60GB), so we only do this occasionally:
-
-```shell
-# Get the list of projects
-curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
-# Repurpose this script to download the repositories for us
-python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
-# Check each project for formatter stability
-cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
-```
-
 ## Helper structs
 
 To abstract formatting something into a helper, create a new struct with the data you want to

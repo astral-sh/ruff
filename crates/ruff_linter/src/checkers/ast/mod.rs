@@ -253,7 +253,7 @@ pub(crate) struct Checker<'a> {
 
 impl<'a> Checker<'a> {
     #[expect(clippy::too_many_arguments)]
-    pub(crate) fn new(
+    fn new(
         parsed: &'a Parsed<ModModule>,
         parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
         settings: &'a LinterSettings,
@@ -605,7 +605,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
-    pub(crate) fn report_type_diagnostic<T: Violation>(&self, kind: T, range: TextRange) {
+    fn report_type_diagnostic<T: Violation>(&self, kind: T, range: TextRange) {
         if !self.semantic.in_no_type_check() {
             self.report_diagnostic(kind, range);
         }
@@ -708,6 +708,19 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        // F722
+        if self.semantic.in_string_type_definition() {
+            if self.is_rule_enabled(Rule::ForwardAnnotationSyntaxError) {
+                self.report_type_diagnostic(
+                    pyflakes::rules::ForwardAnnotationSyntaxError {
+                        parse_error: error.to_string(),
+                    },
+                    error.range,
+                );
+            }
+            return;
+        }
+
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 // F404
@@ -810,11 +823,13 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::DifferentMatchPatternBindings
             | SemanticSyntaxErrorKind::InvalidExpression(..)
             | SemanticSyntaxErrorKind::GlobalParameter(_)
+            | SemanticSyntaxErrorKind::NonlocalParameter(_)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_)
+            | SemanticSyntaxErrorKind::DuplicateKeywordArgument(_)
             | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel
             | SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { .. }
             | SemanticSyntaxErrorKind::NonlocalAndGlobal(_)
@@ -1683,13 +1698,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
             return;
         }
 
+        // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
+        // after having already traversed the source tree once. If we're now visiting the deferred nodes,
+        // we can't defer again, or we'll infinitely recurse!
         if !self.semantic.in_typing_literal()
-            // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
-            // after having already traversed the source tree once. If we're now visiting the deferred nodes,
-            // we can't defer again, or we'll infinitely recurse!
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
-            && (self.semantic.future_annotations_or_stub()||self.target_version().defers_annotations())
+            && (self.semantic.future_annotations_or_stub()
+                || self.target_version().defers_annotations())
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(string_literal) = expr {
@@ -1728,7 +1744,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments: _,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
                 if let Expr::Name(ast::ExprName {
@@ -1848,7 +1864,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
                 self.visit_expr(func);
@@ -2780,15 +2796,14 @@ impl<'a> Checker<'a> {
 
         match parent {
             Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
+            // TODO: It is a bit unfortunate that we do this check twice. Maybe we should change how
+            // we visit this statement so the semantic flag for the type alias sticks around until
+            // after we've handled this store, so we can check the flag instead of duplicating this check.
             Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })
-                // TODO: It is a bit unfortunate that we do this check twice
-                //       maybe we should change how we visit this statement
-                //       so the semantic flag for the type alias sticks around
-                //       until after we've handled this store, so we can check
-                //       the flag instead of duplicating this check
-                if self.semantic.match_typing_expr(annotation, "TypeAlias") => {
-                    flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
-                }
+                if self.semantic.match_typing_expr(annotation, "TypeAlias") =>
+            {
+                flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
+            }
             _ => {}
         }
 
@@ -3527,7 +3542,7 @@ impl<'a> LintContext<'a> {
     /// Prefer [`LintContext::report_diagnostic_if_enabled`] unless you need to attach
     /// sub-diagnostics before the fix title. See its documentation for more details.
     #[expect(unused)]
-    pub(crate) fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
+    fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
         range: TextRange,
@@ -3697,7 +3712,7 @@ impl DiagnosticGuard<'_, '_> {
     /// diagnostic.info("This will appear first");
     /// diagnostic.before_drop(|diag| diag.info("This will appear last, after the fix title"));
     /// ```
-    pub(crate) fn before_drop<F>(&mut self, f: F)
+    fn before_drop<F>(&mut self, f: F)
     where
         F: Fn(&mut Diagnostic) + 'static,
     {

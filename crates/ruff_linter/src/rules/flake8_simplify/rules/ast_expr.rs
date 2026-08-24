@@ -256,7 +256,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
-        range: _,
+        range_start: _,
         node_index: _,
     }) = expr
     else {

@@ -171,14 +171,13 @@ Structural fuel is charged only for depth introduced by a derivation. Propagatin
 concrete bound through a typevar therefore remains cheap.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 type Deep = tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[tuple[int]]]]]]]]]]
 
 def check_deep_bound[T, U]():
-    constraints = ConstraintSet.range(Never, T, U) & ConstraintSet.range(Never, U, Deep)
+    constraints = ConstraintSet.upper_bound(T, U) & ConstraintSet.upper_bound(U, Deep)
     static_assert(constraints.implies_subtype_of(T, Deep))
 ```
 

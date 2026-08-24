@@ -283,55 +283,54 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
 /// UP026
 pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
     match stmt {
+        // Find all `mock` imports.
         Stmt::Import(ast::StmtImport {
             names,
             is_lazy: _,
             range: _,
             node_index: _,
-        })
-            // Find all `mock` imports.
-            if names
-                .iter()
-                .any(|name| &name.name == "mock" || &name.name == "mock.mock")
-            => {
-                // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if let Some(indent) = indentation(checker.source(), stmt) {
-                    match format_import(stmt, indent, checker.locator(), checker.stylist()) {
-                        Ok(content) => Some(content),
-                        Err(e) => {
-                            debug!("Failed to rewrite `mock` import: {e}");
-                            None
-                        }
+        }) if names
+            .iter()
+            .any(|name| &name.name == "mock" || &name.name == "mock.mock") =>
+        {
+            // Generate the fix, if needed, which is shared between all `mock` imports.
+            let content = if let Some(indent) = indentation(checker.source(), stmt) {
+                match format_import(stmt, indent, checker.locator(), checker.stylist()) {
+                    Ok(content) => Some(content),
+                    Err(e) => {
+                        debug!("Failed to rewrite `mock` import: {e}");
+                        None
                     }
-                } else {
-                    None
-                };
+                }
+            } else {
+                None
+            };
 
-                // Add a `Diagnostic` for each `mock` import.
-                for name in names {
-                    if (&name.name == "mock" || &name.name == "mock.mock")
-                        && !is_import_required_by_isort(
-                            &checker.settings().isort.required_imports,
-                            stmt.into(),
-                            name,
-                        )
-                    {
-                        let mut diagnostic = checker.report_diagnostic(
-                            DeprecatedMockImport {
-                                reference_type: MockReference::Import,
-                            },
-                            name.range(),
-                        );
-                        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-                        if let Some(content) = content.as_ref() {
-                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                                content.clone(),
-                                stmt.range(),
-                            )));
-                        }
+            // Add a `Diagnostic` for each `mock` import.
+            for name in names {
+                if (&name.name == "mock" || &name.name == "mock.mock")
+                    && !is_import_required_by_isort(
+                        &checker.settings().isort.required_imports,
+                        stmt.into(),
+                        name,
+                    )
+                {
+                    let mut diagnostic = checker.report_diagnostic(
+                        DeprecatedMockImport {
+                            reference_type: MockReference::Import,
+                        },
+                        name.range(),
+                    );
+                    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+                    if let Some(content) = content.as_ref() {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            content.clone(),
+                            stmt.range(),
+                        )));
                     }
                 }
             }
+        }
         Stmt::ImportFrom(ast::StmtImportFrom {
             module: Some(module),
             level,

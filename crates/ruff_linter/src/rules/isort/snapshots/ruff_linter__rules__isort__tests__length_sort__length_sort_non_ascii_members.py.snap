@@ -16,7 +16,6 @@ I001 [*] Import block is un-sorted or un-formatted
 10 | |     λοοοοοοοοοοοοοονγ,
 11 | | )
    | |_^
-   |
 help: Organize imports
    |
 1  | from module1 import (

@@ -5,11 +5,10 @@ use std::time::{Duration, Instant};
 use lsp_server::RequestId;
 use lsp_types::WorkspaceDiagnosticRequest;
 use lsp_types::{
-    FullDocumentDiagnosticReport, PreviousResultId, ProgressNotification, ProgressParams,
-    ProgressToken, UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport,
+    FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
+    UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportPartialResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
@@ -18,7 +17,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use ty_ide::{Hint, hints};
-use ty_project::{ProgressReporter, ProjectDatabase};
+use ty_project::{ProgressReporter, ProjectDatabase, SemanticDb as _};
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
@@ -240,7 +239,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
-        let unnecessary_hints = hints(db, file);
+        let unnecessary_hints = hints(db, db.program_file(file));
 
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
@@ -288,7 +287,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            let unnecessary_hints = hints(db, file);
+            let unnecessary_hints = hints(db, db.program_file(file));
             response.write_diagnostics_for_file(db, file, &diagnostics, &unnecessary_hints);
         }
         response.maybe_flush();
@@ -624,12 +623,17 @@ impl Streaming {
             .map(WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport)
             .collect();
 
-        let report = self.create_result(items);
+        let partial_result = match self.create_result(items) {
+            WorkspaceDiagnosticReportResult::PartialReport(partial_report) => partial_report,
+            WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }) => {
+                // WorkspaceDiagnosticReport and WorkspaceDiagnosticReportPartialResult have the
+                // same serialization in the LSP.
+                // https://github.com/microsoft/language-server-protocol/issues/2281
+                WorkspaceDiagnosticReportPartialResult { items }
+            }
+        };
         self.client
-            .send_notification::<ProgressNotification>(ProgressParams {
-                token: self.token.clone(),
-                value: json!(report),
-            });
+            .send_partial_result::<WorkspaceDiagnosticRequest>(self.token.clone(), partial_result);
         self.last_flush = Instant::now();
     }
 

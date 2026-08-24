@@ -40,6 +40,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: I002\n",
           "range": {
@@ -78,6 +79,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
       "data": {
         "code": "RUF900",
         "edits": [],
+        "is_preferred": null,
         "noqa_edit": {
           "newText": "  # noqa: RUF900\n",
           "range": {
@@ -130,6 +132,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: RUF901\n",
           "range": {
@@ -182,6 +185,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "is_preferred": false,
         "noqa_edit": {
           "newText": "  # noqa: RUF902\n",
           "range": {
@@ -219,7 +223,22 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
       "tags": [],
       "data": {
         "code": "RUF903",
-        "edits": [],
+        "edits": [
+          {
+            "newText": "# fix from stable-test-rule-display-only-fix\n",
+            "range": {
+              "end": {
+                "character": 0,
+                "line": 0
+              },
+              "start": {
+                "character": 0,
+                "line": 0
+              }
+            }
+          }
+        ],
+        "is_preferred": false,
         "noqa_edit": {
           "newText": "  # noqa: RUF903\n",
           "range": {
@@ -233,7 +252,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         },
-        "title": "stable-test-rule-display-only-fix"
+        "title": "stable-test-rule-display-only-fix (suggestion)"
       }
     },
     {
@@ -258,6 +277,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
       "data": {
         "code": "RUF950",
         "edits": [],
+        "is_preferred": null,
         "noqa_edit": {
           "newText": "  # noqa: RUF950\n",
           "range": {
@@ -313,6 +333,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: I001\n",
           "range": {
@@ -367,6 +388,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -423,6 +445,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -475,6 +498,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: E703\n",
           "range": {
@@ -527,6 +551,7 @@ expression: "final_diagnostics.expect(\"at least one notebook change\")"
             }
           }
         ],
+        "is_preferred": true,
         "noqa_edit": {
           "newText": "  # noqa: F541\n",
           "range": {

@@ -71,7 +71,7 @@ fn map_call_with_two_arguments<'a>(
                 range: _,
                 node_index: _,
             },
-        range: _,
+        range_start: _,
         node_index: _,
     } = call;
 

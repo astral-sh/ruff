@@ -1,4 +1,6 @@
 # ruff: noqa: PYI021
+"""Experimental ty APIs intended to be exposed to end users."""
+
 import collections.abc
 import sys
 from typing import Any, ClassVar, Protocol, _SpecialForm
@@ -105,15 +107,6 @@ eagerly.
 # -----
 # Types
 # -----
-
-Unknown: _SpecialForm
-"""
-`Unknown` is a dynamic type inferred due to missing type information or an inference error.
-
-ty infers `Unknown` for unannotated values with insufficient type information. It also uses it as a
-fallback after certain type errors. This contrasts with `Any`, which represents an *explicitly*
-annotated dynamic type. Like `Any`, however, it is a dynamic type, so ty allows any operation on it.
-"""
 
 AlwaysTruthy: _SpecialForm
 """

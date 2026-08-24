@@ -7,5 +7,4 @@ PLR1722 Use `sys.exit()` instead of `exit`
 7 | def main():
 8 |     exit(0)
   |     ^^^^
-  |
 help: Replace `exit` with `sys.exit()`

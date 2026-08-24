@@ -621,7 +621,6 @@ RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 192 | |                  "baz", "bingo"
 193 | |                  }
     | |__________________^
-    |
 help: Apply a natural sort to `BezierBuilder4.__slots__`
     |
 190 |

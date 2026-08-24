@@ -8,7 +8,6 @@ C400 [*] Unnecessary generator (rewrite as a list comprehension)
 2 |
 3 | list(*x for x in xs)
   | ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Rewrite as a list comprehension
   |
 2 |

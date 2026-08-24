@@ -17,4 +17,3 @@ E501 Line too long (89 > 88)
 16 | # Error (89 characters)
 17 | "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:" + "shape:aaaa"  # pyrefly: ignore[missing-attribute]
    |                                                                                         ^
-   |

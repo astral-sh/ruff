@@ -188,4 +188,3 @@ Module(
 2 | type X[T: int =] = int
 3 | type X[T1 =, T2] = int
   |            ^ Syntax Error: Expected an expression
-  |

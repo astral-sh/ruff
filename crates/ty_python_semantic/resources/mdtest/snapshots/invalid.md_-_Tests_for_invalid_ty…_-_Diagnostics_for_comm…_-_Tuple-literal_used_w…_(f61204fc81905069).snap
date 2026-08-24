@@ -35,7 +35,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
   |
 2 |     x: (),  # error: [invalid-type-form]
   |        ^^ Did you mean `tuple[()]`?
-  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -47,7 +46,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
   |
 3 | ) -> ():  # error: [invalid-type-form]
   |      ^^ Did you mean `tuple[()]`?
-  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -59,7 +57,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
   |
 6 |     x: (int,),  # error: [invalid-type-form]
   |        ^^^^^^ Did you mean `tuple[int]`?
-  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -71,7 +68,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
   |
 7 | ) -> (int,):  # error: [invalid-type-form]
   |      ^^^^^^ Did you mean `tuple[int]`?
-  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -83,7 +79,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
    |
 10 |     x: (int, str),  # error: [invalid-type-form]
    |        ^^^^^^^^^^ Did you mean `tuple[int, str]`?
-   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -95,7 +90,6 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
    |
 11 | ) -> (int, str):  # error: [invalid-type-form]
    |      ^^^^^^^^^^ Did you mean `tuple[int, str]`?
-   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
