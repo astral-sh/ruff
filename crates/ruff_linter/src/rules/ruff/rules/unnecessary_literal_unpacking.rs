@@ -1,13 +1,11 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_diagnostics::IsolationLevel;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{Parentheses, remove_argument, remove_member};
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -44,19 +42,19 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - The literal is a **set**. `foo(*{bar})` is not equivalent to `foo(bar)`: building the set
 ///   requires `bar` to be hashable, so the fix can silence a `TypeError` that is most likely a real
 ///   mistake.
-/// - A comment sits in text the fix deletes: between the `*` and the literal, in the gap that
-///   removing an empty unpacking takes along with the neighbouring comma, or inside a collection
-///   that the fix rewrites wholesale. The comment does not survive the fix.
+/// - A comment sits between the `*` and the literal, in text that the fix deletes. The comment does
+///   not survive the fix.
 ///
 /// ## Fix availability
-/// No fix is offered at all where writing the elements out would not be valid Python. Neither case
-/// applies to an empty literal, which is removed whole rather than written out:
+/// No fix is offered where writing the elements out would not be valid Python:
 ///
 /// - A keyword argument written before the unpacking, since neither `foo(keyword=bar, baz)` nor
 ///   `class C(metaclass=Meta, Base)` is valid Python.
 /// - A multi-line literal inside a tuple written without parentheses, where the literal's
 ///   brackets are what continue the lines. A subscript slice is written that way too, but the
 ///   subscript's own brackets continue the lines there, so it is still fixed.
+///
+/// An empty literal, as in `foo(*[])`, is reported but not fixed.
 ///
 /// ## See also
 /// [`unnecessary-spread`][PIE800] is the counterpart for the dictionary unpacking operator (`**`).
@@ -124,9 +122,10 @@ fn unnecessary_literal_unpacking_fix(
     literal: &SequenceLiteral,
     context: UnpackingContext,
 ) -> Option<Fix> {
-    let Some(last_element) = literal.elts.last() else {
-        return empty_literal_fix(checker, starred, literal.kind, context);
-    };
+    // An empty literal, as in `foo(*[])`, has no elements to write out: removing it takes a
+    // neighbouring comma along with it, and can leave the surrounding collection needing to be
+    // rewritten. No fix is offered for it.
+    let last_element = literal.elts.last()?;
 
     // An unparenthesized tuple has no brackets of its own, so the literal's brackets can be what
     // lets it span several lines. Removing them would leave the continuation lines unterminated,
@@ -202,88 +201,7 @@ fn unnecessary_literal_unpacking_fix(
         .chain(paren_edits)
         .collect();
 
-    Some(build_fix(
-        checker,
-        literal.kind,
-        open_bracket_edit,
-        rest,
-        IsolationLevel::default(),
-    ))
-}
-
-/// Build a fix for unpacking an empty literal, as in `f(*[])`, which contributes no elements at
-/// all and so has to be removed together with one of the commas around it.
-///
-/// Every fix built here is isolated, so the fixer applies at most one of them per pass. That lets
-/// each one reason about a display losing a single element: `(*[], bar, *[])` shrinks to
-/// `(bar, *[])` and only then to `(bar,)`, instead of losing both unpackings at once and
-/// collapsing to plain `bar`.
-fn empty_literal_fix(
-    checker: &Checker,
-    starred: &ast::ExprStarred,
-    kind: SequenceKind,
-    context: UnpackingContext,
-) -> Option<Fix> {
-    let position_of = |elts: &[Expr]| elts.iter().position(|elt| elt.range() == starred.range());
-    let is_only_element = |elts: &[Expr]| matches!(elts, [only] if only.range() == starred.range());
-
-    let (first, rest) = match context {
-        UnpackingContext::CallArguments(arguments) | UnpackingContext::ClassBases(arguments) => (
-            remove_argument(
-                starred,
-                arguments,
-                context.parentheses(),
-                checker.source(),
-                checker.tokens(),
-            )
-            .ok()?,
-            vec![],
-        ),
-        // A display losing its only element is rewritten whole rather than emptied element by
-        // element, since a trailing comma written after that element, as in `[*[],]`, would
-        // otherwise be left behind as `[,]`.
-        UnpackingContext::Display(Expr::List(list)) if is_only_element(&list.elts) => (
-            Edit::range_replacement("[]".to_string(), list.range()),
-            vec![],
-        ),
-        UnpackingContext::Display(Expr::List(ast::ExprList { elts, .. })) => (
-            remove_member(elts, position_of(elts)?, checker.source()).ok()?,
-            vec![],
-        ),
-        // A set display cannot shrink to `{}`, which is an empty dict, so an emptied one has to be
-        // spelled out as a call instead.
-        UnpackingContext::Display(Expr::Set(set)) if is_only_element(&set.elts) => {
-            if !checker.semantic().has_builtin_binding("set") {
-                return None;
-            }
-            (
-                Edit::range_replacement("set()".to_string(), set.range()),
-                vec![],
-            )
-        }
-        UnpackingContext::Display(Expr::Set(ast::ExprSet { elts, .. })) => (
-            remove_member(elts, position_of(elts)?, checker.source()).ok()?,
-            vec![],
-        ),
-        // A tuple display can shrink to `()`, but deleting the unpacking alone would not get
-        // there: a tuple written without parentheses keeps its comma outside the unpacking.
-        UnpackingContext::Display(Expr::Tuple(tuple)) if is_only_element(&tuple.elts) => (
-            Edit::range_replacement("()".to_string(), tuple.range()),
-            vec![],
-        ),
-        UnpackingContext::Display(Expr::Tuple(tuple)) => {
-            empty_tuple_member_edits(checker, tuple, position_of(&tuple.elts)?)?
-        }
-        UnpackingContext::Display(_) => return None,
-    };
-
-    Some(build_fix(
-        checker,
-        kind,
-        first,
-        rest,
-        Checker::isolation(checker.semantic().current_statement_id()),
-    ))
+    Some(build_fix(checker, literal.kind, open_bracket_edit, rest))
 }
 
 /// Assemble `first` and `rest` into a fix, deciding how safe it is to apply.
@@ -292,15 +210,9 @@ fn empty_literal_fix(
 /// afterwards, and when the literal is a set: writing out a set's element drops the hashability
 /// requirement that building the set imposed, which can silence a `TypeError` that is most likely a
 /// real mistake.
-fn build_fix(
-    checker: &Checker,
-    kind: SequenceKind,
-    first: Edit,
-    rest: Vec<Edit>,
-    isolation: IsolationLevel,
-) -> Fix {
+fn build_fix(checker: &Checker, kind: SequenceKind, first: Edit, rest: Vec<Edit>) -> Fix {
     // `comments_in_range` rather than `intersects`: a deletion that stops exactly where a comment
-    // begins, as in `f(*[],  # comment`, leaves the comment alone.
+    // begins, as with the parenthesis deleted in `f(*([bar]  # comment`, leaves the comment alone.
     let deletes_comment = std::iter::once(&first).chain(&rest).any(|edit| {
         !checker
             .comment_ranges()
@@ -313,49 +225,7 @@ fn build_fix(
         Applicability::Safe
     };
 
-    Fix::applicable_edits(first, rest, applicability).isolate(isolation)
-}
-
-/// Remove the element at `index` from a tuple display, keeping the result a tuple.
-///
-/// Removing an element takes one of the display's commas with it, and a tuple needs a comma to
-/// stay a tuple. Shrinking to a single element therefore has to put a trailing comma back, so that
-/// `(*[], bar)` becomes `(bar,)` rather than `(bar)`, which is just `bar`. A display shrinking to
-/// nothing would need `()` written in place of the whole thing, which this does not attempt.
-fn empty_tuple_member_edits(
-    checker: &Checker,
-    tuple: &ast::ExprTuple,
-    index: usize,
-) -> Option<(Edit, Vec<Edit>)> {
-    let surviving = match tuple.elts.as_slice() {
-        // Three or more elements leave at least two behind, so the display keeps a comma of its
-        // own and needs no help putting one back.
-        [_, _, _, ..] => None,
-        // A display losing its only element is rewritten as `()` by the caller instead.
-        [] | [_] => return None,
-        [first, second] => Some(if index == 0 { second } else { first }),
-    };
-
-    let removal = remove_member(&tuple.elts, index, checker.source()).ok()?;
-    let Some(surviving) = surviving else {
-        return Some((removal, vec![]));
-    };
-
-    // Any comma after the surviving element that the removal does not swallow already keeps the
-    // display a tuple, as in `(*[], bar,)`.
-    let trailing_comma_survives = checker
-        .tokens()
-        .in_range(TextRange::new(surviving.end(), tuple.end()))
-        .iter()
-        .any(|token| {
-            token.kind() == TokenKind::Comma && !removal.range().contains_range(token.range())
-        });
-
-    let comma_edit = (!trailing_comma_survives)
-        .then(|| Edit::insertion(",".to_string(), surviving.end()))
-        .into_iter()
-        .collect();
-    Some((removal, comma_edit))
+    Fix::applicable_edits(first, rest, applicability)
 }
 
 /// The place a `*` unpacking sits in, which is what decides whether the unpacked literal's
@@ -403,17 +273,6 @@ impl<'a> UnpackingContext<'a> {
         match self {
             Self::CallArguments(arguments) | Self::ClassBases(arguments) => Some(arguments),
             Self::Display(_) => None,
-        }
-    }
-
-    /// Whether an argument list emptied by removing the unpacking keeps its parentheses.
-    ///
-    /// `class C(*[]): ...` reads better as `class C: ...`, but a call cannot lose the parentheses
-    /// that make it a call.
-    fn parentheses(self) -> Parentheses {
-        match self {
-            Self::ClassBases(_) => Parentheses::Remove,
-            Self::CallArguments(_) | Self::Display(_) => Parentheses::Preserve,
         }
     }
 }
