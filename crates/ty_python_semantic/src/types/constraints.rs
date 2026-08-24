@@ -7624,13 +7624,10 @@ mod tests {
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
     use crate::types::generics::ApplySpecialization;
-    use crate::types::type_alias::TypeAliasType;
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
     };
-    use crate::types::{
-        BoundTypeVarInstance, KnownClass, KnownInstanceType, SubclassOfType, TypeVarVariance,
-    };
+    use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
     use ruff_python_ast::name::Name;
@@ -8390,36 +8387,6 @@ mod tests {
             PathBoundSolution::Solved(Type::Never).as_type(),
             Some(Type::Never)
         );
-    }
-
-    #[test]
-    fn default_solve_preserves_single_lower_type_alias() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented("/src/a.py", "type Scalar = int")?;
-        let db = &db;
-        let env = db.program_environment();
-        let file = system_path_to_file(db, "/src/a.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-        let alias_ty = global_symbol(db, file, "Scalar").place.expect_type();
-        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
-            alias_ty
-        else {
-            anyhow::bail!("expected `Scalar` to be a type alias");
-        };
-        let alias = Type::TypeAlias(TypeAliasType::PEP695(alias));
-        let t = create_typevar(db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let path_bound = PathBound::exact(t, alias);
-
-        assert_eq!(
-            PathBounds::preliminary_solve(db, &env, &builder, &path_bound),
-            PathBoundSolution::Solved(alias)
-        );
-        assert_eq!(
-            PathBounds::default_solve(db, &env, &builder, &path_bound),
-            PathBoundSolution::Solved(alias)
-        );
-        Ok(())
     }
 
     #[test]

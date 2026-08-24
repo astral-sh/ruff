@@ -82,6 +82,21 @@ reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
+An inferred specialization preserves a PEP 695 type alias when it is the only inferred lower bound.
+This keeps diagnostics expressed in terms of the alias instead of expanding it to the underlying
+type.
+
+```py
+type Scalar = int
+
+def takes_str(value: str) -> None:
+    pass
+
+def check_alias(value: Scalar) -> None:
+    # error: [invalid-argument-type] "Argument to function `takes_str` is incorrect: Expected `str`, found `Scalar`"
+    takes_str(f(value))
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
