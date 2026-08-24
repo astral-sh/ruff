@@ -64,7 +64,7 @@ fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["" | "io", "open"] | ["io", "open_code"]
+                ["" | "builtins" | "io", "open"] | ["io", "open_code"]
             )
         })
 }
