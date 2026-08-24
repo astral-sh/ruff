@@ -49,12 +49,6 @@
       description: "Weekly update of NPM development dependencies",
     },
     {
-      groupName: "ESLint dependencies",
-      matchManagers: ["npm"],
-      matchPackageNames: ["@eslint/js", "eslint"],
-      description: "Weekly update of ESLint dependencies",
-    },
-    {
       groupName: "Monaco",
       matchManagers: ["npm"],
       matchPackageNames: ["monaco"],
