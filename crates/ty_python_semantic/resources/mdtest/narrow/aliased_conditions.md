@@ -266,6 +266,94 @@ def _(x: int | None):
         reveal_type(x)  # revealed: None
 ```
 
+## Alias defined in the `if` branch
+
+Only the `if` branch relates `condition` to `x`. After the branches merge, the independent
+assignment can produce either condition outcome for any value of `x`.
+
+```py
+def _(x: int | None, flag: bool, other: bool):
+    if flag:
+        condition = x is not None
+    else:
+        condition = other
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Alias defined in the `else` branch
+
+The same applies when the `else` branch assigns the check. Its relationship to `x` does not hold for
+the independent assignment in the `if` branch.
+
+```py
+def _(x: int | None, flag: bool, other: bool):
+    if flag:
+        condition = other
+    else:
+        condition = x is not None
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Alias assigned conditionally
+
+If the branch is skipped, `condition` keeps the independent argument value. Neither outcome of the
+condition narrows `x`.
+
+```py
+def _(x: int | None, flag: bool, condition: bool):
+    if flag:
+        condition = x is not None
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Alias assigned on a terminal branch
+
+A check assigned on a branch that returns cannot describe the condition used afterward. The
+independent assignment is the only one that reaches this use, so neither outcome narrows `x`.
+
+```py
+def _(x: int | None, flag: bool, other: bool):
+    condition = other
+    if flag:
+        condition = x is not None
+        return
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Alias assigned on the only continuing branch
+
+If the other branch returns, the check is the only assignment that reaches the condition. Its
+relationship to `x` still permits narrowing after the branches merge.
+
+```py
+def _(x: int | None, flag: bool):
+    if flag:
+        condition = x is not None
+    else:
+        return
+
+    if condition:
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: None
+```
+
 ## Nested scope can preserve alias
 
 > TODO: This feature is not supported yet.

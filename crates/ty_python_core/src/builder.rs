@@ -1282,9 +1282,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            let Some(alias) = self.narrowing_aliases.get(&name.id).cloned() else {
+            let Some(alias) = self.narrowing_aliases.get(&name.id) else {
                 return;
             };
+            let Some(use_id) = self.current_ast_ids().try_use_id(leaf) else {
+                return;
+            };
+
+            // The alias may have been registered while visiting a different branch. Only use it
+            // if the sole reaching binding assigns this exact expression.
+            let use_def = self.current_use_def_map();
+            let Some(value) = use_def
+                .bindings_at_use(use_id)
+                .exactly_one()
+                .ok()
+                .and_then(|binding| use_def.definition(binding.binding()).definition())
+                .and_then(|definition| definition.kind(self.db).value(self.module))
+            else {
+                return;
+            };
+            if ExpressionNodeKey::from(value) != ExpressionNodeKey::from(alias.expression) {
+                return;
+            }
+
             let aliased_expression = Expression::new(
                 self.db,
                 self.scope_ids_by_scope[alias.expression_scope],
