@@ -1625,7 +1625,7 @@ impl<'db> Signature<'db> {
             visitor,
         );
         (!constraints
-            .query(|_builder, constraints| constraints.is_always_satisfied(db, visitor.env)))
+            .query(|_builder, constraints| constraints.is_gradually_satisfied(db, visitor.env)))
         .then_some(constraints)
     }
 
