@@ -1595,6 +1595,69 @@ mod uv_metadata {
     }
 
     #[test]
+    fn synchronizes_imported_script_with_one_worker() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_files([
+            ("a.py", "from b import foo\nprint(foo)\n"),
+            (
+                "b.py",
+                r#"
+                # /// script
+                # requires-python = "==3.12.*"
+                # dependencies = []
+                # ///
+                foo = 1
+                "#,
+            ),
+        ])?;
+
+        // Starting with the script must not run its importer on the same Rayon worker while
+        // initialization is waiting for uv. The importer would wait for that initialization.
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .args(["b.py", "a.py"])
+                .env(EnvVars::TY_UV, "scripts")
+                .env(EnvVars::TY_MAX_PARALLELISM, "1"),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn synchronizes_multiple_scripts_with_one_worker() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let script =
+            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n";
+        let case = CliTest::with_files([("first.py", script), ("second.py", script)])?;
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .args(["first.py", "second.py"])
+                .env(EnvVars::TY_MAX_PARALLELISM, "1"),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn cli_python_selects_script_interpreter_without_replacing_its_environment()
     -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;
