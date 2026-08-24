@@ -114,8 +114,8 @@ pub(crate) fn unnecessary_literal_unpacking(checker: &Checker, starred: &ast::Ex
 
 /// Build a fix that drops the `*` and the literal's brackets, leaving its elements in place.
 ///
-/// Returns `None` where dropping the brackets would not round-trip, which the `## Fix availability`
-/// section of the rule documentation lists.
+/// Returns `None` where the literal is empty, and where dropping the brackets would not round-trip.
+/// The `## Fix availability` section of the rule documentation lists both.
 fn unnecessary_literal_unpacking_fix(
     checker: &Checker,
     starred: &ast::ExprStarred,
@@ -125,13 +125,21 @@ fn unnecessary_literal_unpacking_fix(
     // An empty literal, as in `foo(*[])`, has no elements to write out: removing it takes a
     // neighbouring comma along with it, and can leave the surrounding collection needing to be
     // rewritten. No fix is offered for it.
-    let last_element = literal.elts.last()?;
+    let [.., last_element] = literal.elts else {
+        return None;
+    };
 
-    // An unparenthesized tuple has no brackets of its own, so the literal's brackets can be what
-    // lets it span several lines. Removing them would leave the continuation lines unterminated,
-    // unless something else already brackets the tuple, as a subscript does in `A[*(\n int,\n)]`.
-    if let UnpackingContext::Display(Expr::Tuple(tuple)) = context
-        && !tuple.parenthesized
+    // A tuple written without parentheses, as in `values = *[bar], baz` or the slice of
+    // `A[*(int,)]`, has no brackets of its own.
+    let bare_tuple = match context {
+        UnpackingContext::Display(Expr::Tuple(tuple)) if !tuple.parenthesized => Some(tuple),
+        _ => None,
+    };
+
+    // The literal's brackets can be what lets such a tuple span several lines. Removing them would
+    // leave the continuation lines unterminated, unless something else already brackets the tuple,
+    // as a subscript does in `A[*(\n int,\n)]`.
+    if bare_tuple.is_some()
         && !checker
             .semantic()
             .current_expression_grandparent()
@@ -146,7 +154,7 @@ fn unnecessary_literal_unpacking_fix(
 
     // Expanding must not move a positional argument after a keyword argument: neither
     // `foo(keyword=bar, baz)` nor `class C(metaclass=Meta, Base)` is valid Python.
-    if let Some(arguments) = context.arguments()
+    if let UnpackingContext::Arguments(arguments) = context
         && arguments
             .keywords
             .iter()
@@ -178,7 +186,7 @@ fn unnecessary_literal_unpacking_fix(
     // bracket with the comma that the tuple now needs. Two or more elements bring their own comma.
     let close_bracket = TextRange::new(literal.end() - TextSize::from(1), literal.end());
     let close_bracket_edit = if literal.elts.len() == 1
-        && matches!(context, UnpackingContext::Display(Expr::Tuple(tuple)) if !tuple.parenthesized && tuple.range() == starred.range())
+        && bare_tuple.is_some_and(|tuple| tuple.range() == starred.range())
     {
         Edit::range_replacement(",".to_string(), close_bracket)
     } else {
@@ -232,10 +240,9 @@ fn build_fix(checker: &Checker, kind: SequenceKind, first: Edit, rest: Vec<Edit>
 /// elements can be written out where the unpacking is.
 #[derive(Debug, Clone, Copy)]
 enum UnpackingContext<'a> {
-    /// An argument of a call, as in `foo(*[bar])`.
-    CallArguments(&'a ast::Arguments),
-    /// A base of a class definition, as in `class C(*[Base]): ...`.
-    ClassBases(&'a ast::Arguments),
+    /// An argument list: the arguments of a call, as in `foo(*[bar])`,
+    /// or the bases of a class definition, as in `class C(*[Base]): ...`.
+    Arguments(&'a ast::Arguments),
     /// An element of a list, set, or tuple display. A subscript slice counts as a tuple display:
     /// `A[*Ts]` subscripts `A` with a one-element tuple.
     Display(&'a Expr),
@@ -246,7 +253,7 @@ impl<'a> UnpackingContext<'a> {
     /// all.
     fn for_starred(checker: &Checker<'a>, starred: &ast::ExprStarred) -> Option<Self> {
         match checker.semantic().current_expression_parent() {
-            Some(Expr::Call(call)) => Some(Self::CallArguments(&call.arguments)),
+            Some(Expr::Call(call)) => Some(Self::Arguments(&call.arguments)),
             Some(parent @ (Expr::List(_) | Expr::Set(_) | Expr::Tuple(_))) => {
                 Some(Self::Display(parent))
             }
@@ -262,17 +269,9 @@ impl<'a> UnpackingContext<'a> {
                     .arguments
                     .as_deref()
                     .filter(|arguments| arguments.range().contains_range(starred.range()))
-                    .map(Self::ClassBases)
+                    .map(Self::Arguments)
             }
             _ => None,
-        }
-    }
-
-    /// The arguments the unpacking would be expanded into, if it sits in an argument list at all.
-    fn arguments(self) -> Option<&'a ast::Arguments> {
-        match self {
-            Self::CallArguments(arguments) | Self::ClassBases(arguments) => Some(arguments),
-            Self::Display(_) => None,
         }
     }
 }
