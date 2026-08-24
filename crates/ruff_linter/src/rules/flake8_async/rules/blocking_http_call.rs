@@ -55,7 +55,8 @@ fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
             | ["urllib3", "request"]
             | [
                 "httpx" | "requests",
-                "get"
+                "request"
+                    | "get"
                     | "post"
                     | "delete"
                     | "patch"
