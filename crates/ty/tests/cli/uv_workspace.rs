@@ -7,6 +7,7 @@
 use std::{path::Path, process::Command};
 
 use insta_cmd::assert_cmd_snapshot;
+use ty_static::EnvVars;
 
 use crate::CliTest;
 
@@ -337,6 +338,52 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Script-only uv integration must not invoke uv to discover the enclosing workspace.
+#[test]
+fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value: int = 'unselected-workspace-root'")?;
+    case.write_file(
+        "packages/member/member.py",
+        "import shared\nvalue: int = 'selected-member'",
+    )?;
+
+    let mut command = case.command();
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env(EnvVars::TY_UV, "scripts")
+        .env(EnvVars::UV, "missing-uv-executable");
+
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `shared`
+     --> member.py:1:8
+      |
+    1 | import shared
+      |        ^^^^^^
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/packages/member (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+
+    error[invalid-assignment]: Object of type `Literal["selected-member"]` is not assignable to `int`
+     --> member.py:2:14
+      |
+    2 | value: int = 'selected-member'
+      |        ---   ^^^^^^^^^^^^^^^^^ Incompatible value of type `Literal["selected-member"]`
+      |        |
+      |        Declared type
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// Failures to locate uv are visible by default instead of silently disabling integration.
 #[test]
 fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
@@ -419,7 +466,7 @@ fn reports_uv_workspace_python_version_source() -> anyhow::Result<()> {
         assert!(!output.status.success());
         assert!(!stdout.contains("specified on the command line"));
         if output_format == "full" {
-            assert!(stdout.contains("provided by uv workspace metadata"));
+            assert!(stdout.contains("provided by uv metadata"));
         }
     }
 
