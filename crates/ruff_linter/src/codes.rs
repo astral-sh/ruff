@@ -160,6 +160,7 @@ pub enum Category {
     Restriction,
 
     /// Internal testing rules that shouldn't be exposed to users.
+    #[cfg(any(feature = "test-rules", test))]
     #[strum(disabled)]
     Testing,
 }
