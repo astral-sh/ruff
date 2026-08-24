@@ -124,6 +124,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
     registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&MISSING_DIRECT_DEPENDENCY);
     registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
@@ -1171,6 +1172,19 @@ declare_lint! {
         summary: "detects unresolved imports",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
+    #[doc = include_str!("../../resources/lint_docs/missing-direct-dependency.md")]
+    pub(crate) static MISSING_DIRECT_DEPENDENCY = {
+        summary: "detects imports of dependencies that are not declared directly",
+        status: LintStatus::stable("0.0.75"),
+        default_level: Level::Ignore,
     }
 }
 

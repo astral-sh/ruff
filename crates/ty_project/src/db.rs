@@ -921,10 +921,13 @@ pub(crate) mod testing {
 mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::{FileRootKind, system_path_to_file};
-    use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
+    use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_trivia::textwrap::dedent;
     use ty_module_resolver::list_modules;
+    use ty_python_semantic::Db as _;
 
+    use crate::db::testing::TestDb;
     use crate::watch::ChangeEvent;
     use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
 
@@ -994,6 +997,25 @@ mod tests {
         fs.write_file_all(&script, ordinary)?;
         db.apply_changes(&[ChangeEvent::file_content_changed(script)]);
         assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
+
+    // The rule is disabled by default, so checking imports should not pay the cost of
+    // extracting dependency metadata.
+    #[test]
+    fn dependency_metadata_isnt_queried_unnecessarily() -> anyhow::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let mut db = TestDb::new(ProjectMetadata::new("app", root.clone()));
+        db.write_file(
+            root.join("main.py"),
+            "import typing\nfrom typing import Any\n",
+        )?;
+        let file = system_path_to_file(&db, root.join("main.py"))?;
+
+        assert!(db.check_file(file).is_empty());
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "dependency_metadata", None, &events);
 
         Ok(())
     }

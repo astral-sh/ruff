@@ -4,10 +4,12 @@
 //! <https://github.com/astral-sh/uv/blob/main/crates/uv/tests/project/check.rs>.
 
 #[cfg(feature = "test-uv")]
-use std::{path::Path, process::Command};
+use std::{fmt::Write as _, fs::File, io::Write, path::Path, process::Command};
 
 use insta_cmd::assert_cmd_snapshot;
 use ty_static::EnvVars;
+#[cfg(feature = "test-uv")]
+use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 use crate::CliTest;
 
@@ -83,6 +85,147 @@ fn command_with_uv(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result
     }
 
     Ok(command)
+}
+
+#[cfg(feature = "test-uv")]
+fn write_dependency_wheel(
+    case: &CliTest,
+    distribution: &str,
+    module: &str,
+    dependencies: &[&str],
+) -> anyhow::Result<()> {
+    let wheel_directory = case.root().join("wheels");
+    std::fs::create_dir_all(&wheel_directory)?;
+
+    let prefix = format!("{}-0.1.0", distribution.replace('-', "_"));
+    let mut wheel = ZipWriter::new(File::create(
+        wheel_directory.join(format!("{prefix}-py3-none-any.whl")),
+    )?);
+    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+    let mut metadata = format!("Metadata-Version: 2.1\nName: {distribution}\nVersion: 0.1.0\n");
+    for dependency in dependencies {
+        writeln!(metadata, "Requires-Dist: {dependency}")?;
+    }
+    let mut record = Vec::new();
+
+    for (path, contents) in [
+        (format!("{module}.py"), "value: int = 1\n"),
+        (format!("{prefix}.dist-info/METADATA"), metadata.as_str()),
+        (
+            format!("{prefix}.dist-info/WHEEL"),
+            "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        ),
+    ] {
+        wheel.start_file(&path, options)?;
+        wheel.write_all(contents.as_bytes())?;
+        record.push(format!("{path},,"));
+    }
+
+    let record_path = format!("{prefix}.dist-info/RECORD");
+    record.push(format!("{record_path},,"));
+    wheel.start_file(record_path, options)?;
+    writeln!(wheel, "{}", record.join("\n"))?;
+    wheel.finish()?;
+
+    Ok(())
+}
+
+/// Imports are checked against each member's direct dependencies, using uv's mapping from import
+/// names to distributions. A dependency declared by one member does not apply to its siblings.
+#[cfg(feature = "test-uv")]
+#[test]
+fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_files([
+        (
+            "pyproject.toml",
+            r#"
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv]
+no-index = true
+find-links = ["wheels"]
+"#,
+        ),
+        (
+            "packages/member/pyproject.toml",
+            r#"
+[project]
+name = "member"
+version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = ["direct-dependency"]
+"#,
+        ),
+        (
+            "packages/member/member.py",
+            "import direct_module\nfrom indirect_module import value\n",
+        ),
+        ("packages/sibling/sibling.py", "import direct_module\n"),
+    ])?;
+    write_dependency_wheel(&case, "indirect-dependency", "indirect_module", &[])?;
+    write_dependency_wheel(
+        &case,
+        "direct-dependency",
+        "direct_module",
+        &["indirect-dependency"],
+    )?;
+
+    let mut command = command_with_uv(&case, None)?;
+    command.arg("packages");
+    let lockfile = std::fs::read(case.root().join("uv.lock"))?;
+
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    command
+        .args(["--error", "missing-direct-dependency"])
+        .env("TY_OUTPUT_FORMAT", "full");
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+     --> packages/member/member.py:2:6
+      |
+    2 | from indirect_module import value
+      |      ^^^^^^^^^^^^^^^
+    help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
+
+    error[missing-direct-dependency]: Import of `direct_module` requires a direct dependency on `direct-dependency`
+     --> packages/sibling/sibling.py:1:8
+      |
+    1 | import direct_module
+      |        ^^^^^^^^^^^^^
+    help: Declare `direct-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    command.env("TY_OUTPUT_FORMAT", "concise");
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    packages/member/member.py:2:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    packages/sibling/sibling.py:1:8: error[missing-direct-dependency] Import of `direct_module` requires a direct dependency on `direct-dependency`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    assert_eq!(std::fs::read(case.root().join("uv.lock"))?, lockfile);
+
+    Ok(())
 }
 
 /// The workspace root provides first-party imports without expanding analysis to unselected

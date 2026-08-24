@@ -64,6 +64,7 @@ insta-cmd = { workspace = true }
 regex = { workspace = true }
 tempfile = { workspace = true }
 toml = { workspace = true }
+zip = { workspace = true }
 
 [features]
 default = []

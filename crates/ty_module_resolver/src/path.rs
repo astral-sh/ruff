@@ -622,6 +622,11 @@ impl SearchPath {
         matches!(&*self.0, SearchPathInner::SitePackages(_))
     }
 
+    /// Is this search path provided by an editable installation?
+    pub fn is_editable(&self) -> bool {
+        matches!(&*self.0, SearchPathInner::Editable(_))
+    }
+
     /// Is it plausible that this search path contains third-party code?
     pub(crate) fn can_contain_third_party_code(&self) -> bool {
         match &*self.0 {

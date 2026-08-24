@@ -4675,6 +4675,7 @@ dependencies = [
  "ty_site_packages",
  "ty_static",
  "wild",
+ "zip",
 ]
 
 [[package]]
