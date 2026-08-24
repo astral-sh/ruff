@@ -241,15 +241,15 @@ As shown above, this means that configuration like:
     ```
 
 will select all `E` and `F` rules, with the exception of `F401`. Analogously, a selection with the
-`pedantic` category like:
+`suspicious` category like:
 
 === "pyproject.toml"
 
     ```toml
     [tool.ruff.lint]
     preview = true
-    select = ["pedantic"]
-    ignore = ["PTH"]
+    select = ["suspicious"]
+    ignore = ["UP"]
     ```
 
 === "ruff.toml"
@@ -257,11 +257,11 @@ will select all `E` and `F` rules, with the exception of `F401`. Analogously, a 
     ```toml
     [lint]
     preview = true
-    select = ["pedantic"]
-    ignore = ["PTH"]
+    select = ["suspicious"]
+    ignore = ["UP"]
     ```
 
-would select all `pedantic` rules, except for the `PTH` rules.
+would select all `suspicious` rules, except for the `UP` rules in that category.
 
 Note that we plan to deprecate and eventually remove the linter groups in the future. If you give
 the new categories a try and run into situations where you need to fall back on linter groups,
