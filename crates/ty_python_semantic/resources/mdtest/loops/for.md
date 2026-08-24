@@ -2037,6 +2037,9 @@ def _():
 
 ### Loop header definitions don't shadow member bindings
 
+Rebinding an object followed by an unconditional `break` does not affect its members at the start of
+the loop, because the new object never reaches another iteration.
+
 ```py
 class C:
     x = None
@@ -2056,4 +2059,36 @@ for _ in range(1):
     reveal_type(d[0])  # revealed: Literal[1]
     d = []
     break
+```
+
+### Rebinding an object resets attribute narrowing across iterations
+
+The loop body can observe either the initial frame or a replacement from a previous iteration. A
+guard on the initial frame therefore does not narrow `fin` throughout the loop.
+
+```py
+class Frame:
+    fin: bool
+
+def f(frame: Frame, replacement: Frame):
+    if frame.fin:
+        return
+
+    for _ in range(2):
+        reveal_type(frame.fin)  # revealed: bool
+        frame = replacement
+```
+
+Narrowing established on a replacement frame also reaches the next iteration. If each replacement
+has `fin` set to `False`, the loop body keeps that narrowing.
+
+```py
+def narrowed_replacement(frame: Frame, replacement: Frame):
+    if frame.fin:
+        return
+
+    for _ in range(2):
+        reveal_type(frame.fin)  # revealed: Literal[False]
+        frame = replacement
+        assert not frame.fin
 ```

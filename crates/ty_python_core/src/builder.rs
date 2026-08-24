@@ -1842,18 +1842,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Create loop header definitions for all places that are bound within a loop. Return the
-    /// `LoopHeaderId` referenced by those definitions, the set of bound place IDs, and the lower
-    /// bound `ScopedDefinitionId` for definitions created within the loop.
+    /// Create loop header definitions for places that are bound or invalidated within a loop.
+    /// Return the `LoopHeaderId` referenced by those definitions, the set of place IDs, and the
+    /// lower bound `ScopedDefinitionId` for definitions created within the loop.
     fn synthesize_loop_header_definitions(
         &mut self,
         loop_stmt: LoopStmtRef<'ast>,
         bound_places: Vec<PlaceExpr>,
     ) -> (LoopHeaderId, FxHashSet<ScopedPlaceId>, ScopedDefinitionId) {
         let loop_header_id = self.current_use_def_map_mut().reserve_loop_header();
+        let bound_places: Vec<_> = bound_places
+            .into_iter()
+            .map(|place| self.add_place(place))
+            .collect();
+
+        // Rebinding `x` also invalidates `x.attr` and `x[index]`. These places need their own
+        // headers so that the invalidation reaches uses before the assignment on later
+        // iterations. Register all explicit targets first to include their associated places.
+        let associated_places: Vec<_> = bound_places
+            .iter()
+            .flat_map(|place| self.current_place_table().associated_place_ids(*place))
+            .copied()
+            .map(ScopedPlaceId::from)
+            .collect();
         let mut bound_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
-        for place_expr in bound_places {
-            let place_id = self.add_place(place_expr);
+        for place_id in bound_places.into_iter().chain(associated_places) {
             if bound_place_ids.insert(place_id) {
                 let loop_header_ref = LoopHeaderDefinitionNodeRef {
                     loop_stmt,

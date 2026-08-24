@@ -9871,6 +9871,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let reachability_constraints = bindings.reachability_constraints();
                     let predicates = bindings.predicates();
                     let mut union = UnionBuilder::new(db, env);
+                    let mut loop_header_fallbacks = FxHashMap::default();
                     for binding in bindings {
                         let static_reachability = evaluate_reachability_with_cache(
                             db,
@@ -9886,7 +9887,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             DefinitionState::Defined(definition)
                                 if !is_discarded_dict_key_assignment(db, definition) =>
                             {
-                                let binding_ty = binding_type(db, definition);
+                                let mut binding_ty = binding_type(db, definition);
+                                if definition.kind(db).is_loop_header() {
+                                    let fallback_ty = self.loop_header_fallback_type(
+                                        definition,
+                                        ty,
+                                        &mut loop_header_fallbacks,
+                                    );
+                                    binding_ty = UnionType::from_elements(
+                                        db,
+                                        env,
+                                        [binding_ty, fallback_ty],
+                                    );
+                                }
                                 union.add_in_place(
                                     binding
                                         .narrowing_constraint
@@ -9910,6 +9923,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+        ty
+    }
+
+    /// A member invalidated on a loop-back path falls back to its receiver's member type.
+    /// Preserve constraints established after that invalidation, including through nested loops.
+    fn loop_header_fallback_type(
+        &self,
+        definition: Definition<'db>,
+        fallback_ty: Type<'db>,
+        cache: &mut FxHashMap<Definition<'db>, Type<'db>>,
+    ) -> Type<'db> {
+        // Inner headers can be reached through multiple containing headers. The fallback type
+        // is fixed for this traversal, so each definition's contribution only needs computing once.
+        if let Some(ty) = cache.get(&definition) {
+            return *ty;
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+        let header = loop_header_reachability(db, definition);
+        let use_def = self.index.use_def_map(definition.file_scope(db));
+        let place = definition.place(db);
+        let mut union = UnionBuilder::new(db, env);
+
+        for constraint in &header.deleted_narrowing_constraints {
+            union.add_in_place(use_def.narrowing_evaluator(*constraint).narrow(
+                db,
+                env,
+                fallback_ty,
+                place,
+            ));
+        }
+        for binding in &header.reachable_bindings {
+            if binding.definition.kind(db).is_loop_header() {
+                let ty = self.loop_header_fallback_type(binding.definition, fallback_ty, cache);
+                union.add_in_place(
+                    use_def
+                        .narrowing_evaluator(binding.narrowing_constraint)
+                        .narrow(db, env, ty, place),
+                );
+            }
+        }
+
+        let ty = union.build();
+        cache.insert(definition, ty);
         ty
     }
 

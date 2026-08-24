@@ -636,6 +636,9 @@ while True:
 
 ### Loop header definitions don't shadow member bindings
 
+Rebinding an object followed by an unconditional `break` does not affect its members at the start of
+the loop, because the new object never reaches another iteration.
+
 ```py
 class C:
     x = None
@@ -655,6 +658,139 @@ while True:
     reveal_type(d[0])  # revealed: Literal[1]
     d = []
     break
+```
+
+The same applies to narrowing from a guard before the loop. The condition is always true on the only
+iteration, but the replacement frame's attribute is not narrowed after the `break`.
+
+```py
+class Frame:
+    fin: bool
+
+def f(frame: Frame):
+    if frame.fin:
+        return
+
+    while reveal_type(not frame.fin):  # revealed: Literal[True]
+        frame = Frame()
+        break
+
+    reveal_type(frame.fin)  # revealed: bool
+```
+
+### Rebinding an object resets attribute narrowing across iterations
+
+A guard before the loop only constrains the initial object. Rebinding `frame` can make `fin` true on
+a later iteration, so the loop condition is not always true.
+
+```py
+class Frame:
+    fin: bool
+
+def condition(frame: Frame, replacement: Frame):
+    if frame.fin:
+        return
+
+    while reveal_type(not frame.fin):  # revealed: bool
+        frame = replacement
+```
+
+When the loop exits normally, the current frame has `fin` set to `True`.
+
+```py
+def normal_exit(frame: Frame, replacement: Frame):
+    if frame.fin:
+        return
+
+    while not frame.fin:
+        reveal_type(frame.fin)  # revealed: Literal[False]
+        frame = replacement
+
+    reveal_type(frame.fin)  # revealed: Literal[True]
+```
+
+### Rebinding an object before `continue`
+
+Rebinding also invalidates attribute narrowing when the next iteration is reached through
+`continue`. The replacement frame can end the loop.
+
+```py
+class Frame:
+    fin: bool
+
+def f(frame: Frame, replacement: Frame):
+    if frame.fin:
+        return
+
+    while not frame.fin:
+        frame = replacement
+        continue
+
+    reveal_type(frame.fin)  # revealed: Literal[True]
+```
+
+### Rebinding in an inner loop reaches the next outer iteration
+
+An inner loop can rebind `frame` on one iteration, then exit through a `break` before reaching the
+assignment again. The replacement is visible both after the inner loop and on later outer
+iterations, so the initial guard no longer narrows `frame.fin`.
+
+```py
+class Frame:
+    fin: bool
+
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(frame: Frame, replacement: Frame, repeat: bool):
+    if frame.fin:
+        return
+
+    while repeat:
+        reveal_type(frame.fin)  # revealed: bool
+        while True:
+            if stop():
+                break
+            frame = replacement
+        reveal_type(frame.fin)  # revealed: bool
+```
+
+### Rebinding a member resets nested attribute narrowing
+
+Replacing `box.frame` invalidates narrowing of `box.frame.fin` on subsequent iterations, even though
+the outer `box` object is unchanged.
+
+```py
+class Frame:
+    fin: bool
+
+class Box:
+    frame: Frame
+
+def f(box: Box, replacement: Frame):
+    if box.frame.fin:
+        return
+
+    while not box.frame.fin:
+        box.frame = replacement
+
+    reveal_type(box.frame.fin)  # revealed: Literal[True]
+```
+
+### Rebinding a collection resets subscript narrowing
+
+A guard on the initial tuple's element does not constrain the corresponding element of a replacement
+tuple. The replacement can therefore end the loop.
+
+```py
+def f(flags: tuple[bool], replacement: tuple[bool]):
+    if flags[0]:
+        return
+
+    while not flags[0]:
+        flags = replacement
+
+    reveal_type(flags[0])  # revealed: Literal[True]
 ```
 
 [divergent_debugging]: https://github.com/astral-sh/ruff/pull/22794#issuecomment-3852095578
