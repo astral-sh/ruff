@@ -213,9 +213,9 @@ A design for a new lint rule in Ruff should include the following components:
 
 - A draft of the rule documentation with the following sections:
 
-    - What it does - a one line description of what the rule checks
-    - Why is this bad? - a longer explanation of the pattern flagged by the rule and why it causes problems in real projects
-    - Example - a code example showing the problematic code, as well as a code block showing the fixed code
+    - "What it does": a one line description of what the rule checks
+    - "Why is this bad?": a longer explanation of the pattern flagged by the rule and why it causes problems in real projects
+    - "Example": a code example showing the problematic code, as well as a code block showing the fixed code
 
     Some rules benefit from additional documentation. These sections usually emerge through the
     implementation process and aren't required in a design proposal. "Fix safety" and "Options"
@@ -223,12 +223,12 @@ A design for a new lint rule in Ruff should include the following components:
     but the rest of these are fully optional. You can `grep` for each heading to see where they are
     often used.
 
-    - Known problems - any known limitations of the rule, such as false positives or negatives
-    - Fix availability - if the rule only has an autofix in some cases, explain why
-    - Fix safety - if the rule’s fix is ever unsafe, explain why
-    - Options - if the rule depends upon any configuration options, list them
-    - See also - if there are other similar or synergistic rules, list them
-    - References - if there are any relevant external references to Python or other documentation, list them
+    - "Known problems": any known limitations of the rule, such as false positives or negatives
+    - "Fix availability": if the rule only has an autofix in some cases, explain why
+    - "Fix safety": if the rule’s fix is ever unsafe, explain why
+    - "Options": if the rule depends upon any configuration options, list them
+    - "See also": if there are other similar or synergistic rules, list them
+    - "References": if there are any relevant external references to Python or other documentation, list them
 
 - An example diagnostic including the proposed name, primary message, and fix title (if applicable)
 
