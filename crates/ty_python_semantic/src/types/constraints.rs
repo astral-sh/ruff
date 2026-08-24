@@ -3737,6 +3737,17 @@ pub(crate) enum PathBoundSolution<'db> {
 }
 
 impl<'db> PathBoundSolution<'db> {
+    /// Transforms a selected type without losing whether it is only a budget-exhaustion fallback.
+    pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        match self {
+            Self::Solved(ty) => Self::Solved(f(ty)),
+            Self::BudgetExceeded { fallback } => Self::BudgetExceeded {
+                fallback: fallback.map(f),
+            },
+            Self::Unsolved | Self::Unsatisfiable => self,
+        }
+    }
+
     /// Returns the selected type, including a fallback when the budget was exceeded.
     /// Match the outcome directly when completeness or the reason no type was selected matters.
     pub(crate) fn as_type(self) -> Option<Type<'db>> {
@@ -8283,6 +8294,41 @@ mod tests {
             PathBoundSolution::Solved(Type::Never).as_type(),
             Some(Type::Never)
         );
+    }
+
+    #[test]
+    fn promoting_solutions_preserves_completeness() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let literal = Type::int_literal(1);
+        let int = known_instance(db, KnownClass::Int);
+
+        for (solution, expected) in [
+            (
+                PathBoundSolution::Solved(literal),
+                PathBoundSolution::Solved(int),
+            ),
+            (
+                PathBoundSolution::BudgetExceeded {
+                    fallback: Some(literal),
+                },
+                PathBoundSolution::BudgetExceeded {
+                    fallback: Some(int),
+                },
+            ),
+            (PathBoundSolution::Unsolved, PathBoundSolution::Unsolved),
+            (
+                PathBoundSolution::Unsatisfiable,
+                PathBoundSolution::Unsatisfiable,
+            ),
+            (
+                PathBoundSolution::BudgetExceeded { fallback: None },
+                PathBoundSolution::BudgetExceeded { fallback: None },
+            ),
+        ] {
+            assert_eq!(solution.map(|ty| ty.promote(db, &env)), expected);
+        }
     }
 
     #[test]
