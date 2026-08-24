@@ -7,6 +7,7 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::cmp::Ordering;
+use std::debug_assert_matches;
 
 use unicode_ident::{is_xid_continue, is_xid_start};
 
@@ -121,12 +122,6 @@ impl<'src> Lexer<'src> {
     /// Returns the range of the current token.
     pub(crate) const fn current_range(&self) -> TextRange {
         self.current_range
-    }
-
-    /// Returns the current parenthesis, bracket, and brace nesting level.
-    #[inline]
-    pub(crate) const fn nesting(&self) -> u32 {
-        self.nesting
     }
 
     /// Returns the flags for the current token.
@@ -1054,10 +1049,7 @@ impl<'src> Lexer<'src> {
     /// Lex a hex/octal/decimal/binary number without a decimal point.
     fn lex_number_radix(&mut self, radix: Radix) -> TokenKind {
         #[cfg(debug_assertions)]
-        debug_assert!(matches!(
-            self.cursor.previous().to_ascii_lowercase(),
-            'x' | 'o' | 'b'
-        ));
+        debug_assert_matches!(self.cursor.previous().to_ascii_lowercase(), 'x' | 'o' | 'b');
 
         let number = self.radix_run(radix);
         if !number.has_digit {

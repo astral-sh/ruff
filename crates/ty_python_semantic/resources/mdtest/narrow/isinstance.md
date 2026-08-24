@@ -332,6 +332,37 @@ else:
     reveal_type(x)  # revealed: ~A & ~B & ~C
 ```
 
+## `NewType` instances and concrete-base subclasses
+
+A `NewType` constructor returns its argument unchanged at runtime, and runtime class checks ignore
+its static tag. The resulting value can therefore still be an instance of a subclass of its concrete
+base. For example, `UserId(True)` is valid because `bool` is a subtype of `int`, and the returned
+value remains a `bool`.
+
+```py
+from typing import NewType
+
+class Base: ...
+class Child(Base): ...
+
+BrandedBase = NewType("BrandedBase", Base)
+UserId = NewType("UserId", int)
+
+UserId(True)
+
+def narrow_branded_subclass(value: BrandedBase) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: BrandedBase & Child
+    else:
+        reveal_type(value)  # revealed: BrandedBase & ~Child
+
+def narrow_branded_boolean(value: UserId) -> None:
+    if isinstance(value, bool):
+        reveal_type(value)  # revealed: UserId & bool
+    else:
+        reveal_type(value)  # revealed: UserId & ~bool
+```
+
 ## No narrowing for instances of `builtins.type`
 
 ```py

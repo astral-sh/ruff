@@ -314,7 +314,7 @@ impl<'db> AllMembers<'db> {
                             db,
                             env,
                             ty,
-                            class_literal.metaclass(db),
+                            class_type.inferred_metaclass(db).for_inheritance(db, env),
                         );
                     }
                 }
@@ -358,6 +358,7 @@ impl<'db> AllMembers<'db> {
 
             Type::LiteralValue(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::KnownBoundMethod(_)
@@ -504,6 +505,8 @@ impl<'db> AllMembers<'db> {
             .filter_map(ClassBase::into_class)
             .filter_map(|class| class.static_class_literal(db).map(|(lit, _)| lit))
         {
+            self.extend_with_slot_members(db, env, ty, parent);
+
             let parent_scope = parent.body_scope(db);
             for memberdef in all_end_of_scope_members(db, parent_scope) {
                 let result = ty.member(db, env, memberdef.member.name.as_str());
@@ -516,6 +519,38 @@ impl<'db> AllMembers<'db> {
                     is_type_check_only: memberdef.member.is_type_check_only,
                 });
             }
+        }
+    }
+
+    /// Includes slot descriptors that are generated outside the class-body symbol table.
+    ///
+    /// ```python
+    /// class Example:
+    ///     __slots__ = ("value",)
+    /// ```
+    ///
+    /// Both `Example` and `Example()` expose `value` even without an explicit attribute binding.
+    fn extend_with_slot_members(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        class_literal: StaticClassLiteral<'db>,
+    ) {
+        let Some(slots) = class_literal.slot_names(db) else {
+            return;
+        };
+
+        for name in slots {
+            let result = ty.member(db, env, name);
+            let Some(ty) = result.place.ignore_possibly_undefined() else {
+                continue;
+            };
+            self.members.insert(Member {
+                name: name.clone(),
+                ty,
+                is_type_check_only: false,
+            });
         }
     }
 
@@ -551,6 +586,9 @@ impl<'db> AllMembers<'db> {
         let class_body_scope = class_literal.body_scope(db);
         let program_file = class_body_scope.program_file(db);
         let index = semantic_index(db, program_file);
+
+        self.extend_with_slot_members(db, env, ty, class_literal);
+
         for function_scope_id in attribute_scopes(db, class_body_scope) {
             for place_expr in index.place_table(function_scope_id).members() {
                 let Some(name) = place_expr.as_instance_attribute() else {

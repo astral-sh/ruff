@@ -137,7 +137,7 @@ def _(flag: bool):
 
 def _(flag: bool, possibly_falsy_int: int, possibly_falsy_str: str):
     (flag and (x := possibly_falsy_int)) or (x := possibly_falsy_str)
-    reveal_type(x)  # revealed: int | str
+    reveal_type(x)  # revealed: (int & ~AlwaysFalsy) | str
 
 def _(flag: bool):
     (flag or (x := 0)) and (x := 2)

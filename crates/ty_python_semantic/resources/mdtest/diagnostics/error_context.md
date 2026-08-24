@@ -796,7 +796,7 @@ error[invalid-assignment]: Object of type `PersonWithAge` is not assignable to `
    |             |
    |             Declared type
 info: field "age" is required in TypedDict `PersonWithAge` but not required and mutable in TypedDict `PersonWithOptionalAge`
-help: The required field could be removed through a destructive operation like `del` on the target.
+help: The required field could be removed through a destructive operation like `del` on the target
 ```
 
 Assigning a `TypedDict` to a `dict`
@@ -815,8 +815,8 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `dict[st
    |             |
    |             Declared type
 info: TypedDict `Person` is not assignable to `dict`
-help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.
-help: Consider using `Mapping[..]` instead of `dict[..]`.
+help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`
+help: Consider using `Mapping[..]` instead of `dict[..]`
 ```
 
 Assigning an open `TypedDict` to a specialized `Mapping`:
@@ -842,18 +842,51 @@ error[invalid-return-type]: Return type does not match returned value
 40 |     return d  # snapshot
    |            ^ expected `Mapping[str, int]`, found `D`
 info: TypedDict `D` is not assignable to `Mapping[str, int]`
-help: `D` would be assignable to this `Mapping` type if it were declared with `closed=True`, but TypedDicts are open by default.
-help: A subclass of `D` could validly add a new field of an arbitrary type, violating subtyping with the `Mapping` type
+help: `D` would be assignable to `Mapping[str, int]` if it were declared with `closed=True`, but TypedDicts are open by default
+help: A subclass of `D` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, int]`
+```
+
+## Open `TypedDict` and a union of specialized mappings
+
+Each mapping in a union receives its own explanation when an open `TypedDict` is incompatible with
+every alternative.
+
+```py
+from collections.abc import Mapping
+from typing import TypedDict
+
+class Empty(TypedDict):
+    pass
+
+def _(value: Empty) -> Mapping[str, int] | Mapping[str, str]:
+    return value  # snapshot
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:8:12
+  |
+7 | def _(value: Empty) -> Mapping[str, int] | Mapping[str, str]:
+  |                        ------------------------------------- Expected `Mapping[str, int] | Mapping[str, str]` because of return type
+8 |     return value  # snapshot
+  |            ^^^^^ expected `Mapping[str, int] | Mapping[str, str]`, found `Empty`
+info: type `Empty` is not assignable to any element of the union `Mapping[str, int] | Mapping[str, str]`
+info: ├── TypedDict `Empty` is not assignable to `Mapping[str, int]`
+info: └── TypedDict `Empty` is not assignable to `Mapping[str, str]`
+help: `Empty` would be assignable to `Mapping[str, int]` if it were declared with `closed=True`, but TypedDicts are open by default
+help: A subclass of `Empty` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, int]`
+help: `Empty` would be assignable to `Mapping[str, str]` if it were declared with `closed=True`, but TypedDicts are open by default
+help: A subclass of `Empty` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, str]`
 ```
 
 ## Generic `TypedDict` field conflicts in overload diagnostics
 
-A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. The
-resulting overload diagnostic should still explain which field introduced the conflicting
-constraints.
+A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. Capturing
+its type variable from an enclosing function keeps the overload non-generic while retaining the
+conflicting constraints. The resulting diagnostic should explain which field introduced them.
 
 ```py
-from typing import Generic, Self, TypeVar, TypedDict, overload
+from typing import Generic, TypeVar, TypedDict, overload
 
 T = TypeVar("T")
 
@@ -865,38 +898,39 @@ class Fixed(TypedDict):
     first: int
     second: str
 
-class OverloadedSelf:
+def outer(value: T) -> None:
     @overload
-    def method(self, value: Fixed) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
     @overload
-    def method(self, value: str) -> None: ...
-    def method(self, value: Pair[Self] | str) -> None: ...
+    def inner(value: str) -> None: ...
+    def inner(value: Pair[T] | str) -> None: ...
 ```
 
 ```snapshot
 error[invalid-overload]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def method(self, value: Fixed) -> None: ...  # snapshot: invalid-overload
-   |         ^^^^^^
+15 |     def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+   |         ^^^^^
 16 |     @overload
-17 |     def method(self, value: str) -> None: ...
-18 |     def method(self, value: Pair[Self] | str) -> None: ...
-   |         ------ Implementation defined here
-info: Implementation signature `(self, value: Pair[Self@method] | str) -> None` is not assignable to overload signature `(self, value: Fixed) -> None`
-info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[Self@method] | str`
-info: └── type `Fixed` is not assignable to any element of the union `Pair[Self@method] | str`
-info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `Self@method` expected by TypedDict `Pair`
+17 |     def inner(value: str) -> None: ...
+18 |     def inner(value: Pair[T] | str) -> None: ...
+   |         ----- Implementation defined here
+info: Implementation signature `(value: Pair[T@outer] | str) -> None` is not assignable to overload signature `(value: Fixed) -> None`
+info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[T@outer] | str`
+info: └── type `Fixed` is not assignable to any element of the union `Pair[T@outer] | str`
+info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `T@outer` expected by TypedDict `Pair`
 info:     └── ... omitted 1 union element without additional context
 ```
 
 ## Stop checking callable parameters after incompatible generic constraints
 
 Once earlier parameters produce an unsatisfiable nonterminal constraint set, continuing to a later
-parameter must not replace the diagnostic context that explains the original incompatibility.
+parameter must not replace the diagnostic context that explains the original incompatibility. The
+type variable belongs to the enclosing function, so the overload itself remains non-generic.
 
 ```py
-from typing import Generic, Self, TypeVar, TypedDict, overload
+from typing import Generic, TypeVar, TypedDict, overload
 
 T = TypeVar("T")
 
@@ -908,28 +942,28 @@ class Fixed(TypedDict):
     first: int
     second: str
 
-class OverloadedSelf:
+def outer(value: T) -> None:
     @overload
-    def method(self, value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
     @overload
-    def method(self, value: str, later: str) -> None: ...
-    def method(self, value: Pair[Self] | str, later: str) -> None: ...
+    def inner(value: str, later: str) -> None: ...
+    def inner(value: Pair[T] | str, later: str) -> None: ...
 ```
 
 ```snapshot
 error[invalid-overload]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def method(self, value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
-   |         ^^^^^^
+15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+   |         ^^^^^
 16 |     @overload
-17 |     def method(self, value: str, later: str) -> None: ...
-18 |     def method(self, value: Pair[Self] | str, later: str) -> None: ...
-   |         ------ Implementation defined here
-info: Implementation signature `(self, value: Pair[Self@method] | str, later: str) -> None` is not assignable to overload signature `(self, value: Fixed, later: int) -> None`
-info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[Self@method] | str`
-info: └── type `Fixed` is not assignable to any element of the union `Pair[Self@method] | str`
-info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `Self@method` expected by TypedDict `Pair`
+17 |     def inner(value: str, later: str) -> None: ...
+18 |     def inner(value: Pair[T] | str, later: str) -> None: ...
+   |         ----- Implementation defined here
+info: Implementation signature `(value: Pair[T@outer] | str, later: str) -> None` is not assignable to overload signature `(value: Fixed, later: int) -> None`
+info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[T@outer] | str`
+info: └── type `Fixed` is not assignable to any element of the union `Pair[T@outer] | str`
+info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `T@outer` expected by TypedDict `Pair`
 info:     └── ... omitted 1 union element without additional context
 ```
 
@@ -1238,6 +1272,171 @@ info: └── protocol member `check` is incompatible
 info:     └── parameter `y` has an incompatible type: `str` is not assignable to `bytes`
 ```
 
+## Recursive protocol diagnostic context
+
+A value-constrained type parameter makes the recursive `child` override valid for each permitted
+specialization. The explicit receiver on `Outer.expose` preserves unresolved type variables while
+diagnostic context is collected, including the incompatible recursive member and its return type.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def child(self) -> Chain[T]: ...
+    def value(self) -> T: ...
+
+class Outer[T](Protocol):
+    def expose(self: Outer[T]) -> Chain[T]: ...
+
+class Concrete[T: (str, object)](Chain[T], Outer[T]):
+    def child(self) -> Concrete[str]:
+        raise NotImplementedError
+
+    def expose(self: Outer[T]) -> Concrete[T]:
+        raise NotImplementedError
+
+def diagnose[T: (str, object)](value: Concrete[T]) -> None:
+    invalid: Outer[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@diagnose]` is not assignable to `Outer[int]`
+  --> src/mdtest_snippet.py:20:27
+   |
+20 |     invalid: Outer[int] = value  # snapshot: invalid-assignment
+   |              ----------   ^^^^^ Incompatible value of type `Concrete[T@diagnose]`
+   |              |
+   |              Declared type
+info: type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `child` is incompatible
+info:     └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
+info:         └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
+info:             └── protocol member `value` is incompatible
+info:                 └── incompatible return types: `str` is not assignable to `int`
+```
+
+## Protocol method parameter names
+
+Assignability errors against protocols are often caused because a method in the protocol class
+should have used positional-only parameters, but didn't. In this situation, we point out the likely
+cause of the assignability error in a dedicated `help:` message that points out that the issue may
+be due to the protocol itself rather than the type being assigned to the protocol:
+
+```py
+from typing import Protocol
+
+class Target(Protocol):
+    def run(self, expected: int) -> None: ...
+
+class Source:
+    def run(self, actual: int) -> None: ...
+
+target: Target = Source()  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Source` is not assignable to `Target`
+ --> src/mdtest_snippet.py:9:18
+  |
+9 | target: Target = Source()  # snapshot
+  |         ------   ^^^^^^^^ Incompatible value of type `Source`
+  |         |
+  |         Declared type
+info: type `Source` is not assignable to protocol `Target`
+info: └── protocol member `run` is incompatible
+info:     └── the parameter named `actual` does not match `expected` (and can be used as a keyword parameter)
+help: `Source` might be assignable to `Target` if the parameter `expected` were made positional-only in `Target.run`
+```
+
+The same suggestion applies for the case where a positional-or-keyword parameter was apparently
+demanded by a protocol member, but only a positional-only parameter was supplied in the type that
+was assigned to the protocol:
+
+```py
+class Target2(Protocol):
+    def run(self, expected: int) -> None: ...
+
+class Source2:
+    def run(self, actual: int, /) -> None: ...
+
+target: Target2 = Source2()  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Source2` is not assignable to `Target2`
+  --> src/mdtest_snippet.py:16:19
+   |
+16 | target: Target2 = Source2()  # snapshot
+   |         -------   ^^^^^^^^^ Incompatible value of type `Source2`
+   |         |
+   |         Declared type
+info: type `Source2` is not assignable to protocol `Target2`
+info: └── protocol member `run` is incompatible
+info:     └── parameter `actual` is positional-only but must also accept keyword arguments
+help: `Source2` might be assignable to `Target2` if the parameter `expected` were made positional-only in `Target2.run`
+```
+
+Making a parameter positional-only resolves a name mismatch but does not necessarily make the method
+compatible, because its parameter type can still be incorrect. For this reason, we hedge our bets a
+little in our `help:` message (we say "*might* be assignable", rather than "*will* be assignable"):
+
+```py
+class Target3(Protocol):
+    def run(self, expected: int) -> None: ...
+
+class Source3:
+    def run(self, actual: str) -> None: ...
+
+target: Target3 = Source3()  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Source3` is not assignable to `Target3`
+  --> src/mdtest_snippet.py:23:19
+   |
+23 | target: Target3 = Source3()  # snapshot
+   |         -------   ^^^^^^^^^ Incompatible value of type `Source3`
+   |         |
+   |         Declared type
+info: type `Source3` is not assignable to protocol `Target3`
+info: └── protocol member `run` is incompatible
+info:     └── the parameter named `actual` does not match `expected` (and can be used as a keyword parameter)
+help: `Source3` might be assignable to `Target3` if the parameter `expected` were made positional-only in `Target3.run`
+```
+
+Suggestions for inherited protocol methods name the protocol that actually declares the method.
+
+```py
+from typing import Protocol
+
+class Parent(Protocol):
+    def run(self, expected: int) -> None: ...
+
+class Child(Parent, Protocol):
+    pass
+
+class Source4:
+    def run(self, actual: int) -> None: ...
+
+target: Child = Source4()  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Source4` is not assignable to `Child`
+  --> src/mdtest_snippet.py:35:17
+   |
+35 | target: Child = Source4()  # snapshot
+   |         -----   ^^^^^^^^^ Incompatible value of type `Source4`
+   |         |
+   |         Declared type
+info: type `Source4` is not assignable to protocol `Child`
+info: └── protocol member `run` is incompatible
+info:     └── the parameter named `actual` does not match `expected` (and can be used as a keyword parameter)
+help: `Source4` might be assignable to `Child` if the parameter `expected` were made positional-only in `Parent.run`
+```
+
 ## Type aliases
 
 Type aliases should be expanded in diagnostics to understand the underlying incompatibilities:
@@ -1441,6 +1640,7 @@ error[invalid-assignment]: Object of type `IncompatibleFoo` is not assignable to
 info: type `IncompatibleFoo` is not assignable to protocol `SupportsFooAndBar`
 info: └── protocol member `foo` is incompatible
 info:     └── the parameter named `name_` does not match `name` (and can be used as a keyword parameter)
+help: `IncompatibleFoo` might be assignable to `SupportsFooAndBar` if the parameter `name` were made positional-only in `SupportsFooAndBar.foo`
 ```
 
 ## Assigning to `Iterable`

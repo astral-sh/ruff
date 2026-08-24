@@ -5,54 +5,37 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
-use ty_static::EnvVars;
 
-use super::python_version::SupportedPythonVersion;
+use crate::metadata::python_version::SupportedPythonVersion;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub(super) struct UvWorkspace {
-    root: SystemPathBuf,
+pub(crate) struct UvMetadata {
+    workspace_root: SystemPathBuf,
     environment: Option<SystemPathBuf>,
     python_version: Option<RangedValue<SupportedPythonVersion>>,
 }
 
-impl UvWorkspace {
-    pub(super) fn discover(
-        path: &SystemPath,
-        system: &dyn System,
-    ) -> Result<Self, UvWorkspaceError> {
-        let uv = system
-            .env_var(EnvVars::UV)
-            .unwrap_or_else(|_| "uv".to_string());
-
-        // `uv check` has already selected and synchronized the environment. Keep this query
-        // read-only so package selection and `--isolated` aren't overwritten by a second sync.
-        let output = system
-            .run_command(
-                &uv,
-                &["workspace", "metadata", "--frozen", "--active"],
-                path,
-            )
-            .map_err(UvWorkspaceError::Invocation)?;
-
-        if !output.status.success() {
-            return Err(UvWorkspaceError::CommandFailed {
-                status: output.status,
-                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-            });
-        }
-
-        Self::from_metadata(&output.stdout, system)
+impl UvMetadata {
+    pub(crate) fn workspace_root(&self) -> &SystemPath {
+        &self.workspace_root
     }
 
-    pub(super) fn from_metadata(
+    pub(crate) fn environment(&self) -> Option<&SystemPath> {
+        self.environment.as_deref()
+    }
+
+    pub(crate) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
+        self.python_version.as_ref()
+    }
+
+    pub(crate) fn from_metadata(
         metadata: &[u8],
         system: &dyn System,
-    ) -> Result<Self, UvWorkspaceError> {
+    ) -> Result<Self, UvMetadataError> {
         let metadata = serde_json::from_slice::<WorkspaceMetadata>(metadata)
-            .map_err(UvWorkspaceError::InvalidMetadata)?;
+            .map_err(UvMetadataError::InvalidMetadata)?;
 
-        let root = existing_directory(metadata.workspace_root, "workspace root", system)?;
+        let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
 
         let (environment, python_version) = match metadata.environment {
             Some(environment) => (
@@ -67,57 +50,15 @@ impl UvWorkspace {
         };
 
         Ok(Self {
-            root,
+            workspace_root,
             environment,
             python_version,
         })
     }
-
-    pub(super) fn root(&self) -> &SystemPath {
-        &self.root
-    }
-
-    pub(super) fn environment(&self) -> Option<&SystemPath> {
-        self.environment.as_deref()
-    }
-
-    pub(super) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
-        self.python_version.as_ref()
-    }
-}
-
-fn resolve_python_version(
-    version: &Version,
-) -> Result<RangedValue<SupportedPythonVersion>, UvWorkspaceError> {
-    let [major, minor, ..] = version.release() else {
-        return Err(UvWorkspaceError::InvalidPythonVersion(version.clone()));
-    };
-    let version = format!("{major}.{minor}")
-        .parse::<SupportedPythonVersion>()
-        .map_err(|_| UvWorkspaceError::InvalidPythonVersion(version.clone()))?;
-
-    Ok(RangedValue::new(version, ValueSource::UvWorkspace))
-}
-
-fn existing_directory(
-    path: PathBuf,
-    description: &'static str,
-    system: &dyn System,
-) -> Result<SystemPathBuf, UvWorkspaceError> {
-    let path = match SystemPathBuf::from_path_buf(path) {
-        Ok(path) => path,
-        Err(path) => return Err(UvWorkspaceError::NonUnicodePath { description, path }),
-    };
-
-    if !system.is_directory(&path) {
-        return Err(UvWorkspaceError::MissingDirectory { description, path });
-    }
-
-    Ok(path)
 }
 
 #[derive(Debug, Error)]
-pub(super) enum UvWorkspaceError {
+pub(crate) enum UvMetadataError {
     #[error("Failed to invoke `uv workspace metadata`: {0}")]
     Invocation(#[source] std::io::Error),
 
@@ -145,6 +86,35 @@ pub(super) enum UvWorkspaceError {
         path: SystemPathBuf,
     },
 }
+fn existing_directory(
+    path: PathBuf,
+    description: &'static str,
+    system: &dyn System,
+) -> Result<SystemPathBuf, UvMetadataError> {
+    let path = match SystemPathBuf::from_path_buf(path) {
+        Ok(path) => path,
+        Err(path) => return Err(UvMetadataError::NonUnicodePath { description, path }),
+    };
+
+    if !system.is_directory(&path) {
+        return Err(UvMetadataError::MissingDirectory { description, path });
+    }
+
+    Ok(path)
+}
+
+fn resolve_python_version(
+    version: &Version,
+) -> Result<RangedValue<SupportedPythonVersion>, UvMetadataError> {
+    let [major, minor, ..] = version.release() else {
+        return Err(UvMetadataError::InvalidPythonVersion(version.clone()));
+    };
+    let version = format!("{major}.{minor}")
+        .parse::<SupportedPythonVersion>()
+        .map_err(|_| UvMetadataError::InvalidPythonVersion(version.clone()))?;
+
+    Ok(RangedValue::new(version, ValueSource::UvMetadata))
+}
 
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
@@ -165,18 +135,20 @@ struct WorkspacePython {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use ruff_db::system::{SystemPath, TestSystem};
 
-    use super::{UvWorkspace, UvWorkspaceError};
+    use super::{UvMetadata, UvMetadataError};
 
     #[test]
     fn rejects_invalid_metadata() {
         let system = TestSystem::default();
 
-        assert!(matches!(
-            UvWorkspace::from_metadata(b"{", &system),
-            Err(UvWorkspaceError::InvalidMetadata(_))
-        ));
+        assert_matches!(
+            UvMetadata::from_metadata(b"{", &system),
+            Err(UvMetadataError::InvalidMetadata(_))
+        );
     }
 
     #[test]
@@ -189,7 +161,7 @@ mod tests {
             "workspace_root": "/app"
         }"#;
 
-        let workspace = UvWorkspace::from_metadata(metadata, &system)?;
+        let workspace = UvMetadata::from_metadata(metadata, &system)?;
 
         assert!(workspace.environment().is_none());
         assert!(workspace.python_version().is_none());
@@ -212,7 +184,7 @@ mod tests {
             }
         }"#;
 
-        let workspace = UvWorkspace::from_metadata(metadata, &system)?;
+        let workspace = UvMetadata::from_metadata(metadata, &system)?;
 
         assert_eq!(workspace.environment(), Some(SystemPath::new("/env")));
         assert_eq!(
@@ -238,10 +210,10 @@ mod tests {
             }
         }"#;
 
-        assert!(matches!(
-            UvWorkspace::from_metadata(metadata, &system),
-            Err(UvWorkspaceError::InvalidPythonVersion(_))
-        ));
+        assert_matches!(
+            UvMetadata::from_metadata(metadata, &system),
+            Err(UvMetadataError::InvalidPythonVersion(_))
+        );
 
         Ok(())
     }

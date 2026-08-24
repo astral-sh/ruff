@@ -357,7 +357,7 @@ fn diagnostic_kind_for_operator<'a>(
 }
 
 fn is_whitespace_needed(kind: TokenKind) -> bool {
-    matches!(
+    if matches!(
         kind,
         TokenKind::DoubleStarEqual
             | TokenKind::StarEqual
@@ -386,8 +386,14 @@ fn is_whitespace_needed(kind: TokenKind) -> bool {
             | TokenKind::ColonEqual
             | TokenKind::Slash
             | TokenKind::Percent
-    ) || kind.is_arithmetic()
-        || (kind.is_bitwise_or_shift() &&
-            // As a special-case, pycodestyle seems to ignore whitespace around the tilde.
-            !matches!(kind, TokenKind::Tilde))
+    ) {
+        return true;
+    }
+
+    if kind.is_arithmetic() {
+        return true;
+    }
+
+    // As a special-case, pycodestyle seems to ignore whitespace around the tilde.
+    kind.is_bitwise_or_shift() && kind != TokenKind::Tilde
 }

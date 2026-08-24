@@ -60,7 +60,7 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
-        range: _,
+        range_start: _,
         node_index: _,
     }) = &right
     else {

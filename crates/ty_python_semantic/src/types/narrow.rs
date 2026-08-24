@@ -7,9 +7,7 @@ use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, TupleUnpacker};
-use crate::types::typed_dict::{
-    TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
-};
+use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -38,7 +36,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::call::CallArguments;
-use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
+use super::constraints::{ConstraintSetBuilder, PathBoundSolution, PathBounds, Solutions};
 use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
     evaluate_type_equality, evaluate_type_inequality,
@@ -103,7 +101,9 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             .and_then(|constraints| constraints.get(&place).cloned());
             (positive, None)
         }
-        PredicateNode::IsNonTerminalCall(_)
+        PredicateNode::ContextManagerSuppresses { .. }
+        | PredicateNode::FinallyNormalPathImpossible { .. }
+        | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
         | PredicateNode::OrPatternAlternative(_)
         | PredicateNode::StarImportPlaceholder(_) => (None, None),
@@ -116,7 +116,11 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -149,7 +153,11 @@ fn all_narrowing_constraints_for_expression<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -162,7 +170,11 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_narrowing_constraints_for_subject_element_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -683,6 +695,7 @@ impl ClassInfoConstraintFunction {
             | Type::FunctionLiteral(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
@@ -867,12 +880,9 @@ fn specialize_narrowing_target_from_intersection<'db>(
         combined_constraints.intersect(db, &constraints, base_constraint);
     }
 
-    let solutions = combined_constraints.solutions(
-        db,
-        env,
-        &constraints,
-        generic_context.inferable_typevars(db),
-    );
+    let solutions = combined_constraints
+        .solutions(db, env, generic_context.inferable_typevars(db))
+        .ok()?;
     let specialized_class =
         specialize_generic_class_from_solutions(db, env, target_class, solutions)?;
     Some(Type::instance(db, env, specialized_class))
@@ -1504,7 +1514,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 self.evaluate_subject_element_pattern(subject_element)
             }
-            PredicateNode::IsNonTerminalCall(_) => return None,
+            PredicateNode::ContextManagerSuppresses { .. }
+            | PredicateNode::FinallyNormalPathImpossible { .. }
+            | PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
             PredicateNode::OrPatternAlternative(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
@@ -2370,12 +2382,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             )
             .solve_with(|variance, path_bound| {
                 let Some(lower) = path_bound.lower else {
-                    return Ok(None);
+                    return PathBoundSolution::Unsolved;
                 };
                 if variance != TypeVarVariance::Invariant
                     || path_bound.upper.materialize_exact(db, &self.env) != lower
                 {
-                    return Ok(None);
+                    return PathBoundSolution::Unsolved;
                 }
                 PathBounds::default_solve(db, &self.env, &constraints, path_bound)
             });
@@ -3196,8 +3208,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn scope(&self) -> ScopeId<'db> {
         let db = self.db;
         match self.predicate {
-            PredicateNode::Expression(expression) => expression.scope(db),
+            PredicateNode::Expression(expression)
+            | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
+            PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
             PredicateNode::OrPatternAlternative(scope) => scope,
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)
@@ -3632,9 +3646,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 Some(rhs_constraint.negate(db, &self.env))
             }
             ast::CmpOp::Is => {
-                let mut builder = UnionBuilder::new(db, &self.env).add(rhs_ty);
-                let rhs_resolved = rhs_ty.resolve_type_alias(db);
                 let rhs_identity_ty = rhs_ty.identity_comparison_type(db, &self.env);
+                // Identity transfers the runtime type, not a `NewType` tag or type-variable
+                // selection belonging to the other operand.
+                let mut builder = UnionBuilder::new(db, &self.env).add(rhs_identity_ty);
+                let rhs_resolved = rhs_ty.resolve_type_alias(db);
                 let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
                     let overlaps_only_at_runtime = |rhs_element| {
                         element.is_disjoint_from(db, &self.env, rhs_element)
@@ -4040,9 +4056,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             } else {
                 let requires_key = |td: TypedDictType<'db>| -> bool {
-                    td.items(db)
-                        .get(key)
-                        .is_some_and(TypedDictField::is_required)
+                    td.key_membership_truthiness(db, key).is_always_true()
                 };
 
                 let resolved_rhs_type = rhs_type.resolve_type_alias(db);
@@ -4090,11 +4104,23 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
         }
 
+        // Expression-inference cycles can replace every subexpression's type, including literals,
+        // with a cycle placeholder. This can prevent comparisons against `None` from narrowing
+        // recursively inferred attributes. Other literals can encounter the same issue, but a
+        // general solution would require broader changes to cycle recovery. For now, intentionally
+        // preserve only `None`, whose type can be recovered directly.
+        let expression_type = |expr: &ast::Expr, env: &ProgramEnvironment<'db>| {
+            if expr.is_none_literal_expr() {
+                Type::none(db, env)
+            } else {
+                inference.expression_type(expr)
+            }
+        };
         let mut last_rhs_ty: Option<Type> = None;
 
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
-            let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
-            let rhs_ty = inference.expression_type(right);
+            let lhs_ty = last_rhs_ty.unwrap_or_else(|| expression_type(left, &self.env));
+            let rhs_ty = expression_type(right, &self.env);
             let lhs_narrowing_rhs_ty = if matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn) {
                 self.inline_membership_rhs_type(right, inference)
                     .unwrap_or(rhs_ty)
@@ -4813,6 +4839,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             Type::Union(union) => union.map(db, &self.env, |element| {
                 self.narrow_with_present_key(*element, key)
             }),
+            Type::TypedDict(typed_dict)
+                if typed_dict
+                    .key_membership_truthiness(db, key)
+                    .is_always_false() =>
+            {
+                Type::Never
+            }
             resolved if typeddict_declares_key(db, resolved, key) => resolved,
             // TODO: Extend this to subtypes of `Mapping[str, object]` whose membership and
             // subscript operations obey the `Mapping` contract.
@@ -5022,6 +5055,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::SpecialForm(_)
         | Type::KnownInstance(_)
         | Type::PropertyInstance(_)
+        | Type::SlotDescriptor(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::LiteralValue(_)
@@ -5200,6 +5234,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         | Type::SpecialForm(_)
         | Type::KnownInstance(_)
         | Type::PropertyInstance(_)
+        | Type::SlotDescriptor(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::LiteralValue(_)
@@ -5270,14 +5305,6 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
         base_type: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        narrow_type_by_constraint(
-            db,
-            env,
-            self.narrowing_constraints(),
-            self.predicates(),
-            self.constraint(),
-            base_type,
-            place,
-        )
+        narrow_type_by_constraint(db, env, self, base_type, place)
     }
 }

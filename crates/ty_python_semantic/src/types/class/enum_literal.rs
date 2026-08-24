@@ -8,7 +8,7 @@ use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::Type;
 use crate::types::class::known::KnownClass;
 use crate::types::class::{
-    ClassLiteral, ClassType, DynamicClassHeaderAnchor, MemberLookupPolicy,
+    ClassLiteral, ClassType, DynamicClassHeaderAnchor, DynamicClassScopeOffset, MemberLookupPolicy,
     dynamic_class_header_range,
 };
 use crate::types::class_base::ClassBase;
@@ -63,7 +63,7 @@ pub enum DynamicEnumAnchor<'db> {
     },
     ScopeOffset {
         scope: ScopeId<'db>,
-        offset: u32,
+        offset: DynamicClassScopeOffset,
         spec: EnumSpec<'db>,
     },
 }

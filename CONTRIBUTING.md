@@ -68,7 +68,7 @@ Ruff is written in Rust. You'll need to install the
 You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 
 ```shell
-cargo install cargo-insta
+cargo install --locked cargo-insta
 ```
 
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
@@ -184,14 +184,14 @@ crates.io as part of Ruff's releases:
 For a publishable crate, generate its README and verify that the workspace can still be packaged:
 
 ```shell
-uv run --script scripts/generate-crate-readmes.py
+uv run scripts/generate-crate-readmes.py
 cargo publish --workspace --dry-run
 ```
 
 Before merging a publishable crate, ask a crates.io owner to bootstrap it by running:
 
 ```shell
-CARGO_REGISTRY_TOKEN=<token> uv run --no-config --script scripts/setup-crates-io-publish.py
+CARGO_REGISTRY_TOKEN=<token> uv run --no-config scripts/setup-crates-io-publish.py
 ```
 
 The bootstrap script reserves the crate name, configures the release workflow as its trusted
@@ -468,13 +468,13 @@ To preview any changes to the documentation locally:
 1. Generate the MkDocs site with:
 
     ```shell
-    uv run --no-project --isolated --with-requirements docs/requirements.txt scripts/generate_mkdocs.py
+    uv run scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
 
     ```shell
-    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.yml
+    uv run --only-group=docs mkdocs serve -f mkdocs.yml
     ```
 
 The documentation should then be available locally at
@@ -560,7 +560,7 @@ Commit each step of this process separately for easier review.
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
-    1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
+    1. Run `uv run scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
 1. Update the [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repository by following
@@ -612,7 +612,7 @@ git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter
 Install `hyperfine`:
 
 ```shell
-cargo install hyperfine
+cargo install --locked hyperfine
 ```
 
 To benchmark the release build:
@@ -777,7 +777,7 @@ critcmp main pr
 You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comparison.
 
 ```bash
-cargo install critcmp
+cargo install --locked critcmp
 ```
 
 #### Tips
@@ -831,7 +831,7 @@ flamegraph --perfdata perf.data --no-inline
 Install [`cargo-instruments`](https://crates.io/crates/cargo-instruments):
 
 ```shell
-cargo install cargo-instruments
+cargo install --locked cargo-instruments
 ```
 
 Then run the profiler with

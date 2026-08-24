@@ -1,68 +1,32 @@
 # Disjointness relation
 
-Two types `S` and `T` are disjoint if their intersection `S & T` is empty (equivalent to `Never`).
-This means that it is known that no possible runtime object inhabits both types simultaneously.
+Two types `S` and `T` are disjoint if they have no overlap; that is, their intersection `S & T` is
+empty (equivalent to `Never`).
 
 ## Basic builtin types
 
-```pyi
-from typing_extensions import Literal, LiteralString, Any
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_disjoint_from
+For basic builtin types, disjointness simply means that no runtime object can inhabit both types.
 
+```pyi
+from typing_extensions import LiteralString
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+# No object can be both a `bool` and a `str`.
 static_assert(is_disjoint_from(bool, str))
+
+# But the same object can be a `bool`, an `int`, and an `object`.
 static_assert(not is_disjoint_from(bool, bool))
 static_assert(not is_disjoint_from(bool, int))
 static_assert(not is_disjoint_from(bool, object))
-
-static_assert(not is_disjoint_from(Any, bool))
-static_assert(not is_disjoint_from(Any, Any))
-static_assert(not is_disjoint_from(Any, ~Any))
 
 static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
 ```
 
-## Statically empty and non-empty ranges
-
-```py
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_disjoint_from
-
-static_assert(is_disjoint_from(TypeOf[range(0)], TypeOf[range(1)]))
-static_assert(is_disjoint_from(TypeOf[range(1)], TypeOf[range(0)]))
-static_assert(not is_disjoint_from(TypeOf[range(0)], range))
-static_assert(not is_disjoint_from(TypeOf[range(1)], range))
-```
-
-## Enum complements
-
-```pyi
-from enum import Enum
-from typing import Literal
-from ty_extensions import static_assert
-from ty_extensions._internal import is_disjoint_from
-
-class Color(Enum):
-    RED = 1
-    GREEN = 2
-    BLUE = 3
-
-static_assert(
-    is_disjoint_from(
-        Color & ~Literal[Color.RED],
-        Color & ~Literal[Color.GREEN, Color.BLUE],
-    )
-)
-static_assert(
-    is_disjoint_from(
-        Color & ~Literal[Color.GREEN, Color.BLUE],
-        Color & ~Literal[Color.RED],
-    )
-)
-```
-
 ## Class hierarchies
+
+Classes overlap through a common subclass unless finality or incompatible metaclasses prevent it.
 
 ```pyi
 from ty_extensions import static_assert
@@ -112,7 +76,7 @@ static_assert(is_disjoint_from(UsesMeta1, UsesMeta2))
 
 ## `@final` builtin types
 
-Some builtins types are declared as `@final`:
+Some builtin types are declared as `@final`:
 
 ```py
 from ty_extensions import static_assert
@@ -129,123 +93,18 @@ static_assert(is_disjoint_from(memoryview, Foo))
 static_assert(is_disjoint_from(type[memoryview], type[Foo]))
 ```
 
-## Specialized `@final` types
+## Gradual types
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Any, final
-from ty_extensions import static_assert
-from ty_extensions._internal import is_disjoint_from
-
-@final
-class Foo[T]:
-    def get(self) -> T:
-        raise NotImplementedError
-
-class A: ...
-class B: ...
-
-static_assert(not is_disjoint_from(A, B))
-static_assert(not is_disjoint_from(Foo[A], Foo[B]))
-static_assert(not is_disjoint_from(Foo[A], Foo[Any]))
-static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
-
-# `Foo[Never]` is a subtype of both `Foo[int]` and `Foo[str]`.
-static_assert(not is_disjoint_from(Foo[int], Foo[str]))
-```
-
-## Invariant generic specializations and bases
-
-Only incompatible invariant generic arguments imply disjointness. Covariant generic arguments do
-not: a covariant container can be inhabited by an empty value.
+Gradual types are not disjoint if any possible materialization is not disjoint.
 
 ```pyi
-from collections.abc import Sequence
-from typing import Any, Generic, TypeVar
+from typing import Any
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
-T = TypeVar("T")
-U = TypeVar("U")
-T_co = TypeVar("T_co", covariant=True)
-
-class A: ...
-class B: ...
-
-class Invariant(Generic[T]):
-    x: T
-
-class InvariantPair(Generic[T, U]):
-    x: T
-    y: U
-
-class Covariant(Generic[T_co]):
-    def get(self) -> T_co:
-        raise NotImplementedError()
-
-class InvSubA(Invariant[A]):
-    pass
-
-class CoSubB(Covariant[B]):
-    pass
-
-static_assert(is_disjoint_from(Invariant[A], Invariant[B]))
-static_assert(is_disjoint_from(InvSubA, Invariant[B]))
-static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
-static_assert(not is_disjoint_from(Invariant[Any], Invariant[B]))
-static_assert(not is_disjoint_from(Invariant[B], Invariant[Any]))
-# `A | Any` cannot materialize to be equivalent to `B`.
-static_assert(is_disjoint_from(Invariant[A | Any], Invariant[B]))
-static_assert(is_disjoint_from(Invariant[B], Invariant[A | Any]))
-static_assert(is_disjoint_from(Invariant[A & Any], Invariant[B]))
-static_assert(is_disjoint_from(Invariant[B], Invariant[A & Any]))
-static_assert(is_disjoint_from(InvariantPair[A, A], InvariantPair[A, B]))
-static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
-static_assert(not is_disjoint_from(Covariant[A], CoSubB))
-static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
-```
-
-## Type-variable aliases and empty invariant arguments
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Generic, Never, TypeVar
-from ty_extensions import static_assert
-from ty_extensions._internal import is_disjoint_from
-
-T = TypeVar("T")
-
-class Invariant(Generic[T]):
-    x: T
-
-type Id[V] = V
-
-def _[U]():
-    static_assert(not is_disjoint_from(Invariant[U], Invariant[int]))
-    static_assert(not is_disjoint_from(Invariant[Id[U]], Invariant[int]))
-
-static_assert(not is_disjoint_from(Invariant[Id[int]], Invariant[int]))
-static_assert(is_disjoint_from(Invariant[Id[int]], Invariant[str]))
-
-class Mixed[T, U]:
-    x: T
-
-# `Mixed` is bivariant in `U`, so the differing second argument cannot make these disjoint.
-static_assert(not is_disjoint_from(Mixed[Never, int], Mixed[Never, str]))
-
-class Left(Invariant[Never]): ...
-class Right(Invariant[Never]): ...
-class Both(Left, Right): ...
-
-static_assert(not is_disjoint_from(Left, Right))
+static_assert(not is_disjoint_from(Any, bool))
+static_assert(not is_disjoint_from(Any, Any))
+static_assert(not is_disjoint_from(Any, ~Any))
 ```
 
 ## "Disjoint base" builtin types
@@ -337,6 +196,8 @@ static_assert(not is_disjoint_from(D, A))
 
 ## Dataclasses
 
+Dataclasses with incompatible non-empty slots are disjoint; those with empty slots can overlap.
+
 ```py
 from dataclasses import dataclass
 from ty_extensions import static_assert
@@ -369,6 +230,8 @@ static_assert(is_disjoint_from(I, J))
 
 ## Tuple types
 
+Tuple types are disjoint when their lengths or corresponding element types cannot overlap.
+
 ```py
 from typing_extensions import Literal, Never
 from ty_extensions import static_assert
@@ -396,6 +259,8 @@ static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [st
 
 ## Unions
 
+A union is disjoint from another type when none of its alternatives overlap that type.
+
 ```py
 from typing_extensions import Literal
 from ty_extensions import static_assert
@@ -409,6 +274,8 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 ```
 
 ## Intersections
+
+Positive requirements and negations can make an intersection disjoint from another type.
 
 ```pyi
 from typing_extensions import Literal, final, Any, LiteralString
@@ -475,6 +342,8 @@ static_assert(is_disjoint_from(AlwaysFalsy, LiteralString & ~Literal[""]))  # er
 
 ## Special types
 
+Some typing constructs and precisely described runtime values have their own disjointness rules.
+
 ### `Never`
 
 `Never` is disjoint from every type, including itself.
@@ -491,6 +360,8 @@ static_assert(is_disjoint_from(Never, object))
 ```
 
 ### `None`
+
+`None` overlaps only with types that can contain the `None` object.
 
 ```pyi
 from typing_extensions import Literal, LiteralString
@@ -514,6 +385,8 @@ static_assert(is_disjoint_from(None, int & ~str))
 ```
 
 ### Literals
+
+Literal types are disjoint when their values or runtime types cannot overlap.
 
 ```pyi
 from typing_extensions import Literal, LiteralString
@@ -577,6 +450,8 @@ static_assert(is_disjoint_from(LiteralString & ~AlwaysFalsy, ~LiteralString | Al
 
 ### Class, module and function literals
 
+Class, module, and function literal types for distinct runtime objects are disjoint.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -623,6 +498,8 @@ static_assert(not is_disjoint_from(TypeOf[f], object))
 ```
 
 ### Bound methods
+
+Bound methods are disjoint when their names or possible receiver types cannot overlap.
 
 ```py
 from typing import final
@@ -708,6 +585,8 @@ static_assert(not is_disjoint_from(TypeOf[F().foo], TypeOf[G().foo]))
 
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
+`AlwaysTruthy` and `AlwaysFalsy` are disjoint from types with incompatible truthiness.
+
 ```py
 from ty_extensions import AlwaysFalsy, AlwaysTruthy, static_assert
 from ty_extensions._internal import is_disjoint_from
@@ -783,6 +662,9 @@ static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
 
 ### `property`
 
+Property descriptors and property-bearing classes are disjoint from incompatible final classes or
+protocol requirements.
+
 ```py
 from ty_extensions import static_assert
 from ty_extensions._internal import TypeOf, is_disjoint_from
@@ -831,6 +713,8 @@ static_assert(is_disjoint_from(HasReadWriteIntProp, E))
 ```
 
 ### `TypeGuard` and `TypeIs`
+
+`TypeGuard` and `TypeIs` represent boolean return values, so they overlap `bool` but not `str`.
 
 ```py
 from ty_extensions import static_assert
@@ -908,6 +792,8 @@ static_assert(is_disjoint_from(type[Foo], BarNone))
 
 ### `NamedTuple`
 
+`NamedTuple`s overlap matching tuple shapes, but not different lengths or distinct final classes.
+
 ```py
 from __future__ import annotations
 
@@ -930,49 +816,6 @@ static_assert(not is_disjoint_from(Path, tuple[Path | None, str]))
 static_assert(is_disjoint_from(Path, tuple[Path | None]))
 static_assert(is_disjoint_from(Path, tuple[Path | None, str, int]))
 static_assert(is_disjoint_from(Path, Path2))
-```
-
-## Generic aliases
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import final
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_disjoint_from
-
-class GenericClass[T]:
-    x: T  # invariant
-
-static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass]))  # error: [missing-type-argument]
-static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass]))  # error: [missing-type-argument]
-static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))
-static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
-static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]]))
-
-class GenericClassIntBound[T: int]:
-    x: T  # invariant
-
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))  # error: [missing-type-argument]
-static_assert(
-    # error: [missing-type-argument]
-    not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound])
-)
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
-
-@final
-class GenericFinalClass[T]:
-    x: T  # invariant
-
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass]))  # error: [missing-type-argument]
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))  # error: [missing-type-argument]
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
-static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
 ```
 
 ## Callables
@@ -1127,7 +970,23 @@ static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[OrderedDict]))
 static_assert(not is_disjoint_from(TypeOf[OrderedDict], Callable[..., Any]))
 ```
 
+## Statically empty and non-empty ranges
+
+Empty and non-empty ranges are disjoint, but both overlap the general `range` type.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
+
+static_assert(is_disjoint_from(TypeOf[range(0)], TypeOf[range(1)]))
+static_assert(is_disjoint_from(TypeOf[range(1)], TypeOf[range(0)]))
+static_assert(not is_disjoint_from(TypeOf[range(0)], range))
+static_assert(not is_disjoint_from(TypeOf[range(1)], range))
+```
+
 ## Custom enum classes
+
+Enum members overlap their enum class and its ancestors, but not other members or unrelated classes.
 
 ```py
 from enum import Enum
@@ -1151,4 +1010,458 @@ static_assert(is_disjoint_from(Literal[MyAnswer.NO], UnrelatedClass))
 
 static_assert(not is_disjoint_from(Literal[MyAnswer.NO], MyAnswer))
 static_assert(not is_disjoint_from(Literal[MyAnswer.NO], MyEnum))
+```
+
+## Enum complements
+
+Enum types with complementary negations are disjoint when no enum member satisfies both.
+
+```pyi
+from enum import Enum
+from typing import Literal
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+static_assert(
+    is_disjoint_from(
+        Color & ~Literal[Color.RED],
+        Color & ~Literal[Color.GREEN, Color.BLUE],
+    )
+)
+static_assert(
+    is_disjoint_from(
+        Color & ~Literal[Color.GREEN, Color.BLUE],
+        Color & ~Literal[Color.RED],
+    )
+)
+```
+
+## Static tags and typed inhabitants
+
+An inhabitant of a type can be more than a bare runtime object: it can also include static type
+information, not present at runtime, which can be understood as an invisible "tag". For example, a
+generic tag records the type arguments of a specialization such as `list[int]`, while a `NewType`
+tag identifies the `NewType` applied to a value. Neither kind of tag is visible on the runtime
+object itself, but both affect which types an inhabitant belongs to.
+
+Generic tags carry guarantees about how an object can be used. The invariant types `list[int]` and
+`list[str]` are disjoint because one reference could append a string that the other would then
+incorrectly read as an integer. These incompatible generic tags cannot describe the same object
+simultaneously in soundly typed code.
+
+Unlike incompatible invariant generic tags, distinct `NewType` tags can describe different typed
+inhabitants of the same runtime object. If `UserId` and `OrderId` are distinct integer `NewType`s,
+both `UserId(value)` and `OrderId(value)` return the same integer unchanged at runtime, but their
+tags are incompatible. The two `NewType`s are disjoint even though their values can identify the
+same runtime object. Both types still overlap `int`, which does not require either specific tag.
+
+### Invariant and covariant generic specializations
+
+Incompatible invariant arguments make generic specializations disjoint. Covariant specializations
+can still overlap when a common empty or bottom specialization satisfies both.
+
+```pyi
+from collections.abc import Sequence
+from typing import Any, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+static_assert(is_disjoint_from(list[int], list[str]))
+
+T = TypeVar("T")
+U = TypeVar("U")
+T_co = TypeVar("T_co", covariant=True)
+
+class A: ...
+class B: ...
+
+class Invariant(Generic[T]):
+    x: T
+
+class InvariantPair(Generic[T, U]):
+    x: T
+    y: U
+
+class Covariant(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError()
+
+class InvSubA(Invariant[A]):
+    pass
+
+class CoSubB(Covariant[B]):
+    pass
+
+static_assert(is_disjoint_from(Invariant[A], Invariant[B]))
+static_assert(is_disjoint_from(InvSubA, Invariant[B]))
+static_assert(not is_disjoint_from(Invariant[A], Invariant[A]))
+static_assert(not is_disjoint_from(Invariant[Any], Invariant[B]))
+static_assert(not is_disjoint_from(Invariant[B], Invariant[Any]))
+# `A | Any` cannot materialize to be equivalent to `B`.
+static_assert(is_disjoint_from(Invariant[A | Any], Invariant[B]))
+static_assert(is_disjoint_from(Invariant[B], Invariant[A | Any]))
+static_assert(is_disjoint_from(Invariant[A & Any], Invariant[B]))
+static_assert(is_disjoint_from(Invariant[B], Invariant[A & Any]))
+static_assert(is_disjoint_from(InvariantPair[A, A], InvariantPair[A, B]))
+static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
+static_assert(not is_disjoint_from(Covariant[A], CoSubB))
+static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
+```
+
+### Specialized `@final` types
+
+Final generic specializations can overlap through a shared subtype such as `Foo[Never]`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+@final
+class Foo[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+static_assert(not is_disjoint_from(A, B))
+static_assert(not is_disjoint_from(Foo[A], Foo[B]))
+static_assert(not is_disjoint_from(Foo[A], Foo[Any]))
+static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
+
+# `Foo[Never]` is inhabited (`get` can raise) and is a subtype of both `Foo[int]` and `Foo[str]`.
+static_assert(not is_disjoint_from(Foo[int], Foo[str]))
+```
+
+### Type-variable aliases and empty invariant arguments
+
+Type-variable aliases preserve potentially compatible generic arguments. Empty or irrelevant type
+arguments do not make otherwise compatible subclasses disjoint.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Never, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+T = TypeVar("T")
+
+class Invariant(Generic[T]):
+    x: T
+
+type Id[V] = V
+
+def _[U]():
+    static_assert(not is_disjoint_from(Invariant[U], Invariant[int]))
+    static_assert(not is_disjoint_from(Invariant[Id[U]], Invariant[int]))
+
+static_assert(not is_disjoint_from(Invariant[Id[int]], Invariant[int]))
+static_assert(is_disjoint_from(Invariant[Id[int]], Invariant[str]))
+
+class Mixed[T, U]:
+    x: T
+
+# `Mixed` is bivariant in `U`, so the differing second argument cannot make these disjoint.
+static_assert(not is_disjoint_from(Mixed[Never, int], Mixed[Never, str]))
+
+class Left(Invariant[Never]): ...
+class Right(Invariant[Never]): ...
+class Both(Left, Right): ...
+
+static_assert(not is_disjoint_from(Left, Right))
+```
+
+### NewTypes and overlapping types
+
+A `NewType` overlaps with any nominal or structural type that overlaps its concrete base. This
+includes the base itself, its supertypes and subclasses, and protocols satisfied by the base.
+
+```py
+from typing import NewType, Protocol, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+UserId = NewType("UserId", int)
+
+@final
+class FinalInt(int): ...
+
+class OrdinaryInt(int): ...
+
+class SupportsInt(Protocol):
+    def __int__(self) -> int: ...
+
+FinalIntId = NewType("FinalIntId", FinalInt)
+
+static_assert(not is_disjoint_from(UserId, int))
+static_assert(not is_disjoint_from(UserId, object))
+static_assert(not is_disjoint_from(UserId, FinalInt))
+static_assert(not is_disjoint_from(UserId, OrdinaryInt))
+static_assert(not is_disjoint_from(UserId, SupportsInt))
+static_assert(is_disjoint_from(UserId, str))
+static_assert(not is_disjoint_from(FinalIntId, FinalInt))
+static_assert(not is_disjoint_from(FinalIntId, int))
+```
+
+### NewTypes and literal types
+
+The same overlap rule applies to literal types: a `NewType` overlaps with any literal type that
+overlaps with its concrete base. Because `bool` is a subtype of `int`, type checkers correctly
+accept `UserId(True)`, and an integer-based `NewType` also overlaps boolean literals.
+
+```py
+from typing import Literal, NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+UserId = NewType("UserId", int)
+StringId = NewType("StringId", str)
+BytesId = NewType("BytesId", bytes)
+
+UserId(True)
+
+static_assert(not is_disjoint_from(UserId, Literal[True]))
+static_assert(not is_disjoint_from(Literal[True], UserId))
+static_assert(not is_disjoint_from(UserId, Literal[False]))
+static_assert(not is_disjoint_from(UserId, Literal[1]))
+static_assert(not is_disjoint_from(UserId, bool))
+static_assert(not is_disjoint_from(bool, UserId))
+static_assert(is_disjoint_from(UserId, Literal["user"]))
+
+static_assert(not is_disjoint_from(StringId, Literal["user"]))
+static_assert(not is_disjoint_from(BytesId, Literal[b"user"]))
+```
+
+An `IntEnum` and its members also overlap with an integer-based `NewType`.
+
+```py
+from enum import IntEnum
+
+class Choice(IntEnum):
+    FIRST = 1
+    SECOND = 2
+
+static_assert(not is_disjoint_from(UserId, Choice))
+static_assert(not is_disjoint_from(UserId, Literal[Choice.FIRST]))
+```
+
+Nested NewTypes retain the overlap, and a float-based NewType also accepts `int` and `bool` through
+the `int`/`float` special case.
+
+```py
+NestedUserId = NewType("NestedUserId", UserId)
+FloatId = NewType("FloatId", float)
+BoolId = NewType("BoolId", bool)
+
+static_assert(not is_disjoint_from(NestedUserId, bool))
+static_assert(not is_disjoint_from(NestedUserId, Literal[True]))
+static_assert(not is_disjoint_from(FloatId, bool))
+static_assert(not is_disjoint_from(FloatId, Literal[True]))
+static_assert(not is_disjoint_from(FloatId, Literal[1]))
+static_assert(not is_disjoint_from(FloatId, int))
+static_assert(not is_disjoint_from(BoolId, bool))
+```
+
+### NewTypes and type guards
+
+`TypeGuard` and `TypeIs` represent boolean return values, so they overlap with `NewType`s whose
+concrete bases accept booleans, including `int` and `float`. A `NewType` with an incompatible base
+remains disjoint.
+
+```py
+from typing import NewType
+from typing_extensions import TypeGuard, TypeIs
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+Boolean = NewType("Boolean", bool)
+Integer = NewType("Integer", int)
+Numeric = NewType("Numeric", float)
+Text = NewType("Text", str)
+
+static_assert(not is_disjoint_from(Boolean, TypeGuard[str]))
+static_assert(not is_disjoint_from(TypeIs[str], Boolean))
+
+static_assert(not is_disjoint_from(Integer, TypeGuard[str]))
+
+static_assert(not is_disjoint_from(Numeric, TypeIs[str]))
+
+static_assert(is_disjoint_from(Text, TypeGuard[str]))
+static_assert(is_disjoint_from(TypeIs[str], Text))
+```
+
+### Distinct NewTypes
+
+Unrelated `NewType` tags are mutually exclusive, even when their constructors return the same
+runtime object. For the runtime object `True`, `(bool, First)` and `(bool, Second)` are different
+(runtime type, tag) pairs. Both inhabit `int`, `bool`, and `Literal[True]`, but only the first
+inhabits `First` and only the second inhabits `Second`. No pair inhabits both `NewType`s, so those
+types are disjoint even though each overlaps the same ordinary types.
+
+```py
+from typing import Literal, NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_disjoint_from, is_subtype_of
+
+First = NewType("First", int)
+Second = NewType("Second", int)
+Numeric = NewType("Numeric", float)
+Text = NewType("Text", str)
+
+static_assert(is_disjoint_from(First, Second))
+static_assert(is_disjoint_from(Second, First))
+static_assert(is_disjoint_from(First, Numeric))
+static_assert(is_disjoint_from(First, Text))
+
+static_assert(not is_disjoint_from(First, int))
+static_assert(not is_disjoint_from(Second, int))
+static_assert(not is_disjoint_from(First, bool))
+static_assert(not is_disjoint_from(Second, bool))
+static_assert(not is_disjoint_from(First, Literal[True]))
+static_assert(not is_disjoint_from(Second, Literal[True]))
+
+static_assert(not is_subtype_of(First, Second))
+static_assert(not is_assignable_to(First, Second))
+```
+
+### Nested NewTypes
+
+A nested `NewType` remains a subtype of its parent, so their types overlap. Independently nested
+`NewType`s remain disjoint, as do a nested `NewType` and an unrelated tag.
+
+```py
+from typing import NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_disjoint_from, is_subtype_of
+
+First = NewType("First", int)
+Second = NewType("Second", int)
+NestedFirst = NewType("NestedFirst", First)
+OtherNestedFirst = NewType("OtherNestedFirst", First)
+
+static_assert(is_disjoint_from(NestedFirst, Second))
+static_assert(is_disjoint_from(NestedFirst, OtherNestedFirst))
+static_assert(not is_disjoint_from(NestedFirst, First))
+static_assert(not is_disjoint_from(First, NestedFirst))
+static_assert(is_subtype_of(NestedFirst, First))
+static_assert(is_assignable_to(NestedFirst, First))
+static_assert(not is_assignable_to(First, NestedFirst))
+```
+
+### NewTypes and generic classes
+
+A `NewType` based on a covariant generic specialization overlaps with its generic supertypes and
+subclasses. Two differently specialized covariant types can also overlap through a common, more
+specific specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+class Base[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Child[T](Base[T]): ...
+
+BaseId = NewType("BaseId", Base[int])
+
+static_assert(not is_disjoint_from(BaseId, Base[int]))
+static_assert(not is_disjoint_from(BaseId, Base[object]))
+# `Base[Never]` is inhabited (`get` can raise) and is a subtype of both `Base[int]` and `Base[str]`.
+static_assert(not is_disjoint_from(BaseId, Base[str]))
+static_assert(not is_disjoint_from(BaseId, Child[object]))
+```
+
+An ordinary gradual specialization can overlap a `NewType` even when strict subtyping does not hold.
+Independently defined `NewType`s remain disjoint.
+
+```py
+AnyListId = NewType("AnyListId", list[Any])
+IntListId = NewType("IntListId", list[int])
+
+static_assert(not is_subtype_of(AnyListId, list[int]))
+static_assert(not is_disjoint_from(AnyListId, list[int]))
+static_assert(not is_disjoint_from(IntListId, list[Any]))
+static_assert(is_disjoint_from(IntListId, list[str]))
+static_assert(is_disjoint_from(IntListId, AnyListId))
+```
+
+A generic type variable must not make a potentially compatible specialization appear disjoint.
+Compatible constraints and bounds also preserve the overlap.
+
+```py
+def unconstrained[T]() -> None:
+    static_assert(not is_disjoint_from(IntListId, list[T]))
+    static_assert(not is_disjoint_from(list[T], IntListId))
+
+def compatible_constraints[T: (int, str)]() -> None:
+    static_assert(not is_disjoint_from(IntListId, list[T]))
+
+def compatible_bound[T: int]() -> None:
+    static_assert(not is_disjoint_from(IntListId, list[T]))
+```
+
+## Generic aliases
+
+Generic class objects and aliases overlap compatible `type[...]` types; incompatible invariant
+specializations make them disjoint.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, final
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
+
+class GenericClass[T]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]]))
+
+class GenericClassIntBound[T: int]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
+
+@final
+class GenericFinalClass[T]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
 ```

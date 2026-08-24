@@ -59,7 +59,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[
         let Expr::Call(ast::ExprCall {
             func,
             arguments,
-            range: _,
+            range_start: _,
             node_index: _,
         }) = &decorator.expression
         else {

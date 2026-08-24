@@ -103,7 +103,9 @@ impl PublicTypePolicy {
 }
 
 /// The source definition provenance for a place.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(
+    Debug, Clone, Copy, Default, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub(crate) enum Provenance<'db> {
     /// No source definition is known.
     #[default]
@@ -142,7 +144,7 @@ impl<'db> Provenance<'db> {
 }
 
 /// A defined place with its raw type, origin, definedness, public-type policy, and provenance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinedPlace<'db> {
     pub(crate) ty: Type<'db>,
     pub(crate) origin: TypeOrigin,
@@ -221,7 +223,9 @@ impl<'db> DefinedPlace<'db> {
 /// bound_or_declared:   Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
 /// non_existent:        Place::Undefined,
 /// ```
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(
+    Debug, Clone, Copy, Default, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub(crate) enum Place<'db> {
     Defined(DefinedPlace<'db>),
     #[default]
@@ -363,11 +367,13 @@ impl<'db> Place<'db> {
             }),
 
             Place::Defined(defined) => {
-                if let Some((dunder_get_return_ty, _)) =
-                    defined.ty.try_call_dunder_get(db, env, None, owner)
-                {
+                let result = defined
+                    .ty
+                    .try_call_dunder_get(db, env, None, owner)
+                    .unwrap_or_else(|error| Some(error.fallback()));
+                if let Some(result) = result {
                     Place::Defined(DefinedPlace {
-                        ty: dunder_get_return_ty,
+                        ty: result.return_type,
                         provenance: Provenance::Unknown,
                         ..defined
                     })
@@ -894,7 +900,9 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(
+    Debug, Clone, Default, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
@@ -2524,6 +2532,8 @@ pub(crate) enum ConsideredDefinitions {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
     use crate::db::tests::{TestDb, setup_db};
 
@@ -2632,14 +2642,14 @@ mod tests {
 
     #[track_caller]
     fn assert_bound_string_symbol<'db>(db: &'db TestDb, symbol: Place<'db>) {
-        assert!(matches!(
+        assert_matches!(
             symbol,
             Place::Defined(DefinedPlace {
                 ty: Type::NominalInstance(_),
                 definedness: Definedness::AlwaysDefined,
                 ..
             })
-        ));
+        );
         assert_eq!(
             symbol.expect_type(),
             KnownClass::Str.to_instance(db, &db.program_environment())

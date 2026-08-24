@@ -459,85 +459,35 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             }
         }
 
-        struct DisplayCallArguments<'env, 'a, 'db> {
-            call_arguments: &'a CallArguments<'a, 'db>,
-            db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
-        }
-
-        impl std::fmt::Display for DisplayCallArguments<'_, '_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("(")?;
-                for (index, (argument, types)) in self.call_arguments.iter().enumerate() {
-                    if index > 0 {
-                        write!(f, ", ")?;
+        std::fmt::from_fn(move |f| {
+            f.write_str("(")?;
+            for (index, (argument, types)) in self.iter().enumerate() {
+                if index > 0 {
+                    write!(f, ", ")?;
+                }
+                match argument {
+                    Argument::Synthetic => {
+                        write!(f, "self: {}", DisplayCallArgumentTypes { types, db, env })?;
                     }
-                    match argument {
-                        Argument::Synthetic => {
-                            write!(
-                                f,
-                                "self: {}",
-                                DisplayCallArgumentTypes {
-                                    types,
-                                    db: self.db,
-                                    env: self.env,
-                                }
-                            )?;
-                        }
-                        Argument::Positional => {
-                            write!(
-                                f,
-                                "{}",
-                                DisplayCallArgumentTypes {
-                                    types,
-                                    db: self.db,
-                                    env: self.env,
-                                }
-                            )?;
-                        }
-                        Argument::Variadic => {
-                            write!(
-                                f,
-                                "*{}",
-                                DisplayCallArgumentTypes {
-                                    types,
-                                    db: self.db,
-                                    env: self.env,
-                                }
-                            )?;
-                        }
-                        Argument::Keyword(name) => write!(
-                            f,
-                            "{}={}",
-                            name,
-                            DisplayCallArgumentTypes {
-                                types,
-                                db: self.db,
-                                env: self.env,
-                            }
-                        )?,
-                        Argument::Keywords => {
-                            write!(
-                                f,
-                                "**{}",
-                                DisplayCallArgumentTypes {
-                                    types,
-                                    db: self.db,
-                                    env: self.env,
-                                }
-                            )?;
-                        }
+                    Argument::Positional => {
+                        write!(f, "{}", DisplayCallArgumentTypes { types, db, env })?;
+                    }
+                    Argument::Variadic => {
+                        write!(f, "*{}", DisplayCallArgumentTypes { types, db, env })?;
+                    }
+                    Argument::Keyword(name) => write!(
+                        f,
+                        "{}={}",
+                        name,
+                        DisplayCallArgumentTypes { types, db, env }
+                    )?,
+                    Argument::Keywords => {
+                        write!(f, "**{}", DisplayCallArgumentTypes { types, db, env })?;
                     }
                 }
-                f.write_str(")")
             }
-        }
-
-        DisplayCallArguments {
-            call_arguments: self,
-            db,
-            env,
-        }
+            f.write_str(")")
+        })
     }
 }
 

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
+assertion_line: 133
 ---
 RUF012 Mutable default value for class attribute
   --> RUF012.py:9:34
@@ -137,5 +138,60 @@ RUF012 Mutable default value for class attribute
     |            ^^^^
 147 |     _fields_ = [
 148 |         ("attr_set", ctypes.c_uint64),
+    |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+RUF012 Mutable default value for class attribute
+   --> RUF012.py:155:12
+    |
+154 | class LES(ctypes.LittleEndianStructure):
+155 |     test = [""]
+    |            ^^^^
+156 |     _fields_ = [
+157 |         ("attr_set", ctypes.c_uint64),
+    |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+RUF012 Mutable default value for class attribute
+   --> RUF012.py:164:12
+    |
+163 | class BES(ctypes.BigEndianStructure):
+164 |     test = [""]
+    |            ^^^^
+165 |     _fields_ = [
+166 |         ("attr_set", ctypes.c_uint64),
+    |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+RUF012 Mutable default value for class attribute
+   --> RUF012.py:173:12
+    |
+172 | class U(ctypes.Union):
+173 |     test = [""]
+    |            ^^^^
+174 |     _fields_ = [
+175 |         ("a", LES),
+    |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+RUF012 Mutable default value for class attribute
+   --> RUF012.py:180:12
+    |
+179 | class LEU(ctypes.LittleEndianUnion):
+180 |     test = [""]
+    |            ^^^^
+181 |     _fields_ = [
+182 |         ("a", LES),
+    |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+RUF012 Mutable default value for class attribute
+   --> RUF012.py:187:12
+    |
+186 | class BEU(ctypes.BigEndianUnion):
+187 |     test = [""]
+    |            ^^^^
+188 |     _fields_ = [
+189 |         ("a", LES),
     |
 help: Consider initializing in `__init__` or annotating with `typing.ClassVar`

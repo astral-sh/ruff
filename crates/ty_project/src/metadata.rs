@@ -8,25 +8,24 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
-use ty_static::EnvVars;
+use ty_python_semantic::PythonEnvironment;
 
 use crate::Db;
 use crate::metadata::options::{
-    EnvironmentOptions, OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError,
+    EnvironmentOptions, OptionDiagnostic, OptionsContext, ProgramSettingsDiagnostic,
+    ToProgramSettingsError, ToSettingsError,
 };
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
+use crate::uv::{self, UseUv};
 pub use options::Options;
 use options::TyTomlError;
-
 mod configuration_file;
 pub mod options;
 pub mod pyproject;
 pub mod python_version;
-pub(crate) mod script;
 pub mod settings;
-mod uv;
 pub mod value;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -71,7 +70,10 @@ pub struct ProjectMetadata {
     config_file_override: Option<SystemPathBuf>,
 
     #[cfg_attr(test, serde(skip))]
-    uv_workspace: Option<uv::UvWorkspace>,
+    uv_workspace: Option<uv::UvMetadata>,
+
+    #[cfg_attr(test, serde(skip))]
+    use_uv: UseUv,
 }
 
 impl ProjectMetadata {
@@ -87,6 +89,7 @@ impl ProjectMetadata {
             fallback_options: None,
             config_file_override: None,
             uv_workspace: None,
+            use_uv: UseUv::Off,
         }
     }
 
@@ -94,6 +97,16 @@ impl ProjectMetadata {
         path: SystemPathBuf,
         root: &SystemPath,
         system: &dyn System,
+    ) -> Result<Self, ProjectMetadataError> {
+        Self::from_config_file_with_uv(path, root, system, UseUv::from_system(system))
+    }
+
+    /// Loads a project from a configuration file using the explicitly configured uv integrations.
+    pub fn from_config_file_with_uv(
+        path: SystemPathBuf,
+        root: &SystemPath,
+        system: &dyn System,
+        use_uv: UseUv,
     ) -> Result<Self, ProjectMetadataError> {
         tracing::debug!("Using overridden configuration file at '{path}'");
 
@@ -116,6 +129,7 @@ impl ProjectMetadata {
             fallback_options: None,
             config_file_override: Some(path),
             uv_workspace: None,
+            use_uv,
         })
     }
 
@@ -144,26 +158,13 @@ impl ProjectMetadata {
             .map(|name| ProjectName::new(&**name))
             .unwrap_or_else(|| ProjectName::new(root.file_name().unwrap_or("root")));
 
-        // If the `options` don't specify a python version but the `project.requires-python` field is set,
-        // use that as a lower bound instead.
         if let Some(project) = project {
-            if options
-                .environment
-                .as_ref()
-                .is_none_or(|env| env.python_version.is_none())
-            {
-                let requires_python = strategy.fallback_opt(
-                    project.resolve_requires_python_lower_bound(),
-                    |err| {
-                        tracing::debug!("skipping invalid requires_python lower bound: {err}");
-                    },
-                )?;
-                if let Some(requires_python) = requires_python.flatten() {
-                    let mut environment = options.environment.unwrap_or_default();
-                    environment.python_version = Some(requires_python);
-                    options.environment = Some(environment);
-                }
-            }
+            // If the `options` don't specify a python version but the `project.requires-python` field is set,
+            // use that as a lower bound instead.
+            strategy.fallback(
+                options.apply_requires_python(project.requires_python.as_ref()),
+                |error| tracing::debug!("skipping invalid requires_python lower bound: {error}"),
+            )?;
         }
 
         Ok(Self {
@@ -176,6 +177,7 @@ impl ProjectMetadata {
             fallback_options: None,
             config_file_override: None,
             uv_workspace: None,
+            use_uv: UseUv::Off,
         })
     }
 
@@ -192,10 +194,23 @@ impl ProjectMetadata {
         path: &SystemPath,
         system: &dyn System,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        let uv_workspace = if matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true"))
-        {
-            match uv::UvWorkspace::discover(path, system) {
-                Ok(workspace) => Some(workspace),
+        Self::discover_with_uv(path, system, UseUv::from_system(system))
+    }
+
+    /// Discovers the closest project using the explicitly configured uv integrations.
+    pub fn discover_with_uv(
+        path: &SystemPath,
+        system: &dyn System,
+        use_uv: UseUv,
+    ) -> Result<ProjectMetadata, ProjectMetadataError> {
+        let uv_workspace = if use_uv.workspace_discovery_enabled() {
+            let metadata = uv::Uv::new(system)
+                .map_err(uv::uv_executable_error)
+                .map_err(uv::UvMetadataError::Invocation)
+                .and_then(|uv| uv.metadata(system, uv::MetadataTarget::Workspace(path)));
+
+            match metadata {
+                Ok(metadata) => Some(metadata),
                 Err(error) => {
                     tracing::warn!("{error}");
                     None
@@ -206,6 +221,7 @@ impl ProjectMetadata {
         };
 
         Self::discover_with_uv_workspace(path, system, uv_workspace)
+            .map(|metadata| metadata.with_use_uv(use_uv))
     }
 
     /// Discovers the closest project without considering uv workspace metadata.
@@ -214,12 +230,13 @@ impl ProjectMetadata {
         system: &dyn System,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         Self::discover_with_uv_workspace(path, system, None)
+            .map(|metadata| metadata.with_use_uv(UseUv::from_system(system)))
     }
 
     fn discover_with_uv_workspace(
         path: &SystemPath,
         system: &dyn System,
-        uv_workspace: Option<uv::UvWorkspace>,
+        uv_workspace: Option<uv::UvMetadata>,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
@@ -229,7 +246,7 @@ impl ProjectMetadata {
 
         let mut closest_project: Option<ProjectMetadata> = None;
         let mut uv_project: Option<ProjectMetadata> = None;
-        let uv_workspace_root = uv_workspace.as_ref().map(uv::UvWorkspace::root);
+        let uv_workspace_root = uv_workspace.as_ref().map(uv::UvMetadata::workspace_root);
 
         for project_root in path.ancestors() {
             let is_uv_workspace_root = uv_workspace_root == Some(project_root);
@@ -379,15 +396,27 @@ impl ProjectMetadata {
     }
 
     #[must_use]
-    fn with_uv_workspace(mut self, uv_workspace: Option<uv::UvWorkspace>) -> Self {
+    fn with_uv_workspace(mut self, uv_workspace: Option<uv::UvMetadata>) -> Self {
         self.uv_workspace = uv_workspace;
+        self
+    }
+
+    /// Configures which uv integrations are enabled for this project.
+    #[must_use]
+    pub fn with_use_uv(mut self, use_uv: UseUv) -> Self {
+        self.use_uv = use_uv;
         self
     }
 
     /// Rediscovers the project, while preserving applied options.
     pub(crate) fn rediscover(&self, system: &dyn System) -> Result<Self, ProjectMetadataError> {
         let mut metadata = if let Some(config_file) = self.config_file_override() {
-            Self::from_config_file(config_file.to_path_buf(), self.root(), system)?
+            Self::from_config_file_with_uv(
+                config_file.to_path_buf(),
+                self.root(),
+                system,
+                self.use_uv,
+            )?
         } else {
             // The active project root may have been deleted. Start rediscovery from the closest
             // existing ancestor so ty can fall back to an enclosing project.
@@ -396,7 +425,7 @@ impl ProjectMetadata {
                 .ancestors()
                 .find(|path| system.is_directory(path))
                 .unwrap_or_else(|| self.root());
-            Self::discover(rediscovery_path, system)?
+            Self::discover_with_uv(rediscovery_path, system, self.use_uv)?
         };
 
         metadata.override_options.clone_from(&self.override_options);
@@ -405,7 +434,7 @@ impl ProjectMetadata {
         Ok(metadata)
     }
 
-    pub(crate) fn root(&self) -> &SystemPath {
+    pub fn root(&self) -> &SystemPath {
         &self.root
     }
 
@@ -413,8 +442,16 @@ impl ProjectMetadata {
         self.name.as_str()
     }
 
-    fn options(&self) -> &Options {
+    pub(crate) const fn use_uv(&self) -> UseUv {
+        self.use_uv
+    }
+
+    pub(crate) fn options(&self) -> &Options {
         &self.options
+    }
+
+    pub(crate) fn override_options(&self) -> Option<&Options> {
+        self.override_options.as_deref()
     }
 
     /// Returns the explicit configuration file that replaces normal project discovery, if any.
@@ -469,25 +506,30 @@ impl ProjectMetadata {
         }
     }
 
-    /// Returns the project's option layers from highest to lowest precedence.
+    /// Returns project or script option layers from highest to lowest precedence.
     ///
-    /// `options` is used as the raw base layer between the uv workspace and user-level options.
+    /// `options` is the raw project or script configuration, and `uv_options` is its corresponding
+    /// uv metadata layer.
     /// Layers can be merged by passing them to [`Options::combine_with`] in iterator order:
     ///
     /// ```ignore
     /// let mut merged = Options::default();
-    /// for layer in metadata.options_in_precedence_order(metadata.options()) {
+    /// for layer in metadata.options_in_precedence_order(
+    ///     metadata.options(),
+    ///     metadata.uv_workspace_options.as_deref(),
+    /// ) {
     ///     merged.combine_with(layer.clone());
     /// }
     /// ```
-    fn options_in_precedence_order<'a>(
+    pub(crate) fn options_in_precedence_order<'a>(
         &'a self,
         options: &'a Options,
+        uv_options: Option<&'a Options>,
     ) -> impl Iterator<Item = &'a Options> {
         self.override_options
             .as_deref()
             .into_iter()
-            .chain(self.uv_workspace_options.as_deref())
+            .chain(uv_options)
             .chain(std::iter::once(options))
             .chain(
                 self.user_configuration
@@ -523,7 +565,7 @@ impl ProjectMetadata {
                     python_version: uv_workspace.python_version().cloned(),
                     python: uv_workspace
                         .environment()
-                        .map(|path| RelativePathBuf::new(path, ValueSource::UvWorkspace)),
+                        .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
                     ..EnvironmentOptions::default()
                 }),
                 ..Options::default()
@@ -537,7 +579,9 @@ impl ProjectMetadata {
     pub fn to_merged_options(&self) -> MergedOptions<'_> {
         let mut options = Options::default();
 
-        for layer in self.options_in_precedence_order(&self.options) {
+        for layer in
+            self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
+        {
             options.combine_with(layer.clone());
         }
 
@@ -565,10 +609,12 @@ impl MergedOptions<'_> {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
-    {
+    ) -> Result<
+        (ProgramSettings, Vec<ProgramSettingsDiagnostic>),
+        Strategy::Error<ToProgramSettingsError>,
+    > {
         self.options.to_program_settings(
-            self.metadata.root(),
+            OptionsContext::Project(self.metadata.root()),
             self.metadata.name(),
             system,
             vendored,
@@ -576,12 +622,23 @@ impl MergedOptions<'_> {
         )
     }
 
+    /// Resolve the configured Python environment. Return `None` if no path was configured.
+    pub fn python_environment(
+        &self,
+        system: &dyn System,
+    ) -> anyhow::Result<Option<PythonEnvironment>> {
+        self.options
+            .python_environment(self.metadata.root(), system)
+            .map_err(anyhow::Error::from)
+    }
+
     pub fn to_settings<Strategy: MisconfigurationStrategy>(
         &self,
         db: &dyn Db,
         strategy: &Strategy,
     ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
-        self.options.to_settings(db, self.metadata.root(), strategy)
+        self.options
+            .to_settings(db, OptionsContext::Project(self.metadata.root()), strategy)
     }
 }
 
@@ -633,6 +690,8 @@ pub enum ProjectMetadataError {
 mod tests {
     //! Integration tests for project discovery
 
+    use std::assert_matches;
+
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
     use ruff_db::system::{SystemPathBuf, TestSystem};
@@ -640,7 +699,7 @@ mod tests {
     use ruff_ranged_value::ValueSource;
     use ty_static::EnvVars;
 
-    use crate::metadata::{Options, uv::UvWorkspace, value::RelativePathBuf};
+    use crate::metadata::{Options, uv::UvMetadata, value::RelativePathBuf};
     use crate::{ProjectMetadata, ProjectMetadataError};
 
     #[test]
@@ -1085,7 +1144,7 @@ unclosed table, expected `]`
                 },
             },
         });
-        let uv_workspace = UvWorkspace::from_metadata(metadata.to_string().as_bytes(), &system)?;
+        let uv_workspace = UvMetadata::from_metadata(metadata.to_string().as_bytes(), &system)?;
         let mut project =
             ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
         project.apply_fallback_options(Options::from_toml_str(
@@ -1113,18 +1172,18 @@ unclosed table, expected `]`
                 .map(RelativePathBuf::path),
             Some(environment.as_path())
         );
-        assert!(matches!(
+        assert_matches!(
             project_environment
                 .and_then(|environment| environment.python.as_ref())
                 .map(RelativePathBuf::source),
-            Some(ValueSource::UvWorkspace)
-        ));
-        assert!(matches!(
+            Some(ValueSource::UvMetadata)
+        );
+        assert_matches!(
             project_environment
                 .and_then(|environment| environment.python_version.as_ref())
                 .map(ruff_ranged_value::RangedValue::source),
-            Some(ValueSource::UvWorkspace)
-        ));
+            Some(ValueSource::UvMetadata)
+        );
 
         let user_config_directory = root.join("config");
         system
@@ -1618,12 +1677,12 @@ unclosed table, expected `]`
         assert_eq!(format!("{error:#}").replace('\\', "/"), message);
     }
 
-    fn uv_workspace(root: &SystemPathBuf, system: &TestSystem) -> anyhow::Result<UvWorkspace> {
+    fn uv_workspace(root: &SystemPathBuf, system: &TestSystem) -> anyhow::Result<UvMetadata> {
         let metadata = serde_json::json!({
             "workspace_root": root,
         });
 
-        Ok(UvWorkspace::from_metadata(
+        Ok(UvMetadata::from_metadata(
             metadata.to_string().as_bytes(),
             system,
         )?)

@@ -67,7 +67,12 @@ impl super::SyncRequestHandler for ExecuteCommand {
 
         // check if we can apply a workspace edit
         if !session.resolved_client_capabilities().apply_edit {
-            return Err(anyhow::anyhow!("Cannot execute the '{}' command: the client does not support `workspace/applyEdit`", command.label())).with_failure_code(ErrorCode::InternalError);
+            return Err(anyhow::anyhow!(
+                "Cannot execute the '{}' command: \
+                the client does not support `workspace/applyEdit`",
+                command.label()
+            ))
+            .with_failure_code(ErrorCode::InternalError);
         }
 
         let mut arguments: Vec<Argument> = params

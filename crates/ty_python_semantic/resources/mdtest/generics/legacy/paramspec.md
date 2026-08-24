@@ -746,6 +746,172 @@ takes_int_job(defaulted_job)
 takes_int_job(wrong_job)  # error: [invalid-argument-type]
 ```
 
+## Inferring an invariant `ParamSpec` through `Concatenate`
+
+A `Concatenate` prefix is positional-only, so a callback whose first parameter also accepts a
+keyword is not compatible with an invariant wrapper. Even though that argument is rejected, its
+remaining parameters must still be inferred precisely.
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class Callback(Generic[P]):
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def without_first(callback: Callback[Concatenate[object, P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def original(first: object, value: str) -> None: ...
+
+remaining = without_first(Callback(original))  # error: [invalid-argument-type]
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
+## Inferring a contravariant `ParamSpec` through `Concatenate`
+
+The same callback is compatible with a contravariant wrapper, and its remaining parameters must
+still be inferred precisely enough to reject an incompatible later argument.
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P", contravariant=True)
+
+class Callback(Generic[P]):
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def without_first(callback: Callback[Concatenate[object, P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def original(first: object, value: str) -> None: ...
+
+remaining = without_first(Callback(original))
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
+A contravariant callback can accept a broader positional-only prefix than a bounded type variable
+requires. The separate `Middle()` argument determines the narrower specialization without rejecting
+the valid callback.
+
+```py
+class Base: ...
+class Middle(Base): ...
+class Other: ...
+
+Bounded = TypeVar("Bounded", bound=Middle)
+Q = ParamSpec("Q")
+
+def accepts_base(first: Base, /, value: str) -> None: ...
+def bounded(callback: Callback[Concatenate[Bounded, Q]], witness: Bounded) -> tuple[Bounded, Callable[Q, None]]:
+    raise NotImplementedError
+
+bounded_result = bounded(Callback(accepts_base), Middle())
+reveal_type(bounded_result)  # revealed: tuple[Middle, (value: str) -> None]
+bounded_result[1](1)  # error: [invalid-argument-type]
+```
+
+The same contravariant relationship remains valid when the prefix type variable has explicit
+constraints instead of an upper bound.
+
+```py
+Constrained = TypeVar("Constrained", Middle, Other)
+
+def constrained(callback: Callback[Concatenate[Constrained, Q]], witness: Constrained) -> tuple[Constrained, Callable[Q, None]]:
+    raise NotImplementedError
+
+constrained_result = constrained(Callback(accepts_base), Middle())
+reveal_type(constrained_result)  # revealed: tuple[Middle, (value: str) -> None]
+constrained_result[1](1)  # error: [invalid-argument-type]
+```
+
+## Inferring a covariant `ParamSpec` through `Concatenate`
+
+A covariant wrapper containing a callback with a narrower positional-only prefix remains valid,
+whether the wrapper is stored first or constructed inline.
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec
+
+P = ParamSpec("P", covariant=True)
+Q = ParamSpec("Q")
+
+class Base: ...
+class Middle(Base): ...
+
+class Callback(Generic[P]):
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def without_first(callback: Callback[Concatenate[Base, Q]]) -> Callable[Q, None]:
+    raise NotImplementedError
+
+def original(first: Middle, /, value: str) -> None: ...
+
+wrapped = Callback(original)
+# TODO: Should reveal `(value: str) -> None`. Needs ParamSpecs in the new constraint solver.
+reveal_type(without_first(wrapped))  # revealed: (...) -> None
+# TODO: Should reveal `(value: str) -> None`. Needs ParamSpecs in the new constraint solver.
+reveal_type(without_first(Callback(original)))  # revealed: (...) -> None
+```
+
+## Inferring through unions of structural `ParamSpec` protocols
+
+Different protocols with the same parameter list can satisfy a target protocol structurally, even
+when they appear in a union nested inside an invariant or contravariant wrapper.
+
+```py
+from typing import Generic, ParamSpec, Protocol, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+TContra = TypeVar("TContra", contravariant=True)
+
+class Invariant(Generic[T]):
+    value: T
+
+class Contravariant(Generic[TContra]):
+    def put(self, value: TContra) -> None: ...
+
+class Target(Protocol[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Actual(Protocol[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Other(Protocol[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def invariant(value: Invariant[Target[P]]) -> Target[P]:
+    raise NotImplementedError
+
+def contravariant(value: Contravariant[Target[P]]) -> Target[P]:
+    raise NotImplementedError
+
+def compatible(
+    first: Invariant[Actual[[str]] | Other[[str]]],
+    second: Contravariant[Actual[[str]] | Other[[str]]],
+) -> None:
+    reveal_type(invariant(first))  # revealed: Target[(str, /)]
+    reveal_type(contravariant(second))  # revealed: Target[(str, /)]
+```
+
+Union members with incompatible parameter lists cannot satisfy either wrapper. Their signatures must
+remain visible in the inferred result instead of collapsing to a gradual parameter list.
+
+```py
+def incompatible(
+    first: Invariant[Actual[[str]] | Other[[bytes]]],
+    second: Contravariant[Actual[[str]] | Other[[bytes]]],
+) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(invariant(first))  # revealed: Target[((str, /)) | ((bytes, /))]
+    # error: [invalid-argument-type]
+    reveal_type(contravariant(second))  # revealed: Target[((str, /)) | ((bytes, /))]
+```
+
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
 
 <!-- snapshot-diagnostics -->

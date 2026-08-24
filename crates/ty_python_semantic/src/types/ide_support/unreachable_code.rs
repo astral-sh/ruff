@@ -390,6 +390,28 @@ mod tests {
     }
 
     #[test]
+    fn reports_impossible_typed_dict_key_membership() -> anyhow::Result<()> {
+        let source = r#"
+            from typing_extensions import TypedDict
+
+            class Items(TypedDict, closed=True):
+                present: int
+
+            def f(items: Items) -> None:
+                if "missing" in items:
+                    print("missing")
+                if "present" not in items:
+                    print("present")
+            "#;
+
+        let diagnostics = UnreachableTest::new().render(source)?;
+        assert_eq!(diagnostics.matches("Code is unreachable").count(), 2);
+        assert!(diagnostics.contains("print(\"missing\")"));
+        assert!(diagnostics.contains("print(\"present\")"));
+        Ok(())
+    }
+
+    #[test]
     fn reports_statically_empty_loop_bodies() -> anyhow::Result<()> {
         let source = r#"
             while False:

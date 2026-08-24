@@ -3,7 +3,7 @@ use crate::ProgramEnvironment;
 use crate::place::Place;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypedDictModule,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule,
     call::CallError,
     callable::CallableFunctionProvenance,
     function::KnownFunction,
@@ -36,9 +36,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.infer_type_parameters(type_params);
 
         if class.arguments.is_some() {
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
             // PEP 695 class headers are inferred in the type-parameter scope, before the completed
             // class type is available. Infer the bases first because `extra_items=T` is an
@@ -55,7 +53,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_expression(base, TypeContext::default())
                 };
                 is_typed_dict |= match ty {
-                    ty if TypedDictModule::from_type(self.db(), ty).is_some() => true,
+                    ty if TypingModule::from_typed_dict_type(self.db(), ty).is_some() => true,
                     Type::ClassLiteral(class) => class.is_typed_dict(self.db()),
                     Type::GenericAlias(alias) => alias.is_typed_dict(self.db()),
                     _ => false,
@@ -388,9 +386,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // and we don't need to run inference here
         if type_params.is_none() {
             // In stub files, keyword values may reference names that are defined later in the file.
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
             for keyword in class_node.keywords() {
                 if keyword.arg.as_deref() != Some("extra_items") {
                     self.infer_expression(&keyword.value, TypeContext::default());

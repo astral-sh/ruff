@@ -202,6 +202,110 @@ annotation:
 x: "[[foo]]"
 ```
 
+## Invalid subscript operands in string annotations
+
+Invalid subscript operands in string annotations must not be evaluated. In particular, lambda
+defaults and functional `TypedDict` arguments should not produce cascading unresolved-reference
+diagnostics, and assignment expressions should not cause a panic.
+
+`runtime.py`:
+
+```py
+from typing_extensions import TypedDict
+
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+a: "(lambda value=missing: None)[int]"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+b: "(lambda value=(name := int): None)[int]"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+c: "TypedDict('T', {}, extra_items=missing)[int]"
+```
+
+The same error-recovery behavior applies to annotations in stub files:
+
+`stub.pyi`:
+
+```pyi
+from typing_extensions import TypedDict
+
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+a: "(lambda value=missing: None)[int]"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+b: "(lambda value=(name := int): None)[int]"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+c: "TypedDict('T', {}, extra_items=missing)[int]"
+```
+
+## Invalid subscript arguments in string annotations
+
+Even when a subscript's operand is a valid name, it might not be a generic type. We reject such
+specializations without evaluating their arguments in string annotations. Unsupported `type[...]`
+arguments are checked as type expressions while retaining their existing fallback type.
+
+`runtime.py`:
+
+```py
+from typing import Any, Tuple
+
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+a: "int[(name := missing)]"
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+b: "type[int[(name := missing)]]"
+# error: [invalid-type-form] "Named expressions are not allowed"
+c: "type[(name := missing)]"
+# error: [invalid-type-form] "Named expressions are not allowed"
+d: "type[Any[(name := missing)]]"
+# error: [invalid-type-form] "`lambda` expressions are not allowed"
+e: "type[Tuple[lambda default=(name := missing): None]]"
+# error: [invalid-type-form] "`lambda` expressions are not allowed"
+f: "type[lambda default=(name := missing): None]"
+```
+
+Stub files use the same error recovery.
+
+`stub.pyi`:
+
+```pyi
+from typing import Any, Tuple
+
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+a: "int[(name := missing)]"
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+b: "type[int[(name := missing)]]"
+# error: [invalid-type-form] "Named expressions are not allowed"
+c: "type[(name := missing)]"
+# error: [invalid-type-form] "Named expressions are not allowed"
+d: "type[Any[(name := missing)]]"
+# error: [invalid-type-form] "`lambda` expressions are not allowed"
+e: "type[Tuple[lambda default=(name := missing): None]]"
+# error: [invalid-type-form] "`lambda` expressions are not allowed"
+f: "type[lambda default=(name := missing): None]"
+```
+
+## Invalid subscript arguments in evaluated annotations
+
+For annotations that are evaluated, we report invalid type arguments and errors encountered while
+evaluating them.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+# error: [invalid-type-form] "Non-generic class `int` cannot be specialized"
+# error: [unresolved-reference] "Name `missing` used when not defined"
+a: int[(name := missing)]
+
+# error: [invalid-type-form] "Named expressions are not allowed"
+# error: [unresolved-reference] "Name `other_missing` used when not defined"
+b: type[(other := other_missing)]
+
+# error: [invalid-type-form] "Function calls are not allowed"
+# error: [unresolved-reference] "Name `missing_call` used when not defined"
+c: type[missing_call()]
+```
+
 ## Multiple starred expressions in a `tuple` specialization
 
 <!-- snapshot-diagnostics -->

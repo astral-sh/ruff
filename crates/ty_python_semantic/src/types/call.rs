@@ -315,6 +315,24 @@ impl<'db> CallError<'db> {
         self.1.return_type(db, env)
     }
 
+    /// Returns `Some(property)` if the call error was caused by an attempt to read a property
+    /// that has no getter, and `None` otherwise.
+    pub(crate) fn as_attempt_to_get_property_with_no_getter(
+        &self,
+    ) -> Option<PropertyInstanceType<'db>> {
+        if self.0 != CallErrorKind::BindingError {
+            return None;
+        }
+        self.1
+            .iter_flat()
+            .flatten()
+            .flat_map(bind::Binding::errors)
+            .find_map(|error| match error {
+                BindingError::PropertyHasNoGetter(property) => Some(*property),
+                _ => None,
+            })
+    }
+
     /// Returns `Some(property)` if the call error was caused by an attempt to set a property
     /// that has no setter, and `None` otherwise.
     pub(crate) fn as_attempt_to_set_property_with_no_setter(

@@ -224,7 +224,7 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         arguments: args,
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })
 }

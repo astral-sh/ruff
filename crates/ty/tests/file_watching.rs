@@ -395,6 +395,14 @@ fn setup<F>(setup_files: F) -> anyhow::Result<TestCase>
 where
     F: Setup,
 {
+    setup_with_system(setup_files, |_| {})
+}
+
+fn setup_with_system<F, C>(setup_files: F, configure_system: C) -> anyhow::Result<TestCase>
+where
+    F: Setup,
+    C: FnOnce(&TestSystem),
+{
     let temp_dir = tempfile::tempdir()?;
 
     let root_path = SystemPath::from_std_path(temp_dir.path()).ok_or_else(|| {
@@ -423,6 +431,7 @@ where
     let user_config_directory_override = os_system.with_user_config_directory(None);
     let system = TestSystem::new(os_system.clone());
     isolate_environment(&system);
+    configure_system(&system);
 
     let mut setup_context = SetupContext {
         system: &os_system,
@@ -2481,4 +2490,173 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
     );
 
     Ok(())
+}
+
+#[cfg(feature = "test-uv")]
+mod uv_metadata {
+    use std::process::Command;
+    use std::time::Duration;
+
+    use anyhow::Context;
+    use ruff_db::diagnostic::DiagnosticId;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{OsSystem, System as _};
+    use ty_project::{Db, ScriptEnvironmentAvailability};
+    use ty_static::EnvVars;
+
+    use super::{Setup, TestCase, event_for_file, setup_with_system, update_file};
+
+    #[test]
+    fn unchanged_script_environment_is_reused_after_source_edits() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let mut case = setup_script_uv([(
+            "script.py",
+            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+        )])?;
+
+        assert!(case.db().check().is_empty());
+
+        assert!(!update_and_synchronize_script(
+            &mut case,
+            "\n# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\nvalue = 2\n",
+        )?);
+
+        assert!(case.db().check().is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_changes_resynchronize_the_script_environment() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let mut case = setup_script_uv([(
+            "script.py",
+            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+        )])?;
+
+        assert!(case.db().check().is_empty());
+
+        let synchronized = update_and_synchronize_script(
+            &mut case,
+            "# /// script\n# requires-python = '>=3.11'\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+        )?;
+        assert!(synchronized);
+
+        assert!(case.db().check().is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn ordinary_files_becoming_scripts_initialize_their_environments() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let mut case = setup_script_uv([("script.py", "from attrs import define\n")])?;
+
+        let ordinary = case.db().check();
+        assert!(
+            ordinary
+                .iter()
+                .any(|diagnostic| diagnostic.id().as_str() == "unresolved-import")
+        );
+
+        let synchronized = update_and_synchronize_script(
+            &mut case,
+            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+        )?;
+        assert!(!synchronized);
+
+        assert!(case.db().check().is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn corrected_script_dependencies_replace_initialization_errors() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let mut case = setup_script_uv([(
+            "script.py",
+            "# /// script\n# dependencies = ['not a valid requirement ???']\n# ///\nvalue = 1\n",
+        )])?;
+
+        let initial = case.db().check();
+        assert!(
+            initial
+                .iter()
+                .any(|diagnostic| diagnostic.id() == DiagnosticId::UvMetadata)
+        );
+
+        let synchronized = update_and_synchronize_script(
+            &mut case,
+            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+        )?;
+        assert!(synchronized);
+
+        let corrected = case.db().check();
+        assert!(
+            corrected.is_empty(),
+            "unexpected diagnostics: {corrected:?}"
+        );
+
+        Ok(())
+    }
+
+    fn assert_uv_supports_script_metadata() -> anyhow::Result<()> {
+        let output = Command::new("uv")
+            .args(["workspace", "metadata", "--help"])
+            .output()
+            .context("failed to inspect uv workspace metadata support")?;
+
+        assert!(
+            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("--script"),
+            "installed uv does not support script metadata"
+        );
+
+        Ok(())
+    }
+
+    fn setup_script_uv<F>(setup_files: F) -> anyhow::Result<TestCase>
+    where
+        F: Setup,
+    {
+        let uv = OsSystem::default().which("uv")?;
+        setup_with_system(setup_files, move |system| {
+            system.set_env_var(EnvVars::TY_UV, "scripts");
+            system.set_env_var(EnvVars::UV, uv.as_str());
+        })
+    }
+
+    fn update_and_synchronize_script(case: &mut TestCase, source: &str) -> anyhow::Result<bool> {
+        update_file(case.project_path("script.py"), source)?;
+        let changes = case.take_watch_changes(event_for_file("script.py"));
+        case.apply_changes(&changes);
+
+        let file = system_path_to_file(case.db(), case.project_path("script.py"))?;
+        let environments = case.db().script_environments().clone();
+        if !environments.files().contains(&file) {
+            return Ok(false);
+        }
+        let wakeups = environments.sync_wakeups();
+        environments.request_sync(
+            &mut case.db,
+            file,
+            ScriptEnvironmentAvailability::Pending,
+            &|_, _| None,
+        );
+        if !environments.has_pending_synchronizations() {
+            return Ok(false);
+        }
+        let mut changed = Vec::new();
+        while environments.has_pending_synchronizations() {
+            wakeups
+                .recv_timeout(Duration::from_secs(30))
+                .context("script synchronization did not finish")?;
+            changed.extend(environments.poll_sync(&mut case.db));
+        }
+
+        Ok(!changed.is_empty())
+    }
 }

@@ -989,6 +989,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
+                | Type::SlotDescriptor(_)
                 | Type::Intersection(_)
                 | Type::EnumComplement(_)
                 | Type::AlwaysTruthy
@@ -1016,6 +1017,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
+                | Type::SlotDescriptor(_)
                 | Type::Intersection(_)
                 | Type::EnumComplement(_)
                 | Type::AlwaysTruthy

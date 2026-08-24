@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::debug_assert_matches;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
@@ -109,6 +110,19 @@ impl<'db> Module<'db> {
         }
     }
 
+    /// Returns whether this module resolves to a bundled typing-only stub.
+    ///
+    /// A project or installed module with the same name may still exist on a
+    /// lower-priority search path and be available at runtime.
+    pub fn is_type_check_only(self, db: &'db dyn Database) -> bool {
+        self.search_path(db)
+            .is_some_and(SearchPath::is_standard_library)
+            && matches!(
+                self.name(db).first_component(),
+                "_typeshed" | "typing_extensions" | "ty_extensions"
+            )
+    }
+
     /// Determine whether this module is a single-file module or a package
     pub fn kind(self, db: &'db dyn Database) -> ModuleKind {
         match self {
@@ -191,11 +205,7 @@ fn all_submodule_names_for_package<'db>(
     }
 
     let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
-    debug_assert!(
-        matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
-        "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
-        path.file_name(),
-    );
+    debug_assert_matches!(path.file_name(), Some("__init__.py" | "__init__.pyi"));
 
     let resolver_environment = module.resolver_environment(db);
     Some(match path.parent()? {
@@ -391,6 +401,11 @@ pub enum KnownModule {
     PydanticSettingsMain,
     #[strum(serialize = "pydantic.types")]
     PydanticTypes,
+    Pytest,
+    #[strum(serialize = "_pytest.fixtures")]
+    PytestFixtures,
+    #[strum(serialize = "_pytest.mark.structures")]
+    PytestMarkStructures,
 }
 
 impl KnownModule {
@@ -435,6 +450,9 @@ impl KnownModule {
             Self::PydanticRootModel => "pydantic.root_model",
             Self::PydanticSettingsMain => "pydantic_settings.main",
             Self::PydanticTypes => "pydantic.types",
+            Self::Pytest => "pytest",
+            Self::PytestFixtures => "_pytest.fixtures",
+            Self::PytestMarkStructures => "_pytest.mark.structures",
         }
     }
 
@@ -464,7 +482,10 @@ impl KnownModule {
             | Self::PydanticMain
             | Self::PydanticRootModel
             | Self::PydanticSettingsMain
-            | Self::PydanticTypes => true,
+            | Self::PydanticTypes
+            | Self::Pytest
+            | Self::PytestFixtures
+            | Self::PytestMarkStructures => true,
             Self::Builtins
             | Self::Enum
             | Self::Types

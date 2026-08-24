@@ -491,9 +491,8 @@ def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
 
-        # TODO: should be `property`
-        # (or complain that we don't know that `type(c)` has the attribute at all!)
-        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+        # This is the class object's own qualified name, not the instance's descriptor.
+        reveal_type(type(c).__qualname__)  # revealed: str
 
         # `hasattr` only guarantees that an attribute is readable.
         #
@@ -504,8 +503,8 @@ def f_okay(c: Callable[[], None]):
         # into a writable attribute...? What would that look like? Something like this?
         if (
             hasattr(type(c), "__qualname__")
-            and isinstance(type(c).__qualname__, property)
-            and type(c).__qualname__.fset is not None
+            and isinstance(descriptor := type(c).__qualname__, property)
+            and descriptor.fset is not None
         ):
             c.__qualname__ = "my_callable"  # error: [invalid-assignment]
 ```
