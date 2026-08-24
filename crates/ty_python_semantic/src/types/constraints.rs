@@ -2716,6 +2716,14 @@ impl ConstraintId {
         }
         let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
 
+        if !effective_lower.is_static_sequent_eligible(db, env)
+            || merged_upper
+                .iter_clauses()
+                .any(|upper| !upper.ty().is_static_sequent_eligible(db, env))
+        {
+            return IntersectionResult::CannotSimplify;
+        }
+
         // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
         // empty, since there is no type that is both greater than `lower`, and less than `upper`.
         // We use an existential check here ("is there *some* assignment where `lower ≤ upper`?")
