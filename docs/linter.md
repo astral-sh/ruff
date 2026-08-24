@@ -148,7 +148,7 @@ rule (e.g., `unused-import`).
 
 In [preview](preview.md), Ruff supports rule categories in addition to the Flake8-style linter
 groups described above. These categories organize rules by the types of issues they detect and
-determine whether rules are enabled by default. These categories and their brief descriptions, in
+determine whether rules are enabled by default. These categories and their descriptions, in
 order of decreasing severity, are:
 
 - **Correctness**: These rules flag code that is outright wrong or useless as written. If you
@@ -160,8 +160,7 @@ order of decreasing severity, are:
   comment may occasionally be necessary. Deprecations generally also fit into this category.
 - **Complexity**: These rules detect code that can be written in a simpler or more readable way
   without changing its semantics.
-- **Performance**: These rules detect code that can be written in a more efficient way, again
-  without changing its semantics or significantly degrading readability.
+- **Performance**: These rules detect code that can be written in a more efficient way, without changing its semantics or significantly degrading readability.
 - **Style**: These rules flag code that could be written more idiomatically and where the relevant
   idiom has broad community acceptance.
 - **Security**: These rules flag issues that could lead to security vulnerabilities, and as such,
