@@ -1008,6 +1008,13 @@ bitflags! {
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
         const REQUIRE_CONCRETE = 1 << 5;
+
+        /// Do not add the class's generic context to inherited member signatures.
+        ///
+        /// Constructor methods reached through a fixed class-object value such as `type[T]` use
+        /// the class's type variables, but those variables are not inference targets for the call.
+        /// A method's own generic context remains inferable.
+        const NO_INHERITED_GENERIC_CONTEXT = 1 << 6;
     }
 }
 
@@ -1046,6 +1053,11 @@ impl MemberLookupPolicy {
     /// Ignore members that are only available through a dynamic type.
     const fn require_concrete(self) -> bool {
         self.contains(Self::REQUIRE_CONCRETE)
+    }
+
+    /// Do not add the class's generic context to inherited member signatures.
+    const fn no_inherited_generic_context(self) -> bool {
+        self.contains(Self::NO_INHERITED_GENERIC_CONTEXT)
     }
 }
 
@@ -3470,22 +3482,24 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn lookup_dunder_new_inner<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             ty: Type<'db>,
+            policy: MemberLookupPolicy,
         ) -> Option<PlaceAndQualifiers<'db>> {
             let env = &ProgramEnvironment::from_program(program);
-            let mut flags = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
+            let mut flags = policy | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
             if !ty.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) {
                 flags |= MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK;
             }
             ty.find_name_in_mro_with_policy(db, env, "__new__", flags)
         }
 
-        lookup_dunder_new_inner(db, env.program(db), self)
+        lookup_dunder_new_inner(db, env.program(db), self, policy)
     }
 
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
@@ -6549,6 +6563,17 @@ impl<'db> Type<'db> {
 
         let class_literal = class.class_literal(db);
         let class_generic_context = class_literal.generic_context(db);
+        let inferable_class_context = if matches!(self, Type::ClassLiteral(_)) {
+            class_generic_context
+        } else {
+            None
+        };
+        let constructor_member_policy =
+            if class_generic_context.is_some() && inferable_class_context.is_none() {
+                MemberLookupPolicy::NO_INHERITED_GENERIC_CONTEXT
+            } else {
+                MemberLookupPolicy::default()
+            };
 
         // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
         let fallback_bindings = || {
@@ -6558,7 +6583,7 @@ impl<'db> Type<'db> {
             Binding::single(
                 self,
                 Signature::new_generic(
-                    class_generic_context,
+                    inferable_class_context,
                     Parameters::gradual_form(),
                     return_type,
                 ),
@@ -6654,7 +6679,7 @@ impl<'db> Type<'db> {
             let new_method = if class_literal.is_typed_dict(db) {
                 None
             } else {
-                self_type.lookup_dunder_new(db, env)
+                self_type.lookup_dunder_new(db, env, constructor_member_policy)
             };
 
             let init_method_no_object = constructor_instance_ty.member_lookup_with_policy(
@@ -6662,7 +6687,8 @@ impl<'db> Type<'db> {
                 env,
                 "__init__",
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | constructor_member_policy,
             );
 
             let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
@@ -6713,7 +6739,7 @@ impl<'db> Type<'db> {
                             db,
                             env,
                             "__init__",
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK | constructor_member_policy,
                         );
                     match init_method_with_object.place {
                         Place::Defined(DefinedPlace {
@@ -6794,7 +6820,7 @@ impl<'db> Type<'db> {
                 return fallback_bindings();
             };
 
-            bindings.with_generic_context(db, class_generic_context)
+            bindings.with_generic_context(db, inferable_class_context)
         })
     }
 

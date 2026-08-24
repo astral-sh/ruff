@@ -1423,10 +1423,15 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
+        let inherited_generic_context = if policy.no_inherited_generic_context() {
+            None
+        } else {
+            self.inherited_generic_context(db)
+        };
         let result = MroLookup::new(db, env, mro_iter).class_member(
             name,
             policy,
-            self.inherited_generic_context(db),
+            inherited_generic_context,
             self.is_known(db, KnownClass::Object),
         );
 
