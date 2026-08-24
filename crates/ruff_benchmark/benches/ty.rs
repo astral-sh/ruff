@@ -13,12 +13,13 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
-use ruff_ranged_value::{RangedValue, ValueSource};
+use ruff_ranged_value::RangedValue;
 use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options, Rules};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::lint::Level;
 
 mod ty_shared;
 
@@ -1625,9 +1626,10 @@ fn attrs(criterion: &mut Criterion) {
 
     let all_rules_benchmark = ProjectBenchmark {
         freeze_inputs: false,
-        rules: Options::from_toml_str("rules.all = 'error'", ValueSource::Cli)
-            .expect("valid rule configuration")
-            .rules,
+        rules: Some(Rules::from_iter([(
+            RangedValue::cli("all".to_owned()),
+            RangedValue::cli(Level::Error),
+        )])),
         max_diagnostics: 100,
         ..frozen_benchmark
     };
