@@ -1,4 +1,4 @@
-//! Runs uv commands and parses their metadata output.
+//! Runs uv commands and manages background script synchronization.
 
 use std::process::Output;
 
@@ -7,8 +7,10 @@ use ty_combine::Combine;
 use ty_static::EnvVars;
 
 pub(crate) use metadata::{UvMetadata, UvMetadataError};
+pub(crate) use sync::{ScriptSyncTask, UvSyncService};
 
 mod metadata;
+mod sync;
 
 /// Controls which uv integrations ty uses.
 #[derive(
@@ -62,6 +64,7 @@ impl Combine for UseUv {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Uv {
     executable: String,
 }
