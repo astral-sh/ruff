@@ -726,6 +726,16 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
     }
 }
 
+impl<'db> TypeAliasType<'db> {
+    /// Returns whether this alias can refer back to its own definition.
+    pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
+        let root = RecursiveDefinition::TypeAlias(self.unspecialized(db));
+        let root_definition = root.definition(db);
+        SpecializationFlowGraph::build(db, root)
+            .definition_reaches(root_definition, root_definition)
+    }
+}
+
 impl<'db> ProtocolInstanceType<'db> {
     fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         let (origin, _) = self.class_origin(db)?.static_class_literal(db)?;
