@@ -389,7 +389,11 @@ fn file_to_module_impl<'db, 'a>(
         // over `project` when naming `project/pkg/src/pkg/module.py`.
         let root_length = match candidate.as_path() {
             SystemOrVendoredPathRef::System(root) => root.as_str().len(),
-            SystemOrVendoredPathRef::Vendored(root) => root.as_str().len(),
+            SystemOrVendoredPathRef::Vendored(_) => {
+                // Vendored search roots don't overlap, so there's no other enclosing root to try.
+                let module_name = relative_path.to_module_name()?;
+                return file_to_module_with_name(db, resolver_file, &module_name);
+            }
         };
         if best_match.is_some_and(|(best_length, _)| best_length >= root_length) {
             continue;
