@@ -1590,6 +1590,12 @@ fn compare_different_semantics<'db>(
     right: Type<'db>,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    // NoneType is final and inherits only from object. This common case does not need
+    // ancestry checks, which would otherwise be repeated for each member of an optional enum.
+    if left.is_none(db) || right.is_none(db) {
+        return operator.result_from_equality(false);
+    }
+
     match (left, right) {
         (Type::Intersection(intersection), other) | (other, Type::Intersection(intersection)) => {
             // An intersection can only compare equal if all of its positive elements can.
