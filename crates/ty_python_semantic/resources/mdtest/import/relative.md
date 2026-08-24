@@ -317,8 +317,9 @@ reveal_type(utils)  # revealed: <module 'package.utils'>
 
 ## Shadowed module name under the deepest root
 
-The inner `module.py` is importable as `nested.module`. Its shorter name, `module`, resolves to the
-outer file instead. Relative imports therefore use the name from the shallower root.
+The file `/src/nested/module.py` is importable as `nested.module`. The name `module`, derived from
+the deeper root `/src/nested`, resolves to `/src/module.py` instead because `/src` is searched
+first. Relative imports therefore use `nested.module`, derived from `/src`.
 
 ```toml
 [environment]
