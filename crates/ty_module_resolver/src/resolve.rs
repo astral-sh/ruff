@@ -410,8 +410,11 @@ fn file_to_module_with_name<'db>(
     resolver_file: ResolverFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    // A containing root can give this file a name that is shadowed by another file.
-    // Only accept the name if resolving it leads back to this file.
+    // Resolve the module name to see if Python would resolve the name to the same path.
+    // If it doesn't, then that means that multiple modules have the same name in different
+    // root paths, but that the module corresponding to this file is in a lower priority search path,
+    // in which case we ignore this candidate name. Another enclosing root may still give the file
+    // a name that resolves back to it.
     let module = resolve_module(db, ImportingFile::ResolverFile(resolver_file), module_name)?;
     let module_file = module.file(db)?;
 
