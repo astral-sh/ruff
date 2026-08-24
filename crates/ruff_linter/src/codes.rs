@@ -116,7 +116,7 @@ impl serde::Serialize for NoqaCode {
 /// See our [rule categorization guidelines] for more information on assigning categories.
 ///
 /// [Clippy]: https://doc.rust-lang.org/clippy/lints.html
-/// [rule categorization guidelines]: https://docs.astral.sh/ruff/contributing/#rule-categorization-guidelines
+/// [rule categorization guidelines]: https://docs.astral.sh/ruff/rule-proposals/#rule-categorization-guidelines
 #[derive(
     Debug,
     Copy,
