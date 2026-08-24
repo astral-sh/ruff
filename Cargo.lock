@@ -3192,6 +3192,7 @@ dependencies = [
  "tracing",
  "ty_module_resolver",
  "ty_project",
+ "ty_python_semantic",
  "ty_static",
 ]
 
