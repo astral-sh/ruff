@@ -19,6 +19,7 @@ use salsa::{Database, Event, Setter};
 use ty_module_resolver::system_module_search_paths;
 use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, PythonVersionWithSource};
 
@@ -605,6 +606,14 @@ impl SemanticDb for ProjectDatabase {
         settings.analysis(self)
     }
 
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+        if Script::for_file(self, file).is_some() {
+            return None;
+        }
+
+        self.project().dependency_metadata(self)
+    }
+
     fn verbose(&self) -> bool {
         self.project().verbose(self)
     }
@@ -699,6 +708,7 @@ pub(crate) mod testing {
     use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     #[cfg(feature = "testing")]
     use ty_python_semantic::ProgramEnvironment;
+    use ty_python_semantic::dependency::DependencyMetadata;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
 
@@ -865,6 +875,14 @@ pub(crate) mod testing {
 
         fn analysis_settings(&self, file: ruff_db::files::File) -> &AnalysisSettings {
             file_settings(self, file).analysis(self)
+        }
+
+        fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+            if Script::for_file(self, file).is_some() {
+                return None;
+            }
+
+            self.project().dependency_metadata(self)
         }
 
         fn verbose(&self) -> bool {

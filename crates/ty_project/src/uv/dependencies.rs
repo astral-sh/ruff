@@ -1,0 +1,597 @@
+use std::collections::{BTreeMap, BTreeSet};
+
+use anyhow::{Context, bail, ensure};
+use compact_str::CompactString;
+use ruff_db::system::{SystemPath, SystemPathBuf};
+use serde::Deserialize;
+use ty_module_resolver::ModuleName;
+use ty_python_semantic::dependency::{
+    DependencyDistribution, DependencyMetadata, DependencyProject,
+};
+
+/// The part of uv's metadata needed to connect imports to declared dependencies.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+pub(super) struct WorkspaceDependencies {
+    schema: Schema,
+    workspace: Option<NodeReference>,
+    #[serde(default)]
+    members: Box<[WorkspaceMember]>,
+    #[serde(default)]
+    resolution: BTreeMap<CompactString, ResolutionNode>,
+    #[serde(default)]
+    module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
+}
+
+impl WorkspaceDependencies {
+    pub(super) fn from_metadata(metadata: &[u8]) -> Option<Self> {
+        serde_json::from_slice(metadata)
+            .inspect_err(|error| {
+                tracing::debug!(
+                    "Skipping dependency checks: could not read uv dependency metadata: {error}"
+                );
+            })
+            .ok()
+    }
+
+    pub(super) fn to_metadata(&self, root: &SystemPath) -> anyhow::Result<DependencyMetadata> {
+        let mut distributions = BTreeMap::new();
+        let mut extra_packages = BTreeMap::new();
+
+        for (id, node) in &self.resolution {
+            if node.kind != NodeKind::Package {
+                continue;
+            }
+
+            let editable_path = node
+                .source
+                .as_ref()
+                .and_then(|source| source.editable.clone());
+            if let Some(path) = &editable_path
+                && !path.is_absolute()
+            {
+                bail!("editable path `{path}` for package `{id}` is not absolute");
+            }
+
+            distributions.insert(
+                id.clone(),
+                DependencyDistribution {
+                    name: node
+                        .name
+                        .clone()
+                        .with_context(|| format!("package node `{id}` is missing its name"))?,
+                    editable_path,
+                },
+            );
+
+            for extra in &node.optional_dependencies {
+                let extra_node = self.node(&extra.id)?;
+                ensure!(
+                    matches!(extra_node.kind, NodeKind::Extra(_)),
+                    "optional dependency `{}` of package `{id}` has kind {:?}, expected Extra",
+                    extra.id,
+                    extra_node.kind,
+                );
+                if let Some(previous) = extra_packages.insert(&extra.id, id)
+                    && previous != id
+                {
+                    bail!(
+                        "extra node `{}` belongs to both package `{previous}` and package `{id}`",
+                        extra.id,
+                    );
+                }
+            }
+        }
+
+        ensure!(
+            !distributions.is_empty(),
+            "no package information is available in uv metadata"
+        );
+
+        let package_id =
+            |id: &CompactString| {
+                if distributions.contains_key(id) {
+                    Ok(id.clone())
+                } else {
+                    extra_packages.get(id).copied().cloned().with_context(|| {
+                        format!("dependency `{id}` is not a known package or extra")
+                    })
+                }
+            };
+
+        let dependencies = |id: &CompactString, node: &ResolutionNode| {
+            node.dependencies
+                .iter()
+                .map(|dependency| {
+                    package_id(&dependency.id)
+                        .with_context(|| format!("invalid dependency of node `{id}`"))
+                })
+                .collect::<anyhow::Result<BTreeSet<_>>>()
+        };
+
+        let group_dependencies = |id: &CompactString, node: &ResolutionNode| {
+            let mut groups = BTreeSet::new();
+            for group in &node.dependency_groups {
+                let group_node = self.node(&group.id)?;
+                ensure!(
+                    matches!(group_node.kind, NodeKind::Group(_)),
+                    "dependency group `{}` of node `{id}` has kind {:?}, expected Group",
+                    group.id,
+                    group_node.kind,
+                );
+                groups.extend(dependencies(&group.id, group_node)?);
+            }
+            Ok(groups)
+        };
+
+        let workspace_groups = match &self.workspace {
+            Some(workspace) => {
+                let node = self.node(&workspace.id)?;
+                ensure!(
+                    node.kind == NodeKind::Workspace,
+                    "workspace node `{}` has kind {:?}, expected Workspace",
+                    workspace.id,
+                    node.kind,
+                );
+                group_dependencies(&workspace.id, node)?
+            }
+            None => BTreeSet::new(),
+        };
+
+        let mut projects = Vec::new();
+        let mut member_paths = BTreeSet::new();
+        for member in &self.members {
+            ensure!(
+                member.path.is_absolute(),
+                "workspace member `{}` has a non-absolute path `{}`",
+                member.id,
+                member.path,
+            );
+            ensure!(
+                member_paths.insert(&member.path),
+                "multiple workspace members use path `{}`",
+                member.path,
+            );
+            let node = self.node(&member.id)?;
+            ensure!(
+                node.kind == NodeKind::Package,
+                "workspace member `{}` has kind {:?}, expected Package",
+                member.id,
+                node.kind,
+            );
+
+            let mut direct = dependencies(&member.id, node)?;
+            for extra in &node.optional_dependencies {
+                // A member's own extras declare dependencies directly. By contrast, requesting an
+                // extra of another package only declares that package, not its extra's dependencies.
+                direct.extend(dependencies(&extra.id, self.node(&extra.id)?)?);
+            }
+            // Extra nodes also point back to their own package. A project's own imports are
+            // accounted for by `distribution`, not by listing itself as a dependency.
+            direct.remove(&member.id);
+
+            let mut groups = group_dependencies(&member.id, node)?;
+            groups.extend(workspace_groups.iter().cloned());
+
+            projects.push(DependencyProject {
+                path: member.path.clone(),
+                distribution: Some(member.id.clone()),
+                dependencies: direct,
+                group_dependencies: groups,
+            });
+        }
+
+        if self.workspace.is_some()
+            && !projects
+                .iter()
+                .any(|project| project.path.as_path() == root)
+        {
+            projects.push(DependencyProject {
+                path: root.to_path_buf(),
+                distribution: None,
+                dependencies: BTreeSet::new(),
+                group_dependencies: workspace_groups,
+            });
+        }
+
+        ensure!(
+            !projects.is_empty(),
+            "no workspace project information is available in uv metadata"
+        );
+
+        let mut module_owners: BTreeMap<ModuleName, Box<[CompactString]>> = BTreeMap::new();
+        for (module, owners) in &self.module_owners {
+            let Some(module) = ModuleName::new(module) else {
+                continue;
+            };
+            // Keep an empty entry when any owner is unknown. Omitting the entry would allow a
+            // caller to use a known parent module's owner for this incomplete child module.
+            let owners = owners
+                .iter()
+                .map(|owner| {
+                    distributions
+                        .contains_key(&owner.package_id)
+                        .then(|| owner.package_id.clone())
+                })
+                .collect::<Option<BTreeSet<_>>>();
+            let owners = owners.map_or_else(Box::default, |owners| owners.into_iter().collect());
+            module_owners.insert(module, owners);
+        }
+
+        if module_owners.values().all(|owners| owners.is_empty())
+            && !distributions
+                .values()
+                .any(|distribution| distribution.editable_path.is_some())
+        {
+            bail!("no module ownership or editable source paths are available in uv metadata");
+        }
+
+        projects.sort_by(|left, right| left.path.cmp(&right.path));
+
+        Ok(DependencyMetadata {
+            projects: projects.into_boxed_slice(),
+            distributions,
+            module_owners,
+        })
+    }
+
+    fn node(&self, id: &CompactString) -> anyhow::Result<&ResolutionNode> {
+        self.resolution
+            .get(id)
+            .with_context(|| format!("resolution node `{id}` is missing"))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct Schema {
+    version: SchemaVersion,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+#[serde(rename_all = "snake_case")]
+enum SchemaVersion {
+    Preview,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct WorkspaceMember {
+    path: SystemPathBuf,
+    id: CompactString,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct ModuleOwner {
+    package_id: CompactString,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct ResolutionNode {
+    kind: NodeKind,
+    name: Option<CompactString>,
+    source: Option<Source>,
+    // uv always emits this field, even for leaves. Missing edges are incomplete metadata, not
+    // evidence that a project has no direct dependencies.
+    dependencies: Box<[NodeReference]>,
+    #[serde(default)]
+    optional_dependencies: Box<[NodeReference]>,
+    #[serde(default)]
+    dependency_groups: Box<[NodeReference]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+#[serde(rename_all = "snake_case")]
+enum NodeKind {
+    Package,
+    Extra(CompactString),
+    Group(CompactString),
+    Workspace,
+    Script,
+    Build,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct Source {
+    editable: Option<SystemPathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct NodeReference {
+    id: CompactString,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use anyhow::Context;
+    use compact_str::CompactString;
+    use ruff_db::system::SystemPathBuf;
+    use serde_json::{Value, json};
+    use ty_module_resolver::ModuleName;
+    use ty_python_semantic::dependency::{DependencyMetadata, DependencyProject};
+
+    use super::WorkspaceDependencies;
+
+    fn absolute(path: &str) -> SystemPathBuf {
+        if cfg!(windows) {
+            SystemPathBuf::from(format!("C:{path}"))
+        } else {
+            SystemPathBuf::from(path)
+        }
+    }
+
+    fn metadata() -> Value {
+        json!({
+            "schema": {"version": "preview"},
+            "workspace": {"id": "workspace"},
+            "members": [{"id": "member", "path": absolute("/app")}],
+            "module_owners": {
+                "direct": [{"package_id": "direct"}],
+                "indirect": [{"package_id": "indirect"}],
+                "namespace": [{"package_id": "direct"}, {"package_id": "indirect"}],
+                "namespace.direct": [{"package_id": "direct"}],
+                "namespace.indirect": [{"package_id": "indirect"}]
+            },
+            "resolution": {
+                "workspace": {
+                    "kind": "workspace", "dependencies": [],
+                    "dependency_groups": [{"id": "workspace-group"}]
+                },
+                "workspace-group": {
+                    "kind": {"group": "dev"},
+                    "dependencies": [{"id": "workspace-tool"}]
+                },
+                "member": {
+                    "kind": "package", "name": "app", "source": {"virtual": absolute("/app")},
+                    "dependencies": [{"id": "required-extra"}],
+                    "optional_dependencies": [{"id": "member-extra"}],
+                    "dependency_groups": [{"id": "member-group"}]
+                },
+                "member-extra": {
+                    "kind": {"extra": "feature"},
+                    "dependencies": [{"id": "member"}, {"id": "optional"}]
+                },
+                "member-group": {
+                    "kind": {"group": "test"},
+                    "dependencies": [{"id": "development"}]
+                },
+                "direct": {
+                    "kind": "package", "name": "a-different-distribution-name",
+                    "dependencies": [{"id": "indirect"}],
+                    "optional_dependencies": [{"id": "required-extra"}]
+                },
+                "required-extra": {
+                    "kind": {"extra": "feature"},
+                    "dependencies": [{"id": "direct"}, {"id": "indirect"}]
+                },
+                "indirect": {"kind": "package", "name": "indirect", "dependencies": []},
+                "optional": {"kind": "package", "name": "optional", "dependencies": []},
+                "development": {
+                    "kind": "package", "name": "development",
+                    "dependencies": [{"id": "indirect"}]
+                },
+                "workspace-tool": {
+                    "kind": "package", "name": "workspace-tool", "dependencies": []
+                }
+            }
+        })
+    }
+
+    fn extract(metadata: &Value) -> anyhow::Result<DependencyMetadata> {
+        WorkspaceDependencies::from_metadata(&serde_json::to_vec(metadata)?)
+            .context("expected valid dependency metadata")?
+            .to_metadata(&absolute("/app"))
+    }
+
+    fn project<'a>(
+        metadata: &'a DependencyMetadata,
+        path: &str,
+    ) -> anyhow::Result<&'a DependencyProject> {
+        metadata
+            .projects
+            .iter()
+            .find(|project| project.path == absolute(path))
+            .context("expected a project at this path")
+    }
+
+    fn ids<const N: usize>(ids: [&str; N]) -> BTreeSet<CompactString> {
+        ids.into_iter().map(CompactString::from).collect()
+    }
+
+    #[test]
+    fn separates_direct_dependencies_from_transitive_packages() -> anyhow::Result<()> {
+        let metadata = extract(&metadata())?;
+        let project = project(&metadata, "/app")?;
+
+        assert_eq!(project.distribution.as_deref(), Some("member"));
+        assert_eq!(project.dependencies, ids(["direct", "optional"]));
+        assert_eq!(
+            project.group_dependencies,
+            ids(["development", "workspace-tool"])
+        );
+        assert_eq!(
+            metadata
+                .distributions
+                .get("direct")
+                .map(|distribution| distribution.name.as_str()),
+            Some("a-different-distribution-name")
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn preserves_ambiguous_namespace_owners_and_submodules() -> anyhow::Result<()> {
+        let metadata = extract(&metadata())?;
+
+        for (name, expected) in [
+            ("namespace", vec!["direct", "indirect"]),
+            ("namespace.direct", vec!["direct"]),
+            ("namespace.indirect", vec!["indirect"]),
+        ] {
+            let name = ModuleName::new(name).context("expected a valid module name")?;
+            let owners = metadata
+                .module_owners
+                .get(&name)
+                .context("expected module ownership")?;
+            assert_eq!(
+                owners.iter().map(CompactString::as_str).collect::<Vec<_>>(),
+                expected
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_groups_apply_to_each_member_and_virtual_root() -> anyhow::Result<()> {
+        let mut input = metadata();
+        input["members"] = json!([
+            {"id": "member", "path": absolute("/app/packages/member")},
+            {"id": "sibling", "path": absolute("/app/packages/sibling")}
+        ]);
+        input["resolution"]["sibling"] = json!({
+            "kind": "package", "name": "sibling", "dependencies": []
+        });
+        let metadata = extract(&input)?;
+
+        assert_eq!(metadata.projects.len(), 3);
+        let root = project(&metadata, "/app")?;
+        assert!(root.distribution.is_none());
+        assert!(root.dependencies.is_empty());
+        assert_eq!(root.group_dependencies, ids(["workspace-tool"]));
+
+        let member = project(&metadata, "/app/packages/member")?;
+        assert_eq!(member.dependencies, ids(["direct", "optional"]));
+        assert_eq!(
+            member.group_dependencies,
+            ids(["development", "workspace-tool"])
+        );
+
+        let sibling = project(&metadata, "/app/packages/sibling")?;
+        assert!(sibling.dependencies.is_empty());
+        assert_eq!(sibling.group_dependencies, ids(["workspace-tool"]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_without_members_can_supply_groups() -> anyhow::Result<()> {
+        let metadata = extract(&json!({
+            "schema": {"version": "preview"},
+            "workspace": {"id": "workspace"},
+            "module_owners": {"tool": [{"package_id": "tool"}]},
+            "resolution": {
+                "workspace": {
+                    "kind": "workspace", "dependencies": [],
+                    "dependency_groups": [{"id": "group"}]
+                },
+                "group": {"kind": {"group": "dev"}, "dependencies": [{"id": "tool"}]},
+                "tool": {"kind": "package", "name": "tool", "dependencies": []}
+            }
+        }))?;
+
+        let root = project(&metadata, "/app")?;
+        assert!(root.distribution.is_none());
+        assert_eq!(root.group_dependencies, ids(["tool"]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn editable_paths_supply_ownership_without_recorded_modules() -> anyhow::Result<()> {
+        let mut input = metadata();
+        input["module_owners"] = json!({});
+        input["resolution"]["direct"]["source"] =
+            json!({"editable": absolute("/editable-package")});
+        let metadata = extract(&input)?;
+
+        assert!(metadata.module_owners.is_empty());
+        assert_eq!(
+            metadata
+                .distributions
+                .get("direct")
+                .and_then(|distribution| distribution.editable_path.as_deref()),
+            Some(absolute("/editable-package").as_path())
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_module_owners_prevent_parent_fallback() -> anyhow::Result<()> {
+        let mut input = metadata();
+        input["module_owners"]["namespace"] = json!([{"package_id": "direct"}]);
+        input["module_owners"]["namespace.indirect"] = json!([
+            {"package_id": "indirect"}, {"package_id": "missing-package"}
+        ]);
+        input["module_owners"]["namespace.empty"] = json!([]);
+        input["module_owners"]["not-a-module"] = json!([{"package_id": "direct"}]);
+        let metadata = extract(&input)?;
+
+        let namespace = ModuleName::new("namespace").context("expected a valid module name")?;
+        assert_eq!(
+            metadata.module_owners.get(&namespace).map(AsRef::as_ref),
+            Some([CompactString::from("direct")].as_slice())
+        );
+        for child in ["namespace.indirect", "namespace.empty"] {
+            let child = ModuleName::new(child).context("expected a valid module name")?;
+            assert!(
+                metadata
+                    .module_owners
+                    .get(&child)
+                    .is_some_and(|owners| owners.is_empty())
+            );
+        }
+        assert_eq!(metadata.module_owners.len(), 6);
+
+        Ok(())
+    }
+
+    #[test]
+    fn unsupported_metadata_is_not_deserialized() -> anyhow::Result<()> {
+        let mut unsupported_schema = metadata();
+        unsupported_schema["schema"]["version"] = json!("future-version");
+
+        for input in [json!({"workspace_root": "/app"}), unsupported_schema] {
+            assert!(
+                WorkspaceDependencies::from_metadata(&serde_json::to_vec(&input)?).is_none(),
+                "expected unsupported metadata to disable dependency checks: {input}"
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn unavailable_dependency_information_has_a_reason() -> anyhow::Result<()> {
+        let mut missing_graph = metadata();
+        missing_graph["resolution"] = json!({});
+        let mut missing_projects = metadata();
+        missing_projects["workspace"] = json!(null);
+        missing_projects["members"] = json!([]);
+        let mut missing_owners = metadata();
+        missing_owners["module_owners"] = json!({});
+
+        for (input, expected) in [
+            (
+                missing_graph,
+                "no package information is available in uv metadata",
+            ),
+            (
+                missing_projects,
+                "no workspace project information is available in uv metadata",
+            ),
+            (
+                missing_owners,
+                "no module ownership or editable source paths are available in uv metadata",
+            ),
+        ] {
+            let error = extract(&input)
+                .err()
+                .context("expected unavailable information to disable dependency checks")?;
+            assert_eq!(format!("{error:#}"), expected, "{input}");
+        }
+
+        Ok(())
+    }
+}

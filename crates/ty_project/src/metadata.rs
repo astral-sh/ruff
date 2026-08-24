@@ -517,6 +517,10 @@ impl ProjectMetadata {
         Some(diagnostic)
     }
 
+    pub(crate) fn uv_workspace(&self) -> Option<&uv::UvMetadata> {
+        self.environment.metadata.as_ref()
+    }
+
     /// Applies lower-precedence options to this project.
     ///
     /// Options applied later take precedence over options applied earlier, but all fallback options

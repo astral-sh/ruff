@@ -5,7 +5,9 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
+use ty_python_semantic::dependency::DependencyMetadata;
 
+use super::dependencies::WorkspaceDependencies;
 use crate::metadata::python_version::SupportedPythonVersion;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -14,6 +16,7 @@ pub(crate) struct UvMetadata {
     members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
     python_version: Option<RangedValue<SupportedPythonVersion>>,
+    dependencies: Option<WorkspaceDependencies>,
 }
 
 impl UvMetadata {
@@ -39,6 +42,7 @@ impl UvMetadata {
         metadata: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvMetadataError> {
+        let dependencies = WorkspaceDependencies::from_metadata(metadata);
         let metadata = serde_json::from_slice::<WorkspaceMetadata>(metadata)
             .map_err(UvMetadataError::InvalidMetadata)?;
 
@@ -61,7 +65,21 @@ impl UvMetadata {
             members: metadata.members,
             environment,
             python_version,
+            dependencies,
         })
+    }
+
+    pub(crate) fn dependency_metadata(&self) -> Option<DependencyMetadata> {
+        self.dependencies
+            .as_ref()?
+            .to_metadata(&self.workspace_root)
+            .inspect_err(|error| {
+                tracing::debug!(
+                    "Skipping dependency checks for '{}': {error:#}",
+                    self.workspace_root
+                );
+            })
+            .ok()
     }
 }
 
@@ -155,6 +173,7 @@ mod tests {
     use std::assert_matches;
 
     use ruff_db::system::{SystemPath, TestSystem};
+    use serde_json::json;
 
     use super::{UvMetadata, UvMetadataError};
 
@@ -183,6 +202,7 @@ mod tests {
         assert!(workspace.environment().is_none());
         assert!(workspace.python_version().is_none());
         assert!(workspace.members().is_empty());
+        assert!(workspace.dependency_metadata().is_none());
 
         Ok(())
     }
@@ -232,6 +252,41 @@ mod tests {
             UvMetadata::from_metadata(metadata, &system),
             Err(UvMetadataError::InvalidPythonVersion(_))
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn unusable_dependency_metadata_preserves_environment() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        system.memory_file_system().write_files_all([
+            ("/app/pyproject.toml", "[tool.uv.workspace]"),
+            ("/env/marker", ""),
+        ])?;
+        for (schema, resolution) in [
+            (json!("future-version"), json!(["a different format"])),
+            (json!("preview"), json!({})),
+        ] {
+            let metadata = json!({
+                "workspace_root": "/app",
+                "environment": {
+                    "root": "/env",
+                    "python": { "version": "3.13.5" }
+                },
+                "schema": { "version": schema },
+                "resolution": resolution
+            });
+
+            let workspace = UvMetadata::from_metadata(&serde_json::to_vec(&metadata)?, &system)?;
+
+            assert_eq!(workspace.workspace_root(), SystemPath::new("/app"));
+            assert_eq!(workspace.environment(), Some(SystemPath::new("/env")));
+            assert_eq!(
+                workspace.python_version().map(ToString::to_string),
+                Some("3.13".to_string())
+            );
+            assert!(workspace.dependency_metadata().is_none());
+        }
 
         Ok(())
     }
