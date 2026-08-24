@@ -1282,9 +1282,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            let Some(alias) = self.narrowing_aliases.get(&name.id).cloned() else {
+            let Some(alias) = self.narrowing_aliases.get(&name.id) else {
                 return;
             };
+            if self.current_ast_ids().try_use_id(leaf).is_none() {
+                return;
+            }
+
             let aliased_expression = Expression::new(
                 self.db,
                 self.scope_ids_by_scope[alias.expression_scope],
