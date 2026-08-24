@@ -1580,9 +1580,8 @@ fn compare_literal_to_other<'db>(
 ///
 /// A base-class annotation can contain instances of a known subclass with a different
 /// implementation. For example, `Sequence[object]` can contain tuples, so its inherited
-/// `object.__eq__` cannot rule out equality with `tuple[()]`. Only consider known inheritance
-/// here: hypothetical multiple-inheritance subclasses should not prevent the default equality
-/// semantics from narrowing unrelated classes.
+/// `object.__eq__` cannot rule out equality with `tuple[()]`. Multiple inheritance can also
+/// allow the types to overlap, so only disjoint types are known to compare unequal.
 fn compare_different_semantics<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1591,31 +1590,15 @@ fn compare_different_semantics<'db>(
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     // NoneType is final and inherits only from object. This common case does not need
-    // ancestry checks, which would otherwise be repeated for each member of an optional enum.
+    // disjointness checks, which would otherwise be repeated for each member of an optional enum.
     if left.is_none(db) || right.is_none(db) {
         return operator.result_from_equality(false);
     }
 
-    match (left, right) {
-        (Type::Intersection(intersection), other) | (other, Type::Intersection(intersection)) => {
-            // An intersection can only compare equal if all of its positive elements can.
-            intersection
-                .positive(db)
-                .iter()
-                .map(|&element| compare_different_semantics(db, env, element, other, operator))
-                .find(|result| *result != ComparisonResult::Ambiguous)
-                .unwrap_or(ComparisonResult::Ambiguous)
-        }
-        (left, right)
-            if let (Some(left_class), Some(right_class)) =
-                (left.nominal_class(db, env), right.nominal_class(db, env))
-                && (left_class.is_subtype_of_class_literal(db, right_class.class_literal(db))
-                    || right_class
-                        .is_subtype_of_class_literal(db, left_class.class_literal(db))) =>
-        {
-            ComparisonResult::Ambiguous
-        }
-        _ => operator.result_from_equality(false),
+    if left.is_disjoint_from(db, env, right) {
+        operator.result_from_equality(false)
+    } else {
+        ComparisonResult::Ambiguous
     }
 }
 
