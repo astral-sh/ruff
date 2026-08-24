@@ -136,6 +136,7 @@ impl UvSyncService {
                 script = %path,
             ),
         };
+        tracing::debug!("Queuing script synchronization for `{path}`");
         match workers.jobs.send(job) {
             Ok(()) => tracing::debug!("Queued script synchronization for `{path}`"),
             Err(error) => {
