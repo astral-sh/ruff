@@ -35,7 +35,6 @@ indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 markdown = { version = "1.0.0" }
-pretty_assertions = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 schemars = { workspace = true }

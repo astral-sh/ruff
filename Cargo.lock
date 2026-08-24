@@ -3269,7 +3269,6 @@ dependencies = [
  "itertools 0.15.0",
  "libcst",
  "markdown",
- "pretty_assertions",
  "rayon",
  "regex",
  "ruff",
