@@ -73,12 +73,10 @@ pub(crate) fn implicit_namespace_package(
     context: &LintContext,
 ) {
     // Ignore files under a top-level `tests` directory.
-    if path.strip_prefix(project_root).is_ok_and(|relative| {
-        relative
-            .components()
-            .next()
-            .is_some_and(|component| component.as_os_str() == "tests")
-    }) {
+    if path
+        .strip_prefix(project_root)
+        .is_ok_and(|relative| relative.starts_with("tests"))
+    {
         return;
     }
 
