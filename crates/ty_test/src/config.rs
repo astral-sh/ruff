@@ -21,7 +21,11 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::script::ScriptTag;
 use serde::{Deserialize, Serialize};
+use ty_module_resolver::ModuleName;
 use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::dependency::{
+    DependencyDistribution, DependencyMetadata, DependencyProject,
+};
 use ty_python_semantic::lint::Level;
 
 #[derive(Deserialize, Debug, Default, Clone)]
@@ -42,6 +46,9 @@ pub(crate) struct MarkdownTestConfig {
 
     /// Project configuration for installing external dependencies.
     pub(crate) project: Option<Project>,
+
+    /// Dependency declarations and module ownership without installing packages.
+    pub(crate) dependency_metadata: Option<DependencyMetadataFixture>,
 
     /// Simulate the use passing `-v` on the command line,
     /// which can be used to show more information in test diagnostics.
@@ -199,4 +206,88 @@ pub(crate) struct Project {
     ///
     /// Example: `dependencies = ["pydantic==2.12.2"]`
     dependencies: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(try_from = "DependencyMetadataOptions")]
+pub(crate) struct DependencyMetadataFixture {
+    pub(crate) metadata: DependencyMetadata,
+}
+
+impl TryFrom<DependencyMetadataOptions> for DependencyMetadataFixture {
+    type Error = String;
+
+    fn try_from(options: DependencyMetadataOptions) -> Result<Self, Self::Error> {
+        let module_owners = options
+            .module_owners
+            .into_iter()
+            .map(|(module, owners)| {
+                let module_name = ModuleName::new(&module)
+                    .ok_or_else(|| format!("Invalid dependency module name `{module}`"))?;
+                Ok((module_name, owners.into_iter().map(Into::into).collect()))
+            })
+            .collect::<Result<_, Self::Error>>()?;
+
+        Ok(Self {
+            metadata: DependencyMetadata {
+                projects: options
+                    .projects
+                    .into_iter()
+                    .map(|project| DependencyProject {
+                        path: project.path,
+                        distribution: project.distribution.map(Into::into),
+                        dependencies: project.dependencies.into_iter().map(Into::into).collect(),
+                        group_dependencies: project
+                            .group_dependencies
+                            .into_iter()
+                            .map(Into::into)
+                            .collect(),
+                    })
+                    .collect(),
+                distributions: options
+                    .distributions
+                    .into_iter()
+                    .map(|(id, distribution)| {
+                        (
+                            id.into(),
+                            DependencyDistribution {
+                                name: distribution.name.into(),
+                                editable_path: distribution.editable_path,
+                            },
+                        )
+                    })
+                    .collect(),
+                module_owners,
+            },
+        })
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+struct DependencyMetadataOptions {
+    #[serde(default)]
+    projects: Vec<DependencyProjectOptions>,
+    #[serde(default)]
+    distributions: BTreeMap<String, DependencyDistributionOptions>,
+    #[serde(default)]
+    module_owners: BTreeMap<String, Vec<String>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+struct DependencyProjectOptions {
+    path: SystemPathBuf,
+    distribution: Option<String>,
+    #[serde(default)]
+    dependencies: Vec<String>,
+    #[serde(default)]
+    group_dependencies: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+struct DependencyDistributionOptions {
+    name: String,
+    editable_path: Option<SystemPathBuf>,
 }
