@@ -1164,6 +1164,16 @@
             }
           ]
         },
+        "missing-slot": {
+          "title": "detects assignments to declared attributes without instance storage",
+          "description": "## What it does\n\nChecks for assignments to declared attributes that have no matching `__slots__` entry on the class\nor its bases, and no instance dictionary to store their values.\n\n## Why is this bad?\n\nMost Python objects store their attributes in an \"instance dictionary\". Assigning to a new\nattribute adds an entry to this dictionary; deleting that attribute removes it again. Accordingly,\nmost Python objects allow for **arbitrary attributes to be set and read**. The advantage of this is\nthat it allows for many dynamic features; the disadvantage is that it can be costly in terms of\nmemory, and can easily allow for typos to slip in accidentally, e.g.:\n\n```py\nclass Foo:\n    def __init__(self, x):\n        self.x = x\n\n    def update_x(self, x):\n        self.xx = x  # oops, this was meant to be the same attribute set in `__init__`,\n        # but ended up being an entirely separate one!\n```\n\nDefining `__slots__` lets a class reserve space for a fixed set of instance attributes instead.\nUnless an instance dictionary is inherited from a base class or requested by including `\"__dict__\"`\nin `__slots__`, instances of the class have no dictionary in which to store additional attributes.\nAttempting to assign to an attribute not declared in `__slots__` will often raise `AttributeError`\nat runtime if the instance has no instance dictionary.\n\n## Examples\n\n### Class definitions\n\n```python\nclass Item:\n    __slots__ = ()\n    value: int\n\n\nItem().value = 1  # error: [missing-slot]\n```\n\nIf you control the class, include the attribute in `__slots__` to make the assignment valid:\n\n```python\nclass Item:\n    __slots__ = (\"value\",)\n    value: int\n\n\nItem().value = 1\n```\n\n### Stub files\n\nStub files can use properties to indicate that instances have attributes that are readable and\nwritable but do not appear in `__slots__`, for example:\n\n```pyi\nclass Item:\n    __slots__ = ()\n    @property\n    def value(self) -> int: ...\n    @value.setter\n    def value(self, value: int) -> None: ...\n```\n\n## References\n\n- [Python data model: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-type-argument": {
           "title": "detects generic types used without explicit type parameters in type expressions",
           "description": "## What it does\n\nChecks for generic types used without type parameters in type expressions.\n\n## Why is this bad?\n\nUsing a generic type without specifying its type parameters results in the\ntype parameters being implicitly filled with `Unknown`, reducing the\nprecision of type checking. Explicit type parameters make the intended types\nclear and enable the type checker to catch more errors.\n\n## Examples\n\n```python\nimport re\n\n\ndef handle(m: re.Match) -> str:  # error: [missing-type-argument]\n    return m.string\n\n\n# Use explicit type parameters instead:\ndef handle(m: re.Match[str]) -> str:\n    return m.string\n```",
