@@ -1,0 +1,77 @@
+---
+source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+---
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ --> ISC003_docstring.py:5:5
+  |
+3 |   # Unsafe: the fix would create a module docstring.
+4 |   (
+5 | /     "module "
+6 | |     + "docstring"
+  | |_________________^
+7 |   )
+  |
+help: Remove redundant '+' operator to implicitly concatenate
+  |
+5 |     "module "
+  -     + "docstring"
+6 +      "docstring"
+7 | )
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:13:9
+   |
+11 |   class ClassWithExplicitConcatenation:
+12 |       (
+13 | /         "class "
+14 | |         + "docstring"
+   | |_____________________^
+15 |       )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+13 |         "class "
+   -         + "docstring"
+14 +          "docstring"
+15 |     )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:21:9
+   |
+19 |   def function_with_explicit_concatenation():
+20 |       (
+21 | /         "function "
+22 | |         + "docstring"
+   | |_____________________^
+23 |       )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+21 |         "function "
+   -         + "docstring"
+22 +          "docstring"
+23 |     )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC003_docstring.py:29:9
+   |
+27 |   def function_with_safe_concatenation():
+28 |       print(
+29 | /         "hello "
+30 | |         + "world"
+   | |_________________^
+31 |       )
+   |
+help: Remove redundant '+' operator to implicitly concatenate
+   |
+29 |         "hello "
+   -         + "world"
+30 +          "world"
+31 |     )
+   |

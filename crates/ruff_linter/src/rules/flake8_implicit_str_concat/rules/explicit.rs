@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, parenthesized_range};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
+use ruff_python_semantic::ScopeKind;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -24,6 +25,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     + "dog"
 /// )
 /// ```
+///
+/// ## Fix safety
+/// The fix is unsafe when the concatenation is the first statement in a
+/// module, class, or function, because replacing explicit concatenation with
+/// implicit concatenation can turn the expression into a docstring and change
+/// the value of `__doc__`.
 ///
 /// Use instead:
 /// ```python
@@ -105,7 +112,7 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     return;
                 }
 
-                if let Some(fix) = generate_fix(checker, bin_op) {
+                if let Some(fix) = generate_fix(checker, expr, bin_op) {
                     diagnostic.set_fix(fix);
                 }
             }
@@ -113,7 +120,7 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
     }
 }
 
-fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {
+fn generate_fix(checker: &Checker, expr: &Expr, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
 
     let between_operands_range = TextRange::new(left.end(), right.start());
@@ -141,8 +148,40 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> 
         before_plus.trim_end_matches(is_python_whitespace)
     };
 
-    Some(Fix::safe_edit(Edit::range_replacement(
-        format!("{before_plus}{after_plus}"),
-        between_operands_range,
-    )))
+    let edit =
+        Edit::range_replacement(format!("{before_plus}{after_plus}"), between_operands_range);
+
+    let creates_docstring = matches!(
+        (left.as_ref(), right.as_ref()),
+        (Expr::StringLiteral(_), Expr::StringLiteral(_))
+    ) && is_docstring_position(checker, expr);
+
+    Some(if creates_docstring {
+        Fix::unsafe_edit(edit)
+    } else {
+        Fix::safe_edit(edit)
+    })
+}
+
+fn is_docstring_position(checker: &Checker, expr: &Expr) -> bool {
+    let statement = checker.semantic().current_statement();
+
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = statement else {
+        return false;
+    };
+
+    // The concatenation must be the entire expression statement.
+    if !std::ptr::eq(value.as_ref(), expr) {
+        return false;
+    }
+
+    let body = match checker.semantic().current_scope().kind {
+        ScopeKind::Module => checker.module_body(),
+        ScopeKind::Class(class_def) => class_def.body.as_slice(),
+        ScopeKind::Function(function_def) => function_def.body.as_slice(),
+        _ => return false,
+    };
+
+    body.first()
+        .is_some_and(|first| std::ptr::eq(first, statement))
 }

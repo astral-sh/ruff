@@ -525,6 +525,10 @@ impl<'a> Checker<'a> {
         &self.semantic
     }
 
+    pub(crate) fn module_body(&self) -> &'a [Stmt] {
+        self.parsed.suite()
+    }
+
     /// The [`LinterSettings`] for the current analysis, including the enabled rules.
     pub(crate) const fn settings(&self) -> &'a LinterSettings {
         self.context.settings
