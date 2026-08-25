@@ -514,4 +514,66 @@ Parent().method(1)
 Child().method(1)
 ```
 
+## Recursive receiver protocols across overloads
+
+Each overload introduces its own type variables, even when two overloads have identical signatures.
+Binding the receiver preserves these variables when its protocol refers back to the same method.
+
+```py
+from typing import Protocol, overload
+
+class P[T](Protocol):
+    def method(self) -> T: ...
+
+@overload
+def method[T](obj: P[T]) -> T: ...
+@overload
+def method[U](obj: P[U]) -> U: ...
+@overload
+def method(obj: object) -> int: ...
+def method(obj):
+    raise NotImplementedError
+
+class C:
+    method = method
+
+reveal_type(C().method)  # revealed: Overload[[T]() -> T, [U]() -> U, () -> int]
+```
+
+## Concrete overload alternatives with a recursive receiver
+
+A recursive protocol-typed receiver also works with concrete overloads that accept different
+argument types. Binding the receiver preserves both concrete alternatives.
+
+```py
+from typing import Protocol, overload
+
+class P[T](Protocol):
+    def method(self, arg: T) -> None: ...
+
+@overload
+def method[T](obj: P[T], arg: T) -> None: ...
+@overload
+def method(obj: object, arg: int) -> None: ...
+@overload
+def method(obj: object, arg: str) -> None: ...
+def method(obj, arg):
+    raise NotImplementedError
+
+class C:
+    method = method
+
+reveal_type(C().method)  # revealed: Overload[[T](arg: T) -> None, (arg: int) -> None, (arg: str) -> None]
+```
+
+## Builtin functions with recursive receiver protocols
+
+Assigning `pow` to a class's `__pow__` attribute is valid. Its overloads accept protocols describing
+that same method, so receiver checking is recursive.
+
+```py
+class C:
+    __pow__ = pow
+```
+
 [`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092

@@ -324,8 +324,8 @@ impl<'db> OwnedConstraintSet<'db> {
 
     /// Returns the types in constraints that are still reachable from the decision diagram.
     ///
-    /// Source ordering also retains quantified-away constraints to preserve binding order, but
-    /// their type variables must not participate in semantic walks or callable freshening.
+    /// Source ordering can retain constraints that are no longer in the diagram, but their type
+    /// variables must not participate in semantic walks or callable freshening.
     pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.inner.iter().flat_map(|inner| {
             inner
@@ -694,11 +694,27 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: TypeVarSet<'db>,
     ) -> Self {
         self.verify_builder(builder);
+        if to_remove == TypeVarSet::None {
+            return self;
+        }
         let mut storage = builder.storage.borrow_mut();
         let (node, derived_source_order) =
             self.node
                 .exists(db, env, &mut storage, to_remove, self.source_order);
-        let source_order = storage.ordered_source_order(self.source_order, derived_source_order);
+        // The eliminated typevars must also leave the source-order history. Otherwise recursive
+        // relations can re-import each other's quantified constraints after their live graphs have
+        // stabilized. Keep the original order of the remaining entries and append derived facts.
+        let source_order = storage
+            .calculate_source_orders(self.source_order)
+            .into_iter()
+            .fold(None, |source_order, constraint| {
+                if storage.constraint_mentions_typevars(db, constraint, to_remove) {
+                    return source_order;
+                }
+                let constraint_source_order = storage.constraint_source_order(constraint);
+                storage.ordered_source_order(source_order, Some(constraint_source_order))
+            });
+        let source_order = storage.ordered_source_order(source_order, derived_source_order);
         Self::from_node(builder, node, source_order)
     }
 
@@ -1147,10 +1163,10 @@ impl<'db> ConstraintSetBuilder<'db> {
         let source_order = source_constraints
             .into_iter()
             .fold(None, |left, source_constraint| {
-                // Quantified-away constraints can still determine the order of related live
-                // solutions. An unrelated constraint cannot, and keeping its fresh type variables
-                // in a cached value can prevent recursive Salsa queries from reaching a fixed
-                // point. Incomplete supports may hide a relationship, so preserve those entries.
+                // Preserve ordering history for absorbed constraints related to the live graph.
+                // Unrelated history can retain fresh typevars and prevent recursive Salsa queries
+                // from reaching a fixed point. Incomplete supports may hide a relationship, so
+                // preserve those entries.
                 let constraint_support_id = storage.constraint_support_id(source_constraint);
                 let constraint_support = storage.support_data(constraint_support_id);
                 if !used_constraints[source_constraint.index()]
@@ -1587,6 +1603,17 @@ impl<'db> ConstraintSetStorage<'db> {
 
     fn constraint_support(&self, constraint: ConstraintId) -> &Support {
         self.support_data(self.constraint_support_id(constraint))
+    }
+
+    fn constraint_mentions_typevars(
+        &self,
+        db: &'db dyn Db,
+        constraint: ConstraintId,
+        typevars: TypeVarSet<'db>,
+    ) -> bool {
+        self.constraint_support(constraint)
+            .iter()
+            .any(|typevar| self.typevar_data(typevar).is_inferable(db, typevars))
     }
 
     fn node_support_id(&self, node: NodeId) -> Option<SupportId> {
@@ -4608,11 +4635,7 @@ impl InteriorNode {
             // the sequent map can propagate any derived constraints that do not mention the
             // quantified typevars.
             &mut |storage: &ConstraintSetStorage<'_>, constraint| {
-                let support = storage.constraint_support(constraint);
-                support.iter().any(|typevar| {
-                    let typevar = storage.typevar_data(typevar);
-                    typevar.is_inferable(db, bound_typevars)
-                })
+                storage.constraint_mentions_typevars(db, constraint, bound_typevars)
             },
         );
         result
@@ -7447,47 +7470,53 @@ class E: ...
     }
 
     #[test]
-    fn owned_constraint_set_preserves_related_quantified_constraint_order() {
+    fn owned_constraint_set_preserves_projected_solution_order() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
-        let v = create_typevar(db, "V");
+        let inferable = TypeVarSet::from_typevars(db, [u]);
+        let expected = Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
+            vec![TypeVarSolution {
+                bound_typevar: u,
+                solution: known_instance(db, KnownClass::Int),
+            }],
+            vec![TypeVarSolution {
+                bound_typevar: u,
+                solution: known_instance(db, KnownClass::Str),
+            }],
+        ])));
 
         let owned = ConstraintSetBuilder::new().into_owned(|builder| {
-            let u_t = ConstraintSet::constrain_typevar_with_bounds(
+            let u_t = ConstraintSet::constrain_typevar(
                 db,
                 &env,
                 builder,
                 u,
-                None,
-                Some(ConstraintBound::Evidence(Type::TypeVar(t))),
+                Type::TypeVar(t),
+                Type::TypeVar(t),
             );
-            let t_v = ConstraintSet::constrain_typevar(
-                db,
-                &env,
-                builder,
-                t,
-                Type::TypeVar(v),
-                Type::TypeVar(v),
-            );
+            let t_str = create_constraint(db, builder, t, KnownClass::Str);
+            let u_int = create_constraint(db, builder, u, KnownClass::Int);
 
-            u_t.and(db, builder, || t_v).reduce_inferable(
-                db,
-                &env,
-                builder,
-                TypeVarSet::from_typevars(db, [t]),
-            )
+            // Eliminating T leaves a derived U = str alternative alongside the direct U = int.
+            let projected = u_t
+                .and(db, builder, || t_str)
+                .or(db, builder, || u_int)
+                .reduce_inferable(db, &env, builder, TypeVarSet::from_typevars(db, [t]));
+            assert_eq!(projected.solutions(db, &env, inferable), expected);
+            projected
         });
-
-        assert_eq!(
-            owned.inner.as_ref().map(|inner| inner.source_orders.len()),
-            Some(5),
-        );
 
         let reloaded =
             ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &owned));
+        for constraints in [&owned, &reloaded] {
+            constraints.query(|_builder, constraints| {
+                assert_eq!(constraints.solutions(db, &env, inferable), expected);
+            });
+        }
+
         let reloaded_again =
             ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &reloaded));
         assert_eq!(reloaded, reloaded_again);
@@ -7521,6 +7550,55 @@ class E: ...
         };
 
         assert_eq!(build(false), build(true));
+    }
+
+    #[test]
+    fn owned_constraint_set_preserves_order_when_reintroducing_constraints() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let inferable = TypeVarSet::from_typevars(db, [t]);
+        let int = known_instance(db, KnownClass::Int);
+        let str = known_instance(db, KnownClass::Str);
+
+        // Absorption can remove a constraint without eliminating its typevar. Its source order
+        // still matters if it is reintroduced, including when gradual bounds affect the solutions.
+        for (lower, upper) in [(Some(str), Some(str)), (None, Some(Type::any()))] {
+            let mut expected = None;
+            let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+                let earlier =
+                    ConstraintSet::constrain_typevar_lower_bound(db, &env, builder, t, int);
+                let later = ConstraintSet::constrain_typevar_with_bounds(
+                    db,
+                    &env,
+                    builder,
+                    t,
+                    lower.map(ConstraintBound::Evidence),
+                    upper.map(ConstraintBound::Evidence),
+                );
+                let absorbed = earlier.or(db, builder, || later).and(db, builder, || later);
+                expected = Some(
+                    absorbed
+                        .or(db, builder, || earlier)
+                        .solutions(db, &env, inferable),
+                );
+                absorbed
+            });
+            assert_matches!(&expected, Some(Ok(Solutions::Constrained(_))));
+
+            let builder = ConstraintSetBuilder::new();
+            let reloaded = builder.load(db, &env, &owned);
+            let earlier = ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, t, int);
+            assert_eq!(
+                Some(
+                    reloaded
+                        .or(db, &builder, || earlier)
+                        .solutions(db, &env, inferable),
+                ),
+                expected,
+            );
+        }
     }
 
     #[test]
