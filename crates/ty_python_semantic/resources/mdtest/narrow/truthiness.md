@@ -6,6 +6,7 @@ A generator object is truthy even when it yields no values.
 
 ```py
 def narrow(value: int | None) -> None:
+    # error: [redundant-condition] "always truthy"
     if (value for _ in ()):
         if value is None:
             return
@@ -32,24 +33,28 @@ def _(x: X):
         reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 
 def _(x: X):
+    # error: [redundant-condition] "always truthy"
     if x and not x:
         reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 def _(x: X):
+    # error: [redundant-condition] "Object of type `Literal[-1, True, "foo", b"bar"]` is always truthy"
     if not (x and not x):
         reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
     else:
         reveal_type(x)  # revealed: Never
 
 def _(x: X):
+    # error: [redundant-condition] "always falsy"
     if x or not x:
         reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
     else:
         reveal_type(x)  # revealed: Never
 
 def _(x: X):
+    # error: [redundant-condition] "Object of type `Literal[0, False, "", b""] | None | tuple[()]` is always falsy"
     if not (x or not x):
         reveal_type(x)  # revealed: Never
     else:
@@ -152,7 +157,7 @@ def bar(world: str, *args, **kwargs) -> float:
 
 x = foo if flag() else bar
 
-if x:
+if x:  # error: [redundant-condition] "always truthy"
     reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> float)
 else:
     reveal_type(x)  # revealed: Never
@@ -227,14 +232,14 @@ class F:
 
 t = T()
 
-if t:
+if t:  # error: [redundant-condition] "always truthy"
     reveal_type(t)  # revealed: T
 else:
     reveal_type(t)  # revealed: Never
 
 f = F()
 
-if f:
+if f:  # error: [redundant-condition] "always falsy"
     reveal_type(f)  # revealed: Never
 else:
     reveal_type(f)  # revealed: F
@@ -288,6 +293,7 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(x)  # revealed: Literal[0, 1]
         reveal_type(y)  # revealed: Literal["", "hello"]
 
+    # error: [redundant-condition] "Object of type `Literal["hello"]` is always truthy"
     if (x or not x) and (y and not y):
         reveal_type(x)  # revealed: Never
         reveal_type(y)  # revealed: Never
@@ -554,6 +560,7 @@ def f(arg1: Empty | None, arg2: NonEmpty | None, arg3: HasNotRequired1 | None, a
     if arg4:
         reveal_type(arg4)  # revealed: HasNotRequired2 & ~AlwaysFalsy
 
+    # error: [redundant-condition] "always truthy"
     if arg5:
         reveal_type(arg5)  # revealed: AlsoNonEmpty
 ```

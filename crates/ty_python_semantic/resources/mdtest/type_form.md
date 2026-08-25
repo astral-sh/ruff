@@ -272,15 +272,19 @@ def either_invalid(flag: bool) -> TypeForm[str] | None:
     return 1 if flag else None  # error: [invalid-type-form]
 
 def boolean_fallback(value: None) -> TypeForm[str] | None:
+    # error: [redundant-condition] "always falsy"
     return value or str
 
 def boolean_union(value: None) -> TypeForm[int | str] | None:
+    # error: [redundant-condition] "always falsy"
     return value or (int | str)
 
 def boolean_quoted(value: None) -> TypeForm[str] | None:
+    # error: [redundant-condition] "always falsy"
     return value or "str"
 
 def boolean_invalid(value: None) -> TypeForm[str] | None:
+    # error: [redundant-condition] "always falsy"
     return value or 1  # error: [invalid-type-form]
 
 def identity[T](value: T) -> T:

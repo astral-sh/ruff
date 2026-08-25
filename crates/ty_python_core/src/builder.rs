@@ -2262,6 +2262,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    /// Records an `if`, `elif`, `while` or `match` guard test that uses `not`, `and`, or `or`.
+    fn record_compound_condition_test(&mut self, test: &ast::Expr) {
+        if matches!(
+            test,
+            ast::Expr::BoolOp(_)
+                | ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    ..
+                })
+        ) {
+            self.current_use_def_map_mut()
+                .record_compound_condition_test(test.range());
+        }
+    }
+
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
     /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
@@ -4190,6 +4205,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // `msg` branch back into the following flow, since there is no way of getting out
                 // of that branch. Code after the assertion starts from the condition's truthy flow.
 
+                self.current_use_def_map_mut()
+                    .record_assertion_test(test.range());
                 self.visit_expr_with_context(test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test, ExpressionContext::Condition);
@@ -4363,6 +4380,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
+                self.record_compound_condition_test(&node.test);
                 self.visit_expr_with_context(&node.test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
@@ -4417,6 +4435,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     let next_falsy = if let Some(elif_test) = clause_test {
+                        self.record_compound_condition_test(elif_test);
                         self.visit_expr_with_context(elif_test, ExpressionContext::Condition);
                         // A test expression is evaluated whether the branch is taken or not
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
@@ -4500,6 +4519,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
+                self.record_compound_condition_test(test);
                 self.visit_expr_with_context(test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 
@@ -4845,6 +4865,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let mut previous_pattern: Option<PatternPredicate<'_>> = None;
 
                 for (i, case) in cases.iter().enumerate() {
+                    if let Some(guard) = case.guard.as_deref() {
+                        self.record_compound_condition_test(guard);
+                    }
                     let match_pattern_predicate = self.create_pattern_predicate(
                         subject_expr,
                         &case.pattern,

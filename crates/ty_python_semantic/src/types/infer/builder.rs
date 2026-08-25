@@ -168,6 +168,7 @@ mod named_tuple;
 mod new_class;
 mod paramspec_validation;
 mod post_inference;
+mod redundant_conditions;
 mod subscript;
 mod type_call;
 mod type_expression;
@@ -2119,6 +2120,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+
+        if self.should_check_condition_redundancy() {
+            self.check_suite_for_redundant_if_statements(suite);
+        }
     }
 
     fn infer_statement(&mut self, statement: &ast::Stmt) {
@@ -2696,8 +2701,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(guard) = guard.as_deref() {
                 let guard_ty = self.infer_standalone_expression(guard, TypeContext::default());
 
-                if let Err(err) = guard_ty.try_bool(db, self.program_environment()) {
-                    err.report_diagnostic(&self.context, guard);
+                let truthiness = guard_ty
+                    .try_bool(db, self.program_environment())
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, guard);
+                        err.fallback_truthiness()
+                    });
+
+                if self.should_check_condition_redundancy() {
+                    self.check_condition_redundancy(guard, guard_ty, truthiness);
                 }
             }
 
@@ -5200,12 +5212,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
-        if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
-            err.report_diagnostic(&self.context, &**test);
-        }
+        let test_truthiness = test_ty
+            .try_bool(db, self.program_environment())
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, &**test);
+                err.fallback_truthiness()
+            });
 
         self.infer_body(body);
         self.infer_body(orelse);
+
+        if self.should_check_condition_redundancy() {
+            self.check_condition_redundancy(test, test_ty, test_truthiness);
+        }
     }
 
     fn infer_assert_statement(&mut self, assert: &ast::StmtAssert) {
@@ -5219,8 +5238,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
-        if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
-            err.report_diagnostic(&self.context, &**test);
+        let truthiness = test_ty
+            .try_bool(db, self.program_environment())
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, &**test);
+                err.fallback_truthiness()
+            });
+
+        if self.should_check_condition_redundancy() {
+            self.check_condition_redundancy(test, test_ty, truthiness);
         }
 
         self.infer_optional_expression(msg.as_deref(), TypeContext::default());
@@ -8325,11 +8351,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .homogeneous_element_type(db, env)
         });
 
+        let should_check_condition_redundancy = self.should_check_condition_redundancy();
+
         for expr in ifs {
             let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
 
-            if let Err(err) = test_ty.try_bool(db, env) {
+            let truthiness = test_ty.try_bool(db, env).unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, expr);
+                err.fallback_truthiness()
+            });
+
+            if should_check_condition_redundancy {
+                self.check_condition_redundancy(expr, test_ty, truthiness);
             }
         }
     }
@@ -8488,6 +8521,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.fallback_truthiness()
             }
         };
+        if self.should_check_condition_redundancy() {
+            self.check_condition_redundancy(test, test_ty, test_truthiness);
+        }
+
         match test_truthiness {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
@@ -11004,16 +11041,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ))
             }
 
-            (ast::UnaryOp::Not, ty) => Type::from_truthiness(
-                db,
-                env,
-                ty.try_bool(db, env)
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, unary);
-                        err.fallback_truthiness()
-                    })
-                    .negate(),
-            ),
+            (ast::UnaryOp::Not, ty) => {
+                let original_truthiness = ty.try_bool(db, env).unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, unary);
+                    err.fallback_truthiness()
+                });
+
+                // Avoid diagnostics for `not obj` where `obj` is inferred as a `ConstraintSet` instance.
+                // Otherwise there are a huge number of `redundant-condition` diagnostics in our test suite
+                // for `static_assert(not is_assignable_to(foo, bar))` etc.
+                if self.should_check_condition_redundancy()
+                    && !matches!(ty, Type::KnownInstance(KnownInstanceType::ConstraintSet(_)))
+                {
+                    self.check_condition_redundancy(&unary.operand, ty, original_truthiness);
+                }
+
+                Type::from_truthiness(db, env, original_truthiness.negate())
+            }
             // Handle constrained TypeVars specially: check each constraint individually.
             //
             // TODO: We expect to replace this with more general support once we migrate to the new
@@ -11171,6 +11215,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bool_op: &ast::ExprBoolOp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+
         let ast::ExprBoolOp {
             range: _,
             node_index: _,
@@ -11181,7 +11228,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accumulating prior types cannot affect inference.
         let track_peer_types = is_empty_collection_type_context(tcx)
             && values.iter().skip(1).any(is_collection_literal);
-        self.infer_chained_boolean_types(
+        let result = self.infer_chained_boolean_types(
             *op,
             track_peer_types,
             values.iter().enumerate(),
@@ -11198,8 +11245,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 (ty, value.range())
             },
-        )
-        .value_type
+        );
+
+        if self.should_check_condition_redundancy() {
+            for value in &values[..values.len() - 1] {
+                let ty = self.expression_type(value);
+                self.check_condition_redundancy(value, ty, ty.bool(db, env));
+            }
+        }
+
+        result.value_type
     }
 
     /// Computes the output of a chain of (one) boolean operation, consuming as input an iterator
