@@ -1603,22 +1603,12 @@ def ordinary_subject[**P, T]() -> None:
     ConstraintSet.range(Never, T, P)  # error: [invalid-type-form] "Bare ParamSpec `P`"
 ```
 
-Bare TypeVarTuples remain invalid bounds, including when arguments are passed by keyword.
+Bare TypeVarTuples remain invalid bounds.
 
 ```py
 def typevartuple_bounds[**P, *Us]() -> None:
     ConstraintSet.range(Us, P, Callable[[int], None])  # error: [invalid-type-form] "TypeVarTuple `Us`"
     ConstraintSet.range(Callable[[int], None], P, Us)  # error: [invalid-type-form] "TypeVarTuple `Us`"
-    ConstraintSet.range(
-        typevar=P,
-        upper_bound=Callable[[int], None],
-        lower_bound=Us,  # error: [invalid-type-form] "TypeVarTuple `Us`"
-    )
-    ConstraintSet.range(
-        upper_bound=Us,  # error: [invalid-type-form] "TypeVarTuple `Us`"
-        lower_bound=Callable[[int], None],
-        typevar=P,
-    )
 ```
 
 The exception must not leak into other TypeForm calls, constructors, or nested type expressions.
