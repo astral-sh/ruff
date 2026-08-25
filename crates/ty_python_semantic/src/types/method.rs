@@ -171,9 +171,13 @@ impl<'db> BoundMethodType<'db> {
             }
 
             return CallableSignature::from_overloads(
-                function_signature.overloads.iter().filter_map(|signature| {
-                    signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
-                }),
+                function_signature
+                    .overloads
+                    .iter()
+                    .filter_map(|signature| {
+                        signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
+                    })
+                    .flat_map(|signature| signature.overloads),
             );
         };
 
@@ -183,12 +187,9 @@ impl<'db> BoundMethodType<'db> {
             None
         };
 
-        CallableSignature::single(
-            specialized
-                .as_ref()
-                .unwrap_or(signature)
-                .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type)),
-        )
+        specialized
+            .unwrap_or_else(|| CallableSignature::single(signature.clone()))
+            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
     }
 
     pub(super) fn recursive_type_normalized_impl(

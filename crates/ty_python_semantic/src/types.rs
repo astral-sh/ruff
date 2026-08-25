@@ -5750,7 +5750,7 @@ impl<'db> Type<'db> {
                 } else {
                     // Solve exact receiver constraints before checking the other arguments, but
                     // retain the receiver itself for call inference and receiver diagnostics.
-                    let overloads = signature.overloads.iter().map(|overload| {
+                    let overloads = signature.overloads.iter().flat_map(|overload| {
                         if overload.has_receiver_determined_method_typevar(db, env)
                             && let Some(specialized) = overload.specialize_for_bound_receiver(
                                 db,
@@ -5759,9 +5759,9 @@ impl<'db> Type<'db> {
                                 bound_method.typing_self_type(db),
                             )
                         {
-                            specialized
+                            specialized.overloads
                         } else {
-                            overload.clone()
+                            smallvec_inline![overload.clone()]
                         }
                     });
 
