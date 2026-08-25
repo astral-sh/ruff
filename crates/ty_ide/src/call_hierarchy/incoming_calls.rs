@@ -78,11 +78,7 @@ pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
     if is_externally_visible {
         let program = model.program();
         let files = db.project().files(db);
-        let files: Vec<_> = files
-            .iter()
-            .copied()
-            .filter(|other| *other != source_file)
-            .collect();
+        let files: Vec<_> = files.iter().filter(|other| *other != source_file).collect();
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
         // The byte-level text prefilter still pays off as a coarse gate:
         // files that don't contain the target name (or an import of it)

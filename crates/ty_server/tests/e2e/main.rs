@@ -42,6 +42,7 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod script_preparation;
 mod semantic_tokens;
 mod signature_help;
 mod type_hierarchy;

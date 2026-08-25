@@ -969,6 +969,138 @@ fn changed_file() -> anyhow::Result<()> {
 }
 
 #[test]
+fn scripts_to_synchronize_after_file_and_directory_changes() -> anyhow::Result<()> {
+    let script = dedent(
+        r"
+        # /// script
+        # dependencies = []
+        # ///
+        ",
+    );
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("existing.py", &script)?;
+        context.write_project_file("edited.py", "")?;
+        context.write_file("new/script.py", &script)
+    })?;
+    let edited = case.project_path("edited.py");
+    assert_eq!(
+        case.db().project().script_files(case.db()).iter().count(),
+        1
+    );
+
+    update_file(&edited, &script)?;
+
+    let changes = case.take_watch_changes(event_for_file("edited.py"));
+    let changes = case.apply_changes(&changes);
+    assert_eq!(
+        changes.scripts_to_synchronize(case.db()),
+        vec![case.system_file(&edited)?]
+    );
+
+    std::fs::rename(
+        case.root_path().join("new").as_std_path(),
+        case.project_path("new").as_std_path(),
+    )?;
+    let mut changes = case.take_watch_changes(event_for_file("new"));
+    update_file(&edited, "")?;
+    changes.extend(case.stop_watch(event_for_file("edited.py")));
+
+    // Directory discovery also includes unchanged scripts, but `edited.py` no longer
+    // contains a PEP 723 script metadata block.
+    let changes = case.apply_changes(&changes);
+    assert_eq!(
+        changes
+            .scripts_to_synchronize(case.db())
+            .into_iter()
+            .collect::<HashSet<_>>(),
+        HashSet::from([
+            case.system_file(case.project_path("existing.py"))?,
+            case.system_file(case.project_path("new/script.py"))?,
+        ])
+    );
+
+    Ok(())
+}
+
+#[test]
+fn script_exclusion_tracks_file_creation_and_metadata_edits() -> anyhow::Result<()> {
+    let mut case = setup([(
+        "ty.toml",
+        r"
+        [src]
+        exclude-scripts = true
+        ",
+    )])?;
+    let path = case.project_path("script.py");
+    let script = r"
+        # /// script
+        # dependencies = []
+        # ///
+        missing
+        ";
+    assert!(case.db().check().is_empty());
+
+    std::fs::write(path.as_std_path(), dedent(script).as_ref())?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    let changes = case.apply_changes(&changes);
+    assert!(changes.scripts_to_synchronize(case.db()).is_empty());
+    let file = case.system_file(&path)?;
+    assert!(case.db().check().is_empty());
+    assert!(case.db().check_file(file).is_empty());
+
+    update_file(&path, "missing\n")?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
+
+    update_file(&path, script)?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert!(case.db().check().is_empty());
+    assert!(case.db().check_file(file).is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn explicitly_included_file_remains_checked_when_becoming_a_script() -> anyhow::Result<()> {
+    let mut case = setup([
+        (
+            "ty.toml",
+            r"
+            [src]
+            exclude-scripts = true
+            ",
+        ),
+        ("script.py", "missing\n"),
+    ])?;
+    let path = case.project_path("script.py");
+    let file = case.system_file(&path)?;
+    case.db
+        .project()
+        .set_included_paths(&mut case.db, vec![path.clone()]);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
+
+    update_file(
+        &path,
+        r"
+        # /// script
+        # dependencies = []
+        # ///
+        missing
+        ",
+    )?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
+
+    Ok(())
+}
+
+#[test]
 fn deleted_file() -> anyhow::Result<()> {
     let foo_source = "print('Hello, world!')";
     let mut case = setup([("foo.py", foo_source)])?;

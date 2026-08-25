@@ -646,7 +646,6 @@ impl Project {
             let files = self.files(db);
             files
                 .iter()
-                .copied()
                 .filter(|file| {
                     file.path(db).as_system_path().is_some_and(|file_path| {
                         paths
@@ -671,7 +670,7 @@ impl Project {
         }
     }
 
-    fn add_file(self, db: &mut dyn Db, file: File) {
+    fn add_file(self, db: &mut dyn Db, file: File, is_script: bool) {
         tracing::debug!(
             "Adding file `{}` to project `{}`",
             file.path(db),
@@ -682,7 +681,7 @@ impl Project {
             return;
         };
 
-        index.insert(file);
+        index.insert(file, is_script);
     }
 
     /// Replaces the diagnostics from indexing the project files with `diagnostics`.
@@ -694,6 +693,15 @@ impl Project {
         };
 
         index.set_diagnostics(diagnostics);
+    }
+
+    /// Returns whether `file` itself is an explicit check path.
+    ///
+    /// Including a parent directory does not count as explicitly including the file.
+    fn is_file_explicitly_included(self, db: &dyn Db, file: File) -> bool {
+        self.included_paths_or_root(db)
+            .iter()
+            .any(|path| file.path(db) == path)
     }
 
     /// Returns the files belonging to this project.
@@ -708,7 +716,7 @@ impl Project {
                 let start = ruff_db::Instant::now();
 
                 let walker = ProjectFilesWalker::full();
-                let (files, diagnostics) = walker.collect_set(db);
+                let (files, diagnostics) = walker.collect_vec(db);
 
                 tracing::info!(
                     "Indexed {} file(s) in {:.3}s",
@@ -718,6 +726,18 @@ impl Project {
                 vacant.set(files, diagnostics)
             }
             Index::Indexed(indexed) => indexed,
+        }
+    }
+
+    /// Returns all scripts in the project, including explicitly opened scripts.
+    ///
+    /// Scripts are identified solely by the presence of a PEP 723 script metadata block.
+    /// For open files, this includes unsaved changes.
+    pub fn script_files(self, db: &dyn Db) -> ScriptFiles<'_> {
+        ScriptFiles {
+            db,
+            indexed: self.files(db),
+            open_files: self.open_files(db),
         }
     }
 
@@ -737,6 +757,25 @@ impl Project {
             .map(OptionDiagnostic::to_diagnostic)
             .chain(self.metadata(db).uv_diagnostic(db))
             .collect()
+    }
+}
+
+/// An iterable view of a project's scripts.
+pub struct ScriptFiles<'db> {
+    db: &'db dyn Db,
+    indexed: Indexed<'db>,
+    open_files: &'db FxHashSet<File>,
+}
+
+impl ScriptFiles<'_> {
+    /// Iterates over the scripts without duplicates.
+    pub fn iter(&self) -> impl Iterator<Item = File> + '_ {
+        let indexed = self.indexed.scripts();
+        indexed.iter().copied().chain(
+            self.open_files.iter().copied().filter(move |file| {
+                !indexed.contains(file) && script_tag(self.db, *file).is_some()
+            }),
+        )
     }
 }
 
@@ -819,7 +858,7 @@ pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
             }
 
             let should_check =
-                project.files(db).contains(&file) || project.open_files(db).contains(&file);
+                project.files(db).contains(file) || project.open_files(db).contains(&file);
             if !should_check {
                 tracing::trace!(
                     "Not checking {path} because check mode is `AllFiles` \

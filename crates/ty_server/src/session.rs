@@ -2094,7 +2094,7 @@ impl DocumentHandle {
     ///
     /// This can return an error when the document does not exist in the
     /// session index.
-    pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
+    pub(crate) fn close(&self, session: &mut Session, client: &Client) -> crate::Result<bool> {
         let is_cell = self.is_cell();
         let path = self.notebook_or_file_path();
 
@@ -2125,8 +2125,10 @@ impl DocumentHandle {
                             db.project().remove_file(db, file);
                         }
 
-                        // Bump the file's revision back to using the file system's revision.
-                        file.sync(db);
+                        // Restore file and script membership from the saved contents. Discarding
+                        // unsaved script metadata can bring a file back into the project when
+                        // `exclude-scripts` is enabled.
+                        self.update_in_db(session, client);
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every

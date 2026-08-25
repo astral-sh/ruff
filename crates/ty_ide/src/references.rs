@@ -120,11 +120,7 @@ pub(crate) fn references(
     if search_across_files && (is_parameter || is_externally_visible_symbol) {
         let program = model.program();
         let files = db.project().files(db);
-        let files: Vec<_> = files
-            .iter()
-            .copied()
-            .filter(|other| *other != source_file)
-            .collect();
+        let files: Vec<_> = files.iter().filter(|other| *other != source_file).collect();
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
         let other_references = files
             .into_par_iter()
