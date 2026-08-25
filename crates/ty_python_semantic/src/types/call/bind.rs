@@ -8500,7 +8500,10 @@ pub(crate) struct CallableDescription<'a> {
 }
 
 impl<'db> CallableDescription<'db> {
-    fn defining_class(db: &'db dyn Db, callable_type: Type<'db>) -> Option<ClassLiteral<'db>> {
+    pub(crate) fn defining_class(
+        db: &'db dyn Db,
+        callable_type: Type<'db>,
+    ) -> Option<ClassLiteral<'db>> {
         let function = match callable_type {
             Type::FunctionLiteral(function) => function,
             Type::BoundMethod(method) => method.function(db),

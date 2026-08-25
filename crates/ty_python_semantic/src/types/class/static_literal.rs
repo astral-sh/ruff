@@ -448,6 +448,44 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_legacy_generic_context_inner(db, self)
     }
 
+    /// Iterate through the decorators on this class, returning the span of the first one
+    /// that matches the given predicate.
+    fn find_decorator_span(
+        self,
+        db: &'db dyn Db,
+        predicate: impl Fn(Type<'db>) -> bool,
+    ) -> Option<Span> {
+        if !self.has_decorators(db) {
+            return None;
+        }
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        self.node(db, &parsed_module(db, definition.python_file(db)).load(db))
+            .decorator_list
+            .iter()
+            .find(|decorator| {
+                predicate(definition_expression_type(
+                    db,
+                    definition,
+                    &decorator.expression,
+                ))
+            })
+            .map(|decorator| Span::from(file).with_range(decorator.range))
+    }
+
+    /// Iterate through the decorators on this class, returning the span of the first one
+    /// that matches the given [`KnownFunction`].
+    pub(crate) fn find_known_decorator_span(
+        self,
+        db: &'db dyn Db,
+        needle: KnownFunction,
+    ) -> Option<Span> {
+        self.find_decorator_span(db, |ty| {
+            ty.as_function_literal()
+                .is_some_and(|f| f.is_known(db, needle))
+        })
+    }
+
     /// Returns all of the typevars that are referenced in this class's base class list.
     /// (This is used to ensure that classes do not reference typevars from enclosing
     /// generic contexts.)
