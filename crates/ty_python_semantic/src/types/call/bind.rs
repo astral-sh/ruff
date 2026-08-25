@@ -1392,6 +1392,73 @@ impl<'db> Bindings<'db> {
         )
     }
 
+    /// Applies a fallible transformation to individual return types before combining callable
+    /// intersections and unions.
+    ///
+    /// NOTE: this API is a workaround for <https://github.com/astral-sh/ty/issues/2799>: the
+    /// constraint solver currently combines alternative specializations using a union even when an
+    /// intersection is required. Keeping callable bindings separate avoids that limitation. This
+    /// method should become unnecessary once the solver combines those specializations correctly.
+    ///
+    /// Suppose the callable bindings have the shape `(callable_a & callable_b) | callable_c`, with
+    /// return types `R_a`, `R_b`, and `R_c`, respectively. The usual `return_type` method first
+    /// combines those return types:
+    ///
+    /// ```text
+    /// return_type()                 = (R_a & R_b) | R_c
+    /// try_map_return_type(map)      = (map(R_a) & map(R_b)) | map(R_c)
+    /// map(return_type())            = map((R_a & R_b) | R_c)
+    /// ```
+    ///
+    /// The latter two operations are not equivalent when `map` cannot preserve intersections or
+    /// unions that have already been combined. For example, awaiting an object calls `__await__`
+    /// and extracts the third type argument from the returned `Generator`:
+    ///
+    /// ```py
+    /// from typing import Any, Coroutine
+    /// from ty_extensions import Intersection
+    ///
+    /// class A: ...
+    /// class B: ...
+    ///
+    /// async def f(value: Intersection[Coroutine[Any, Any, A], Coroutine[Any, Any, B]]):
+    ///     reveal_type(await value)  # A & B
+    /// ```
+    ///
+    /// The `__await__` bindings return `Generator[Any, None, A]` and `Generator[Any, None, B]`.
+    /// Extracting their return types separately and then intersecting them produces `A & B`.
+    /// Extracting a return type from the combined generator intersection instead gives the
+    /// constraint solver two alternative solutions, producing `A | B`.
+    ///
+    /// A failed transformation discards one alternative within an intersection. Each union
+    /// element, however, is a possible runtime value, so every union element must retain at least
+    /// one successfully transformed alternative:
+    ///
+    /// ```text
+    /// map(R_a) = Some(A), map(R_b) = None, map(R_c) = Some(C) => Some(A | C)
+    /// map(R_a) = Some(A), map(R_b) = None, map(R_c) = None    => None
+    /// ```
+    pub(crate) fn try_map_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut map: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let mut union = UnionBuilder::new(db, env);
+
+        for element in &self.elements {
+            let mut mapped = element
+                .items()
+                .filter(|item| item.is_callable())
+                .filter_map(|item| map(item.return_type(db, env)))
+                .peekable();
+            mapped.peek()?;
+            union.add_in_place(IntersectionType::from_elements(db, env, mapped));
+        }
+
+        Some(union.build())
+    }
+
     /// Returns the inferred type for the argument at the specified index.
     pub(crate) fn type_for_argument<'a>(
         &'a self,
