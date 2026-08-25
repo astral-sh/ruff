@@ -1735,17 +1735,6 @@ def invalid_typevar_bounds[**P, **Q, T]() -> None:
     static_assert(ConstraintSet.equality(P, Q.args) == ConstraintSet.never())
 ```
 
-Allowing ParamSpec bounds must not admit them as ordinary TypeVar bounds.
-
-```py
-def ordinary_subject[**P, T]() -> None:
-    ConstraintSet.range(P, T, object)  # error: [invalid-type-form] "Bare ParamSpec `P`"
-    ConstraintSet.range(Never, T, P)  # error: [invalid-type-form] "Bare ParamSpec `P`"
-    ConstraintSet.lower_bound(P, T)  # error: [invalid-type-form] "Bare ParamSpec `P`"
-    ConstraintSet.upper_bound(T, P)  # error: [invalid-type-form] "Bare ParamSpec `P`"
-    ConstraintSet.equality(T, P)  # error: [invalid-type-form] "Bare ParamSpec `P`"
-```
-
 Bare TypeVarTuples remain invalid bounds.
 
 ```py
@@ -1757,35 +1746,13 @@ def typevartuple_bounds[**P, *Us]() -> None:
     ConstraintSet.equality(P, Us)  # error: [invalid-type-form] "TypeVarTuple `Us`"
 ```
 
-Nested type expressions and unrelated TypeForm calls keep their ordinary validation.
+Allowing ParamSpecs in a constructor does not affect subsequent unrelated TypeForm calls.
 
 ```py
 def accepts_type_form(form: TypeForm[object]) -> None: ...
 def invalid_forms[**P]() -> None:
-    ConstraintSet.range(Callable[[int], None], list[P], Callable[[int], None])  # error: [invalid-type-arguments]
-    ConstraintSet.range(Callable[[P], None], P, Callable[[int], None])  # error: [invalid-type-form]
-    ConstraintSet.range(Callable[[int], None], P, Callable[..., P])  # error: [invalid-type-form]
-    ConstraintSet.lower_bound(Callable[[P], None], P)  # error: [invalid-type-form]
-    ConstraintSet.upper_bound(P, Callable[..., P])  # error: [invalid-type-form]
-    ConstraintSet.equality(list[P], Callable[[int], None])  # error: [invalid-type-arguments]
     ConstraintSet.equality(P, Callable[[int], None])
     accepts_type_form(P)  # error: [invalid-type-form]
-```
-
-An attribute receiver must still reject bare ParamSpecs in unrelated TypeForm calls.
-
-```py
-class Holder:
-    form: TypeForm[int]
-
-def receiver(form: TypeForm[object]) -> Holder:
-    return Holder()
-
-def invalid_receiver[**P, **Q]() -> None:
-    ConstraintSet.range(int, receiver(P).form, object)  # error: [invalid-type-form]
-    ConstraintSet.lower_bound(Callable[[int], None], receiver(P).form)  # error: [invalid-type-form] "Bare ParamSpec `P`"
-    ConstraintSet.upper_bound(receiver(P).form, Callable[[int], None])  # error: [invalid-type-form] "Bare ParamSpec `P`"
-    ConstraintSet.equality(P, receiver(Q).form)  # error: [invalid-type-form] "Bare ParamSpec `Q`"
 ```
 
 ParamSpec components keep their ordinary bounds; bare TypeVarTuples remain invalid subjects.

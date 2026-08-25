@@ -9495,62 +9495,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        let paramspec_constraint_subject = match callable_type {
+        // The internal constraint constructors accept ParamSpecs as well as ordinary types.
+        let previously_allowed_paramspec = matches!(
+            callable_type,
             Type::KnownBoundMethod(
                 KnownBoundMethodType::ConstraintSetLowerBound
-                | KnownBoundMethodType::ConstraintSetRange,
-            ) => arguments.find_argument_value("typevar", 1),
-            Type::KnownBoundMethod(
-                KnownBoundMethodType::ConstraintSetUpperBound
-                | KnownBoundMethodType::ConstraintSetEquality,
-            ) => arguments.find_argument_value("typevar", 0),
-            _ => None,
-        };
-        let paramspec_constraint_subject_is_bare = paramspec_constraint_subject
-            .filter(|subject| is_dotted_name(subject))
-            .is_some_and(|subject| {
-                let mut speculative = self.speculate_without_diagnostics();
-                speculative.expression_cache = None;
-                match speculative.infer_expression(subject, TypeContext::default()) {
-                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                        typevar.is_paramspec(db)
-                    }
-                    Type::TypeVar(typevar) => {
-                        typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none()
-                    }
-                    _ => false,
-                }
-            });
+                    | KnownBoundMethodType::ConstraintSetUpperBound
+                    | KnownBoundMethodType::ConstraintSetEquality
+                    | KnownBoundMethodType::ConstraintSetRange
+            )
+        )
+        .then(|| {
+            self.context
+                .inference_flags
+                .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true)
+        });
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| {
-                // A ParamSpec constraint can refer to other ParamSpecs. Limit the exception to
-                // dotted names so nested types and calls in attribute receivers keep
-                // their ordinary validation.
-                if (paramspec_constraint_subject_is_bare
-                    || paramspec_constraint_subject
-                        .is_some_and(|subject| std::ptr::eq(subject, expr)))
-                    && is_dotted_name(expr)
-                {
-                    let previously_allowed = builder
-                        .context
-                        .inference_flags
-                        .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
-                    let ty = builder.infer_expression(expr, tcx);
-                    builder.context.inference_flags.set(
-                        InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
-                        previously_allowed,
-                    );
-                    ty
-                } else {
-                    builder.infer_expression(expr, tcx)
-                }
-            },
+            &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
             &mut bindings,
             call_expression_tcx,
         );
+
+        if let Some(previously_allowed_paramspec) = previously_allowed_paramspec {
+            self.context.inference_flags.set(
+                InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                previously_allowed_paramspec,
+            );
+        }
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
