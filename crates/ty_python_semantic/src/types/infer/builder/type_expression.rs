@@ -3,6 +3,7 @@ use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -617,14 +618,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if let (Some(first_elt), Some(last_elt)) =
                                 (tuple.elts.first(), tuple.elts.last())
                             {
+                                let first_range = parenthesized_range(
+                                    first_elt.into(),
+                                    tuple.into(),
+                                    self.module().tokens(),
+                                )
+                                .unwrap_or(first_elt.range());
+                                let last_range = parenthesized_range(
+                                    last_elt.into(),
+                                    tuple.into(),
+                                    self.module().tokens(),
+                                )
+                                .unwrap_or(last_elt.range());
                                 diagnostic.set_fix(Fix::unsafe_edits(
                                     Edit::range_replacement(
                                         "tuple[".to_string(),
-                                        TextRange::new(tuple.start(), first_elt.start()),
+                                        TextRange::new(tuple.start(), first_range.start()),
                                     ),
                                     [Edit::range_replacement(
                                         "]".to_string(),
-                                        TextRange::new(last_elt.end(), tuple.end()),
+                                        TextRange::new(last_range.end(), tuple.end()),
                                     )],
                                 ));
                             } else {
@@ -788,20 +801,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         && SemanticModel::new(db, self.program_file())
                             .definitely_has_builtin_binding("dict", dict.into())
                     {
+                        let key_range =
+                            parenthesized_range(key.into(), dict.into(), self.module().tokens())
+                                .unwrap_or(key.range());
+                        let value_range =
+                            parenthesized_range(value.into(), dict.into(), self.module().tokens())
+                                .unwrap_or(value.range());
                         diagnostic.help("Replace with `dict[...]`");
                         diagnostic.set_fix(Fix::unsafe_edits(
                             Edit::range_replacement(
                                 "dict[".to_string(),
-                                TextRange::new(dict.start(), key.start()),
+                                TextRange::new(dict.start(), key_range.start()),
                             ),
                             [
                                 Edit::range_replacement(
                                     ", ".to_string(),
-                                    TextRange::new(key.end(), value.start()),
+                                    TextRange::new(key_range.end(), value_range.start()),
                                 ),
                                 Edit::range_replacement(
                                     "]".to_string(),
-                                    TextRange::new(value.end(), dict.end()),
+                                    TextRange::new(value_range.end(), dict.end()),
                                 ),
                             ],
                         ));
@@ -842,15 +861,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         && SemanticModel::new(db, self.program_file())
                             .definitely_has_builtin_binding("set", set.into())
                     {
+                        let element_range = parenthesized_range(
+                            single_element.into(),
+                            set.into(),
+                            self.module().tokens(),
+                        )
+                        .unwrap_or(single_element.range());
                         diagnostic.help("Replace with `set[...]`");
                         diagnostic.set_fix(Fix::unsafe_edits(
                             Edit::range_replacement(
                                 "set[".to_string(),
-                                TextRange::new(set.start(), single_element.start()),
+                                TextRange::new(set.start(), element_range.start()),
                             ),
                             [Edit::range_replacement(
                                 "]".to_string(),
-                                TextRange::new(single_element.end(), set.end()),
+                                TextRange::new(element_range.end(), set.end()),
                             )],
                         ));
                     }
