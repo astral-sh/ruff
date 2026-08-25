@@ -572,3 +572,333 @@ def bad(
     d: "invalid syntax",
 ): ...
 ```
+
+## Collection literal fixes require Python 3.9 or later
+
+Builtin collection types cannot be subscripted on Python 3.8, so their literals do not receive fixes
+that would introduce unsupported subscripts.
+
+```toml
+[environment]
+python-version = "3.8"
+```
+
+```py
+as_list: [int]  # snapshot: invalid-type-form
+as_tuple: (int,)  # snapshot: invalid-type-form
+as_dict: {str: int}  # snapshot: invalid-type-form
+as_set: {int}  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:1:10
+  |
+1 | as_list: [int]  # snapshot: invalid-type-form
+  |          ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Tuple literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:2:11
+  |
+2 | as_tuple: (int,)  # snapshot: invalid-type-form
+  |           ^^^^^^ Did you mean `tuple[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Dict literals are not allowed in type expressions
+ --> src/mdtest_snippet.py:3:10
+  |
+3 | as_dict: {str: int}  # snapshot: invalid-type-form
+  |          ^^^^^^^^^^ Did you mean `dict[str, int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Set literals are not allowed in type expressions
+ --> src/mdtest_snippet.py:4:9
+  |
+4 | as_set: {int}  # snapshot: invalid-type-form
+  |         ^^^^^ Did you mean `set[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+## Collection literal fixes are omitted for starred elements
+
+Starred subscripts are unavailable before Python 3.11, so starred collection elements cannot be
+rewritten into subscripts when targeting Python 3.10.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+types = (int, str)
+
+as_list: [*types]  # snapshot: invalid-type-form
+as_tuple: (*types,)  # snapshot: invalid-type-form
+as_set: {*types}  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:3:10
+  |
+3 | as_list: [*types]  # snapshot: invalid-type-form
+  |          ^^^^^^^^ Did you mean `list[tuple[Unknown, ...]]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Tuple literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:4:11
+  |
+4 | as_tuple: (*types,)  # snapshot: invalid-type-form
+  |           ^^^^^^^^^ Did you mean `tuple[tuple[Unknown, ...]]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Set literals are not allowed in type expressions
+ --> src/mdtest_snippet.py:5:9
+  |
+5 | as_set: {*types}  # snapshot: invalid-type-form
+  |         ^^^^^^^^ Did you mean `set[tuple[Unknown, ...]]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+## Collection literal fixes are omitted for multiline annotations
+
+Multiline collection literals can contain comments that would be removed by replacing their
+delimiters, so we do not offer an autofix.
+
+`list.py`:
+
+```py
+values: [  # snapshot: invalid-type-form
+    # The element must not be discarded.
+    int,
+]
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/list.py:1:9
+  |
+1 |   values: [  # snapshot: invalid-type-form
+  |  _________^
+2 | |     # The element must not be discarded.
+3 | |     int,
+4 | | ]
+  | |_^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+The same restriction applies to tuple literals.
+
+`tuple.py`:
+
+```py
+value: (  # snapshot: invalid-type-form
+    # The first type remains documented.
+    int,
+    str,  # The final type remains documented.
+)
+```
+
+```snapshot
+error[invalid-type-form]: Tuple literals are not allowed in this context in a type expression
+ --> src/tuple.py:1:8
+  |
+1 |   value: (  # snapshot: invalid-type-form
+  |  ________^
+2 | |     # The first type remains documented.
+3 | |     int,
+4 | |     str,  # The final type remains documented.
+5 | | )
+  | |_^ Did you mean `tuple[int, str]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+A dictionary literal may have comments around its key, colon, value, or trailing comma.
+
+`dict.py`:
+
+```py
+mapping: {  # snapshot: invalid-type-form
+    # The key remains documented.
+    str:  # The separator remains documented.
+    # The value remains documented.
+    int,  # The trailing comma remains documented.
+}
+```
+
+```snapshot
+error[invalid-type-form]: Dict literals are not allowed in type expressions
+ --> src/dict.py:1:10
+  |
+1 |   mapping: {  # snapshot: invalid-type-form
+  |  __________^
+2 | |     # The key remains documented.
+3 | |     str:  # The separator remains documented.
+4 | |     # The value remains documented.
+5 | |     int,  # The trailing comma remains documented.
+6 | | }
+  | |_^ Did you mean `dict[str, int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+Set literals can likewise contain comments around their element.
+
+`set.py`:
+
+```py
+items: {  # snapshot: invalid-type-form
+    # The element remains documented.
+    int,  # The trailing comma remains documented.
+}
+```
+
+```snapshot
+error[invalid-type-form]: Set literals are not allowed in type expressions
+ --> src/set.py:1:8
+  |
+1 |   items: {  # snapshot: invalid-type-form
+  |  ________^
+2 | |     # The element remains documented.
+3 | |     int,  # The trailing comma remains documented.
+4 | | }
+  | |_^ Did you mean `set[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+## Class attributes do not shadow collection builtins in methods
+
+A class attribute named `set` is not visible when resolving names in a method body, so it does not
+prevent an annotation from being rewritten with the builtin `set`.
+
+```py
+class Container:
+    set = 42
+
+    def check(self):
+        value: {int}  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: Set literals are not allowed in type expressions
+ --> src/mdtest_snippet.py:5:16
+  |
+5 |         value: {int}  # snapshot: invalid-type-form
+  |                ^^^^^ Did you mean `set[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `set[...]`
+  |
+4 |     def check(self):
+  -         value: {int}  # snapshot: invalid-type-form
+5 +         value: set[int]  # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+## Collection literal fixes with project-level builtin overrides
+
+A project-level `__builtins__.pyi` can replace `list` while leaving the standard `set` builtin
+available. We suppress only the fix that would reference the overridden builtin.
+
+```py
+overridden: [int]  # snapshot: invalid-type-form
+standard: {int}  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:1:13
+  |
+1 | overridden: [int]  # snapshot: invalid-type-form
+  |             ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Set literals are not allowed in type expressions
+ --> src/mdtest_snippet.py:2:11
+  |
+2 | standard: {int}  # snapshot: invalid-type-form
+  |           ^^^^^ Did you mean `set[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `set[...]`
+  |
+1 | overridden: [int]  # snapshot: invalid-type-form
+  - standard: {int}  # snapshot: invalid-type-form
+2 + standard: set[int]  # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+`__builtins__.pyi`:
+
+```pyi
+list: object
+```
+
+## Collection literal fixes are omitted in string annotations
+
+Collection literals parsed from quoted annotations do not have source ranges that can be rewritten
+directly, so their diagnostics do not offer collection-literal fixes.
+
+```py
+quoted_list: "[int]"  # snapshot: invalid-type-form
+quoted_tuple: "(int, str)"  # snapshot: invalid-type-form
+quoted_dict: "{int: str}"  # snapshot: invalid-type-form
+quoted_set: "{int}"  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:1:15
+  |
+1 | quoted_list: "[int]"  # snapshot: invalid-type-form
+  |               ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Tuple literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:2:16
+  |
+2 | quoted_tuple: "(int, str)"  # snapshot: invalid-type-form
+  |                ^^^^^^^^^^ Did you mean `tuple[int, str]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Dict literals are not allowed in type expressions
+ --> src/mdtest_snippet.py:3:15
+  |
+3 | quoted_dict: "{int: str}"  # snapshot: invalid-type-form
+  |               ^^^^^^^^^^ Did you mean `dict[int, str]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Set literals are not allowed in type expressions
+ --> src/mdtest_snippet.py:4:14
+  |
+4 | quoted_set: "{int}"  # snapshot: invalid-type-form
+  |              ^^^^^ Did you mean `set[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```

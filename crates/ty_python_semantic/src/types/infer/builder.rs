@@ -8,6 +8,7 @@ use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -68,9 +69,9 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_DEFAULT, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
     TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
     UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR,
-    UNUSED_AWAITABLE, YieldKind, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_call_to_abstract_method,
+    UNUSED_AWAITABLE, YieldKind, autofix_with_notimplementederror,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
     report_invalid_assignment, report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -125,7 +126,7 @@ use crate::types::{
     any_over_type, binding_type, extract_fixed_length_iterable_element_types,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet};
+use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, BindingsOwner,
     ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
@@ -9080,6 +9081,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diagnostic.set_concise_message(
                     "`NotImplemented` is not callable - did you mean `NotImplementedError`?",
                 );
+                autofix_with_notimplementederror(&self.context, &mut diagnostic, func);
             }
             return Type::unknown();
         }
@@ -10224,6 +10226,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
                 diagnostic
                     .set_primary_annotation_message(format_args!("Did you mean `{builtin_name}`?"));
+                if SemanticModel::new(db, self.program_file())
+                    .definitely_has_builtin_binding(builtin_name, expr_name_node.into())
+                {
+                    diagnostic.help(format_args!("Replace with `{builtin_name}`"));
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                        builtin_name.to_string(),
+                        expr_name_node.range(),
+                    )));
+                }
             }
         }
 

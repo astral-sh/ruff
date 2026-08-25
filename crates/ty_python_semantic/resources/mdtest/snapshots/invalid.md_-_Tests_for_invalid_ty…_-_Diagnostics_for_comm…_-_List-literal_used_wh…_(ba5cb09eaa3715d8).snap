@@ -35,6 +35,14 @@ error[invalid-type-form]: List literals are not allowed in this context in a par
   |        ^^^^^ Did you mean `list[int]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `list[...]`
+  |
+1 | def _(
+  -     x: [int],  # error: [invalid-type-form]
+2 +     x: list[int],  # error: [invalid-type-form]
+3 | ) -> [int]:  # error: [invalid-type-form]
+  |
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 
@@ -46,6 +54,14 @@ error[invalid-type-form]: List literals are not allowed in this context in a ret
   |      ^^^^^ Did you mean `list[int]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `list[...]`
+  |
+2 |     x: [int],  # error: [invalid-type-form]
+  - ) -> [int]:  # error: [invalid-type-form]
+3 + ) -> list[int]:  # error: [invalid-type-form]
+4 |     return x
+  |
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 

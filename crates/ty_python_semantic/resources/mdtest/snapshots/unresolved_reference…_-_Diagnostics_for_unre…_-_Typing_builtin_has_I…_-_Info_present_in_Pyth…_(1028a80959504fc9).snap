@@ -25,6 +25,13 @@ error[unresolved-reference]: Name `List` used when not defined
   |
 1 | foo: List[int]  # error: [unresolved-reference]
   |      ^^^^ Did you mean `list`?
+help: Replace with `list`
+  |
+  - foo: List[int]  # error: [unresolved-reference]
+1 + foo: list[int]  # error: [unresolved-reference]
+2 | bar: Type  # error: [unresolved-reference]
+  |
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 
@@ -34,5 +41,12 @@ error[unresolved-reference]: Name `Type` used when not defined
   |
 2 | bar: Type  # error: [unresolved-reference]
   |      ^^^^ Did you mean `type`?
+help: Replace with `type`
+  |
+1 | foo: List[int]  # error: [unresolved-reference]
+  - bar: Type  # error: [unresolved-reference]
+2 + bar: type  # error: [unresolved-reference]
+  |
+note: This is an unsafe fix and may change runtime behavior
 
 ```
