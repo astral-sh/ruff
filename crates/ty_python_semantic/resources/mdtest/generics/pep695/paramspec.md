@@ -933,6 +933,39 @@ reveal_type(foo.method)  # revealed: bound method Foo[(int, str, /)].method(int,
 reveal_type(foo.method(1, "a"))  # revealed: str
 ```
 
+### Specializing explicit instance receivers with `ParamSpec`
+
+Specializing a `ParamSpec` preserves inference from an explicit receiver annotation. The writable
+`value` attribute makes `Box` invariant in `T`, so binding `get` to a `Box[int, [str]]` instance
+fixes `U` to `int` before the method is called.
+
+```py
+class Box[T, **P]:
+    value: T
+
+    def get[U](self: "Box[U, P]", *args: P.args, **kwargs: P.kwargs) -> U:
+        return self.value
+
+def check(box: Box[int, [str]]) -> None:
+    reveal_type(box.get)  # revealed: bound method Box[int, (str, /)].get(str, /) -> int
+```
+
+### Specializing explicit class method receivers with `ParamSpec`
+
+A class method's explicit `cls` annotation also determines a method-scoped type variable when the
+method is bound. Specializing `Factory` with a concrete parameter list preserves that binding, so
+`make` returns the specialized `Factory` type.
+
+```py
+class Factory[**P]:
+    @classmethod
+    def make[T](cls: type[T], *args: P.args, **kwargs: P.kwargs) -> T:
+        return cls()
+
+# revealed: bound method <class 'Factory[(int, /)]'>.make(int, /) -> Factory[(int, /)]
+reveal_type(Factory[[int]].make)
+```
+
 ### Gradual types propagate through `ParamSpec` inference
 
 ```py
