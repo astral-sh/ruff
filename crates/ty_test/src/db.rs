@@ -354,12 +354,13 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
         // negation types in our tests for better readability.
         "experimental-syntax",
-        // The `unsound-*` rules are also exceptions because they are very strict, would
-        // result in lots of additional diagnostics in mdtests, and are not the default behaviour
-        // we'll show to our users.
+        // The `unsound-*` rules and `redundant-condition-strict` are also exceptions because they
+        // are very strict, would result in lots of additional diagnostics in mdtests, and are not
+        // the default behaviour we'll show to our users.
         "unsound-assignment",
         "unsound-return-statement",
         "unsound-yield",
+        "redundant-condition-strict",
     ];
 
     let registry = default_lint_registry();

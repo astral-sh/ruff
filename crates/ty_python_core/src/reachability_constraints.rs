@@ -5,7 +5,8 @@
 use std::cmp::Ordering;
 
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::predicate::ScopedPredicateId;
@@ -151,6 +152,43 @@ pub struct ReachabilityConstraints {
 }
 
 impl ReachabilityConstraints {
+    /// Iterate over the predicates in every branch of a constraint, without evaluating them.
+    ///
+    /// A given predicate ID can be yielded multiple times by this iterator: different nodes
+    /// in the constraint's graph can test the same predicate, and this iterator makes no
+    /// attempt to deduplicate the predicate IDs yielded.
+    ///
+    /// Each graph node is visited at most once, by this iterator, however, even when several
+    /// branches lead to it. This keeps traversal linear in the number of reachable nodes.
+    pub fn predicate_ids(
+        &self,
+        root: ScopedReachabilityConstraintId,
+    ) -> impl Iterator<Item = ScopedPredicateId> + '_ {
+        // Eight IDs use 32 bytes of inline storage and accommodate a few levels of
+        // three-way branching. This is a small-buffer heuristic; larger worklists
+        // spill onto the heap.
+        let mut pending = SmallVec::<[ScopedReachabilityConstraintId; 8]>::new();
+
+        if !root.is_terminal() {
+            pending.push(root);
+        }
+
+        let mut visited = FxHashSet::default();
+
+        std::iter::from_fn(move || {
+            while let Some(id) = pending.pop() {
+                if id.is_terminal() || !visited.insert(id) {
+                    continue;
+                }
+
+                let node = self.get_interior_node(id);
+                pending.extend([node.if_false(), node.if_ambiguous(), node.if_true()]);
+                return Some(node.atom());
+            }
+            None
+        })
+    }
+
     /// Look up an interior node by its constraint ID.
     pub fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
         debug_assert!(!id.is_terminal());

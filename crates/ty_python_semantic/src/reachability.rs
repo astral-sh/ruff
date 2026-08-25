@@ -1763,6 +1763,20 @@ fn analyze_non_terminal_call<'db>(
     // add them on all statement-level function calls.
     let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
 
+    is_non_terminal_call(db, &env, ty, is_await, || {
+        infer_same_file_expression_type(db, call_expr, TypeContext::default())
+    })
+}
+
+/// Shares terminal-call classification between scope reachability and defensive-check exemptions.
+/// The result type is only needed when overload selection, generics, or awaiting can affect it.
+pub(crate) fn is_non_terminal_call<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    is_await: bool,
+    call_type: impl FnOnce() -> Type<'db>,
+) -> Truthiness {
     // Short-circuit for well-known types that are known not to return `Never` when called. Without
     // the short-circuit, we've seen that threads keep blocking each other because they all try to
     // acquire Salsa's `CallableType` lock that ensures each type is only interned once. The lock is
@@ -1773,7 +1787,7 @@ fn analyze_non_terminal_call<'db>(
     }
 
     let overloads_iterator = if let Some(callable) = ty
-        .try_upcast_to_callable(db, &env)
+        .try_upcast_to_callable(db, env)
         .and_then(CallableTypes::exactly_one)
     {
         callable.signatures(db).overloads.iter()
@@ -1786,23 +1800,18 @@ fn analyze_non_terminal_call<'db>(
     let mut any_overload_is_generic = false;
 
     for overload in overloads_iterator {
-        let returns_never = overload.return_ty.is_equivalent_to(db, &env, Type::Never);
+        let returns_never = overload.return_ty.is_equivalent_to(db, env, Type::Never);
         no_overloads_return_never &= !returns_never;
         all_overloads_return_never &= returns_never;
-        any_overload_is_generic |= overload.return_ty.has_typevar(db, &env);
+        any_overload_is_generic |= overload.return_ty.has_typevar(db, env);
     }
 
     if no_overloads_return_never && !any_overload_is_generic && !is_await {
         Truthiness::AlwaysTrue
-    } else if all_overloads_return_never {
+    } else if all_overloads_return_never || call_type().is_equivalent_to(db, env, Type::Never) {
         Truthiness::AlwaysFalse
     } else {
-        let call_expr_ty = infer_same_file_expression_type(db, call_expr, TypeContext::default());
-        if call_expr_ty.is_equivalent_to(db, &env, Type::Never) {
-            Truthiness::AlwaysFalse
-        } else {
-            Truthiness::AlwaysTrue
-        }
+        Truthiness::AlwaysTrue
     }
 }
 

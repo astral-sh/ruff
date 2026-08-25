@@ -12,7 +12,9 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
+use ruff_python_ast::{
+    self as ast, AtomicNodeIndex, HasNodeIndex, NodeIndex, PySourceType, PythonVersion,
+};
 use ruff_python_parser::semantic_errors::{
     LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
     SemanticSyntaxErrorKind, YieldOutsideFunctionKind,
@@ -38,7 +40,7 @@ use crate::definition::{
     MatchPatternDefinitionNodeRef, NestedBindingExecution, NestedBindingsDefinitionKind,
     ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
-use crate::expression::{Expression, ExpressionKind};
+use crate::expression::{Expression, ExpressionContext, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{
@@ -49,7 +51,8 @@ use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
     MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
     PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
-    SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
+    SequencePatternPredicateKind, StarImportPlaceholderPredicate, StatementCall,
+    SubjectElementPatternPredicate,
 };
 use crate::re_exports::exported_names;
 use crate::reachability_constraints::{
@@ -228,39 +231,6 @@ impl ConditionFlowSnapshot {
     }
 }
 
-/// Whether evaluation produces a result object or chooses a control-flow path.
-///
-/// In `Value` context, the enclosing code receives the expression's result object. For example,
-/// `result = x and y` produces `x` if `x` is falsy, or `y` otherwise. This also applies to expressions
-/// that return `bool`: the comparison in `result = x > 0` has value context.
-///
-/// In `Condition` context, the enclosing code only needs to know which branch to take. For example,
-/// CPython evaluates `if x and y` by testing `x` and, only if `x` is truthy, testing `y`. If `x` tests
-/// falsy, that one truthiness check is enough to skip the body: `x` is not tested again as the
-/// result of `x and y`.
-///
-/// This distinction matters when an operand's `__bool__` can change between calls:
-///
-/// ```python
-/// if x and False:      # A falsy x skips the body; a truthy x reaches False.
-///     ...              # Unreachable in either case.
-/// saved = x and False  # Can produce x after checking that it is falsy.
-/// if saved:            # Can call x.__bool__ again, which may now return True.
-///     ...              # Reachable.
-/// ```
-///
-/// The context propagates through `and`, `or`, `not`, and the branches of conditional expressions.
-/// Condition context does not propagate through calls or assignment expressions: in
-/// `if f(x and False)`, the call's result controls the branch, but its argument is evaluated in
-/// value context.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ExpressionContext {
-    /// Produce the expression's result object for the enclosing code to use.
-    Value,
-    /// Choose the truthy or falsy control-flow path without preserving the result object.
-    Condition,
-}
-
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -278,6 +248,11 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'ast str>,
+
+    /// The scope of a boolean test whose subexpressions we are currently visiting.
+    ///
+    /// See [`Self::visit_boolean_test`] for details on how this field is used.
+    active_boolean_test_scope: Option<FileScopeId>,
 
     /// Per-scope exception contexts for nested `try` and `with` statements.
     exception_context_stack_manager: ExceptionContextStackManager,
@@ -353,6 +328,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_statements: Vec::new(),
             current_match_case: None,
             current_first_parameter_name: None,
+            active_boolean_test_scope: None,
             exception_context_stack_manager: ExceptionContextStackManager::default(),
 
             has_future_annotations: false,
@@ -2262,6 +2238,82 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    fn visit_condition(&mut self, test: &'ast ast::Expr) {
+        self.visit_boolean_test(test, ExpressionContext::Condition);
+    }
+
+    /// Visit a boolean test.
+    ///
+    /// A boolean test is an expression that Python tests for truthiness, such as an `if`
+    /// condition or the operand of a `not` expression. ty's `redundant-condition` and
+    /// `redundant-condition-strict` rules can warn when such a test is always true or
+    /// always false. The rules try hard to avoid emitting duplicate diagnostics on the
+    /// same boolean test, however: in this case, a naive implementation would emit two
+    /// diagnostics on the `if` test, since there is both an `if` condition that is always
+    /// falsy and a `not` operand that is always truthy:
+    ///
+    /// ```py
+    /// def func(): ...
+    ///
+    /// if not func:  # one diagnostic, or two?
+    ///     pass
+    /// ```
+    ///
+    /// To determine whether diagnostics on boolean-test subexpressions need to be suppressed,
+    /// the rules need to be able to reliably know whether a boolean test is nested within
+    /// another outer boolean test. The [`super::UseDefMap`] answers these queries by storing
+    /// [`NodeIndex`]es for each outermost boolean test in any given scope.
+    ///
+    /// [`Self::visit_boolean_test`] is responsible for instructing the [`UseDefMapBuilder`]
+    /// to record a new outermost boolean test. The method is called whenever we visit a boolean
+    /// test such as an `if` condition, `while` condition, `assert` condition or `not` operand,
+    /// and it consults the [`Self::active_boolean_test_scope`] field to inform its decision:
+    ///
+    /// - If the field is `None`, it knows that the expression currently being visited is not
+    ///   nested inside another outermost boolean test, so the expression currently being
+    ///   visited should be recorded
+    /// - If the field is `Some(scope)`, the scope must be compared against the scope currently
+    ///   being visited. If it's a new scope, it should be recorded; if it's the same scope, it
+    ///   should not.
+    ///
+    /// As further examples, in the following snippet, `ready` is a function object, which is
+    /// always truthy. Each use of `not ready` should therefore produce a warning suggesting a
+    /// call to `ready`:
+    ///
+    /// ```python
+    /// def ready() -> bool:
+    ///     return True
+    ///
+    /// def consume(value: object) -> bool:
+    ///     return bool(value)
+    ///
+    /// if consume(not ready):
+    ///     print("Condition passed")
+    ///
+    /// if consume(lambda: not ready):
+    ///     print("Condition passed")
+    /// ```
+    ///
+    /// For the first `if`, we record `consume(not ready)`. Its diagnostic check will also
+    /// examine the test of `ready`, so we do not record `ready` separately. While visiting the
+    /// call's arguments, this field keeps the call's scope ID even though the arguments are
+    /// evaluated with `ExpressionContext::Value`.
+    ///
+    /// For the second `if`, the `lambda` body is checked independently in its own scope. Storing
+    /// the scope ID lets `visit_boolean_test` recognize that the test of `ready` inside the
+    /// `lambda` needs its own entry. This field is temporary visitor state; only the recorded
+    /// expression node IDs are retained in the semantic index.
+    fn visit_boolean_test(&mut self, test: &'ast ast::Expr, context: ExpressionContext) {
+        let scope = self.current_scope();
+        let previous = self.active_boolean_test_scope.replace(scope);
+        if previous != Some(scope) {
+            self.current_use_def_map_mut()
+                .record_boolean_test_root(test.node_index().load());
+        }
+        self.visit_expr_with_context(test, context);
+        self.active_boolean_test_scope = previous;
+    }
+
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
     /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
@@ -3076,7 +3128,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// print(last)
     /// ```
     fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) -> FlowSnapshot {
-        self.visit_expr_with_context(if_expr, ExpressionContext::Condition);
+        self.visit_condition(if_expr);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
         let filtered_out = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
             self.flow_restore(snapshots.truthy);
@@ -3542,14 +3594,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.record_exception_checkpoint();
             }
             ast::Expr::UnaryOp(unary) => {
-                self.visit_expr_with_context(
-                    &unary.operand,
-                    if unary.op == ast::UnaryOp::Not {
-                        context
-                    } else {
-                        ExpressionContext::Value
-                    },
-                );
+                if unary.op == ast::UnaryOp::Not {
+                    self.visit_boolean_test(&unary.operand, context);
+                } else {
+                    self.visit_expr_with_context(&unary.operand, ExpressionContext::Value);
+                }
                 self.record_exception_checkpoint_if(
                     unary.op != ast::UnaryOp::Not
                         || !Self::condition_evaluation_is_known_safe(&unary.operand),
@@ -3599,7 +3648,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let ast::ExprIf {
             body, test, orelse, ..
         } = node;
-        self.visit_expr_with_context(test, ExpressionContext::Condition);
+        self.visit_condition(test);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
             self.flow_restore(snapshots.truthy);
@@ -4190,7 +4239,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // `msg` branch back into the following flow, since there is no way of getting out
                 // of that branch. Code after the assertion starts from the condition's truthy flow.
 
-                self.visit_expr_with_context(test, ExpressionContext::Condition);
+                self.visit_condition(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test, ExpressionContext::Condition);
 
@@ -4363,7 +4412,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
-                self.visit_expr_with_context(&node.test, ExpressionContext::Condition);
+                self.visit_condition(&node.test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                     self.flow_restore(snapshots.truthy);
@@ -4417,7 +4466,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     let next_falsy = if let Some(elif_test) = clause_test {
-                        self.visit_expr_with_context(elif_test, ExpressionContext::Condition);
+                        self.visit_condition(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
                         let next_falsy =
@@ -4500,7 +4549,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
-                self.visit_expr_with_context(test, ExpressionContext::Condition);
+                self.visit_condition(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 
                 // Take the pre_loop snapshot from the post-test fallback flow before restoring the
@@ -4878,7 +4927,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // while the next case is reached through `!P || (P && !G)`. Save `P && !G`
                     // separately so it can be merged with the pattern-failure state after the body.
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
-                        self.visit_expr_with_context(guard, ExpressionContext::Condition);
+                        self.visit_condition(guard);
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(guard);
                         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches()
                         {
@@ -5388,20 +5437,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // it significantly degrades performance. We thus cut scope here and add these
                 // constraints only at statement-level function calls, like `sys.exit()`, and not
                 // within sub-expressions like `3 + sys.exit()` etc.
-                let call_info = match value.as_ref() {
-                    ast::Expr::Call(ast::ExprCall { func, .. }) => {
-                        Some((func.as_ref(), value.as_ref(), false))
-                    }
-                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => match inner.as_ref() {
-                        ast::Expr::Call(ast::ExprCall { func, .. }) => {
-                            Some((func.as_ref(), value.as_ref(), true))
-                        }
-                        _ => None,
-                    },
-                    _ => None,
-                };
-
-                if let Some((func, expr, is_await)) = call_info {
+                if let Some(StatementCall { call, is_await }) =
+                    StatementCall::from_expression(value)
+                {
+                    let func = call.func.as_ref();
                     // Avoid creating reachability nodes for calls on unannotated collection
                     // literals. Without this short-circuit, performing reachability analysis
                     // can lead to quadratic blowup of cycle dependencies during full-scope
@@ -5424,7 +5463,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     {
                         let callable =
                             self.add_standalone_expression_impl(func, ExpressionKind::Callee, None);
-                        let call_expr = self.add_standalone_expression(expr);
+                        let call_expr = self.add_standalone_expression(value);
 
                         let predicate = Predicate {
                             node: PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
