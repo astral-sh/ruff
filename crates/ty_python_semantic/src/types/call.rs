@@ -19,7 +19,7 @@ pub(super) use bind::{
 ///
 /// `Possibly` requires preserving both dispatch results because the static types admit runtime
 /// pairs for which either method has priority.
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum ReflectedMethodPriority {
     Never,
     Possibly,
@@ -82,6 +82,27 @@ fn reflected_method_priority<'db>(
         return ReflectedMethodPriority::Never;
     }
 
+    // Positive intersection components retain their nominal subclass relationships, even
+    // when a negative component prevents a subtype check against the full intersection.
+    // Any component can establish possible or definite priority for the reflected method.
+    match (left_ty, right_ty) {
+        (Type::Intersection(intersection), _) => {
+            return intersection
+                .positive_elements_or_object(db)
+                .map(|left| reflected_method_priority(db, env, left, right_ty))
+                .max()
+                .unwrap_or(ReflectedMethodPriority::Never);
+        }
+        (_, Type::Intersection(intersection)) => {
+            return intersection
+                .positive_elements_or_object(db)
+                .map(|right| reflected_method_priority(db, env, left_ty, right))
+                .max()
+                .unwrap_or(ReflectedMethodPriority::Never);
+        }
+        _ => {}
+    }
+
     if let (Some(left_class), Some(right_class)) = (
         operator_dispatch_class(db, env, left_ty),
         operator_dispatch_class(db, env, right_ty),
@@ -116,12 +137,27 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> Option<Type<'db>> {
         let call_dunder = |name, receiver: Type<'db>, argument: Type<'db>| {
+            let mut arguments = CallArguments::positional([argument]);
+            if let Type::Intersection(intersection) = receiver {
+                return intersection
+                    .try_call_dunder_with_policy(
+                        db,
+                        env,
+                        name,
+                        &mut arguments,
+                        TypeContext::default(),
+                        policy,
+                    )
+                    .map(|outcome| outcome.return_type(db, env))
+                    .ok();
+            }
+
             receiver
                 .try_call_dunder_with_policy(
                     db,
                     env,
                     name,
-                    &mut CallArguments::positional([argument]),
+                    &mut arguments,
                     TypeContext::default(),
                     policy,
                 )
