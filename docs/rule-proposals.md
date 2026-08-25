@@ -138,6 +138,13 @@ more idiomatic. Thus, the question prompts you to consider the _primary_ improve
 primarily make code simpler are `complexity` lints, those that primarily make code faster or use
 less memory are `performance` lints, and those that primarily make code more idiomatic are `style`.
 
+Note that "useless" in the context of a `correctness` rule should be indicative of a mistake. For
+example, `useless-exception-statement` (`PLW0133`) flags exceptions that are constructed and never
+raised, suggesting that the user forgot to raise or otherwise use them. In contrast, code that is
+merely unnecessary but still working as intended may be a better fit for `complexity`, such as
+`useless-try-except` (`TRY203`). As described above, if the code is probably not intentional but may
+be in certain cases, `suspicious` can also be a good fit.
+
 ## Other guidelines
 
 Following these steps should generally ensure that a rule is a good fit for Ruff. A couple of
