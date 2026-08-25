@@ -192,3 +192,175 @@ def match_guard(flag: bool, subject: object):
 def comprehension_filter(flag: bool):
     [reveal_type(x) for _ in range(1) if flag and (x := 1)]  # revealed: Literal[1]
 ```
+
+## Reachability of compound conditions
+
+An `and` condition with an always-falsy operand cannot take the truthy branch. Similarly, an `or`
+condition with an always-truthy operand cannot take the falsy branch. This holds even when another
+operand has mutable truthiness, and when conditions contain nested boolean operations or `not`.
+
+```py
+def conditions(value: object):
+    if value and False:
+        "".missing
+
+    if value or True:
+        pass
+    else:
+        "".missing
+
+    if not (value and False):
+        pass
+    else:
+        "".missing
+
+    if (value and False) or not (value or True):
+        "".missing
+```
+
+Short-circuiting also skips later operands within a condition, including after nested boolean
+operations.
+
+```py
+def nested_operands(value: object):
+    if (value and False) and "".missing:
+        pass
+
+    if (value or True) or "".missing:
+        pass
+
+    if not (value or True) and "".missing:
+        pass
+```
+
+The same short-circuit rules apply to loop conditions, assertions, conditional expressions,
+comprehension filters, and match guards.
+
+```py
+def other_conditions(value: object):
+    while value and False:
+        "".missing
+
+    assert value or True, value.missing
+
+    "".missing if value and False else None
+
+    [item.missing for item in range(1) if value and False]
+
+    match value:
+        case _ if value and False:
+            "".missing
+
+    assert value and False
+    "".missing
+```
+
+## Conditional expressions used as conditions
+
+When a conditional expression is itself a condition, its selected branch is evaluated as a condition
+too. The unselected branch does not affect whether the condition is truthy.
+
+```py
+def conditional_expressions(value: object, flag: bool):
+    if (value and False) if flag else False:
+        "".missing
+
+    if True if flag else (value or True):
+        pass
+    else:
+        "".missing
+
+    if True if value and False else False:
+        "".missing
+```
+
+## Chained comparison conditions
+
+A comparison chain used as a condition is falsy if any comparison is always falsy, even if an
+earlier comparison returns an arbitrary object.
+
+```py
+class Comparable:
+    def __lt__(self, other: int) -> object:
+        return object()
+
+def comparisons(value: Comparable):
+    if value < 1 < 0:
+        "".missing
+
+    if value < 1 < 0 < 1:
+        "".missing
+
+    if (value < 1 < 0) and "".missing:
+        pass
+
+    if not (value < 1 < 0):
+        pass
+    else:
+        "".missing
+```
+
+Saving the result of a comparison chain can cause a non-boolean comparison result to be tested
+twice. Its truthiness can change between those tests, so the truthy branch remains reachable.
+
+```py
+def saved_comparison(value: Comparable):
+    result = value < 1 < 0
+    if result:
+        "".missing  # error: [unresolved-attribute]
+
+    if result := value < 1 < 0:
+        "".missing  # error: [unresolved-attribute]
+```
+
+An unreachable assignment does not affect the inferred type of a loop variable. Inferring `value`
+and deciding whether its assignment is reachable depend on each other, but `1 < 0` still makes the
+branch unreachable.
+
+```py
+def loop_condition(flag: bool):
+    value = 0
+    while flag:
+        if value < 1 < 0:
+            value = Comparable()
+        reveal_type(value)  # revealed: Literal[0]
+```
+
+## Re-testing boolean expression results
+
+Saving the result of `value and False` and then testing it can call `value.__bool__` twice. The
+second call may return a different result, so the truthy branch remains reachable. Assignment
+expressions and nested boolean operations in value contexts can also cause this extra test.
+
+```py
+class MutableTruthiness:
+    truthy: bool = False
+
+    def __bool__(self) -> bool:
+        self.truthy = not self.truthy
+        return self.truthy
+
+def expressions(value: MutableTruthiness, flag: bool):
+    saved = value and False
+    if saved:
+        "".missing  # error: [unresolved-attribute]
+
+    if saved := value and False:
+        "".missing  # error: [unresolved-attribute]
+
+    saved = (value and False) if flag else False
+    if saved:
+        "".missing  # error: [unresolved-attribute]
+
+    result = (value and False) and "".missing  # error: [unresolved-attribute]
+    result = (not (value or True)) or "".missing  # error: [unresolved-attribute]
+```
+
+Call arguments are evaluated as values, even when the call is itself used as a condition. Nested
+boolean operations in an argument can therefore re-test an intermediate result.
+
+```py
+def call_argument(value: MutableTruthiness):
+    if bool((value and False) and "".missing):  # error: [unresolved-attribute]
+        pass
+```

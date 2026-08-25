@@ -520,6 +520,61 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
     assert_eq!(cycles, Vec::<String>::new());
 }
 
+#[test]
+fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("src/comparison.py", "0 < 1 < 2")?;
+    let file = program_file(&db, system_path_to_file(&db, "src/comparison.py")?);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let Some(ast::Stmt::Expr(statement)) = module.syntax().body.first() else {
+        anyhow::bail!("expected a comparison expression statement");
+    };
+    let expression = ExpressionNodeKey::from(statement.value.as_ref());
+    let scope = global_scope(&db, file);
+    let env = ProgramEnvironment::from_scope(scope);
+    let inference = |ty, truthiness: Option<Truthiness>| ExpressionInference {
+        expressions: [(expression, ty)].into_iter().collect(),
+        extra: truthiness.map(|truthiness| {
+            Box::new(ExpressionInferenceExtra {
+                comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
+                ..ExpressionInferenceExtra::default()
+            })
+        }),
+        #[cfg(debug_assertions)]
+        scope,
+    };
+
+    // A previously widened condition stays ambiguous even when the new result omits its
+    // override and has a definite value-type fallback.
+    let previous = inference(Type::bool_literal(false), Some(Truthiness::Ambiguous));
+    let mut current = inference(Type::bool_literal(false), None);
+    current.widen_comparison_truthiness(&db, &env, &previous);
+    assert_eq!(
+        current.comparison_truthiness(expression),
+        Some(Truthiness::Ambiguous)
+    );
+
+    // A new override is compared with the previous result's value-type fallback.
+    let previous = inference(Type::bool_literal(true), None);
+    let mut current = inference(Type::unknown(), Some(Truthiness::AlwaysFalse));
+    current.widen_comparison_truthiness(&db, &env, &previous);
+    assert_eq!(
+        current.comparison_truthiness(expression),
+        Some(Truthiness::Ambiguous)
+    );
+
+    // Removing an override does not widen an unchanged effective truthiness.
+    let previous = inference(Type::unknown(), Some(Truthiness::AlwaysFalse));
+    let mut current = inference(Type::bool_literal(false), None);
+    current.widen_comparison_truthiness(&db, &env, &previous);
+    assert_eq!(
+        current.comparison_truthiness(expression),
+        Some(Truthiness::AlwaysFalse)
+    );
+
+    Ok(())
+}
+
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
 /// reachability-constraint checks in that scope.
 #[test]
