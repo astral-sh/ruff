@@ -500,19 +500,18 @@ fn print_fix_summary(
             relativize_path(filename).bold(),
             ":".cyan()
         )?;
-        for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
-            if is_human_readable_names_enabled(preview) && !prefer_rule_codes {
-                writeln!(
-                    writer,
-                    "    {count:>num_digits$} × {name} ({code})",
-                    name = name.to_string().red().bold(),
-                )?;
-            } else {
-                writeln!(
-                    writer,
-                    "    {count:>num_digits$} × {code} ({name})",
-                    code = code.to_string().red().bold(),
-                )?;
+        for (name, code, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+            write!(writer, "    {count:>num_digits$} × ")?;
+            match code {
+                Some(code) if is_human_readable_names_enabled(preview) && !prefer_rule_codes => {
+                    writeln!(writer, "{name} ({code})", name = name.as_str().red().bold())?;
+                }
+                Some(code) => {
+                    writeln!(writer, "{code} ({name})", code = code.as_str().red().bold())?;
+                }
+                None => {
+                    writeln!(writer, "{name}", name = name.as_str().red().bold())?;
+                }
             }
         }
     }
