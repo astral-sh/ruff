@@ -62,8 +62,10 @@
 //! therefore bounded by the number of projects and scripts, not the number of changes. The worker
 //! count limits concurrent uv processes, but the queues do not apply backpressure to the host.
 //!
-//! `poll_sync` submits the latest follow-up only after the current job reports completion, keeping
-//! the same progress reporter. This avoids overlapping synchronizations for one environment.
+//! A newer request cancels the previous job if a worker has not started it yet. Running uv processes
+//! are allowed to finish. Both cancelled and executed jobs report completion; only then can
+//! `poll_sync` submit the latest follow-up, keeping the same progress reporter. This avoids both
+//! overlapping synchronizations for one environment and accumulating cancelled queue entries.
 
 use std::hash::Hasher;
 use std::sync::Arc;
@@ -72,6 +74,7 @@ use crossbeam::channel::Receiver;
 use parking_lot::Mutex;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::FxDashMap;
+use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use salsa::Setter;
@@ -125,22 +128,29 @@ impl UvEnvironments {
         path: &SystemPath,
         make_progress: &ProjectSyncProgressFactory<'_>,
     ) {
-        let progress = {
+        let (progress, cancellation) = {
             let mut project = self.inner.project.lock();
             if let Some(sync) = project.as_mut() {
                 sync.next_request = Some(path.to_path_buf());
+                sync.cancellation.cancel();
                 return;
             }
 
             let progress = make_progress(db, db.project());
-            *project = Some(ProjectSync { next_request: None });
-            progress
+            let cancellation = CancellationTokenSource::new();
+            let token = cancellation.token();
+            *project = Some(ProjectSync {
+                next_request: None,
+                cancellation,
+            });
+            (progress, token)
         };
 
         tracing::debug!("Requested workspace metadata for `{path}`");
         self.inner.sync_service.schedule_one(
             db.system(),
             UvSyncTask::Workspace(path.to_path_buf()),
+            cancellation,
             progress,
         );
     }
@@ -207,9 +217,10 @@ impl UvEnvironments {
     /// whether it can be used while synchronization runs. An existing `ScriptEnvironment`
     /// remains available, even if its virtual environment has not previously been synchronized.
     ///
-    /// If another synchronization is pending, records the latest request to run afterward,
-    /// reusing the existing progress reporter. Otherwise, creates a new progress reporter and
-    /// submits the synchronization.
+    /// If another synchronization is pending, records the latest request to run afterward and
+    /// cancels the queued job if it has not started. Running uv processes are allowed to finish.
+    /// The follow-up reuses the existing progress reporter. Otherwise, creates a new progress
+    /// reporter and submits the synchronization.
     ///
     /// Submission does not wait for uv or queue space.
     pub fn request_sync(
@@ -265,12 +276,15 @@ impl UvEnvironments {
         };
 
         let progress = make_progress(db, file);
+        let cancellation = CancellationTokenSource::new();
+        let token = cancellation.token();
         *state = ScriptEnvironmentState::Synchronizing {
             environment,
             availability,
             sync: InFlightSync {
                 active_cache_key: task.request.cache_key(),
                 next_request: None,
+                cancellation,
             },
         };
 
@@ -281,9 +295,12 @@ impl UvEnvironments {
 
         drop(state);
 
-        self.inner
-            .sync_service
-            .schedule_one(db.system(), UvSyncTask::Script(task), progress);
+        self.inner.sync_service.schedule_one(
+            db.system(),
+            UvSyncTask::Script(task),
+            token,
+            progress,
+        );
     }
 
     /// Applies completed background requests to their projects or script environments.
@@ -294,7 +311,7 @@ impl UvEnvironments {
     ///
     /// If a newer synchronization was requested while the current one was pending, discards the
     /// outdated result and schedules the newer request instead, transferring the existing progress
-    /// reporter.
+    /// reporter. Cancelled jobs also schedule their replacement without changing the environment.
     ///
     /// Reports project completions and changed scripts so callers can refresh diagnostics.
     pub fn poll_sync(&self, db: &mut dyn Db) -> UvSyncChanges {
@@ -311,21 +328,32 @@ impl UvEnvironments {
             } = result;
             match task {
                 UvSyncTask::Workspace(path) => {
-                    let next = self
-                        .inner
-                        .project
-                        .lock()
+                    let mut project_sync = self.inner.project.lock();
+                    let next = project_sync
                         .as_mut()
                         .and_then(|sync| sync.next_request.take());
-                    if let Some(next) = next {
-                        tracing::debug!("Discarded superseded workspace metadata for `{path}`");
-                        self.inner.sync_service.schedule_one(
-                            db.system(),
-                            UvSyncTask::Workspace(next),
-                            progress,
-                        );
-                        continue;
-                    }
+                    let output = match (next, output) {
+                        (None, Some(output)) => output,
+                        (next, _) => {
+                            tracing::debug!("Discarded superseded workspace metadata for `{path}`");
+                            let cancellation = CancellationTokenSource::new();
+                            let token = cancellation.token();
+                            *project_sync = Some(ProjectSync {
+                                next_request: None,
+                                cancellation,
+                            });
+                            drop(project_sync);
+
+                            self.inner.sync_service.schedule_one(
+                                db.system(),
+                                UvSyncTask::Workspace(next.unwrap_or(path)),
+                                token,
+                                progress,
+                            );
+                            continue;
+                        }
+                    };
+                    drop(project_sync);
                     let project = db.project();
                     let environment = match Uv::parse_metadata_output(db.system(), output) {
                         Ok(metadata) => ProjectEnvironment {
@@ -378,30 +406,40 @@ impl UvEnvironments {
                         request.path()
                     );
 
-                    if let Some(next) = sync.next_request.take() {
-                        // uv updates the same environment on disk for every version of this script. If the
-                        // metadata changes A -> B -> A, the B synchronization may already have modified the
-                        // environment. Run A again even though its cache key matches the last completed
-                        // synchronization.
-                        sync.active_cache_key = next.cache_key();
+                    let output = match (sync.next_request.take(), output) {
+                        (None, Some(output)) => output,
+                        (next, _) => {
+                            // uv updates the same environment on disk for every version of this script. If the
+                            // metadata changes A -> B -> A, the B synchronization may already have modified the
+                            // environment. Run A again even though its cache key matches the last completed
+                            // synchronization.
+                            //
+                            // A cancelled request can become current again after another edit. Retry it
+                            // when there is no newer request; cancellation does not update the environment.
+                            let next = next.unwrap_or(request);
+                            sync.active_cache_key = next.cache_key();
+                            sync.cancellation = CancellationTokenSource::new();
+                            let token = sync.cancellation.token();
 
-                        tracing::debug!(
-                            "Discarded superseded script environment synchronization result for `{}`",
-                            next.path()
-                        );
+                            tracing::debug!(
+                                "Discarded superseded script environment synchronization result for `{}`",
+                                next.path()
+                            );
 
-                        drop(state);
+                            drop(state);
 
-                        self.inner.sync_service.schedule_one(
-                            db.system(),
-                            UvSyncTask::Script(ScriptSyncTask {
-                                file,
-                                request: next,
-                            }),
-                            progress,
-                        );
-                        continue;
-                    }
+                            self.inner.sync_service.schedule_one(
+                                db.system(),
+                                UvSyncTask::Script(ScriptSyncTask {
+                                    file,
+                                    request: next,
+                                }),
+                                token,
+                                progress,
+                            );
+                            continue;
+                        }
+                    };
 
                     let environment = *environment;
                     apply_sync_result(db, environment, &request, output);
@@ -578,6 +616,7 @@ impl Default for UvEnvironmentsInner {
 
 struct ProjectSync {
     next_request: Option<SystemPathBuf>,
+    cancellation: CancellationTokenSource,
 }
 
 type ScriptEnvironmentEntry = Mutex<ScriptEnvironmentState>;
@@ -631,13 +670,16 @@ enum ScriptEnvironmentState {
 struct InFlightSync {
     active_cache_key: ScriptEnvironmentCacheKey,
     next_request: Option<ScriptSyncRequest>,
+    /// Signals the worker to skip this request if it has not started.
+    cancellation: CancellationTokenSource,
 }
 
 impl InFlightSync {
     /// Updates the synchronization to run after the active request.
     ///
     /// If `request` matches the active synchronization, removes any previously requested follow-up.
-    /// Otherwise, replaces the follow-up with `request`.
+    /// Otherwise, replaces the follow-up with `request`. A changed request cancels the queued job;
+    /// an already running uv process is allowed to finish.
     ///
     /// Returns whether the requested synchronization changed.
     fn update_next_request(&mut self, request: ScriptSyncRequest) -> bool {
@@ -654,6 +696,7 @@ impl InFlightSync {
         } else {
             Some(request)
         };
+        self.cancellation.cancel();
         true
     }
 }

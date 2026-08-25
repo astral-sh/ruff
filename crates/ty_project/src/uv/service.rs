@@ -2,6 +2,7 @@ use std::process::Output;
 use std::sync::{Arc, OnceLock};
 
 use crossbeam::channel::{Receiver, Sender, TrySendError};
+use ruff_db::cancellation::CancellationToken;
 use ruff_db::files::File;
 use ruff_db::system::{CommandExecutor, System, SystemPathBuf};
 
@@ -19,6 +20,8 @@ use crate::UvSyncProgress;
 /// time, including jobs whose results have not yet been consumed. It retains only the latest
 /// follow-up and submits it after consuming the previous result. Both request and result queues
 /// are therefore bounded by the number of projects and scripts, not the number of changes.
+/// Superseded jobs are cancelled before execution when possible. Running uv processes are not
+/// interrupted, and cancelled jobs still return a result so their replacements can be scheduled.
 ///
 /// The service deliberately owns neither a database nor its `System`. Workers stay alive between
 /// jobs, while the host must be able to apply file changes and completed uv results. Salsa waits
@@ -54,11 +57,13 @@ impl UvMetadataService {
 
     /// Submits one background synchronization.
     ///
-    /// Submission does not wait for queue space.
+    /// Submission does not wait for queue space. Cancellation skips a job that has not started,
+    /// but still produces a result and wakeup. It does not interrupt a running uv process.
     pub(crate) fn schedule_one(
         &self,
         system: &dyn System,
         task: UvSyncTask,
+        cancellation: CancellationToken,
         progress: Option<Box<dyn UvSyncProgress>>,
     ) {
         let workers = match self.worker_pool(system) {
@@ -66,7 +71,7 @@ impl UvMetadataService {
             Err(error) => {
                 self.publish_result(UvMetadataResult {
                     task,
-                    output: Err(error),
+                    output: Some(Err(error)),
                     progress,
                 });
                 return;
@@ -82,6 +87,7 @@ impl UvMetadataService {
 
         let job = UvJob {
             task,
+            cancellation,
             result_sender: self.results_sender.clone(),
             wake_sender: self.wake_sender.clone(),
             progress,
@@ -91,7 +97,7 @@ impl UvMetadataService {
             let job = error.into_inner();
             self.publish_result(UvMetadataResult {
                 task: job.task,
-                output: Err(worker_disconnected()),
+                output: Some(Err(worker_disconnected())),
                 progress: job.progress,
             });
         }
@@ -204,7 +210,8 @@ impl UvSyncTask {
 /// This keeps the progress reporter alive until the result is consumed or rescheduled.
 pub(crate) struct UvMetadataResult {
     pub(crate) task: UvSyncTask,
-    pub(crate) output: std::io::Result<Output>,
+    /// `None` if the worker skipped this request because it was cancelled before execution.
+    pub(crate) output: Option<std::io::Result<Output>>,
     pub(crate) progress: Option<Box<dyn UvSyncProgress>>,
 }
 
@@ -285,24 +292,31 @@ impl UvWorker {
             };
 
             let _span = job.span.enter();
-            let target = job.task.metadata_target();
-            match &target {
-                MetadataTarget::Workspace(path) => {
-                    tracing::info!("Reading workspace metadata for `{path}`");
+            let output = if job.cancellation.is_cancelled() {
+                tracing::debug!("Skipped cancelled uv metadata request");
+                None
+            } else {
+                let target = job.task.metadata_target();
+                match &target {
+                    MetadataTarget::Workspace(path) => {
+                        tracing::info!("Reading workspace metadata for `{path}`");
+                    }
+                    MetadataTarget::Script { path, .. } => {
+                        tracing::info!("Synchronizing script `{path}`");
+                    }
                 }
-                MetadataTarget::Script { path, .. } => {
-                    tracing::info!("Synchronizing script `{path}`");
+                if let Some(progress) = job.progress.as_mut() {
+                    progress.started();
                 }
-            }
-            if let Some(progress) = job.progress.as_mut() {
-                progress.started();
-            }
 
-            let output = self.uv.execute(&*self.executor, &target);
+                let output = self.uv.execute(&*self.executor, &target);
 
-            if let Some(progress) = job.progress.as_mut() {
-                progress.finished();
-            }
+                if let Some(progress) = job.progress.as_mut() {
+                    progress.finished();
+                }
+
+                Some(output)
+            };
 
             // Send the result
             // The receiver disappears when the owning project is dropped.
@@ -325,6 +339,9 @@ impl UvWorker {
 struct UvJob {
     /// The request to return with the synchronization result.
     task: UvSyncTask,
+
+    /// Checked before invoking uv; does not interrupt an already running process.
+    cancellation: CancellationToken,
 
     /// The sender end of the channel communicating with the sync service.
     result_sender: Sender<UvMetadataResult>,
