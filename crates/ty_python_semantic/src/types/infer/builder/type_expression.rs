@@ -1,8 +1,12 @@
 use itertools::Either;
+use ruff_db::source::source_text;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_text_size::Ranged;
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
@@ -27,7 +31,7 @@ use crate::types::{
     TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
     todo_type,
 };
-use crate::{FxOrderSet, add_inferred_python_version_hint_to_diagnostic};
+use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -555,6 +559,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             hinted_type.display(db, env),
                         ));
                     }
+
+                    if !self.in_string_annotation()
+                        && env.python_version(db) >= PythonVersion::PY39
+                        && !single_element.is_starred_expr()
+                        && !source_text(db, self.file()).contains_line_break(list.range())
+                        && SemanticModel::new(db, self.program_file())
+                            .definitely_has_builtin_binding("list", expression.into())
+                    {
+                        diagnostic.help("Replace with `list[...]`");
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                            "list".to_string(),
+                            expression.start(),
+                        )));
+                    }
                 }
                 Type::unknown()
             }
@@ -587,6 +605,47 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 "Did you mean `{}`?",
                                 hinted_type.display(db, env),
                             ));
+                        }
+
+                        if !self.in_string_annotation()
+                            && !source_text(db, self.file()).contains_line_break(tuple.range())
+                            && env.python_version(db) >= PythonVersion::PY39
+                            && !tuple.elts.iter().any(ast::Expr::is_starred_expr)
+                            && SemanticModel::new(db, self.program_file())
+                                .definitely_has_builtin_binding("tuple", tuple.into())
+                        {
+                            diagnostic.help("Replace with `tuple[...]`");
+                            if let (Some(first_elt), Some(last_elt)) =
+                                (tuple.elts.first(), tuple.elts.last())
+                            {
+                                let first_range = parenthesized_range(
+                                    first_elt.into(),
+                                    tuple.into(),
+                                    self.module().tokens(),
+                                )
+                                .unwrap_or(first_elt.range());
+                                let last_range = parenthesized_range(
+                                    last_elt.into(),
+                                    tuple.into(),
+                                    self.module().tokens(),
+                                )
+                                .unwrap_or(last_elt.range());
+                                diagnostic.set_fix(Fix::unsafe_edits(
+                                    Edit::range_replacement(
+                                        "tuple[".to_string(),
+                                        TextRange::new(tuple.start(), first_range.start()),
+                                    ),
+                                    [Edit::range_replacement(
+                                        "]".to_string(),
+                                        TextRange::new(last_range.end(), tuple.end()),
+                                    )],
+                                ));
+                            } else {
+                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                                    "tuple[()]".to_string(),
+                                    tuple.range(),
+                                )));
+                            }
                         }
                     }
                 } else {
@@ -736,6 +795,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             hinted_type.display(db, env),
                         ));
                     }
+                    if !self.in_string_annotation()
+                        && env.python_version(db) >= PythonVersion::PY39
+                        && !source_text(db, self.file()).contains_line_break(dict.range())
+                        && SemanticModel::new(db, self.program_file())
+                            .definitely_has_builtin_binding("dict", dict.into())
+                    {
+                        let key_range =
+                            parenthesized_range(key.into(), dict.into(), self.module().tokens())
+                                .unwrap_or(key.range());
+                        let value_range =
+                            parenthesized_range(value.into(), dict.into(), self.module().tokens())
+                                .unwrap_or(value.range());
+                        diagnostic.help("Replace with `dict[...]`");
+                        diagnostic.set_fix(Fix::unsafe_edits(
+                            Edit::range_replacement(
+                                "dict[".to_string(),
+                                TextRange::new(dict.start(), key_range.start()),
+                            ),
+                            [
+                                Edit::range_replacement(
+                                    ", ".to_string(),
+                                    TextRange::new(key_range.end(), value_range.start()),
+                                ),
+                                Edit::range_replacement(
+                                    "]".to_string(),
+                                    TextRange::new(value_range.end(), dict.end()),
+                                ),
+                            ],
+                        ));
+                    }
                 }
                 Type::unknown()
             }
@@ -762,6 +851,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `{}`?",
                             hinted_type.display(db, env),
+                        ));
+                    }
+
+                    if !self.in_string_annotation()
+                        && env.python_version(db) >= PythonVersion::PY39
+                        && !single_element.is_starred_expr()
+                        && !source_text(db, self.file()).contains_line_break(set.range())
+                        && SemanticModel::new(db, self.program_file())
+                            .definitely_has_builtin_binding("set", set.into())
+                    {
+                        let element_range = parenthesized_range(
+                            single_element.into(),
+                            set.into(),
+                            self.module().tokens(),
+                        )
+                        .unwrap_or(single_element.range());
+                        diagnostic.help("Replace with `set[...]`");
+                        diagnostic.set_fix(Fix::unsafe_edits(
+                            Edit::range_replacement(
+                                "set[".to_string(),
+                                TextRange::new(set.start(), element_range.start()),
+                            ),
+                            [Edit::range_replacement(
+                                "]".to_string(),
+                                TextRange::new(element_range.end(), set.end()),
+                            )],
                         ));
                     }
                 }
@@ -1966,6 +2081,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Did you mean `Callable[..., {}]`?",
                             returns.display(db, builder.program_environment())
                         ));
+                        if !builder.in_string_annotation()
+                            && !source_text(db, builder.file())
+                                .contains_line_break(first_argument.range())
+                        {
+                            diagnostic.help("Replace `[...]` with `...`");
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                                "...".to_string(),
+                                first_argument.range(),
+                            )));
+                        }
                     }
                 }
                 Type::single_callable(
