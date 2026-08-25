@@ -411,6 +411,74 @@ while x < 10:
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+### Deletions in nested loops reach the outer loop
+
+An inner loop can delete a variable on one iteration, then exit through `break` on a later
+iteration. The variable can therefore be unbound both after the inner loop and at the start of the
+next outer iteration.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 0
+    while repeat:
+        x  # error: [possibly-unresolved-reference]
+        while True:
+            if stop():
+                break
+            x = 0
+            del x
+        x  # error: [possibly-unresolved-reference]
+```
+
+### Rebinding after an inner loop restores boundness
+
+An inner loop's deletion does not make a variable possibly unbound on later outer iterations if the
+variable is reassigned before reaching the next iteration.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 0
+    while repeat:
+        reveal_type(x)  # revealed: Literal[0]
+        while True:
+            if stop():
+                break
+            x = 0
+            del x
+        x = 0
+```
+
+### Statically unreachable deletions in nested loops preserve boundness
+
+A deletion guarded by an impossible comparison does not make the variable possibly unbound, even
+through several nested loops. Evaluating the loop conditions and comparison depends on bindings from
+the enclosing loops.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 1
+    while repeat:
+        reveal_type(x)  # revealed: Literal[1]
+        while x:
+            if stop():
+                break
+            while x:
+                if stop():
+                    break
+                if x == 4:
+                    del x
+        reveal_type(x)  # revealed: Literal[1]
+```
+
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py

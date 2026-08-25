@@ -1758,6 +1758,28 @@ for _ in iterable():
 x
 ```
 
+### Deletions in nested loops reach the outer loop
+
+A deletion followed by `continue` in an inner loop can remain visible after a later `break`. The
+variable can be unbound on the next outer iteration, even when exhausting the inner loop returns
+from the function.
+
+```py
+def f(flags: list[bool]):
+    x = 0
+    for _ in flags:
+        x  # error: [possibly-unresolved-reference]
+        for stop in flags:
+            if stop:
+                break
+            x = 0
+            del x
+            continue
+        else:
+            return
+        x  # error: [possibly-unresolved-reference]
+```
+
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
