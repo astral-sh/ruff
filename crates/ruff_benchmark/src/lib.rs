@@ -32,43 +32,6 @@ pub static LARGE_DATASET: TestFile = TestFile::new(
 );
 
 #[derive(Debug, Clone)]
-pub struct TestCase {
-    file: TestFile,
-}
-
-impl TestCase {
-    pub const fn fast(file: TestFile) -> Self {
-        Self { file }
-    }
-
-    pub const fn normal(file: TestFile) -> Self {
-        Self { file }
-    }
-
-    pub const fn slow(file: TestFile) -> Self {
-        Self { file }
-    }
-
-    pub fn code(&self) -> &str {
-        self.file.code
-    }
-
-    pub fn name(&self) -> &str {
-        self.file.name
-    }
-
-    pub fn path(&self) -> PathBuf {
-        PathBuf::from(file!())
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("resources")
-            .join(self.name())
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct TestFile {
     name: &'static str,
     code: &'static str,
@@ -85,5 +48,15 @@ impl TestFile {
 
     pub fn name(&self) -> &str {
         self.name
+    }
+
+    pub fn path(&self) -> PathBuf {
+        PathBuf::from(file!())
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("resources")
+            .join(self.name())
     }
 }
