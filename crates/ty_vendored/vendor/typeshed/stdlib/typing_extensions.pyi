@@ -805,7 +805,6 @@ else:
         kw_only_default: bool = False,
         frozen_default: bool = False,
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
-        **kwargs: object,
     ) -> IdentityFunction:
         """Decorator that marks a function, class, or metaclass as providing
         dataclass-like behavior.
@@ -1337,7 +1336,7 @@ else:
 
     For example::
 
-        def is_awaitable(val: object) -> TypeIs[Awaitable[Any]]:
+        def is_awaitable(val: object) -> TypeIs[Awaitable[object]]:
             return hasattr(val, '__await__')
 
         def f(val: Union[int, Awaitable[int]]) -> int:
