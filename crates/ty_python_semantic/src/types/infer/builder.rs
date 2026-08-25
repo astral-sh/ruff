@@ -171,6 +171,7 @@ mod named_tuple;
 mod new_class;
 mod paramspec_validation;
 mod post_inference;
+mod redundant_conditions;
 mod subscript;
 mod type_call;
 mod type_expression;
@@ -2146,6 +2147,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+
+        self.check_suite_for_redundant_conditions(suite);
     }
 
     fn infer_statement(&mut self, statement: &ast::Stmt) {
@@ -2723,9 +2726,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(guard) = guard.as_deref() {
                 let guard_ty = self.infer_standalone_expression(guard, TypeContext::default());
 
-                if let Err(err) = guard_ty.try_bool(db, self.program_environment()) {
-                    err.report_diagnostic(&self.context, guard);
-                }
+                let truthiness = guard_ty
+                    .try_bool(db, self.program_environment())
+                    .map(|_| self.condition_truthiness(guard))
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, guard);
+                        err.fallback_truthiness()
+                    });
+
+                self.check_condition_redundancy(guard, guard_ty, truthiness);
             }
 
             self.infer_body(body);
@@ -8400,9 +8409,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for expr in ifs {
             let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
 
-            if let Err(err) = test_ty.try_bool(db, env) {
-                err.report_diagnostic(&self.context, expr);
-            }
+            let truthiness = test_ty
+                .try_bool(db, env)
+                .map(|_| self.condition_truthiness(expr))
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, expr);
+                    err.fallback_truthiness()
+                });
+
+            self.check_condition_redundancy(expr, test_ty, truthiness);
         }
     }
 
@@ -8547,24 +8562,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 (body_ty, orelse_ty)
             };
 
-        let test_truthiness = match test_ty.try_bool(db, env) {
-            Ok(_) => analyze_condition_expression(test, &|node| {
-                self.comparison_truthiness
-                    .get(&node.into())
-                    .copied()
-                    .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
-            })
-            .unwrap_or(Truthiness::Ambiguous),
-            Err(err) => {
+        let test_truthiness = test_ty
+            .try_bool(db, env)
+            .map(|_| self.condition_truthiness(test))
+            .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, &**test);
                 err.fallback_truthiness()
-            }
-        };
+            });
+
+        self.check_condition_redundancy(test, test_ty, test_truthiness);
+
         match test_truthiness {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
             Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
         }
+    }
+
+    /// Evaluates an already-inferred expression as a direct condition.
+    ///
+    /// Unlike testing a saved expression's value, this does not re-test intermediate
+    /// short-circuit results, whose truthiness may have changed.
+    fn condition_truthiness(&self, test: &ast::Expr) -> Truthiness {
+        let db = self.db();
+        let env = self.program_environment();
+        analyze_condition_expression(test, &|node| {
+            self.comparison_truthiness
+                .get(&node.into())
+                .copied()
+                .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
+        })
+        .unwrap_or(Truthiness::Ambiguous)
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda, tcx: TypeContext<'db>) {
@@ -11251,16 +11279,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ))
             }
 
-            (ast::UnaryOp::Not, ty) => Type::from_truthiness(
-                db,
-                env,
-                ty.try_bool(db, env)
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, unary);
-                        err.fallback_truthiness()
-                    })
-                    .negate(),
-            ),
+            (ast::UnaryOp::Not, ty) => {
+                let original_truthiness = ty.try_bool(db, env).unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, unary);
+                    err.fallback_truthiness()
+                });
+
+                self.check_negation_redundancy(unary, ty, original_truthiness);
+
+                Type::from_truthiness(db, env, original_truthiness.negate())
+            }
             // Handle constrained TypeVars specially: check each constraint individually.
             //
             // TODO: We expect to replace this with more general support once we migrate to the new

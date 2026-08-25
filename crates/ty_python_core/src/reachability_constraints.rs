@@ -5,7 +5,7 @@
 use std::cmp::Ordering;
 
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::predicate::ScopedPredicateId;
@@ -151,6 +151,37 @@ pub struct ReachabilityConstraints {
 }
 
 impl ReachabilityConstraints {
+    /// Iterate over the predicates in every branch of a constraint, without evaluating them.
+    ///
+    /// Each predicate is yielded once, even if several decision-diagram nodes refer to it.
+    /// Shared nodes are also visited only once.
+    pub fn predicate_ids(
+        &self,
+        root: ScopedReachabilityConstraintId,
+    ) -> impl Iterator<Item = ScopedPredicateId> + '_ {
+        let mut pending = Vec::new();
+        if !root.is_terminal() {
+            pending.push(root);
+        }
+        let mut visited = FxHashSet::default();
+        let mut predicates = FxHashSet::default();
+
+        std::iter::from_fn(move || {
+            while let Some(id) = pending.pop() {
+                if id.is_terminal() || !visited.insert(id) {
+                    continue;
+                }
+
+                let node = self.get_interior_node(id);
+                pending.extend([node.if_false(), node.if_ambiguous(), node.if_true()]);
+                if predicates.insert(node.atom()) {
+                    return Some(node.atom());
+                }
+            }
+            None
+        })
+    }
+
     /// Look up an interior node by its constraint ID.
     pub fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
         debug_assert!(!id.is_terminal());

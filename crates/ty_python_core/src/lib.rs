@@ -553,6 +553,21 @@ impl<'db> SemanticIndex<'db> {
         })
     }
 
+    /// Returns the outermost boolean test containing `range`, including an exact match.
+    ///
+    /// Direct conditions and operands of `not` are recorded so the redundant-condition rules
+    /// can check a complete test once, including any boolean tests nested inside it.
+    ///
+    /// Only tests recorded in `scope_id` are considered; an outer statement's context does not
+    /// extend into a lambda or another nested scope.
+    pub fn enclosing_boolean_test(
+        &self,
+        scope_id: FileScopeId,
+        range: TextRange,
+    ) -> Option<TextRange> {
+        self.use_def_map(scope_id).enclosing_boolean_test(range)
+    }
+
     /// Returns an iterator over the descendent scopes of `scope`.
     fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
         DescendantsIter::new(&self.scopes, scope)
@@ -952,6 +967,10 @@ impl Truthiness {
 
     pub const fn may_be_true(self) -> bool {
         !self.is_always_false()
+    }
+
+    pub const fn may_be_false(self) -> bool {
+        !self.is_always_true()
     }
 
     pub const fn is_always_true(self) -> bool {
