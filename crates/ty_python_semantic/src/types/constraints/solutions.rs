@@ -5,8 +5,8 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder,
-    PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
+    PathBoundBuilder, PathBounds, SolutionLimits,
 };
 use crate::types::typevar::TypeVarBoundOrConstraints;
 use crate::types::{BoundTypeVarInstance, Type};
@@ -83,34 +83,83 @@ impl<'db> SolutionWalker<'db> {
 
         // At this point we actually have to walk the outgoing edges of this node.
         let interior = storage.interior_node_data(node);
-        let constraint = interior.constraint;
-        for (assignment, child) in [
-            (constraint.when_true(), interior.if_true),
-            (constraint.when_unconstrained(), interior.if_uncertain),
-            (constraint.when_false(), interior.if_false),
-        ] {
-            path.walk_edge(
-                db,
-                env,
-                storage,
-                assignment,
-                |storage, path, _new_range, found_conflict| {
-                    if !found_conflict {
-                        self.visit_node_and_then(
-                            db,
-                            env,
-                            storage,
-                            limits,
-                            path,
-                            child,
-                            process_satisfied,
-                        )?;
-                    }
-                    ControlFlow::Continue(())
-                },
-            )?;
-        }
+        self.visit_edge(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            interior.constraint.when_true(),
+            interior.if_true,
+            process_satisfied,
+        )?;
+        self.visit_edge(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            interior.constraint.when_unconstrained(),
+            interior.if_uncertain,
+            process_satisfied,
+        )?;
+        self.visit_edge(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            interior.constraint.when_false(),
+            interior.if_false,
+            process_satisfied,
+        )?;
         ControlFlow::Continue(())
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::type_complexity)]
+    fn visit_edge<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        assignment: ConstraintAssignment,
+        child: NodeId,
+        process_satisfied: &mut dyn FnMut(
+            &mut Self,
+            &mut ConstraintSetStorage<'db>,
+            &mut L,
+            &mut PathAssignments,
+        ) -> ControlFlow<L::Break>,
+    ) -> ControlFlow<L::Break> {
+        // Don't bother adding the assignment and checking the sequent map if the edge takes us to
+        // the ALWAYS_FALSE terminal.
+        if child == ALWAYS_FALSE {
+            return ControlFlow::Continue(());
+        }
+
+        path.walk_edge(
+            db,
+            env,
+            storage,
+            assignment,
+            |storage, path, _new_range, found_conflict| {
+                if !found_conflict {
+                    self.visit_node_and_then(
+                        db,
+                        env,
+                        storage,
+                        limits,
+                        path,
+                        child,
+                        process_satisfied,
+                    )?;
+                }
+                ControlFlow::Continue(())
+            },
+        )
     }
 
     fn validate_satisfied_path<L: SolutionLimits>(
