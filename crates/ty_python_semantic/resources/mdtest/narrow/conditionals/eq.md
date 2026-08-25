@@ -2718,11 +2718,12 @@ def protocol_union(value: TaggedA | TaggedB):
         reveal_type(value.field_b)  # revealed: str
 
 def protocol_union_multiple_tags(value: TaggedA | TaggedC1):
-    if value.tag == "c":
+    if value.tag == "a":
+        reveal_type(value)  # revealed: TaggedA
+        reveal_type(value.field_a)  # revealed: int
+    else:
         reveal_type(value)  # revealed: TaggedC1
         reveal_type(value.field_c1)  # revealed: str
-    else:
-        reveal_type(value)  # revealed: TaggedA | TaggedC1
 ```
 
 Enum literals are also supported as attribute tags:
