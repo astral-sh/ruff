@@ -2959,8 +2959,23 @@ impl<'db> Bindings<'db> {
                             if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none() {
                                 let normalize_bound =
                                     |bound: Type<'db>| match bound.resolve_type_alias(db) {
+                                        Type::Callable(callable)
+                                            if let [signature] =
+                                                callable.signatures(db).overloads.as_slice()
+                                                && signature.generic_context.is_none()
+                                                && let Some(paramspec) =
+                                                    signature.parameters().as_paramspec() =>
+                                        {
+                                            Some(Type::TypeVar(paramspec))
+                                        }
                                         Type::Callable(callable) => {
                                             Some(Type::Callable(callable.into_paramspec_value(db)))
+                                        }
+                                        Type::TypeVar(bound)
+                                            if bound.is_paramspec(db)
+                                                && bound.paramspec_attr(db).is_none() =>
+                                        {
+                                            Some(Type::TypeVar(bound))
                                         }
                                         _ => None,
                                     };

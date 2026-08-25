@@ -9501,14 +9501,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => None,
         };
+        let paramspec_range_subject_is_bare = paramspec_range_subject
+            .filter(|subject| is_dotted_name(subject))
+            .is_some_and(|subject| {
+                let mut speculative = self.speculate_without_diagnostics();
+                speculative.expression_cache = None;
+                match speculative.infer_expression(subject, TypeContext::default()) {
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                        typevar.is_paramspec(db)
+                    }
+                    Type::TypeVar(typevar) => {
+                        typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none()
+                    }
+                    _ => false,
+                }
+            });
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                // The internal range constructor accepts a bare ParamSpec subject, but
-                // this must not allow nested uses such as `list[P]` or `Callable[..., P]`.
-                if paramspec_range_subject.is_some_and(|subject| std::ptr::eq(subject, expr))
+                // A ParamSpec range can refer to other ParamSpecs. Limit the exception to
+                // dotted names so nested types and calls in attribute receivers keep
+                // their ordinary validation.
+                if (paramspec_range_subject_is_bare
+                    || paramspec_range_subject.is_some_and(|subject| std::ptr::eq(subject, expr)))
                     && is_dotted_name(expr)
                 {
                     let previously_allowed = builder

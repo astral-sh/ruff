@@ -1225,6 +1225,16 @@ def signature[**P]() -> None:
     reveal_type(constraints.with_detailed_display())
 ```
 
+Generic callable bounds keep their own ParamSpec binder.
+
+```py
+def callback[**Q](*args: Q.args, **kwargs: Q.kwargs) -> None: ...
+def generic_signature[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[callback], P, RegularCallableTypeOf[callback])
+    # revealed: ConstraintSet[(P@generic_signature = (**Q@callback))]
+    reveal_type(constraints.with_detailed_display())
+```
+
 ## ParamSpec
 
 A ParamSpec range is `lower_parameters ≤ P ≤ upper_parameters`; callable returns are ignored.
@@ -1341,6 +1351,86 @@ def incompatible[**P]() -> None:
     static_assert(inverted == ConstraintSet.never())
     incomparable = ConstraintSet.range(Callable[[Base], None], P, Callable[[Unrelated], None])
     static_assert(incomparable == ConstraintSet.never())
+```
+
+### Symbolic bounds
+
+Another ParamSpec can bind both endpoints, requiring the parameter lists to be equal.
+
+```py
+from typing import Any, Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def equality[**P, **Q]() -> None:
+    constraints = ConstraintSet.range(Q, P, Q)
+    expected = is_constraint_set_assignable_to(Callable[P, Any], Callable[Q, Any])
+    static_assert(constraints == expected)
+    static_assert(constraints == ConstraintSet.range(P, Q, P))
+```
+
+Each endpoint is retained; a self-bound (`P ≤ P`) leaves that side unconstrained.
+
+```py
+def symbolic_lower[**P, **Q]() -> None:
+    constraints = ConstraintSet.range(Q, P, Callable[[int], None])
+    lower = ConstraintSet.range(Q, P, P)
+    upper = ConstraintSet.range(P, P, Callable[[int], None])
+    static_assert(constraints == (lower & upper))
+    static_assert(constraints != lower)
+    static_assert(constraints != upper)
+```
+
+Symbolic upper bounds likewise retain their concrete lower bound.
+
+```py
+def symbolic_upper[**P, **Q]() -> None:
+    constraints = ConstraintSet.range(Callable[[int], None], P, Q)
+    lower = ConstraintSet.range(Callable[[int], None], P, P)
+    upper = ConstraintSet.range(P, P, Q)
+    static_assert(constraints == (lower & upper))
+    static_assert(constraints != lower)
+    static_assert(constraints != upper)
+```
+
+Three ParamSpecs form a two-sided range, independent of conjunction order.
+
+```py
+def symbolic_range[**P, **Q, **R]() -> None:
+    constraints = ConstraintSet.range(Q, P, R)
+    lower = ConstraintSet.range(Q, P, P)
+    upper = ConstraintSet.range(P, P, R)
+    static_assert(constraints == (lower & upper))
+    static_assert(constraints == (upper & lower))
+    static_assert(constraints != lower)
+    static_assert(constraints != upper)
+```
+
+### Symbolic callable bounds
+
+An unprefixed callable bound describes the same parameter list as its bare ParamSpec.
+
+```py
+from typing import Any, Callable, Concatenate
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def unprefixed[**P, **Q]() -> None:
+    constraints = ConstraintSet.range(Callable[Q, int], P, Callable[Q, str])
+    static_assert(constraints == ConstraintSet.range(Q, P, Q))
+```
+
+A `Concatenate` bound preserves its prefix and symbolic tail while erasing the return.
+
+```py
+def prefixed[**P, **Q]() -> None:
+    constraints = ConstraintSet.range(Callable[Concatenate[int, Q], int], P, Callable[Concatenate[int, Q], str])
+    expected = is_constraint_set_assignable_to(Callable[Concatenate[int, Q], int], Callable[P, Any])
+    expected &= is_constraint_set_assignable_to(Callable[P, Any], Callable[Concatenate[int, Q], str])
+    static_assert(constraints == expected)
+    static_assert(constraints != ConstraintSet.range(Q, P, Q))
+    different_prefix = ConstraintSet.range(Callable[Concatenate[str, Q], None], P, Callable[Concatenate[str, Q], None])
+    static_assert(constraints != different_prefix)
 ```
 
 ### Signature preservation
