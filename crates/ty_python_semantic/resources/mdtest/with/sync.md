@@ -558,6 +558,28 @@ def _(context_expr: Manager1 | Manager2):
         reveal_type(f)  # revealed: str | int
 ```
 
+## Context managers returning narrowed `Self`
+
+A context manager whose `__enter__` returns `Self` preserves narrowing of the context expression in
+the bound value.
+
+```py
+from typing_extensions import Self
+
+class Manager:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: object) -> None: ...
+
+class Excluded: ...
+
+def use(manager: Manager):
+    if not isinstance(manager, Excluded):
+        with manager as value:
+            reveal_type(value)  # revealed: Manager & ~Excluded
+```
+
 ## Type aliases preserve context manager behavior
 
 ```toml
