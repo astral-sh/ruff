@@ -3103,8 +3103,6 @@ pub(crate) enum PathBoundSolution<'db> {
     Unsolved,
     /// The path's lower and upper bounds cannot be satisfied together
     Unsatisfiable,
-    /// The path does not satisfy the typevar's declared upper bound
-    ViolatesDeclaredUpperBound,
     /// The path does not satisfy the typevar's declared constraints
     ViolatesDeclaredConstraints,
     /// Computing the solution exceeded the type-construction budget. A previously known type
@@ -3122,10 +3120,7 @@ impl<'db> PathBoundSolution<'db> {
             Self::BudgetExceeded { fallback } => Self::BudgetExceeded {
                 fallback: fallback.map(f),
             },
-            Self::Unsolved
-            | Self::Unsatisfiable
-            | Self::ViolatesDeclaredUpperBound
-            | Self::ViolatesDeclaredConstraints => self,
+            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints => self,
         }
     }
 
@@ -3134,10 +3129,7 @@ impl<'db> PathBoundSolution<'db> {
     pub(crate) fn as_type(self) -> Option<Type<'db>> {
         match self {
             Self::Solved(ty) => Some(ty),
-            Self::Unsolved
-            | Self::Unsatisfiable
-            | Self::ViolatesDeclaredUpperBound
-            | Self::ViolatesDeclaredConstraints => None,
+            Self::Unsolved | Self::Unsatisfiable | Self::ViolatesDeclaredConstraints => None,
             Self::BudgetExceeded { fallback } => fallback,
         }
     }
@@ -3754,22 +3746,16 @@ impl<'db> CandidateSolutions<'db> {
         choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
     ) -> Option<(Solution<'db>, bool)> {
         let mut solved_typevars = Vec::with_capacity(candidate.typevars.len());
-        let mut violations = Vec::new();
+        let mut violations = match &candidate.validity {
+            SolutionValidity::Valid => Vec::new(),
+            SolutionValidity::Invalid(violations) => violations.clone().into_vec(),
+        };
         let mut exceeded_budget = false;
         for path_bound in &candidate.typevars {
             let ty = match choose(path_bound.variance(), path_bound) {
                 PathBoundSolution::Solved(ty) => Some(ty),
                 PathBoundSolution::Unsolved => None,
                 PathBoundSolution::Unsatisfiable => return None,
-                PathBoundSolution::ViolatesDeclaredUpperBound => {
-                    violations.push(SolutionViolation {
-                        bound_typevar: path_bound.bound_typevar,
-                        argument: path_bound.evidence_lower(),
-                        variance: path_bound.variance(),
-                        kind: SolutionViolationKind::UpperBound,
-                    });
-                    None
-                }
                 PathBoundSolution::ViolatesDeclaredConstraints => {
                     violations.push(SolutionViolation {
                         bound_typevar: path_bound.bound_typevar,
@@ -3847,29 +3833,17 @@ impl<'db> CandidateSolutions<'db> {
     ) -> PathBoundSolution<'db> {
         // Choose a solution type that satisfies the constraints on this path, as well as any upper
         // bound or constraints of the typevar itself.
-        // TODO: Handle the upper bound/constraints by conjoining them with the constraint set
-        // before solving.
+        // TODO: Handle the constraints by conjoining them with the constraint set before solving.
 
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.effective_lower(db, env);
 
         match bound_typevar.require_bound_or_constraints(db, env) {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                let declared_upper = bound.top_materialization(db, env);
-
+            TypeVarBoundOrConstraints::UpperBound(_) => {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
                 if path_bound.evidence_lower.is_some() {
-                    if !is_possibly_constraint_set_assignable(
-                        db,
-                        TypePair::new(db, env.program(db), lower, declared_upper),
-                    ) {
-                        // Prefer a declared-bound violation when the inferred bounds are also
-                        // contradictory, so callers can report the more specific cause.
-                        return PathBoundSolution::ViolatesDeclaredUpperBound;
-                    }
-
                     if !path_bound.upper.is_satisfied_by(db, env, lower) {
                         let mut storage = builder.storage.borrow_mut();
                         let (when_upper, source_order) =
@@ -3890,7 +3864,7 @@ impl<'db> CandidateSolutions<'db> {
                     return IntersectionType::bounded_from_elements(
                         db,
                         env,
-                        iter::chain(path_bound.upper.iter_clauses(), [declared_upper]),
+                        path_bound.upper.iter_clauses(),
                     )
                     .map_or(
                         PathBoundSolution::BudgetExceeded { fallback: None },
@@ -5258,6 +5232,38 @@ mod tests {
             assert_eq!(mentioned, vec![t, u]);
             assert!(support.is_complete());
         }
+    }
+
+    #[test]
+    fn validity_closes_over_typevars_in_declared_upper_bounds() {
+        // Both evidence paths violate `T ≤ U ≤ int`. `U` occurs only in `T`'s declared upper bound,
+        // so rejecting them requires validity traversal to add `U` to its worklist.
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let u = create_typevar(db, "U")
+            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(int)));
+        let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
+        });
+        let builder = ConstraintSetBuilder::new();
+        let set = create_constraint(db, &builder, t, KnownClass::Str).or(db, &builder, || {
+            create_constraint(db, &builder, t, KnownClass::Bytes)
+        });
+        let inferable = TypeVarSet::from_typevars(db, [t]);
+
+        assert_eq!(
+            CandidateSolutions::compute(
+                db,
+                &env,
+                &mut builder.storage.borrow_mut(),
+                set.node,
+                inferable,
+                set.source_order,
+            ),
+            CandidateSolutions::Unsatisfiable
+        );
     }
 
     #[test]
