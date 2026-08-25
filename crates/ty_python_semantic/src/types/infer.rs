@@ -70,7 +70,7 @@ use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, semantic_index};
+use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
 mod comparisons;
@@ -1703,6 +1703,10 @@ struct ExpressionInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
+    /// Truthiness of chained comparisons evaluated directly as conditions, before their
+    /// potentially stateful comparison results can be saved and tested again.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
@@ -1755,6 +1759,16 @@ impl<'db> ExpressionInference<'db> {
                     *binding_ty = binding_ty.recursive_type_normalized(db, env, cycle);
                 }
             }
+
+            if cycle.iteration() > crate::TAINTED_CYCLES {
+                // Widening operand types must not make reachability alternate between
+                // definite outcomes during cycle recovery.
+                for (expr, truthiness) in &mut extra.comparison_truthiness {
+                    if previous.comparison_truthiness(*expr) != Some(*truthiness) {
+                        *truthiness = Truthiness::Ambiguous;
+                    }
+                }
+            }
         }
 
         for (expr, ty) in &mut self.expressions {
@@ -1786,6 +1800,17 @@ impl<'db> ExpressionInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn comparison_truthiness(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Truthiness> {
+        self.extra
+            .as_deref()?
+            .comparison_truthiness
+            .get(&expression.into())
+            .copied()
     }
 
     fn collection_use_constraints(

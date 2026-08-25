@@ -36,6 +36,31 @@ def _(flag: bool):
     reveal_type(x)  # revealed: Literal[1] | None
 ```
 
+## Statically known compound conditions
+
+Short-circuit conditions can select a single branch even when an operand has mutable truthiness.
+Saving the condition's value and testing it again does not provide the same guarantee.
+
+```py
+def _(value: object):
+    reveal_type(1 if value and False else 2)  # revealed: Literal[2]
+    reveal_type(1 if value or True else 2)  # revealed: Literal[1]
+
+    saved = value and False
+    reveal_type(1 if saved else 2)  # revealed: Literal[1, 2]
+```
+
+This also applies when comparisons return values with unknown truthiness, including in comparison
+chains.
+
+```py
+def _(value):
+    if value is None:
+        return
+    reveal_type(True if value != "" and False else False)  # revealed: Literal[False]
+    reveal_type(False if value == 1 < 0 else True)  # revealed: Literal[True]
+```
+
 ## Condition with object that implements `__bool__` incorrectly
 
 ```py

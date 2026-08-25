@@ -228,6 +228,13 @@ impl ConditionFlowSnapshot {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+enum ExpressionContext {
+    #[default]
+    Value,
+    Condition,
+}
+
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -253,6 +260,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     has_future_annotations: bool,
     /// Whether we are currently visiting an `if TYPE_CHECKING` block.
     in_type_checking_block: bool,
+    /// How the next `visit_expr` consumes its expression. The visitor resets this to `Value`
+    /// before walking children; only short-circuit expressions propagate it to their operands.
+    next_expression_context: ExpressionContext,
 
     // Used for checking semantic syntax errors
     resolver_environment: ResolverEnvironment<'db>,
@@ -324,6 +334,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             has_future_annotations: false,
             in_type_checking_block: false,
+            next_expression_context: ExpressionContext::Value,
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
@@ -2149,12 +2160,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         predicate_node: &'ast ast::Expr,
     ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
-        let predicate = self.build_predicate(predicate_node);
+        let predicate = self.build_predicate(predicate_node, ExpressionContext::Condition);
         let predicate_id = self.record_narrowing_constraint(predicate);
         (predicate, predicate_id)
     }
 
-    fn build_predicate(&mut self, predicate_node: &'ast ast::Expr) -> PredicateOrLiteral<'db> {
+    fn build_predicate(
+        &mut self,
+        predicate_node: &'ast ast::Expr,
+        context: ExpressionContext,
+    ) -> PredicateOrLiteral<'db> {
         // Some commonly used test expressions are eagerly evaluated as `true`
         // or `false` here for performance reasons. This list does not need to
         // be exhaustive. More complex expressions will still evaluate to the
@@ -2186,7 +2201,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         match resolve_to_literal(predicate_node) {
             Some(literal) => PredicateOrLiteral::Literal(literal),
             None => PredicateOrLiteral::Predicate(Predicate {
-                node: PredicateNode::Expression(expression),
+                node: if matches!(context, ExpressionContext::Condition)
+                    && match predicate_node {
+                        ast::Expr::BoolOp(_) | ast::Expr::If(_) => true,
+                        ast::Expr::UnaryOp(unary) => unary.op == ast::UnaryOp::Not,
+                        ast::Expr::Compare(compare) => compare.ops.len() > 1,
+                        _ => false,
+                    } {
+                    PredicateNode::Condition(expression)
+                } else {
+                    PredicateNode::Expression(expression)
+                },
                 is_positive: true,
             }),
         }
@@ -2245,7 +2270,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let place_table = self.current_place_table();
 
                 match pred.node {
-                    PredicateNode::Expression(expression) => {
+                    PredicateNode::Expression(expression)
+                    | PredicateNode::Condition(expression) => {
                         let expression_node = expression.node_ref(self.db).node(self.module);
                         let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);
@@ -3004,7 +3030,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// print(last)
     /// ```
     fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) -> FlowSnapshot {
-        self.visit_expr(if_expr);
+        self.visit_expr_with_context(if_expr, ExpressionContext::Condition);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
         let filtered_out = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
             self.flow_restore(snapshots.truthy);
@@ -3269,13 +3295,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .get_or_init(|| source_text(self.db, self.file.file(self.db)))
     }
 
+    fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
+        self.next_expression_context = context;
+        self.visit_expr(expr);
+    }
+
     /// Visits a conditional expression without reserving its flow snapshots in every recursive
     /// expression-visitor frame. This matters for deeply nested expressions in unoptimized builds.
-    fn visit_if_expression(&mut self, node: &'ast ast::ExprIf) {
+    fn visit_if_expression(&mut self, node: &'ast ast::ExprIf, context: ExpressionContext) {
         let ast::ExprIf {
             body, test, orelse, ..
         } = node;
-        self.visit_expr(test);
+        self.visit_expr_with_context(test, ExpressionContext::Condition);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
             self.flow_restore(snapshots.truthy);
@@ -3288,7 +3319,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let in_type_checking_block = self.in_type_checking_block;
         self.current_use_def_map_mut()
             .record_range_reachability(body.range(), in_type_checking_block);
-        self.visit_expr(body);
+        self.visit_expr_with_context(body, context);
         let post_body = self.flow_snapshot();
         self.flow_restore(falsy);
 
@@ -3297,12 +3328,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let in_type_checking_block = self.in_type_checking_block;
         self.current_use_def_map_mut()
             .record_range_reachability(orelse.range(), in_type_checking_block);
-        self.visit_expr(orelse);
+        self.visit_expr_with_context(orelse, context);
         self.flow_merge(post_body);
     }
 
     /// Keeps short-circuit flow snapshots out of the common recursive expression-visitor frame.
-    fn visit_bool_expression(&mut self, node: &'ast ast::ExprBoolOp) {
+    fn visit_bool_expression(&mut self, node: &'ast ast::ExprBoolOp, context: ExpressionContext) {
         let ast::ExprBoolOp { values, op, .. } = node;
         let mut snapshots = vec![];
         let mut reachability_constraints = vec![];
@@ -3317,7 +3348,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let in_type_checking_block = self.in_type_checking_block;
             self.current_use_def_map_mut()
                 .record_range_reachability(value.range(), in_type_checking_block);
-            self.visit_expr(value);
+            self.visit_expr_with_context(value, context);
 
             // Only non-final values can short-circuit this boolean operation. The final
             // value can still have its own outcome-specific flow if it is nested.
@@ -3326,7 +3357,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     value,
                 ));
                 let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
-                let predicate = self.build_predicate(value);
+                let predicate = self.build_predicate(value, context);
                 let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                 let predicate_id = match op {
                     ast::BoolOp::And => self.add_predicate(predicate),
@@ -3866,9 +3897,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // `msg` branch back into the following flow, since there is no way of getting out
                 // of that branch. Code after the assertion starts from the condition's truthy flow.
 
-                self.visit_expr(test);
+                self.visit_expr_with_context(test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
-                let predicate = self.build_predicate(test);
+                let predicate = self.build_predicate(test, ExpressionContext::Condition);
 
                 if msg.is_some()
                     || self
@@ -4039,7 +4070,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
-                self.visit_expr(&node.test);
+                self.visit_expr_with_context(&node.test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                     self.flow_restore(snapshots.truthy);
@@ -4093,7 +4124,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     let next_falsy = if let Some(elif_test) = clause_test {
-                        self.visit_expr(elif_test);
+                        self.visit_expr_with_context(elif_test, ExpressionContext::Condition);
                         // A test expression is evaluated whether the branch is taken or not
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
                         let next_falsy =
@@ -4176,7 +4207,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
-                self.visit_expr(test);
+                self.visit_expr_with_context(test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 
                 // Take the pre_loop snapshot from the post-test fallback flow before restoring the
@@ -4554,7 +4585,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // while the next case is reached through `!P || (P && !G)`. Save `P && !G`
                     // separately so it can be merged with the pattern-failure state after the body.
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
-                        self.visit_expr(guard);
+                        self.visit_expr_with_context(guard, ExpressionContext::Condition);
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(guard);
                         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches()
                         {
@@ -5266,6 +5297,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        let context = std::mem::take(&mut self.next_expression_context);
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         self.scopes_by_expression
@@ -5399,7 +5431,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(lambda.body.as_ref());
                 self.pop_scope();
             }
-            ast::Expr::If(node) => self.visit_if_expression(node),
+            ast::Expr::If(node) => self.visit_if_expression(node, context),
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
                     elt, generators, ..
@@ -5466,7 +5498,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.record_exception_checkpoint();
             }
             ast::Expr::UnaryOp(unary) => {
-                walk_expr(self, expr);
+                self.visit_expr_with_context(
+                    &unary.operand,
+                    if unary.op == ast::UnaryOp::Not {
+                        context
+                    } else {
+                        ExpressionContext::Value
+                    },
+                );
                 self.record_exception_checkpoint_if(
                     unary.op != ast::UnaryOp::Not
                         || !Self::condition_evaluation_is_known_safe(&unary.operand),
@@ -5487,7 +5526,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     ));
                 }
             }
-            ast::Expr::BoolOp(node) => self.visit_bool_expression(node),
+            ast::Expr::BoolOp(node) => self.visit_bool_expression(node, context),
             ast::Expr::StringLiteral(_) => {
                 walk_expr(self, expr);
             }

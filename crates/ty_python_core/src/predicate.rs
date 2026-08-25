@@ -114,7 +114,14 @@ pub struct CallableAndCallExpr<'db> {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
+    /// The truthiness of an expression's resulting value.
     Expression(Expression<'db>),
+    /// A short-circuit expression evaluated directly as a condition: a boolean operation, `not`,
+    /// a chained comparison, or a conditional expression.
+    ///
+    /// In `if x and False`, the truthy branch is unreachable. But after `y = x and False`,
+    /// `if y` may be truthy: it can call `x.__bool__` a second time and get a different result.
+    Condition(Expression<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during
