@@ -1206,8 +1206,9 @@ def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
 
 ### Strict mode
 
-An invariant generic base determines its subclass's type arguments only when every argument has one
-exact solution. Unconstrained arguments and variant bases retain conservative member types.
+Captures retain the type information available in the narrowed subject. A known base argument
+constrains the corresponding subclass argument even if other parameters remain unconstrained.
+Covariant base arguments also constrain the types of captured values.
 
 ```toml
 [analysis]
@@ -1324,14 +1325,14 @@ def test_match_partially_specialized_generic_subclass(
 ) -> None:
     match value:
         case PartiallySpecializedGenericPatternChild(item=item):
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_covariant_generic_subclass(
     value: CovariantGenericPatternBase[int],
 ) -> None:
     match value:
         case CovariantGenericPatternChild(item=item):
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_inherited_generic_subclass_capture(
     value: GenericMemberBase[GenericPatternT],
@@ -1359,7 +1360,7 @@ def test_match_direct_generic_pattern_preserves_declared_member(value: object) -
 def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
     match value:
         case DefaultGenericPatternBox(value=int() as item):
-            reveal_type(item)  # revealed: Unknown & int
+            reveal_type(item)  # revealed: int
 ```
 
 ### Strict mode with a union type alias

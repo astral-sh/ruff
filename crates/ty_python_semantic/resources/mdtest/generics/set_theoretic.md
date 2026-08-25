@@ -531,7 +531,6 @@ from ty_extensions._internal import is_equivalent_to
 class P: ...
 
 # TODO: Support intersections inside `type[...]`.
-# error: [unsupported-operator]
 # error: [static-assert-error]
 static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
 ```
@@ -559,4 +558,22 @@ def preserve_typevar[T: Co[P]](value: T & Co[Any]) -> T:
 
 def preserve_newtype(value: CoId & Co[Any]) -> CoId:
     return value
+```
+
+### Specializations with type variables
+
+Relations like (7b) also hold if they involve specializations using (non inferable) type variables:
+
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Co[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Child[T](Co[T]): ...
+
+def generic[T]() -> None:
+    static_assert(is_equivalent_to(Co[T] & Child[object], Child[T]))
 ```
