@@ -439,7 +439,7 @@ impl<'db> Type<'db> {
     ///
     /// This is a separate method so that we can skip this expensive check when diagnostics
     /// are suppressed.
-    pub(crate) fn relation_error_context(
+    fn relation_error_context(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2769,7 +2769,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 }
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
-    pub(super) env: &'a ProgramEnvironment<'db>,
+    env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,

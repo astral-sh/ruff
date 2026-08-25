@@ -505,7 +505,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Returns the generic context that should be inherited by any constructor methods of this class.
-    pub(super) fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+    fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
     }
 

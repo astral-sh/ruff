@@ -100,11 +100,11 @@ use crate::types::tuple::TupleSpec;
 pub use crate::types::type_alias::TypeAliasType;
 pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
-pub(crate) use crate::types::typevar::TypeVarBoundOrConstraints;
-pub use crate::types::typevar::{
-    BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarKind,
+pub(crate) use crate::types::typevar::{
+    BindingContext, BoundTypeVarIdentity, ParamSpecAttrKind, TypeVarBoundOrConstraints,
     TypeVarNonce,
 };
+pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -1880,7 +1880,7 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub(crate) fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
+    fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
         dynamic_content(db, env, self).is_absent()
     }
 
@@ -1978,7 +1978,7 @@ impl<'db> Type<'db> {
         self.cycle_normalized_impl(db, env, previous, cycle)
     }
 
-    pub(super) fn cycle_normalized_impl(
+    fn cycle_normalized_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4794,7 +4794,7 @@ impl<'db> Type<'db> {
     /// See also: [`Type::static_member`]
     ///
     #[must_use]
-    pub(crate) fn member(
+    fn member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

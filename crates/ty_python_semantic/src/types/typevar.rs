@@ -819,7 +819,7 @@ impl<'db> TypeVarInstance<'db> {
 /// `0` is reserved for source-level, non-freshened typevars. Positive values identify fresh
 /// occurrences.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TypeVarNonce(u32);
+pub(crate) struct TypeVarNonce(u32);
 
 // This type does not have any heap storage.
 impl get_size2::GetSize for TypeVarNonce {}
@@ -1694,7 +1694,7 @@ impl<'db> BindingContext<'db> {
         }
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
+    fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
             Self::Definition(definition) => definition.program(db),
             Self::Synthetic(program) => program,
@@ -1707,7 +1707,7 @@ impl<'db> BindingContext<'db> {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
-pub enum ParamSpecAttrKind {
+pub(crate) enum ParamSpecAttrKind {
     Args,
     Kwargs,
 }
@@ -2139,7 +2139,7 @@ pub enum TypeVarBoundOrConstraints<'db> {
     Constraints(TypeVarConstraints<'db>),
 }
 
-pub(super) fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     bounds: TypeVarBoundOrConstraints<'db>,
     visitor: &V,

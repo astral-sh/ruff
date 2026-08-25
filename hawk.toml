@@ -136,22 +136,6 @@ reason = "preserves the public syntax-validity predicate API"
 
 [[override]]
 lint = "hawk::unnecessary_public"
-crate = "ruff_python_parser"
-item = "parser::options::ParseOptions::with_max_recursion_depth"
-kind = "inherent_method"
-level = "expect"
-reason = "public parser options support configuring the documented recursion limit"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ruff_python_parser"
-item = "parser::options::ParseOptions::max_recursion_depth"
-kind = "inherent_method"
-level = "expect"
-reason = "preserves the public recursion-limit builder and accessor pair"
-
-[[override]]
-lint = "hawk::unnecessary_public"
 crate = "ruff_workspace"
 item = "settings::FormatterSettings::resolve_target_version"
 kind = "inherent_method"
@@ -893,6 +877,158 @@ item = "env_vars::EnvVars::XDG_CONFIG_HOME"
 kind = "inherent_associated_constant"
 level = "expect"
 reason = "consumed by the generated environment-variable reference"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_db"
+item = "system::command::Command::arg"
+kind = "inherent_method"
+level = "expect"
+reason = "command descriptions expose a complete argument builder and inspection API"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_db"
+item = "system::command::Command::get_current_dir"
+kind = "inherent_method"
+level = "expect"
+reason = "command descriptions expose a complete argument builder and inspection API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "expression::Expression::<'db>::python_file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "expression::Expression::<'db>::program"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "predicate::PatternPredicate::<'db>::file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "predicate::PatternPredicate::<'db>::python_file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "predicate::PatternPredicate::<'db>::program"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "statement::StatementInner::<'db>::file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "statement::StatementInner::<'db>::python_file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "statement::StatementInner::<'db>::program"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "unpack::Unpack::<'db>::file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "unpack::Unpack::<'db>::python_file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "unpack::Unpack::<'db>::program"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_python_semantic"
+item = "FixtureBinding"
+kind = "reexport"
+level = "expect"
+reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_python_semantic"
+item = "fixture_bindings_for_parameter"
+kind = "reexport"
+level = "expect"
+reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_python_semantic"
+item = "types::FixtureBinding"
+kind = "reexport"
+level = "expect"
+reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_python_semantic"
+item = "types::fixture_bindings_for_parameter"
+kind = "reexport"
+level = "expect"
+reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "types::dedicated::pytest::FixtureBinding::<'db>::request"
+kind = "inherent_method"
+level = "expect"
+reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_python_semantic"
+item = "types::dedicated::pytest::FixtureBinding::<'db>::fixture"
+kind = "inherent_method"
+level = "expect"
+reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
 
 # Keep public APIs whose narrower visibility would break a uniform interface or
 # activate compiler lints that Rust intentionally suppresses for public APIs.
