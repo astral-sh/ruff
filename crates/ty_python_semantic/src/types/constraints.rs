@@ -4121,6 +4121,9 @@ impl<'db> PathBounds<'db> {
         inferable: TypeVarSet<'db>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, Option<Self>> {
+        let bound_is_ineligible =
+            |ty: Type<'db>| ty.has_typevar(db, env) || ty.has_unspecialized_type_var(db, env);
+
         let mut constraints = Vec::default();
         let mut current = node;
         loop {
@@ -4130,7 +4133,6 @@ impl<'db> PathBounds<'db> {
                     if constraints.is_empty() {
                         return ControlFlow::Continue(Some(PathBounds::Unconstrained));
                     }
-                    limits.satisfied_path()?;
                     break;
                 }
                 Node::AlwaysFalse => {
@@ -4151,9 +4153,7 @@ impl<'db> PathBounds<'db> {
 
                     let mut bounds = iter::chain(constraint.bounds.lower, constraint.bounds.upper)
                         .map(ConstraintBound::ty);
-                    if bounds.any(|bound| {
-                        bound.has_typevar(db, env) || bound.has_unspecialized_type_var(db, env)
-                    }) {
+                    if bounds.any(bound_is_ineligible) {
                         return ControlFlow::Continue(None);
                     }
 
@@ -4204,9 +4204,17 @@ impl<'db> PathBounds<'db> {
                 // solutions, other than the evidence we already have in the BDD.
                 None => continue,
             };
+
+            if bound_is_ineligible(bound) {
+                // If this declared upper bound mentions other typevars, we don't have a simple
+                // conjunction that's eligible for this fast path.
+                return ControlFlow::Continue(None);
+            }
+
             bounds.add_upper(db, env, ConstraintBound::Validity(bound));
         }
 
+        limits.satisfied_path()?;
         let path = mappings
             .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
