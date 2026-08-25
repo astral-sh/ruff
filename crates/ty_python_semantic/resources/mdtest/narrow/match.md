@@ -1361,6 +1361,73 @@ def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
             reveal_type(item)  # revealed: Unknown & int
 ```
 
+### Strict mode with a union type alias
+
+Strict generic narrowing preserves the specialization when an invariant generic subject is
+parameterized by a PEP 695 union type alias.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class AliasPatternBase(Generic[T]): ...
+
+class AliasPatternChild(AliasPatternBase[T]):
+    item: T
+
+type Item = int | str
+
+def test_union_alias_capture(value: AliasPatternBase[Item]) -> None:
+    match value:
+        case AliasPatternChild(item=item):
+            # revealed: int | str
+            reveal_type(item)
+
+            # error: [unresolved-attribute] "Object of type `int | str` has no attribute `nonexistent`"
+            item.nonexistent()
+```
+
+### Strict mode with a recursive type alias
+
+The inferred specialization also retains recursion instead of replacing a recursive alias with an
+unknown type.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class AliasPatternBase(Generic[T]): ...
+
+class AliasPatternChild(AliasPatternBase[T]):
+    item: T
+
+type RecursiveItem = int | list[RecursiveItem]
+
+def test_recursive_alias_capture(value: AliasPatternBase[RecursiveItem]) -> None:
+    match value:
+        case AliasPatternChild(item=item):
+            # revealed: int | list[RecursiveItem]
+            reveal_type(item)
+```
+
 ## Positional class patterns
 
 `__match_args__` is read through the pattern class and must identify literal attribute names. This

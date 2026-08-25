@@ -13,8 +13,9 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{SolutionBudget, SolutionProjection};
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBoundSolution, PathBounds, SolutionPaths, Solutions,
+    ConstraintBound, ConstraintBounds, ConstraintSet, ConstraintSetBuilder,
+    IteratorConstraintsExtension, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
+    Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -3073,8 +3074,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         variance: TypeVarVariance,
     ) {
         let bounds = match variance {
-            TypeVarVariance::Covariant => ConstraintBounds::new(Some(ty), None),
-            TypeVarVariance::Contravariant => ConstraintBounds::new(None, Some(ty)),
+            TypeVarVariance::Covariant => {
+                ConstraintBounds::new(Some(ConstraintBound::Evidence(ty)), None)
+            }
+            TypeVarVariance::Contravariant => {
+                ConstraintBounds::new(None, Some(ConstraintBound::Evidence(ty)))
+            }
             TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
             TypeVarVariance::Bivariant => return,
         };
@@ -3151,8 +3156,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Option<ConstraintFailure<'db>> {
         let db = self.db;
         let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.lower?;
-        let variance = if path_bound.has_upper() {
+        let argument = path_bound.evidence_lower?;
+        let variance = if path_bound.has_upper_evidence() {
             ConstraintFailureVariance::Invariant
         } else {
             ConstraintFailureVariance::Contravariant
@@ -3168,12 +3173,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 bound_typevar,
                 argument,
             }),
-            TypeVarBoundOrConstraints::Constraints(_) => {
-                (!path_bound.has_upper()).then_some(SpecializationError::MismatchedConstraint {
+            TypeVarBoundOrConstraints::Constraints(_) => (!path_bound.has_upper_evidence())
+                .then_some(SpecializationError::MismatchedConstraint {
                     bound_typevar,
                     argument,
-                })
-            }
+                }),
         }?;
         Some(ConstraintFailure { error, variance })
     }

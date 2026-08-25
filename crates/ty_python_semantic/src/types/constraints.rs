@@ -335,9 +335,11 @@ impl<'db> OwnedConstraintSet<'db> {
                 .unique()
                 .map(|constraint| inner.constraints[inner.retained_constraint_index(constraint)])
                 .flat_map(|constraint| {
-                    std::iter::once(Type::TypeVar(constraint.typevar))
-                        .chain(constraint.bounds.lower)
-                        .chain(constraint.bounds.upper)
+                    [
+                        Type::TypeVar(constraint.typevar),
+                        constraint.bounds.lower_bound().ty(),
+                        constraint.bounds.upper_bound().ty(),
+                    ]
                 })
         })
     }
@@ -440,7 +442,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self::constrain_typevar_with_bounds(db, env, builder, typevar, Some(lower), Some(upper))
+        Self::constrain_typevar_with_bounds(
+            db,
+            env,
+            builder,
+            typevar,
+            Some(ConstraintBound::Evidence(lower)),
+            Some(ConstraintBound::Evidence(upper)),
+        )
     }
 
     /// Returns a constraint set that constrains a typevar with explicit lower and/or upper bounds.
@@ -449,8 +458,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
-        lower: Option<Type<'db>>,
-        upper: Option<Type<'db>>,
+        lower: Option<ConstraintBound<'db>>,
+        upper: Option<ConstraintBound<'db>>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
         let (node, source_order) =
@@ -466,7 +475,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
     ) -> Self {
-        Self::constrain_typevar_with_bounds(db, env, builder, typevar, Some(lower), None)
+        Self::constrain_typevar_with_bounds(
+            db,
+            env,
+            builder,
+            typevar,
+            Some(ConstraintBound::Evidence(lower)),
+            None,
+        )
     }
 
     /// Returns a constraint set that constrains a typevar to be a subtype of `upper`.
@@ -477,7 +493,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self::constrain_typevar_with_bounds(db, env, builder, typevar, None, Some(upper))
+        Self::constrain_typevar_with_bounds(
+            db,
+            env,
+            builder,
+            typevar,
+            None,
+            Some(ConstraintBound::Evidence(upper)),
+        )
     }
 
     /// Verifies that this constraint set was created by `builder`
@@ -749,14 +772,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 tcx,
                 visitor,
             );
-            let lower = constraint
-                .bounds
-                .lower
-                .map(|lower| lower.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-            let upper = constraint
-                .bounds
-                .upper
-                .map(|upper| upper.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            let lower = constraint.bounds.lower.map(|lower| {
+                lower.map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            });
+            let upper = constraint.bounds.upper.map(|upper| {
+                upper.map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            });
 
             let env = visitor.env;
             let mut storage = self.builder.storage.borrow_mut();
@@ -767,7 +788,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     Some(lower) => storage.load(
                         db,
                         env,
-                        &lower.when_constraint_set_assignable_to_owned(db, env, subject),
+                        &lower
+                            .ty()
+                            .when_constraint_set_assignable_to_owned(db, env, subject),
                     ),
                     None => (ALWAYS_TRUE, None),
                 };
@@ -775,7 +798,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     Some(upper) => storage.load(
                         db,
                         env,
-                        &subject.when_constraint_set_assignable_to_owned(db, env, upper),
+                        &subject.when_constraint_set_assignable_to_owned(db, env, upper.ty()),
                     ),
                     None => (ALWAYS_TRUE, None),
                 };
@@ -1317,10 +1340,10 @@ impl<'db> ConstraintSetStorage<'db> {
         let mut support = Support::default();
         support.insert(self.intern_typevar(db, typevar));
         if let Some(lower) = bounds.lower {
-            self.intern_mentioned_typevars_in_type(db, env, lower, &mut support);
+            self.intern_mentioned_typevars_in_type(db, env, lower.ty(), &mut support);
         }
         if let Some(upper) = bounds.upper {
-            self.intern_mentioned_typevars_in_type(db, env, upper, &mut support);
+            self.intern_mentioned_typevars_in_type(db, env, upper.ty(), &mut support);
         }
         support
     }
@@ -1811,15 +1834,115 @@ pub(crate) struct Constraint<'db> {
     bounds: ConstraintBounds<'db>,
 }
 
-/// The explicit lower and upper bounds inferred for a typevar on one constraint path.
+/// The lower or upper bound of a constraint, along with its _provenance_
 ///
-/// Missing bounds are represented as `None`; callers can materialize them to the logical defaults
-/// (`Never` for lower bounds, `object` for upper bounds) when they need to reason about
-/// satisfiability.
+/// Most bounds come from specific relationships found at the call site — for instance, the
+/// relationship between the argument type and parameter annotation when invoking a generic
+/// function. These bounds express actual user intent, and are called _evidence_ bounds.
+///
+/// Other bounds are background limitations on which specializations are valid — for instance, a
+/// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
+/// don't want to choose a validity bound as a solution unless we have no other choice. There is
+/// often an evidence bound that is a better choice.
+///
+/// A bound derived only from validity remains validity. Any derivation that also depends on
+/// evidence is itself evidence.
+///
+/// Every type is a supertype of `Never` and a subtype of `object`, so `Validity(Never)` represents
+/// an absent lower bound and `Validity(object)` represents an absent upper bound.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum ConstraintBound<'db> {
+    Validity(Type<'db>),
+    Evidence(Type<'db>),
+}
+
+impl<'db> ConstraintBound<'db> {
+    pub(crate) const fn missing_lower() -> Self {
+        Self::Validity(Type::Never)
+    }
+
+    pub(crate) const fn missing_upper() -> Self {
+        Self::Validity(Type::object())
+    }
+
+    pub(crate) fn ty(self) -> Type<'db> {
+        match self {
+            Self::Validity(ty) | Self::Evidence(ty) => ty,
+        }
+    }
+
+    const fn is_missing_lower(self) -> bool {
+        matches!(self, Self::Validity(Type::Never))
+    }
+
+    const fn is_missing_upper(self) -> bool {
+        matches!(self, Self::Validity(Type::NominalInstance(instance)) if instance.is_object())
+    }
+
+    fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        match self {
+            Self::Validity(ty) => Self::Validity(f(ty)),
+            Self::Evidence(ty) => Self::Evidence(f(ty)),
+        }
+    }
+
+    fn with_type(self, ty: Type<'db>) -> Self {
+        self.map(|_| ty)
+    }
+
+    /// Creates a bound produced by mathematically combining `lhs` and `rhs`.
+    ///
+    /// If one operand already equals the result, that operand alone establishes the combined
+    /// bound, so its provenance is retained. Otherwise, the result is validity only if both
+    /// operands are validity.
+    fn from_combination(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
+        match (combined == lhs.ty(), combined == rhs.ty()) {
+            (true, false) => lhs.with_type(combined),
+            (false, true) => rhs.with_type(combined),
+            _ => match (lhs, rhs) {
+                (Self::Validity(_), Self::Validity(_)) => Self::Validity(combined),
+                _ => Self::Evidence(combined),
+            },
+        }
+    }
+
+    /// Creates a bound derived by transitivity from two constraint bounds.
+    ///
+    /// Unlike a union or intersection on one typevar, neither premise is redundant merely because
+    /// the result has the same type as one of them. For example, deriving `int ≤ S` from
+    /// `int ≤ T` and `T ≤ S` requires both premises even though the resulting bound type is still
+    /// `int`.
+    ///
+    /// The result depends on both premises, so it is validity if both premises are validity and
+    /// evidence otherwise.
+    fn from_transitive_derivation(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
+        match (lhs, rhs) {
+            (Self::Validity(_), Self::Validity(_)) => Self::Validity(combined),
+            _ => Self::Evidence(combined),
+        }
+    }
+
+    /// Applies the source range's provenance to an evidence bound derived by comparing that range.
+    /// Bounds not produced by the comparison retain their existing provenance.
+    fn with_source_provenance(self, source: ConstraintBounds<'db>) -> Self {
+        match self {
+            Self::Evidence(ty) => {
+                Self::from_transitive_derivation(ty, source.lower_bound(), source.upper_bound())
+            }
+            Self::Validity(_) => self,
+        }
+    }
+}
+
+/// The lower and upper bounds for a typevar on one constraint path.
+///
+/// Missing bounds are stored as `None`, even though this is technically redundant with
+/// `Validity(Never)` or `Validity(object)`. This is purely an optimization, which makes constraint
+/// equality and hashing more performant for the (common) missing-bounds cases.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ConstraintBounds<'db> {
-    pub(crate) lower: Option<Type<'db>>,
-    pub(crate) upper: Option<Type<'db>>,
+    pub(crate) lower: Option<ConstraintBound<'db>>,
+    pub(crate) upper: Option<ConstraintBound<'db>>,
 }
 
 impl<'db> Type<'db> {
@@ -1869,83 +1992,98 @@ impl<'db> Type<'db> {
 }
 
 impl<'db> ConstraintBounds<'db> {
-    pub(crate) fn new(lower: Option<Type<'db>>, upper: Option<Type<'db>>) -> Self {
-        Self { lower, upper }
+    pub(crate) fn new(
+        lower: Option<ConstraintBound<'db>>,
+        upper: Option<ConstraintBound<'db>>,
+    ) -> Self {
+        // Canonicalize missing lower/upper bounds so that we always store them as `None`, instead
+        // of `Some(Validity(Never/object))`.
+        Self {
+            lower: lower.filter(|bound| !bound.is_missing_lower()),
+            upper: upper.filter(|bound| !bound.is_missing_upper()),
+        }
     }
 
     pub(crate) fn exact(ty: Type<'db>) -> Self {
-        Self::new(Some(ty), Some(ty))
+        Self::new(
+            Some(ConstraintBound::Evidence(ty)),
+            Some(ConstraintBound::Evidence(ty)),
+        )
     }
 
-    fn has_lower(self) -> bool {
-        self.lower.is_some()
+    pub(crate) fn lower_bound(self) -> ConstraintBound<'db> {
+        self.lower.unwrap_or_else(ConstraintBound::missing_lower)
     }
 
-    fn has_upper(self) -> bool {
-        self.upper.is_some()
+    pub(crate) fn upper_bound(self) -> ConstraintBound<'db> {
+        self.upper.unwrap_or_else(ConstraintBound::missing_upper)
     }
 
     fn as_equality(self) -> Option<Type<'db>> {
-        let lower = self.lower?;
-        let upper = self.upper?;
+        let lower = self.lower?.ty();
+        let upper = self.upper?.ty();
         (lower == upper).then_some(lower)
     }
 
     fn is_concrete(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         iter::chain(self.lower, self.upper).all(|bound| {
+            let bound = bound.ty();
             !bound.has_typevar(db, env)
                 && !bound.has_unspecialized_type_var(db, env)
                 && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
         })
     }
-
-    fn materialized_lower(self) -> Type<'db> {
-        self.lower.unwrap_or(Type::Never)
-    }
-
-    fn materialized_upper(self) -> Type<'db> {
-        self.upper.unwrap_or(Type::object())
-    }
 }
 
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
 ///
-/// Each stored type is one clause in the conjunction that forms the upper bound. Importantly, each
-/// clause may be a union. This keeps bounds such as `(A | B) & (C | D)` factored in a CNF-like
-/// form instead of immediately converting them to the DNF representation that [`Type`] uses.
+/// Validity and evidence clauses are stored separately. Clauses may be unions, keeping
+/// bounds such as `(A | B) & (C | D)` factored rather than distributing them into the DNF
+/// representation used by [`Type`].
 ///
-/// An empty `UpperBound` represents a _missing_ upper bound, which (in the absence of other
-/// constraints) we solve to `Unknown`. An upper bound of `object` is treated as an explicit
-/// request for "any type" as a solution, so we solve it to `object`.
+/// An empty validity set represents an unconstrained validity upper bound of `object`. This avoids
+/// allocating or checking the intersection identity on every path. An explicit evidence bound of
+/// `object` remains meaningful because evidence and validity clauses are stored separately.
 ///
-/// Redundant clauses are retained while accumulating the bound, avoiding repeated relation checks
-/// for every newly discovered clause. Consumers that require one effective bound can recover it
-/// with [`UpperBound::as_single_bound`] without eagerly expanding large intersections of unions.
+/// Redundant clauses are retained to preserve evidence even when a validity restriction is
+/// stronger. Consumers that require one effective bound can recover it with
+/// [`UpperBound::as_single_bound`] without eagerly expanding intersections of unions.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UpperBound<'db> {
-    clauses: FxOrderSet<Type<'db>>,
+    evidence: FxOrderSet<Type<'db>>,
+    validity: FxOrderSet<Type<'db>>,
 }
 
 impl<'db> UpperBound<'db> {
-    fn none() -> Self {
+    fn unconstrained() -> Self {
         Self::default()
     }
 
-    /// Creates an upper bound from one explicit clause.
-    ///
-    /// This preserves an explicit `object` clause so callers can distinguish `T <= object` from a
-    /// missing upper bound. Use [`UpperBound::add_clause`] when accumulating multiple clauses.
+    /// Creates an upper bound from one explicit evidence clause.
     fn from_clause(clause: Type<'db>) -> Self {
-        let clauses = FxOrderSet::from_iter([clause]);
-        Self { clauses }
+        let mut upper = Self::default();
+        upper.evidence.insert(clause);
+        upper
     }
 
     fn is_empty(&self) -> bool {
-        self.clauses.is_empty()
+        self.evidence.is_empty() && self.validity.is_empty()
     }
 
-    fn has_explicit_bound(&self) -> bool {
-        !self.is_empty()
+    fn iter_evidence(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+        self.evidence.iter().copied().map(ConstraintBound::Evidence)
+    }
+
+    fn iter_validity(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+        self.validity.iter().copied().map(ConstraintBound::Validity)
+    }
+
+    pub(crate) fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+        iter::chain(self.iter_evidence(), self.iter_validity())
+    }
+
+    fn has_evidence(&self) -> bool {
+        !self.evidence.is_empty()
     }
 
     /// Returns an existing upper-bound clause if every other clause is redundant with it.
@@ -1953,48 +2091,73 @@ impl<'db> UpperBound<'db> {
     /// This preserves constrained type variables without distributing unions: expanding
     /// `S & (int | str)` into `(S & int) | (S & str)` would otherwise lose `S` as the single
     /// effective bound. Returns `None` instead of materializing intersections when no existing
-    /// clause dominates the others. A missing bound remains distinct from an explicit `object`.
+    /// clause dominates the others. An unconstrained validity bound remains distinct from an
+    /// explicit evidence bound of `object`.
     pub(crate) fn as_single_bound(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        let mut clauses = self.clauses.iter().copied();
-        let first = clauses.next()?;
-        let candidate = clauses.fold(first, |candidate, clause| {
-            if candidate.is_redundant_with(db, env, clause) {
-                candidate
-            } else {
-                clause
-            }
-        });
+        let clauses = self.iter_clauses();
+        if clauses.clone().next().is_none() {
+            Some(Type::object())
+        } else {
+            Self::single_bound_from_iterator(db, env, clauses)
+        }
+    }
 
-        self.clauses
-            .iter()
-            .all(|clause| candidate.is_redundant_with(db, env, *clause))
+    fn single_bound_from_iterator(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut clauses: impl Iterator<Item = ConstraintBound<'db>> + Clone,
+    ) -> Option<Type<'db>> {
+        let candidate = clauses
+            .clone()
+            .map(ConstraintBound::ty)
+            .reduce(|candidate, clause| {
+                if candidate.is_redundant_with(db, env, clause) {
+                    candidate
+                } else {
+                    clause
+                }
+            })?;
+
+        clauses
+            .all(|clause| candidate.is_redundant_with(db, env, clause.ty()))
             .then_some(candidate)
     }
 
-    fn is_never(&self) -> bool {
-        self.clauses.len() == 1 && self.clauses.contains(&Type::Never)
-    }
-
-    fn add_clause(&mut self, clause: Type<'db>) {
-        if self.is_never() {
+    fn add_clause(&mut self, clause: ConstraintBound<'db>) {
+        if clause == ConstraintBound::missing_upper()
+            || (matches!(clause, ConstraintBound::Evidence(_))
+                && self.evidence.contains(&Type::Never))
+        {
             return;
         }
 
-        if clause.is_never() {
-            self.clauses.clear();
-            self.clauses.insert(Type::Never);
-            return;
+        match clause {
+            ConstraintBound::Evidence(Type::Never) => {
+                self.evidence.clear();
+                self.evidence.insert(Type::Never);
+            }
+            ConstraintBound::Validity(Type::Never) => {
+                self.validity.clear();
+                self.validity.insert(Type::Never);
+            }
+            ConstraintBound::Evidence(ty) => {
+                self.evidence.insert(ty);
+            }
+            ConstraintBound::Validity(ty) => {
+                if !self.validity.contains(&Type::Never) {
+                    self.validity.insert(ty);
+                }
+            }
         }
-
-        self.clauses.insert(clause);
     }
 
     fn shrink_to_fit(&mut self) {
-        self.clauses.shrink_to_fit();
+        self.evidence.shrink_to_fit();
+        self.validity.shrink_to_fit();
     }
 
     /// Exact conversion to an ordinary [`Type`]. This may be expensive: if any stored clause is a
@@ -2005,11 +2168,11 @@ impl<'db> UpperBound<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        IntersectionType::from_elements(db, env, self.clauses.iter().copied())
+        IntersectionType::from_elements(db, env, self.iter_clauses().map(ConstraintBound::ty))
     }
 
     fn has_visible_union_clause(&self) -> bool {
-        self.clauses.iter().copied().any(Type::is_union)
+        self.iter_clauses().any(|clause| clause.ty().is_union())
     }
 
     fn is_satisfied_by(
@@ -2018,9 +2181,8 @@ impl<'db> UpperBound<'db> {
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
     ) -> bool {
-        self.clauses
-            .iter()
-            .all(|clause| ty.is_constraint_set_assignable_to(db, env, *clause))
+        self.iter_clauses()
+            .all(|clause| ty.is_constraint_set_assignable_to(db, env, clause.ty()))
     }
 
     /// Returns the constraints under which `lower` is assignable to every stored upper clause.
@@ -2033,8 +2195,8 @@ impl<'db> UpperBound<'db> {
     ) -> (NodeId, Option<SourceOrderId>) {
         let mut node = ALWAYS_TRUE;
         let mut source_order = None;
-        for clause in &self.clauses {
-            let when_clause = lower.when_constraint_set_assignable_to_owned(db, env, *clause);
+        for clause in self.iter_clauses() {
+            let when_clause = lower.when_constraint_set_assignable_to_owned(db, env, clause.ty());
             let (clause_node, clause_source_order) = storage.load(db, env, &when_clause);
             node = node.and(storage, clause_node);
             source_order = storage.ordered_source_order(source_order, clause_source_order);
@@ -2055,7 +2217,14 @@ impl ConstraintId {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> ConstraintId {
-        Self::new_with_bounds(db, env, storage, typevar, Some(lower), Some(upper))
+        Self::new_with_bounds(
+            db,
+            env,
+            storage,
+            typevar,
+            Some(ConstraintBound::Evidence(lower)),
+            Some(ConstraintBound::Evidence(upper)),
+        )
     }
 
     fn new_with_bounds<'db>(
@@ -2063,8 +2232,8 @@ impl ConstraintId {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         typevar: BoundTypeVarInstance<'db>,
-        lower: Option<Type<'db>>,
-        upper: Option<Type<'db>>,
+        lower: Option<ConstraintBound<'db>>,
+        upper: Option<ConstraintBound<'db>>,
     ) -> ConstraintId {
         storage.intern_constraint(
             db,
@@ -2154,7 +2323,8 @@ fn max_constructor_and_typevar_depth<'db>(
 
 impl<'db> Constraint<'db> {
     fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
-        let both_bounds = iter::chain(self.bounds.lower, self.bounds.upper);
+        let both_bounds =
+            iter::chain(self.bounds.lower, self.bounds.upper).map(ConstraintBound::ty);
         both_bounds.fold((0, 0), |(constructor_depth, typevar_depth), bound| {
             let (bound_constructor_depth, bound_typevar_depth) =
                 max_constructor_and_typevar_depth(db, env, bound);
@@ -2183,16 +2353,14 @@ impl<'db> Constraint<'db> {
         keeps_lower || keeps_upper
     }
 
-    /// Returns a new range constraint, preserving whether each bound was present explicitly.
-    ///
-    /// Panics if present `lower` and `upper` bounds are not fully static.
+    /// Returns a new range constraint, preserving the presence and provenance of both bounds.
     fn new_node_with_bounds(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         typevar: BoundTypeVarInstance<'db>,
-        mut lower: Option<Type<'db>>,
-        mut upper: Option<Type<'db>>,
+        mut lower: Option<ConstraintBound<'db>>,
+        mut upper: Option<ConstraintBound<'db>>,
     ) -> (NodeId, Option<SourceOrderId>) {
         if lower.is_none() && upper.is_none() {
             return (ALWAYS_TRUE, None);
@@ -2206,7 +2374,9 @@ impl<'db> Constraint<'db> {
         //   T ≤ (α & β)   ⇔ (T ≤ α) ∧ (T ≤ β)
         //   T ≤ (¬α & ¬β) ⇔ (T ≤ ¬α) ∧ (T ≤ ¬β)
         //   (α | β) ≤ T   ⇔ (α ≤ T) ∧ (β ≤ T)
-        if let Some(Type::Union(lower_union)) = lower {
+        if let Some(lower_bound) = lower
+            && let Type::Union(lower_union) = lower_bound.ty()
+        {
             let mut result = ALWAYS_TRUE;
             let mut source_order = None;
             for lower_element in lower_union.elements(db) {
@@ -2215,7 +2385,7 @@ impl<'db> Constraint<'db> {
                     env,
                     storage,
                     typevar,
-                    Some(*lower_element),
+                    Some(lower_bound.with_type(*lower_element)),
                     upper,
                 );
                 result = result.and(storage, element_node);
@@ -2226,7 +2396,8 @@ impl<'db> Constraint<'db> {
         // A negated type ¬α is represented as an intersection with no positive elements, and a
         // single negative element. We _don't_ want to treat that an "intersection" for the
         // purposes of simplifying upper bounds.
-        if let Some(Type::Intersection(upper_intersection)) = upper
+        if let Some(upper_bound) = upper
+            && let Type::Intersection(upper_intersection) = upper_bound.ty()
             && !upper_intersection.is_simple_negation(db)
         {
             let mut result = ALWAYS_TRUE;
@@ -2238,7 +2409,7 @@ impl<'db> Constraint<'db> {
                     storage,
                     typevar,
                     lower,
-                    Some(upper_element),
+                    Some(upper_bound.with_type(upper_element)),
                 );
                 result = result.and(storage, element_node);
                 source_order = storage.ordered_source_order(source_order, element_source_order);
@@ -2250,7 +2421,7 @@ impl<'db> Constraint<'db> {
                     storage,
                     typevar,
                     lower,
-                    Some(upper_element.negate(db, env)),
+                    Some(upper_bound.with_type(upper_element.negate(db, env))),
                 );
                 result = result.and(storage, element_node);
                 source_order = storage.ordered_source_order(source_order, element_source_order);
@@ -2260,7 +2431,7 @@ impl<'db> Constraint<'db> {
 
         // Two identical typevars must always solve to the same type, so it is not useful to have
         // an upper or lower bound that is the typevar being constrained.
-        match lower {
+        match lower.map(ConstraintBound::ty) {
             Some(Type::TypeVar(lower_bound_typevar))
                 if typevar.is_same_typevar_as(db, lower_bound_typevar) =>
             {
@@ -2290,7 +2461,7 @@ impl<'db> Constraint<'db> {
             }
             _ => {}
         }
-        match upper {
+        match upper.map(ConstraintBound::ty) {
             Some(Type::TypeVar(upper_bound_typevar))
                 if typevar.is_same_typevar_as(db, upper_bound_typevar) =>
             {
@@ -2315,8 +2486,8 @@ impl<'db> Constraint<'db> {
         // `upper`. We use an existential check here ("is there *some* assignment where
         // `lower ≤ upper`?") rather than a universal check, because the bounds may mention
         // typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable when `int ≤ T`.
-        let effective_lower = lower.unwrap_or(Type::Never);
-        let effective_upper = upper.unwrap_or(Type::object());
+        let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
+        let effective_upper = upper.map_or(Type::object(), ConstraintBound::ty);
         let when =
             effective_lower.when_constraint_set_assignable_to_owned(db, env, effective_upper);
         let is_never_satisfied = when.query(|_storage, when| when.is_never_satisfied(db, env));
@@ -2332,35 +2503,39 @@ impl<'db> Constraint<'db> {
         // therefore the typevar that the constraint applies to.
         match (effective_lower, effective_upper) {
             // L ≤ T ≤ L == (T ≤ [L] ≤ T)
-            (Type::TypeVar(lower), Type::TypeVar(upper)) if lower.is_same_typevar_as(db, upper) => {
-                let (bound, typevar) = if lower.can_be_bound_for(db, storage, typevar) {
-                    (lower, typevar)
-                } else {
-                    (typevar, lower)
-                };
-                let constraint = ConstraintId::new(
+            (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar))
+                if lower_typevar.is_same_typevar_as(db, upper_typevar) =>
+            {
+                let (bound, subject, lower, upper) =
+                    if lower_typevar.can_be_bound_for(db, storage, typevar) {
+                        (lower_typevar, typevar, lower, upper)
+                    } else {
+                        (typevar, lower_typevar, upper, lower)
+                    };
+                let bound = Type::TypeVar(bound);
+                let constraint = ConstraintId::new_with_bounds(
                     db,
                     env,
                     storage,
-                    typevar,
-                    Type::TypeVar(bound),
-                    Type::TypeVar(bound),
+                    subject,
+                    lower.map(|lower| lower.with_type(bound)),
+                    upper.map(|upper| upper.with_type(bound)),
                 );
                 Node::new_constraint(storage, constraint)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
-            (Type::TypeVar(lower), Type::TypeVar(upper))
-                if typevar.can_be_bound_for(db, storage, lower)
-                    && typevar.can_be_bound_for(db, storage, upper) =>
+            (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar))
+                if typevar.can_be_bound_for(db, storage, lower_typevar)
+                    && typevar.can_be_bound_for(db, storage, upper_typevar) =>
             {
                 let lower_constraint = ConstraintId::new_with_bounds(
                     db,
                     env,
                     storage,
-                    lower,
+                    lower_typevar,
                     None,
-                    Some(Type::TypeVar(typevar)),
+                    lower.map(|lower| lower.with_type(Type::TypeVar(typevar))),
                 );
                 let (lower_node, lower_source_order) =
                     Node::new_constraint(storage, lower_constraint);
@@ -2368,8 +2543,8 @@ impl<'db> Constraint<'db> {
                     db,
                     env,
                     storage,
-                    upper,
-                    Some(Type::TypeVar(typevar)),
+                    upper_typevar,
+                    upper.map(|upper| upper.with_type(Type::TypeVar(typevar))),
                     None,
                 );
                 let (upper_node, upper_source_order) =
@@ -2381,22 +2556,21 @@ impl<'db> Constraint<'db> {
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
-            (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, storage, lower) => {
+            (Type::TypeVar(lower_typevar), _)
+                if typevar.can_be_bound_for(db, storage, lower_typevar) =>
+            {
                 let lower_constraint = ConstraintId::new_with_bounds(
                     db,
                     env,
                     storage,
-                    lower,
+                    lower_typevar,
                     None,
-                    Some(Type::TypeVar(typevar)),
+                    lower.map(|lower| lower.with_type(Type::TypeVar(typevar))),
                 );
                 let (lower_node, lower_source_order) =
                     Node::new_constraint(storage, lower_constraint);
-                let (upper_node, upper_source_order) = if upper.is_none() {
-                    (ALWAYS_TRUE, None)
-                } else {
-                    Constraint::new_node_with_bounds(db, env, storage, typevar, None, upper)
-                };
+                let (upper_node, upper_source_order) =
+                    Constraint::new_node_with_bounds(db, env, storage, typevar, None, upper);
                 let node = lower_node.and(storage, upper_node);
                 let source_order =
                     storage.ordered_source_order(lower_source_order, upper_source_order);
@@ -2404,18 +2578,17 @@ impl<'db> Constraint<'db> {
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
-            (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, storage, upper) => {
-                let (lower_node, lower_source_order) = if lower.is_none() {
-                    (ALWAYS_TRUE, None)
-                } else {
-                    Constraint::new_node_with_bounds(db, env, storage, typevar, lower, None)
-                };
+            (_, Type::TypeVar(upper_typevar))
+                if typevar.can_be_bound_for(db, storage, upper_typevar) =>
+            {
+                let (lower_node, lower_source_order) =
+                    Constraint::new_node_with_bounds(db, env, storage, typevar, lower, None);
                 let upper_constraint = ConstraintId::new_with_bounds(
                     db,
                     env,
                     storage,
-                    upper,
-                    Some(Type::TypeVar(typevar)),
+                    upper_typevar,
+                    upper.map(|upper| upper.with_type(Type::TypeVar(typevar))),
                     None,
                 );
                 let (upper_node, upper_source_order) =
@@ -2494,18 +2667,12 @@ impl ConstraintId {
         {
             return false;
         }
-        other_constraint
-            .bounds
-            .materialized_lower()
-            .is_constraint_set_assignable_to(db, env, self_constraint.bounds.materialized_lower())
-            && self_constraint
-                .bounds
-                .materialized_upper()
-                .is_constraint_set_assignable_to(
-                    db,
-                    env,
-                    other_constraint.bounds.materialized_upper(),
-                )
+        let other_lower = other_constraint.bounds.lower_bound().ty();
+        let self_lower = self_constraint.bounds.lower_bound().ty();
+        let self_upper = self_constraint.bounds.upper_bound().ty();
+        let other_upper = other_constraint.bounds.upper_bound().ty();
+        other_lower.is_constraint_set_assignable_to(db, env, self_lower)
+            && self_upper.is_constraint_set_assignable_to(db, env, other_upper)
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -2533,18 +2700,21 @@ impl ConstraintId {
 
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
         let lower = match (self_constraint.bounds.lower, other_constraint.bounds.lower) {
-            (Some(left), Some(right)) => Some(UnionType::from_two_elements(db, env, left, right)),
+            (Some(left), Some(right)) => {
+                let combined = UnionType::from_two_elements(db, env, left.ty(), right.ty());
+                Some(ConstraintBound::from_combination(combined, left, right))
+            }
             (Some(lower), None) | (None, Some(lower)) => Some(lower),
             (None, None) => None,
         };
-        let mut merged_upper = UpperBound::none();
+        let mut merged_upper = UpperBound::unconstrained();
         if let Some(upper) = self_constraint.bounds.upper {
             merged_upper.add_clause(upper);
         }
         if let Some(upper) = other_constraint.bounds.upper {
             merged_upper.add_clause(upper);
         }
-        let effective_lower = lower.unwrap_or(Type::Never);
+        let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
         // empty, since there is no type that is both greater than `lower`, and less than `upper`.
@@ -2562,15 +2732,25 @@ impl ConstraintId {
         // intersections, since those can be broken apart into BDDs over simpler constraints. If the
         // merged upper contains a union clause, keep any useful disjointness result from above but
         // do not try to derive a factored upper-bound constraint.
-        if lower.is_some_and(Type::is_union) || merged_upper.has_visible_union_clause() {
+        if lower.is_some_and(|bound| bound.ty().is_union())
+            || merged_upper.has_visible_union_clause()
+        {
             return IntersectionResult::CannotSimplify;
         }
 
-        let upper = (!merged_upper.is_empty()).then(|| merged_upper.materialize_exact(db, env));
-
-        if upper.is_some_and(|upper| upper.is_nontrivial_intersection(db)) {
-            return IntersectionResult::CannotSimplify;
-        }
+        let upper = if merged_upper.is_empty() {
+            None
+        } else {
+            let effective_upper = merged_upper.materialize_exact(db, env);
+            if effective_upper.is_nontrivial_intersection(db) {
+                return IntersectionResult::CannotSimplify;
+            }
+            Some(ConstraintBound::from_combination(
+                effective_upper,
+                self_constraint.bounds.upper_bound(),
+                other_constraint.bounds.upper_bound(),
+            ))
+        };
 
         IntersectionResult::Simplified(Constraint {
             typevar: self_constraint.typevar,
@@ -3155,14 +3335,16 @@ impl NodeId {
                 storage,
                 bound_typevar,
                 None,
-                Some(rhs.bottom_materialization(db, env)),
+                Some(ConstraintBound::Evidence(
+                    rhs.bottom_materialization(db, env),
+                )),
             ),
             (_, Type::TypeVar(bound_typevar)) => Constraint::new_node_with_bounds(
                 db,
                 env,
                 storage,
                 bound_typevar,
-                Some(lhs.top_materialization(db, env)),
+                Some(ConstraintBound::Evidence(lhs.top_materialization(db, env))),
                 None,
             ),
             _ => panic!("at least one type should be a typevar"),
@@ -3446,18 +3628,18 @@ struct InteriorNodeData {
     if_false: NodeId,
 }
 
-/// Accumulates lower and upper bounds for a single typevar on a single BDD path.
+/// Accumulates validity and evidence bounds for a single typevar on one TDD path.
 ///
-/// Lower bounds are collected into a union (they are alternatives for the minimum type the
-/// typevar can specialize to). Upper bounds are kept as a factored intersection (the typevar
-/// must satisfy all of them simultaneously). Once the path has been fully traversed, the
-/// accumulated bounds are stored in a [`PathBound`].
+/// Separate lower-bound unions preserve inference evidence even when a wider validity restriction
+/// determines the effective minimum. Upper clauses retain their individual provenance and stay
+/// factored to avoid distributing intersections over unions.
 #[derive(Default)]
 struct ConstraintBoundsBuilder<'db> {
-    lower: FxIndexSet<Type<'db>>,
+    evidence_lower: FxIndexSet<Type<'db>>,
+    validity_lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
-    // Classify each bound before aggregation: unioning lower bounds can otherwise make separate
-    // gradual and static evidence indistinguishable from a single gradual union.
+    // Classify each evidence bound before aggregation: a union can otherwise make gradual and
+    // static argument evidence indistinguishable from a single gradual union.
     has_gradual_evidence: bool,
     has_static_evidence: bool,
 }
@@ -3474,18 +3656,38 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         }
     }
 
-    fn add_lower(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
+    fn add_lower(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: ConstraintBound<'db>,
+    ) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
-        self.classify_evidence(db, env, ty);
-        self.lower.insert(ty);
+        match bound {
+            ConstraintBound::Evidence(ty) => {
+                self.classify_evidence(db, env, ty);
+                self.evidence_lower.insert(ty);
+            }
+            ConstraintBound::Validity(ty) if bound != ConstraintBound::missing_lower() => {
+                self.validity_lower.insert(ty);
+            }
+            ConstraintBound::Validity(_) => {}
+        }
     }
 
-    fn add_upper(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
-        self.classify_evidence(db, env, ty);
-        self.upper.add_clause(ty);
+    fn add_upper(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: ConstraintBound<'db>,
+    ) {
+        if let ConstraintBound::Evidence(ty) = bound {
+            self.classify_evidence(db, env, ty);
+        }
+        self.upper.add_clause(bound);
     }
 
     fn finish(
@@ -3495,16 +3697,24 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> PathBound<'db> {
         let Self {
-            lower,
+            evidence_lower,
+            validity_lower,
             mut upper,
             has_gradual_evidence,
             has_static_evidence,
         } = self;
-        let lower = (!lower.is_empty()).then(|| UnionType::from_elements(db, env, lower));
+        let evidence_lower =
+            (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
+        let validity_lower = if validity_lower.is_empty() {
+            Type::Never
+        } else {
+            UnionType::from_elements(db, env, validity_lower)
+        };
         upper.shrink_to_fit();
         PathBound {
             bound_typevar,
-            lower,
+            evidence_lower,
+            validity_lower,
             upper,
             has_only_gradual_evidence: has_gradual_evidence && !has_static_evidence,
         }
@@ -3542,7 +3752,8 @@ impl<'db> PathBoundSolution<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    pub(crate) lower: Option<Type<'db>>,
+    pub(crate) evidence_lower: Option<Type<'db>>,
+    pub(crate) validity_lower: Type<'db>,
     pub(crate) upper: UpperBound<'db>,
     /// Whether the path contains gradual evidence and no static evidence.
     has_only_gradual_evidence: bool,
@@ -3552,31 +3763,38 @@ impl<'db> PathBound<'db> {
     pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
         Self {
             bound_typevar,
-            lower: Some(ty),
+            evidence_lower: Some(ty),
+            validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
             has_only_gradual_evidence: false,
         }
     }
 
+    pub(crate) fn effective_lower(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let Some(evidence_lower) = self.evidence_lower else {
+            return self.validity_lower;
+        };
+        if self.validity_lower.is_never() {
+            return evidence_lower;
+        }
+        UnionType::from_elements(db, env, [evidence_lower, self.validity_lower])
+    }
+
     fn variance(&self) -> TypeVarVariance {
-        match (self.lower, self.has_upper()) {
-            (None, true) => TypeVarVariance::Covariant,
-            (Some(_), false) => TypeVarVariance::Contravariant,
-            (Some(_), true) => TypeVarVariance::Invariant,
-            (None, false) => TypeVarVariance::Bivariant,
+        match (self.evidence_lower.is_some(), self.has_upper_evidence()) {
+            (false, true) => TypeVarVariance::Covariant,
+            (true, false) => TypeVarVariance::Contravariant,
+            (true, true) => TypeVarVariance::Invariant,
+            (false, false) => TypeVarVariance::Bivariant,
         }
     }
 
-    fn lower_or_never(&self) -> Type<'db> {
-        self.lower.unwrap_or(Type::Never)
-    }
-
-    pub(crate) fn has_upper(&self) -> bool {
-        self.upper.has_explicit_bound()
-    }
-
-    fn has_only_gradual_evidence(&self) -> bool {
-        self.has_only_gradual_evidence
+    pub(crate) fn has_upper_evidence(&self) -> bool {
+        self.upper.has_evidence()
     }
 
     /// Restricts the range of a gradual solution by the upper bounds inferred for this constraint.
@@ -3587,8 +3805,9 @@ impl<'db> PathBound<'db> {
         env: &ProgramEnvironment<'db>,
         solution: Type<'db>,
     ) -> Option<Type<'db>> {
-        if self.lower != Some(solution)
-            || !self.has_upper()
+        if self.evidence_lower.is_none()
+            || self.effective_lower(db, env) != solution
+            || !self.has_upper_evidence()
             || solution.bottom_materialization(db, env) == solution.top_materialization(db, env)
         {
             return Some(solution);
@@ -3600,7 +3819,9 @@ impl<'db> PathBound<'db> {
         }
 
         // `Divergent` is not safely reflexive, so we cannot intersect identical bounds.
-        if self.upper.clauses.len() == 1 && self.upper.clauses.contains(&solution) {
+        if UpperBound::single_bound_from_iterator(db, env, self.upper.iter_evidence())
+            == Some(solution)
+        {
             return Some(solution);
         }
 
@@ -3620,9 +3841,8 @@ impl<'db> PathBound<'db> {
 
         let mut upper_bounds = self
             .upper
-            .clauses
-            .iter()
-            .copied()
+            .iter_evidence()
+            .map(ConstraintBound::ty)
             .filter_map(materialize_upper);
         let Some(first_upper) = upper_bounds.next() else {
             return Some(solution);
@@ -3907,7 +4127,9 @@ impl<'db> PathBounds<'db> {
                         return ControlFlow::Continue(None);
                     }
 
-                    if iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
+                    let mut bounds = iter::chain(constraint.bounds.lower, constraint.bounds.upper)
+                        .map(ConstraintBound::ty);
+                    if bounds.any(|bound| {
                         bound.has_typevar(db, env) || bound.has_unspecialized_type_var(db, env)
                     }) {
                         return ControlFlow::Continue(None);
@@ -4076,7 +4298,7 @@ impl<'db> PathBounds<'db> {
         // before solving.
 
         let bound_typevar = path_bound.bound_typevar;
-        let lower = path_bound.lower_or_never();
+        let lower = path_bound.effective_lower(db, env);
 
         match bound_typevar
             .typevar(db)
@@ -4088,7 +4310,7 @@ impl<'db> PathBounds<'db> {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
-                if let Some(lower) = path_bound.lower {
+                if path_bound.evidence_lower.is_some() {
                     if !path_bound.upper.is_satisfied_by(db, env, lower) {
                         let mut storage = builder.storage.borrow_mut();
                         let (when_upper, source_order) =
@@ -4114,16 +4336,14 @@ impl<'db> PathBounds<'db> {
                     return PathBoundSolution::Solved(lower);
                 }
 
-                if path_bound.has_upper() {
+                if path_bound.has_upper_evidence() {
                     return IntersectionType::bounded_from_elements(
                         db,
                         env,
-                        path_bound
-                            .upper
-                            .clauses
-                            .iter()
-                            .copied()
-                            .chain([declared_upper]),
+                        iter::chain(
+                            path_bound.upper.iter_clauses().map(ConstraintBound::ty),
+                            [declared_upper],
+                        ),
                     )
                     .map_or(
                         PathBoundSolution::BudgetExceeded { fallback: None },
@@ -4178,7 +4398,7 @@ impl<'db> PathBounds<'db> {
                         current_best.is_assignable_to(db, env, candidate);
 
                     if candidate_assignable_to_best != best_assignable_to_candidate {
-                        if path_bound.lower.is_some() {
+                        if path_bound.evidence_lower.is_some() {
                             candidate_assignable_to_best
                         } else {
                             best_assignable_to_candidate
@@ -4232,9 +4452,10 @@ impl<'db> PathBounds<'db> {
                     return PathBoundSolution::Unsatisfiable;
                 };
 
-                if let (Some(ty @ Type::TypeVar(_)), _) | (_, Some(ty @ Type::TypeVar(_))) =
-                    (path_bound.lower, path_bound.upper.as_single_bound(db, env))
-                {
+                if let (ty @ Type::TypeVar(_), _) | (_, Some(ty @ Type::TypeVar(_))) = (
+                    path_bound.effective_lower(db, env),
+                    path_bound.upper.as_single_bound(db, env),
+                ) {
                     // This path relates two TypeVars, such as passing `S` to a parameter typed as
                     // `T: (int, str)`. The compatibility check above has verified that at least
                     // one of `T`'s declared constraints can satisfy the path, but choosing a
@@ -4251,14 +4472,14 @@ impl<'db> PathBounds<'db> {
                 // as the result if it's gradual. (Checking `Any` against `T: (int, str)` selects
                 // `T = Any`) If the path solution is fully static, we choose the "tightest"
                 // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
-                if multiple_compatible_constraints && path_bound.has_only_gradual_evidence() {
-                    if let Some(lower) = path_bound.lower {
-                        PathBoundSolution::Solved(lower)
-                    } else if path_bound.has_upper() {
+                if multiple_compatible_constraints && path_bound.has_only_gradual_evidence {
+                    if path_bound.evidence_lower.is_some() {
+                        PathBoundSolution::Solved(path_bound.effective_lower(db, env))
+                    } else if path_bound.has_upper_evidence() {
                         IntersectionType::bounded_from_elements(
                             db,
                             env,
-                            path_bound.upper.clauses.iter().copied(),
+                            path_bound.upper.iter_clauses().map(ConstraintBound::ty),
                         )
                         .map_or(
                             PathBoundSolution::BudgetExceeded { fallback: None },
@@ -4475,9 +4696,14 @@ impl InteriorNode {
         source_order: Option<SourceOrderId>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)> {
-        let is_bare_inferable_typevar = |ty: Type<'_>| {
-            ty.as_typevar()
-                .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
+        let is_bare_inferable_typevar = |bound: Option<ConstraintBound<'_>>| {
+            bound.is_some_and(|bound| {
+                matches!(
+                    bound,
+                    ConstraintBound::Evidence(Type::TypeVar(bound_typevar))
+                        if bound_typevar.is_inferable(db, inferable)
+                )
+            })
         };
         self.abstract_inner(
             db,
@@ -4487,8 +4713,8 @@ impl InteriorNode {
             limits,
             // We only want to keep constraints on inferable typevars. If the constraint's typevar
             // is itself inferable, we keep it. We also need to keep some constraints in
-            // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
-            // This ensure that our quantification logic does not depend on typevar ordering.
+            // non-inferable typevars, if an evidence bound is a bare inferable typevar. This
+            // ensures that our quantification logic does not depend on typevar ordering.
             //
             // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
             // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
@@ -4497,14 +4723,8 @@ impl InteriorNode {
             &mut |storage: &ConstraintSetStorage<'_>, constraint| {
                 let constraint = storage.constraint_data(constraint);
                 !constraint.typevar.is_inferable(db, inferable)
-                    && !constraint
-                        .bounds
-                        .lower
-                        .is_some_and(is_bare_inferable_typevar)
-                    && !constraint
-                        .bounds
-                        .upper
-                        .is_some_and(is_bare_inferable_typevar)
+                    && !is_bare_inferable_typevar(constraint.bounds.lower)
+                    && !is_bare_inferable_typevar(constraint.bounds.upper)
             },
         )
     }
@@ -4828,8 +5048,8 @@ impl ConstraintAssignment {
 
         std::fmt::from_fn(move |f| {
             let constraint_data = storage.constraint_data(self.constraint());
-            let lower = constraint_data.bounds.materialized_lower();
-            let upper = constraint_data.bounds.materialized_upper();
+            let lower = constraint_data.bounds.lower_bound().ty();
+            let upper = constraint_data.bounds.upper_bound().ty();
             let typevar = constraint_data.typevar;
             if lower.is_equivalent_to(db, env, upper) {
                 // If this typevar is equivalent to another, output the constraint in a
@@ -5015,19 +5235,14 @@ impl SequentMap {
             return false;
         }
 
-        let (
-            ConstraintBounds {
-                lower: Some(left_lower),
-                upper: None,
-            },
-            ConstraintBounds {
-                lower: Some(right_lower),
-                upper: None,
-            },
-        ) = (left.bounds, right.bounds)
-        else {
+        let (Some(left_lower), Some(right_lower)) = (left.bounds.lower, right.bounds.lower) else {
             return false;
         };
+        if left.bounds.upper.is_some() || right.bounds.upper.is_some() {
+            return false;
+        }
+        let left_lower = left_lower.ty();
+        let right_lower = right_lower.ty();
 
         // This call might need its own borrow of the builder's storage, so create a new builder
         // that it can use.
@@ -5057,17 +5272,12 @@ impl SequentMap {
     ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
         let post_data = storage.constraint_data(post);
+        let post_lower = post_data.bounds.lower_bound().ty();
+        let post_upper = post_data.bounds.upper_bound().ty();
         let (when, source_order) = storage.load(
             db,
             env,
-            &post_data
-                .bounds
-                .materialized_lower()
-                .when_constraint_set_assignable_to_owned(
-                    db,
-                    env,
-                    post_data.bounds.materialized_upper(),
-                ),
+            &post_lower.when_constraint_set_assignable_to_owned(db, env, post_upper),
         );
         if when.is_never_satisfied(db, env, storage, source_order) {
             self.add_pair_impossibility(ante1, ante2);
@@ -5102,8 +5312,8 @@ impl SequentMap {
         // If this constraint binds its typevar to `Never ≤ T ≤ object`, then the typevar can take
         // on any type, and the constraint is always satisfied.
         let constraint_data = storage.constraint_data(constraint);
-        let lower = constraint_data.bounds.materialized_lower();
-        let upper = constraint_data.bounds.materialized_upper();
+        let lower = constraint_data.bounds.lower_bound().ty();
+        let upper = constraint_data.bounds.upper_bound().ty();
         if lower.is_never() && upper.is_object() {
             self.add_single_tautology(constraint);
             return;
@@ -5145,11 +5355,7 @@ impl SequentMap {
         // implication.)
 
         // Skip trivial cases where the assignability check won't produce useful results.
-        if !constraint_data.bounds.has_lower()
-            || !constraint_data.bounds.has_upper()
-            || lower.is_never()
-            || upper.is_object()
-        {
+        if lower.is_never() || upper.is_object() {
             return;
         }
 
@@ -5217,11 +5423,26 @@ impl SequentMap {
                 Node::AlwaysTrue | Node::AlwaysFalse => break,
                 Node::Interior(interior) => {
                     let interior = storage.interior_node_data(interior.node());
+                    let derived = storage.constraint_data(interior.constraint);
+                    let derived = ConstraintId::new_with_bounds(
+                        db,
+                        env,
+                        storage,
+                        derived.typevar,
+                        derived
+                            .bounds
+                            .lower
+                            .map(|bound| bound.with_source_provenance(constraint_data.bounds)),
+                        derived
+                            .bounds
+                            .upper
+                            .map(|bound| bound.with_source_provenance(constraint_data.bounds)),
+                    );
                     if interior.if_true != ALWAYS_FALSE {
-                        self.add_single_implication(constraint, interior.constraint);
+                        self.add_single_implication(constraint, derived);
                         node = interior.if_true;
                     } else {
-                        self.add_pair_impossibility(constraint, interior.constraint);
+                        self.add_pair_impossibility(constraint, derived);
                         node = interior.if_false;
                     }
                 }
@@ -5272,22 +5493,18 @@ impl SequentMap {
                 right_constraint,
             );
             self.add_nested_typevar_sequents(db, env, storage, left_constraint, right_constraint);
-        } else if left_constraint_data
-            .bounds
-            .lower
-            .is_some_and(Type::is_type_var)
-            || left_constraint_data
-                .bounds
-                .upper
-                .is_some_and(Type::is_type_var)
+        } else if left_constraint_data.bounds.lower_bound().ty().is_type_var()
+            || left_constraint_data.bounds.upper_bound().ty().is_type_var()
             || right_constraint_data
                 .bounds
-                .lower
-                .is_some_and(Type::is_type_var)
+                .lower_bound()
+                .ty()
+                .is_type_var()
             || right_constraint_data
                 .bounds
-                .upper
-                .is_some_and(Type::is_type_var)
+                .upper_bound()
+                .ty()
+                .is_type_var()
         {
             self.add_mutual_sequents_for_same_typevars(
                 db,
@@ -5333,46 +5550,68 @@ impl SequentMap {
         let bound_typevar = bound_constraint_data.typevar;
         let constrained_constraint_data = storage.constraint_data(constrained_constraint);
         let constrained_typevar = constrained_constraint_data.typevar;
+        let constrained_lower_bound = constrained_constraint_data.bounds.lower_bound();
+        let constrained_upper_bound = constrained_constraint_data.bounds.upper_bound();
+        let bound_lower_bound = bound_constraint_data.bounds.lower_bound();
+        let bound_upper_bound = bound_constraint_data.bounds.upper_bound();
 
         // Transitive pivots require subtyping; classes with dynamic bases can be assignable to
         // unrelated types without being subtypes.
         let (new_lower, new_upper) = match (
-            constrained_constraint_data.bounds.lower,
-            constrained_constraint_data.bounds.upper,
-            bound_constraint_data.bounds.lower,
-            bound_constraint_data.bounds.upper,
+            constrained_lower_bound.ty(),
+            constrained_upper_bound.ty(),
+            bound_lower_bound.ty(),
+            bound_upper_bound.ty(),
         ) {
             // (B ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ BU)
-            (
-                Some(Type::TypeVar(constrained_lower)),
-                Some(Type::TypeVar(constrained_upper)),
-                _,
-                _,
-            ) if constrained_lower.is_same_typevar_as(db, bound_typevar)
-                && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
+            (Type::TypeVar(constrained_lower), Type::TypeVar(constrained_upper), _, _)
+                if constrained_lower.is_same_typevar_as(db, bound_typevar)
+                    && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
             {
                 (
-                    bound_constraint_data.bounds.lower,
-                    bound_constraint_data.bounds.upper,
+                    ConstraintBound::from_transitive_derivation(
+                        bound_lower_bound.ty(),
+                        constrained_lower_bound,
+                        bound_lower_bound,
+                    ),
+                    ConstraintBound::from_transitive_derivation(
+                        bound_upper_bound.ty(),
+                        constrained_upper_bound,
+                        bound_upper_bound,
+                    ),
                 )
             }
 
             // (CL ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ BU)
-            (constrained_lower, Some(Type::TypeVar(constrained_upper)), _, _)
+            (_, Type::TypeVar(constrained_upper), _, _)
                 if constrained_upper.is_same_typevar_as(db, bound_typevar) =>
             {
-                (constrained_lower, bound_constraint_data.bounds.upper)
+                (
+                    constrained_lower_bound,
+                    ConstraintBound::from_transitive_derivation(
+                        bound_upper_bound.ty(),
+                        constrained_upper_bound,
+                        bound_upper_bound,
+                    ),
+                )
             }
 
             // (B ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ CU)
-            (Some(Type::TypeVar(constrained_lower)), constrained_upper, _, _)
+            (Type::TypeVar(constrained_lower), _, _, _)
                 if constrained_lower.is_same_typevar_as(db, bound_typevar) =>
             {
-                (bound_constraint_data.bounds.lower, constrained_upper)
+                (
+                    ConstraintBound::from_transitive_derivation(
+                        bound_lower_bound.ty(),
+                        constrained_lower_bound,
+                        bound_lower_bound,
+                    ),
+                    constrained_upper_bound,
+                )
             }
 
             // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
-            (constrained_lower, Some(constrained_upper), Some(bound_lower), _)
+            (_, constrained_upper, bound_lower, _)
                 if !constrained_upper.is_never()
                     && !constrained_upper.is_object()
                     && storage.cached_is_constraint_set_subtype_of(
@@ -5382,11 +5621,18 @@ impl SequentMap {
                         bound_lower.bottom_materialization(db, env),
                     ) =>
             {
-                (constrained_lower, Some(Type::TypeVar(bound_typevar)))
+                (
+                    constrained_lower_bound,
+                    ConstraintBound::from_transitive_derivation(
+                        Type::TypeVar(bound_typevar),
+                        constrained_upper_bound,
+                        bound_lower_bound,
+                    ),
+                )
             }
 
             // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
-            (Some(constrained_lower), constrained_upper, _, Some(bound_upper))
+            (constrained_lower, _, _, bound_upper)
                 if !constrained_lower.is_never()
                     && !constrained_lower.is_object()
                     && storage.cached_is_constraint_set_subtype_of(
@@ -5396,7 +5642,14 @@ impl SequentMap {
                         constrained_lower.bottom_materialization(db, env),
                     ) =>
             {
-                (Some(Type::TypeVar(bound_typevar)), constrained_upper)
+                (
+                    ConstraintBound::from_transitive_derivation(
+                        Type::TypeVar(bound_typevar),
+                        constrained_lower_bound,
+                        bound_upper_bound,
+                    ),
+                    constrained_upper_bound,
+                )
             }
 
             _ => return,
@@ -5407,8 +5660,8 @@ impl SequentMap {
         // explicit bounds that are equivalent to missing lower/upper bounds, so a derived
         // `T ≤ U ≤ object` can satisfy a later query for `T ≤ U` without requiring a separate
         // materialized-default implication.
-        let mut constrained_lower = new_lower.filter(|lower| !lower.is_never());
-        let mut constrained_upper = new_upper.filter(|upper| !upper.is_object());
+        let mut constrained_lower = (!new_lower.ty().is_never()).then_some(new_lower);
+        let mut constrained_upper = (!new_upper.ty().is_object()).then_some(new_upper);
 
         // The transitive rule above gives us an intended post-condition
         // `new_lower ≤ [constrained] ≤ new_upper`.
@@ -5425,7 +5678,7 @@ impl SequentMap {
         // `T` in this ordering, we emit two pair implications:
         //   `(Never ≤ [A] ≤ T)` and `(T ≤ [B] ≤ object)`.
         // This preserves the relationship while keeping all derived constraints canonical.
-        if let Some(Type::TypeVar(lower_bound_typevar)) = new_lower
+        if let Type::TypeVar(lower_bound_typevar) = new_lower.ty()
             && !lower_bound_typevar.can_be_bound_for(db, storage, constrained_typevar)
         {
             post_constraints.push(ConstraintId::new_with_bounds(
@@ -5434,12 +5687,12 @@ impl SequentMap {
                 storage,
                 lower_bound_typevar,
                 None,
-                Some(Type::TypeVar(constrained_typevar)),
+                Some(new_lower.with_type(Type::TypeVar(constrained_typevar))),
             ));
             constrained_lower = None;
         }
 
-        if let Some(Type::TypeVar(upper_bound_typevar)) = new_upper
+        if let Type::TypeVar(upper_bound_typevar) = new_upper.ty()
             && !upper_bound_typevar.can_be_bound_for(db, storage, constrained_typevar)
         {
             post_constraints.push(ConstraintId::new_with_bounds(
@@ -5447,15 +5700,13 @@ impl SequentMap {
                 env,
                 storage,
                 upper_bound_typevar,
-                Some(Type::TypeVar(constrained_typevar)),
+                Some(new_upper.with_type(Type::TypeVar(constrained_typevar))),
                 None,
             ));
             constrained_upper = None;
         }
 
-        if !(constrained_lower.is_none_or(|ty| ty.is_never())
-            && constrained_upper.is_none_or(|ty| ty.is_object()))
-        {
+        if constrained_lower.is_some() || constrained_upper.is_some() {
             post_constraints.push(ConstraintId::new_with_bounds(
                 db,
                 env,
@@ -5499,10 +5750,10 @@ impl SequentMap {
         let has_typevar_bound = |bounds: ConstraintBounds<'db>| {
             bounds
                 .lower
-                .is_some_and(|bound| any_over_type(db, env, bound, true, Type::is_type_var))
-                || bounds
-                    .upper
-                    .is_some_and(|bound| any_over_type(db, env, bound, true, Type::is_type_var))
+                .is_some_and(|lower| any_over_type(db, env, lower.ty(), true, Type::is_type_var))
+                || bounds.upper.is_some_and(|upper| {
+                    any_over_type(db, env, upper.ty(), true, Type::is_type_var)
+                })
         };
         if !has_typevar_bound(storage.constraint_data(left_constraint).bounds)
             && !has_typevar_bound(storage.constraint_data(right_constraint).bounds)
@@ -5515,11 +5766,15 @@ impl SequentMap {
                 let bound_data = storage.constraint_data(bound_constraint);
                 let bound_typevar = bound_data.typevar;
                 let bound_identity = bound_typevar.identity(db);
+                let bound_lower_bound = bound_data.bounds.lower_bound();
+                let bound_upper_bound = bound_data.bounds.upper_bound();
                 let constrained_data = storage.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
                 let constrained_identity = constrained_typevar.identity(db);
-                let constrained_lower = constrained_data.bounds.materialized_lower();
-                let constrained_upper = constrained_data.bounds.materialized_upper();
+                let constrained_lower_bound = constrained_data.bounds.lower_bound();
+                let constrained_upper_bound = constrained_data.bounds.upper_bound();
+                let constrained_lower = constrained_lower_bound.ty();
+                let constrained_upper = constrained_upper_bound.ty();
 
                 // If the replacement contains the bound typevar itself (e.g., the bound
                 // constraint is `_V ≤ G[_V]`), or the constrained typevar (e.g., the bound
@@ -5547,8 +5802,8 @@ impl SequentMap {
                 // (e.g., `Option<TypeVarVariance>`).
                 let upper_replacement = match (
                     constrained_upper.variance_of(db, env, bound_identity),
-                    bound_data.bounds.lower,
-                    bound_data.bounds.upper,
+                    bound_lower_bound.ty(),
+                    bound_upper_bound.ty(),
                 ) {
                     (TypeVarVariance::Bivariant, _, _) => None,
                     // Skip bare typevars — those are handled by
@@ -5556,23 +5811,23 @@ impl SequentMap {
                     _ if constrained_upper.is_type_var() => None,
                     // Covariance preserves direction: upper bound on T substitutes into upper
                     // bound. A ≤ B → G[A] ≤ G[B], so (T ≤ u_B) gives G[T] ≤ G[u_B].
-                    (TypeVarVariance::Covariant, _, Some(bound_upper))
-                        if !bound_upper.is_object() =>
-                    {
-                        bound_data.bounds.upper
+                    (TypeVarVariance::Covariant, _, bound_upper) if !bound_upper.is_object() => {
+                        Some(bound_upper_bound)
                     }
                     // Contravariance flips direction: lower bound on T substitutes into upper
                     // bound. A ≤ B → G[B] ≤ G[A], so (l_B ≤ T) gives G[T] ≤ G[l_B].
-                    (TypeVarVariance::Contravariant, Some(bound_lower), _)
-                        if !bound_lower.is_never() =>
-                    {
-                        bound_data.bounds.lower
+                    (TypeVarVariance::Contravariant, bound_lower, _) if !bound_lower.is_never() => {
+                        Some(bound_lower_bound)
                     }
                     // Invariance requires equality: only substitute if l_B = u_B.
-                    (TypeVarVariance::Invariant, Some(bound_lower), Some(bound_upper))
+                    (TypeVarVariance::Invariant, bound_lower, bound_upper)
                         if bound_lower == bound_upper && !bound_lower.is_never() =>
                     {
-                        bound_data.bounds.lower
+                        Some(ConstraintBound::from_combination(
+                            bound_lower,
+                            bound_lower_bound,
+                            bound_upper_bound,
+                        ))
                     }
                     _ => None,
                 };
@@ -5581,17 +5836,17 @@ impl SequentMap {
                     // very-weak derived constraints and cause severe performance regressions.
                     // Keep the common/non-union case enabled; skip union upper bounds for this
                     // specific typevar-to-typevar replacement shape.
-                    if replacement.is_type_var() && constrained_upper.is_union() {
+                    if replacement.ty().is_type_var() && constrained_upper.is_union() {
                         return false;
                     }
-                    !replacement_mentions_bound_or_constrained(*replacement)
+                    !replacement_mentions_bound_or_constrained(replacement.ty())
                 });
                 if let Some(replacement) = upper_replacement {
                     let new_upper = constrained_upper.substitute_one_typevar(
                         db,
                         env,
                         bound_typevar,
-                        replacement,
+                        replacement.ty(),
                     );
                     if new_upper != constrained_upper {
                         let post = ConstraintId::new_with_bounds(
@@ -5600,7 +5855,11 @@ impl SequentMap {
                             storage,
                             constrained_typevar,
                             constrained_data.bounds.lower,
-                            Some(new_upper),
+                            Some(ConstraintBound::from_transitive_derivation(
+                                new_upper,
+                                constrained_upper_bound,
+                                replacement,
+                            )),
                         );
                         self.add_pair_implication(
                             db,
@@ -5616,30 +5875,32 @@ impl SequentMap {
                 // Check the lower bound of the constrained constraint for nested occurrences.
                 let lower_replacement = match (
                     constrained_lower.variance_of(db, env, bound_identity),
-                    bound_data.bounds.lower,
-                    bound_data.bounds.upper,
+                    bound_lower_bound.ty(),
+                    bound_upper_bound.ty(),
                 ) {
                     (TypeVarVariance::Bivariant, _, _) => None,
                     _ if constrained_lower.is_type_var() => None,
                     // Covariance preserves direction: lower bound on T substitutes into lower
                     // bound. A ≤ B → G[A] ≤ G[B], so (l_B ≤ T) gives G[l_B] ≤ G[T].
-                    (TypeVarVariance::Covariant, Some(bound_lower), _)
-                        if !bound_lower.is_never() =>
-                    {
-                        bound_data.bounds.lower
+                    (TypeVarVariance::Covariant, bound_lower, _) if !bound_lower.is_never() => {
+                        Some(bound_lower_bound)
                     }
                     // Contravariance flips direction: upper bound on T substitutes into lower
                     // bound. A ≤ B → G[B] ≤ G[A], so (T ≤ u_B) gives G[u_B] ≤ G[T].
-                    (TypeVarVariance::Contravariant, _, Some(bound_upper))
+                    (TypeVarVariance::Contravariant, _, bound_upper)
                         if !bound_upper.is_object() =>
                     {
-                        bound_data.bounds.upper
+                        Some(bound_upper_bound)
                     }
                     // Invariance requires equality: only substitute if l_B = u_B.
-                    (TypeVarVariance::Invariant, Some(bound_lower), Some(bound_upper))
+                    (TypeVarVariance::Invariant, bound_lower, bound_upper)
                         if bound_lower == bound_upper && !bound_lower.is_never() =>
                     {
-                        bound_data.bounds.lower
+                        Some(ConstraintBound::from_combination(
+                            bound_lower,
+                            bound_lower_bound,
+                            bound_upper_bound,
+                        ))
                     }
                     _ => None,
                 };
@@ -5648,17 +5909,17 @@ impl SequentMap {
                     // many very-weak derived constraints and cause severe performance regressions.
                     // Keep the common/non-intersection case enabled; skip intersection lower
                     // bounds for this specific typevar-to-typevar replacement shape.
-                    if replacement.is_type_var() && constrained_lower.is_intersection() {
+                    if replacement.ty().is_type_var() && constrained_lower.is_intersection() {
                         return false;
                     }
-                    !replacement_mentions_bound_or_constrained(*replacement)
+                    !replacement_mentions_bound_or_constrained(replacement.ty())
                 });
                 if let Some(replacement) = lower_replacement {
                     let new_lower = constrained_lower.substitute_one_typevar(
                         db,
                         env,
                         bound_typevar,
-                        replacement,
+                        replacement.ty(),
                     );
                     if new_lower != constrained_lower {
                         let post = ConstraintId::new_with_bounds(
@@ -5666,7 +5927,11 @@ impl SequentMap {
                             env,
                             storage,
                             constrained_typevar,
-                            Some(new_lower),
+                            Some(ConstraintBound::from_transitive_derivation(
+                                new_lower,
+                                constrained_lower_bound,
+                                replacement,
+                            )),
                             constrained_data.bounds.upper,
                         );
                         self.add_pair_implication(
@@ -5709,14 +5974,18 @@ impl SequentMap {
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = storage.constraint_data(bound_constraint);
                 let bound_typevar = bound_data.typevar;
-                let bound_lower = bound_data.bounds.materialized_lower();
+                let bound_lower_bound = bound_data.bounds.lower_bound();
+                let bound_upper_bound = bound_data.bounds.upper_bound();
+                let bound_lower = bound_lower_bound.ty();
                 let constrained_data = storage.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
-                let constrained_lower = constrained_data.bounds.materialized_lower();
-                let constrained_upper = constrained_data.bounds.materialized_upper();
+                let constrained_lower_bound = constrained_data.bounds.lower_bound();
+                let constrained_upper_bound = constrained_data.bounds.upper_bound();
+                let constrained_lower = constrained_lower_bound.ty();
+                let constrained_upper = constrained_upper_bound.ty();
 
-                let mut try_one_bound = |bound: Type<'db>, is_upper_bound: bool| {
-                    let Some(nested_typevar) = bound.as_typevar() else {
+                let mut try_one_bound = |bound: ConstraintBound<'db>, is_upper_bound: bool| {
+                    let Some(nested_typevar) = bound.ty().as_typevar() else {
                         return;
                     };
 
@@ -5746,7 +6015,7 @@ impl SequentMap {
                             TypeVarVariance::Covariant => !is_upper_bound,
                             TypeVarVariance::Contravariant => is_upper_bound,
                             TypeVarVariance::Invariant => {
-                                bound_data.bounds.lower == bound_data.bounds.upper
+                                bound_lower_bound.ty() == bound_upper_bound.ty()
                                     && !bound_lower.is_never()
                             }
                         };
@@ -5764,7 +6033,11 @@ impl SequentMap {
                                 storage,
                                 constrained_typevar,
                                 constrained_data.bounds.lower,
-                                Some(new_upper),
+                                Some(ConstraintBound::from_transitive_derivation(
+                                    new_upper,
+                                    constrained_upper_bound,
+                                    bound,
+                                )),
                             );
                             self.add_pair_implication(
                                 db,
@@ -5788,7 +6061,7 @@ impl SequentMap {
                             TypeVarVariance::Covariant => is_upper_bound,
                             TypeVarVariance::Contravariant => !is_upper_bound,
                             TypeVarVariance::Invariant => {
-                                bound_data.bounds.lower == bound_data.bounds.upper
+                                bound_lower_bound.ty() == bound_upper_bound.ty()
                                     && !bound_lower.is_never()
                             }
                         };
@@ -5805,7 +6078,11 @@ impl SequentMap {
                                 env,
                                 storage,
                                 constrained_typevar,
-                                Some(new_lower),
+                                Some(ConstraintBound::from_transitive_derivation(
+                                    new_lower,
+                                    constrained_lower_bound,
+                                    bound,
+                                )),
                                 constrained_data.bounds.upper,
                             );
                             self.add_pair_implication(
@@ -5847,21 +6124,23 @@ impl SequentMap {
         let mut try_one_direction =
             |left_constraint: ConstraintId, right_constraint: ConstraintId| {
                 let left_constraint_data = storage.constraint_data(left_constraint);
-                let left_lower = left_constraint_data.bounds.lower;
-                let left_upper = left_constraint_data.bounds.upper;
+                let left_lower = left_constraint_data.bounds.lower_bound();
+                let left_upper = left_constraint_data.bounds.upper_bound();
                 let right_constraint_data = storage.constraint_data(right_constraint);
-                let right_lower = right_constraint_data.bounds.lower;
-                let right_upper = right_constraint_data.bounds.upper;
+                let right_lower = right_constraint_data.bounds.lower_bound();
+                let right_upper = right_constraint_data.bounds.upper_bound();
                 let mut new_constraints =
                     |bound_typevar: BoundTypeVarInstance<'db>,
-                     mut right_lower: Option<Type<'db>>,
-                     mut right_upper: Option<Type<'db>>| {
-                        if let Some(Type::TypeVar(other_bound_typevar)) = right_lower
+                     mut right_lower: Option<ConstraintBound<'db>>,
+                     mut right_upper: Option<ConstraintBound<'db>>| {
+                        if let Some(right_lower_bound) = right_lower
+                            && let Type::TypeVar(other_bound_typevar) = right_lower_bound.ty()
                             && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
                         {
                             right_lower = None;
                         }
-                        if let Some(Type::TypeVar(other_bound_typevar)) = right_upper
+                        if let Some(right_upper_bound) = right_upper
+                            && let Type::TypeVar(other_bound_typevar) = right_upper_bound.ty()
                             && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
                         {
                             right_upper = None;
@@ -5876,10 +6155,13 @@ impl SequentMap {
                         // Avoid preserving explicit bounds that are equivalent to missing
                         // lower/upper bounds; direct constraints still retain their explicit
                         // bound presence.
-                        let mut constrained_lower = right_lower.filter(|lower| !lower.is_never());
-                        let mut constrained_upper = right_upper.filter(|upper| !upper.is_object());
+                        let mut constrained_lower =
+                            right_lower.filter(|bound| !bound.ty().is_never());
+                        let mut constrained_upper =
+                            right_upper.filter(|bound| !bound.ty().is_object());
 
-                        if let Some(Type::TypeVar(lower_bound_typevar)) = right_lower
+                        if let Some(right_lower_bound) = right_lower
+                            && let Type::TypeVar(lower_bound_typevar) = right_lower_bound.ty()
                             && !lower_bound_typevar.can_be_bound_for(db, storage, bound_typevar)
                         {
                             post_constraints.push(ConstraintId::new_with_bounds(
@@ -5888,12 +6170,13 @@ impl SequentMap {
                                 storage,
                                 lower_bound_typevar,
                                 None,
-                                Some(Type::TypeVar(bound_typevar)),
+                                Some(right_lower_bound.with_type(Type::TypeVar(bound_typevar))),
                             ));
                             constrained_lower = None;
                         }
 
-                        if let Some(Type::TypeVar(upper_bound_typevar)) = right_upper
+                        if let Some(right_upper_bound) = right_upper
+                            && let Type::TypeVar(upper_bound_typevar) = right_upper_bound.ty()
                             && !upper_bound_typevar.can_be_bound_for(db, storage, bound_typevar)
                         {
                             post_constraints.push(ConstraintId::new_with_bounds(
@@ -5901,15 +6184,13 @@ impl SequentMap {
                                 env,
                                 storage,
                                 upper_bound_typevar,
-                                Some(Type::TypeVar(bound_typevar)),
+                                Some(right_upper_bound.with_type(Type::TypeVar(bound_typevar))),
                                 None,
                             ));
                             constrained_upper = None;
                         }
 
-                        if !(constrained_lower.unwrap_or(Type::Never).is_never()
-                            && constrained_upper.unwrap_or(Type::object()).is_object())
-                        {
+                        if constrained_lower.is_some() || constrained_upper.is_some() {
                             post_constraints.push(ConstraintId::new_with_bounds(
                                 db,
                                 env,
@@ -5922,19 +6203,42 @@ impl SequentMap {
 
                         post_constraints
                     };
-                let post_constraints = match (left_lower, left_upper) {
-                    (
-                        Some(Type::TypeVar(bound_typevar)),
-                        Some(Type::TypeVar(other_bound_typevar)),
-                    ) if bound_typevar.is_same_typevar_as(db, other_bound_typevar) => {
-                        new_constraints(bound_typevar, right_lower, right_upper)
+                let post_constraints = match (left_lower.ty(), left_upper.ty()) {
+                    (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
+                        if bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
+                    {
+                        new_constraints(
+                            bound_typevar,
+                            Some(ConstraintBound::from_transitive_derivation(
+                                right_lower.ty(),
+                                left_lower,
+                                right_lower,
+                            )),
+                            Some(ConstraintBound::from_transitive_derivation(
+                                right_upper.ty(),
+                                left_upper,
+                                right_upper,
+                            )),
+                        )
                     }
-                    (Some(Type::TypeVar(bound_typevar)), _) => {
-                        new_constraints(bound_typevar, None, right_upper)
-                    }
-                    (_, Some(Type::TypeVar(bound_typevar))) => {
-                        new_constraints(bound_typevar, right_lower, None)
-                    }
+                    (Type::TypeVar(bound_typevar), _) => new_constraints(
+                        bound_typevar,
+                        None,
+                        Some(ConstraintBound::from_transitive_derivation(
+                            right_upper.ty(),
+                            left_lower,
+                            right_upper,
+                        )),
+                    ),
+                    (_, Type::TypeVar(bound_typevar)) => new_constraints(
+                        bound_typevar,
+                        Some(ConstraintBound::from_transitive_derivation(
+                            right_lower.ty(),
+                            left_upper,
+                            right_lower,
+                        )),
+                        None,
+                    ),
                     _ => return,
                 };
                 for post_constraint in post_constraints {
@@ -7356,7 +7660,7 @@ mod tests {
             db,
             &env,
             t,
-            ConstraintBounds::new(None, Some(actual_bound)),
+            ConstraintBounds::new(None, Some(ConstraintBound::Evidence(actual_bound))),
         );
         let mentioned = support
             .iter()
@@ -7411,7 +7715,7 @@ mod tests {
                 db,
                 &env,
                 t,
-                ConstraintBounds::new(None, Some(Type::TypeVar(u))),
+                ConstraintBounds::new(None, Some(ConstraintBound::Evidence(Type::TypeVar(u)))),
             );
             let mentioned = support
                 .iter()
@@ -7480,12 +7784,12 @@ mod tests {
         let int = known_instance(db, KnownClass::Int);
 
         let mut upper = UpperBound::from_clause(int);
-        upper.add_clause(Type::Never);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
+        upper.add_clause(ConstraintBound::Evidence(Type::Never));
+        assert_eq!(upper.evidence, FxOrderSet::from_iter([Type::Never]));
         assert_eq!(upper.materialize_exact(db, &env), Type::Never);
 
-        upper.add_clause(int);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
+        upper.add_clause(ConstraintBound::Evidence(int));
+        assert_eq!(upper.evidence, FxOrderSet::from_iter([Type::Never]));
     }
 
     #[test]
@@ -7510,12 +7814,12 @@ mod tests {
             ([int_or_str, u], u),
             ([u, int_or_str], u),
         ] {
-            let mut upper = UpperBound::none();
+            let mut upper = UpperBound::unconstrained();
             for clause in clauses {
-                upper.add_clause(clause);
+                upper.add_clause(ConstraintBound::Evidence(clause));
             }
 
-            assert_eq!(upper.clauses.len(), 2);
+            assert_eq!(upper.evidence.len(), 2);
             assert_eq!(upper.as_single_bound(db, &env), Some(expected));
         }
     }
@@ -7526,11 +7830,13 @@ mod tests {
         let db = &db;
         let env = db.program_environment();
 
-        assert_eq!(UpperBound::none().as_single_bound(db, &env), None);
-        assert_eq!(
-            UpperBound::from_clause(Type::object()).as_single_bound(db, &env),
-            Some(Type::object())
-        );
+        let missing = UpperBound::unconstrained();
+        assert!(!missing.has_evidence());
+        assert_eq!(missing.as_single_bound(db, &env), Some(Type::object()));
+
+        let explicit = UpperBound::from_clause(Type::object());
+        assert!(explicit.has_evidence());
+        assert_eq!(explicit.as_single_bound(db, &env), Some(Type::object()));
     }
 
     #[test]
@@ -7545,9 +7851,9 @@ mod tests {
         let int_or_bytes = UnionType::from_two_elements(db, &env, int, bytes);
 
         for clauses in [[int_or_str, int_or_bytes], [int_or_bytes, int_or_str]] {
-            let mut upper = UpperBound::none();
+            let mut upper = UpperBound::unconstrained();
             for clause in clauses {
-                upper.add_clause(clause);
+                upper.add_clause(ConstraintBound::Evidence(clause));
             }
 
             assert_eq!(upper.materialize_exact(db, &env), int);
@@ -7563,7 +7869,7 @@ mod tests {
         let int = known_instance(db, KnownClass::Int);
         let u = Type::TypeVar(create_typevar(db, "U"));
         let mut upper = UpperBound::from_clause(u);
-        upper.add_clause(int);
+        upper.add_clause(ConstraintBound::Evidence(int));
 
         assert!(
             upper
@@ -7654,9 +7960,22 @@ mod tests {
         let type_of_u = SubclassOfType::from(db, &env, u);
         let bool_class = KnownClass::Bool.to_class_literal(db, &env);
         let mut storage = builder.storage.borrow_mut();
-        let left = ConstraintId::new_with_bounds(db, &env, &mut storage, t, Some(type_of_u), None);
-        let right =
-            ConstraintId::new_with_bounds(db, &env, &mut storage, t, Some(bool_class), None);
+        let left = ConstraintId::new_with_bounds(
+            db,
+            &env,
+            &mut storage,
+            t,
+            Some(ConstraintBound::Evidence(type_of_u)),
+            None,
+        );
+        let right = ConstraintId::new_with_bounds(
+            db,
+            &env,
+            &mut storage,
+            t,
+            Some(ConstraintBound::Evidence(bool_class)),
+            None,
+        );
 
         for (left, right) in [(left, right), (right, left)] {
             let sequents = SequentMap::for_constraint_pair(db, &env, &mut storage, left, right);
@@ -7910,8 +8229,9 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let path_bound = PathBound {
             bound_typevar: t,
-            lower: None,
-            upper: UpperBound::none(),
+            evidence_lower: None,
+            validity_lower: Type::Never,
+            upper: UpperBound::unconstrained(),
             has_only_gradual_evidence: false,
         };
 
@@ -7934,8 +8254,16 @@ mod tests {
         let t = create_typevar(db, "T");
         let builder = ConstraintSetBuilder::new();
         let mut bounds = ConstraintBoundsBuilder::default();
-        bounds.add_lower(db, &env, known_instance(db, KnownClass::Int));
-        bounds.add_upper(db, &env, known_instance(db, KnownClass::Str));
+        bounds.add_lower(
+            db,
+            &env,
+            ConstraintBound::Evidence(known_instance(db, KnownClass::Int)),
+        );
+        bounds.add_upper(
+            db,
+            &env,
+            ConstraintBound::Evidence(known_instance(db, KnownClass::Str)),
+        );
         let invalid = bounds.finish(db, &env, t);
 
         assert_eq!(
@@ -7999,11 +8327,13 @@ class E: ...
 
         for lower in [None, Some(Type::any())] {
             let mut bounds = ConstraintBoundsBuilder::default();
-            if let Some(lower) = lower {
-                bounds.add_lower(db, &env, lower);
-            }
-            bounds.add_upper(db, &env, left);
-            bounds.add_upper(db, &env, right);
+            bounds.add_lower(
+                db,
+                &env,
+                lower.map_or_else(ConstraintBound::missing_lower, ConstraintBound::Evidence),
+            );
+            bounds.add_upper(db, &env, ConstraintBound::Evidence(left));
+            bounds.add_upper(db, &env, ConstraintBound::Evidence(right));
             let exhausted = bounds.finish(db, &env, t);
             let expected = PathBoundSolution::BudgetExceeded { fallback: lower };
             assert_eq!(
@@ -8039,8 +8369,8 @@ class E: ...
 
             // A later contradiction rejects the entire path, including its exhausted binding.
             let mut invalid = ConstraintBoundsBuilder::default();
-            invalid.add_lower(db, &env, int);
-            invalid.add_upper(db, &env, str);
+            invalid.add_lower(db, &env, ConstraintBound::Evidence(int));
+            invalid.add_upper(db, &env, ConstraintBound::Evidence(str));
             let invalid = invalid.finish(db, &env, u);
             for invalid_first in [false, true] {
                 let mut rejected = vec![exhausted.clone(), invalid.clone()];
@@ -8070,10 +8400,10 @@ class E: ...
         assert!(IntersectionType::bounded_from_elements(db, &env, gradual_upper).is_none());
         let mut bounds = ConstraintBoundsBuilder::default();
         for upper in gradual_upper {
-            bounds.add_upper(db, &env, upper);
+            bounds.add_upper(db, &env, ConstraintBound::Evidence(upper));
         }
         let exhausted = bounds.finish(db, &env, constrained);
-        assert!(exhausted.has_only_gradual_evidence());
+        assert!(exhausted.has_only_gradual_evidence);
         assert_eq!(
             PathBounds::preliminary_solve(db, &env, &builder, &exhausted),
             PathBoundSolution::BudgetExceeded { fallback: None }
@@ -8099,15 +8429,21 @@ class E: ...
         let int_or_str = UnionType::from_two_elements(db, &env, int, str);
         let bytes_or_bytearray = UnionType::from_two_elements(db, &env, bytes, bytearray);
         let mut storage = builder.storage.borrow_mut();
-        let left =
-            ConstraintId::new_with_bounds(db, &env, &mut storage, t, Some(int), Some(int_or_str));
+        let left = ConstraintId::new_with_bounds(
+            db,
+            &env,
+            &mut storage,
+            t,
+            Some(ConstraintBound::Evidence(int)),
+            Some(ConstraintBound::Evidence(int_or_str)),
+        );
         let right = ConstraintId::new_with_bounds(
             db,
             &env,
             &mut storage,
             t,
             None,
-            Some(bytes_or_bytearray),
+            Some(ConstraintBound::Evidence(bytes_or_bytearray)),
         );
 
         // Check satisfiability against each upper clause before punting on the union-bearing
@@ -8360,8 +8696,8 @@ class E: ...
     #[derive(Clone, Copy)]
     struct PermutedConstraint<'db>(
         BoundTypeVarInstance<'db>,
-        Option<Type<'db>>,
-        Option<Type<'db>>,
+        ConstraintBound<'db>,
+        ConstraintBound<'db>,
     );
 
     impl<'db> PermutedConstraint<'db> {
@@ -8372,7 +8708,9 @@ class E: ...
             storage: &mut ConstraintSetStorage<'db>,
         ) -> NodeId {
             let PermutedConstraint(typevar, lower, upper) = self;
-            Constraint::new_node_with_bounds(db, env, storage, typevar, lower, upper).0
+            let bounds = ConstraintBounds::new(Some(lower), Some(upper));
+            Constraint::new_node_with_bounds(db, env, storage, typevar, bounds.lower, bounds.upper)
+                .0
         }
     }
 
@@ -8409,7 +8747,7 @@ class E: ...
                     &env,
                     Constraint {
                         typevar,
-                        bounds: ConstraintBounds::new(lower, upper),
+                        bounds: ConstraintBounds::new(Some(lower), Some(upper)),
                     },
                 );
             }
@@ -8422,7 +8760,7 @@ class E: ...
                     &env,
                     Constraint {
                         typevar,
-                        bounds: ConstraintBounds::new(lower, upper),
+                        bounds: ConstraintBounds::new(Some(lower), Some(upper)),
                     },
                 );
                 let constraint_source_order = storage.constraint_source_order(constraint);
@@ -8502,8 +8840,16 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, Some(str), None),
-            PermutedConstraint(t, Some(int), None),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(str),
+                ConstraintBound::missing_upper(),
+            ),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(int),
+                ConstraintBound::missing_upper(),
+            ),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -8540,9 +8886,21 @@ class E: ...
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, Some(str), None),
-            PermutedConstraint(u, Some(bytes), None),
-            PermutedConstraint(t, Some(int), None),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(str),
+                ConstraintBound::missing_upper(),
+            ),
+            PermutedConstraint(
+                u,
+                ConstraintBound::Evidence(bytes),
+                ConstraintBound::missing_upper(),
+            ),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(int),
+                ConstraintBound::missing_upper(),
+            ),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -8570,9 +8928,21 @@ class E: ...
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, Some(str), None),
-            PermutedConstraint(u, Some(bytes), None),
-            PermutedConstraint(x, Some(int), None),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(str),
+                ConstraintBound::missing_upper(),
+            ),
+            PermutedConstraint(
+                u,
+                ConstraintBound::Evidence(bytes),
+                ConstraintBound::missing_upper(),
+            ),
+            PermutedConstraint(
+                x,
+                ConstraintBound::Evidence(int),
+                ConstraintBound::missing_upper(),
+            ),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -8598,8 +8968,16 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, Some(str), None),
-            PermutedConstraint(t, Some(int), None),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(str),
+                ConstraintBound::missing_upper(),
+            ),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(int),
+                ConstraintBound::missing_upper(),
+            ),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -8629,10 +9007,26 @@ class E: ...
         let list_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let list_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
         let atoms = [
-            PermutedConstraint(t, None, Some(list_u)),
-            PermutedConstraint(u, None, Some(int)),
-            PermutedConstraint(t, Some(list_int), None),
-            PermutedConstraint(v, Some(bytes), None),
+            PermutedConstraint(
+                t,
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Evidence(list_u),
+            ),
+            PermutedConstraint(
+                u,
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Evidence(int),
+            ),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(list_int),
+                ConstraintBound::missing_upper(),
+            ),
+            PermutedConstraint(
+                v,
+                ConstraintBound::Evidence(bytes),
+                ConstraintBound::missing_upper(),
+            ),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -8669,9 +9063,21 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, None, Some(int)),
-            PermutedConstraint(t, None, Some(str)),
-            PermutedConstraint(u, Some(bytes), None),
+            PermutedConstraint(
+                t,
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Evidence(int),
+            ),
+            PermutedConstraint(
+                t,
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Evidence(str),
+            ),
+            PermutedConstraint(
+                u,
+                ConstraintBound::Evidence(bytes),
+                ConstraintBound::missing_upper(),
+            ),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -8705,10 +9111,26 @@ class E: ...
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, None, Some(int)),
-            PermutedConstraint(t, None, Some(str)),
-            PermutedConstraint(t, Some(int), None),
-            PermutedConstraint(u, None, Some(int)),
+            PermutedConstraint(
+                t,
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Evidence(int),
+            ),
+            PermutedConstraint(
+                t,
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Evidence(str),
+            ),
+            PermutedConstraint(
+                t,
+                ConstraintBound::Evidence(int),
+                ConstraintBound::missing_upper(),
+            ),
+            PermutedConstraint(
+                u,
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Evidence(int),
+            ),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -9394,7 +9816,14 @@ class E: ...
         let t = create_typevar(db, "T");
         let u = Type::TypeVar(create_typevar(db, "U"));
 
-        for (lower, upper) in [(Some(u), None), (None, Some(u)), (Some(u), Some(u))] {
+        for (lower, upper) in [
+            (Some(ConstraintBound::Evidence(u)), None),
+            (None, Some(ConstraintBound::Evidence(u))),
+            (
+                Some(ConstraintBound::Evidence(u)),
+                Some(ConstraintBound::Evidence(u)),
+            ),
+        ] {
             let original = ConstraintSetBuilder::new().into_owned(|builder| {
                 ConstraintSet::constrain_typevar_with_bounds(db, &env, builder, t, lower, upper)
             });
@@ -9557,7 +9986,7 @@ class E: ...
                 builder,
                 u,
                 None,
-                Some(Type::TypeVar(t)),
+                Some(ConstraintBound::Evidence(Type::TypeVar(t))),
             );
             let t_v = ConstraintSet::constrain_typevar(
                 db,

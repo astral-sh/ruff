@@ -117,9 +117,9 @@ impl<'db> SolutionWalker<'db> {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, env, lower);
 
-                    if let Type::TypeVar(lower_bound_typevar) = lower {
+                    if let Type::TypeVar(lower_bound_typevar) = lower.ty() {
                         let bounds = mappings.entry(lower_bound_typevar).or_default();
-                        bounds.add_upper(db, env, Type::TypeVar(typevar));
+                        bounds.add_upper(db, env, lower.with_type(Type::TypeVar(typevar)));
                     }
                 }
 
@@ -127,9 +127,9 @@ impl<'db> SolutionWalker<'db> {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_upper(db, env, upper);
 
-                    if let Type::TypeVar(upper_bound_typevar) = upper {
+                    if let Type::TypeVar(upper_bound_typevar) = upper.ty() {
                         let bounds = mappings.entry(upper_bound_typevar).or_default();
-                        bounds.add_lower(db, env, Type::TypeVar(typevar));
+                        bounds.add_lower(db, env, upper.with_type(Type::TypeVar(typevar)));
                     }
                 }
             }
