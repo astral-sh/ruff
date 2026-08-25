@@ -9,6 +9,7 @@ use crate::rules::flake8_use_pathlib::{
     rules::Glob,
     violations::{Joiner, OsListdir, OsPathJoin, OsPathSplitext, PyPath},
 };
+use crate::{Edit, Fix};
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
@@ -91,7 +92,14 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             {
                 return;
             }
-            checker.report_diagnostic_if_enabled(OsListdir, range)
+            let mut diagnostic = checker.report_diagnostic(OsListdir, range);
+            if let Some(path) = call.arguments.find_argument_value("path", 0) {
+                diagnostic.set_fix(Fix::display_only_edit(Edit::range_replacement(
+                    format!("Path({}).iterdir()", checker.locator().slice(path)),
+                    call.range(),
+                )));
+            }
+            Some(diagnostic)
         }
 
         _ => return,
