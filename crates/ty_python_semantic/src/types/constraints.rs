@@ -1847,14 +1847,15 @@ pub(crate) struct Constraint<'db> {
 /// relationship between the argument type and parameter annotation when invoking a generic
 /// function. These bounds express actual user intent, and are called _evidence_ bounds.
 ///
-/// Other bounds are background limitations on which specializations are valid — for instance, the
-/// declared upper bound or constraints of a typevar. These are called _validity_ bounds.
-/// Importantly, we don't want to choose a validity bound as a solution unless we have no other
-/// choice. There is often an evidence bound that is a better choice.
+/// Other bounds are background limitations on which specializations are valid — for instance, a
+/// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
+/// don't want to choose a validity bound as a solution unless we have no other choice. There is
+/// often an evidence bound that is a better choice.
 ///
-/// A bound derived from both evidence and validity is _mixed_. Mixed bounds remain
-/// evidence-bearing, but are kept separate from pure validity so that they do not obscure exact
-/// declared bounds or constraints.
+/// Provenance records everything that a bound's derivation depends on. A bound derived only from
+/// evidence remains evidence, and one derived only from validity remains validity. A bound derived
+/// from both is _mixed_. Evidence and mixed bounds can both be used for inference, but mixed bounds
+/// remain distinct so that subsequent derivations do not forget their validity dependency.
 ///
 /// Every type is a supertype of `Never` and a subtype of `object`, so `Validity(Never)` represents
 /// an absent lower bound and `Validity(object)` represents an absent upper bound.
@@ -1926,14 +1927,13 @@ impl<'db> ConstraintBound<'db> {
     /// `int ≤ T` and `T ≤ S` requires both premises even though the resulting bound type is still
     /// `int`.
     ///
-    /// Only direct constraints from a typevar's declared bound or constraints are validity bounds.
-    /// A derived bound with any validity premise is mixed so that it cannot obscure a constrained
-    /// typevar's exact validity equality on a complete path.
+    /// The result depends on both premises, so it is validity if both premises are validity,
+    /// evidence if both are evidence, and mixed otherwise.
     fn from_transitive_derivation(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
-        if matches!((lhs, rhs), (Self::Evidence(_), Self::Evidence(_))) {
-            Self::Evidence(combined)
-        } else {
-            Self::Mixed(combined)
+        match (lhs, rhs) {
+            (Self::Validity(_), Self::Validity(_)) => Self::Validity(combined),
+            (Self::Evidence(_), Self::Evidence(_)) => Self::Evidence(combined),
+            _ => Self::Mixed(combined),
         }
     }
 
@@ -1942,7 +1942,7 @@ impl<'db> ConstraintBound<'db> {
     fn with_source_provenance(self, source: ConstraintBounds<'db>) -> Self {
         match self {
             Self::Evidence(ty) => {
-                Self::from_combination(ty, source.lower_bound(), source.upper_bound())
+                Self::from_transitive_derivation(ty, source.lower_bound(), source.upper_bound())
             }
             Self::Validity(_) | Self::Mixed(_) => self,
         }
