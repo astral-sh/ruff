@@ -33,7 +33,7 @@ typevar can only specialize to a type that is a supertype of the lower bound, an
 upper bound.
 
 ```py
-from typing import Any, final, Never, Sequence
+from typing import Any, Callable, final, Never, Sequence
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
@@ -84,6 +84,13 @@ or incomparable, then there is no type that can satisfy the constraint.
 def _[T]() -> None:
     static_assert(not ConstraintSet.range(Super, T, Sub))
     static_assert(not ConstraintSet.range(Base, T, Unrelated))
+```
+
+Ordinary TypeVar bounds compare whole callables, so incompatible returns make a range unsatisfiable.
+
+```py
+def callable_returns[T]() -> None:
+    static_assert(ConstraintSet.range(Callable[[int], int], T, Callable[[int], str]) == ConstraintSet.never())
 ```
 
 When the lower and upper bounds are the same type, `equality` requires the typevar to specialize to
@@ -1191,7 +1198,7 @@ out all of the different kinds of constraints described above. Here we just test
 exists, and provides more detail than otherwise.
 
 ```py
-from ty_extensions._internal import ConstraintSet
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
 
 class Super: ...
 class Base(Super): ...
@@ -1204,4 +1211,363 @@ def _[T]() -> None:
     # from above. If our constraint set rendering changes, update this accordingly.
     # revealed: ConstraintSet[(Sub ≤ T@_ ≤ Super)]
     reveal_type(ConstraintSet.range(Sub, T, Super).with_detailed_display())
+```
+
+ParamSpec bounds display the full parameter list without the callable return type.
+
+```py
+def complete(value: int, /, text: str = "", *args: float, flag: bool = False, **kwargs: bytes) -> int:
+    return 0
+
+def signature[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[complete], P, RegularCallableTypeOf[complete])
+    # revealed: ConstraintSet[(P@signature = (value: int, /, text: str = "", *args: float, flag: bool = False, **kwargs: bytes))]
+    reveal_type(constraints.with_detailed_display())
+```
+
+## ParamSpec
+
+A ParamSpec range is `lower_parameters ≤ P ≤ upper_parameters`; callable returns are ignored.
+
+### Range construction
+
+A legacy ParamSpec bound by a generic callable is valid as the subject of a nontrivial range.
+
+```py
+from typing import Callable, ParamSpec
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+P = ParamSpec("P")
+
+def legacy(callback: Callable[P, None]) -> None:
+    constraints = ConstraintSet.range(Callable[[int, str], None], P, Callable[[int, str], None])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    different_returns = ConstraintSet.range(Callable[[int, str], int], P, Callable[[int, str], str])
+    static_assert(constraints == different_returns)
+```
+
+An empty parameter list is an exact bound, distinct from a one-parameter list.
+
+```py
+def empty[**P]() -> None:
+    constraints = ConstraintSet.range(Callable[[], None], P, Callable[[], None])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.range(Callable[[int], None], P, Callable[[int], None]))
+```
+
+### Qualified subjects
+
+A module-qualified legacy ParamSpec is valid when bound by the enclosing function.
+
+`params.py`:
+
+```py
+from typing import ParamSpec
+
+P = ParamSpec("P")
+```
+
+`main.py`:
+
+```py
+from typing import Callable
+from ty_extensions._internal import ConstraintSet
+import params
+
+def qualified(callback: Callable[params.P, None]) -> None:
+    constraints = ConstraintSet.range(Callable[[int], None], params.P, Callable[[int], None])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+```
+
+### Callable aliases
+
+Specialized callable aliases have the same bounds as their expanded parameter lists.
+
+```py
+from typing import Callable, Concatenate
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+type Callback[**Q, R] = Callable[Q, R]
+
+def aliases[**P]() -> None:
+    constraints = ConstraintSet.range(Callback[[int, str, bool], int], P, Callback[[int, str, bool], str])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    expected = ConstraintSet.range(Callable[[int, str, bool], None], P, Callable[[int, str, bool], None])
+    static_assert(constraints == expected)
+```
+
+Fully specializing a `Concatenate` alias preserves every prefix parameter and the concrete tail.
+
+```py
+type Prefixed[**Q, R] = Callable[Concatenate[int, str, Q], R]
+
+def concatenate[**P]() -> None:
+    constraints = ConstraintSet.range(Prefixed[[bool], int], P, Prefixed[[bool], str])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    expected = ConstraintSet.range(Callable[[int, str, bool], None], P, Callable[[int, str, bool], None])
+    static_assert(constraints == expected)
+```
+
+### Two-sided bounds
+
+A callable accepting `Super` and a consumer passing a `Sub` give `(Super, /) ≤ P ≤ (Sub, /)`.
+
+```py
+from typing import Callable, final
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def two_sided[**P]() -> None:
+    constraints = ConstraintSet.range(Callable[[Super], None], P, Callable[[Sub], None])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.range(Callable[[Super], None], P, Callable[[Super], None]))
+    static_assert(constraints != ConstraintSet.range(Callable[[Sub], None], P, Callable[[Sub], None]))
+```
+
+Inverted or incomparable bounds are unsatisfiable.
+
+```py
+def incompatible[**P]() -> None:
+    inverted = ConstraintSet.range(Callable[[Sub], None], P, Callable[[Super], None])
+    static_assert(inverted == ConstraintSet.never())
+    incomparable = ConstraintSet.range(Callable[[Base], None], P, Callable[[Unrelated], None])
+    static_assert(incomparable == ConstraintSet.never())
+```
+
+### Signature preservation
+
+Named parameters accept positional-only calls; the reverse range is invalid.
+
+```pyi
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+def named(value: int) -> None: ...
+def positional_only[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[named], P, Callable[[int], None])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    reverse = ConstraintSet.range(Callable[[int], None], P, RegularCallableTypeOf[named])
+    static_assert(reverse == ConstraintSet.never())
+```
+
+Named parameters also accept keyword-only calls; the reverse range is invalid.
+
+```pyi
+def keyword(*, value: int) -> None: ...
+def keyword_only[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[named], P, RegularCallableTypeOf[keyword])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    reverse = ConstraintSet.range(RegularCallableTypeOf[keyword], P, RegularCallableTypeOf[named])
+    static_assert(reverse == ConstraintSet.never())
+```
+
+An optional parameter accepts every call to a required parameter, but not the reverse.
+
+```pyi
+def optional(value: int = ...) -> None: ...
+def defaults[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[optional], P, RegularCallableTypeOf[named])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    reverse = ConstraintSet.range(RegularCallableTypeOf[named], P, RegularCallableTypeOf[optional])
+    static_assert(reverse == ConstraintSet.never())
+```
+
+Variadic positional parameters accept fixed positional lists, but not the reverse.
+
+```pyi
+def args(*args: int) -> None: ...
+def positional_variadics[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[args], P, Callable[[int, int], None])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    reverse = ConstraintSet.range(Callable[[int, int], None], P, RegularCallableTypeOf[args])
+    static_assert(reverse == ConstraintSet.never())
+```
+
+Variadic keyword parameters likewise accept a fixed keyword-only parameter, but not the reverse.
+
+```pyi
+def kwargs(**kwargs: int) -> None: ...
+def keyword_variadics[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[kwargs], P, RegularCallableTypeOf[keyword])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    reverse = ConstraintSet.range(RegularCallableTypeOf[keyword], P, RegularCallableTypeOf[kwargs])
+    static_assert(reverse == ConstraintSet.never())
+```
+
+### Overloaded bounds
+
+Return types are erased in every overload, without keeping only the first or last parameter list.
+
+```pyi
+from typing import Callable, overload
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+@overload
+def overloaded(value: int, /) -> int: ...
+@overload
+def overloaded(*, value: str) -> str: ...
+@overload
+def swapped_returns(value: int, /) -> str: ...
+@overload
+def swapped_returns(*, value: str) -> int: ...
+def keyword(*, value: str) -> None: ...
+def overloads[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[overloaded], P, RegularCallableTypeOf[swapped_returns])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints == ConstraintSet.range(RegularCallableTypeOf[overloaded], P, RegularCallableTypeOf[overloaded]))
+    static_assert(constraints != ConstraintSet.range(Callable[[int], None], P, Callable[[int], None]))
+    static_assert(constraints != ConstraintSet.range(RegularCallableTypeOf[keyword], P, RegularCallableTypeOf[keyword]))
+```
+
+An overloaded lower bound can satisfy a single signature; an overloaded upper bound requires both.
+
+```pyi
+def asymmetric[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[overloaded], P, Callable[[int], None])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    reverse = ConstraintSet.range(Callable[[int], None], P, RegularCallableTypeOf[overloaded])
+    static_assert(reverse == ConstraintSet.never())
+```
+
+The string overload accepts only a keyword argument, not a positional argument.
+
+```pyi
+def parameter_kinds[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[overloaded], P, RegularCallableTypeOf[keyword])
+    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    positional = ConstraintSet.range(RegularCallableTypeOf[overloaded], P, Callable[[str], None])
+    static_assert(positional == ConstraintSet.never())
+```
+
+### Gradual parameter lists
+
+Ellipsis describes gradual parameters; `Any` annotates one required positional-only parameter.
+
+```py
+from typing import Any, Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def gradual[**P]() -> None:
+    ellipsis = ConstraintSet.range(Callable[..., int], P, Callable[..., str])
+    reveal_type(ellipsis.with_detailed_display())  # revealed: ConstraintSet[(P@gradual = (...))]
+    any_parameter = ConstraintSet.range(Callable[[Any], int], P, Callable[[Any], str])
+    reveal_type(any_parameter.with_detailed_display())  # revealed: ConstraintSet[(P@gradual = (Any, /))]
+```
+
+Only ellipsis is compatible with an empty parameter list in either bound.
+
+```py
+def empty[**P]() -> None:
+    reveal_type(ConstraintSet.range(Callable[..., None], P, Callable[[], None]))  # revealed: ConstraintSet[bool]
+    reveal_type(ConstraintSet.range(Callable[[], None], P, Callable[..., None]))  # revealed: ConstraintSet[bool]
+    static_assert(ConstraintSet.range(Callable[[Any], None], P, Callable[[], None]) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(Callable[[], None], P, Callable[[Any], None]) == ConstraintSet.never())
+```
+
+### Invalid forms and preservation controls
+
+An ordinary type in either bound makes a ParamSpec range unsatisfiable.
+
+```py
+from typing import Callable, Never, TypeVarTuple
+from typing_extensions import TypeForm
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def invalid_bounds[**P]() -> None:
+    static_assert(ConstraintSet.range(int, P, Callable[[int], None]) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(Callable[[int], None], P, int) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(object, P, object) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(Never, P, Never) == ConstraintSet.never())
+```
+
+An ordinary TypeVar or ParamSpec component is not a complete parameter list.
+
+```py
+def invalid_typevar_bounds[**P, **Q, T]() -> None:
+    static_assert(ConstraintSet.range(T, P, Callable[[int], None]) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(Callable[[int], None], P, T) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(Q.args, P, Callable[[int], None]) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(Callable[[int], None], P, Q.args) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(Q.kwargs, P, Callable[[int], None]) == ConstraintSet.never())
+    static_assert(ConstraintSet.range(Callable[[int], None], P, Q.kwargs) == ConstraintSet.never())
+```
+
+Allowing ParamSpec bounds must not admit them as ordinary TypeVar bounds.
+
+```py
+def ordinary_subject[**P, T]() -> None:
+    ConstraintSet.range(P, T, object)  # error: [invalid-type-form] "Bare ParamSpec `P`"
+    ConstraintSet.range(Never, T, P)  # error: [invalid-type-form] "Bare ParamSpec `P`"
+```
+
+Bare TypeVarTuples remain invalid bounds, including when arguments are passed by keyword.
+
+```py
+def typevartuple_bounds[**P, *Us]() -> None:
+    ConstraintSet.range(Us, P, Callable[[int], None])  # error: [invalid-type-form] "TypeVarTuple `Us`"
+    ConstraintSet.range(Callable[[int], None], P, Us)  # error: [invalid-type-form] "TypeVarTuple `Us`"
+    ConstraintSet.range(
+        typevar=P,
+        upper_bound=Callable[[int], None],
+        lower_bound=Us,  # error: [invalid-type-form] "TypeVarTuple `Us`"
+    )
+    ConstraintSet.range(
+        upper_bound=Us,  # error: [invalid-type-form] "TypeVarTuple `Us`"
+        lower_bound=Callable[[int], None],
+        typevar=P,
+    )
+```
+
+The exception must not leak into other TypeForm calls, constructors, or nested type expressions.
+
+```py
+def accepts_type_form(form: TypeForm[object]) -> None: ...
+def invalid_forms[**P]() -> None:
+    ConstraintSet.lower_bound(Callable[[int], None], P)  # error: [invalid-type-form]
+    ConstraintSet.upper_bound(P, Callable[[int], None])  # error: [invalid-type-form]
+    ConstraintSet.equality(P, Callable[[int], None])  # error: [invalid-type-form]
+    ConstraintSet.range(Callable[[int], None], list[P], Callable[[int], None])  # error: [invalid-type-arguments]
+    ConstraintSet.range(Callable[[P], None], P, Callable[[int], None])  # error: [invalid-type-form]
+    ConstraintSet.range(Callable[[int], None], P, Callable[..., P])  # error: [invalid-type-form]
+    accepts_type_form(P)  # error: [invalid-type-form]
+```
+
+An attribute receiver must still reject bare ParamSpecs in unrelated TypeForm calls.
+
+```py
+class Holder:
+    form: TypeForm[int]
+
+def receiver(form: TypeForm[object]) -> Holder:
+    return Holder()
+
+def invalid_receiver[**P]() -> None:
+    ConstraintSet.range(int, receiver(P).form, object)  # error: [invalid-type-form]
+```
+
+ParamSpec components keep their ordinary bounds; bare TypeVarTuples remain invalid subjects.
+
+```py
+Ts = TypeVarTuple("Ts")
+
+def legacy(value: tuple[*Ts]) -> None:
+    ConstraintSet.range(Callable[[int], None], Ts, Callable[[int], None])  # error: [invalid-type-form]
+
+def components_and_typevartuple[**P, *Us]() -> None:
+    reveal_type(ConstraintSet.range(tuple[int], P.args, tuple[object, ...]))  # revealed: ConstraintSet[bool]
+    reveal_type(ConstraintSet.range(dict[str, object], P.kwargs, dict[str, object]))  # revealed: ConstraintSet[bool]
+    ConstraintSet.range(Callable[[int], None], Us, Callable[[int], None])  # error: [invalid-type-form]
 ```

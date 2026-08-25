@@ -2955,8 +2955,24 @@ impl<'db> Bindings<'db> {
                         let Type::TypeVar(typevar) = typevar else {
                             return;
                         };
+                        let bounds =
+                            if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none() {
+                                let normalize_bound =
+                                    |bound: Type<'db>| match bound.resolve_type_alias(db) {
+                                        Type::Callable(callable) => {
+                                            Some(Type::Callable(callable.into_paramspec_value(db)))
+                                        }
+                                        _ => None,
+                                    };
+                                normalize_bound(lower).zip(normalize_bound(upper))
+                            } else {
+                                Some((lower, upper))
+                            };
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
+                            let Some((lower, upper)) = bounds else {
+                                return ConstraintSet::from_bool(constraints, false);
+                            };
                             ConstraintSet::constrain_typevar(
                                 db,
                                 env,
