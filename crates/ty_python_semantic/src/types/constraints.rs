@@ -3505,6 +3505,9 @@ impl<'db> PathBounds<'db> {
         inferable: TypeVarSet<'db>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, Option<Self>> {
+        let bound_is_ineligible =
+            |ty: Type<'db>| ty.has_typevar(db, env) || ty.has_provisional_marker(db, env);
+
         let mut constraints = Vec::default();
         let mut current = node;
         loop {
@@ -3514,7 +3517,6 @@ impl<'db> PathBounds<'db> {
                     if constraints.is_empty() {
                         return ControlFlow::Continue(Some(PathBounds::Unconstrained));
                     }
-                    limits.satisfied_path()?;
                     break;
                 }
                 Node::AlwaysFalse => {
@@ -3534,9 +3536,7 @@ impl<'db> PathBounds<'db> {
                             if !lower.typevar.is_inferable(db, inferable) {
                                 return ControlFlow::Continue(None);
                             }
-                            if lower.bound.has_typevar(db, env)
-                                || lower.bound.has_provisional_marker(db, env)
-                            {
+                            if bound_is_ineligible(lower.bound) {
                                 return ControlFlow::Continue(None);
                             }
                             constraints.push((
@@ -3551,9 +3551,7 @@ impl<'db> PathBounds<'db> {
                             if !upper.typevar.is_inferable(db, inferable) {
                                 return ControlFlow::Continue(None);
                             }
-                            if upper.bound.has_typevar(db, env)
-                                || upper.bound.has_provisional_marker(db, env)
-                            {
+                            if bound_is_ineligible(upper.bound) {
                                 return ControlFlow::Continue(None);
                             }
                             constraints.push((
@@ -3568,9 +3566,7 @@ impl<'db> PathBounds<'db> {
                             if !equivalence.typevar.is_inferable(db, inferable) {
                                 return ControlFlow::Continue(None);
                             }
-                            if equivalence.bound.has_typevar(db, env)
-                                || equivalence.bound.has_provisional_marker(db, env)
-                            {
+                            if bound_is_ineligible(equivalence.bound) {
                                 return ControlFlow::Continue(None);
                             }
                             constraints.push((
@@ -3637,9 +3633,17 @@ impl<'db> PathBounds<'db> {
                 // solutions, other than the evidence we already have in the BDD.
                 None => continue,
             };
+
+            if bound_is_ineligible(bound) {
+                // If this declared upper bound mentions other typevars, we don't have a simple
+                // conjunction that's eligible for this fast path.
+                return ControlFlow::Continue(None);
+            }
+
             bounds.add_upper(db, env, ConstraintProvenance::Validity, bound);
         }
 
+        limits.satisfied_path()?;
         let path = mappings
             .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
