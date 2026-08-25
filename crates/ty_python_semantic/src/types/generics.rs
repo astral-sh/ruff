@@ -3033,8 +3033,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.env,
             self.constraints,
             bound_typevar,
-            bounds.lower_bound(),
-            bounds.upper_bound(),
+            bounds.lower,
+            bounds.upper,
         );
         self.pending.intersect(db, self.constraints, constraint);
     }
@@ -3074,14 +3074,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         variance: TypeVarVariance,
     ) {
         let bounds = match variance {
-            TypeVarVariance::Covariant => ConstraintBounds::new(
-                ConstraintBound::Evidence(ty),
-                ConstraintBound::missing_upper(),
-            ),
-            TypeVarVariance::Contravariant => ConstraintBounds::new(
-                ConstraintBound::missing_lower(),
-                ConstraintBound::Evidence(ty),
-            ),
+            TypeVarVariance::Covariant => {
+                ConstraintBounds::new(Some(ConstraintBound::Evidence(ty)), None)
+            }
+            TypeVarVariance::Contravariant => {
+                ConstraintBounds::new(None, Some(ConstraintBound::Evidence(ty)))
+            }
             TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
             TypeVarVariance::Bivariant => return,
         };
