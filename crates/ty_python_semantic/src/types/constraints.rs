@@ -955,19 +955,21 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return self;
         }
 
-        let mut variables = FxHashMap::default();
         let mut mapped_constraints = FxHashMap::default();
         let mut storage = builder.storage.borrow_mut();
         let mut constraints = SmallVec::<[ConstraintId; 8]>::new();
         self.node
             .for_each_unique_constraint(&storage, &mut |constraint| constraints.push(constraint));
         for constraint_id in constraints {
-            let Some(gradual) = storage.constraint_data(constraint_id).as_gradual() else {
+            if storage
+                .constraint_data(constraint_id)
+                .as_gradual()
+                .is_none()
+                || mapped_constraints.contains_key(&constraint_id)
+            {
                 continue;
-            };
-            let variable = *variables
-                .entry(gradual)
-                .or_insert_with(|| storage.next_gradual_variable());
+            }
+            let variable = storage.next_gradual_variable();
             mapped_constraints.insert(constraint_id, variable.new_node(db, env, &mut storage));
         }
 
@@ -1375,7 +1377,6 @@ impl<'db> ConstraintSetBuilder<'db> {
             .collect();
         let node_indices = RankBitBox::from_bits(used_nodes);
 
-        let mut gradual_variables = FxHashMap::default();
         let mut gradual_variable_count = 0;
         let constraints = storage
             .constraints
@@ -1383,12 +1384,9 @@ impl<'db> ConstraintSetBuilder<'db> {
             .zip(&used_constraints)
             .filter_map(|(constraint, used)| {
                 used.then(|| match constraint {
-                    ConstraintData::Gradual(variable) => {
-                        let variable = *gradual_variables.entry(variable).or_insert_with(|| {
-                            let variable = GradualVariableId::from_usize(gradual_variable_count);
-                            gradual_variable_count += 1;
-                            variable
-                        });
+                    ConstraintData::Gradual(_) => {
+                        let variable = GradualVariableId::from_usize(gradual_variable_count);
+                        gradual_variable_count += 1;
                         ConstraintData::Gradual(variable)
                     }
                     ConstraintData::TypeVar(_) => constraint,
@@ -1912,10 +1910,8 @@ impl<'db> ConstraintSetStorage<'db> {
             self.intern_typevar(db, inner.typevars[typevar]);
         }
 
-        let gradual_variables: IndexVec<GradualVariableId, GradualVariableId> = (0..inner
-            .gradual_variable_count)
-            .map(|_| self.next_gradual_variable())
-            .collect();
+        let gradual_variable_offset = self.gradual_variable_count;
+        self.gradual_variable_count += inner.gradual_variable_count;
 
         // Rebuild constraints in their saved order, using the destination's typevar ordering.
         let constraints: Box<[_]> = inner
@@ -1930,9 +1926,9 @@ impl<'db> ConstraintSetStorage<'db> {
                     old_constraint.bounds.lower,
                     old_constraint.bounds.upper,
                 ),
-                ConstraintData::Gradual(variable) => {
-                    gradual_variables[*variable].new_node(db, env, self)
-                }
+                ConstraintData::Gradual(variable) => self
+                    .adjusted_gradual_variable_id(*variable + gradual_variable_offset)
+                    .new_node(db, env, self),
             })
             .collect();
 
