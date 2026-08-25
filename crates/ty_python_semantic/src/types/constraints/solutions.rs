@@ -7,8 +7,8 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintId,
-    ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits, SolutionValidity,
+    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, ConstraintAssignment,
+    ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder, SolutionLimits, SolutionValidity,
     SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::TypeVarBoundOrConstraints;
@@ -99,28 +99,64 @@ impl<'db> SolutionWalker<'db> {
             (constraint.when_unconstrained(), interior.if_uncertain),
             (constraint.when_false(), interior.if_false),
         ] {
-            path.walk_edge(
+            self.visit_edge(
                 db,
                 env,
                 storage,
+                limits,
+                path,
                 assignment,
-                |storage, path, _new_range, found_conflict| {
-                    if !found_conflict {
-                        self.visit_node_and_then(
-                            db,
-                            env,
-                            storage,
-                            limits,
-                            path,
-                            child,
-                            process_satisfied,
-                        )?;
-                    }
-                    ControlFlow::Continue(())
-                },
+                child,
+                process_satisfied,
             )?;
         }
         ControlFlow::Continue(())
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::type_complexity)]
+    fn visit_edge<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        assignment: ConstraintAssignment,
+        child: NodeId,
+        process_satisfied: &mut dyn FnMut(
+            &mut Self,
+            &mut ConstraintSetStorage<'db>,
+            &mut L,
+            &mut PathAssignments,
+        ) -> ControlFlow<L::Break>,
+    ) -> ControlFlow<L::Break> {
+        // Don't bother adding the assignment and checking the sequent map if the edge takes us to
+        // the ALWAYS_FALSE terminal.
+        if child == ALWAYS_FALSE {
+            return ControlFlow::Continue(());
+        }
+
+        path.walk_edge(
+            db,
+            env,
+            storage,
+            assignment,
+            |storage, path, _new_range, found_conflict| {
+                if !found_conflict {
+                    self.visit_node_and_then(
+                        db,
+                        env,
+                        storage,
+                        limits,
+                        path,
+                        child,
+                        process_satisfied,
+                    )?;
+                }
+                ControlFlow::Continue(())
+            },
+        )
     }
 
     fn validate_satisfied_path<L: SolutionLimits>(
