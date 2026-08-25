@@ -97,6 +97,29 @@ def check_alias(value: Scalar) -> None:
     takes_str(f(value))
 ```
 
+A PEP 695 type alias is also preserved when relating one generic function to a generic callback.
+This lets us infer the callback's return type from the members of the alias.
+
+```py
+from collections.abc import Callable
+
+type Items = tuple[int] | tuple[str]
+
+def identity[T](value: T) -> T:
+    return value
+
+def extract[T](callback: Callable[[Items], tuple[T]]) -> T:
+    raise NotImplementedError
+
+result = extract(identity)
+
+# revealed: str | int
+reveal_type(result)
+
+# error: [unresolved-attribute] "Object of type `str | int` has no attribute `nonexistent`"
+result.nonexistent()
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive

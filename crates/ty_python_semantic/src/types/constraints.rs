@@ -2749,12 +2749,15 @@ impl ConstraintId {
         }
 
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let effective_lower = UnionType::from_two_elements(
-            db,
-            env,
-            self_constraint.bounds.lower_bound().ty(),
-            other_constraint.bounds.lower_bound().ty(),
-        );
+        let lower = match (self_constraint.bounds.lower, other_constraint.bounds.lower) {
+            (Some(left), Some(right)) => {
+                let combined = UnionType::from_two_elements(db, env, left.ty(), right.ty());
+                Some(ConstraintBound::from_combination(combined, left, right))
+            }
+            (Some(lower), None) | (None, Some(lower)) => Some(lower),
+            (None, None) => None,
+        };
+        let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
         let mut merged_upper = UpperBound::unconstrained();
         if let Some(upper) = self_constraint.bounds.upper {
             merged_upper.add_clause(upper);
@@ -2779,15 +2782,11 @@ impl ConstraintId {
         // intersections, since those can be broken apart into BDDs over simpler constraints. If the
         // merged upper contains a union clause, keep any useful disjointness result from above but
         // do not try to derive a factored upper-bound constraint.
-        if effective_lower.is_union() || merged_upper.has_visible_union_clause() {
+        if lower.is_some_and(|bound| bound.ty().is_union())
+            || merged_upper.has_visible_union_clause()
+        {
             return IntersectionResult::CannotSimplify;
         }
-
-        let lower = ConstraintBound::from_combination(
-            effective_lower,
-            self_constraint.bounds.lower_bound(),
-            other_constraint.bounds.lower_bound(),
-        );
 
         let effective_upper = merged_upper.materialize_exact(db, env);
         if effective_upper.is_nontrivial_intersection(db) {
@@ -2802,7 +2801,10 @@ impl ConstraintId {
 
         IntersectionResult::Simplified(Constraint {
             typevar: self_constraint.typevar,
-            bounds: ConstraintBounds::new(lower, upper),
+            bounds: ConstraintBounds::new(
+                lower.unwrap_or_else(ConstraintBound::missing_lower),
+                upper,
+            ),
         })
     }
 
