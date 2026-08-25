@@ -1543,7 +1543,11 @@ fn loop_header_reachability_impl<'db>(
         }
 
         match use_def.definition(live_binding.binding()) {
-            DefinitionState::Defined(def) => {
+            // Assignment validity can depend on this header, so avoid inferring it while
+            // initializing a cycle.
+            DefinitionState::Defined(def)
+                if is_cycle_initial || !is_discarded_dict_key_assignment(db, def) =>
+            {
                 debug_assert_ne!(
                     def, definition,
                     "loop headers only include bindings from within the loop"
@@ -1556,7 +1560,9 @@ fn loop_header_reachability_impl<'db>(
             // `del` in the loop body is always visible to code after the loop via the
             // normal control flow merge. Updating `deleted_reachability` here is
             // necessary for prior uses in the loop to see it.
-            DefinitionState::Deleted => {
+            // Discarded dictionary-key bindings also require a fallback to the receiver's
+            // value type instead of contributing their assigned value.
+            DefinitionState::Defined(_) | DefinitionState::Deleted => {
                 deleted_reachability = deleted_reachability.or(reachability);
                 deleted_narrowing_constraints.insert(live_binding.narrowing_constraint());
             }
@@ -1577,10 +1583,10 @@ fn loop_header_reachability_impl<'db>(
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct LoopHeaderReachability<'db> {
     pub(crate) deleted_reachability: Truthiness,
-    /// Constraints established after a deletion or an assignment that invalidated a member.
+    /// Constraints established after a deletion, member invalidation, or discarded key assignment.
     /// These still narrow the fallback type of the member on the next iteration.
     pub(crate) deleted_narrowing_constraints: Box<[ScopedNarrowingConstraint]>,
-    /// Reachable loop-back bindings that are not `del`s.
+    /// Reachable loop-back bindings whose values contribute to inferred types.
     pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
 }
 

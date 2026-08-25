@@ -326,6 +326,70 @@ def _(y: Y):
     f1(**y.inner)
 ```
 
+## Known key values after loop replacements
+
+An accepted dictionary replacement contributes its known key values to subsequent iterations.
+
+```py
+def accepted():
+    values: dict[str, int] = {"a": 1}
+    for _ in range(2):
+        reveal_type(values["a"])  # revealed: Literal[1, 2]
+        values = {"a": 2}
+    reveal_type(values["a"])  # revealed: Literal[2]
+```
+
+## Rejected dictionary replacements in loops
+
+A rejected replacement instead falls back to the declared value type. An assertion after the
+replacement narrows that fallback on the next iteration, rather than preserving the original key's
+literal type or using the rejected value.
+
+```py
+def rejected(repeat: bool):
+    values: dict[str, int | None] = {"a": 1}
+    while repeat:
+        reveal_type(values["a"])  # revealed: int
+        values = {"a": "bad"}  # error: [invalid-assignment]
+        assert values["a"] is not None
+    reveal_type(values["a"])  # revealed: int
+```
+
+## Setter dictionary assignments in loops
+
+A property setter need not store the assigned dictionary. Key reads use the getter's value type,
+including when a key was already read before the loop and the setter accepts a different value type.
+
+```py
+class C:
+    @property
+    def values(self) -> dict[str, int]:
+        return {"a": 1}
+
+    @values.setter
+    def values(self, value: dict[str, str]) -> None:
+        pass
+
+def f(c: C, repeat: bool) -> int:
+    reveal_type(c.values["a"])  # revealed: int
+    while repeat:
+        reveal_type(c.values["a"])  # revealed: int
+        c.values = {"a": "bad"}
+    return c.values["a"]
+```
+
+The same applies when the assigned dictionary depends on a key read from an earlier iteration.
+Inferring that assignment must converge without using the setter's input type for getter reads.
+
+```py
+def loop_carried_value(c: C, repeat: bool) -> int:
+    reveal_type(c.values["a"])  # revealed: int
+    while repeat:
+        reveal_type(c.values["a"])  # revealed: int
+        c.values = {"a": str(c.values["a"])}
+    return c.values["a"]
+```
+
 ## Rejected annotations in stubs
 
 Annotation-only declarations in stubs are also bindings. A rejected annotation should fall back to
