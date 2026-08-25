@@ -9495,13 +9495,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        let paramspec_range_subject = match callable_type {
-            Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
-                arguments.find_argument_value("typevar", 1)
-            }
+        let paramspec_constraint_subject = match callable_type {
+            Type::KnownBoundMethod(
+                KnownBoundMethodType::ConstraintSetLowerBound
+                | KnownBoundMethodType::ConstraintSetRange,
+            ) => arguments.find_argument_value("typevar", 1),
+            Type::KnownBoundMethod(
+                KnownBoundMethodType::ConstraintSetUpperBound
+                | KnownBoundMethodType::ConstraintSetEquality,
+            ) => arguments.find_argument_value("typevar", 0),
             _ => None,
         };
-        let paramspec_range_subject_is_bare = paramspec_range_subject
+        let paramspec_constraint_subject_is_bare = paramspec_constraint_subject
             .filter(|subject| is_dotted_name(subject))
             .is_some_and(|subject| {
                 let mut speculative = self.speculate_without_diagnostics();
@@ -9521,11 +9526,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                // A ParamSpec range can refer to other ParamSpecs. Limit the exception to
+                // A ParamSpec constraint can refer to other ParamSpecs. Limit the exception to
                 // dotted names so nested types and calls in attribute receivers keep
                 // their ordinary validation.
-                if (paramspec_range_subject_is_bare
-                    || paramspec_range_subject.is_some_and(|subject| std::ptr::eq(subject, expr)))
+                if (paramspec_constraint_subject_is_bare
+                    || paramspec_constraint_subject
+                        .is_some_and(|subject| std::ptr::eq(subject, expr)))
                     && is_dotted_name(expr)
                 {
                     let previously_allowed = builder
