@@ -3477,6 +3477,19 @@ impl NodeId {
         searcher.clauses
     }
 
+    fn path_assignments<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_order: Option<SourceOrderId>,
+    ) -> PathAssignments {
+        match self.node() {
+            Node::AlwaysFalse | Node::AlwaysTrue => PathAssignments::default(),
+            Node::Interior(interior) => interior.path_assignments(db, env, storage, source_order),
+        }
+    }
+
     fn display<'db, 'a>(
         self,
         db: &'db dyn Db,
@@ -4071,24 +4084,13 @@ impl<'db> PathBounds<'db> {
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
-        let interior = match node.node() {
-            Node::AlwaysTrue => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(PathBounds::Unconstrained);
-            }
-            Node::AlwaysFalse => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(PathBounds::Unsatisfiable);
-            }
-            Node::Interior(interior) => interior,
-        };
 
         let mut walker = SolutionWalker::new(source_orders);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(db, env, storage, path_source_order);
+        let mut path = node.path_assignments(db, env, storage, path_source_order);
         walker.visit_node(
             db,
             env,
@@ -4195,7 +4197,9 @@ impl<'db> PathBounds<'db> {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
                 // A constrained typevar introduces a disjunction over its declared constraints,
                 // which means we can't engage this fast path.
-                Some(TypeVarBoundOrConstraints::Constraints(_)) => return None,
+                Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+                    return ControlFlow::Continue(None);
+                }
                 // An unconstrained typevar does not add any additional constraints on its
                 // solutions, other than the evidence we already have in the BDD.
                 None => continue,
@@ -6821,6 +6825,22 @@ impl Ord for AssignmentFuel {
         let self_key = (self.remaining, std::cmp::Reverse(self.consumed));
         let other_key = (other.remaining, std::cmp::Reverse(other.consumed));
         self_key.cmp(&other_key)
+    }
+}
+
+impl Default for PathAssignments {
+    fn default() -> Self {
+        Self {
+            sequents: Vec::default(),
+            assignments: FxIndexMap::default(),
+            additional_fuels: Vec::default(),
+            discovered: FxIndexMap::default(),
+            elaborated_pairs: FxHashSet::default(),
+            independent_typevars: FxHashSet::default(),
+            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
+            assignment_queue: VecDeque::default(),
+            new_assignments: FxIndexMap::default(),
+        }
     }
 }
 
@@ -9527,22 +9547,6 @@ class E: ...
         }
     }
 
-    fn path_assignments_for<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-        node: NodeId,
-        source_order: Option<SourceOrderId>,
-    ) -> PathAssignments {
-        let mut storage = builder.storage.borrow_mut();
-        match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([], FxHashSet::default()),
-            Node::Interior(interior) => {
-                interior.path_assignments(db, env, &mut storage, source_order)
-            }
-        }
-    }
-
     #[test]
     fn path_assignments_follow_constraint_source_order() {
         let db = setup_db();
@@ -9557,8 +9561,10 @@ class E: ...
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
-        let path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-        let storage = builder.storage.borrow();
+        let mut storage = builder.storage.borrow_mut();
+        let path = set
+            .node
+            .path_assignments(db, &env, &mut storage, set.source_order);
         let expected =
             [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
         let actual: Vec<_> = path.discovered.keys().copied().collect();
@@ -9615,9 +9621,11 @@ class E: ...
             tautology,
             transitive,
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-            let mut fold = ReconstructPathFold { break_at: None };
             let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
+            let mut fold = ReconstructPathFold { break_at: None };
             let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
                 path.visit(db, &env, &mut storage, set.node, &mut fold)
             else {
@@ -9652,11 +9660,13 @@ class E: ...
             PathFoldBreak::Impossible,
             PathFoldBreak::Combine,
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
+            let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
             let mut aborting_fold = ReconstructPathFold {
                 break_at: Some(break_at),
             };
-            let mut storage = builder.storage.borrow_mut();
             assert_eq!(
                 path.visit(db, &env, &mut storage, set.node, &mut aborting_fold),
                 ControlFlow::Break(break_at)
@@ -9707,8 +9717,10 @@ class E: ...
             (usize::MAX, 1, ProjectionError::TraversalBudgetExceeded),
             (1, usize::MAX, ProjectionError::PathBudgetExceeded),
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
             let mut limits = BoundedSolutionLimits {
                 remaining_paths,
                 remaining_visits,

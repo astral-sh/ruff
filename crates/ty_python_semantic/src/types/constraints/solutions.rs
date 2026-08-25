@@ -228,6 +228,11 @@ impl<'db> SolutionWalker<'db> {
         if self.sorted_paths.is_empty() {
             return PathBounds::Unsatisfiable;
         }
+        if let [single_path] = self.sorted_paths.as_slice()
+            && single_path.is_empty()
+        {
+            return PathBounds::Unconstrained;
+        }
 
         self.sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
