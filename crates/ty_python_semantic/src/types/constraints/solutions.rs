@@ -409,6 +409,11 @@ impl<'db> SolutionWalker<'db> {
         if self.pending.is_empty() {
             return CandidateSolutions::Unsatisfiable;
         }
+        if let [single] = self.pending.as_slice()
+            && single.candidate.typevars.is_empty()
+        {
+            return CandidateSolutions::Unconstrained;
+        }
 
         self.pending.sort_by(|pending1, pending2| {
             let source_orders1 = pending1.source_orders.iter().copied();
