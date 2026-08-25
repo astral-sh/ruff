@@ -372,6 +372,32 @@ class Outer[*Ts]:
         return values  # error: [invalid-return-type]
 ```
 
+A fixed-length tuple cannot replace an arbitrary type variable tuple either. The caller determines
+the pack's length and element types, so even an empty tuple is not a valid return for every pack.
+The same restriction applies to annotated assignments inside the function.
+
+```py
+def reject_empty[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
+    return ()  # error: [invalid-return-type]
+
+def reject_fixed[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
+    return (1, "a")  # error: [invalid-return-type]
+
+def reject_fixed_assignment[*Ts]() -> None:
+    fixed: tuple[*Ts] = (1,)  # error: [invalid-assignment]
+```
+
+Matching fixed elements before or after a pack do not establish what the pack contains. The
+remaining elements still cannot replace an arbitrary type variable tuple.
+
+```py
+def reject_empty_middle[*Ts](values: tuple[*Ts]) -> tuple[int, *Ts, str]:
+    return (1, "a")  # error: [invalid-return-type]
+
+def reject_fixed_middle[*Ts](values: tuple[*Ts]) -> tuple[int, *Ts, str]:
+    return (1, True, "a")  # error: [invalid-return-type]
+```
+
 Materializing a type variable tuple can change its default without changing the identity of the
 bound type variable occurrence.
 
@@ -387,6 +413,20 @@ from ty_extensions._internal import is_assignable_to
 
 def materialized_default[*Ts = *tuple[Any, ...]]() -> None:
     static_assert(is_assignable_to(tuple[*Ts], Top[tuple[*Ts]]))
+```
+
+Fixed-length tuples are not subtypes of an arbitrary pack either. An `Any` or `Never` element does
+not change a fixed tuple's length.
+
+```py
+from typing import Never
+from ty_extensions._internal import is_subtype_of
+
+def fixed_tuple_relations[*Ts]() -> None:
+    static_assert(not is_subtype_of(tuple[()], tuple[*Ts]))
+    static_assert(not is_subtype_of(tuple[int], tuple[*Ts]))
+    static_assert(not is_assignable_to(tuple[Any], tuple[*Ts]))
+    static_assert(not is_assignable_to(tuple[Never], tuple[*Ts]))
 ```
 
 ### Gradual tuple assignability to symbolic packs
