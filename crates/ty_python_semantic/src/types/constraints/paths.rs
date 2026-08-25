@@ -135,6 +135,24 @@ impl Ord for AssignmentFuel {
     }
 }
 
+impl Default for PathAssignments {
+    fn default() -> Self {
+        Self {
+            sequents: Vec::default(),
+            assignments: FxIndexMap::default(),
+            additional_fuels: Vec::default(),
+            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
+            discovered: FxIndexMap::default(),
+            elaborated_pairs: FxHashSet::default(),
+            single_replay_consequents: FxHashMap::default(),
+            pair_replay_consequents: FxHashMap::default(),
+            independent_typevars: FxHashSet::default(),
+            assignment_queue: VecDeque::default(),
+            new_assignments: FxIndexMap::default(),
+        }
+    }
+}
+
 impl PathAssignments {
     /// Orders projected facts by replaying the rules already discovered during this walk.
     ///
@@ -1174,22 +1192,6 @@ mod tests {
         }
     }
 
-    fn path_assignments_for<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-        node: NodeId,
-        source_order: Option<SourceOrderId>,
-    ) -> PathAssignments {
-        let mut storage = builder.storage.borrow_mut();
-        match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([], FxHashSet::default()),
-            Node::Interior(interior) => {
-                interior.path_assignments(db, env, &mut storage, source_order)
-            }
-        }
-    }
-
     #[test]
     fn path_assignments_follow_constraint_source_order() {
         let db = setup_db();
@@ -1204,8 +1206,10 @@ mod tests {
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
-        let path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-        let storage = builder.storage.borrow();
+        let mut storage = builder.storage.borrow_mut();
+        let path = set
+            .node
+            .path_assignments(db, &env, &mut storage, set.source_order);
         let expected =
             [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
         let actual: Vec<_> = path.discovered.keys().copied().collect();
@@ -1262,9 +1266,11 @@ mod tests {
             tautology,
             transitive,
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-            let mut fold = ReconstructPathFold { break_at: None };
             let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
+            let mut fold = ReconstructPathFold { break_at: None };
             let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
                 path.visit(db, &env, &mut storage, set.node, &mut fold)
             else {
@@ -1299,11 +1305,13 @@ mod tests {
             PathFoldBreak::Impossible,
             PathFoldBreak::Combine,
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
+            let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
             let mut aborting_fold = ReconstructPathFold {
                 break_at: Some(break_at),
             };
-            let mut storage = builder.storage.borrow_mut();
             assert_eq!(
                 path.visit(db, &env, &mut storage, set.node, &mut aborting_fold),
                 ControlFlow::Break(break_at)
@@ -1354,8 +1362,10 @@ mod tests {
             (usize::MAX, 1, ProjectionError::TraversalBudgetExceeded),
             (1, usize::MAX, ProjectionError::PathBudgetExceeded),
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
             let mut limits = BoundedSolutionLimits {
                 remaining_paths,
                 remaining_visits,

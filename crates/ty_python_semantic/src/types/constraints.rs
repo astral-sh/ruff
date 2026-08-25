@@ -2841,6 +2841,19 @@ impl NodeId {
         searcher.clauses
     }
 
+    fn path_assignments<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_order: Option<SourceOrderId>,
+    ) -> PathAssignments {
+        match self.node() {
+            Node::AlwaysFalse | Node::AlwaysTrue => PathAssignments::default(),
+            Node::Interior(interior) => interior.path_assignments(db, env, storage, source_order),
+        }
+    }
+
     fn display<'db, 'a>(
         self,
         db: &'db dyn Db,
@@ -3455,24 +3468,13 @@ impl<'db> PathBounds<'db> {
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
-        let interior = match node.node() {
-            Node::AlwaysTrue => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(PathBounds::Unconstrained);
-            }
-            Node::AlwaysFalse => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(PathBounds::Unsatisfiable);
-            }
-            Node::Interior(interior) => interior,
-        };
 
         let mut walker = SolutionWalker::new(source_orders);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(db, env, storage, path_source_order);
+        let mut path = node.path_assignments(db, env, storage, path_source_order);
         walker.visit_node(
             db,
             env,
