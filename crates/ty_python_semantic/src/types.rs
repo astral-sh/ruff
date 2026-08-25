@@ -2258,10 +2258,35 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Materialization<'db>> {
-        if !matches!(
-            self,
-            Type::Union(_) | Type::Intersection(_) | Type::Dynamic(_)
-        ) {
+        fn is_materializable<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            match ty {
+                Type::Dynamic(dynamic) => !dynamic.is_provisional_marker(),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .any(|ty| is_materializable(db, *ty)),
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .chain(intersection.iter_negative(db))
+                    .any(|ty| is_materializable(db, ty)),
+                _ => false,
+            }
+        }
+
+        // Fast-path for a bare dynamic type.
+        if let Some(dynamic) = self.as_dynamic()
+            && !dynamic.is_provisional_marker()
+        {
+            return Some(Materialization {
+                bottom: Type::Never,
+                dynamic,
+                top: Type::object(),
+            });
+        }
+
+        // Note that we only consider the gradual types contained within a top-level
+        // union or intersection.
+        if !is_materializable(db, self) {
             return None;
         }
 
