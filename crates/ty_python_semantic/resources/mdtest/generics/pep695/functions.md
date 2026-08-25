@@ -720,7 +720,7 @@ class Bad:
 def f[T: A](x: P[T, T], value: T) -> None:
     raise NotImplementedError
 
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `C` does not satisfy upper bound `A` of type variable `T`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `P[B, B]`, found `Bad`"
 f(Bad(), B())
 ```
 
