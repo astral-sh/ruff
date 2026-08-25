@@ -35,16 +35,14 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
-    explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
+    loop_header_reachability, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place_from_bindings_with_reachability_cache,
+    place_from_declarations_with_reachability_cache, typing_extensions_symbol,
 };
 use crate::place_load::{
-    ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
-    PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
+    PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
+    PlaceLoadResolutionStep, PlaceLoadSource, resolve_place_load,
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -9987,7 +9985,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let env = self.program_environment();
         let mode = if self.is_deferred() && self.in_string_annotation() {
-            PlaceLoadMode::StringAnnotation
+            PlaceLoadMode::Untracked
         } else if self.is_deferred() {
             PlaceLoadMode::Deferred
         } else {
@@ -10063,63 +10061,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> PlaceAndQualifiers<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let is_class_body_global_fallback = source.is_class_body_global_fallback();
-
-        let place = match source.kind {
-            PlaceLoadSourceKind::Bindings(bindings) => {
-                let mut place = place_from_bindings_with_reachability_cache(
-                    db,
-                    env,
-                    bindings,
-                    self.reachability_cache(),
-                )
-                .place;
-
-                // Compatibility policy: ty historically treats a possibly-bound module snapshot
-                // reached through a class-body global fallback as definitely bound. At runtime,
-                // an unbound snapshot would continue to builtins or produce a name error.
-                if is_class_body_global_fallback && let Place::Defined(defined) = place {
-                    place = Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
-                }
-
-                place.into()
-            }
-            PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => place_by_id(
-                db,
-                scope,
-                id,
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::AllReachable,
-            ),
-            PlaceLoadSourceKind::Implicit(implicit) => match implicit {
-                ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
-                    .map_or_else(
-                        || Place::Undefined.into(),
-                        |class| Place::bound(class).into(),
-                    ),
-                ImplicitPlaceLoad::ClassBodySymbol(name) => {
-                    let implicit = class_body_implicit_symbol(db, env, &name);
-                    if implicit.place.is_definitely_bound() {
-                        implicit
-                    } else {
-                        Place::Undefined.into()
-                    }
-                }
-                ImplicitPlaceLoad::ExplicitGlobalSymbol { file, name } => {
-                    explicit_global_symbol(db, file, &name)
-                }
-                ImplicitPlaceLoad::ModuleImplicitGlobal { file, name } => {
-                    module_type_implicit_global_symbol(db, file, &name)
-                }
-                ImplicitPlaceLoad::Builtin(name) => {
-                    if Some(self.scope()) == builtins_module_scope(db, env) {
-                        Place::Undefined.into()
-                    } else {
-                        implicit_builtins_symbol(db, env, &name)
-                    }
-                }
-            },
-        };
+        let place = source.infer_type(db, env, self.scope(), Some(self.reachability_cache()));
 
         if narrowing_constraints.is_empty() {
             place

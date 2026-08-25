@@ -520,6 +520,49 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
     assert_eq!(cycles, Vec::<String>::new());
 }
 
+#[test]
+fn builtin_autofixes_do_not_reenter_scope_inference() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        "
+        from builtins import list, NotImplementedError
+
+        items: [int]
+        other: List[int]
+
+        def check():
+            raise NotImplemented
+        ",
+    )?;
+
+    let file = system_path_to_file(&db, "src/a.py")?;
+    let diagnostics = check_types(&db, program_file(&db, file));
+    assert_eq!(diagnostics.len(), 3);
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.fix().is_some())
+    );
+
+    let events = db.take_salsa_events();
+    let cycles = salsa::attach(&db, || {
+        events
+            .into_iter()
+            .filter_map(|event| {
+                if let salsa::EventKind::WillIterateCycle { database_key, .. } = event.kind {
+                    Some(format!("{database_key:?}"))
+                } else {
+                    None
+                }
+            })
+            .filter(|key| key.contains("infer_scope_types_impl"))
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(cycles, Vec::<String>::new());
+    Ok(())
+}
+
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
 /// reachability-constraint checks in that scope.
 #[test]

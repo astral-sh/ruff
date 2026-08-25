@@ -1240,7 +1240,7 @@ python-version = "3.12"
 class C:
     list = 42
 
-    # TODO: `visible_ancestor_scopes` skips the class through nested annotation scopes,
+    # TODO: The builtin lookup skips the class through nested annotation scopes,
     # so we incorrectly offer a fix that resolves `list` to `C.list`.
     type Alias[T] = [int]  # snapshot: invalid-type-form
 ```
@@ -1260,6 +1260,220 @@ help: Replace with `list[...]`
 6 +     type Alias[T] = list[int]  # snapshot: invalid-type-form
   |
 note: This is an unsafe fix and may change runtime behavior
+```
+
+#### Collection literal fixes with aliases to builtins
+
+An import or assignment that binds a collection name to the corresponding builtin still permits the
+fix.
+
+```py
+import builtins
+from builtins import list
+
+items: [int]  # snapshot: invalid-type-form
+
+tuple = builtins.tuple
+pair: (int, str)  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:4:8
+  |
+4 | items: [int]  # snapshot: invalid-type-form
+  |        ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `list[...]`
+  |
+3 |
+  - items: [int]  # snapshot: invalid-type-form
+4 + items: list[int]  # snapshot: invalid-type-form
+5 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[invalid-type-form]: Tuple literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:7:7
+  |
+7 | pair: (int, str)  # snapshot: invalid-type-form
+  |       ^^^^^^^^^^ Did you mean `tuple[int, str]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `tuple[...]`
+  |
+6 | tuple = builtins.tuple
+  - pair: (int, str)  # snapshot: invalid-type-form
+7 + pair: tuple[int, str]  # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+#### Collection literal fixes with unreachable shadowing
+
+An assignment in an unreachable module-level branch does not shadow the builtin.
+
+```py
+if False:
+    list = 42
+
+items: [int]  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:4:8
+  |
+4 | items: [int]  # snapshot: invalid-type-form
+  |        ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `list[...]`
+  |
+3 |
+  - items: [int]  # snapshot: invalid-type-form
+4 + items: list[int]  # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+#### Collection literal fixes with global declarations
+
+A `global` declaration skips enclosing function bindings and resolves to the builtin imported at
+module scope.
+
+```py
+from builtins import list
+
+def outer():
+    list = 42
+
+    def inner():
+        global list
+        items: [int]  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:8:16
+  |
+8 |         items: [int]  # snapshot: invalid-type-form
+  |                ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `list[...]`
+  |
+7 |         global list
+  -         items: [int]  # snapshot: invalid-type-form
+8 +         items: list[int]  # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+#### Collection literal fixes with nonlocal declarations
+
+Following `nonlocal` declarations through nested functions can resolve a name to an alias of the
+builtin.
+
+```py
+def outer():
+    from builtins import set
+
+    def middle():
+        nonlocal set
+
+        def inner():
+            nonlocal set
+            items: {int}  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: Set literals are not allowed in type expressions
+ --> src/mdtest_snippet.py:9:20
+  |
+9 |             items: {int}  # snapshot: invalid-type-form
+  |                    ^^^^^ Did you mean `set[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `set[...]`
+  |
+8 |             nonlocal set
+  -             items: {int}  # snapshot: invalid-type-form
+9 +             items: set[int]  # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+#### Collection literal fixes with ambiguous bindings
+
+A name that might refer to a different class is not a suitable replacement, even if one of its
+possible values is the expected builtin.
+
+```py
+import builtins
+
+def check(flag: bool):
+    list = builtins.list if flag else builtins.set
+
+    def inner():
+        items: [int]  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:7:16
+  |
+7 |         items: [int]  # snapshot: invalid-type-form
+  |                ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+#### Collection literal fixes with unbound local names
+
+An unreachable local assignment still makes the name local to the function. It prevents lookup from
+falling back to the builtin.
+
+```py
+def check():
+    if False:
+        list = 42
+    items: [int]  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:4:12
+  |
+4 |     items: [int]  # snapshot: invalid-type-form
+  |            ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+#### Collection literal fixes before a local alias is bound
+
+An assignment of the builtin to a local name does not make that name available earlier in the
+function.
+
+```py
+import builtins
+
+def check():
+    items: [int]  # snapshot: invalid-type-form
+    list = builtins.list
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:4:12
+  |
+4 |     items: [int]  # snapshot: invalid-type-form
+  |            ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 #### Collection literal fixes with project-level builtin overrides
@@ -1302,6 +1516,31 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```pyi
 list: object
+```
+
+#### Collection literal fixes with project-level replacement classes
+
+A replacement class in `__builtins__.pyi` is not the standard collection class, even when it has the
+same name.
+
+```py
+items: [int]  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a type expression
+ --> src/mdtest_snippet.py:1:8
+  |
+1 | items: [int]  # snapshot: invalid-type-form
+  |        ^^^^^ Did you mean `list[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+`__builtins__.pyi`:
+
+```pyi
+class list: ...
 ```
 
 #### Collection literal fixes are omitted in string annotations

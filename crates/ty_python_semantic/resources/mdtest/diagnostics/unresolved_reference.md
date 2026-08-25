@@ -79,6 +79,31 @@ error[unresolved-reference]: Name `List` used when not defined
   |            ^^^^ Did you mean `list`?
 ```
 
+### Builtin replacement imported explicitly
+
+Importing `list` from `builtins` still permits replacing the unresolved `List` with `list`.
+
+```py
+from builtins import list
+
+items: List[int]  # snapshot: unresolved-reference
+```
+
+```snapshot
+error[unresolved-reference]: Name `List` used when not defined
+ --> src/mdtest_snippet.py:3:8
+  |
+3 | items: List[int]  # snapshot: unresolved-reference
+  |        ^^^^ Did you mean `list`?
+help: Replace with `list`
+  |
+2 |
+  - items: List[int]  # snapshot: unresolved-reference
+3 + items: list[int]  # snapshot: unresolved-reference
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
 ### Info not present before Python 3.9
 
 <!-- snapshot-diagnostics -->

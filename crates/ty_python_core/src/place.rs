@@ -9,6 +9,7 @@ use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use smallvec::SmallVec;
 use std::hash::Hash;
 use std::iter::FusedIterator;
@@ -45,11 +46,16 @@ pub enum PlaceExpr {
 }
 
 impl PlaceExpr {
+    /// Create a symbol place from a name, without requiring an AST occurrence.
+    pub fn from_name(name: Name) -> Self {
+        Self::Symbol(Symbol::new(name))
+    }
+
     /// Create a new `PlaceExpr` from a name.
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
     pub fn from_expr_name(name: &ast::ExprName) -> Self {
-        PlaceExpr::Symbol(Symbol::new(name.id.clone()))
+        Self::from_name(name.id.clone())
     }
 
     /// Tries to create a `PlaceExpr` from an expression.

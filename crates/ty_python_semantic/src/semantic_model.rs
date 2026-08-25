@@ -16,7 +16,10 @@ use ty_module_resolver::{
 
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
-use crate::place::{builtins_module_scope, implicit_builtins_symbol_scope};
+use crate::place::{Definedness, Place, PlaceAndQualifiers, known_module_symbol};
+use crate::place_load::{
+    PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind, resolve_place_load,
+};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
@@ -24,6 +27,7 @@ use crate::types::{
     infer_complete_scope_types, inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
@@ -90,37 +94,57 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db, self.file())
     }
 
-    /// Returns whether `name` refers to a standard builtin in the scope containing `node`.
+    /// Returns whether a name introduced by an autofix resolves to the standard builtin class.
     ///
-    /// This method uses a simplified implementation of name resolution: any binding or declaration
-    /// in a visible scope shadows the builtin, even if it does not reach `node`. As a result, it
-    /// can return `false` when the builtin is actually available. That is acceptable when deciding
-    /// whether to offer an autofix: we can safely omit the fix in edge cases where resolving the
-    /// name precisely would require more complex analysis.
-    ///
-    /// Definitions in a project-level `__builtins__.pyi` also shadow standard builtins.
+    /// Use the same name resolution and binding inference as an ordinary load, including aliases
+    /// and project-level builtin overrides. The introduced name has no recorded use-site state,
+    /// so consider all reachable bindings in the scope containing `node`.
     pub(crate) fn definitely_has_builtin_binding(
         &self,
         name: &str,
         node: ast::AnyNodeRef<'_>,
     ) -> bool {
-        let index = semantic_index(self.db, self.program_file());
+        let db = self.db;
+        let env = self.program_environment();
+        let Some(builtin) = known_module_symbol(db, &env, KnownModule::Builtins, name)
+            .ignore_possibly_undefined()
+            .and_then(Type::as_class_literal)
+        else {
+            return false;
+        };
         let Some(scope) = self.scope(node) else {
             return false;
         };
-
-        if index.visible_ancestor_scopes(scope).any(|(scope, _)| {
-            index
-                .place_table(scope)
-                .symbol_by_name(name)
-                .is_some_and(|symbol| symbol.is_bound() || symbol.is_declared())
-        }) {
-            return false;
+        let scope = scope.to_scope_id(db, self.program_file());
+        let index = semantic_index(db, self.program_file());
+        let mut resolution = resolve_place_load(
+            db,
+            index,
+            scope,
+            PlaceExpr::from_name(Name::new(name)),
+            PlaceLoadMode::Untracked,
+        );
+        let mut place = PlaceAndQualifiers::from(Place::Undefined);
+        while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
+            place = place.or_fall_back_to(db, &env, || {
+                let is_local_source = matches!(source.kind, PlaceLoadSourceKind::Bindings(_));
+                let mut inferred = source.infer_type(db, &env, scope, None);
+                // Reachable local bindings can occur after the insertion point. They cannot
+                // establish that the introduced name is already bound there.
+                if is_local_source && let Place::Defined(defined) = inferred.place {
+                    inferred.place =
+                        Place::Defined(defined.with_definedness(Definedness::PossiblyUndefined));
+                }
+                inferred
+            });
+            if place.place.is_definitely_bound() {
+                return place
+                    .ignore_possibly_undefined()
+                    .and_then(Type::as_class_literal)
+                    == Some(builtin);
+            }
         }
-
-        let env = self.program_environment();
-        implicit_builtins_symbol_scope(self.db, &env, name)
-            .is_some_and(|scope| Some(scope) == builtins_module_scope(self.db, &env))
+        false
     }
 
     /// Returns a map from symbol name to that symbol's

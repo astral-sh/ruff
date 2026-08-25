@@ -94,7 +94,15 @@ use ty_python_core::{
     ProgramFile, SemanticIndex,
 };
 
-use crate::Db;
+use crate::place::{
+    ConsideredDefinitions, Definedness, Place, PlaceAndQualifiers, RequiresExplicitReExport,
+    builtins_module_scope, class_body_implicit_symbol, explicit_global_symbol,
+    implicit_builtins_symbol, module_type_implicit_global_symbol, place_by_id, place_from_bindings,
+    place_from_bindings_with_reachability_cache,
+};
+use crate::reachability::ReachabilityEvaluationCache;
+use crate::types::original_class_type;
+use crate::{Db, ProgramEnvironment};
 
 /// Returns an iterator over the steps that resolve a value for a place load.
 pub(crate) fn resolve_place_load<'db, 'ast>(
@@ -137,12 +145,15 @@ pub(crate) enum PlaceLoadMode<'ast> {
     ///
     /// For example, `Model` in `item: Model` can resolve to a class defined later in the scope.
     Deferred,
-    /// Resolve reachable bindings in a parsed string annotation.
+    /// Resolve all reachable bindings without an indexed expression occurrence.
     ///
     /// A caller uses this mode for a name such as `Model` after parsing `item: "Model"`. The
     /// parsed expression is not part of the original semantic index, so it may not have its own
     /// place-table entry.
-    StringAnnotation,
+    ///
+    /// Autofixes also use this mode when introducing a name that does not occur in the source.
+    /// Callers must account for bindings that might not have executed at the insertion point.
+    Untracked,
 }
 
 /// Exposes an iterator over the steps that resolve the value for a place load.
@@ -686,9 +697,72 @@ pub(crate) struct PlaceLoadSource<'db> {
     role: PlaceLoadSourceRole,
 }
 
-impl PlaceLoadSource<'_> {
+impl<'db> PlaceLoadSource<'db> {
+    /// Infer this source's value before applying constraints from earlier resolution steps.
+    pub(crate) fn infer_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        scope: ScopeId<'db>,
+        reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
+        let is_class_body_global_fallback = self.is_class_body_global_fallback();
+        match self.kind {
+            PlaceLoadSourceKind::Bindings(bindings) => {
+                let mut place = if let Some(cache) = reachability_cache {
+                    place_from_bindings_with_reachability_cache(db, env, bindings, cache)
+                } else {
+                    place_from_bindings(db, env, bindings)
+                }
+                .place;
+
+                // Compatibility policy: ty historically treats a possibly-bound module snapshot
+                // reached through a class-body global fallback as definitely bound. At runtime,
+                // an unbound snapshot would continue to builtins or produce a name error.
+                if is_class_body_global_fallback && let Place::Defined(defined) = place {
+                    place = Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
+                }
+
+                place.into()
+            }
+            PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => place_by_id(
+                db,
+                scope,
+                id,
+                RequiresExplicitReExport::No,
+                ConsideredDefinitions::AllReachable,
+            ),
+            PlaceLoadSourceKind::Implicit(implicit) => match implicit {
+                ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
+                    .map(|class| Place::bound(class).into())
+                    .unwrap_or_else(|| Place::Undefined.into()),
+                ImplicitPlaceLoad::ClassBodySymbol(name) => {
+                    let implicit = class_body_implicit_symbol(db, env, &name);
+                    if implicit.place.is_definitely_bound() {
+                        implicit
+                    } else {
+                        Place::Undefined.into()
+                    }
+                }
+                ImplicitPlaceLoad::ExplicitGlobalSymbol { file, name } => {
+                    explicit_global_symbol(db, file, &name)
+                }
+                ImplicitPlaceLoad::ModuleImplicitGlobal { file, name } => {
+                    module_type_implicit_global_symbol(db, file, &name)
+                }
+                ImplicitPlaceLoad::Builtin(name) => {
+                    if Some(scope) == builtins_module_scope(db, env) {
+                        Place::Undefined.into()
+                    } else {
+                        implicit_builtins_symbol(db, env, &name)
+                    }
+                }
+            },
+        }
+    }
+
     /// Returns whether this source is the module fallback for a class-local name.
-    pub(crate) fn is_class_body_global_fallback(&self) -> bool {
+    fn is_class_body_global_fallback(&self) -> bool {
         self.role == PlaceLoadSourceRole::ClassBodyGlobalFallback
     }
 
@@ -932,12 +1006,12 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     Some((scope, ConstraintKey::UseId(use_id))),
                 ))
             }
-            PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
+            PlaceLoadMode::Deferred | PlaceLoadMode::Untracked => {
                 let source = table
                     .place_id(place_expr)
                     .map(|id| PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)));
                 assert!(
-                    source.is_some() || matches!(self.mode, PlaceLoadMode::StringAnnotation),
+                    source.is_some() || matches!(self.mode, PlaceLoadMode::Untracked),
                     "Expected the place table to create a place for every valid PlaceExpr node"
                 );
                 source.map(|source| (source, None))
@@ -957,7 +1031,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
             table
                 .parents(place_expr)
                 .filter_map(|prefix_id| match self.mode {
-                    PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
+                    PlaceLoadMode::Deferred | PlaceLoadMode::Untracked => {
                         Some(PlaceExprPrefixLoad::AllReachable(prefix_id))
                     }
                     PlaceLoadMode::AtExpression(mut prefix_expr_ref) => {
