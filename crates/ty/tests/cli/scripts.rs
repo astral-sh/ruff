@@ -1565,27 +1565,17 @@ mod uv_metadata {
             ),
         ])?;
 
-        // FIXME: Checking a.py can create b.py's environment before synchronization, causing
-        // b.py to use its Python 3.11 fallback instead of the Python 3.12 environment from uv.
+        // The script uses uv's Python version even when its importer is checked first.
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["a.py", "b.py"])
                 .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[type-assertion-failure]: Argument does not have asserted type `tuple[Literal[3], Literal[12]]`
-          --> b.py:12:1
-           |
-        12 | assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
-           | ^^^^^^^^^^^^--------------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-           |             |
-           |             Inferred type is `tuple[Literal[3], Literal[11]]`
-        info: `tuple[Literal[3], Literal[12]]` and `tuple[Literal[3], Literal[11]]` are not equivalent types
-
-        Found 1 diagnostic
+        All checks passed!
 
         ----- stderr -----
         "

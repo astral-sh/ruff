@@ -5,34 +5,34 @@
 //! declare their own requirements in inline metadata, so uv may need to create and synchronize
 //! separate environments for them.
 //!
-//! The project environment is resolved during initial discovery. Discovering which Python files need
-//! synchronization, however, requires reading their contents to look for inline script metadata.
-//! Initializing every script before checking a project would therefore require inspecting every
-//! candidate file upfront.
-//! This is particularly problematic for language-server latency: a single filesystem event can
-//! represent an entire directory, requiring ty to traverse the directory, read every file, and
-//! initialize its script environments before handling the next editor request. We also want to
-//! avoid initializing environments for files that never need checking.
+//! The project environment is resolved during initial discovery. The file index identifies
+//! standalone scripts by reading their inline metadata, but does not synchronize their environments.
 //!
-//! Instead, ty discovers and initializes script environments lazily during checking. When it
-//! encounters a script without an environment, it runs uv and waits before continuing.
-//! Waiting is necessary because the script's dependencies and Python version must be known to
+//! The CLI requests synchronization for indexed scripts and applies the results before checking.
+//! Checks use the environment available when they run; they never invoke uv. Waiting before the
+//! check is necessary because the script's dependencies and Python version must be known to
 //! produce accurate diagnostics.
 //!
-//! The language server cannot use the same blocking behavior when opening or updating documents.
-//! Synchronizing scripts can create environments and install packages; waiting for those
-//! operations would increase the latency of other editor requests. For example, semantic tokens
-//! should remain available while synchronization is running. The language server therefore
-//! requests project metadata in the background when configuration changes, and schedules script
-//! synchronization when a script is opened or saved, or when a file-watcher event reports a change
-//! to a closed script.
+//! The language server requests synchronization for indexed scripts when opening a project,
+//! including scripts that are not open in the editor. It also requests synchronization when
+//! scripts are discovered, opened or saved, or when a file-watcher event reports a change to a
+//! closed script. Project metadata is refreshed when configuration changes.
+//!
+//! These operations run in the background because synchronizing scripts can create environments
+//! and install packages. Waiting for them would increase the latency of other editor requests;
+//! for example, semantic tokens should remain available while synchronization is running.
+//! Scripts are discovered independently of diagnostics because workspace symbols and references
+//! also need their environments.
 //! This avoids a rust-analyzer-like experience where editor operations wait for `cargo check` to
 //! complete before becoming available.
 //!
-//! While uv runs in the background, existing projects and scripts continue using their most
-//! recently applied environments.
-//! For a newly opened script without a synchronized environment, ty defers semantic diagnostics
-//! rather than reporting incorrect missing-dependency errors.
+//! While a script's initial environment is unavailable, the language server defers its semantic
+//! diagnostics to avoid incorrect missing-dependency errors. Document pull requests receive an
+//! empty diagnostic report, while workspace diagnostic requests are suspended. After applying the
+//! synchronization result, the server resumes suspended requests and refreshes diagnostics.
+//!
+//! Refreshing an available environment does not defer diagnostics. Projects and scripts continue
+//! using their most recently applied environments until the refresh results are applied.
 //!
 //! uv reads files from disk, not from the editor. If a user adds a script metadata block to an
 //! open file, ty does not request synchronization until the file is saved. It keeps checking the
@@ -40,21 +40,36 @@
 //! finishes synchronization, ty checks it again using the environment returned by uv.
 //!
 //! CLI watch mode also schedules requests in the background after filesystem changes, but delays
-//! the next check until those requests have completed. Scripts discovered during the subsequent
-//! check are initialized lazily. Repeated changes to a project or script are combined so only the
-//! latest requested update runs after the current one.
+//! the next check until those requests have completed. Repeated changes to a project or script
+//! are combined so only the latest requested update runs after the current one.
 //!
 //! The main loop applies project metadata by rediscovering the existing project, including when uv
 //! fails. Each script's virtual environment is represented by a stable [`ScriptEnvironment`] Salsa
 //! input. Updating these inputs invalidates semantic queries that depend on the Python version or
 //! module search paths, ensuring that checks are rerun after synchronization.
+//!
+//! Applying an update cancels active queries and waits for their database snapshots to be dropped.
+//! A query waiting for an existing environment input to be updated would therefore prevent that
+//! update. Semantic queries therefore use the available environment without waiting for
+//! synchronization. The host applies results through [`UvEnvironments::poll_sync`].
+//!
+//! # Scheduling and capacity
+//!
+//! [`UvEnvironments::request_sync`] owns request construction, coalescing, and submission in one
+//! call. The request and result queues have no fixed capacity, so submission does not wait for uv.
+//! Each project or script has at most one job queued, running, or awaiting result processing. A
+//! newer request replaces the latest follow-up rather than adding another job. Queue lengths are
+//! therefore bounded by the number of projects and scripts, not the number of changes. The worker
+//! count limits concurrent uv processes, but the queues do not apply backpressure to the host.
+//!
+//! `poll_sync` submits the latest follow-up only after the current job reports completion, keeping
+//! the same progress indicator. This avoids overlapping synchronizations for one environment.
 
 use std::hash::Hasher;
 use std::sync::Arc;
-use std::time::Duration;
 
 use crossbeam::channel::Receiver;
-use parking_lot::{Condvar, Mutex, MutexGuard};
+use parking_lot::Mutex;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::FxDashMap;
 use ruff_db::files::{File, Files};
@@ -66,11 +81,7 @@ use crate::uv::{
     ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataResult, UvMetadataService,
     UvSyncTask,
 };
-use crate::{
-    Db, ProgressReporter, ProjectReloadResult, ProjectSyncProgressFactory, UseUv, UvSyncProgress,
-};
-
-const CANCELLATION_CHECK_INTERVAL: Duration = Duration::from_millis(1);
+use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UseUv, UvSyncProgress};
 
 type ProgressFactory<'factory> =
     dyn Fn(&dyn Db, File) -> Option<Box<dyn UvSyncProgress>> + 'factory;
@@ -85,9 +96,6 @@ type ProgressFactory<'factory> =
 /// remains the same when synchronization later provides that metadata, just as a [`File`]
 /// continues to identify the same path when a previously nonexistent file is created. Updating
 /// the existing input ensures Salsa invalidates queries that read it before initialization.
-///
-/// If a blocking synchronization is already running, waits for it to finish instead of creating
-/// a second [`ScriptEnvironment`] input.
 ///
 /// Returns `None` if script integration is disabled or the script is not an actual file on disk.
 pub(crate) fn script_environment(db: &dyn Db, file: File) -> Option<ScriptEnvironment> {
@@ -150,117 +158,47 @@ impl UvEnvironments {
         self.inner.sync_wakeups.clone()
     }
 
-    /// Initializes `file`'s environment before checking it.
-    ///
-    /// Discovering scripts requires reading file contents, so initializing every environment before
-    /// a project check would require eagerly inspecting every candidate file. After a directory
-    /// change, it could also require traversing the directory and reading each file before applying
-    /// the change, increasing CLI and language-server latency.
-    ///
-    /// Instead, project checks initialize virtual environments lazily as they encounter scripts.
-    /// For a closed file without a [`ScriptEnvironment`], this method synchronizes the virtual
-    /// environment and waits for uv before creating the input. An existing environment is reused.
-    /// Open files without an environment use the default environment until they are saved.
-    ///
-    /// Background synchronization works differently: it creates the [`ScriptEnvironment`] input
-    /// before invoking uv so other operations can use it while synchronization runs. Applying the
-    /// result must therefore update an existing Salsa input. Before allowing that update, Salsa
-    /// cancels active checks and waits for them to finish. This method cannot wait for the update
-    /// because the current check must finish before the update can proceed.
-    ///
-    /// Returns [`Pending`] if no usable environment exists yet, allowing callers to decide whether
-    /// to proceed. For example, a caller can skip diagnostics that would be incorrect without the
-    /// script's dependencies. Applying the synchronization result schedules another check once the
-    /// environment becomes available.
-    ///
-    /// [`Pending`]: ScriptEnvironmentAvailability::Pending
-    pub(crate) fn initialize_blocking(
-        &self,
-        db: &dyn Db,
-        file: File,
-        reporter: &dyn ProgressReporter,
-    ) -> ScriptEnvironmentAvailability {
-        if !self.is_enabled() {
-            return ScriptEnvironmentAvailability::Available;
-        }
-
-        let Some(task) = script_sync_task(db, file) else {
-            return ScriptEnvironmentAvailability::Available;
-        };
-        let entry = self.entry(file);
-
-        let mut state = entry.state.lock();
-        loop {
-            match &*state {
-                ScriptEnvironmentState::Current { .. } => {
-                    return ScriptEnvironmentAvailability::Available;
-                }
-
-                ScriptEnvironmentState::SynchronizingInBackground { availability, .. } => {
-                    return *availability;
-                }
-
-                // Another caller is synchronizing the virtual environment and will create its
-                // `ScriptEnvironment` input when uv finishes.
-                // Wait for that caller instead of starting a second synchronization.
-                ScriptEnvironmentState::InitializingBlocking { .. } => {
-                    // If the other caller is cancelled, it restores the entry to `Vacant`. Check the
-                    // state again after waiting so this caller can initialize the environment instead.
-                    state = entry.wait_until_initialized(db, state);
-                }
-
-                ScriptEnvironmentState::Vacant if db.is_open_file(file) => {
-                    // An unsaved edit added a script metadata block to an ordinary file.
-                    // Keep diagnostics available with the default environment, as for other
-                    // unsaved edits. Synchronize on save, when uv can read the metadata from disk.
-                    return ScriptEnvironmentAvailability::Available;
-                }
-
-                ScriptEnvironmentState::Vacant => {
-                    let cache_key = task.request.cache_key();
-                    let claim = InitializationClaim::new(&entry, state, cache_key);
-
-                    db.unwind_if_revision_cancelled();
-                    tracing::debug!(
-                        "Initializing script environment for `{}`",
-                        task.request.path()
-                    );
-
-                    // Run uv and show progress until the synchronization finishes.
-                    let output = {
-                        let _progress = reporter.for_script(db, file);
-                        self.inner
-                            .sync_service
-                            .run_blocking(db, task.request.to_metadata_target())
-                    };
-
-                    // Create the `ScriptEnvironment` input from uv's output, retaining its cache key
-                    // and any initialization error.
-                    let (uv_metadata, initialization_error) = parse_metadata_output(db, output);
-                    let environment = ScriptEnvironment::new(
-                        db,
-                        Some(cache_key),
-                        uv_metadata,
-                        initialization_error,
-                    );
-
-                    // Store the `ScriptEnvironment` input and wake waiting callers. Dropping the
-                    // claim without completing it would instead restore the entry to `Vacant`.
-                    claim.complete(environment);
-                    return ScriptEnvironmentAvailability::Available;
-                }
-            }
-        }
-    }
-
     /// Returns whether `file`'s environment is [`Pending`](ScriptEnvironmentAvailability::Pending).
+    ///
+    /// A `false` result does not guarantee that initialization has finished. It may not have been
+    /// requested yet, and another database handle can request it after this call. Callers must submit
+    /// any required initial synchronization before scheduling operations that rely on this check.
+    ///
+    /// Refreshing an available environment does not make it pending. A pending environment stays
+    /// pending until [`poll_sync`](Self::poll_sync) applies its result, even if uv has finished.
+    ///
+    /// Salsa does not track changes to the pending state.
     pub fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
         if !self.is_enabled() || script_tag(db, file).is_none() {
             return false;
         }
 
-        self.existing_entry(file)
-            .is_some_and(|entry| entry.state.lock().availability().is_pending())
+        self.existing_entry(file).is_some_and(|entry| {
+            matches!(
+                *entry.lock(),
+                ScriptEnvironmentState::Synchronizing {
+                    availability: ScriptEnvironmentAvailability::Pending,
+                    ..
+                }
+            )
+        })
+    }
+
+    /// Returns whether any script's initial environment is unavailable.
+    ///
+    /// Like [`Self::is_initialization_pending`], this only covers requested synchronizations.
+    /// Refreshing an available environment does not make it unavailable again. Project
+    /// environments are initialized during discovery, before background requests are scheduled.
+    pub fn has_pending_initializations(&self) -> bool {
+        self.inner.scripts.iter().any(|entry| {
+            matches!(
+                *entry.lock(),
+                ScriptEnvironmentState::Synchronizing {
+                    availability: ScriptEnvironmentAvailability::Pending,
+                    ..
+                }
+            )
+        })
     }
 
     /// Requests background synchronization for `file`'s environment.
@@ -269,11 +207,11 @@ impl UvEnvironments {
     /// whether it can be used while synchronization runs. An existing `ScriptEnvironment`
     /// remains available, even if its virtual environment has not previously been synchronized.
     ///
-    /// If another synchronization is already running, records the latest request to run afterward
-    /// and reuses the existing progress indicator. Otherwise, creates a new progress indicator and
+    /// If another synchronization is pending, records the latest request to run afterward,
+    /// reusing the existing progress indicator. Otherwise, creates a new progress indicator and
     /// submits the synchronization.
     ///
-    /// Blocks while the worker queue is full, applying backpressure to the caller.
+    /// Submission does not wait for uv or queue space.
     pub fn request_sync(
         &self,
         db: &mut dyn Db,
@@ -289,25 +227,9 @@ impl UvEnvironments {
             return;
         };
         let entry: Arc<ScriptEnvironmentEntry> = self.entry(file);
-        let mut state = entry.state.lock();
+        let mut state = entry.lock();
 
         let (environment, availability) = match &mut *state {
-            ScriptEnvironmentState::InitializingBlocking { cache_key: running } => {
-                // Both requests must observe the same script metadata and Python override. Changing
-                // either requires a Salsa update, which first cancels the blocking initialization
-                // and waits for it to finish. A different cache key therefore cannot be observed
-                // while the blocking initialization is still running.
-                assert_eq!(
-                    *running,
-                    task.request.cache_key(),
-                    "concurrent initializations must use the same script environment cache key"
-                );
-                tracing::trace!(
-                    "Script environment synchronization for `{}` is already running",
-                    task.request.path()
-                );
-                return;
-            }
             ScriptEnvironmentState::Vacant => {
                 (ScriptEnvironment::new(db, None, None, None), availability)
             }
@@ -325,7 +247,7 @@ impl UvEnvironments {
 
                 (*environment, ScriptEnvironmentAvailability::Available)
             }
-            ScriptEnvironmentState::SynchronizingInBackground { sync, .. } => {
+            ScriptEnvironmentState::Synchronizing { sync, .. } => {
                 if !sync.update_next_request(task.request.clone()) {
                     tracing::trace!(
                         "Script environment synchronization for `{}` is already requested",
@@ -343,7 +265,7 @@ impl UvEnvironments {
         };
 
         let progress = make_progress(db, file);
-        *state = ScriptEnvironmentState::SynchronizingInBackground {
+        *state = ScriptEnvironmentState::Synchronizing {
             environment,
             availability,
             sync: InFlightSync {
@@ -357,7 +279,6 @@ impl UvEnvironments {
             task.request.path()
         );
 
-        // Scheduling can block while the worker queue is full; release the entry lock first.
         drop(state);
 
         self.inner
@@ -371,9 +292,9 @@ impl UvEnvironments {
     /// requires mutable access to the database. The CLI and language-server main loops call this
     /// method after receiving a [`sync_wakeups`](Self::sync_wakeups) notification.
     ///
-    /// If a newer synchronization was requested while the current one was running, discards the
+    /// If a newer synchronization was requested while the current one was pending, discards the
     /// outdated result and schedules the newer request instead, transferring the existing progress
-    /// indicator. Scheduling can block while the worker queue is full.
+    /// indicator.
     ///
     /// Reports project completions and changed scripts so callers can refresh diagnostics.
     pub fn poll_sync(&self, db: &mut dyn Db) -> UvSyncChanges {
@@ -440,8 +361,8 @@ impl UvEnvironments {
                         );
                     };
 
-                    let mut state = entry.state.lock();
-                    let ScriptEnvironmentState::SynchronizingInBackground {
+                    let mut state = entry.lock();
+                    let ScriptEnvironmentState::Synchronizing {
                         environment, sync, ..
                     } = &mut *state
                     else {
@@ -466,10 +387,9 @@ impl UvEnvironments {
 
                         tracing::debug!(
                             "Discarded superseded script environment synchronization result for `{}`",
-                            request.path()
+                            next.path()
                         );
 
-                        // Scheduling can block while the worker queue is full; release the entry lock first.
                         drop(state);
 
                         self.inner.sync_service.schedule_one(
@@ -496,30 +416,18 @@ impl UvEnvironments {
 
     /// Returns whether any project or script synchronization is pending.
     ///
-    /// Can be used to delay checking until all requested synchronizations have completed.
+    /// A request stays pending until [`poll_sync`](Self::poll_sync) applies its result, even if uv
+    /// has already finished.
     ///
-    /// Other database handles can start or finish script synchronization at any time,
-    /// including between this call and using its result. To avoid this race, call
-    /// after `trigger_cancellation` returns and do not create another database handle
-    /// until you have used the result.
+    /// The result reflects the current state. A new synchronization can be requested after this
+    /// method returns.
     pub fn has_pending_synchronizations(&self) -> bool {
         self.inner.project.lock().is_some()
-            || self.inner.scripts.iter().any(|entry| {
-                matches!(
-                    *entry.state.lock(),
-                    ScriptEnvironmentState::InitializingBlocking { .. }
-                        | ScriptEnvironmentState::SynchronizingInBackground { .. }
-                )
-            })
-    }
-
-    /// Returns every file for which a `ScriptEnvironment` input has been created.
-    pub fn files(&self) -> Vec<File> {
-        self.inner
-            .scripts
-            .iter()
-            .filter_map(|entry| entry.state.lock().environment().map(|_| *entry.key()))
-            .collect()
+            || self
+                .inner
+                .scripts
+                .iter()
+                .any(|entry| matches!(*entry.lock(), ScriptEnvironmentState::Synchronizing { .. }))
     }
 
     fn environment(&self, db: &dyn Db, file: File) -> Option<ScriptEnvironment> {
@@ -528,23 +436,16 @@ impl UvEnvironments {
         }
 
         let entry = self.entry(file);
-        let mut state = entry.state.lock();
+        let mut state = entry.lock();
 
-        loop {
-            match *state {
-                ScriptEnvironmentState::Vacant => {
-                    let environment = ScriptEnvironment::new(db, None, None, None);
-                    *state = ScriptEnvironmentState::Current { environment };
-                    return Some(environment);
-                }
-                ScriptEnvironmentState::InitializingBlocking { .. } => {
-                    state = entry.wait_until_initialized(db, state);
-                }
-                ScriptEnvironmentState::Current { environment }
-                | ScriptEnvironmentState::SynchronizingInBackground { environment, .. } => {
-                    return Some(environment);
-                }
+        match *state {
+            ScriptEnvironmentState::Vacant => {
+                let environment = ScriptEnvironment::new(db, None, None, None);
+                *state = ScriptEnvironmentState::Current { environment };
+                Some(environment)
             }
+            ScriptEnvironmentState::Current { environment }
+            | ScriptEnvironmentState::Synchronizing { environment, .. } => Some(environment),
         }
     }
 
@@ -558,8 +459,8 @@ impl UvEnvironments {
     }
 
     fn entry(&self, file: File) -> Arc<ScriptEnvironmentEntry> {
-        // Return an owned entry so the map's shard lock is released before the caller waits
-        // for synchronization. Otherwise, unrelated scripts in the same shard would also be blocked.
+        // Return an owned entry so the map's shard lock is released before the caller locks the
+        // script's state. Otherwise, unrelated scripts in the same shard would also be blocked.
         Arc::clone(self.inner.scripts.entry(file).or_default().value())
     }
 }
@@ -599,17 +500,11 @@ pub(crate) struct ProjectEnvironment {
 /// the script's settings, and synchronization is deferred until the file is saved.
 #[derive(Clone, Copy)]
 pub enum ScriptEnvironmentAvailability {
-    /// Operations that require the script's dependencies should be deferred.
+    /// The host should skip semantic diagnostics until synchronization finishes.
     Pending,
 
     /// The default or previously synchronized environment can be used.
     Available,
-}
-
-impl ScriptEnvironmentAvailability {
-    pub(crate) const fn is_pending(self) -> bool {
-        matches!(self, Self::Pending)
-    }
 }
 
 /// Identifies when a script's environment needs to be synchronized.
@@ -681,67 +576,16 @@ struct ProjectSync {
     next_request: Option<SystemPathBuf>,
 }
 
-#[derive(Default)]
-struct ScriptEnvironmentEntry {
-    state: Mutex<ScriptEnvironmentState>,
-
-    /// Wakes callers when a blocking synchronization finishes or is cancelled.
-    ///
-    /// A cancelled synchronization creates no [`ScriptEnvironment`], allowing a waiting caller
-    /// to retry.
-    initialized: Condvar,
-}
-
-impl ScriptEnvironmentEntry {
-    /// Waits for a blocking synchronization to finish or be cancelled.
-    ///
-    /// Database updates cancel running operations and wait for them to finish before modifying
-    /// Salsa inputs. Periodically checking for cancellation allows a waiting caller to unwind;
-    /// otherwise, the update could wait indefinitely for an operation blocked on this condition.
-    ///
-    /// Does not run other Rayon tasks while waiting: a nested task could depend on an
-    /// initialization suspended on the same worker's stack.
-    fn wait_until_initialized<'entry>(
-        &'entry self,
-        db: &dyn Db,
-        mut state: MutexGuard<'entry, ScriptEnvironmentState>,
-    ) -> MutexGuard<'entry, ScriptEnvironmentState> {
-        loop {
-            // A database update cannot proceed until this cancelled operation unwinds.
-            db.unwind_if_revision_cancelled();
-            if !matches!(*state, ScriptEnvironmentState::InitializingBlocking { .. }) {
-                return state;
-            }
-
-            self.initialized
-                .wait_for(&mut state, CANCELLATION_CHECK_INTERVAL);
-        }
-    }
-}
+type ScriptEnvironmentEntry = Mutex<ScriptEnvironmentState>;
 
 /// The synchronization state of one script environment.
 ///
-/// Distinguishes blocking initialization from background synchronization because they create
-/// and update Salsa inputs differently. Also ensures that at most one synchronization runs for
-/// a script at a time.
+/// Ensures that at most one synchronization runs for a script at a time.
 #[derive(Default)]
 enum ScriptEnvironmentState {
     /// No [`ScriptEnvironment`] exists and no synchronization is running.
-    ///
-    /// This is the initial state. A cancelled blocking synchronization also restores this state,
-    /// allowing another caller to initialize the environment.
     #[default]
     Vacant,
-
-    /// A caller is waiting for uv to initialize the script's environment.
-    ///
-    /// Unlike background synchronization, this does not create a [`ScriptEnvironment`] in advance.
-    /// The caller waits for uv, creates the input from its result, and wakes any other callers
-    /// waiting for the same script.
-    InitializingBlocking {
-        /// Identifies the script metadata and Python override passed to uv.
-        cache_key: ScriptEnvironmentCacheKey,
-    },
 
     /// The last synchronized environment, or the default environment before synchronization.
     ///
@@ -759,14 +603,13 @@ enum ScriptEnvironmentState {
 
     /// A background synchronization is initializing or updating the script's virtual environment.
     ///
-    /// Unlike blocking initialization, a [`ScriptEnvironment`] input already exists while uv runs.
     /// If no input exists yet, one is created before synchronization starts so semantic queries
     /// have a stable Salsa identity to depend on.
     ///
     /// The background worker cannot update the [`ScriptEnvironment`] because modifying a Salsa
     /// input requires mutable access to the database. Instead, the CLI or language-server main loop
     /// updates it when synchronization finishes.
-    SynchronizingInBackground {
+    Synchronizing {
         /// The [`ScriptEnvironment`] input that will receive the synchronization result.
         environment: ScriptEnvironment,
 
@@ -775,24 +618,6 @@ enum ScriptEnvironmentState {
         /// The active synchronization and the next request, if any.
         sync: InFlightSync,
     },
-}
-
-impl ScriptEnvironmentState {
-    fn availability(&self) -> ScriptEnvironmentAvailability {
-        match self {
-            Self::InitializingBlocking { .. } => ScriptEnvironmentAvailability::Pending,
-            Self::Vacant | Self::Current { .. } => ScriptEnvironmentAvailability::Available,
-            Self::SynchronizingInBackground { availability, .. } => *availability,
-        }
-    }
-
-    fn environment(&self) -> Option<ScriptEnvironment> {
-        match self {
-            Self::Current { environment, .. }
-            | Self::SynchronizingInBackground { environment, .. } => Some(*environment),
-            Self::Vacant | Self::InitializingBlocking { .. } => None,
-        }
-    }
 }
 
 /// An active synchronization and the latest request to run after it.
@@ -829,50 +654,6 @@ impl InFlightSync {
     }
 }
 
-/// Ensures a blocking synchronization always releases its claim on the script.
-///
-/// The synchronization runs without holding the entry's state lock. On completion, this guard
-/// stores the new [`ScriptEnvironment`] and wakes waiting callers.
-///
-/// If the caller is cancelled or unwinds before completing synchronization, dropping the guard
-/// restores the entry to `Vacant` and wakes waiting callers so another caller can retry.
-#[must_use]
-struct InitializationClaim<'entry>(Option<&'entry ScriptEnvironmentEntry>);
-
-impl<'entry> InitializationClaim<'entry> {
-    fn new(
-        entry: &'entry ScriptEnvironmentEntry,
-        mut state: MutexGuard<'entry, ScriptEnvironmentState>,
-        cache_key: ScriptEnvironmentCacheKey,
-    ) -> Self {
-        *state = ScriptEnvironmentState::InitializingBlocking { cache_key };
-        Self(Some(entry))
-    }
-
-    fn complete(mut self, environment: ScriptEnvironment) {
-        self.finish(ScriptEnvironmentState::Current { environment });
-    }
-
-    fn finish(&mut self, next: ScriptEnvironmentState) {
-        if let Some(entry) = self.0.take() {
-            let mut state = entry.state.lock();
-            debug_assert!(matches!(
-                *state,
-                ScriptEnvironmentState::InitializingBlocking { .. }
-            ));
-            *state = next;
-            drop(state);
-            entry.initialized.notify_all();
-        }
-    }
-}
-
-impl Drop for InitializationClaim<'_> {
-    fn drop(&mut self) {
-        self.finish(ScriptEnvironmentState::Vacant);
-    }
-}
-
 /// Applies a completed synchronization to the existing [`ScriptEnvironment`] input.
 ///
 /// Stores the returned metadata or initialization error and records the synchronized cache key.
@@ -889,7 +670,10 @@ fn apply_sync_result(
         .and_then(UvMetadata::environment)
         .map(ToOwned::to_owned);
     let recovering_from_error = environment.initialization_error(db).is_some();
-    let (uv_metadata, initialization_error) = parse_metadata_output(db, output);
+    let (uv_metadata, initialization_error) = match Uv::parse_metadata_output(db.system(), output) {
+        Ok(metadata) => (Some(metadata), None),
+        Err(error) => (None, Some(error.to_string().into_boxed_str())),
+    };
     let current_root = uv_metadata.as_ref().and_then(UvMetadata::environment);
 
     if let Some(root) = previous_root
@@ -927,16 +711,6 @@ fn apply_sync_result(
         "Applied script environment synchronization result for `{}`",
         request.path()
     );
-}
-
-fn parse_metadata_output(
-    db: &dyn Db,
-    output: std::io::Result<std::process::Output>,
-) -> (Option<UvMetadata>, Option<Box<str>>) {
-    match Uv::parse_metadata_output(db.system(), output) {
-        Ok(metadata) => (Some(metadata), None),
-        Err(error) => (None, Some(error.to_string().into_boxed_str())),
-    }
 }
 
 fn script_sync_task(db: &dyn Db, file: File) -> Option<ScriptSyncTask> {
@@ -1020,6 +794,7 @@ mod tests {
             SystemPathBuf,
         };
         use salsa::Database as _;
+        use ty_python_semantic::Db as _;
         use ty_static::EnvVars;
 
         use super::super::{ScriptEnvironmentAvailability, UvSyncChanges, script_environment};
@@ -1134,6 +909,14 @@ mod tests {
                 "#,
             )?;
             let environments = case.db.uv_environments().clone();
+
+            // Semantic analysis can reach a script before the host requests synchronization.
+            // The missing-import diagnostic must clear when the environment becomes available.
+            let _ = case.db.program_file(case.file);
+            let diagnostics = crate::check_file(&case.db, case.file);
+            assert_eq!(diagnostics.len(), 1);
+            assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+
             let environment = script_environment(&case.db, case.file)
                 .context("expected a default script environment")?;
 
@@ -1149,6 +932,7 @@ mod tests {
             assert_eq!(case.wait_for_synchronizations()?.scripts, vec![case.file]);
             assert_eq!(script_environment(&case.db, case.file), Some(environment));
             case.assert_can_import("attrs")?;
+            assert!(crate::check_file(&case.db, case.file).is_empty());
 
             Ok(())
         }
@@ -1250,7 +1034,7 @@ mod tests {
                 // A cancelled query may need this lock before it can drop its snapshot. Use a
                 // timeout so a regression fails instead of deadlocking the test itself.
                 assert!(
-                    entry.state.try_lock_for(Duration::from_secs(1)).is_some(),
+                    entry.try_lock_for(Duration::from_secs(1)).is_some(),
                     "the entry lock was held while waiting for a cancelled snapshot"
                 );
                 drop(snapshot);

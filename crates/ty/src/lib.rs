@@ -31,7 +31,7 @@ use ty_project::watch::ProjectWatcher;
 use ty_project::{
     CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress, watch,
 };
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
 
@@ -152,7 +152,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         }
         None if check_paths.iter().any(|path| system.is_file(path)) => {
             // `uv check --script` passes a file as its check path. Standalone scripts must not
-            // inherit the enclosing workspace; their environments are synchronized lazily.
+            // inherit the enclosing workspace; their environments are synchronized separately.
             ProjectMetadata::discover_without_uv(&project_path, &system)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
@@ -340,7 +340,12 @@ impl MainLoop {
         let mut revision = 0u64;
         let uv_sync_wakeups = db.uv_environments().sync_wakeups();
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
-        request_check(db, &check_sender);
+
+        // Initialize the uv environment for all scripts
+        let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+        self.synchronize_scripts(db, &scripts);
+
+        request_check(&check_sender);
 
         // Apply all queued changes before starting a pending check because every applied change
         // cancels the running check.
@@ -490,12 +495,22 @@ impl MainLoop {
                     if !changes.is_empty() {
                         revision += 1;
                     }
-                    if changes.project.is_some()
-                        && let Some(watcher) = self.watcher.as_mut()
-                    {
-                        watcher.update(db);
+                    if let Some(project_change) = changes.project {
+                        if matches!(
+                            project_change,
+                            ProjectReloadResult::Changed {
+                                files_changed: true,
+                            }
+                        ) {
+                            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+                            self.synchronize_scripts(db, &scripts);
+                        }
+
+                        if let Some(watcher) = self.watcher.as_mut() {
+                            watcher.update(db);
+                        }
                     }
-                    request_check(db, &check_sender);
+                    request_check(&check_sender);
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
@@ -505,25 +520,17 @@ impl MainLoop {
 
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes_with_progress(&changes, &|db, project| {
+                    let result = db.apply_changes_with_progress(&changes, &|db, project| {
                         self.progress.for_project(db, project)
                     });
-
-                    let environments = db.uv_environments().clone();
-                    for file in environments.files() {
-                        environments.request_sync(
-                            db,
-                            file,
-                            ScriptEnvironmentAvailability::Pending,
-                            &|db, file| self.progress.for_script(db, file),
-                        );
-                    }
+                    let scripts = result.scripts_to_synchronize(db);
+                    self.synchronize_scripts(db, &scripts);
 
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
 
-                    request_check(db, &check_sender);
+                    request_check(&check_sender);
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
@@ -537,6 +544,18 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+
+    fn synchronize_scripts(&self, db: &mut ProjectDatabase, scripts: &[File]) {
+        let environments = db.uv_environments().clone();
+        for &file in scripts {
+            environments.request_sync(
+                db,
+                file,
+                ScriptEnvironmentAvailability::Pending,
+                &|db, file| self.progress.for_script(db, file),
+            );
+        }
     }
 
     fn write_diagnostics(
@@ -696,10 +715,6 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.checking_bar.tick();
     }
 
-    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn UvSyncProgress>> {
-        self.progress.for_script(db, file)
-    }
-
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         self.collector.report_checked_file(db, file, diagnostics);
         self.checking_bar.inc(1);
@@ -801,11 +816,7 @@ enum MainLoopMessage {
     Exit,
 }
 
-fn request_check(db: &dyn Db, sender: &crossbeam_channel::Sender<()>) {
-    if db.uv_environments().has_pending_synchronizations() {
-        return;
-    }
-
+fn request_check(sender: &crossbeam_channel::Sender<()>) {
     // A full channel means that a check has already been requested. Keeping one pending request
     // coalesces bursts of file changes while the main loop drains higher-priority work.
     let _ = sender.try_send(());

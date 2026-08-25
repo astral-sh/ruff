@@ -140,13 +140,6 @@ pub trait ProgressReporter: Send + Sync {
     /// Initialize the reporter with the number of files.
     fn set_files(&mut self, files: usize);
 
-    /// Creates an owned progress guard for synchronizing `file`'s standalone-script environment.
-    ///
-    /// Returns `None` when synchronization progress should not be displayed.
-    fn for_script(&self, _db: &dyn Db, _file: File) -> Option<Box<dyn UvSyncProgress>> {
-        None
-    }
-
     /// Report the completion of checking a given file along with its diagnostics.
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]);
 
@@ -463,15 +456,6 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
-                let initialization = db.uv_environments().initialize_blocking(db, file, reporter);
-                if initialization.is_pending() {
-                    // The CLI watch loop or language server already scheduled this script's first
-                    // synchronization in the background. Until it completes, there is no
-                    // environment that can produce correct diagnostics. Applying the result
-                    // causes the diagnostics to be recomputed.
-                    reporter.report_checked_file(db, file, &[]);
-                    return;
-                }
                 let program_file = db.program_file(file);
 
                 match check_file_impl(db, program_file) {
@@ -792,8 +776,7 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 /// Returns whether semantic checking and semantic diagnostics should run for `file`.
 ///
 /// Scripts with invalid configuration still produce configuration diagnostics and retain a program
-/// for editor operations, but their semantic diagnostics must not be reported. Semantic checks are
-/// also skipped until a script's first environment synchronization completes.
+/// for editor operations, but their semantic diagnostics must not be reported.
 pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
     if !db.should_check_file(file) {
         return false;
@@ -803,7 +786,19 @@ pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
         return true;
     };
 
-    script.has_valid_settings(db) && !db.uv_environments().is_initialization_pending(db, file)
+    script.has_valid_settings(db)
+}
+
+/// Whether this is a first-party file, independently of which files receive diagnostics.
+#[salsa::tracked(returns(copy))]
+pub(crate) fn is_project_file(db: &dyn Db, file: File) -> bool {
+    if file.path(db).is_vendored_path() {
+        return false;
+    }
+
+    let project = db.project();
+    // Indexed files should not depend on changes to the open-file set.
+    project.files(db).contains(file) || project.open_files(db).contains(&file)
 }
 
 /// Returns `true` if the file should be checked.

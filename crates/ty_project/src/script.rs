@@ -73,7 +73,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     let tag = script_tag(db, file)?;
 
     // Never treat third-party files as scripts.
-    if !crate::should_check_file(db, file) {
+    if !crate::is_project_file(db, file) {
         return None;
     }
 

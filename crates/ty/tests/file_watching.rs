@@ -2632,7 +2632,7 @@ mod uv_metadata {
 
     use anyhow::Context;
     use ruff_db::diagnostic::DiagnosticId;
-    use ruff_db::files::system_path_to_file;
+    use ruff_db::files::File;
     use ruff_db::system::{OsSystem, System as _};
     use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges};
     use ty_static::EnvVars;
@@ -2824,7 +2824,7 @@ mod uv_metadata {
                 .any(|diagnostic| diagnostic.id().as_str() == "unresolved-import")
         );
 
-        let synchronized = update_and_synchronize_script(
+        update_and_synchronize_script(
             &mut case,
             r#"
             # /// script
@@ -2834,9 +2834,8 @@ mod uv_metadata {
             from attrs import define
             "#,
         )?;
-        assert!(!synchronized);
-
-        assert!(case.db().check().is_empty());
+        let diagnostics = case.db().check();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
 
         Ok(())
     }
@@ -2887,7 +2886,7 @@ mod uv_metadata {
 
     fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
         let uv = OsSystem::default().which("uv")?;
-        setup_with_system(
+        let mut case = setup_with_system(
             |context: &mut SetupContext| {
                 for (path, content) in files {
                     context.write_project_file(path, content)?;
@@ -2916,7 +2915,10 @@ mod uv_metadata {
                 );
                 system.set_env_var(EnvVars::UV, uv.as_str());
             },
-        )
+        )?;
+        let scripts: Vec<_> = case.db().project().script_files(case.db()).iter().collect();
+        synchronize_scripts(&mut case, &scripts)?;
+        Ok(case)
     }
 
     fn update_and_synchronize_project(case: &mut TestCase, source: &str) -> anyhow::Result<()> {
@@ -2931,21 +2933,24 @@ mod uv_metadata {
     fn update_and_synchronize_script(case: &mut TestCase, source: &str) -> anyhow::Result<bool> {
         update_file(case.project_path("script.py"), source)?;
         let changes = case.take_watch_changes(event_for_file("script.py"));
-        case.apply_changes(&changes);
+        let changes = case.apply_changes(&changes);
+        let scripts = changes.scripts_to_synchronize(case.db());
+        let changes = synchronize_scripts(case, &scripts)?;
+        Ok(!changes.scripts.is_empty())
+    }
 
-        let file = system_path_to_file(case.db(), case.project_path("script.py"))?;
+    fn synchronize_scripts(case: &mut TestCase, scripts: &[File]) -> anyhow::Result<UvSyncChanges> {
         let environments = case.db().uv_environments().clone();
-        if !environments.files().contains(&file) {
-            return Ok(false);
+        for &file in scripts {
+            environments.request_sync(
+                &mut case.db,
+                file,
+                ScriptEnvironmentAvailability::Pending,
+                &|_, _| None,
+            );
         }
-        environments.request_sync(
-            &mut case.db,
-            file,
-            ScriptEnvironmentAvailability::Pending,
-            &|_, _| None,
-        );
 
-        Ok(!wait_for_synchronizations(case)?.scripts.is_empty())
+        wait_for_synchronizations(case)
     }
 
     fn wait_for_synchronizations(case: &mut TestCase) -> anyhow::Result<UvSyncChanges> {

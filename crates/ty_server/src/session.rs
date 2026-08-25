@@ -21,13 +21,12 @@ use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
-use salsa::Database as _;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{
-    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability,
-    SemanticDb as _, UseUv, UvSyncChanges,
+    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
+    ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
 };
 
 use index::DocumentError;
@@ -264,29 +263,6 @@ impl Session {
             .collect()
     }
 
-    /// Resynchronizes closed scripts whose metadata changed after filesystem events.
-    pub(crate) fn synchronize_closed_scripts(&mut self, client: &Client) {
-        let capabilities = self.resolved_client_capabilities;
-        for state in self.projects.values_mut() {
-            let db = &mut state.db;
-            for file in db.uv_environments().files() {
-                // Open documents are synchronized when opened or saved. Ignore watcher events
-                // for them because the file on disk may differ from the open document.
-                if db.is_open_file(file) {
-                    continue;
-                }
-
-                Self::request_script_sync(
-                    db,
-                    file,
-                    client,
-                    capabilities,
-                    ScriptEnvironmentAvailability::Available,
-                );
-            }
-        }
-    }
-
     /// Gives one project's uv environments an opportunity to make progress.
     pub(crate) fn poll_uv_sync(&mut self, client: &Client, project_root: &SystemPath) {
         let Some(project) = self.projects.get_mut(project_root) else {
@@ -298,6 +274,20 @@ impl Session {
         let db = &mut project.db;
         let environments = db.uv_environments().clone();
         let changes = environments.poll_sync(db);
+        if matches!(
+            changes.project,
+            Some(ProjectReloadResult::Changed {
+                files_changed: true,
+            })
+        ) {
+            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+            Self::synchronize_closed_scripts(
+                db,
+                &scripts,
+                client,
+                self.resolved_client_capabilities,
+            );
+        }
         self.uv_environments_changed(client, project_root, changes);
     }
 
@@ -339,6 +329,29 @@ impl Session {
 
         if capabilities.supports_inlay_hint_refresh() {
             client.send_request::<lsp_types::InlayHintRefreshRequest>(self, (), |_, ()| {});
+        }
+    }
+
+    /// Requests synchronization using the scripts' saved metadata.
+    fn synchronize_closed_scripts(
+        db: &mut ProjectDatabase,
+        scripts: &[File],
+        client: &Client,
+        capabilities: ResolvedClientCapabilities,
+    ) {
+        for &file in scripts {
+            // Open and save handle editor documents separately. Their metadata may contain
+            // unsaved changes, including overlays that are not in the diagnostic open-file set.
+            if db.document(file).is_some() {
+                continue;
+            }
+            Self::request_script_sync(
+                db,
+                file,
+                client,
+                capabilities,
+                ScriptEnvironmentAvailability::Pending,
+            );
         }
     }
 
@@ -546,14 +559,17 @@ impl Session {
         self.bump_revision();
 
         let capabilities = self.resolved_client_capabilities;
-        self.project_db_mut(path)
-            .apply_changes_with_progress(changes, &|db, project| {
-                Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
-                    client,
-                    &format!("Refreshing {} metadata", project.name(db)),
-                    capabilities,
-                )))
-            })
+        let db = self.project_db_mut(path);
+        let result = db.apply_changes_with_progress(changes, &|db, project| {
+            Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                client,
+                &format!("Refreshing {} metadata", project.name(db)),
+                capabilities,
+            )))
+        });
+        let scripts = result.scripts_to_synchronize(db);
+        Self::synchronize_closed_scripts(db, &scripts, client, capabilities);
+        result
     }
 
     /// Returns a mutable iterator over all project databases.
@@ -766,7 +782,7 @@ impl Session {
                 ProjectDatabase::fallible(metadata, system.clone())
             });
 
-        let db = match project {
+        let mut db = match project {
             Ok(db) => db,
             Err(err) => {
                 tracing::error!(
@@ -795,6 +811,13 @@ impl Session {
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
+        let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
+        Self::synchronize_closed_scripts(
+            &mut db,
+            &scripts,
+            client,
+            self.resolved_client_capabilities,
+        );
         self.projects.insert(
             root.clone(),
             ProjectState {
@@ -1382,9 +1405,6 @@ impl Session {
             // refresh the file from the editor contents instead.
             File::sync_path(db, &system_path);
             if let Ok(file) = system_path_to_file(db, &system_path) {
-                // Keep the synchronization alive when the editor buffer is installed. Cancel any
-                // blocking initialization now instead of reusing one that index_mut would cancel.
-                db.trigger_cancellation();
                 Self::request_script_sync(
                     db,
                     file,
@@ -2127,7 +2147,8 @@ impl DocumentHandle {
 
                         // Restore file and script membership from the saved contents. Discarding
                         // unsaved script metadata can bring a file back into the project when
-                        // `exclude-scripts` is enabled.
+                        // `exclude-scripts` is enabled. Also request synchronization for saved
+                        // metadata changes that were skipped while the editor overlay was present.
                         self.update_in_db(session, client);
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the

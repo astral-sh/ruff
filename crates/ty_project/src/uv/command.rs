@@ -2,7 +2,7 @@
 
 use std::process::Output;
 
-use ruff_db::system::{Command, CommandExecutor, System, SystemPathBuf, WhichError};
+use ruff_db::system::{Command, CommandExecutor, System, SystemPath, WhichError};
 use ty_static::EnvVars;
 
 use super::{UvMetadata, UvMetadataError};
@@ -26,7 +26,7 @@ impl Uv {
     pub(crate) fn metadata(
         &self,
         system: &dyn System,
-        target: &MetadataTarget,
+        target: &MetadataTarget<'_>,
     ) -> Result<UvMetadata, UvMetadataError> {
         let output = system
             .command_executor()
@@ -43,7 +43,7 @@ impl Uv {
     pub(crate) fn execute(
         &self,
         executor: &dyn CommandExecutor,
-        target: &MetadataTarget,
+        target: &MetadataTarget<'_>,
     ) -> std::io::Result<Output> {
         let mut command = Command::new(self.executable.as_str());
         command.args(["workspace", "metadata", "--quiet"]);
@@ -102,15 +102,15 @@ impl Uv {
 
 /// The workspace or standalone script for which to request uv metadata.
 #[derive(Debug)]
-pub(crate) enum MetadataTarget {
+pub(crate) enum MetadataTarget<'path> {
     /// The directory from which uv discovers the workspace, not necessarily the workspace root.
-    Workspace(SystemPathBuf),
+    Workspace(&'path SystemPath),
     /// A standalone Python script.
     Script {
         /// The script file passed to `--script`.
-        path: SystemPathBuf,
+        path: &'path SystemPath,
         /// The optional `--python` argument.
-        python: Option<SystemPathBuf>,
+        python: Option<&'path SystemPath>,
     },
 }
 

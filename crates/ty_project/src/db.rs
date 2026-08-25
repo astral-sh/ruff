@@ -55,10 +55,9 @@ fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
         return project_program.program_file(db, file);
     }
 
-    let program = db
-        .uv_environments()
-        .files()
-        .into_iter()
+    let program = project
+        .script_files(db)
+        .iter()
         .filter_map(|script| Script::for_file(db, script))
         .map(|script| script.program(db))
         .find(|program| {
@@ -128,6 +127,8 @@ impl ProjectDatabase {
     /// read immutable [`Project`] inputs, and every field on files created after this call. Existing
     /// files retain their durability. This must not be used by incremental consumers or checks that
     /// apply fixes.
+    ///
+    /// Initial script synchronization only updates `ScriptEnvironment` inputs, which remain mutable.
     pub fn freeze(&mut self) {
         self.project().freeze(self);
         self.files.freeze();
@@ -208,6 +209,9 @@ impl ProjectDatabase {
 
     /// Checks the files in the project and its dependencies as per the project's check mode.
     ///
+    /// Uses current settings and environments without starting or waiting for uv. Callers that
+    /// require synchronized environments must request synchronization and apply its results first.
+    ///
     /// Use [`set_check_mode`] to update the check mode.
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
@@ -219,6 +223,8 @@ impl ProjectDatabase {
 
     /// Checks the files in the project and its dependencies, using the given reporter.
     ///
+    /// Uses the same environment synchronization behavior as [`check`](Self::check).
+    ///
     /// Use [`set_check_mode`] to update the check mode.
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
@@ -226,6 +232,9 @@ impl ProjectDatabase {
         self.project().check(self, reporter);
     }
 
+    /// Checks `file` using its current settings and available environment.
+    ///
+    /// Uses the same environment synchronization behavior as [`check`](Self::check).
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
         crate::check_file(self, file)
@@ -893,11 +902,83 @@ pub(crate) mod testing {
 #[cfg(test)]
 mod tests {
     use ruff_db::Db as _;
-    use ruff_db::files::FileRootKind;
+    use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_python_trivia::textwrap::dedent;
     use ty_module_resolver::list_modules;
 
-    use crate::{Db as _, ProjectDatabase, ProjectMetadata};
+    use crate::watch::ChangeEvent;
+    use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
+
+    #[test]
+    fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/project");
+        system.memory_file_system().write_file_all(
+            root.join("script.py"),
+            dedent(
+                r"
+                # /// script
+                # dependencies = []
+                # ///
+                import nonexistent_script_dependency
+                ",
+            )
+            .as_ref(),
+        )?;
+        let metadata = ProjectMetadata::discover(&root, &system)?.with_use_uv(UseUv::Scripts);
+        let db = ProjectDatabase::fallible(metadata, system)?;
+        let file = system_path_to_file(&db, root.join("script.py"))?;
+
+        // This system cannot run commands. Analysis still reports the missing import using its
+        // available configuration; preparing the environment is the host's responsibility.
+        let diagnostics = db.check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        let diagnostics = db.check_file(file);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+
+        Ok(())
+    }
+
+    #[test]
+    fn changed_script_metadata_updates_import_resolution() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let fs = system.memory_file_system().clone();
+        let root = SystemPathBuf::from("/project");
+        let script = root.join("script.py");
+        let ordinary = "import dependency";
+        fs.write_files_all([
+            (script.clone(), ordinary),
+            (SystemPathBuf::from("/external/dependency.py"), ""),
+        ])?;
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        assert_eq!(db.check().len(), 1);
+
+        fs.write_file_all(
+            &script,
+            dedent(
+                r"
+                # /// script
+                # [tool.ty.environment]
+                # extra-paths = ['../external']
+                # ///
+                import dependency
+                ",
+            )
+            .as_ref(),
+        )?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(script.clone())]);
+        assert!(db.check().is_empty());
+
+        fs.write_file_all(&script, ordinary)?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(script)]);
+        assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
 
     #[test]
     fn frozen_inputs_support_a_one_shot_check() -> anyhow::Result<()> {
