@@ -539,11 +539,11 @@ impl<'db> KnownBoundMethodType<'db> {
             KnownBoundMethodType::ConstraintSetRange => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("lower_bound")))
+                        Parameter::positional_or_keyword(Name::new_static("lower_bound"))
                             .with_annotated_type(object_type_form()),
-                        Parameter::positional_only(Some(Name::new_static("typevar")))
+                        Parameter::positional_or_keyword(Name::new_static("typevar"))
                             .with_annotated_type(object_type_form()),
-                        Parameter::positional_only(Some(Name::new_static("upper_bound")))
+                        Parameter::positional_or_keyword(Name::new_static("upper_bound"))
                             .with_annotated_type(object_type_form()),
                     ]),
                     KnownClass::ConstraintSet.to_instance(db, env),
