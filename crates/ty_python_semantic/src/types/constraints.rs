@@ -2043,7 +2043,7 @@ impl<'db> ConstraintBounds<'db> {
     }
 
     fn is_concrete(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        self.lower.into_iter().chain(self.upper).all(|bound| {
+        iter::chain(self.lower, self.upper).all(|bound| {
             let bound = bound.ty();
             !bound.has_typevar(db, env)
                 && !bound.has_unspecialized_type_var(db, env)
@@ -2084,6 +2084,10 @@ impl<'db> UpperBound<'db> {
         upper
     }
 
+    fn is_empty(&self) -> bool {
+        self.evidence.is_empty() && self.mixed.is_empty() && self.validity.is_empty()
+    }
+
     fn iter_evidence(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
         self.evidence.iter().copied().map(ConstraintBound::Evidence)
     }
@@ -2093,7 +2097,7 @@ impl<'db> UpperBound<'db> {
     }
 
     fn iter_inference(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
-        std::iter::chain(self.iter_evidence(), self.iter_mixed())
+        iter::chain(self.iter_evidence(), self.iter_mixed())
     }
 
     fn iter_validity(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
@@ -2101,7 +2105,7 @@ impl<'db> UpperBound<'db> {
     }
 
     pub(crate) fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
-        std::iter::chain(self.iter_inference(), self.iter_validity())
+        iter::chain(self.iter_inference(), self.iter_validity())
     }
 
     fn has_evidence(&self) -> bool {
@@ -2739,7 +2743,6 @@ impl ConstraintId {
             (Some(lower), None) | (None, Some(lower)) => Some(lower),
             (None, None) => None,
         };
-        let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
         let mut merged_upper = UpperBound::unconstrained();
         if let Some(upper) = self_constraint.bounds.upper {
             merged_upper.add_clause(upper);
@@ -2747,6 +2750,7 @@ impl ConstraintId {
         if let Some(upper) = other_constraint.bounds.upper {
             merged_upper.add_clause(upper);
         }
+        let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
         // empty, since there is no type that is both greater than `lower`, and less than `upper`.
@@ -2770,7 +2774,7 @@ impl ConstraintId {
             return IntersectionResult::CannotSimplify;
         }
 
-        let upper = if merged_upper.iter_clauses().next().is_none() {
+        let upper = if merged_upper.is_empty() {
             None
         } else {
             let effective_upper = merged_upper.materialize_exact(db, env);
@@ -3846,7 +3850,7 @@ impl<'db> PathBound<'db> {
         Some(UnionType::from_elements(
             db,
             env,
-            std::iter::once(first).chain(lower),
+            iter::once(first).chain(lower),
         ))
     }
 
@@ -4410,7 +4414,7 @@ impl<'db> PathBounds<'db> {
                     return IntersectionType::bounded_from_elements(
                         db,
                         env,
-                        std::iter::chain(
+                        iter::chain(
                             path_bound.upper.iter_clauses().map(ConstraintBound::ty),
                             [declared_upper],
                         ),
