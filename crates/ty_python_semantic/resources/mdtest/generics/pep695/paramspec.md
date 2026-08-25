@@ -1059,6 +1059,43 @@ wrapper.call(False)  # error: [no-matching-overload]
 wrapper.call(True, "wrong")  # error: [no-matching-overload]
 ```
 
+When the callback is overloaded, each method overload expands into multiple signatures. A failed
+call lists each method overload declaration only once.
+
+```py
+@overload
+def overloaded_callback(value: int) -> int: ...
+@overload
+def overloaded_callback(*, label: str) -> int: ...
+def overloaded_callback(value: int = 0, *, label: str = "") -> int:
+    return value
+
+overloaded_wrapper = Wrapper(overloaded_callback)
+overloaded_wrapper.call(False, b"wrong")  # snapshot: no-matching-overload
+```
+
+```snapshot
+error[no-matching-overload]: No overload of bound method `Wrapper.call` matches arguments
+  --> src/mdtest_snippet.py:34:1
+   |
+34 | overloaded_wrapper.call(False, b"wrong")  # snapshot: no-matching-overload
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: First overload defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | /     @overload
+8 | |     def call[**Q](self: "Wrapper[Q]", as_str: Literal[False], /, *args: Q.args, **kwargs: Q.kwargs) -> int: ...
+  | |_______________________________________________________________________________________________________________^ First overload defined here
+info: Possible overloads for bound method `call`:
+info:   [**Q](self: Wrapper[Q], as_str: Literal[False], /, *args: Q.args, **kwargs: Q.kwargs) -> int
+info:   [**Q](self: Wrapper[Q], as_str: Literal[True], /, *args: Q.args, **kwargs: Q.kwargs) -> str
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:11:9
+   |
+11 |     def call(self, as_str: bool, /, *args: P.args, **kwargs: P.kwargs) -> int | str:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
 ### Classmethod receivers with overloaded constructors
 
 A classmethod forwards each constructor overload independently. A call supplies either an integer

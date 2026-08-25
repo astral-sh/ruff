@@ -3613,11 +3613,12 @@ impl<'db> CallableBinding<'db> {
         })
     }
 
-    /// Returns the source overload indexes that should be shown in diagnostics.
+    /// Returns the distinct source overload indexes that should be shown in diagnostics.
     ///
-    /// Bound method overloads preserve their source indexes after receiver filtering. Method
-    /// wrapper overloads are synthesized from `__get__`, so their indexes do not correspond to
-    /// the overload declarations of the underlying function.
+    /// Bound method overloads preserve their source indexes after receiver filtering. Receiver
+    /// specialization can expand one source overload into multiple signatures. Method wrapper
+    /// overloads are synthesized from `__get__`, so their indexes do not correspond to the overload
+    /// declarations of the underlying function.
     fn diagnostic_overload_indexes(
         &self,
         db: &'db dyn Db,
@@ -3632,6 +3633,7 @@ impl<'db> CallableBinding<'db> {
         self.overloads
             .iter()
             .map(Binding::source_overload_index)
+            .unique()
             .collect()
     }
 
