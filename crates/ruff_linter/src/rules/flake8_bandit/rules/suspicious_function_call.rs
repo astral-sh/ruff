@@ -12,6 +12,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_suspicious_function_reference_enabled;
+use crate::rules::flake8_bandit::rules::ExecBuiltin;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -1160,6 +1161,14 @@ fn suspicious_function(
         // Eval
         ["" | "builtins", "eval"] => {
             checker.report_diagnostic_if_enabled(SuspiciousEvalUsage, range)
+        }
+
+        // Exec
+        // Calls to `exec` are reported by [`exec_used`]; here we only flag
+        // non-call references (see `suspicious_function_reference`) to avoid
+        // duplicate diagnostics.
+        ["" | "builtins", "exec"] if arguments.is_none() => {
+            checker.report_diagnostic_if_enabled(ExecBuiltin, range)
         }
 
         // MarkSafe
