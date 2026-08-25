@@ -104,3 +104,12 @@ from pathlib import Path
 def format_file(file: Path):
     with file.open() as f:
         contents = f.read()
+
+# https://github.com/astral-sh/ruff/issues/28012
+import builtins
+
+# Error.
+builtins.open("test.txt")
+
+# Non-error.
+builtins.open("test.txt", encoding="utf-8")

@@ -429,3 +429,21 @@ help: Add explicit `encoding` argument
 106 |         contents = f.read()
     |
 note: This is an unsafe fix and may change runtime behavior
+
+PLW1514 [*] `builtins.open` in text mode without explicit `encoding` argument
+   --> unspecified_encoding.py:112:1
+    |
+111 | # Error.
+112 | builtins.open("test.txt")
+    | ^^^^^^^^^^^^^
+113 |
+114 | # Non-error.
+    |
+help: Add explicit `encoding` argument
+    |
+111 | # Error.
+    - builtins.open("test.txt")
+112 + builtins.open("test.txt", encoding="utf-8")
+113 |
+    |
+note: This is an unsafe fix and may change runtime behavior
