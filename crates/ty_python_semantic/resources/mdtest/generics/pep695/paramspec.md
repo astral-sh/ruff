@@ -966,6 +966,142 @@ class Factory[**P]:
 reveal_type(Factory[[int]].make)
 ```
 
+### `ParamSpec` inferred from classmethod receivers
+
+The class object bound to `cls` determines the constructor parameters represented by `P`. The bound
+method accepts those parameters, preserving their names, kinds, and defaults.
+
+```py
+from typing import Callable
+
+class Factory:
+    def __init__(self, value: int, *, label: str = "") -> None: ...
+    @classmethod
+    def make[**P](cls: Callable[P, "Factory"], *args: P.args, **kwargs: P.kwargs) -> "Factory":
+        return cls(*args, **kwargs)
+
+# revealed: bound method <class 'Factory'>.make(value: int, *, label: str = "") -> Factory
+reveal_type(Factory.make)
+reveal_type(Factory.make(1))  # revealed: Factory
+Factory.make(value=1, label="label")
+
+make: Callable[[int], Factory] = Factory.make
+```
+
+Calls and callback assignments are checked against the constructor signature. In particular, the
+required parameter cannot be omitted, and the optional keyword-only parameter cannot be positional.
+
+```py
+Factory.make()  # error: [missing-argument] "No argument provided for required parameter `value`"
+Factory.make("wrong")  # error: [invalid-argument-type] "Expected `int`"
+Factory.make(1, label=2)  # error: [invalid-argument-type] "Expected `str`"
+Factory.make(1, "label")  # error: [too-many-positional-arguments]
+Factory.make(1, unexpected=True)  # error: [unknown-argument]
+
+wrong_factory: Callable[[str], Factory] = Factory.make  # error: [invalid-assignment]
+```
+
+### `ParamSpec` inferred from callable instance receivers
+
+An instance method can infer `P` from the bound instance's `__call__` signature. If the callable is
+generic, its type parameters remain available for inference from the forwarded arguments.
+
+```py
+from typing import Callable
+
+class Callback:
+    def __call__[T](self, value: T) -> T:
+        return value
+
+    def call[**P, R](self: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+        return self(*args, **kwargs)
+
+callback = Callback()
+
+# revealed: bound method Callback.call[T](value: T) -> T
+reveal_type(callback.call)
+reveal_type(callback.call(value=1))  # revealed: Literal[1]
+reveal_type(callback.call("value"))  # revealed: Literal["value"]
+callback.call()  # error: [missing-argument] "No argument provided for required parameter `value`"
+callback.call(1, 2)  # error: [too-many-positional-arguments]
+```
+
+### Overloaded methods with generic receivers
+
+The mutable callback attribute makes `Wrapper` invariant in `P`, so its receiver determines each
+overload's `Q` exactly. The prepended flag determines the return type.
+
+```py
+from typing import Callable, Literal, overload
+
+class Wrapper[**P]:
+    def __init__(self, callback: Callable[P, int]) -> None:
+        self.callback = callback
+
+    @overload
+    def call[**Q](self: "Wrapper[Q]", as_str: Literal[False], /, *args: Q.args, **kwargs: Q.kwargs) -> int: ...
+    @overload
+    def call[**Q](self: "Wrapper[Q]", as_str: Literal[True], /, *args: Q.args, **kwargs: Q.kwargs) -> str: ...
+    def call(self, as_str: bool, /, *args: P.args, **kwargs: P.kwargs) -> int | str:
+        result = self.callback(*args, **kwargs)
+        return str(result) if as_str else result
+
+def callback(value: int) -> int:
+    return value
+
+wrapper = Wrapper(callback)
+
+# revealed: Overload[(as_str: Literal[False], /, value: int) -> int, (as_str: Literal[True], /, value: int) -> str]
+reveal_type(wrapper.call)
+reveal_type(wrapper.call(False, 1))  # revealed: int
+reveal_type(wrapper.call(True, value=1))  # revealed: str
+wrapper.call(False)  # error: [no-matching-overload]
+wrapper.call(True, "wrong")  # error: [no-matching-overload]
+```
+
+### Classmethod receivers with overloaded constructors
+
+A classmethod forwards each constructor overload independently. A call supplies either an integer
+value or a keyword-only string label, not both.
+
+```py
+from typing import Callable, overload
+
+class Factory:
+    @overload
+    def __init__(self, value: int) -> None: ...
+    @overload
+    def __init__(self, *, label: str) -> None: ...
+    def __init__(self, value: int = 0, *, label: str = "") -> None: ...
+    @classmethod
+    def make[**P](cls: Callable[P, "Factory"], *args: P.args, **kwargs: P.kwargs) -> "Factory":
+        return cls(*args, **kwargs)
+
+# revealed: Overload[(value: int) -> Factory, (*, label: str) -> Factory]
+reveal_type(Factory.make)
+reveal_type(Factory.make(1))  # revealed: Factory
+reveal_type(Factory.make(label="label"))  # revealed: Factory
+
+Factory.make()  # snapshot: no-matching-overload
+Factory.make(1, label="label")  # error: [no-matching-overload]
+```
+
+```snapshot
+error[no-matching-overload]: No overload of bound method `Factory.make` matches arguments
+  --> src/mdtest_snippet.py:18:1
+   |
+18 | Factory.make()  # snapshot: no-matching-overload
+   | ^^^^^^^^^^^^^^
+info: Possible overloads for bound method `make`:
+info:   (value: int) -> Factory
+info:   (*, label: str) -> Factory
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:10:9
+   |
+10 |     def make[**P](cls: Callable[P, "Factory"], *args: P.args, **kwargs: P.kwargs) -> "Factory":
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
 ### Gradual types propagate through `ParamSpec` inference
 
 ```py

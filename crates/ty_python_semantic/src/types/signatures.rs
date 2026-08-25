@@ -1279,7 +1279,8 @@ impl<'db> Signature<'db> {
     ///
     /// Matching the receiver can constrain type variables that occur elsewhere in the signature.
     /// Exact bounds determine an unambiguous specialization; one-sided constraints remain
-    /// available to normal call inference. The receiver remains in the returned signature so
+    /// available to normal call inference. A `ParamSpec` can capture multiple overloads, so one
+    /// signature can expand into several. The receiver remains in each returned signature so
     /// bound-method calls can still check it and report receiver-related diagnostics.
     pub(crate) fn specialize_for_bound_receiver(
         &self,
@@ -1287,11 +1288,11 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> Option<Self> {
+    ) -> Option<CallableSignature<'db>> {
         let bound_signature =
             self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
-            return Some(self.clone());
+            return Some(CallableSignature::single(self.clone()));
         };
 
         let constraints = ConstraintSetBuilder::new();
@@ -1300,17 +1301,19 @@ impl<'db> Signature<'db> {
 
         match when.solutions(db, env, inferable) {
             Ok(Solutions::Unsatisfiable) => return None,
-            Ok(Solutions::Unconstrained) | Err(_) => return Some(self.clone()),
+            Ok(Solutions::Unconstrained) | Err(_) => {
+                return Some(CallableSignature::single(self.clone()));
+            }
             // Each receiver path can leave a different type variable unconstrained. Preserve the
             // original relation instead of combining those independent solutions.
             Ok(Solutions::Constrained(solutions)) if solutions.as_slice().len() > 1 => {
-                return Some(self.clone());
+                return Some(CallableSignature::single(self.clone()));
             }
             Ok(Solutions::Constrained(_)) => {}
         }
 
         let Some(generic_context) = self.generic_context else {
-            return Some(self.clone());
+            return Some(CallableSignature::single(self.clone()));
         };
 
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
@@ -1343,7 +1346,22 @@ impl<'db> Signature<'db> {
             Some(Type::TypeVar(typevar))
         });
 
-        Some(self.apply_specialization(db, specialization))
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
+        let mut specialized = CallableSignature::single(self.clone()).apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        );
+
+        // The captured `ParamSpec` can carry overload indices from another callable. Keep
+        // this method's overload index so call diagnostics refer to the correct declaration.
+        for signature in &mut specialized.overloads {
+            signature.source_overload_index = self.source_overload_index;
+        }
+
+        Some(specialized)
     }
 
     /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
@@ -1354,7 +1372,7 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> Option<Self> {
+    ) -> Option<CallableSignature<'db>> {
         if !self.can_bind_self_to(db, env, receiver_type) {
             return None;
         }
