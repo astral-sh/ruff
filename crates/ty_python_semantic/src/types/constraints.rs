@@ -1845,10 +1845,8 @@ pub(crate) struct Constraint<'db> {
 /// don't want to choose a validity bound as a solution unless we have no other choice. There is
 /// often an evidence bound that is a better choice.
 ///
-/// Provenance records everything that a bound's derivation depends on. A bound derived only from
-/// evidence remains evidence, and one derived only from validity remains validity. A bound derived
-/// from both is _mixed_. Evidence and mixed bounds can both be used for inference, but mixed bounds
-/// remain distinct so that subsequent derivations do not forget their validity dependency.
+/// A bound derived only from validity remains validity. Any derivation that also depends on
+/// evidence is itself evidence.
 ///
 /// Every type is a supertype of `Never` and a subtype of `object`, so `Validity(Never)` represents
 /// an absent lower bound and `Validity(object)` represents an absent upper bound.
@@ -1856,7 +1854,6 @@ pub(crate) struct Constraint<'db> {
 pub(crate) enum ConstraintBound<'db> {
     Validity(Type<'db>),
     Evidence(Type<'db>),
-    Mixed(Type<'db>),
 }
 
 impl<'db> ConstraintBound<'db> {
@@ -1870,7 +1867,7 @@ impl<'db> ConstraintBound<'db> {
 
     pub(crate) fn ty(self) -> Type<'db> {
         match self {
-            Self::Validity(ty) | Self::Evidence(ty) | Self::Mixed(ty) => ty,
+            Self::Validity(ty) | Self::Evidence(ty) => ty,
         }
     }
 
@@ -1886,7 +1883,6 @@ impl<'db> ConstraintBound<'db> {
         match self {
             Self::Validity(ty) => Self::Validity(f(ty)),
             Self::Evidence(ty) => Self::Evidence(f(ty)),
-            Self::Mixed(ty) => Self::Mixed(f(ty)),
         }
     }
 
@@ -1897,19 +1893,16 @@ impl<'db> ConstraintBound<'db> {
     /// Creates a bound produced by mathematically combining `lhs` and `rhs`.
     ///
     /// If one operand already equals the result, that operand alone establishes the combined
-    /// bound, so its provenance is retained. `Mixed` is only needed when operands with different
-    /// provenance both contribute to a new result.
+    /// bound, so its provenance is retained. Otherwise, the result is validity only if both
+    /// operands are validity.
     fn from_combination(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
         match (combined == lhs.ty(), combined == rhs.ty()) {
             (true, false) => lhs.with_type(combined),
             (false, true) => rhs.with_type(combined),
-            (true, true) => match (lhs, rhs) {
-                (Self::Evidence(_), _) | (_, Self::Evidence(_)) => Self::Evidence(combined),
-                (Self::Mixed(_), _) | (_, Self::Mixed(_)) => Self::Mixed(combined),
+            _ => match (lhs, rhs) {
                 (Self::Validity(_), Self::Validity(_)) => Self::Validity(combined),
+                _ => Self::Evidence(combined),
             },
-            (false, false) if lhs.has_same_provenance(rhs) => lhs.with_type(combined),
-            (false, false) => Self::Mixed(combined),
         }
     }
 
@@ -1920,13 +1913,12 @@ impl<'db> ConstraintBound<'db> {
     /// `int ≤ T` and `T ≤ S` requires both premises even though the resulting bound type is still
     /// `int`.
     ///
-    /// The result depends on both premises, so it is validity if both premises are validity,
-    /// evidence if both are evidence, and mixed otherwise.
+    /// The result depends on both premises, so it is validity if both premises are validity and
+    /// evidence otherwise.
     fn from_transitive_derivation(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
         match (lhs, rhs) {
             (Self::Validity(_), Self::Validity(_)) => Self::Validity(combined),
-            (Self::Evidence(_), Self::Evidence(_)) => Self::Evidence(combined),
-            _ => Self::Mixed(combined),
+            _ => Self::Evidence(combined),
         }
     }
 
@@ -1937,17 +1929,8 @@ impl<'db> ConstraintBound<'db> {
             Self::Evidence(ty) => {
                 Self::from_transitive_derivation(ty, source.lower_bound(), source.upper_bound())
             }
-            Self::Validity(_) | Self::Mixed(_) => self,
+            Self::Validity(_) => self,
         }
-    }
-
-    fn has_same_provenance(self, other: Self) -> bool {
-        matches!(
-            (self, other),
-            (Self::Validity(_), Self::Validity(_))
-                | (Self::Evidence(_), Self::Evidence(_))
-                | (Self::Mixed(_), Self::Mixed(_))
-        )
     }
 }
 
@@ -2054,7 +2037,7 @@ impl<'db> ConstraintBounds<'db> {
 
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
 ///
-/// Validity, evidence, and mixed clauses are stored separately. Clauses may be unions, keeping
+/// Validity and evidence clauses are stored separately. Clauses may be unions, keeping
 /// bounds such as `(A | B) & (C | D)` factored rather than distributing them into the DNF
 /// representation used by [`Type`].
 ///
@@ -2068,7 +2051,6 @@ impl<'db> ConstraintBounds<'db> {
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UpperBound<'db> {
     evidence: FxOrderSet<Type<'db>>,
-    mixed: FxOrderSet<Type<'db>>,
     validity: FxOrderSet<Type<'db>>,
 }
 
@@ -2085,19 +2067,11 @@ impl<'db> UpperBound<'db> {
     }
 
     fn is_empty(&self) -> bool {
-        self.evidence.is_empty() && self.mixed.is_empty() && self.validity.is_empty()
+        self.evidence.is_empty() && self.validity.is_empty()
     }
 
     fn iter_evidence(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
         self.evidence.iter().copied().map(ConstraintBound::Evidence)
-    }
-
-    fn iter_mixed(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
-        self.mixed.iter().copied().map(ConstraintBound::Mixed)
-    }
-
-    fn iter_inference(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
-        iter::chain(self.iter_evidence(), self.iter_mixed())
     }
 
     fn iter_validity(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
@@ -2105,11 +2079,11 @@ impl<'db> UpperBound<'db> {
     }
 
     pub(crate) fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
-        iter::chain(self.iter_inference(), self.iter_validity())
+        iter::chain(self.iter_evidence(), self.iter_validity())
     }
 
     fn has_evidence(&self) -> bool {
-        !self.evidence.is_empty() || !self.mixed.is_empty()
+        !self.evidence.is_empty()
     }
 
     /// Returns an existing upper-bound clause if every other clause is redundant with it.
@@ -2166,21 +2140,12 @@ impl<'db> UpperBound<'db> {
                 self.evidence.clear();
                 self.evidence.insert(Type::Never);
             }
-            ConstraintBound::Mixed(Type::Never) => {
-                self.mixed.clear();
-                self.mixed.insert(Type::Never);
-            }
             ConstraintBound::Validity(Type::Never) => {
                 self.validity.clear();
                 self.validity.insert(Type::Never);
             }
             ConstraintBound::Evidence(ty) => {
                 self.evidence.insert(ty);
-            }
-            ConstraintBound::Mixed(ty) => {
-                if !self.mixed.contains(&Type::Never) {
-                    self.mixed.insert(ty);
-                }
             }
             ConstraintBound::Validity(ty) => {
                 if !self.validity.contains(&Type::Never) {
@@ -2192,7 +2157,6 @@ impl<'db> UpperBound<'db> {
 
     fn shrink_to_fit(&mut self) {
         self.evidence.shrink_to_fit();
-        self.mixed.shrink_to_fit();
         self.validity.shrink_to_fit();
     }
 
@@ -3672,7 +3636,6 @@ struct InteriorNodeData {
 #[derive(Default)]
 struct ConstraintBoundsBuilder<'db> {
     evidence_lower: FxIndexSet<Type<'db>>,
-    mixed_lower: FxIndexSet<Type<'db>>,
     validity_lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
     // Classify each evidence bound before aggregation: a union can otherwise make gradual and
@@ -3708,10 +3671,6 @@ impl<'db> ConstraintBoundsBuilder<'db> {
                 self.classify_evidence(db, env, ty);
                 self.evidence_lower.insert(ty);
             }
-            ConstraintBound::Mixed(ty) => {
-                self.classify_evidence(db, env, ty);
-                self.mixed_lower.insert(ty);
-            }
             ConstraintBound::Validity(ty) if bound != ConstraintBound::missing_lower() => {
                 self.validity_lower.insert(ty);
             }
@@ -3725,7 +3684,7 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         bound: ConstraintBound<'db>,
     ) {
-        if let ConstraintBound::Evidence(ty) | ConstraintBound::Mixed(ty) = bound {
+        if let ConstraintBound::Evidence(ty) = bound {
             self.classify_evidence(db, env, ty);
         }
         self.upper.add_clause(bound);
@@ -3739,7 +3698,6 @@ impl<'db> ConstraintBoundsBuilder<'db> {
     ) -> PathBound<'db> {
         let Self {
             evidence_lower,
-            mixed_lower,
             validity_lower,
             mut upper,
             has_gradual_evidence,
@@ -3747,8 +3705,6 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         } = self;
         let evidence_lower =
             (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
-        let mixed_lower =
-            (!mixed_lower.is_empty()).then(|| UnionType::from_elements(db, env, mixed_lower));
         let validity_lower = if validity_lower.is_empty() {
             Type::Never
         } else {
@@ -3758,7 +3714,6 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         PathBound {
             bound_typevar,
             evidence_lower,
-            mixed_lower,
             validity_lower,
             upper,
             has_only_gradual_evidence: has_gradual_evidence && !has_static_evidence,
@@ -3798,7 +3753,6 @@ impl<'db> PathBoundSolution<'db> {
 pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) evidence_lower: Option<Type<'db>>,
-    mixed_lower: Option<Type<'db>>,
     pub(crate) validity_lower: Type<'db>,
     pub(crate) upper: UpperBound<'db>,
     /// Whether the path contains gradual evidence and no static evidence.
@@ -3810,7 +3764,6 @@ impl<'db> PathBound<'db> {
         Self {
             bound_typevar,
             evidence_lower: Some(ty),
-            mixed_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
             has_only_gradual_evidence: false,
@@ -3822,44 +3775,17 @@ impl<'db> PathBound<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        let mut lower = self
-            .evidence_lower
-            .into_iter()
-            .chain(self.mixed_lower)
-            .chain((!self.validity_lower.is_never()).then_some(self.validity_lower));
-        let Some(first) = lower.next() else {
-            return Type::Never;
+        let Some(evidence_lower) = self.evidence_lower else {
+            return self.validity_lower;
         };
-        let Some(second) = lower.next() else {
-            return first;
-        };
-        UnionType::from_elements(
-            db,
-            env,
-            iter::once(first).chain(iter::once(second)).chain(lower),
-        )
-    }
-
-    pub(crate) fn inference_lower(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Type<'db>> {
-        let mut lower = self.evidence_lower.into_iter().chain(self.mixed_lower);
-        let first = lower.next()?;
-        Some(UnionType::from_elements(
-            db,
-            env,
-            iter::once(first).chain(lower),
-        ))
-    }
-
-    pub(crate) fn has_lower_evidence(&self) -> bool {
-        self.evidence_lower.is_some() || self.mixed_lower.is_some()
+        if self.validity_lower.is_never() {
+            return evidence_lower;
+        }
+        UnionType::from_elements(db, env, [evidence_lower, self.validity_lower])
     }
 
     fn variance(&self) -> TypeVarVariance {
-        match (self.has_lower_evidence(), self.has_upper_evidence()) {
+        match (self.evidence_lower.is_some(), self.has_upper_evidence()) {
             (false, true) => TypeVarVariance::Covariant,
             (true, false) => TypeVarVariance::Contravariant,
             (true, true) => TypeVarVariance::Invariant,
@@ -3879,7 +3805,7 @@ impl<'db> PathBound<'db> {
         env: &ProgramEnvironment<'db>,
         solution: Type<'db>,
     ) -> Option<Type<'db>> {
-        if !self.has_lower_evidence()
+        if self.evidence_lower.is_none()
             || self.effective_lower(db, env) != solution
             || !self.has_upper_evidence()
             || solution.bottom_materialization(db, env) == solution.top_materialization(db, env)
@@ -3893,7 +3819,7 @@ impl<'db> PathBound<'db> {
         }
 
         // `Divergent` is not safely reflexive, so we cannot intersect identical bounds.
-        if UpperBound::single_bound_from_iterator(db, env, self.upper.iter_inference())
+        if UpperBound::single_bound_from_iterator(db, env, self.upper.iter_evidence())
             == Some(solution)
         {
             return Some(solution);
@@ -3915,7 +3841,7 @@ impl<'db> PathBound<'db> {
 
         let mut upper_bounds = self
             .upper
-            .iter_inference()
+            .iter_evidence()
             .map(ConstraintBound::ty)
             .filter_map(materialize_upper);
         let Some(first_upper) = upper_bounds.next() else {
@@ -4384,7 +4310,7 @@ impl<'db> PathBounds<'db> {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
-                if path_bound.has_lower_evidence() {
+                if path_bound.evidence_lower.is_some() {
                     if !path_bound.upper.is_satisfied_by(db, env, lower) {
                         let mut storage = builder.storage.borrow_mut();
                         let (when_upper, source_order) =
@@ -4472,7 +4398,7 @@ impl<'db> PathBounds<'db> {
                         current_best.is_assignable_to(db, env, candidate);
 
                     if candidate_assignable_to_best != best_assignable_to_candidate {
-                        if path_bound.has_lower_evidence() {
+                        if path_bound.evidence_lower.is_some() {
                             candidate_assignable_to_best
                         } else {
                             best_assignable_to_candidate
@@ -4547,7 +4473,7 @@ impl<'db> PathBounds<'db> {
                 // `T = Any`) If the path solution is fully static, we choose the "tightest"
                 // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
                 if multiple_compatible_constraints && path_bound.has_only_gradual_evidence {
-                    if path_bound.has_lower_evidence() {
+                    if path_bound.evidence_lower.is_some() {
                         PathBoundSolution::Solved(path_bound.effective_lower(db, env))
                     } else if path_bound.has_upper_evidence() {
                         IntersectionType::bounded_from_elements(
@@ -4775,7 +4701,6 @@ impl InteriorNode {
                 matches!(
                     bound,
                     ConstraintBound::Evidence(Type::TypeVar(bound_typevar))
-                        | ConstraintBound::Mixed(Type::TypeVar(bound_typevar))
                         if bound_typevar.is_inferable(db, inferable)
                 )
             })
@@ -8305,7 +8230,6 @@ mod tests {
         let path_bound = PathBound {
             bound_typevar: t,
             evidence_lower: None,
-            mixed_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
             has_only_gradual_evidence: false,
