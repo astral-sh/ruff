@@ -379,7 +379,9 @@ impl<'db> CallableSignature<'db> {
                                     type_mapping.update_signature_generic_context(db, env, context)
                                 }),
                             ),
-                            definition: signature.definition,
+                            // Keep the enclosing method's definition for binding `Self` and
+                            // other receiver type variables after specializing its parameters.
+                            definition: self_signature.definition,
                             source_overload_index: signature.source_overload_index,
                             receiver_constraints: {
                                 let mapped = self_signature.map_receiver_constraints(
