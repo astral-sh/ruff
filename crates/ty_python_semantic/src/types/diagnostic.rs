@@ -1772,24 +1772,22 @@ fn assignment_value_node<'db, 'ast>(
     definition_kind: &DefinitionKind<'db>,
 ) -> Option<&'ast ast::Expr> {
     match definition_kind {
-        DefinitionKind::Assignment(assignment) => {
+        DefinitionKind::Assignment(assignment) if let Some(unpack) = assignment.unpack() => {
             let module = context.module();
             let value = assignment.value(module);
 
             Some(
-                assignment
-                    .unpack()
-                    .and_then(|unpack| {
-                        unpacked_assignment_value(
-                            unpack.target(context.db(), module),
-                            value,
-                            assignment.target(module),
-                        )
-                    })
-                    .unwrap_or(value),
+                unpacked_assignment_value(
+                    unpack.target(context.db(), module),
+                    value,
+                    assignment.target(module),
+                )
+                .unwrap_or(value),
             )
         }
-        DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(context.module()),
+        DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_) => {
+            definition_kind.value(context.module())
+        }
         DefinitionKind::NamedExpression(assignment) => {
             Some(&*assignment.node(context.module()).value)
         }
@@ -1850,6 +1848,22 @@ struct StarredAssignmentElement<'db> {
     collected_range: TextRange,
     actual_type: Type<'db>,
     expected_type: Type<'db>,
+}
+
+fn assignment_display_settings<'db>(
+    context: &InferContext<'db, '_>,
+    target_type: Type<'db>,
+    value_type: Type<'db>,
+    starred_element: Option<&StarredAssignmentElement<'db>>,
+) -> DisplaySettings<'db> {
+    DisplaySettings::from_possibly_ambiguous_types(
+        context.db(),
+        context.program_environment(),
+        starred_element
+            .into_iter()
+            .flat_map(|element| [element.actual_type, element.expected_type])
+            .chain([target_type, value_type]),
+    )
 }
 
 fn starred_assignment_element<'db>(
@@ -1954,13 +1968,6 @@ pub(super) fn report_invalid_assignment<'db>(
 ) {
     let db = context.db();
     let definition_kind = definition.kind(context.db());
-    let invalid_element = starred_assignment_element(
-        context,
-        definition_kind,
-        target_ty,
-        value_ty,
-        AssignmentDiagnosticKind::Invalid,
-    );
     let value_node = assignment_value_node(context, definition_kind);
     let original_value_node = definition_kind.value(context.module()).or(value_node);
 
@@ -1976,15 +1983,15 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(
-        db,
-        env,
-        [target_ty, value_ty].into_iter().chain(
-            invalid_element
-                .iter()
-                .flat_map(|element| [element.actual_type, element.expected_type]),
-        ),
+    let invalid_element = starred_assignment_element(
+        context,
+        definition_kind,
+        target_ty,
+        value_ty,
+        AssignmentDiagnosticKind::Invalid,
     );
+    let settings =
+        assignment_display_settings(context, target_ty, value_ty, invalid_element.as_ref());
 
     let diagnostic_range =
         assignment_diagnostic_range(context, target_node, value_node, invalid_element.as_ref());
@@ -2111,15 +2118,8 @@ pub(super) fn report_unsound_assignment<'db>(
         return;
     };
 
-    let settings = DisplaySettings::from_possibly_ambiguous_types(
-        db,
-        env,
-        [target_ty, value_ty].into_iter().chain(
-            unsound_element
-                .iter()
-                .flat_map(|element| [element.actual_type, element.expected_type]),
-        ),
-    );
+    let settings =
+        assignment_display_settings(context, target_ty, value_ty, unsound_element.as_ref());
     let actual_display = value_ty.display_with(db, env, settings.clone());
     let expected_display = target_ty.display_with(db, env, settings.clone());
 

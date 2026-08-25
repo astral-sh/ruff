@@ -476,29 +476,19 @@ fn sequence_value_for_target<'ast>(
     let first_value_starred_index = values.iter().position(ast::Expr::is_starred_expr);
     let last_value_starred_index = values.iter().rposition(ast::Expr::is_starred_expr);
 
-    if target_starred_index.is_none()
-        && first_value_starred_index.is_none()
-        && targets.len() != values.len()
-    {
-        return None;
-    }
-
-    if target_starred_index.is_some()
-        && first_value_starred_index.is_none()
-        && values.len() < targets.len().saturating_sub(1)
-    {
-        return None;
-    }
-
-    if target_starred_index.is_none()
-        && first_value_starred_index.is_some()
-        && targets.len()
-            < values
+    match (target_starred_index, first_value_starred_index) {
+        (None, None) if targets.len() != values.len() => return None,
+        (Some(_), None) if values.len() < targets.len().saturating_sub(1) => return None,
+        (None, Some(_))
+            if values
                 .iter()
                 .filter(|value| !value.is_starred_expr())
                 .count()
-    {
-        return None;
+                > targets.len() =>
+        {
+            return None;
+        }
+        _ => {}
     }
 
     let target_prefix_length = target_starred_index.unwrap_or(targets.len());
