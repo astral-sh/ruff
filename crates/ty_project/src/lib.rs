@@ -149,13 +149,25 @@ pub trait ProgressReporter: Send + Sync {
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>);
 }
 
-/// An owned progress guard for a project or standalone-script uv metadata request.
+/// An owned progress reporter for a project or standalone-script uv metadata request.
 ///
-/// Creating the guard starts progress reporting and dropping it finishes progress reporting. A
-/// background synchronization may move the guard between threads and outlive the operation that
+/// The worker calls [`Self::started`] and [`Self::finished`] around each uv invocation. The reporter
+/// stays alive across rescheduled requests. The host calls [`Self::completed`] after handling the
+/// final result, or drops the reporter if the request is abandoned.
+/// Background synchronization may move the reporter between threads and outlive the operation that
 /// scheduled it. Implementations must not retain a database because doing so could keep a cancelled
 /// database snapshot alive until synchronization finishes.
-pub trait UvSyncProgress: Send {}
+pub trait UvSyncProgress: Send {
+    /// Called immediately before running uv. Cancelled queued requests do not call this method.
+    fn started(&mut self) {}
+
+    /// Called when uv returns, including when it returns an error.
+    fn finished(&mut self) {}
+
+    /// Called after the final synchronization result is handled, including errors.
+    /// Requests that are rescheduled keep their reporter without completing it.
+    fn completed(self: Box<Self>) {}
+}
 
 /// Creates progress reporting when a project metadata refresh is scheduled.
 pub type ProjectSyncProgressFactory<'a> =

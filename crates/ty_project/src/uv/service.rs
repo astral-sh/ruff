@@ -201,7 +201,7 @@ impl UvSyncTask {
 
 /// The result of a background uv metadata request.
 ///
-/// This owns the progress guard so progress remains active until the result is consumed.
+/// This keeps the progress reporter alive until the result is consumed or rescheduled.
 pub(crate) struct UvMetadataResult {
     pub(crate) task: UvSyncTask,
     pub(crate) output: std::io::Result<Output>,
@@ -273,7 +273,7 @@ struct UvWorker {
 impl UvWorker {
     fn run(self) {
         loop {
-            let job = crossbeam::channel::select_biased! {
+            let mut job = crossbeam::channel::select_biased! {
                 // The worker pool disconnected, exit immetiatley
                 recv(self.shutdown) -> _ => return,
                 recv(self.jobs) -> job => {
@@ -294,7 +294,15 @@ impl UvWorker {
                     tracing::info!("Synchronizing script `{path}`");
                 }
             }
+            if let Some(progress) = job.progress.as_mut() {
+                progress.started();
+            }
+
             let output = self.uv.execute(&*self.executor, &target);
+
+            if let Some(progress) = job.progress.as_mut() {
+                progress.finished();
+            }
 
             // Send the result
             // The receiver disappears when the owning project is dropped.

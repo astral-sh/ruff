@@ -63,7 +63,7 @@
 //! count limits concurrent uv processes, but the queues do not apply backpressure to the host.
 //!
 //! `poll_sync` submits the latest follow-up only after the current job reports completion, keeping
-//! the same progress indicator. This avoids overlapping synchronizations for one environment.
+//! the same progress reporter. This avoids overlapping synchronizations for one environment.
 
 use std::hash::Hasher;
 use std::sync::Arc;
@@ -208,7 +208,7 @@ impl UvEnvironments {
     /// remains available, even if its virtual environment has not previously been synchronized.
     ///
     /// If another synchronization is pending, records the latest request to run afterward,
-    /// reusing the existing progress indicator. Otherwise, creates a new progress indicator and
+    /// reusing the existing progress reporter. Otherwise, creates a new progress reporter and
     /// submits the synchronization.
     ///
     /// Submission does not wait for uv or queue space.
@@ -294,7 +294,7 @@ impl UvEnvironments {
     ///
     /// If a newer synchronization was requested while the current one was pending, discards the
     /// outdated result and schedules the newer request instead, transferring the existing progress
-    /// indicator.
+    /// reporter.
     ///
     /// Reports project completions and changed scripts so callers can refresh diagnostics.
     pub fn poll_sync(&self, db: &mut dyn Db) -> UvSyncChanges {
@@ -408,6 +408,10 @@ impl UvEnvironments {
                     *state = ScriptEnvironmentState::Current { environment };
                     changes.scripts.push(file);
                 }
+            }
+
+            if let Some(progress) = progress {
+                progress.completed();
             }
         }
 

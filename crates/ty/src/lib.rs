@@ -277,8 +277,8 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
-    /// Progress bars shared by project checks and background uv synchronization.
-    progress: ProgressDisplay,
+    /// Progress for the current synchronization batch, cleared before checking starts.
+    sync_progress: Option<SyncProgress>,
 
     /// Interface for displaying information to the user.
     printer: Printer,
@@ -295,8 +295,6 @@ impl MainLoop {
 
         let cancellation_token_source = CancellationTokenSource::new();
         let cancellation_token = cancellation_token_source.token();
-        let progress = ProgressDisplay::new();
-        progress.bars.set_draw_target(printer.progress_target());
 
         (
             Self {
@@ -304,7 +302,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                progress,
+                sync_progress: None,
                 printer,
                 cancellation_token,
             },
@@ -363,15 +361,16 @@ impl MainLoop {
                         tracing::debug!("Deferring check until uv synchronization completes");
                         continue;
                     }
+                    self.sync_progress = None;
                     let db = db.clone();
                     let sender = self.sender.clone();
-                    let progress = self.progress.clone();
+                    let printer = self.printer;
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = IndicatifReporter::new(progress);
+                            let mut reporter = IndicatifReporter::new(printer.progress_target());
                             db.check_with_reporter(&mut reporter);
                             reporter.into_sorted_diagnostics(&db)
                         }) {
@@ -514,15 +513,20 @@ impl MainLoop {
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
-                    // Another filesystem event can arrive while a script is still synchronizing.
-                    // Keep its progress visible after clearing the previous check's output.
-                    self.progress.bars.suspend(Printer::clear_screen)?;
+                    let progress = self
+                        .sync_progress
+                        .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
 
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     let result = db.apply_changes_with_progress(&changes, &|db, project| {
-                        self.progress.for_project(db, project)
+                        progress.for_project(db, project)
                     });
+
+                    // Another filesystem event can arrive while a script is still synchronizing.
+                    // Keep its progress visible after clearing the previous check's output.
+                    progress.bars.suspend(Printer::clear_screen)?;
+
                     let scripts = result.scripts_to_synchronize(db);
                     self.synchronize_scripts(db, &scripts);
 
@@ -535,7 +539,6 @@ impl MainLoop {
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
                     db.trigger_cancellation();
-                    self.progress.clear();
                     return Ok(ExitStatus::Interrupted);
                 }
             }
@@ -546,14 +549,23 @@ impl MainLoop {
         Ok(ExitStatus::Success)
     }
 
-    fn synchronize_scripts(&self, db: &mut ProjectDatabase, scripts: &[File]) {
+    fn synchronize_scripts(&mut self, db: &mut ProjectDatabase, scripts: &[File]) {
         let environments = db.uv_environments().clone();
+
+        if scripts.is_empty() {
+            return;
+        }
+
+        let progress = self
+            .sync_progress
+            .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
+
         for &file in scripts {
             environments.request_sync(
                 db,
                 file,
                 ScriptEnvironmentAvailability::Pending,
-                &|db, file| self.progress.for_script(db, file),
+                &|db, file| progress.for_script(db, file),
             );
         }
     }
@@ -673,23 +685,14 @@ fn exit_status_from_diagnostics(
 struct IndicatifReporter {
     collector: CollectReporter,
 
-    progress: ProgressDisplay,
-
-    /// A reporter that is ready, containing a progress bar to report to.
-    ///
-    /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
-    /// do not initialize the bar too early as it may take a while to collect the number of files to
-    /// process and we don't want to display an empty "0/0" bar.
+    /// Kept hidden until the files to check have been collected, to avoid displaying "0/0".
     checking_bar: indicatif::ProgressBar,
 }
 
 impl IndicatifReporter {
-    fn new(progress: ProgressDisplay) -> Self {
-        let checking_bar = progress.bars.add(indicatif::ProgressBar::hidden());
-
+    fn new(target: indicatif::ProgressDrawTarget) -> Self {
         Self {
-            progress,
-            checking_bar,
+            checking_bar: indicatif::ProgressBar::with_draw_target(None, target),
             collector: CollectReporter::default(),
         }
     }
@@ -707,12 +710,12 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.checking_bar.set_message("Checking");
         self.checking_bar.set_style(
             indicatif::ProgressStyle::with_template(
-                "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
+                "{msg:8.dim} {wide_bar:.green/dim} {pos}/{len} files",
             )
             .unwrap()
             .progress_chars("--"),
         );
-        self.checking_bar.tick();
+        self.checking_bar.force_draw();
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
@@ -727,65 +730,106 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 
 impl Drop for IndicatifReporter {
     fn drop(&mut self) {
-        self.progress.finish_checking(&self.checking_bar);
+        self.checking_bar.finish_and_clear();
     }
 }
 
-/// Coordinates the file-checking bar and uv synchronization messages.
-#[derive(Clone)]
-struct ProgressDisplay {
+/// Shows the script count and individual uv status lines for one synchronization batch.
+struct SyncProgress {
     bars: indicatif::MultiProgress,
+
+    /// Hidden until the first script synchronization is requested.
+    script_bar: indicatif::ProgressBar,
 }
 
-impl ProgressDisplay {
-    fn new() -> Self {
-        Self {
-            bars: indicatif::MultiProgress::with_draw_target(
-                indicatif::ProgressDrawTarget::hidden(),
-            ),
-        }
+impl SyncProgress {
+    fn new(target: indicatif::ProgressDrawTarget) -> Self {
+        let bars = indicatif::MultiProgress::with_draw_target(target);
+        let script_bar = indicatif::ProgressBar::hidden();
+        script_bar.set_length(0);
+        script_bar.set_message("Syncing");
+        script_bar.set_style(
+            indicatif::ProgressStyle::with_template(
+                "{msg:8.dim} {wide_bar:.green/dim} {pos}/{len} scripts",
+            )
+            .unwrap()
+            .progress_chars("--"),
+        );
+        let script_bar = bars.add(script_bar);
+        Self { bars, script_bar }
     }
 
     fn for_project(&self, db: &dyn Db, project: Project) -> Option<Box<dyn UvSyncProgress>> {
-        self.start("Refreshing", format_args!("{} metadata", project.name(db)))
+        Some(self.start("Refreshing", format_args!("{} metadata", project.name(db)))?)
     }
 
     fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn UvSyncProgress>> {
         let path = file.path(db).as_system_path()?;
         let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
-        self.start("Syncing", path)
+        let mut progress = self.start("Syncing", path)?;
+        self.script_bar.inc_length(1);
+        self.script_bar.force_draw();
+        progress.completion_bar = Some(self.script_bar.clone());
+        Some(progress)
     }
 
-    fn start(&self, action: &str, target: impl Display) -> Option<Box<dyn UvSyncProgress>> {
+    fn start(&self, action: &str, target: impl Display) -> Option<Box<UvSyncProgressBar>> {
         if self.bars.is_hidden() {
             return None;
         }
 
-        let bar = self.bars.insert(0, indicatif::ProgressBar::hidden());
+        let bar = indicatif::ProgressBar::hidden();
         bar.set_style(indicatif::ProgressStyle::with_template("{wide_msg}").unwrap());
         bar.set_message(format!("   {} {target}", action.bold().cyan()));
-        Some(Box::new(UvSyncProgressBar { bar }))
+        Some(Box::new(UvSyncProgressBar {
+            bars: self.bars.clone(),
+            bar,
+            completion_bar: None,
+        }))
     }
+}
 
-    fn finish_checking(&self, bar: &indicatif::ProgressBar) {
-        self.bars.remove(bar);
-        self.clear();
-    }
-
-    fn clear(&self) {
+impl Drop for SyncProgress {
+    fn drop(&mut self) {
+        self.script_bar.finish_and_clear();
         let _ = self.bars.clear();
     }
 }
 
 struct UvSyncProgressBar {
+    bars: indicatif::MultiProgress,
     bar: indicatif::ProgressBar,
+    /// The shared script synchronization bar, advanced when this request completes.
+    ///
+    /// This reporter handles both script synchronization (`Some`) and project metadata
+    /// refreshes (`None`), which do not contribute to the script count.
+    completion_bar: Option<indicatif::ProgressBar>,
 }
 
-impl UvSyncProgress for UvSyncProgressBar {}
+impl UvSyncProgress for UvSyncProgressBar {
+    fn started(&mut self) {
+        self.bar.reset();
+        self.bars.insert(0, self.bar.clone());
+        // There are no periodic ticks to redraw this status line if drawing is rate-limited.
+        self.bar.force_draw();
+    }
+
+    fn finished(&mut self) {
+        self.bar.finish_and_clear();
+        self.bars.remove(&self.bar);
+    }
+
+    fn completed(self: Box<Self>) {
+        if let Some(bar) = &self.completion_bar {
+            bar.inc(1);
+            bar.force_draw();
+        }
+    }
+}
 
 impl Drop for UvSyncProgressBar {
     fn drop(&mut self) {
-        self.bar.finish_and_clear();
+        self.finished();
     }
 }
 

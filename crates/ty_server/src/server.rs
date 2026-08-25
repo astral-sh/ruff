@@ -19,6 +19,7 @@ mod api;
 mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
+mod script_progress;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
@@ -29,6 +30,7 @@ pub(crate) use lazy_work_done_progress::LazyWorkDoneProgress;
 pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
+pub(crate) use script_progress::ScriptProgress;
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {

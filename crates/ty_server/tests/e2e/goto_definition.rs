@@ -92,7 +92,11 @@ from attrs import define
 
         server.open_text_document(script, source, 1);
 
-        server.assert_work_done_progress("Syncing script.py")?;
+        let end = server.assert_work_done_progress("Synchronizing scripts")?;
+        assert_eq!(
+            end.message.as_deref(),
+            Some("Finished synchronizing scripts")
+        );
 
         let definition = server
             .goto_definition_request(script, Position::new(4, 18))
