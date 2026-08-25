@@ -907,6 +907,14 @@ impl SearchPaths {
         }
     }
 
+    /// Returns the configured roots for first-party modules.
+    pub fn first_party_roots(&self) -> impl Iterator<Item = &SystemPath> {
+        self.static_paths
+            .iter()
+            .filter(|path| path.is_first_party())
+            .filter_map(SearchPath::as_system_path)
+    }
+
     /// Registers file roots for all non-dynamically discovered search paths.
     pub fn try_register_static_roots(&self, db: &dyn Db) {
         let files = db.files();
@@ -3443,6 +3451,31 @@ not_a_directory
             !search_paths.contains(
                 &&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()
             )
+        );
+    }
+
+    #[test]
+    fn first_party_roots_exclude_dynamic_search_paths() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "")])
+            .with_site_packages_files(&[("_foo.pth", "/editable")])
+            .build();
+        db.memory_file_system()
+            .create_directory_all("/editable")
+            .expect("valid editable directory");
+
+        let all_paths: Vec<_> =
+            search_paths(&db, db.resolver_environment(), ModuleResolveMode::Typing).collect();
+        assert!(
+            all_paths.contains(
+                &&SearchPath::editable(db.system(), SystemPathBuf::from("/editable"))
+                    .expect("valid editable search path")
+            )
+        );
+
+        assert_eq!(
+            db.search_paths().first_party_roots().collect::<Vec<_>>(),
+            [&*src]
         );
     }
 
