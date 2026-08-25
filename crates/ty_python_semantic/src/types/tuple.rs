@@ -765,11 +765,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .zip_longest(target.iter_suffix_elements().rev()),
             )
             .when_all(db, self.constraints, |pair| {
-                let (source, target) = match pair {
-                    EitherOrBoth::Both(source, target) => (source, target),
-                    EitherOrBoth::Left(source) => (source, target_variable),
-                    EitherOrBoth::Right(target) => (source_variable, target),
-                };
+                let (source, target) = pair.or(source_variable, target_variable);
                 self.check_type_pair(db, source, target)
             })
     }
