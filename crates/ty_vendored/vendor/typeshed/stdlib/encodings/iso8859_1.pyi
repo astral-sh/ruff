@@ -1,3 +1,6 @@
+"""Python Character Mapping Codec iso8859_1 generated from 'MAPPINGS/ISO8859/8859-1.TXT' with gencodec.py.
+
+"""
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
