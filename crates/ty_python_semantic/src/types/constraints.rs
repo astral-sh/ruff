@@ -4101,12 +4101,15 @@ impl<'db> PathBounds<'db> {
         ControlFlow::Continue(walker.finish(db, env, storage))
     }
 
-    /// Accumulates a conjunction of concrete bound constraints without constructing a
-    /// [`PathAssignments`] or its sequent map.
+    /// Solves a constraint set when it represents a _simple conjunction_: it can be expressed as a
+    /// single conjunction of constraints, and the lower/upper bounds of those constraints do not
+    /// mention any other typevars. That lets us use a fast path that doesn't require constructing
+    /// a [`PathAssignments`] or its sequent map.
     ///
-    /// There are no relationships to derive between these constraints, as the upper and lower
-    /// bounds do not contain typevars. The normal solution-selection logic still validates each
-    /// accumulated bound against the typevar's declared bound or constraints.
+    /// We do still have to consider the declared upper bound/constraints of the typevars in the
+    /// constraint set. To be eligible for this fast path, the solution cannot mention any
+    /// _constrained_ typevars, since those introduce a disjunction. And like the constraints in
+    /// the BDD itself, the declared upper bound of each type cannot mention any other typevars.
     fn compute_simple_bound_conjunction<L: SolutionLimits>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4175,6 +4178,29 @@ impl<'db> PathBounds<'db> {
             if let Some(upper) = constraint.upper {
                 bounds.add_upper(db, env, upper);
             }
+        }
+
+        // Add the declared upper bounds of each typevar in this fast-path solution. This fast path
+        // only engages for _simple conjunctions_. That means we should give up if we find any
+        // _constrained_ typevars, since those introduce a disjunction into the solution.
+        //
+        // Unlike the more general `SolutionWalker`, here we only have to consider the typevars
+        // that are actually mentioned in the solution we found, rather than incorporating the
+        // validity constraints of _every_ typevar. For this fast path, we have already ensured
+        // that the solution does not depend on any cross-typevar relationships, so the validity
+        // bounds of unmentioned typevars cannot affect the solution of the typevars we have
+        // evidence for.
+        for (bound_typevar, bounds) in &mut mappings {
+            let bound = match bound_typevar.typevar(db).bound_or_constraints(db, env) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
+                // A constrained typevar introduces a disjunction over its declared constraints,
+                // which means we can't engage this fast path.
+                Some(TypeVarBoundOrConstraints::Constraints(_)) => return None,
+                // An unconstrained typevar does not add any additional constraints on its
+                // solutions, other than the evidence we already have in the BDD.
+                None => continue,
+            };
+            bounds.add_upper(db, env, ConstraintBound::Validity(bound));
         }
 
         let path = mappings
