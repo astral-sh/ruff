@@ -1314,6 +1314,10 @@ struct DeferredAndUndecorated<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
+    /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
+    /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1409,6 +1413,13 @@ impl<'db> DefinitionInferenceExtra<'db> {
             _ => None,
         }
     }
+
+    fn comparison_truthiness(&self) -> Option<&FrozenMap<ExpressionNodeKey, Truthiness>> {
+        match self {
+            Self::Other(extra) => Some(&extra.comparison_truthiness),
+            _ => None,
+        }
+    }
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1501,6 +1512,10 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         let env = ProgramEnvironment::from_definition(definition);
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, &env, previous_inference);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, &env, previous_ty, cycle);
@@ -1546,6 +1561,35 @@ impl<'db> DefinitionInference<'db> {
         }
 
         self
+    }
+
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
+        if comparison_truthiness.iter().next().is_some() {
+            let mut extra = self
+                .extra
+                .take()
+                .map_or_else(OtherDefinitionInferenceExtra::default, |extra| {
+                    extra.into_other()
+                });
+            extra.comparison_truthiness = comparison_truthiness;
+            self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
+        }
     }
 
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -1709,6 +1753,43 @@ impl<'db> DefinitionInference<'db> {
     }
 }
 
+/// Widen comparison truthiness for expression, statement, and definition regions using the same rules.
+///
+/// Sparse overrides can appear or disappear as operand types change. Compare the effective
+/// truthiness in both iterations, including previous-only overrides, so widening cannot make
+/// a condition alternate between definite outcomes. The fallbacks use each iteration's value
+/// types before those types are themselves widened.
+fn widen_comparison_truthiness(
+    current: Option<&FrozenMap<ExpressionNodeKey, Truthiness>>,
+    previous: Option<&FrozenMap<ExpressionNodeKey, Truthiness>>,
+    current_fallback: impl Fn(ExpressionNodeKey) -> Truthiness,
+    previous_fallback: impl Fn(ExpressionNodeKey) -> Truthiness,
+) -> FrozenMap<ExpressionNodeKey, Truthiness> {
+    current
+        .into_iter()
+        .chain(previous)
+        .flatten()
+        .map(|(expression, _)| {
+            let truthiness = current
+                .and_then(|overrides| overrides.get(expression))
+                .copied()
+                .unwrap_or_else(|| current_fallback(*expression));
+            let previous_truthiness = previous
+                .and_then(|overrides| overrides.get(expression))
+                .copied()
+                .unwrap_or_else(|| previous_fallback(*expression));
+            (
+                *expression,
+                if truthiness == previous_truthiness {
+                    truthiness
+                } else {
+                    Truthiness::Ambiguous
+                },
+            )
+        })
+        .collect()
+}
+
 /// The inferred types for an expression region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ExpressionInference<'db> {
@@ -1838,37 +1919,23 @@ impl<'db> ExpressionInference<'db> {
         self
     }
 
-    /// Sparse overrides can appear or disappear as operand types change. Compare the effective
-    /// truthiness in both iterations, including previous-only overrides, so widening cannot make
-    /// a condition alternate between definite outcomes.
     fn widen_comparison_truthiness(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         previous: &Self,
     ) {
-        let comparison_truthiness: FrozenMap<_, _> = self
-            .extra
-            .iter()
-            .chain(previous.extra.iter())
-            .flat_map(|extra| &extra.comparison_truthiness)
-            .map(|(expression, _)| {
-                let truthiness = self
-                    .comparison_truthiness(*expression)
-                    .unwrap_or_else(|| self.expression_type(*expression).bool(db, env));
-                let previous_truthiness = previous
-                    .comparison_truthiness(*expression)
-                    .unwrap_or_else(|| previous.expression_type(*expression).bool(db, env));
-                (
-                    *expression,
-                    if truthiness == previous_truthiness {
-                        truthiness
-                    } else {
-                        Truthiness::Ambiguous
-                    },
-                )
-            })
-            .collect();
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
         if comparison_truthiness.iter().next().is_some() {
             self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
         }
@@ -1972,6 +2039,10 @@ pub(crate) struct StatementInferenceInner<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct StatementInferenceInnerExtra<'db> {
+    /// Condition truthiness retained for checks performed by the enclosing suite.
+    /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -2028,6 +2099,10 @@ impl<'db> StatementInferenceInner<'db> {
         previous_inference: &StatementInferenceInner<'db>,
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, env, previous_inference);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
@@ -2070,6 +2145,28 @@ impl<'db> StatementInferenceInner<'db> {
         }
 
         self
+    }
+
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
+        if comparison_truthiness.iter().next().is_some() {
+            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
+        }
     }
 
     fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
