@@ -342,6 +342,59 @@ def inspect_gradual[T]() -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
 ```
 
+### Constraints introduced by recursive properties
+
+A recursive property can introduce constraints that the outer properties do not impose. Here, the
+outer `value` properties both return `str | int`, but the children return `bytes | int` and
+`T | int`. The child therefore contributes the lower bound `bytes <: T`. Its specialization stays
+unchanged on subsequent recursive steps.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+class Recursive[A, B](Protocol):
+    @property
+    def value(self) -> A | int: ...
+    @property
+    def child(self) -> Recursive[B, B]: ...
+
+def materialized_source[T]() -> None:
+    top = is_constraint_set_assignable_to(Top[Recursive[str | int, bytes]], Recursive[str, T])
+    static_assert(top == ConstraintSet.lower_bound(bytes, T))
+    reveal_type(top.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=bytes]]
+
+    bottom = is_constraint_set_assignable_to(Bottom[Recursive[str | int, bytes]], Recursive[str, T])
+    static_assert(bottom == ConstraintSet.lower_bound(bytes, T))
+```
+
+Materializing the target instead preserves the same bound. These specializations contain no gradual
+types, so neither materialization changes their requirements.
+
+```py
+def materialized_target[T]() -> None:
+    top = is_constraint_set_assignable_to(Recursive[str | int, bytes], Top[Recursive[str, T]])
+    static_assert(top == ConstraintSet.lower_bound(bytes, T))
+
+    bottom = is_constraint_set_assignable_to(Recursive[str | int, bytes], Bottom[Recursive[str, T]])
+    static_assert(bottom == ConstraintSet.lower_bound(bytes, T))
+```
+
+The bound also survives opposite materializations. Combining it with an incompatible upper bound has
+no solution; the recursive comparison does not merely succeed without constraining `T`.
+
+```py
+def incompatible_bound[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Top[Recursive[str | int, bytes]], Bottom[Recursive[str, T]])
+    static_assert(constraints == ConstraintSet.lower_bound(bytes, T))
+
+    incompatible = constraints & ConstraintSet.upper_bound(T, str)
+    reveal_type(incompatible.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
 ## Intersection
 
 The intersection of two constraint sets requires that the constraints in both sets hold. In many
