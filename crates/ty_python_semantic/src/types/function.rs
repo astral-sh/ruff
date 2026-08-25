@@ -1389,18 +1389,26 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_known_decorator(db, decorator)
     }
 
-    /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
-    /// classmethod.
+    /// Returns true if every definition of this method uses `@classmethod`, or is implicitly a
+    /// classmethod. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        self.iter_overloads_and_implementation(db)
-            .any(|overload| overload.is_classmethod(db))
+        let mut overloads = self.iter_overloads_and_implementation(db);
+        // Overload discovery can return no definitions during cycle recovery.
+        overloads
+            .next()
+            .is_some_and(|overload| overload.is_classmethod(db))
+            && overloads.all(|overload| overload.is_classmethod(db))
     }
 
-    /// Returns true if this method is decorated with `@staticmethod`, or if it is implicitly a
-    /// static method.
+    /// Returns true if every definition of this method uses `@staticmethod`, or is implicitly a
+    /// static method. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
-        self.iter_overloads_and_implementation(db)
-            .any(|overload| overload.is_staticmethod(db))
+        let mut overloads = self.iter_overloads_and_implementation(db);
+        // Overload discovery can return no definitions during cycle recovery.
+        overloads
+            .next()
+            .is_some_and(|overload| overload.is_staticmethod(db))
+            && overloads.all(|overload| overload.is_staticmethod(db))
     }
 
     /// Returns true if this function has an implicit `self` or `cls` receiver parameter.
