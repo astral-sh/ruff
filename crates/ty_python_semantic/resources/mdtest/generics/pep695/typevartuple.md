@@ -473,11 +473,13 @@ def crossing_sources[*Ts](
 ```
 
 A scalar type variable can match itself at an aligned position, but it does not constrain the
-unrelated elements of the symbolic pack.
+unrelated elements of the symbolic pack. An aligned `T` also cannot satisfy a fixed `int` target,
+since `T` is not necessarily a subtype of `int`.
 
 ```py
 def scalar_source[T, *Ts](source: tuple[T, *tuple[Any, ...]]) -> None:
     aligned: tuple[T, *Ts] = source
+    no_specialization: tuple[int, *Ts] = source  # error: [invalid-assignment]
     crossing: tuple[*Ts, int] = source  # error: [invalid-assignment]
 ```
 
