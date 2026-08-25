@@ -1,6 +1,7 @@
 """This module provides primitive operations to manage Python interpreters.
 The 'interpreters' module provides a more convenient interface.
 """
+
 import types
 from collections.abc import Callable
 from typing import Any, Final, Literal, SupportsIndex, TypeAlias, TypeVar, overload
@@ -13,8 +14,10 @@ _SharedDict: TypeAlias = dict[str, Any]  # many objects can be shared
 
 class InterpreterError(Exception):
     """A cross-interpreter operation failed"""
+
 class InterpreterNotFoundError(InterpreterError):
     """An interpreter was not found"""
+
 class NotShareableError(ValueError): ...
 
 @disjoint_base
@@ -25,60 +28,70 @@ class CrossInterpreterBufferView:
 def new_config(name: _Configs = "isolated", /, **overides: object) -> types.SimpleNamespace:
     """Return a representation of a new PyInterpreterConfig.
 
-The name determines the initial values of the config.  Supported named
-configs are: default, isolated, legacy, and empty.
+    The name determines the initial values of the config.  Supported named
+    configs are: default, isolated, legacy, and empty.
 
-Any keyword arguments are set on the corresponding config fields,
-overriding the initial values.
-"""
+    Any keyword arguments are set on the corresponding config fields,
+    overriding the initial values.
+    """
+
 def create(config: types.SimpleNamespace | _Configs | None = "isolated", *, reqrefs: bool = False) -> int:
     """Create a new interpreter and return a unique generated ID.
 
-The caller is responsible for destroying the interpreter before exiting,
-typically by using _interpreters.destroy().  This can be managed
-automatically by passing "reqrefs=True" and then using _incref() and
-_decref() appropriately.
+    The caller is responsible for destroying the interpreter before exiting,
+    typically by using _interpreters.destroy().  This can be managed
+    automatically by passing "reqrefs=True" and then using _incref() and
+    _decref() appropriately.
 
-"config" must be a valid interpreter config or the name of a
-predefined config ('isolated' or 'legacy').  The default
-is 'isolated'.
-"""
+    "config" must be a valid interpreter config or the name of a
+    predefined config ('isolated' or 'legacy').  The default
+    is 'isolated'.
+    """
+
 def destroy(id: SupportsIndex, *, restrict: bool = False) -> None:
     """Destroy the identified interpreter.
 
-Attempting to destroy the current interpreter raises InterpreterError.
-So does an unrecognized ID.
-"""
+    Attempting to destroy the current interpreter raises InterpreterError.
+    So does an unrecognized ID.
+    """
+
 def list_all(*, require_ready: bool = False) -> list[tuple[int, _Whence]]:
     """Return a list containing the ID of every existing interpreter."""
+
 def get_current() -> tuple[int, _Whence]:
     """Return (ID, whence) of the current interpreter."""
+
 def get_main() -> tuple[int, _Whence]:
     """Return (ID, whence) of the main interpreter."""
+
 def is_running(id: SupportsIndex, *, restrict: bool = False) -> bool:
     """Return whether or not the identified interpreter is running."""
+
 def get_config(id: SupportsIndex, *, restrict: bool = False) -> types.SimpleNamespace:
     """Return a representation of the config used to initialize the interpreter."""
+
 def whence(id: SupportsIndex) -> _Whence:
     """Return an identifier for where the interpreter was created."""
+
 def exec(
     id: SupportsIndex, code: str | types.CodeType | Callable[[], object], shared: _SharedDict = {}, *, restrict: bool = False
 ) -> None | types.SimpleNamespace:
     """Execute the provided code in the identified interpreter.
 
-This is equivalent to running the builtin exec() under the target
-interpreter, using the __dict__ of its __main__ module as both
-globals and locals.
+    This is equivalent to running the builtin exec() under the target
+    interpreter, using the __dict__ of its __main__ module as both
+    globals and locals.
 
-"code" may be a string containing the text of a Python script.
+    "code" may be a string containing the text of a Python script.
 
-Functions (and code objects) are also supported, with some restrictions.
-The code/function must not take any arguments or be a closure
-(i.e. have cell vars).  Methods and other callables are not supported.
+    Functions (and code objects) are also supported, with some restrictions.
+    The code/function must not take any arguments or be a closure
+    (i.e. have cell vars).  Methods and other callables are not supported.
 
-If a function is provided, its code object is used and all its state
-is ignored, including its __globals__ dict.
-"""
+    If a function is provided, its code object is used and all its state
+    is ignored, including its __globals__ dict.
+    """
+
 def call(
     id: SupportsIndex,
     callable: Callable[..., _R],
@@ -90,28 +103,32 @@ def call(
 ) -> tuple[_R, types.SimpleNamespace]:
     """Call the provided object in the identified interpreter.
 
-Pass the given args and kwargs, if possible.
-"""
+    Pass the given args and kwargs, if possible.
+    """
+
 def run_string(
     id: SupportsIndex, script: str | types.CodeType | Callable[[], object], shared: _SharedDict = {}, *, restrict: bool = False
 ) -> None:
     """Execute the provided string in the identified interpreter.
 
-(See _interpreters.exec().)
-"""
+    (See _interpreters.exec().)
+    """
+
 def run_func(
     id: SupportsIndex, func: types.CodeType | Callable[[], object], shared: _SharedDict = {}, *, restrict: bool = False
 ) -> None:
     """Execute the body of the provided function in the identified interpreter.
 
-Code objects are also supported.  In both cases, closures and args
-are not supported.  Methods and other callables are not supported
-either.
+    Code objects are also supported.  In both cases, closures and args
+    are not supported.  Methods and other callables are not supported
+    either.
 
-(See _interpreters.exec().)
-"""
+    (See _interpreters.exec().)
+    """
+
 def set___main___attrs(id: SupportsIndex, updates: _SharedDict, *, restrict: bool = False) -> None:
     """Bind the given attributes in the interpreter's __main__ module."""
+
 def incref(id: SupportsIndex, *, implieslink: bool = False, restrict: bool = False) -> None: ...
 def decref(id: SupportsIndex, *, restrict: bool = False) -> None: ...
 def is_shareable(obj: object) -> bool:
@@ -121,10 +138,10 @@ def is_shareable(obj: object) -> bool:
 def capture_exception(exc: BaseException) -> types.SimpleNamespace:
     """Return a snapshot of an exception.
 
-If "exc" is None then the current exception, if any, is used (but not
-cleared).  The returned snapshot is the same as what
-_interpreters.exec() returns.
-"""
+    If "exc" is None then the current exception, if any, is used (but not
+    cleared).  The returned snapshot is the same as what
+    _interpreters.exec() returns.
+    """
 @overload
 def capture_exception(exc: None = None) -> types.SimpleNamespace | None: ...
 

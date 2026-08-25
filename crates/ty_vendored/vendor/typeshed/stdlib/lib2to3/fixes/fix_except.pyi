@@ -19,6 +19,7 @@ The following cases will be converted:
         except E as t:
             T = t.args
 """
+
 from collections.abc import Generator, Iterable
 from typing import ClassVar, Literal, TypeVar
 

@@ -7,6 +7,7 @@ This work similar to UTF-8 with the following changes:
 * On decoding/reading if the first three bytes are a UTF-8 encoded BOM, these
   bytes will be skipped.
 """
+
 import codecs
 from _typeshed import ReadableBuffer
 
