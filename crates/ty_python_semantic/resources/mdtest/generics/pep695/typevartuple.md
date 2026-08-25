@@ -115,6 +115,59 @@ def _(value: Container) -> None:
     expected: Kind[int, Any] = value
 ```
 
+### Unpacked specializations containing `Never`
+
+Unpacking a sequence of type arguments preserves a required `Never` element, even though a tuple
+with the same elements would be uninhabited according to certain theories of product types.
+
+```py
+from typing import Never, Unpack
+
+class Container[*Ts]: ...
+
+def check(
+    first: Container[*tuple[int, Never]],
+    second: Container[*tuple[Never, int]],
+    one_element: Container[*tuple[Never]],
+    quoted: Container[Unpack["tuple[int, Never]"]],
+) -> None:
+    reveal_type(first)  # revealed: Container[int, Never]
+    reveal_type(second)  # revealed: Container[Never, int]
+    reveal_type(one_element)  # revealed: Container[Never]
+    reveal_type(quoted)  # revealed: Container[int, Never]
+```
+
+### Inconsistent inherited specializations
+
+An empty variadic argument sequence is a concrete specialization, so it conflicts with a nonempty
+specialization of the same base regardless of their order.
+
+```py
+class Base[*Ts]: ...
+class Empty(Base[()]): ...
+class Nonempty(Base[int]): ...
+
+# error: [invalid-generic-class]
+class EmptyFirst(Empty, Nonempty): ...
+
+# error: [invalid-generic-class]
+class EmptySecond(Nonempty, Empty): ...
+```
+
+A dynamically typed element does not erase the concrete length of a variadic specialization.
+
+```py
+from typing import Any
+
+class Dynamic(Base[Any]): ...
+
+# error: [invalid-generic-class]
+class DynamicFirst(Dynamic, Empty): ...
+
+# error: [invalid-generic-class]
+class DynamicSecond(Empty, Dynamic): ...
+```
+
 ### `TypeVarTuple` with `ParamSpec`
 
 ```py
@@ -173,6 +226,44 @@ indirect: Variadic[str] = inferred
 direct: Variadic[str] = Variadic(1)
 ```
 
+### Constructor inference with `Never` arguments
+
+A `Never` constructor argument does not erase the other arguments or its position in the inferred
+variadic specialization.
+
+```py
+from typing import Never
+
+class Factory[*Ts]:
+    def __init__(self, *args: *Ts) -> None: ...
+
+def check(value: Never) -> None:
+    reveal_type(Factory(1, value))  # revealed: Factory[Literal[1], Never]
+    reveal_type(Factory(value, 1))  # revealed: Factory[Never, Literal[1]]
+    reveal_type(Factory(1, value, "x"))  # revealed: Factory[Literal[1], Never, Literal["x"]]
+```
+
+### Inherited variadic constructors and `Self`
+
+A variadic subclass inherits its base class's constructor, and `Self` preserves the subclass's
+specialization.
+
+```py
+from typing import Self
+
+class Base[*Ts]:
+    def __init__(self, *args: *Ts) -> None: ...
+    def identity(self) -> Self:
+        return self
+
+class Child[*Ts](Base[*Ts]): ...
+
+Child(1, "hello")
+
+def check(value: Child[int, str]) -> None:
+    reveal_type(value.identity())  # revealed: Child[int, str]
+```
+
 ### Unspecified type arguments
 
 An unsubscripted variadic generic behaves as if it used an unknown-length tuple of `Any` arguments.
@@ -204,6 +295,26 @@ class WithDefault[*Ts = *tuple[int, str]]:
 
 reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
 reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
+```
+
+### Default type arguments containing `Never`
+
+A defaulted variadic parameter preserves its complete argument sequence when a required element is
+`Never`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Never
+
+class WithNeverDefault[*Ts = *tuple[int, Never]]: ...
+class WithOneNeverDefault[*Ts = *tuple[Never]]: ...
+
+reveal_type(WithNeverDefault())  # revealed: WithNeverDefault[int, Never]
+reveal_type(WithOneNeverDefault())  # revealed: WithOneNeverDefault[Never]
 ```
 
 ### Gradual specializations
@@ -250,6 +361,44 @@ class Interface(Generic[C]):
 ```
 
 ## Functions
+
+### Generic class arguments containing `Never`
+
+Inference from a generic class preserves each variadic type argument, including `Never` arguments
+and fixed type parameters beside the variadic pack.
+
+```py
+from typing import Never
+
+class Container[*Ts]:
+    values: tuple[*Ts]
+
+def identity[*Ts](value: Container[*Ts]) -> Container[*Ts]:
+    return value
+
+def first[T, *Ts](value: Container[T, *Ts]) -> T:
+    raise NotImplementedError
+
+def check(value: Container[int, Never]) -> None:
+    reveal_type(identity(value))  # revealed: Container[int, Never]
+    reveal_type(first(value))  # revealed: int
+```
+
+### Argument lengths containing `Never`
+
+A type variable tuple inferred from a generic argument determines the required number of variadic
+arguments even when one of its elements is `Never`.
+
+```py
+from typing import Never
+
+class Container[*Ts]: ...
+
+def use[*Ts](value: Container[*Ts], *args: *Ts) -> None: ...
+def check(value: Container[int, Never]) -> None:
+    use(value, 1)  # error: [invalid-argument-type]
+    use(value, 1, "wrong", "extra")  # error: [invalid-argument-type]
+```
 
 ### Multiple type variable tuples
 
@@ -670,6 +819,73 @@ reveal_type(simple(variadic2))  # revealed: tuple[Unknown, ...]
 reveal_type(simple(keyword_only))  # revealed: tuple[Unknown, ...]
 ```
 
+### Unpacked callable parameters containing `Never`
+
+An unpacked tuple containing `Never` retains every parameter in callable and variadic parameter
+annotations.
+
+```py
+from typing import Callable, Never
+
+def check(callback: Callable[[*tuple[int, Never]], None]) -> None:
+    reveal_type(callback)  # revealed: (*tuple[int, Never]) -> None
+
+def unpacked(*args: *tuple[int, Never]) -> None: ...
+
+reveal_type(unpacked)  # revealed: def unpacked(*args: tuple[int, Never]) -> None
+```
+
+### Callable inference with `Never` arguments
+
+Callable parameter lists are sequences of argument types. A `Never` parameter does not erase the
+other parameters when inferring a variadic specialization.
+
+```py
+from typing import Callable, Never
+
+class Container[*Ts]: ...
+
+def infer_callable[*Ts](callback: Callable[[*Ts], None]) -> Container[*Ts]:
+    raise NotImplementedError
+
+def callback(first: int, second: Never) -> None: ...
+
+reveal_type(infer_callable(callback))  # revealed: Container[int, Never]
+```
+
+A fixed suffix following the variadic pack is not part of the inferred pack.
+
+```py
+def infer_mixed_callable[*Ts](callback: Callable[[int, *Ts, str], None]) -> Container[*Ts]:
+    raise NotImplementedError
+
+def mixed_callback(first: int, middle: Never, last: str) -> None: ...
+
+reveal_type(infer_mixed_callable(mixed_callback))  # revealed: Container[Never]
+```
+
+### Protocol inference with `Never` arguments
+
+A structural protocol preserves each inferred positional argument, including `Never`, when its
+method is implemented by a concrete class.
+
+```py
+from typing import Never, Protocol
+
+class Container[*Ts]: ...
+
+class Runner[*Ts](Protocol):
+    def run(self, *args: *Ts) -> None: ...
+
+def infer_runner[*Ts](runner: Runner[*Ts]) -> Container[*Ts]:
+    raise NotImplementedError
+
+class Concrete:
+    def run(self, first: int, second: Never) -> None: ...
+
+reveal_type(infer_runner(Concrete()))  # revealed: Container[int, Never]
+```
+
 ### Callable inference through invariant and contravariant wrappers
 
 An unpacked `TypeVarTuple` keeps its precise inferred parameter types when a callable or callable
@@ -808,6 +1024,25 @@ reveal_type(infer_return_middle(fixed_middle))  # revealed: tuple[str]
 reveal_type(infer_return_middle(mixed_middle))  # revealed: tuple[str, ...]
 ```
 
+### Callable return inference with `Never` arguments
+
+A callable returning a variadic generic preserves the full specialized argument sequence, including
+required `Never` elements.
+
+```py
+from typing import Callable, Never
+
+class Container[*Ts]: ...
+
+def infer_return[*Ts](callback: Callable[[], Container[*Ts]]) -> Container[*Ts]:
+    raise NotImplementedError
+
+def callback() -> Container[int, Never]:
+    raise NotImplementedError
+
+reveal_type(infer_return(callback))  # revealed: Container[int, Never]
+```
+
 ### Callable inference with sub-call checking
 
 This usage pattern is similar to how `ParamSpec` can be used to accept a callable and its arguments
@@ -857,6 +1092,59 @@ def forward_mixed[*Ts](
     *args: *tuple[int, *Ts, str],
 ) -> None:
     accept_mixed_forwarded(callback, args)
+```
+
+### Callable inference with optional parameters
+
+When a callback's parameters have default values, it can be invoked without forwarding any
+arguments. The inferred type variable tuple does not treat those optional parameters as required.
+
+```py
+from functools import partial
+from typing import Callable
+
+def invoke[*Ts](callback: Callable[[*Ts], None], *args: *Ts) -> None: ...
+def optional(value: int = 1) -> None: ...
+def positional_only(value: int = 1, /) -> None: ...
+def multiple(first: int = 1, second: str = "") -> None: ...
+
+invoke(optional)
+invoke(positional_only)
+invoke(multiple)
+```
+
+The same signature rules apply to callable objects, bound methods, and partially applied functions.
+
+```py
+class Callback:
+    def __call__(self, value: int = 1) -> None: ...
+    def method(self, value: int = 1) -> None: ...
+
+def required(first: int, second: str = "") -> None: ...
+
+invoke(Callback())
+invoke(Callback().method)
+invoke(partial(required, 1))
+```
+
+### Protocol inference with optional parameters
+
+A structural protocol can be specialized with an empty type variable tuple when its implementation
+has only optional method parameters. Forwarding an empty argument sequence remains valid.
+
+```py
+from typing import Protocol
+
+class Runner[*Ts](Protocol):
+    def run(self, *args: *Ts) -> None: ...
+
+def invoke[*Ts](runner: Runner[*Ts], *args: *Ts) -> None: ...
+
+class OptionalRunner:
+    def run(self, value: int = 0) -> None: ...
+
+empty: Runner[()] = OptionalRunner()
+invoke(OptionalRunner())
 ```
 
 ### Callable inference through nested callable parameters
@@ -1349,6 +1637,24 @@ type Padded[T] = Container[T, Never]
 
 def _(value: Padded[int]) -> None:
     reveal_type(value)  # revealed: Container[int, Never]
+```
+
+### Union aliases containing variadic specializations
+
+A generic union retains a concrete alternative when specializing its variadic parameter to the empty
+tuple does not make that alternative redundant.
+
+```py
+class Container[*Ts]:
+    value: tuple[*Ts]
+
+type Unioned[*Ts] = Container[*Ts] | Container[int]
+
+def check(value: Unioned[()]) -> None:
+    reveal_type(value)  # revealed: Container[()] | Container[int]
+
+def accepts(value: Container[int]) -> Unioned[()]:
+    return value
 ```
 
 ### Unpacked tuple type arguments
