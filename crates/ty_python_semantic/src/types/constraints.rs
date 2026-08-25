@@ -111,7 +111,7 @@ use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Parameters, Type, TypeContext,
     TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
@@ -2384,6 +2384,23 @@ fn max_constructor_and_typevar_depth<'db>(
 }
 
 impl<'db> Constraint<'db> {
+    /// Materialize missing bounds within the subject's domain when comparing constraints.
+    /// The stored options remain unchanged because absent bounds are not inference evidence.
+    fn materialized_bounds(self, db: &'db dyn Db) -> (Type<'db>, Type<'db>) {
+        if self.typevar.is_paramspec(db) && self.typevar.paramspec_attr(db).is_none() {
+            (
+                self.stored_lower_bound()
+                    .map(ConstraintBound::ty)
+                    .unwrap_or_else(|| Type::paramspec_value_callable(db, Parameters::bottom())),
+                self.stored_upper_bound()
+                    .map(ConstraintBound::ty)
+                    .unwrap_or_else(|| Type::paramspec_value_callable(db, Parameters::top())),
+            )
+        } else {
+            (self.lower_bound().ty(), self.upper_bound().ty())
+        }
+    }
+
     fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
         let both_bounds = self.iter_stored_bounds().map(ConstraintBound::ty);
         both_bounds.fold((0, 0), |(constructor_depth, typevar_depth), bound| {
@@ -2730,10 +2747,8 @@ impl ConstraintId {
         {
             return false;
         }
-        let other_lower = other_constraint.lower_bound().ty();
-        let self_lower = self_constraint.lower_bound().ty();
-        let self_upper = self_constraint.upper_bound().ty();
-        let other_upper = other_constraint.upper_bound().ty();
+        let (self_lower, self_upper) = self_constraint.materialized_bounds(db);
+        let (other_lower, other_upper) = other_constraint.materialized_bounds(db);
         other_lower.is_constraint_set_assignable_to(db, env, self_lower)
             && self_upper.is_constraint_set_assignable_to(db, env, other_upper)
     }

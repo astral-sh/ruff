@@ -1244,6 +1244,21 @@ def _[T]() -> None:
     reveal_type(ConstraintSet.range(Sub, T, Super).with_detailed_display())
 ```
 
+Explicit ParamSpec extrema remain visible as supplied bound evidence.
+
+```py
+from typing import Callable, Never
+from ty_extensions import Bottom, Top
+
+def explicit_parameter_extrema[**P]() -> None:
+    lower = ConstraintSet.range(Bottom[Callable[..., Never]], P, Callable[[int], int])
+    # revealed: ConstraintSet[((*args: object, **kwargs: object) ≤ P@explicit_parameter_extrema ≤ (int, /))]
+    reveal_type(lower.with_detailed_display())
+    upper = ConstraintSet.range(Callable[[int], int], P, Top[Callable[..., object]])
+    # revealed: ConstraintSet[((int, /) ≤ P@explicit_parameter_extrema ≤ Top[(...)])]
+    reveal_type(upper.with_detailed_display())
+```
+
 ParamSpec bounds display the full parameter list without the callable return type.
 
 ```py
@@ -1645,6 +1660,30 @@ def empty[**P]() -> None:
     reveal_type(ConstraintSet.range(Callable[[], None], P, Callable[..., None]))  # revealed: ConstraintSet[bool]
     static_assert(ConstraintSet.range(Callable[[Any], None], P, Callable[[], None]) == ConstraintSet.never())
     static_assert(ConstraintSet.range(Callable[[], None], P, Callable[[Any], None]) == ConstraintSet.never())
+```
+
+### Missing bounds
+
+A missing lower bound is equivalent to the bottom signature, which accepts all arguments.
+
+```py
+from typing import Callable, Never
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import ConstraintSet
+
+def missing_lower_bound[**P]() -> None:
+    constraints = ConstraintSet.upper_bound(P, Callable[[int], int])
+    expected = ConstraintSet.range(Bottom[Callable[..., Never]], P, Callable[[int], int])
+    static_assert(constraints == expected)
+```
+
+A missing upper bound is equivalent to the top signature, which accepts no calls.
+
+```py
+def missing_upper_bound[**P]() -> None:
+    constraints = ConstraintSet.lower_bound(Callable[[int], int], P)
+    expected = ConstraintSet.range(Callable[[int], int], P, Top[Callable[..., object]])
+    static_assert(constraints == expected)
 ```
 
 Missing endpoints differ from explicit gradual evidence, without requiring solution extraction.
