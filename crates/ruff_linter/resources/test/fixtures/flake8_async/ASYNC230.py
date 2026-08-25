@@ -80,3 +80,10 @@ async def func():
 
 def func():
     Path("foo").open()  # OK
+
+
+import builtins
+
+
+async def func():
+    builtins.open("")  # ASYNC230

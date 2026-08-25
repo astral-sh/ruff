@@ -106,3 +106,10 @@ ASYNC230 Async functions should not open files with blocking methods like `open`
 58 |
 59 |     p1.open()  # ASYNC230
    |     ^^^^^^^
+
+ASYNC230 Async functions should not open files with blocking methods like `open`
+  --> ASYNC230.py:89:5
+   |
+88 | async def func():
+89 |     builtins.open("")  # ASYNC230
+   |     ^^^^^^^^^^^^^
