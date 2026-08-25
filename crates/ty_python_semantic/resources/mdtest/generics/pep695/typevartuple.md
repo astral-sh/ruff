@@ -514,6 +514,7 @@ materializing its `Any` appropriately.
 
 ```py
 from typing import Any
+from ty_extensions._internal import Unknown
 
 def crossing_targets[*Ts](
     prefix: tuple[int, *Ts],
@@ -524,6 +525,7 @@ def crossing_targets[*Ts](
     moved_prefix: tuple[object, *tuple[Any, ...]] = suffix
     moved_long_suffix: tuple[object, *tuple[Any, ...], str] = long_suffix
     moved_suffix: tuple[*tuple[Any, ...], Any] = prefix
+    unknown_prefix: tuple[Unknown, *tuple[Any, ...]] = suffix
     union_suffix: tuple[*tuple[Any, ...], Any | int] = prefix
 
     restricted_prefix: tuple[int, *tuple[Any, ...]] = suffix  # error: [invalid-assignment]
@@ -532,6 +534,96 @@ def crossing_targets[*Ts](
 
 def scalar_target[T, *Ts](source: tuple[*Ts, int]) -> None:
     target: tuple[T, *tuple[Any, ...]] = source  # error: [invalid-assignment]
+```
+
+### Protocol target elements crossing symbolic packs
+
+A protocol used as a fixed target element must accept every possible pack element. All objects
+support `__str__`, but a pack can contain an unhashable value such as a list. A protocol that
+requires `__hash__` therefore cannot accept an arbitrary pack element at a fixed endpoint.
+
+```py
+from typing import Any, Protocol
+
+class SupportsStr(Protocol):
+    def __str__(self) -> str: ...
+
+class SupportsHash(Protocol):
+    def __hash__(self) -> int: ...
+
+def protocol_targets[*Ts](prefix: tuple[int, *Ts], suffix: tuple[*Ts, int]) -> None:
+    universal_prefix: tuple[SupportsStr, *tuple[Any, ...]] = suffix
+    universal_suffix: tuple[*tuple[Any, ...], SupportsStr] = prefix
+
+    hash_prefix: tuple[SupportsHash, *tuple[Any, ...]] = suffix  # error: [invalid-assignment]
+    hash_suffix: tuple[*tuple[Any, ...], SupportsHash] = prefix  # error: [invalid-assignment]
+```
+
+The standard-library `Hashable` protocol follows the same rule, including through an alias:
+
+```py
+from collections.abc import Hashable
+
+type HashableAlias = Hashable
+
+def hashable_targets[*Ts](prefix: tuple[int, *Ts], suffix: tuple[*Ts, int]) -> None:
+    hash_prefix: tuple[Hashable, *tuple[Any, ...]] = suffix  # snapshot: invalid-assignment
+    hash_suffix: tuple[*tuple[Any, ...], HashableAlias] = prefix  # error: [invalid-assignment]
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `tuple[*Ts@hashable_targets, int]` is not assignable to `tuple[Hashable, *tuple[Any, ...]]`
+  --> src/mdtest_snippet.py:20:54
+   |
+20 |     hash_prefix: tuple[Hashable, *tuple[Any, ...]] = suffix  # snapshot: invalid-assignment
+   |                  ---------------------------------   ^^^^^^ Incompatible value of type `tuple[*Ts@hashable_targets, int]`
+   |                  |
+   |                  Declared type
+```
+
+Fixed `object` endpoints retain their ordinary assignability to `Hashable`, which permits uses such
+as `object()` sentinels. This does not imply that arbitrary pack elements are hashable:
+
+```py
+def fixed_objects[*Ts](source: tuple[object, *Ts, object]) -> None:
+    prefix: tuple[Hashable, *tuple[Any, ...]] = source
+    suffix: tuple[*tuple[Any, ...], Hashable] = source
+```
+
+When a fixed source endpoint is unhashable, the diagnostic identifies that endpoint's type:
+
+```py
+def fixed_unhashable[*Ts](source: tuple[list[int], *Ts]) -> None:
+    target: tuple[Hashable, *tuple[Any, ...]] = source  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `tuple[list[int], *Ts@fixed_unhashable]` is not assignable to `tuple[Hashable, *tuple[Any, ...]]`
+  --> src/mdtest_snippet.py:26:49
+   |
+26 |     target: tuple[Hashable, *tuple[Any, ...]] = source  # snapshot: invalid-assignment
+   |             ---------------------------------   ^^^^^^ Incompatible value of type `tuple[list[int], *Ts@fixed_unhashable]`
+   |             |
+   |             Declared type
+info: type `list[int]` is not assignable to protocol `Hashable`
+info: └── protocol member `__hash__` is incompatible
+```
+
+### Inferring scalar target elements beside symbolic packs
+
+When assigning a generic function to a callable type, its scalar type parameter can be inferred from
+a tuple containing a symbolic pack. The inferred element type must accept every possible pack
+element. A type variable without an explicit bound can match, but one bounded by `Hashable` cannot.
+
+```py
+from collections.abc import Hashable
+from typing import Any, Callable
+
+def accept[T](value: tuple[T, *tuple[Any, ...]]) -> None: ...
+def accept_hashable[T: Hashable](value: tuple[T, *tuple[Any, ...]]) -> None: ...
+def callbacks[*Ts]() -> None:
+    unbounded: Callable[[tuple[*Ts, int]], None] = accept
+    hashable: Callable[[tuple[*Ts, int]], None] = accept_hashable  # error: [invalid-assignment]
 ```
 
 ### Aliases of gradual tuple elements

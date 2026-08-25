@@ -619,7 +619,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         {
                             // Conversely, the target's required elements must fit even with an
                             // empty source pack. A target endpoint extending into the pack must
-                            // accept any possible element, which we check using `object`.
+                            // accept any possible element. An empty protocol expresses this without
+                            // inheriting `object`'s permissive assignability to hash protocols.
                             if source.len().minimum() < target.len().minimum() {
                                 return self.never();
                             }
@@ -627,7 +628,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 db,
                                 source,
                                 target,
-                                Type::object(),
+                                Type::protocol_with_methods(db, env, []),
                                 target_element,
                             );
                         }
@@ -765,6 +766,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .zip_longest(target.iter_suffix_elements().rev()),
             )
             .when_all(db, self.constraints, |pair| {
+                if let EitherOrBoth::Right(target) = pair
+                    && matches!(source.variable(), VariableSegment::TypeVarTuple(_))
+                {
+                    // The synthesized protocol stands for an arbitrary pack element. Diagnostics
+                    // should describe the original tuple types, not this internal placeholder.
+                    return self.without_context_collection(|| {
+                        self.check_type_pair(db, source_variable, target)
+                    });
+                }
                 let (source, target) = pair.or(source_variable, target_variable);
                 self.check_type_pair(db, source, target)
             })
