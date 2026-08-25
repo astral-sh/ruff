@@ -23,7 +23,7 @@ env:
   CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CARGO_TERM_COLOR: always
   # renovate: datasource=github-releases depName=astral-sh/hawk
-  HAWK_VERSION: 0.1.12
+  HAWK_VERSION: 0.1.13
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
@@ -344,13 +344,13 @@ jobs:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
-        run: rustup toolchain install 1.97.1
+        run: rustup toolchain install 1.98.0
       - name: "Install Hawk"
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf \
             "https://github.com/astral-sh/hawk/releases/download/${HAWK_VERSION}/cargo-hawk-installer.sh" | sh
       - name: "Hawk"
-        run: cargo +1.97.1 hawk check --target-dir target/hawk -D warnings
+        run: cargo +1.98.0 hawk check --target-dir target/hawk -D warnings
 
   cargo-publish-dry-run:
     name: "cargo publish dry-run"

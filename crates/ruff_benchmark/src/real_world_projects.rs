@@ -121,7 +121,7 @@ pub struct InstalledProject<'a> {
     pub config: RealWorldProject<'a>,
 }
 
-impl<'a> InstalledProject<'a> {
+impl InstalledProject<'_> {
     /// Get the benchmark paths
     pub fn check_paths(&self) -> &[&str] {
         self.config.paths
