@@ -945,6 +945,26 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                             self.attribute,
                             self.object_ty.display(db, env)
                         ));
+                    } else if self
+                        .object_ty
+                        .nominal_class(db, env)
+                        .and_then(|class| class.static_class_literal(db))
+                        .is_some_and(|(class, _)| class.lacks_instance_storage(db, self.attribute))
+                        && !self
+                            .object_ty
+                            .class_member(db, env, self.attribute)
+                            .place
+                            .is_undefined()
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Cannot assign to attribute `{}`: `{}` has no slot or instance dictionary",
+                            self.attribute,
+                            self.object_ty.display(db, env),
+                        ));
+                        diagnostic.info(format_args!(
+                            "Attribute `{}` is declared but is not included in `__slots__`",
+                            self.attribute,
+                        ));
                     } else {
                         builder.into_diagnostic(format_args!(
                             "Unresolved attribute `{}` on type `{}`",
