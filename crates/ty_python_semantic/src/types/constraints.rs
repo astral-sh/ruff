@@ -1054,8 +1054,8 @@ struct ConstraintSetStorage<'db> {
     /// source-order sidecar, so distinct orderings of the same BDD must not share a cache entry.
     exists_cache: FxHashMap<ExistsCacheKey<'db>, (NodeId, Option<SourceOrderId>)>,
 
-    single_sequent_cache: FxHashMap<ConstraintId, SequentMap>,
-    pair_sequent_cache: FxHashMap<(ConstraintId, ConstraintId), SequentMap>,
+    single_sequent_cache: FxHashMap<ConstraintId, SequentMap<ConstraintId>>,
+    pair_sequent_cache: FxHashMap<(ConstraintId, ConstraintId), SequentMap<ConstraintId>>,
     constraint_set_subtype_cache: FxHashMap<(Type<'db>, Type<'db>), bool>,
 }
 
