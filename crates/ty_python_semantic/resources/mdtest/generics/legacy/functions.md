@@ -326,7 +326,7 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.11"
 ```
 
 Every member of a union argument contributes to the inferred element type of a homogeneous tuple
