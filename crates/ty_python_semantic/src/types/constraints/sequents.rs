@@ -25,7 +25,7 @@ use crate::{Db, ProgramEnvironment};
 /// seen them directly.
 ///
 /// Sequent maps are primarily used when walking a BDD path with a
-/// [`PathAssignments`][super::PathAssignments]. The
+/// [`PathAssignments`][super::paths::PathAssignments]. The
 /// `PathAssignments` will hold a sequent map containing all of the constraints that are
 /// encountered during the walk. It builds up its sequent map lazily, so that it only has to
 /// include sequents for the constraints that are actually encountered. However, we also don't want
