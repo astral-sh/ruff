@@ -62,7 +62,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
     let Expr::Call(ast::ExprCall {
         func,
         arguments,
-        range: _,
+        range_start: _,
         node_index: _,
     }) = expr
     else {

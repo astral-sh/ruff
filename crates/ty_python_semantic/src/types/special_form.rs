@@ -1,7 +1,7 @@
 //! An enumeration of special forms in the Python type system.
 //! Each of these is considered to inhabit a unique type in our model of the type system.
 
-use super::{ClassType, Type, TypeFormType, class::KnownClass};
+use super::{ClassType, Type, TypeFormType, TypingModule, class::KnownClass};
 use crate::ProgramEnvironment;
 use crate::db::Db;
 use crate::types::IntersectionType;
@@ -11,11 +11,11 @@ use crate::types::{
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
-use ruff_db::PythonFile;
+use ruff_python_ast::PythonVersion;
 use strum_macros::EnumString;
-use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
+use ty_module_resolver::{ImportingFile, KnownModule, file_to_module, resolve_module_confident};
 use ty_python_core::{
-    FileScopeId,
+    FileScopeId, ProgramFile,
     definition::{Definition, DefinitionKind},
     place::ScopedPlaceId,
     place_table,
@@ -111,7 +111,7 @@ pub enum SpecialFormType {
     /// The symbol `typing.TypeGuard` (which can also be found as `typing_extensions.TypeGuard`)
     TypeGuard,
     /// The symbol `typing.TypedDict` or `typing_extensions.TypedDict`.
-    TypedDict(TypedDictModule),
+    TypedDict(TypingModule),
     /// The symbol `typing.TypeIs` (which can also be found as `typing_extensions.TypeIs`)
     TypeIs,
 
@@ -133,52 +133,12 @@ pub enum SpecialFormType {
     NamedTuple,
 }
 
-/// The module or modules from which `TypedDict` may have been imported.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub enum TypedDictModule {
-    /// `typing.TypedDict`.
-    Typing,
-    /// `typing_extensions.TypedDict`.
-    TypingExtensions,
-}
-
-impl TypedDictModule {
-    /// Return the module for a `TypedDict` special form, including a union of the special forms
-    /// exported by `typing` and `typing_extensions`.
-    pub(super) fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        match ty {
-            Type::SpecialForm(SpecialFormType::TypedDict(module)) => Some(module),
-            Type::Union(union) => {
-                let mut elements = union.elements(db).iter();
-                let Type::SpecialForm(SpecialFormType::TypedDict(module)) = elements.next()? else {
-                    return None;
-                };
-                elements.try_fold(*module, |module, element| {
-                    let Type::SpecialForm(SpecialFormType::TypedDict(element_module)) = element
-                    else {
-                        return None;
-                    };
-                    // `typing_extensions.TypedDict` always offers strictly more functionality than `typing.TypedDict`.
-                    // If any element is from `typing`, we therefore infer that the type is a `typing.TypedDict`,
-                    // since an operation on a union is only valid if the operation is valid on all elements in the
-                    // union.
-                    Some(match (module, element_module) {
-                        (TypedDictModule::TypingExtensions, TypedDictModule::TypingExtensions) => {
-                            TypedDictModule::TypingExtensions
-                        }
-                        _ => TypedDictModule::Typing,
-                    })
-                })
-            }
-            _ => None,
-        }
-    }
-}
-
 impl SpecialFormType {
     /// Return the [`KnownClass`] which this symbol is an instance of
-    pub(crate) const fn class(self) -> KnownClass {
+    pub(crate) fn class(self, db: &dyn Db, env: &ProgramEnvironment<'_>) -> KnownClass {
         match self {
+            Self::Union if env.python_version(db) >= PythonVersion::PY314 => KnownClass::Type,
+
             Self::Annotated
             | Self::Literal
             | Self::LiteralString
@@ -191,7 +151,6 @@ impl SpecialFormType {
             | Self::TypeForm
             | Self::TypingSelf
             | Self::TypingCallable
-            | Self::CollectionsAbcCallable
             | Self::Concatenate
             | Self::Unpack
             | Self::TypeAlias
@@ -218,7 +177,7 @@ impl SpecialFormType {
             // as being valid.
             Self::Protocol => KnownClass::ProtocolMeta,
 
-            Self::Generic | Self::Any => KnownClass::Type,
+            Self::Generic | Self::Any | Self::CollectionsAbcCallable => KnownClass::Type,
 
             Self::LegacyStdlibAlias(_) => KnownClass::StdlibAlias,
 
@@ -229,14 +188,14 @@ impl SpecialFormType {
     /// Return the instance type which this type is a subtype of.
     ///
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
-    /// so `SpecialFormType::Literal.instance_fallback(db, python_version)`
+    /// so `SpecialFormType::Literal.instance_fallback(db, env)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
     pub(super) fn instance_fallback<'db>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.class().to_instance(db, env)
+        self.class(db, env).to_instance(db, env)
     }
 
     /// Return `true` if this special form is guaranteed to be a singleton at runtime.
@@ -289,21 +248,23 @@ impl SpecialFormType {
         env: &ProgramEnvironment<'_>,
         class: ClassType,
     ) -> bool {
-        self.class().is_subclass_of(db, env, class)
+        self.class(db, env).is_subclass_of(db, env, class)
     }
 
     pub(super) fn try_from_file_and_name(
         db: &dyn Db,
-        file: PythonFile<'_>,
+        file: ImportingFile<'_>,
         symbol_name: &str,
     ) -> Option<Self> {
-        Self::candidates_from_name(symbol_name)
+        let candidates = Self::candidates_from_name(symbol_name);
+        if candidates.is_empty() {
+            return None;
+        }
+
+        let known_module = file_to_module(db, file.resolver_file(db))?.known(db)?;
+        candidates
             .iter()
-            .find(|candidate| {
-                file_to_module(db, file)
-                    .and_then(|module| module.known(db))
-                    .is_some_and(|known_module| candidate.check_module(known_module))
-            })
+            .find(|candidate| candidate.check_module(known_module))
             .copied()
     }
 
@@ -488,8 +449,8 @@ impl SpecialFormType {
                     SpecialFormTypeBuilder::Unpack => &[Self::Unpack],
                     SpecialFormTypeBuilder::Tuple => &[Self::Tuple],
                     SpecialFormTypeBuilder::TypedDict => &[
-                        Self::TypedDict(TypedDictModule::Typing),
-                        Self::TypedDict(TypedDictModule::TypingExtensions),
+                        Self::TypedDict(TypingModule::Typing),
+                        Self::TypedDict(TypingModule::TypingExtensions),
                     ],
                     SpecialFormTypeBuilder::TypeOf => &[Self::TypeOf],
                     SpecialFormTypeBuilder::List => {
@@ -542,8 +503,8 @@ impl SpecialFormType {
 
     /// Return `true` if `module` is a module from which this `SpecialFormType` variant can validly originate.
     ///
-    /// Most variants can only exist in one module, which is the same as `self.class().canonical_module(db)`.
-    /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
+    /// Some variants are defined in only one module; others can be defined in either
+    /// `typing` or `typing_extensions`.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::TypeQualifier(qualifier) => qualifier.check_module(module),
@@ -554,7 +515,7 @@ impl SpecialFormType {
             | Self::Tuple
             | Self::Type
             | Self::Generic
-            | Self::TypedDict(TypedDictModule::Typing)
+            | Self::TypedDict(TypingModule::Typing)
             | Self::TypingCallable => module.is_typing(),
 
             Self::Annotated
@@ -593,7 +554,7 @@ impl SpecialFormType {
                 KnownModule::CollectionsAbc | KnownModule::CollectionsAbcInternal
             ),
 
-            Self::TypedDict(TypedDictModule::TypingExtensions) => module.is_typing_extensions(),
+            Self::TypedDict(TypingModule::TypingExtensions) => module.is_typing_extensions(),
         }
     }
 
@@ -602,7 +563,7 @@ impl SpecialFormType {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.class().to_class_literal(db, env)
+        self.class(db, env).to_class_literal(db, env)
     }
 
     /// Return true if this special form is callable at runtime.
@@ -611,16 +572,16 @@ impl SpecialFormType {
     pub(super) const fn is_callable(self) -> bool {
         match self {
             // TypedDict can be called as a constructor to create TypedDict types
-            Self::TypedDict(_)
+            Self::TypedDict(_) => true,
 
             // Collection constructors are callable
             // TODO actually implement support for calling them
-            | Self::LegacyStdlibAlias(
+            Self::LegacyStdlibAlias(
                 LegacyStdlibAlias::ChainMap
                 | LegacyStdlibAlias::Counter
                 | LegacyStdlibAlias::DefaultDict
                 | LegacyStdlibAlias::Deque
-                | LegacyStdlibAlias::OrderedDict
+                | LegacyStdlibAlias::OrderedDict,
             )
             | Self::NamedTuple => true,
             Self::TypeForm => true,
@@ -631,7 +592,7 @@ impl SpecialFormType {
                 LegacyStdlibAlias::List
                 | LegacyStdlibAlias::Dict
                 | LegacyStdlibAlias::Set
-                | LegacyStdlibAlias::FrozenSet
+                | LegacyStdlibAlias::FrozenSet,
             )
             | Self::Tuple
             | Self::Type => false,
@@ -712,9 +673,11 @@ impl SpecialFormType {
             | Self::Divergent
             | Self::Todo
             | Self::TypeOf
-            | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
-            | Self::Unpack => false,
-            Self::TypeForm => false,
+            | Self::Unpack
+            | Self::TypeForm => false,
+
+            // can be used in `issubclass()` but not `isinstance()`.
+            Self::Any => false,
         }
     }
 
@@ -796,8 +759,8 @@ impl SpecialFormType {
                 &[KnownModule::Typing, KnownModule::TypingExtensions]
             }
 
-            SpecialFormType::TypedDict(TypedDictModule::Typing) => &[KnownModule::Typing],
-            SpecialFormType::TypedDict(TypedDictModule::TypingExtensions) => {
+            SpecialFormType::TypedDict(TypingModule::Typing) => &[KnownModule::Typing],
+            SpecialFormType::TypedDict(TypingModule::TypingExtensions) => {
                 &[KnownModule::TypingExtensions]
             }
 
@@ -829,8 +792,9 @@ impl SpecialFormType {
         self.definition_modules()
             .iter()
             .find_map(|module| {
-                let file = resolve_module_confident(db, env.python_version(db), &module.name())?
-                    .python_file(db)?;
+                let module =
+                    resolve_module_confident(db, env.resolver_environment(db), &module.name())?;
+                let file = ProgramFile::new(db, module.file(db)?, env.program(db));
                 let scope = FileScopeId::global().to_scope_id(db, file);
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 
@@ -886,8 +850,8 @@ impl SpecialFormType {
                     return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
                 }
 
-                let python_file = scope_id.python_file(db);
-                let index = semantic_index(db, python_file);
+                let program_file = scope_id.program_file(db);
+                let index = semantic_index(db, program_file);
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                     return Err(InvalidTypeExpression::InvalidType(
                         Type::SpecialForm(self),
@@ -925,6 +889,17 @@ impl SpecialFormType {
                     });
                 if is_in_metaclass {
                     return Err(InvalidTypeExpression::TypingSelfInMetaclass);
+                }
+
+                if inference_flags.contains(InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER)
+                    && inference_flags.intersects(
+                        InferenceFlags::IN_RETURN_TYPE | InferenceFlags::IN_PARAMETER_ANNOTATION,
+                    )
+                    && let Some(typing_self) = typing_self
+                {
+                    return Err(InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(
+                        typing_self,
+                    ));
                 }
 
                 Ok(typing_self

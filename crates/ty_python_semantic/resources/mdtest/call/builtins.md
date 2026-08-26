@@ -460,6 +460,14 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           --------------^^
   |           |
   |           Did you mean `NotImplementedError`?
+help: Use `NotImplementedError` instead
+  |
+2 |     # snapshot: call-non-callable
+  -     raise NotImplemented()
+3 +     raise NotImplementedError()
+4 | def _():
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```py
@@ -474,6 +482,33 @@ error[call-non-callable]: `NotImplemented` is not callable
   |
 6 |     raise NotImplemented("this module is not implemented yet!!!")
   |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |           |
+  |           Did you mean `NotImplementedError`?
+help: Use `NotImplementedError` instead
+  |
+5 |     # snapshot: call-non-callable
+  -     raise NotImplemented("this module is not implemented yet!!!")
+6 +     raise NotImplementedError("this module is not implemented yet!!!")
+7 | def _(NotImplementedError: object):
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+When a local binding shadows `NotImplementedError`, replacing `NotImplemented` with that name would
+not necessarily produce an exception, so we omit the fix.
+
+```py
+def _(NotImplementedError: object):
+    # snapshot: call-non-callable
+    raise NotImplemented()
+```
+
+```snapshot
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:9:11
+  |
+9 |     raise NotImplemented()
+  |           --------------^^
   |           |
   |           Did you mean `NotImplementedError`?
 ```
@@ -494,4 +529,72 @@ def _(xs: Unknown | list[str]):
     reveal_type(escaped)  # revealed: map[str]
     tokens: list[Unknown | str] = []
     tokens.extend(escaped)
+```
+
+## Failed `map` calls retain their result type
+
+When the argument count identifies a single `map` overload, an incompatible callback still produces
+its usual error. The mapped values retain the callback's return type and do not produce an
+additional error when called.
+
+```py
+class Function:
+    def __init__(self, value: str) -> None: ...
+    def __call__(self) -> None: ...
+
+# error: [invalid-argument-type]
+for function in map(Function, [object()]):
+    function()
+```
+
+## Failed `dict` calls do not expose internal type variables
+
+Several `dict` overloads accept one positional argument. When none matches, an arbitrarily selected
+overload must not make an otherwise compatible return type fail.
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from collections.abc import Mapping
+
+def copy(value: object) -> dict[str, str]:
+    if isinstance(value, Mapping):
+        return dict(value)  # error: [no-matching-overload]
+    return {}
+```
+
+## Failed `dict` calls preserve narrowed mapping types
+
+An invalid `dict` call must not invalidate an assignment inside a branch where the original value
+has already been narrowed to a mapping.
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from collections.abc import Mapping
+
+def clean(value: dict[str, int] | str | None) -> None:
+    if isinstance(value, Mapping):
+        value = dict(value)  # error: [no-matching-overload]
+        for key, item in value.items():
+            value[key] = item
+```
+
+## Failed inner `OrderedDict` calls do not invalidate outer constructors
+
+Constructing an `OrderedDict` from a list containing both strings and floats is already rejected.
+That failure must not cause a second error when the resulting value is passed to another
+`OrderedDict` constructor.
+
+```py
+from collections import OrderedDict
+
+items = [OrderedDict([["key", 1.0]])]  # error: [no-matching-overload]
+OrderedDict(zip(["name"], items))
 ```

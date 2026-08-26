@@ -450,7 +450,7 @@ def my_handler(env: str, x: int, y: float) -> bool:
     return True
 
 m = Middleware(my_handler)
-reveal_type(m)  # revealed: Middleware[(x: int, y: int | float), bool]
+reveal_type(m)  # revealed: Middleware[(x: int, y: float), bool]
 ```
 
 ### Specializing `ParamSpec` with `Concatenate`
@@ -568,6 +568,24 @@ reveal_type(only_variadic)  # revealed: (...) -> None
 def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
 
 reveal_type(unpack_variadic)  # revealed: (*args: str, **kwargs: int) -> None
+```
+
+### Function with a named prefix and required unpacked suffix
+
+`Concatenate` can remove a named positional prefix without discarding the required suffix of an
+unpacked variadic parameter.
+
+```py
+from typing import Callable, Concatenate
+
+def remove_first[**P](callback: Callable[Concatenate[int, P], None]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+# TODO: Preserve the unpacked tuple instead of exposing synthetic comparison parameters.
+# Should reveal `(*args: *tuple[*tuple[int, ...], int]) -> None`.
+reveal_type(remove_first(named_prefix_and_suffix))  # revealed: (*args: int, int, /) -> None
 ```
 
 ## `Concatenate` with `ParamSpec` in generic function calls

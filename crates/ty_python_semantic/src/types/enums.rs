@@ -311,9 +311,8 @@ pub struct EnumClassLiteral<'db> {
     pub(super) aliases_are_known: bool,
     /// Whether the canonical members exhaust the runtime values of this enum class.
     ///
-    /// `Flag` classes, transforming metaclasses, and enums with a custom `_missing_` method can
-    /// create runtime members beyond those declared in the class body, so their declared members
-    /// are not a closed value set.
+    /// `Flag` classes and transforming metaclasses can create runtime members beyond those
+    /// declared in the class body, so their declared members are not a closed value set.
     #[returns(copy)]
     pub(crate) members_are_exhaustive: bool,
 }
@@ -332,7 +331,7 @@ fn enum_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumClassLiteral<'db>> {
-    let env = ProgramEnvironment::from_file(class.python_file(db));
+    let env = ProgramEnvironment::from_file(class.program_file(db));
     let metadata = enum_metadata(db, class)?;
     let members = metadata
         .members
@@ -354,8 +353,7 @@ fn enum_class_literal<'db>(
             db,
             &env,
             KnownClass::Flag.to_subclass_of(db, &env),
-        )
-        && !enum_has_custom_missing(db, class);
+        );
 
     Some(EnumClassLiteral::new(
         db,
@@ -365,20 +363,6 @@ fn enum_class_literal<'db>(
         metadata.aliases_are_known,
         members_are_exhaustive,
     ))
-}
-
-/// Return whether enum construction may create pseudo-members through a custom `_missing_` method.
-fn enum_has_custom_missing<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    let ClassLiteral::Static(class) = class else {
-        return false;
-    };
-
-    class
-        .iter_mro(db, None)
-        .filter_map(ClassBase::into_class)
-        .take_while(|base| base.known(db) != Some(KnownClass::Enum))
-        .filter_map(|base| base.class_literal(db).as_static())
-        .any(|base| custom_enum_method(db, base.body_scope(db), "_missing_").is_some())
 }
 
 impl<'db> EnumClassLiteral<'db> {
@@ -1056,7 +1040,7 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    let env = ProgramEnvironment::from_file(class.python_file(db));
+    let env = ProgramEnvironment::from_file(class.program_file(db));
 
     if !is_enum_class_by_inheritance(db, &env, class) {
         return None;

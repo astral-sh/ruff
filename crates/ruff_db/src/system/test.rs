@@ -1,14 +1,13 @@
 use ruff_notebook::{Notebook, NotebookError};
 use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
-use std::process::Output;
 use std::sync::{Arc, Mutex};
 
 use crate::Db;
 use crate::files::File;
 use crate::system::{
-    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath, WhichError, WhichResult,
+    CommandExecutor, DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
@@ -141,13 +140,8 @@ impl System for TestSystem {
         Err(WhichError::CannotFindBinaryPath)
     }
 
-    fn run_command(
-        &self,
-        program: &str,
-        args: &[&str],
-        current_directory: &SystemPath,
-    ) -> Result<Output> {
-        self.system().run_command(program, args, current_directory)
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        self.system().command_executor()
     }
 
     fn read_directory<'a>(

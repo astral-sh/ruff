@@ -493,8 +493,11 @@ where
                 anyhow::anyhow!("JSON parsing failure:\n{json_err}")
             }
             server::ExtractError::MethodMismatch(_) => {
-                unreachable!("A method mismatch should not be possible here unless you've used a different handler (`Req`) \
-                    than the one whose method name was matched against earlier.")
+                unreachable!(
+                    "A method mismatch should not be possible here \
+                    unless you've used a different handler (`Req`) \
+                    than the one whose method name was matched against earlier."
+                )
             }
         })
         .with_failure_code(server::ErrorCode::InvalidParams)
@@ -542,8 +545,11 @@ where
                     anyhow::anyhow!("JSON parsing failure:\n{json_err}")
                 }
                 server::ExtractError::MethodMismatch(_) => {
-                    unreachable!("A method mismatch should not be possible here unless you've used a different handler (`N`) \
-                        than the one whose method name was matched against earlier.")
+                    unreachable!(
+                        "A method mismatch should not be possible here \
+                        unless you've used a different handler (`N`) \
+                        than the one whose method name was matched against earlier."
+                    )
                 }
             })
             .with_failure_code(server::ErrorCode::InvalidParams)?,

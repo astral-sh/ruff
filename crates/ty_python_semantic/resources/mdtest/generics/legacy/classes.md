@@ -168,10 +168,32 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Class-preserving decorators
+
+A decorator that returns its class argument preserves the generic context of a base class. A
+subclass can forward a type variable to the decorated base.
+
+```py
+import collections.abc
+from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
+
+T = TypeVar("T")
+
+@collections.abc.Mapping.register
+class Base(Generic[T]): ...
+
+reveal_type(generic_context(Base))  # revealed: ty_extensions._internal.GenericContext[T@Base]
+
+class Child(Base[T]): ...
+
+child: Child[int]
+```
+
 ## Specializing classes with unavailable generic context
 
 When an earlier error prevents ty from determining a class's generic context, specializing the class
-can emit a cascading `not-subscriptable` diagnostic.
+can emit a cascading `invalid-type-form` diagnostic.
 
 ### Conditional typing compatibility imports
 
@@ -192,34 +214,31 @@ T = typing.TypeVar("T")
 class Parser(typing.Generic[T]): ...
 
 # TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
-parser: Parser[int]  # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Parser'>`"
+parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` cannot be specialized in a type expression"
 ```
 
 ### Decorated generic bases
 
-A decorator that ty cannot fully understand can obscure the generic context of a base class. A
-subclass that forwards type variables to that base remains possibly generic.
+An unresolved decorator obscures the generic context of a base class. Specializing a subclass that
+forwards a type variable to that base currently produces a cascading error.
 
 ```py
-import collections.abc
 from typing import Generic, TypeVar
 from ty_extensions._internal import generic_context
 
-K = TypeVar("K")
-V = TypeVar("V")
+T = TypeVar("T")
 
-# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
-@collections.abc.Mapping.register
-class Mapping(Generic[K, V]): ...
+# error: [unresolved-reference] "Name `unknown_decorator` used when not defined"
+@unknown_decorator
+class Base(Generic[T]): ...
 
-# TODO: Invalid decorator causes us to lose the generic context from the class...
-reveal_type(generic_context(Mapping))  # revealed: None
+reveal_type(generic_context(Base))  # revealed: None
 
-class FrozenDict(Mapping[K, V]): ...
+class Child(Base[T]): ...
 
-# TODO: ...which then causes us to emit this
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'FrozenDict'>`"
-mapping: FrozenDict[str, int]
+# TODO: Avoid this cascading error when the base's generic context is unavailable.
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
+child: Child[int]
 ```
 
 ### Unresolved generic bases
@@ -235,7 +254,7 @@ T = TypeVar("T")
 
 class Child(Base[T]): ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
 child: Child[int]
 ```
 
@@ -274,7 +293,7 @@ T = TypeVar("T")
 # error: [unsupported-base]
 class Child(Base[T]): ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
 child: Child[int]
 ```
 
@@ -615,6 +634,53 @@ reveal_type(C(1))  # revealed: C[int]
 wrong_innards: C[int] = C("five")
 ```
 
+### Constructing the class from its own type variable
+
+A constructor call inside a generic class can use a value whose type is one of the class's type
+variables. The constructed instance keeps that type variable instead of falling back to `Unknown`,
+so an incompatible type context is rejected.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def __init__(self, value: T) -> None:
+        reveal_type(C(value))  # revealed: C[T@C]
+
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        invalid: C[int] = C(value)
+```
+
+### Constructing through a classmethod receiver
+
+A constructor call through a classmethod receiver keeps an enclosing `TypeVarTuple` when checking
+the constructor arguments. In particular, freshening the constructor must not replace the
+`TypeVarTuple` in the receiver with `Unknown`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Thunk(Generic[*Ts]):
+    def __init__(self, state: Unresolved[*Ts] | None) -> None: ...
+    @classmethod
+    def make(cls, *values: *Ts) -> Thunk[*Ts]:
+        return cls(Unresolved(values))
+
+class Unresolved(Generic[*Ts]):
+    def __init__(self, values: tuple[*Ts]) -> None: ...
+```
+
 ### Many invariant parameters with dynamic bounds
 
 Treating unrelated classes with `Any` in their MRO as transitive pivots caused inference time to
@@ -829,7 +895,7 @@ def test_seq(x: Sequence[T]) -> Sequence[T]:
     return x
 
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
-    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t1))  # revealed: Sequence[complex | list[int]]
     reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
     reveal_type(test_seq(t3))  # revealed: Sequence[Never]
 ```
@@ -977,7 +1043,7 @@ When a generic subclass fills its superclass's type parameter with one of its ow
 propagate through:
 
 ```py
-from typing_extensions import Generic, TypeVar
+from typing_extensions import Generic, Self, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -986,6 +1052,17 @@ W = TypeVar("W")
 
 class Parent(Generic[T]):
     x: T
+
+    @staticmethod
+    def static(value: T) -> T:
+        return value
+
+    @classmethod
+    def class_method(cls, value: T) -> T:
+        return value
+
+    def method(self, value: T, other: U) -> U:
+        return other
 
 class ExplicitlyGenericChild(Parent[U], Generic[U]): ...
 class ExplicitlyGenericGrandchild(ExplicitlyGenericChild[V], Generic[V]): ...
@@ -1001,6 +1078,68 @@ reveal_type(ExplicitlyGenericGrandchild[int]().x)  # revealed: int
 reveal_type(ImplicitlyGenericGrandchild[int]().x)  # revealed: int
 reveal_type(ExplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
 reveal_type(ImplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
+```
+
+Implicitly generic subclasses, explicitly generic subclasses, and longer inheritance chains all
+replace an unresolved class type variable with `Unknown`.
+
+```py
+reveal_type(Parent.x)  # revealed: Unknown
+reveal_type(ExplicitlyGenericChild.x)  # revealed: Unknown
+reveal_type(ImplicitlyGenericChild.x)  # revealed: Unknown
+reveal_type(ImplicitlyGenericGrandchild.x)  # revealed: Unknown
+```
+
+The same specialization applies to inherited static methods, class methods, and ordinary methods.
+Type variables belonging to a method remain generic.
+
+```py
+# revealed: def static(value: Unknown) -> Unknown
+reveal_type(ImplicitlyGenericChild.static)
+# revealed: bound method <class 'ImplicitlyGenericChild'>.class_method(value: Unknown) -> Unknown
+reveal_type(ImplicitlyGenericChild.class_method)
+# revealed: def method[U](self, value: Unknown, other: U) -> U
+reveal_type(ImplicitlyGenericChild.method)
+
+ImplicitlyGenericChild.static(1)
+ImplicitlyGenericChild.class_method(1)
+reveal_type(ImplicitlyGenericChild[int].static(1))  # revealed: int
+```
+
+Constructor methods inherit their class's type variables into their own generic contexts, so they
+remain generic when accessed explicitly. Calling the class itself also infers its type arguments.
+
+```py
+class ConstructorParent(Generic[T]):
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, value: T) -> None: ...
+
+class ConstructorChild(ConstructorParent[T]): ...
+
+# revealed: def __new__[Self, T](cls, value: T) -> Self
+reveal_type(ConstructorChild.__new__)
+# revealed: def __init__[T](self, value: T) -> None
+reveal_type(ConstructorChild.__init__)
+reveal_type(ConstructorChild(1))  # revealed: ConstructorChild[int]
+```
+
+A generic descriptor inherited from the parent also receives the receiver's specialization before
+its `__get__` method is called.
+
+```py
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object | None, owner: type[object]) -> T:
+        raise NotImplementedError
+
+class DescriptorParent(Generic[T]):
+    descriptor: Descriptor[T] = Descriptor()
+
+class DescriptorChild(DescriptorParent[T]): ...
+
+reveal_type(DescriptorChild.descriptor)  # revealed: Unknown
+reveal_type(DescriptorChild[int].descriptor)  # revealed: int
 ```
 
 ## Generic methods
@@ -1044,6 +1183,102 @@ reveal_type(generic_context(c))
 reveal_type(generic_context(c.method))
 # revealed: ty_extensions._internal.GenericContext[Self@generic_method, U@generic_method]
 reveal_type(generic_context(c.generic_method))
+```
+
+## Members of constrained type variables
+
+Member lookup distributes over the constraints of a non-inferable type variable. Each member is
+bound to its matching receiver alternative, while `Self` continues to refer to the original type
+variable.
+
+```py
+from typing_extensions import Self, TypeVar
+
+class TextStream:
+    @property
+    def closed(self) -> bool:
+        return False
+
+    def close(self) -> None: ...
+    def clone(self) -> Self:
+        raise NotImplementedError
+
+class BinaryStream:
+    @property
+    def closed(self) -> bool:
+        return False
+
+    def close(self) -> None: ...
+    def clone(self) -> Self:
+        raise NotImplementedError
+
+Stream = TypeVar("Stream", TextStream, BinaryStream)
+
+def use_stream(stream: Stream) -> Stream:
+    # revealed: bool
+    reveal_type(stream.closed)
+    # revealed: (bound method Stream@use_stream when TextStream.close() -> None) | (bound method Stream@use_stream when BinaryStream.close() -> None)
+    reveal_type(stream.close)
+    if not stream.closed:
+        stream.close()
+    return stream.clone()
+```
+
+## Members of type variables with union upper bounds
+
+Unlike constraints, a union upper bound does not enumerate the possible assignments of a type
+variable. Member lookup can still use the upper bound to prove that a common member is available.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+U = TypeVar("U", bound=A | B)
+
+def use_union(value: A | B):
+    # revealed: int | str
+    reveal_type(value.value)
+
+def use_typevar(value: U):
+    # TODO: This should not error once member lookup supports union upper bounds.
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
+    # revealed: int | str
+    reveal_type(value.value)
+```
+
+## Correlated constrained receiver calls
+
+Multiple occurrences of the same constrained type variable have the same assignment. Distributing
+member lookup over the receiver's constraints must preserve that correlation when checking method
+arguments.
+
+```py
+from typing_extensions import TypeVar
+
+class A:
+    def combine(self, other: "A") -> None: ...
+
+class B:
+    def combine(self, other: "B") -> None: ...
+
+T = TypeVar("T", A, B)
+
+def combine(left: T, right: T) -> None:
+    # revealed: (bound method T@combine when A.combine(other: A) -> None) | (bound method T@combine when B.combine(other: B) -> None)
+    reveal_type(left.combine)
+    # TODO: This should not error once callable binding preserves the receiver branch correlation.
+    # error: [invalid-argument-type] "Argument to bound method `A.combine` is incorrect"
+    # error: [invalid-argument-type] "Argument to bound method `B.combine` is incorrect"
+    left.combine(right)
 ```
 
 ## Specializations propagate

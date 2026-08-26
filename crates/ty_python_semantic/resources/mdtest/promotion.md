@@ -55,12 +55,12 @@ reveal_type(x4)  # revealed: Literal[MyEnum.A]
 reveal_type(promote(x4))  # revealed: list[MyEnum]
 
 x5 = 3.14
-reveal_type(x5)  # revealed: float
-reveal_type(promote(x5))  # revealed: list[int | float]
+reveal_type(x5)  # revealed: float*
+reveal_type(promote(x5))  # revealed: list[float]
 
 x6 = 3.14j
-reveal_type(x6)  # revealed: complex
-reveal_type(promote(x6))  # revealed: list[int | float | complex]
+reveal_type(x6)  # revealed: complex*
+reveal_type(promote(x6))  # revealed: list[complex]
 
 def _(source: Literal["foo", "bar"]):
     x7 = f"hello"
@@ -97,6 +97,22 @@ Covariant collection literals are not promoted:
 ```py
 reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
+```
+
+## Callable defaults are not promoted
+
+Promoting a callable as a collection element does not change its default values. This applies both
+to defaults on the source function and to values supplied by keyword to `functools.partial`.
+
+```py
+from functools import partial
+
+def f(x: int = 5, *, y: int) -> int:
+    return x + y
+
+bound = partial(f, y=7)
+reveal_type(bound)  # revealed: partial[(x: int = 5, *, y: int = 7) -> int]
+reveal_type([bound])  # revealed: list[partial[(x: int = 5, *, y: int = 7) -> int]]
 ```
 
 ## Unions of homogeneous, fixed-length tuples can be promoted to a single variadic tuple
@@ -635,6 +651,36 @@ def i[T: Literal[1] | str](x: T) -> list[T]:
 
 reveal_type(i("a"))  # revealed: list[str]
 reveal_type(i(1))  # revealed: list[Literal[1]]
+```
+
+## Promotion respects inferred upper bounds
+
+Promotion must not select a solution that violates its inferred upper bound.
+
+```py
+from typing import Callable
+
+def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
+    return [value]
+
+def _(upper: Callable[[int], None]):
+    # error: [invalid-argument-type]
+    reveal_type(f("x", upper))  # revealed: list[str | int]
+```
+
+This also applies when multiple inheritance contributes both static and gradual specializations:
+
+```py
+from typing import Any
+
+class Base[T]: ...
+class Specialized(Base[str]): ...
+class Mixed(Specialized, Base[Any]): ...
+
+def g[T](values: list[T], base: Base[T]) -> list[T]:
+    return values
+
+g([1], Mixed())  # error: [invalid-argument-type]
 ```
 
 ## Literal annotations from declaration are respected

@@ -5,7 +5,6 @@ use rustc_hash::FxHashMap;
 
 use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
@@ -13,6 +12,7 @@ use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
 use ty_python_semantic::{HasType, SemanticModel};
@@ -103,7 +103,8 @@ impl InlayHint {
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
 
-                        let module = file_to_module(db, definition.python_file(db))?;
+                        let file = definition.program_file(db);
+                        let module = file_to_module(db, file.resolver_file(db))?;
 
                         if should_skip_import(db, module, *ty) {
                             return None;
@@ -291,11 +292,11 @@ pub struct InlayHintTextEdit {
 
 pub fn inlay_hints(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     range: TextRange,
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
-    let ast = parsed_module(db, file).load(db);
+    let ast = parsed_module(db, file.python_file(db)).load(db);
     let source_file = file.file(db);
 
     let source = source_text(db, source_file);
@@ -348,7 +349,7 @@ impl Default for InlayHintSettings {
 
 struct InlayHintImportContext<'a, 'db> {
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     importer: &'a Importer<'db>,
     dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
 }
@@ -370,7 +371,7 @@ struct InlayHintVisitor<'a, 'db> {
 impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     fn new(
         db: &'db dyn Db,
-        file: PythonFile<'db>,
+        file: ProgramFile<'db>,
         importer: Importer<'db>,
         range: TextRange,
         settings: &'a InlayHintSettings,
@@ -399,7 +400,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 
         let context = InlayHintImportContext {
             db: self.db,
-            file: self.model.python_file(),
+            file: self.model.program_file(),
             importer: &self.importer,
             dynamic_imports: &mut self.dynamic_imports,
         };
@@ -621,19 +622,23 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
         Expr::Tuple(expr_tuple) => expr_tuple.elts.iter().all(type_hint_is_excessive_for_expr),
 
         // Various Literal[...] types which are always excessive to hint
-        | Expr::BytesLiteral(_)
+        Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
-        | Expr::StringLiteral(_)
+        | Expr::StringLiteral(_) => true,
         // `None` isn't terribly verbose, but still redundant
-        | Expr::NoneLiteral(_)
+        Expr::NoneLiteral(_) => true,
         // This one expands to `str` which isn't verbose but is redundant
-        | Expr::FString(_)
+        Expr::FString(_) => true,
         // This one expands to `Template` which isn't verbose but is redundant
-        | Expr::TString(_)=> true,
+        Expr::TString(_) => true,
 
         // You too `+1 and `-1`, get back here
-        Expr::UnaryOp(ExprUnaryOp { op: UnaryOp::UAdd | UnaryOp::USub, operand, .. }) => matches!(**operand, Expr::NumberLiteral(_)),
+        Expr::UnaryOp(ExprUnaryOp {
+            op: UnaryOp::UAdd | UnaryOp::USub,
+            operand,
+            ..
+        }) => matches!(**operand, Expr::NumberLiteral(_)),
 
         // Everything else is reasonable
         _ => false,
@@ -818,8 +823,6 @@ mod tests {
         let mut db =
             ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
-        db.init_program().unwrap();
-
         let source = dedent(source);
 
         let start = source.find(START);
@@ -882,7 +885,11 @@ mod tests {
         fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
             let hints = inlay_hints(
                 &self.db,
-                PythonFile::new(&self.db, self.file, self.db.python_version()),
+                ProgramFile::new(
+                    &self.db,
+                    self.file,
+                    self.db.program_environment().program(&self.db),
+                ),
                 self.range,
                 settings,
             );
@@ -2439,7 +2446,7 @@ Source with applied edits:
         assert_snapshot!(test.inlay_hints(), @r#"
 
         a[: list[int]] = [1, 2]
-        b[: list[int | float]] = [1.0, 2.0]
+        b[: list[float]] = [1.0, 2.0]
         c[: list[bool]] = [True, False]
         d[: list[None | Unknown]] = [None, None]
         e[: list[str]] = ["hel", "lo"]
@@ -2447,8 +2454,8 @@ Source with applied edits:
         g[: list[str]] = [f"{ft}", f"{ft}"]
         h[: list[Template]] = [t"wow %d", t"wow %d"]
         i[: list[bytes]] = [b'/x01', b'/x02']
-        j[: list[int | float]] = [+1, +2.0]
-        k[: list[int | float]] = [-1, -2.0]
+        j[: list[float]] = [+1, +2.0]
+        k[: list[float]] = [-1, -2.0]
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -2481,19 +2488,8 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:5
            |
-        LL | b[: list[int | float]] = [1.0, 2.0]
+        LL | b[: list[float]] = [1.0, 2.0]
            |     ^^^^
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/builtins.pyi:LL:7
-           |
-        LL | class int:
-           |       ^^^
-        info: Source
-          --> main2.py:LL:10
-           |
-        LL | b[: list[int | float]] = [1.0, 2.0]
-           |          ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2501,10 +2497,10 @@ Source with applied edits:
         LL | class float:
            |       ^^^^^
         info: Source
-          --> main2.py:LL:16
+          --> main2.py:LL:10
            |
-        LL | b[: list[int | float]] = [1.0, 2.0]
-           |                ^^^^^
+        LL | b[: list[float]] = [1.0, 2.0]
+           |          ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2679,19 +2675,8 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:5
            |
-        LL | j[: list[int | float]] = [+1, +2.0]
+        LL | j[: list[float]] = [+1, +2.0]
            |     ^^^^
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/builtins.pyi:LL:7
-           |
-        LL | class int:
-           |       ^^^
-        info: Source
-          --> main2.py:LL:10
-           |
-        LL | j[: list[int | float]] = [+1, +2.0]
-           |          ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2699,10 +2684,10 @@ Source with applied edits:
         LL | class float:
            |       ^^^^^
         info: Source
-          --> main2.py:LL:16
+          --> main2.py:LL:10
            |
-        LL | j[: list[int | float]] = [+1, +2.0]
-           |                ^^^^^
+        LL | j[: list[float]] = [+1, +2.0]
+           |          ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2712,19 +2697,8 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:5
            |
-        LL | k[: list[int | float]] = [-1, -2.0]
+        LL | k[: list[float]] = [-1, -2.0]
            |     ^^^^
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/builtins.pyi:LL:7
-           |
-        LL | class int:
-           |       ^^^
-        info: Source
-          --> main2.py:LL:10
-           |
-        LL | k[: list[int | float]] = [-1, -2.0]
-           |          ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2732,10 +2706,10 @@ Source with applied edits:
         LL | class float:
            |       ^^^^^
         info: Source
-          --> main2.py:LL:16
+          --> main2.py:LL:10
            |
-        LL | k[: list[int | float]] = [-1, -2.0]
-           |                ^^^^^
+        LL | k[: list[float]] = [-1, -2.0]
+           |          ^^^^^
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
@@ -2756,7 +2730,7 @@ Source with applied edits:
            - j = [+1, +2.0]
            - k = [-1, -2.0]
         4  + a: list[int] = [1, 2]
-        5  + b: list[int | float] = [1.0, 2.0]
+        5  + b: list[float] = [1.0, 2.0]
         6  + c: list[bool] = [True, False]
         7  + d: list[None | Unknown] = [None, None]
         8  + e: list[str] = ["hel", "lo"]
@@ -2764,8 +2738,8 @@ Source with applied edits:
         10 + g: list[str] = [f"{ft}", f"{ft}"]
         11 + h: list[Template] = [t"wow %d", t"wow %d"]
         12 + i: list[bytes] = [b'/x01', b'/x02']
-        13 + j: list[int | float] = [+1, +2.0]
-        14 + k: list[int | float] = [-1, -2.0]
+        13 + j: list[float] = [+1, +2.0]
+        14 + k: list[float] = [-1, -2.0]
            |
         "#);
     }
@@ -6044,7 +6018,7 @@ Source with applied edits:
 
         def foo(x: int, *y: bool, z: str | int | list[str]): ...
 
-        a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+        a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -6054,7 +6028,7 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:16
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
            |                ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -6065,7 +6039,7 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:25
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
            |                         ^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -6074,10 +6048,10 @@ Source with applied edits:
         LL | class str(Sequence[str]):
            |       ^^^
         info: Source
-          --> main2.py:LL:37
+          --> main2.py:LL:34
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                     ^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                  ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -6085,10 +6059,10 @@ Source with applied edits:
         LL | class int:
            |       ^^^
         info: Source
-          --> main2.py:LL:43
+          --> main2.py:LL:40
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                           ^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                        ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -6096,10 +6070,10 @@ Source with applied edits:
         LL | class list(MutableSequence[_T]):
            |       ^^^^
         info: Source
-          --> main2.py:LL:49
+          --> main2.py:LL:46
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                                 ^^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                              ^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -6107,10 +6081,10 @@ Source with applied edits:
         LL | class str(Sequence[str]):
            |       ^^^
         info: Source
-          --> main2.py:LL:54
+          --> main2.py:LL:51
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                                      ^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                                   ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/ty_extensions/_internal.pyi:LL:1
@@ -6118,10 +6092,10 @@ Source with applied edits:
         LL | Unknown: _SpecialForm
            | ^^^^^^^
         info: Source
-          --> main2.py:LL:63
+          --> main2.py:LL:60
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                                               ^^^^^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                                            ^^^^^^^
         ");
     }
 

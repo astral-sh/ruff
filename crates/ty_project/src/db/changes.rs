@@ -8,7 +8,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use ty_python_core::program::{FallibleStrategy, Program};
+use ty_python_core::program::FallibleStrategy;
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -34,7 +34,7 @@ impl ProjectDatabase {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
         let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
-        let program = Program::get(self);
+        let program = self.project().program(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
             .map(|path| path.join("VERSIONS"));
@@ -203,7 +203,8 @@ impl ProjectDatabase {
 
                         if configuration_paths.may_contain_configuration(path, &project_root) {
                             tracing::debug!(
-                                "Reload project because a configuration file may have been deleted."
+                                "Reload project because a configuration file \
+                                may have been deleted."
                             );
                             reload_project = true;
                         }
@@ -240,7 +241,8 @@ impl ProjectDatabase {
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {
                         let error = anyhow::Error::new(error);
                         tracing::error!(
-                            "Failed to apply configuration files, continuing without applying them: {error:#}"
+                            "Failed to apply configuration files, \
+                            continuing without applying them: {error:#}"
                         );
                     }
 
@@ -253,38 +255,37 @@ impl ProjectDatabase {
                         &FallibleStrategy,
                     ) {
                         Ok((program_settings, diagnostics)) => {
-                            let program = Program::get(self);
-                            program.update_from_settings(self, program_settings);
+                            project.update_program(self, program_settings);
                             diagnostics
                         }
                         Err(error) => {
                             tracing::error!(
-                                "Failed to convert metadata to program settings, continuing without applying them: {error}"
+                                "Failed to convert metadata to program settings, \
+                                continuing without applying them: {error}"
                             );
                             Vec::new()
                         }
                     };
 
-                    let (settings, settings_diagnostics) = match merged_options
-                        .to_settings(self, &FallibleStrategy)
-                    {
-                        Ok((settings, diagnostics)) => (Some(settings), diagnostics),
-                        Err(error) => {
-                            tracing::warn!(
-                                "Keeping old project configuration because loading the new settings failed with: {error}"
-                            );
-                            (None, vec![error.into_diagnostic()])
-                        }
-                    };
+                    let (settings, mut settings_diagnostics) =
+                        match merged_options.to_settings(self, &FallibleStrategy) {
+                            Ok((settings, diagnostics)) => (Some(settings), diagnostics),
+                            Err(error) => {
+                                tracing::warn!(
+                                    "Keeping old project configuration because loading the new \
+                                     settings failed with: {error}"
+                                );
+                                (None, vec![error.into_diagnostic()])
+                            }
+                        };
+                    settings_diagnostics.extend(
+                        program_settings_diagnostics
+                            .into_iter()
+                            .map(|diagnostic| diagnostic.into_diagnostic(self)),
+                    );
 
                     tracing::debug!("Reloading project after structural change");
-                    match project.reload(
-                        self,
-                        metadata,
-                        settings,
-                        settings_diagnostics,
-                        program_settings_diagnostics,
-                    ) {
+                    match project.reload(self, metadata, settings, settings_diagnostics) {
                         ProjectReloadResult::Unchanged => {}
                         ProjectReloadResult::Changed { files_changed } => {
                             result.project_changed = true;
@@ -325,17 +326,18 @@ impl ProjectDatabase {
                 &FallibleStrategy,
             ) {
                 Ok((program_settings, program_settings_diagnostics)) => {
-                    let settings_diagnostics =
+                    let mut settings_diagnostics =
                         match merged_options.to_settings(self, &FallibleStrategy) {
                             Ok((_, diagnostics)) => diagnostics,
                             Err(error) => vec![error.into_diagnostic()],
                         };
-                    program.update_from_settings(self, program_settings);
-                    project.update_settings_diagnostics(
-                        self,
-                        settings_diagnostics,
-                        program_settings_diagnostics,
+                    project.update_program(self, program_settings);
+                    settings_diagnostics.extend(
+                        program_settings_diagnostics
+                            .into_iter()
+                            .map(|diagnostic| diagnostic.into_diagnostic(self)),
                     );
+                    project.update_settings_diagnostics(self, settings_diagnostics);
                 }
                 Err(error) => {
                     tracing::error!("Failed to resolve program settings: {error}");

@@ -14,6 +14,7 @@ use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
@@ -25,6 +26,7 @@ use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, ProgramEnvironment, SemanticModel,
     TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
+    fixture_bindings_for_parameter,
 };
 
 #[derive(Clone, Debug)]
@@ -265,7 +267,7 @@ impl<'db> Definitions<'db> {
         let ty_def = ty.definition(db, env)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
-                ResolvedDefinition::Module(module.python_file(db)?)
+                ResolvedDefinition::Module(ProgramFile::new(db, module.file(db)?, env.program(db)))
             }
             ty_python_semantic::types::TypeDefinition::StaticClass(definition)
             | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)
@@ -343,8 +345,27 @@ impl<'db> Definitions<'db> {
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
     ) -> Option<Definitions<'db>> {
-        let definitions = self.goto_declaration(model, goto_target)?;
-        Some(definitions.map_stubs(model.db()))
+        let mut definitions = self;
+
+        if let GotoTarget::Parameter(parameter) = goto_target {
+            let fixture_bindings =
+                fixture_bindings_for_parameter(model.db(), parameter.definition(model));
+
+            if !fixture_bindings.is_empty() {
+                definitions = Self::new(
+                    fixture_bindings
+                        .iter()
+                        .map(|binding| ResolvedDefinition::Definition(binding.fixture()))
+                        .collect(),
+                );
+            }
+        }
+
+        Some(
+            definitions
+                .goto_declaration(model, goto_target)?
+                .map_stubs(model.db()),
+        )
     }
 
     /// Map definitions from stub files to corresponding source implementations.
@@ -1451,7 +1472,7 @@ fn definitions_for_module<'db>(
     level: u32,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let module = model.resolve_module(module, level)?;
-    let file = module.python_file(model.db())?;
+    let file = ProgramFile::new(model.db(), module.file(model.db())?, model.program());
     Some(vec![ResolvedDefinition::Module(file)])
 }
 

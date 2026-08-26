@@ -685,16 +685,18 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
     use crate::ProgramEnvironment;
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
     use crate::types::Type;
-    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
     use std::cell::Cell;
     use std::hash::{Hash, Hasher};
+    use ty_python_core::ProgramFile;
 
     struct TestVisit;
 
@@ -765,7 +767,7 @@ mod tests {
         name: &str,
     ) -> Type<'db> {
         let file = system_path_to_file(db, "/src/a.py").unwrap();
-        let file = PythonFile::new(db, file, env.python_version(db));
+        let file = ProgramFile::new(db, file, env.program(db));
         global_symbol(db, file, name)
             .place
             .expect_type()
@@ -806,14 +808,14 @@ class RecursivePropertySetter[T](Protocol):
             global_instance_type(&db, &env, "GenericProperty").recursive_identity(&db),
             None
         );
-        assert!(matches!(
+        assert_matches!(
             global_instance_type(&db, &env, "RecursiveProperty").recursive_identity(&db),
             Some(TypeIdentity::RecursiveProtocol(_))
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             global_instance_type(&db, &env, "RecursivePropertySetter").recursive_identity(&db),
             Some(TypeIdentity::RecursiveProtocol(_))
-        ));
+        );
     }
 
     #[test]

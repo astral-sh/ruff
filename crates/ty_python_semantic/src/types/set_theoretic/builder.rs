@@ -1972,6 +1972,17 @@ impl<'db> InnerIntersectionBuilder<'db> {
             if speculative.is_never() {
                 return Type::Never;
             }
+
+            if let Type::EnumComplement(complement) = speculative
+                && complement.is_singleton(db)
+                && self
+                    .positive
+                    .iter()
+                    .any(|positive| matches!(positive, Type::NewTypeInstance(_)))
+            {
+                // Preserve the NewType while making its remaining enum member explicit.
+                self.add_positive(db, env, complement.remaining_literal_union(db, env));
+            }
         }
 
         if let Some(complement) =
@@ -2005,9 +2016,9 @@ mod tests {
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{KnownClass, KnownInstanceType, Truthiness};
 
-    use ruff_db::PythonFile;
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
+    use ty_python_core::ProgramFile;
 
     #[test]
     fn build_union_no_elements() {
@@ -2203,7 +2214,7 @@ mod tests {
         let env = db.program_environment();
 
         let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
-        let module = PythonFile::new(&db, module, db.python_version());
+        let module = ProgramFile::new(&db, module, db.program_environment().program(&db));
         let alias_ty = global_symbol(&db, module, "Alias").place.expect_type();
         let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
             alias_ty

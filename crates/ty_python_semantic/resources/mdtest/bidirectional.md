@@ -67,6 +67,200 @@ def f() -> list[Literal[1]]:
     return [1]
 ```
 
+## Loop-carried assignment context
+
+A declaration inside a loop provides context to assignments that reach it from an earlier iteration.
+
+### While loops
+
+A declaration inside a `while` loop applies to list literals assigned in each iteration.
+
+```py
+while True:
+    values: list[object]
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### For loops
+
+The same declaration context applies to assignments in a `for` loop.
+
+```py
+for _ in range(2):
+    values: list[object]
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### Nested dictionary values
+
+A declaration inside a loop also provides context for values nested within a dictionary literal.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    values: list[float]
+
+while True:
+    record: Record
+    record = {"values": [1]}
+    reveal_type(record)  # revealed: Record
+```
+
+### Invalid dictionary values
+
+An incompatible dictionary item is reported at the assignment, not at the declaration.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    value: int
+
+while True:
+    record: Record
+    record = {"value": "invalid"}  # error: [invalid-argument-type]
+    reveal_type(record)  # revealed: Record
+```
+
+### Stringified annotations
+
+String annotations provide their resolved type when a loop-carried assignment needs context.
+
+```py
+while True:
+    values: "list[object]"
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### Deferred forward references
+
+Deferred annotations resolve a `TypedDict` defined after the loop before inferring its dictionary
+assignments.
+
+```py
+from __future__ import annotations
+from typing import TypedDict
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    reveal_type(record)  # revealed: Record
+
+    invalid: Record
+    invalid = {"value": "invalid"}  # error: [invalid-argument-type]
+
+class Record(TypedDict):
+    value: int
+```
+
+### Deferred forward references in overloaded calls
+
+Selecting an overload must not recursively infer a loop-carried forward reference before its
+declared `TypedDict` is available.
+
+```py
+from __future__ import annotations
+from typing import Never, TypedDict, overload
+
+@overload
+def inspect(value: str) -> Never: ...
+@overload
+def inspect(value: object) -> int: ...
+def inspect(value: object) -> int:
+    return 1
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    inspect(record)
+    reveal_type(record)  # revealed: Record
+    record["missing"]  # error: [invalid-key]
+
+class Record(TypedDict):
+    value: int
+```
+
+### Deferred forward references in nested non-function loops
+
+A loop-carried forward reference keeps its declared type when the module-level loop is nested inside
+a conditional.
+
+```py
+from __future__ import annotations
+from typing import Never, TypedDict, overload
+
+@overload
+def inspect(value: str) -> Never: ...
+@overload
+def inspect(value: object) -> int: ...
+def inspect(value: object) -> int:
+    return 1
+
+if bool(input()) and bool(input()):
+    for _ in range(2):
+        record: ModuleRecord
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: ModuleRecord
+
+class ModuleRecord(TypedDict):
+    value: int
+```
+
+A statically known outer branch also preserves the loop-carried declaration.
+
+```py
+if 1 + 1 == 2:
+    for _ in range(2):
+        record: StaticModuleRecord
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: StaticModuleRecord
+
+class StaticModuleRecord(TypedDict):
+    value: int
+```
+
+TODO: In class-body `while` loops, eager collection cycle recovery loses the declared `TypedDict`
+context.
+
+```py
+class Container:
+    while bool(input()):
+        record: ClassRecord  # error: [invalid-declaration]
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: dict[str, int]
+
+class ClassRecord(TypedDict):
+    value: int
+```
+
+### Deferred forward references on Python 3.14
+
+Annotations are deferred by default in Python 3.14 and later.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypedDict
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    reveal_type(record)  # revealed: Record
+
+class Record(TypedDict):
+    value: int
+```
+
 ## Collection literals
 
 ### Basic
@@ -174,7 +368,7 @@ takes_float_sequence([1])
 
 mutable_floats = [1.0]
 mutable_floats.append(1)
-reveal_type(mutable_floats)  # revealed: list[int | float]
+reveal_type(mutable_floats)  # revealed: list[float]
 ```
 
 ### Exact complex types in covariant contexts
@@ -1053,6 +1247,25 @@ def mean(data: DataFrame) -> float:
 x23: Mapping[Hashable, AggregateSpec] = {"col1": ["sum", mean], "col2": mean}
 ```
 
+## Recursive aliases remain stable in invariant collection contexts
+
+An invariant collection context can infer the same recursive type as both bounds. Because recursive
+inference introduces `Divergent`, intersecting those bounds should not discard any element of the
+union.
+
+```py
+from collections.abc import MutableMapping, MutableSequence
+from typing import TypeAlias, TypedDict
+
+class Leaf(TypedDict, total=False):
+    path: str
+
+RecursiveValue: TypeAlias = int | Leaf | MutableSequence["RecursiveValue | None"] | MutableMapping[str, "RecursiveValue | None"]
+RecursiveMapping: TypeAlias = MutableMapping[str, RecursiveValue | None]
+
+recursive: RecursiveMapping = {}
+```
+
 ## Implicit generic class specialization
 
 Callable type context is also used to inform the implicit specialization of a generic class:
@@ -1671,11 +1884,10 @@ reveal_type(f7)  # revealed: (*args) -> None
 f8: Callable[[int], None] = lambda *, x=1: None
 reveal_type(f8)  # revealed: (int, /) -> None
 
-# `Callable` annotations only describe positional parameters, so the keyword-only `x` is not
-# compatible with the positional suffix in the annotation.
-# error: [invalid-assignment]
+# An optional keyword-only parameter does not prevent `*args` from accepting the positional
+# suffix in a `Callable` annotation.
 f9: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f9)  # revealed: (*tuple[int, ...], int) -> None
+reveal_type(f9)  # revealed: (*args, x=1) -> None
 
 f10: Callable[[str, int, str], tuple[str, int, str]] = lambda x, y, z: reveal_type((x, y, z))  # revealed: tuple[str, int, str]
 reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]
@@ -1715,6 +1927,53 @@ f12 = lambda: [1]
 # TODO: This should not error.
 _: list[int | str] = f12()  # error: [invalid-assignment]
 reveal_type(f12)  # revealed: () -> list[int]
+```
+
+## Lambda contextual inference through union type aliases
+
+A lambda parameter is inferred from a callable behind a union-valued type alias, including when that
+alias is itself an element of another union:
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType
+
+type IntCallback = Callable[[int], None]
+type IntCallbackOrInt = Callable[[int], None] | int
+IntCallbackOrIntAliasType = TypeAliasType("IntCallbackOrIntAliasType", Callable[[int], None] | int)
+
+def consume(value: int) -> None:
+    pass
+
+x1: Callable[[int], None] | str = lambda value: consume(reveal_type(value))  # revealed: int
+x2: IntCallbackOrInt | str = lambda value: consume(reveal_type(value))  # revealed: int
+x3: IntCallbackOrIntAliasType | str = lambda value: consume(reveal_type(value))  # revealed: int
+
+# TODO: An alias that does not resolve to a union is not expanded here, so the parameter is not
+# inferred from the type context.
+x4: IntCallback = lambda value: consume(reveal_type(value))  # revealed: Unknown
+```
+
+## Lambda contextual inference through `TypeAliasType` on Python 3.11
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+On Python 3.11, `typing_extensions.TypeAliasType` provides the same alias semantics without the
+`type` statement:
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType
+
+IntCallbackOrInt = TypeAliasType("IntCallbackOrInt", Callable[[int], None] | int)
+
+def consume(value: int) -> None:
+    pass
+
+y1: IntCallbackOrInt | str = lambda value: consume(reveal_type(value))  # revealed: int
 ```
 
 ## Unified call inference
@@ -1907,7 +2166,7 @@ def overloaded_call(data: object, dtype: object) -> object:
 
 def _(dtype: FloatDtype):
     x = overloaded_call([1.0], dtype)
-    reveal_type(x)  # revealed: int | float
+    reveal_type(x)  # revealed: float
 ```
 
 ```py
@@ -1940,6 +2199,23 @@ def _(callback: TakesInt) -> None:
         # TODO: Perform fixpoint iteration when evaluating callable intersections.
         x2 = callback("str", lambda value: reveal_type(value) + "!")  # revealed: Unknown
         reveal_type(x2)  # revealed: str
+```
+
+A structural type context can infer a gradual lower bound and a static upper bound before dictionary
+values contribute their constraints. The preliminary solution should retain the gradual lower bound.
+
+```py
+T_co = TypeVar("T_co", covariant=True)
+
+class DictLike(Protocol[T_co]):
+    def __getitem__(self, key: str, /) -> T_co: ...
+    def __setitem__(self, key: str, value: Any, /) -> None: ...
+
+class Command: ...
+
+def _(command: Any):
+    # revealed: dict[str, Any]
+    mapping: DictLike[type[Command]] = reveal_type({"command": command})
 ```
 
 Note that long chains of callables with constraint dependencies in reverse source-order may require
@@ -2279,7 +2555,7 @@ def _() -> int:
 ```py
 x7 = []
 x7[:] = [1, "2", 3.0]
-reveal_type(x7)  # revealed: list[int | str | float]
+reveal_type(x7)  # revealed: list[float | str]
 ```
 
 ```py
@@ -2416,7 +2692,7 @@ x23 = [None, None, None]
 x23[0] = 1
 x23[1] = "2"
 x23[2] = 3.0
-reveal_type(x23)  # revealed: list[int | str | float | None]
+reveal_type(x23)  # revealed: list[float | str | None]
 ```
 
 ```py

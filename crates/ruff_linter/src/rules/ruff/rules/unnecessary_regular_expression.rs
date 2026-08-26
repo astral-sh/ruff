@@ -6,7 +6,7 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -181,7 +181,7 @@ impl<'a> ReFunc<'a> {
 
         let (comparison_to_none, range) = match comparison_to_none {
             Some((cmp, range)) => (Some(cmp), range),
-            None => (None, call.range),
+            None => (None, call.range()),
         };
 
         match (func_name, call.arguments.len()) {
@@ -356,7 +356,7 @@ impl<'a> ReFunc<'a> {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
-            range: TextRange::default(),
+            range_start: ruff_text_size::TextSize::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
     }

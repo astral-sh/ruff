@@ -1,19 +1,21 @@
 use crate::ProgramEnvironment;
 use std::borrow::Cow;
+use std::debug_assert_matches;
 
 use ruff_db::parsed::ParsedModuleRef;
 
-use ruff_db::PythonFile;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_text_size::Ranged;
 
 use crate::Db;
 use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::{ResizeTupleError, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use ty_python_core::ExpressionNodeKey;
+use ty_python_core::ProgramFile;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
@@ -43,7 +45,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         db: &'db dyn Db,
         env: &'ast ProgramEnvironment<'db>,
         target_scope: ScopeId<'db>,
-        python_file: PythonFile<'db>,
+        program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         Self {
@@ -51,8 +53,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 db,
                 env,
                 target_scope,
-                python_file.file(db),
-                python_file,
+                program_file.file(db),
+                program_file,
                 module,
             ),
             targets: FxHashMap::default(),
@@ -70,8 +72,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         let db = self.db();
-        debug_assert!(
-            matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
+        debug_assert_matches!(
+            target,
+            ast::Expr::List(_) | ast::Expr::Tuple(_),
             "Unpacking target must be a list or tuple expression"
         );
 
@@ -163,9 +166,14 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let Some(values) = sequence_elts(value_expr) else {
+                let Some(values) = fixed_sequence_elements(value_expr, elts.len()) else {
                     return false;
                 };
+
+                if elts.iter().any(ast::Expr::is_starred_expr) {
+                    return false;
+                }
+
                 self.unpack_fixed_sequence_from_inference(elts, values, value_inference)
             }
             _ => false,
@@ -178,13 +186,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         values: &[ast::Expr],
         value_inference: &ExpressionInference<'db>,
     ) -> bool {
-        if targets.len() != values.len()
-            || targets.iter().any(ast::Expr::is_starred_expr)
-            || values.iter().any(ast::Expr::is_starred_expr)
-        {
-            return false;
-        }
-
         // Even `a, b = 1, 2` recurses through this helper. `.all()` short-circuits,
         // so in nested cases an earlier element may update `self.targets` before a
         // later element falls back to the general unpacking path. That's harmless
@@ -363,6 +364,155 @@ impl<'db> UnpackResult<'db> {
 
         self
     }
+}
+
+/// Return a tuple or list's elements when they correspond exactly to a fixed-length sequence.
+pub(super) fn fixed_sequence_elements(
+    expression: &ast::Expr,
+    expected_length: usize,
+) -> Option<&[ast::Expr]> {
+    let elements = sequence_elts(expression)?;
+
+    if elements.len() != expected_length {
+        return None;
+    }
+
+    elements
+        .iter()
+        .all(|element| !element.is_starred_expr())
+        .then_some(elements)
+}
+
+/// Find the expression assigned to one target in a tuple or list unpacking.
+///
+/// For `first, (second, third) = (0, (1, 2))`, this associates `second` with `1`.
+/// Explicit values before or after a starred element remain unambiguous, but a starred target or
+/// an element supplied by a starred value has no single corresponding source expression.
+pub(super) fn unpacked_assignment_value<'ast>(
+    unpack_target: &ast::Expr,
+    value: &'ast ast::Expr,
+    requested_target: &ast::Expr,
+) -> Option<&'ast ast::Expr> {
+    assignment_values_for_target(unpack_target, value, requested_target)
+        .and_then(UnpackedAssignmentValues::as_single)
+}
+
+/// Return the explicit values collected by a starred assignment target.
+///
+/// For `first, *middle, last = (0, 1, 2, 3)`, `middle` collects the expressions `1` and `2`.
+/// Values containing their own starred expressions have no unambiguous collected slice.
+pub(super) fn starred_assignment_values<'ast>(
+    unpack_target: &ast::Expr,
+    value: &'ast ast::Expr,
+    requested_target: &ast::Expr,
+) -> Option<&'ast [ast::Expr]> {
+    assignment_values_for_target(unpack_target, value, requested_target)
+        .and_then(UnpackedAssignmentValues::as_collected)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum UnpackedAssignmentValues<'ast> {
+    Single(&'ast ast::Expr),
+    Collected(&'ast [ast::Expr]),
+}
+
+impl<'ast> UnpackedAssignmentValues<'ast> {
+    fn as_single(self) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::Single(value) => Some(value),
+            Self::Collected(_) => None,
+        }
+    }
+
+    fn as_collected(self) -> Option<&'ast [ast::Expr]> {
+        match self {
+            Self::Single(_) => None,
+            Self::Collected(values) => Some(values),
+        }
+    }
+}
+
+fn assignment_values_for_target<'ast>(
+    unpack_target: &ast::Expr,
+    value: &'ast ast::Expr,
+    requested_target: &ast::Expr,
+) -> Option<UnpackedAssignmentValues<'ast>> {
+    if ExpressionNodeKey::from(unpack_target) == ExpressionNodeKey::from(requested_target) {
+        return Some(UnpackedAssignmentValues::Single(value));
+    }
+
+    let targets = sequence_elts(unpack_target)?;
+    let values = sequence_elts(value)?;
+    let requested_range = requested_target.range();
+    let (index, target) = targets
+        .iter()
+        .enumerate()
+        .find(|(_, target)| target.range().contains_range(requested_range))?;
+
+    if let ast::Expr::Starred(starred) = target {
+        if ExpressionNodeKey::from(starred.value.as_ref())
+            != ExpressionNodeKey::from(requested_target)
+            || values.iter().any(ast::Expr::is_starred_expr)
+        {
+            return None;
+        }
+
+        let suffix_length = targets.len().checked_sub(index + 1)?;
+        let collected_end = values.len().checked_sub(suffix_length)?;
+        return values
+            .get(index..collected_end)
+            .map(UnpackedAssignmentValues::Collected);
+    }
+
+    let nested_value = sequence_value_for_target(targets, values, index)?;
+    assignment_values_for_target(target, nested_value, requested_target)
+}
+
+/// Match fixed prefix and suffix elements without guessing the width of a starred expression.
+fn sequence_value_for_target<'ast>(
+    targets: &[ast::Expr],
+    values: &'ast [ast::Expr],
+    target_index: usize,
+) -> Option<&'ast ast::Expr> {
+    let target_starred_index = targets.iter().position(ast::Expr::is_starred_expr);
+    let first_value_starred_index = values.iter().position(ast::Expr::is_starred_expr);
+    let last_value_starred_index = values.iter().rposition(ast::Expr::is_starred_expr);
+
+    match (target_starred_index, first_value_starred_index) {
+        (None, None) if targets.len() != values.len() => return None,
+        (Some(_), None) if values.len() < targets.len().saturating_sub(1) => return None,
+        (None, Some(_))
+            if values
+                .iter()
+                .filter(|value| !value.is_starred_expr())
+                .count()
+                > targets.len() =>
+        {
+            return None;
+        }
+        _ => {}
+    }
+
+    let target_prefix_length = target_starred_index.unwrap_or(targets.len());
+    let value_prefix_length = first_value_starred_index.unwrap_or(values.len());
+
+    if target_index < target_prefix_length && target_index < value_prefix_length {
+        return values.get(target_index);
+    }
+
+    let target_suffix_length = target_starred_index
+        .map(|index| targets.len() - index - 1)
+        .unwrap_or(targets.len());
+    let value_suffix_length = last_value_starred_index
+        .map(|index| values.len() - index - 1)
+        .unwrap_or(values.len());
+    let suffix_index = targets.len() - target_index - 1;
+
+    if suffix_index < target_suffix_length && suffix_index < value_suffix_length {
+        return values.get(values.len() - suffix_index - 1);
+    }
+
+    None
 }
 
 /// Extract the element slice from a list or tuple expression.

@@ -18,8 +18,9 @@ use super::diagnostic::{
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
-    UnionBuilder, definition_expression_annotation, definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, Type,
+    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable,
+    definition_expression_annotation, definition_expression_type, visitor,
 };
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
@@ -27,6 +28,7 @@ use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::{Db, ProgramEnvironment};
+use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
 bitflags! {
@@ -259,8 +261,9 @@ impl<'db> TypedDictType<'db> {
                 }
             };
 
-            let python_file = static_class.python_file(db);
-            let env = ProgramEnvironment::from_file(python_file);
+            let program_file = static_class.program_file(db);
+            let python_file = program_file.python_file(db);
+            let env = ProgramEnvironment::from_file(program_file);
             let module = parsed_module(db, python_file).load(db);
             let class_definition = static_class.definition(db);
             let class_stmt = class_definition
@@ -357,6 +360,20 @@ impl<'db> TypedDictType<'db> {
                 builder.add(Type::string_literal(db, name))
             })
             .build()
+    }
+
+    /// Returns whether a literal string key must, cannot, or might be present.
+    ///
+    /// An undeclared key can still exist in an implicitly open `TypedDict` or one with explicit
+    /// extra items. An optional field with an uninhabited value type can never be present.
+    pub(crate) fn key_membership_truthiness(self, db: &'db dyn Db, key: &str) -> Truthiness {
+        match self.items(db).get(key) {
+            Some(field) if field.is_required() => Truthiness::AlwaysTrue,
+            Some(field) if field.may_be_present(db) => Truthiness::Ambiguous,
+            Some(_) => Truthiness::AlwaysFalse,
+            None if self.openness(db).is_closed() => Truthiness::AlwaysFalse,
+            None => Truthiness::Ambiguous,
+        }
     }
 
     /// Returns the field exposed by a literal key.
@@ -460,41 +477,24 @@ impl<'db> TypedDictType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        let extra_items = self.explicit_extra_items(db)?;
-        if extra_items.is_read_only()
-            || self.items(db).values().any(|field| {
-                field.is_required()
-                    || field.is_read_only()
-                    || !field
-                        .declared_ty
-                        .is_equivalent_to(db, env, extra_items.declared_ty)
-            })
-        {
-            return None;
-        }
-        Some(extra_items.declared_ty)
+        self.dict_value_type_if(db, |field_ty, extra_items_ty| {
+            field_ty.is_equivalent_to(db, env, extra_items_ty)
+        })
     }
 
-    /// Returns the value type if this `TypedDict` is assignable to `dict[str, VT]`.
-    ///
-    /// This uses mutual assignability rather than equivalence so gradual value types can satisfy
-    /// the mutable `dict` contract.
-    pub(crate) fn assignable_dict_value_type(
+    /// Like [`Self::dict_value_type`], but uses the caller's equivalence or mutual-assignability
+    /// check so recursive comparisons can share their cycle guards.
+    pub(super) fn dict_value_type_if(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        types_match: impl Fn(Type<'db>, Type<'db>) -> bool,
     ) -> Option<Type<'db>> {
         let extra_items = self.explicit_extra_items(db)?;
         if extra_items.is_read_only()
             || self.items(db).values().any(|field| {
                 field.is_required()
                     || field.is_read_only()
-                    || !field
-                        .declared_ty
-                        .is_assignable_to(db, env, extra_items.declared_ty)
-                    || !extra_items
-                        .declared_ty
-                        .is_assignable_to(db, env, field.declared_ty)
+                    || !types_match(field.declared_ty, extra_items.declared_ty)
             })
         {
             return None;
@@ -550,6 +550,30 @@ impl<'db> TypedDictType<'db> {
             }
             Self::Synthesized(synthesized) => synthesized.items(db),
         }
+    }
+
+    pub(super) fn variance_of_items(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
+        self.items(db)
+            .values()
+            .map(|field| (field.declared_ty, field.is_read_only()))
+            .chain(
+                self.explicit_extra_items(db)
+                    .map(|extra_items| (extra_items.declared_ty, extra_items.is_read_only())),
+            )
+            .map(|(ty, is_read_only)| {
+                let polarity = if is_read_only {
+                    TypeVarVariance::Covariant
+                } else {
+                    TypeVarVariance::Invariant
+                };
+                ty.with_polarity(polarity).variance_of(db, env, typevar)
+            })
+            .collect()
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -1273,17 +1297,57 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typed_dict: TypedDictType<'db>,
     visitor: &V,
 ) {
-    match typed_dict {
-        TypedDictType::Class(defining_class) => {
-            visitor.visit_type(db, defining_class.into());
+    if let TypedDictType::Class(defining_class) = typed_dict {
+        visitor.visit_type(db, defining_class.into());
+
+        if !visitor.should_visit_lazy_type_attributes() {
+            visitor.notify_skipped_lazy_type_attributes();
+            return;
         }
-        TypedDictType::Synthesized(synthesized) => {
-            for field in synthesized.items(db).values() {
-                visitor.visit_type(db, field.declared_ty);
+    }
+
+    for field in typed_dict.items(db).values() {
+        visitor.visit_type(db, field.declared_ty);
+    }
+
+    if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
+        visitor.visit_type(db, extra_items.declared_ty);
+    }
+}
+
+impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
+        match self {
+            Self::Class(class) if class.static_class_literal(db).is_some() => {
+                // Compose each type parameter's variance with its type argument. Inferred variance
+                // is computed on the unspecialized class: expanding specialized fields here would
+                // not terminate for a recursive item such as `child: Node[list[T]]`.
+                class.variance_of(db, env, typevar)
             }
-            if let Some(extra_items) = synthesized.openness(db).explicit_extra_items() {
-                visitor.visit_type(db, extra_items.declared_ty);
+            Self::Class(class) => {
+                #[salsa::tracked(
+                    returns(copy),
+                    cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+                    heap_size=ruff_memory_usage::heap_size
+                )]
+                fn functional_variance<'db>(
+                    db: &'db dyn Db,
+                    class: ClassType<'db>,
+                    typevar: BoundTypeVarIdentity<'db>,
+                ) -> TypeVarVariance {
+                    let env =
+                        ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+                    TypedDictType::new(class).variance_of_items(db, &env, typevar)
+                }
+
+                functional_variance(db, class, typevar)
             }
+            Self::Synthesized(_) => self.variance_of_items(db, env, typevar),
         }
     }
 }
@@ -1297,8 +1361,9 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictSchema<'db> {
-    let python_file = definition.python_file(db);
-    let env = ProgramEnvironment::from_file(python_file);
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     let node = definition
         .kind(db)
@@ -1361,8 +1426,9 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
-    let python_file = definition.python_file(db);
-    let env = ProgramEnvironment::from_file(python_file);
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     let node = definition
         .kind(db)
@@ -1512,7 +1578,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
             return true;
         }
 
-        if diagnostic::is_invalid_typed_dict_literal(db, item.declared_ty, self.value_node) {
+        if diagnostic::is_invalid_typed_dict_literal(db, env, item.declared_ty, self.value_node) {
             return false;
         }
 
@@ -1935,6 +2001,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         | Type::SpecialForm(_)
         | Type::KnownInstance(_)
         | Type::PropertyInstance(_)
+        | Type::SlotDescriptor(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::LiteralValue(_)

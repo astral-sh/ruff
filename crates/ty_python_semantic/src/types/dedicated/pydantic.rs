@@ -171,7 +171,7 @@ impl<'db> FieldMetadata<'db> {
         // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
         // metadata, we need to follow the alias back to its definition and parse the metadata
         // from there.
-        let model = SemanticModel::new(db, definition.python_file(db));
+        let model = SemanticModel::new(db, definition.program_file(db));
         let Some(alias_definition) = definitions_for_name(
             &model,
             name.id.as_str(),
@@ -1189,7 +1189,7 @@ fn instance_symbol<'db>(
     ty: Type<'db>,
 ) -> Option<(KnownModule, &'db str, StaticClassLiteral<'db>)> {
     let class = ty.nominal_class(db, env)?.class_literal(db).as_static()?;
-    let module = file_to_module(db, class.python_file(db))?.known(db)?;
+    let module = file_to_module(db, class.program_file(db).resolver_file(db))?.known(db)?;
     Some((module, class.name(db).as_str(), class))
 }
 

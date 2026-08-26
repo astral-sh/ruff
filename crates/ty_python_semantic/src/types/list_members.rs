@@ -17,14 +17,14 @@ use crate::{
         place_from_declarations,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownFunction, ProgramEnvironment, StaticClassLiteral,
+        ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
         exists_at_runtime,
     },
 };
 use ty_python_core::{
-    attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
-    semantic_index, use_def_map,
+    ProgramFile, attribute_scopes, definition::Definition, global_scope, place_table,
+    scope::ScopeId, semantic_index, use_def_map,
 };
 
 /// Iterate over all declarations and bindings that exist at the end
@@ -52,6 +52,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
             let member = Member {
                 name: symbol.name().clone(),
                 ty,
+                is_type_check_only: false,
             };
             Some(MemberWithDefinition {
                 member,
@@ -72,6 +73,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let member = Member {
                     name: symbol.name().clone(),
                     ty,
+                    is_type_check_only: false,
                 };
                 Some(MemberWithDefinition {
                     member,
@@ -109,6 +111,7 @@ pub(crate) fn all_reachable_members<'db>(
                         let member = Member {
                             name: symbol.name().clone(),
                             ty,
+                            is_type_check_only: false,
                         };
                         Some(MemberWithDefinition {
                             member,
@@ -125,6 +128,7 @@ pub(crate) fn all_reachable_members<'db>(
                         let member = Member {
                             name: symbol.name().clone(),
                             ty,
+                            is_type_check_only: false,
                         };
                         Some(MemberWithDefinition {
                             member,
@@ -310,7 +314,7 @@ impl<'db> AllMembers<'db> {
                             db,
                             env,
                             ty,
-                            class_literal.metaclass(db),
+                            class_type.inferred_metaclass(db).for_inheritance(db, env),
                         );
                     }
                 }
@@ -354,6 +358,7 @@ impl<'db> AllMembers<'db> {
 
             Type::LiteralValue(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::KnownBoundMethod(_)
@@ -419,45 +424,35 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: Name::new_static("__file__"),
                     ty: dunder_file_type,
+                    is_type_check_only: false,
                 });
 
                 self.extend_with_type(db, env, KnownClass::ModuleType.to_instance(db, env));
 
-                let Some(python_file) = module.python_file(db) else {
+                let Some(file) = module.file(db) else {
                     return;
                 };
+                let program_file = ProgramFile::new(db, file, env.program(db));
 
-                let module_scope = global_scope(db, python_file);
+                let module_scope = global_scope(db, program_file);
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(defined) =
-                        imported_symbol(db, env, Some(python_file), symbol_name, None).place
+                        imported_symbol(db, env, Some(program_file), symbol_name, None).place
                     else {
                         continue;
                     };
 
-                    if let Some(definition) = defined.provenance.definition()
-                        && !exists_at_runtime(db, definition)
-                        // Source-module completions retain `@type_check_only` symbols and rank them
-                        // lower.
-                        && (python_file.file(db).is_stub(db) || !defined.ty.is_type_check_only(db))
-                        // The decorator itself is typing-only, but users must still be able to
-                        // import it when defining typing-only classes and functions.
-                        && !matches!(
-                            defined.ty,
-                            Type::FunctionLiteral(function)
-                                if function.known(db) == Some(KnownFunction::TypeCheckOnly)
-                        )
-                    {
-                        continue;
-                    }
-
                     self.members.insert(Member {
                         name: symbol_name.clone(),
                         ty: defined.ty,
+                        is_type_check_only: defined
+                            .provenance
+                            .definition()
+                            .is_some_and(|definition| !exists_at_runtime(db, definition)),
                     });
                 }
 
@@ -466,7 +461,11 @@ impl<'db> AllMembers<'db> {
                         |submodule_name| {
                             let ty = literal.resolve_submodule(db, &submodule_name)?;
                             let name = submodule_name.clone();
-                            Some(Member { name, ty })
+                            Some(Member {
+                                name,
+                                ty,
+                                is_type_check_only: false,
+                            })
                         },
                     ));
             }
@@ -506,6 +505,8 @@ impl<'db> AllMembers<'db> {
             .filter_map(ClassBase::into_class)
             .filter_map(|class| class.static_class_literal(db).map(|(lit, _)| lit))
         {
+            self.extend_with_slot_members(db, env, ty, parent);
+
             let parent_scope = parent.body_scope(db);
             for memberdef in all_end_of_scope_members(db, parent_scope) {
                 let result = ty.member(db, env, memberdef.member.name.as_str());
@@ -515,8 +516,41 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: memberdef.member.name,
                     ty,
+                    is_type_check_only: memberdef.member.is_type_check_only,
                 });
             }
+        }
+    }
+
+    /// Includes slot descriptors that are generated outside the class-body symbol table.
+    ///
+    /// ```python
+    /// class Example:
+    ///     __slots__ = ("value",)
+    /// ```
+    ///
+    /// Both `Example` and `Example()` expose `value` even without an explicit attribute binding.
+    fn extend_with_slot_members(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        class_literal: StaticClassLiteral<'db>,
+    ) {
+        let Some(slots) = class_literal.slot_names(db) else {
+            return;
+        };
+
+        for name in slots {
+            let result = ty.member(db, env, name);
+            let Some(ty) = result.place.ignore_possibly_undefined() else {
+                continue;
+            };
+            self.members.insert(Member {
+                name: name.clone(),
+                ty,
+                is_type_check_only: false,
+            });
         }
     }
 
@@ -550,8 +584,11 @@ impl<'db> AllMembers<'db> {
         class_literal: StaticClassLiteral<'db>,
     ) {
         let class_body_scope = class_literal.body_scope(db);
-        let python_file = class_body_scope.python_file(db);
-        let index = semantic_index(db, python_file);
+        let program_file = class_body_scope.program_file(db);
+        let index = semantic_index(db, program_file);
+
+        self.extend_with_slot_members(db, env, ty, class_literal);
+
         for function_scope_id in attribute_scopes(db, class_body_scope) {
             for place_expr in index.place_table(function_scope_id).members() {
                 let Some(name) = place_expr.as_instance_attribute() else {
@@ -564,6 +601,7 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: Name::new(name),
                     ty,
+                    is_type_check_only: false,
                 });
             }
         }
@@ -581,6 +619,7 @@ impl<'db> AllMembers<'db> {
             self.members.insert(Member {
                 name: memberdef.member.name,
                 ty,
+                is_type_check_only: memberdef.member.is_type_check_only,
             });
         }
     }
@@ -643,6 +682,7 @@ impl<'db> AllMembers<'db> {
                         self.members.insert(Member {
                             name: Name::from(*attr),
                             ty: synthetic_member,
+                            is_type_check_only: false,
                         });
                     }
                 }
@@ -676,6 +716,8 @@ pub struct MemberWithDefinition<'db> {
 pub struct Member<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
+    /// Whether this member is known to exist only during type checking.
+    pub(crate) is_type_check_only: bool,
 }
 
 impl std::hash::Hash for Member<'_> {

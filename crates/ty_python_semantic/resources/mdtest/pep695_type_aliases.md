@@ -23,6 +23,32 @@ def f() -> None:
     reveal_type(x)  # revealed: int | str
 ```
 
+## Runtime classes
+
+On Python 3.12, aliases defined by a `type` statement or the `typing.TypeAliasType` constructor are
+instances of the standard-library class, while aliases created with
+`typing_extensions.TypeAliasType` are instances of the distinct backport class.
+
+```py
+from typing import TypeAliasType as StdlibTypeAliasType
+from typing_extensions import TypeAliasType as ExtensionsTypeAliasType
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+type StatementAlias = int
+StdlibAlias = StdlibTypeAliasType("StdlibAlias", int)
+ExtensionsAlias = ExtensionsTypeAliasType("ExtensionsAlias", int)
+
+static_assert(is_subtype_of(TypeOf[StatementAlias], StdlibTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[StatementAlias], ExtensionsTypeAliasType))
+
+static_assert(is_subtype_of(TypeOf[StdlibAlias], StdlibTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[StdlibAlias], ExtensionsTypeAliasType))
+
+static_assert(is_subtype_of(TypeOf[ExtensionsAlias], ExtensionsTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[ExtensionsAlias], StdlibTypeAliasType))
+```
+
 ## Type aliases in `type[...]`
 
 ```py
@@ -203,7 +229,8 @@ def _(flag: bool):
 
 ```py
 type ListOrSet[T] = list[T] | set[T]
-reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+# revealed: tuple[typing.TypeVar | typing_extensions.TypeVar | typing.ParamSpec | typing_extensions.ParamSpec | typing.TypeVarTuple | typing_extensions.TypeVarTuple, ...]
+reveal_type(ListOrSet.__type_params__)
 type Tuple1[T] = tuple[T]
 
 def _(cond: bool):
@@ -227,6 +254,50 @@ except Exception:
 
 def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
+```
+
+## Unpacking tuple aliases
+
+Both unpack spellings accept a tuple alias and preserve positional argument types and arity.
+
+```py
+from typing import Unpack
+
+type Pair = tuple[int, str]
+
+def starred(*args: *Pair) -> None:
+    reveal_type(args)  # revealed: tuple[int, str]
+
+def explicit(*args: Unpack[Pair]) -> None:
+    reveal_type(args)  # revealed: tuple[int, str]
+
+starred(1, "a")
+starred(1)  # error: [missing-argument]
+starred(1, 2)  # error: [invalid-argument-type]
+explicit(1, "a")
+explicit(1, "a", 3)  # error: [too-many-positional-arguments]
+```
+
+Unpacking also follows alias chains and applies generic substitutions.
+
+```py
+type GenericPair[T] = tuple[T, str]
+type SpecializedPair = GenericPair[bytes]
+
+def specialized(*args: *SpecializedPair) -> None:
+    reveal_type(args)  # revealed: tuple[bytes, str]
+
+specialized(b"a", "b")
+specialized(1, "a")  # error: [invalid-argument-type]
+```
+
+Non-tuple aliases remain invalid.
+
+```py
+type NotTuple = list[int]
+
+def invalid_starred(*args: *NotTuple) -> None: ...  # error: [invalid-type-form]
+def invalid_explicit(*args: Unpack[NotTuple]) -> None: ...  # error: [invalid-type-form]
 ```
 
 ## Stringified values

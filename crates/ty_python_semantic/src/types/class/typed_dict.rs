@@ -11,19 +11,21 @@ use ty_module_resolver::KnownModule;
 use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::class::{DynamicClassHeaderAnchor, dynamic_class_header_range};
+use crate::types::class::{
+    DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range,
+};
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
-    TypedDictField, TypedDictOpenness, TypedDictSchema, deferred_functional_typed_dict_openness,
-    deferred_functional_typed_dict_schema,
+    SynthesizedTypedDictType, TypedDictField, TypedDictOpenness, TypedDictSchema,
+    deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictModule,
-    TypedDictType, UnionType, determine_upper_bound,
+    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
+    TypingModule, UnionType, determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -133,8 +135,8 @@ impl<'db> TypedDictFields<'db> {
 /// 1. `__init__(self, __map: TD, /, *, field1: T1 = ..., field2: T2 = ...) -> None`
 ///    Allows passing another instance of the `TypedDict` when creating a new instance.
 ///    Technically, `__map` could accept a subset of the `TypedDict` if the remaining
-///    fields are provided as keyword arguments, but we don't model that in the
-///    synthesized `__init__`, since this signature is primarily used for IDE support.
+///    fields are provided as keyword arguments. Such mixed calls use dedicated constructor
+///    validation instead because this overload cannot describe the overwritten mapping entries.
 ///    Fields that are not valid Python identifiers are collapsed into `**kwargs`.
 /// 2. `__init__(self, *, field1: T1, field2: T2 = ...) -> None`
 ///    Keyword-only. Fields that are not valid Python identifiers are collapsed into `**kwargs`.
@@ -145,6 +147,14 @@ fn synthesize_typed_dict_init<'db>(
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
+    // Only a bare generic class exposes a generic method. Explicit aliases already substitute
+    // their arguments into both the receiver and the fields.
+    let generic_context = typed_dict.defining_class().and_then(|class| {
+        let alias = class.into_generic_alias()?;
+        let specialization = alias.specialization(db);
+        let generic_context = specialization.generic_context(db);
+        (specialization == generic_context.identity_specialization(db)).then_some(generic_context)
+    });
     let keyword_fields: Vec<_> = fields
         .iter()
         .filter(|(name, _)| is_identifier(name))
@@ -174,7 +184,8 @@ fn synthesize_typed_dict_init<'db>(
             .with_definition(field.first_declaration())
     });
 
-    let map_overload = Signature::new(
+    let map_overload = Signature::new_generic(
+        generic_context,
         Parameters::standard(
             [self_param.clone(), map_param]
                 .into_iter()
@@ -195,7 +206,8 @@ fn synthesize_typed_dict_init<'db>(
         }
     });
 
-    let keyword_overload = Signature::new(
+    let keyword_overload = Signature::new_generic(
+        generic_context,
         Parameters::standard(
             std::iter::once(self_param)
                 .chain(keyword_field_params)
@@ -837,12 +849,12 @@ pub enum DynamicTypedDictAnchor<'db> {
 
     /// The `TypedDict()` call is "dangling" (not assigned to a variable).
     ///
-    /// The offset is relative to the enclosing scope's anchor node index. The eagerly
-    /// computed `spec` preserves field types for inline uses like
+    /// The [`DynamicClassScopeOffset`] locates the call relative to the enclosing scope.
+    /// The eagerly computed `spec` preserves field types for inline uses like
     /// `TypedDict("Point", {"x": int})(x=1)`.
     ScopeOffset {
         scope: ScopeId<'db>,
-        offset: u32,
+        offset: DynamicClassScopeOffset,
         schema: TypedDictSchema<'db>,
         openness: TypedDictOpenness<'db>,
     },
@@ -883,14 +895,13 @@ pub struct DynamicTypedDictLiteral<'db> {
     ///
     /// - `Definition`: The call is assigned to a variable. The definition
     ///   uniquely identifies this TypedDict and can be used to find the call.
-    /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
-    ///   is relative to the enclosing scope's anchor node index, and the
-    ///   eagerly computed spec is stored on the anchor.
+    /// - `ScopeOffset`: The call is "dangling" (not assigned). Its location
+    ///   is relative to the enclosing scope, and the eagerly computed spec is stored on the anchor.
     #[returns(ref)]
     pub(crate) anchor: DynamicTypedDictAnchor<'db>,
 
     #[returns(copy)]
-    pub(crate) typed_dict_module: TypedDictModule,
+    pub(crate) typed_dict_module: TypingModule,
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
@@ -1030,16 +1041,43 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 }
 
+/// Resolves members of a schema that has no defining `TypedDict` class.
+pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    synthesized: SynthesizedTypedDictType<'db>,
+    lookup_policy: MemberLookupPolicy,
+    name: &str,
+) -> PlaceAndQualifiers<'db> {
+    let typed_dict = TypedDictType::Synthesized(synthesized);
+
+    if let Some(member) = synthesize_typed_dict_method(db, env, typed_dict, name, || {
+        TypedDictFields::Dynamic(synthesized.items(db))
+    }) {
+        return Member::definitely_declared(member).inner;
+    }
+
+    typed_dict_inherited_class_member(
+        db,
+        env,
+        typed_dict,
+        TypingModule::Typing,
+        lookup_policy,
+        name,
+        || Type::TypedDict(typed_dict),
+    )
+}
+
 pub(super) fn typed_dict_fallback_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    module: TypedDictModule,
+    module: TypingModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     let fallback = match module {
-        TypedDictModule::Typing => KnownClass::TypedDictFallback,
-        TypedDictModule::TypingExtensions => KnownClass::ExtensionTypedDictFallback,
+        TypingModule::Typing => KnownClass::TypedDictFallback,
+        TypingModule::TypingExtensions => KnownClass::ExtensionTypedDictFallback,
     };
 
     fallback
@@ -1052,23 +1090,44 @@ pub(super) fn typed_dict_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class: ClassType<'db>,
-    module: TypedDictModule,
+    module: TypingModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     let self_class = class.class_literal(db);
+
+    typed_dict_inherited_class_member(
+        db,
+        env,
+        TypedDictType::new(class),
+        module,
+        lookup_policy,
+        name,
+        || determine_upper_bound(db, env, self_class, ClassBase::is_typed_dict),
+    )
+}
+
+fn typed_dict_inherited_class_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    typed_dict: TypedDictType<'db>,
+    module: TypingModule,
+    lookup_policy: MemberLookupPolicy,
+    name: &str,
+    new_upper_bound: impl FnOnce() -> Type<'db>,
+) -> PlaceAndQualifiers<'db> {
     let fallback_member = typed_dict_fallback_class_member(db, env, module, lookup_policy, name)
         .map_type(|ty| {
-            let new_upper_bound =
-                determine_upper_bound(db, env, self_class, ClassBase::is_typed_dict);
-            let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
+            let mapping = TypeMapping::ReplaceSelf {
+                new_upper_bound: new_upper_bound(),
+            };
             ty.apply_type_mapping(db, env, &mapping, TypeContext::default())
         });
     if !fallback_member.is_undefined() {
         return fallback_member;
     }
 
-    if let Some(value_ty) = TypedDictType::new(class).dict_value_type(db, env)
+    if let Some(value_ty) = typed_dict.dict_value_type(db, env)
         && let Some(dict_class) = KnownClass::Dict.to_specialized_class_type(
             db,
             env,

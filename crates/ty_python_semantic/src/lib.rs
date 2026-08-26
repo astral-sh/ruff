@@ -29,6 +29,7 @@ pub(crate) use suppression::{
 };
 use ty_module_resolver::ModuleGlobSet;
 pub use ty_python_core::Program;
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::scope::ScopeId;
@@ -38,7 +39,7 @@ use ty_python_core::{
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
-    SitePackagesPaths, SysPrefixPathOrigin,
+    SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
 };
 pub use types::ide_support::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
@@ -47,13 +48,18 @@ pub use types::ide_support::{
     map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
     type_hierarchy_supertypes,
 };
-pub use types::{DisplaySettings, ProgramEnvironment, TypeQualifiers};
+pub use types::{
+    DisplaySettings, FixtureBinding, ProgramEnvironment, TypeQualifiers,
+    fixture_bindings_for_parameter,
+};
 
 mod db;
 mod dunder_all;
 mod fixes;
+mod lexical_name_path;
 pub mod lint;
 pub(crate) mod place;
+pub(crate) mod place_load;
 mod reachability;
 mod semantic_model;
 mod subscript;
@@ -92,6 +98,9 @@ fn register_lints(registry: &mut LintRegistryBuilder) {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct AnalysisSettings {
+    /// Whether narrowing with generic classes uses the top materialization.
+    pub strict_generic_narrowing: bool,
+
     /// Whether ty should use conservative equality and inequality semantics.
     pub strict_equality_semantics: bool,
 
@@ -112,6 +121,7 @@ pub struct AnalysisSettings {
 impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
+            strict_generic_narrowing: false,
             strict_equality_semantics: false,
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
@@ -130,7 +140,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let index = semantic_index(db, class_body_scope.python_file(db));
+    let index = semantic_index(db, class_body_scope.program_file(db));
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
@@ -150,7 +160,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let index = semantic_index(db, class_body_scope.python_file(db));
+    let index = semantic_index(db, class_body_scope.program_file(db));
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
@@ -170,13 +180,13 @@ pub(crate) fn module_docstring(db: &dyn Db, file: PythonFile<'_>) -> Option<Stri
         .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }
 
-pub fn check_file_unwrap(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
+pub fn check_file_unwrap(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     check_file(db, file)
         .map(<[ruff_db::diagnostic::Diagnostic]>::into_vec)
         .unwrap_or_else(|error| vec![error])
 }
 
-pub fn check_file(db: &dyn Db, file: PythonFile<'_>) -> Result<Box<[Diagnostic]>, Diagnostic> {
+pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let source_file = file.file(db);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
@@ -191,7 +201,7 @@ pub fn check_file(db: &dyn Db, file: PythonFile<'_>) -> Result<Box<[Diagnostic]>
         .to_diagnostic());
     }
 
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
 
     let parsed_ref = parsed.load(db);
     diagnostics.extend(
@@ -203,7 +213,12 @@ pub fn check_file(db: &dyn Db, file: PythonFile<'_>) -> Result<Box<[Diagnostic]>
 
     diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
         let mut error = Diagnostic::invalid_syntax(source_file, error, error);
-        add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
+        add_inferred_python_version_hint_to_diagnostic(
+            db,
+            source_file,
+            &mut error,
+            "parsing syntax",
+        );
         error
     }));
 

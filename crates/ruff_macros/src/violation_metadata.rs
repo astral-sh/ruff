@@ -8,10 +8,10 @@ use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, meta::ParseNestedMet
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
 
-    let Some(group) = get_rule_status(&input.attrs)? else {
+    let Some(status) = get_rule_status(&input.attrs)? else {
         return Err(Error::new_spanned(
             input,
-            "Missing required rule group metadata",
+            "Missing required rule status metadata",
         ));
     };
 
@@ -31,8 +31,8 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
                 Some(#docs)
             }
 
-            fn group() -> crate::codes::RuleGroup {
-                crate::codes::#group
+            fn status() -> crate::codes::RuleStatus {
+                crate::codes::#status
             }
 
             fn file() -> &'static str {
@@ -75,27 +75,27 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 /// ```
 ///
 /// The result is returned as a `TokenStream` so that the version string literal can be combined
-/// with the proper `RuleGroup` variant, e.g. `RuleGroup::Stable` for `stable_since` above.
+/// with the proper `RuleStatus` variant, e.g. `RuleStatus::Stable` for `stable_since` above.
 fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
-    let mut group = None;
+    let mut status = None;
     for attr in attrs {
         if attr.path().is_ident("violation_metadata") {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("stable_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Stable { since: #lit }));
+                    status = Some(quote!(RuleStatus::Stable { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("preview_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Preview { since: #lit }));
+                    status = Some(quote!(RuleStatus::Preview { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("deprecated_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Deprecated { since: #lit }));
+                    status = Some(quote!(RuleStatus::Deprecated { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("removed_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Removed { since: #lit }));
+                    status = Some(quote!(RuleStatus::Removed { since: #lit }));
                     return Ok(());
                 }
                 Err(Error::new_spanned(
@@ -105,7 +105,7 @@ fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
             })?;
         }
     }
-    Ok(group)
+    Ok(status)
 }
 
 fn parse_attr<'a, const LEN: usize>(

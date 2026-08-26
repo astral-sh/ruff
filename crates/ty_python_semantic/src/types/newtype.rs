@@ -66,8 +66,9 @@ impl<'db> NewType<'db> {
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
         let definition = self.definition(db);
-        let python_file = definition.python_file(db);
-        let env = ProgramEnvironment::from_file(python_file);
+        let program_file = definition.program_file(db);
+        let python_file = program_file.python_file(db);
+        let env = ProgramEnvironment::from_file(program_file);
         let object_fallback = NewTypeBase::ClassType(ClassType::object(db, &env));
         let module = parsed_module(db, python_file).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
@@ -262,7 +263,11 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     let base = if visitor.should_visit_lazy_type_attributes() {
         Some(newtype.base(db))
     } else {
-        newtype.eager_base(db)
+        let base = newtype.eager_base(db);
+        if base.is_none() {
+            visitor.notify_skipped_lazy_type_attributes();
+        }
+        base
     };
     if let Some(base) = base {
         visitor.visit_type(db, base.instance_type(db, visitor.program_environment()));

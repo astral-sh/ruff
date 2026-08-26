@@ -1,18 +1,18 @@
 use crate::goto::find_goto_target;
 use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticModel;
 
 /// Returns the range of the symbol if it can be renamed, None if not.
 pub fn can_rename(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<ruff_text_size::TextRange> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = ruff_db::parsed::parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let source_file = file.file(db);
     let model = SemanticModel::new(db, file);
@@ -56,11 +56,11 @@ pub fn can_rename(
 /// Returns all locations that need to be updated with the new name.
 pub fn rename(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
     new_name: &str,
 ) -> Option<Vec<ReferenceTarget>> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = ruff_db::parsed::parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
 
@@ -108,7 +108,7 @@ mod tests {
             let Some(range) = salsa::attach(&self.db, || {
                 can_rename(
                     &self.db,
-                    self.python_file(self.cursor.file),
+                    self.program_file(self.cursor.file),
                     self.cursor.offset,
                 )
             }) else {
@@ -122,13 +122,13 @@ mod tests {
             let rename_results = salsa::attach(&self.db, || {
                 can_rename(
                     &self.db,
-                    self.python_file(self.cursor.file),
+                    self.program_file(self.cursor.file),
                     self.cursor.offset,
                 )?;
 
                 rename(
                     &self.db,
-                    self.python_file(self.cursor.file),
+                    self.program_file(self.cursor.file),
                     self.cursor.offset,
                     new_name,
                 )

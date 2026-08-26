@@ -3,7 +3,7 @@ use crate::ProgramEnvironment;
 use crate::place::Place;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypedDictModule,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule,
     call::CallError,
     callable::CallableFunctionProvenance,
     function::KnownFunction,
@@ -15,7 +15,7 @@ use crate::types::{
     special_form::TypeQualifier,
 };
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
-use ty_module_resolver::{KnownModule, file_to_module};
+use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -36,9 +36,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.infer_type_parameters(type_params);
 
         if class.arguments.is_some() {
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
             // PEP 695 class headers are inferred in the type-parameter scope, before the completed
             // class type is available. Infer the bases first because `extra_items=T` is an
@@ -55,7 +53,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_expression(base, TypeContext::default())
                 };
                 is_typed_dict |= match ty {
-                    ty if TypedDictModule::from_type(self.db(), ty).is_some() => true,
+                    ty if TypingModule::from_typed_dict_type(self.db(), ty).is_some() => true,
                     Type::ClassLiteral(class) => class.is_typed_dict(self.db()),
                     Type::GenericAlias(alias) => alias.is_typed_dict(self.db()),
                     _ => false,
@@ -107,12 +105,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
-            .to_scope_id(db, self.python_file());
+            .to_scope_id(db, self.program_file());
 
-        let maybe_known_class = KnownClass::try_from_file_and_name(db, self.python_file(), name);
+        let file = self.program_file();
+        let importing_file = ImportingFile::File(file.file(db), env.resolver_environment(db));
+        let maybe_known_class = KnownClass::try_from_file_and_name(db, importing_file, name);
 
-        let known_module =
-            || file_to_module(db, self.python_file()).and_then(|module| module.known(db));
+        let known_module = || {
+            file_to_module(db, importing_file.resolver_file(db)).and_then(|module| module.known(db))
+        };
         let in_typing_module = || {
             matches!(
                 known_module(),
@@ -385,9 +386,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // and we don't need to run inference here
         if type_params.is_none() {
             // In stub files, keyword values may reference names that are defined later in the file.
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
             for keyword in class_node.keywords() {
                 if keyword.arg.as_deref() != Some("extra_items") {
                     self.infer_expression(&keyword.value, TypeContext::default());

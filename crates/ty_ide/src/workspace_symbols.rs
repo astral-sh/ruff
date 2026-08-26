@@ -1,6 +1,5 @@
 use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file};
 use rayon::prelude::*;
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ty_project::{Db, parallel::ParallelIteratorExt};
 
@@ -16,7 +15,6 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
     let _span = workspace_symbols_span.enter();
 
     let project = db.project();
-
     let query = QueryPattern::fuzzy(query);
     let files = project.files(db);
     let files: Vec<_> = files.iter().copied().collect();
@@ -31,7 +29,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
             );
             let _entered = symbols_for_file_span.entered();
 
-            symbols_for_file(db, PythonFile::new(db, file, db.python_version()))
+            symbols_for_file(db, db.program_file(file))
                 .search(&query)
                 .map(|(_, symbol)| WorkspaceSymbolInfo {
                     symbol: symbol.to_owned(),

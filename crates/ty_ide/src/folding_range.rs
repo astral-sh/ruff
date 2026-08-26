@@ -700,11 +700,10 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
             AnyNodeRef::ExprList(_) | AnyNodeRef::ExprListComp(_) | AnyNodeRef::TypeParams(_) => {
                 self.add_delimited_expression_range(node.range(), BRACKETS);
             }
-            AnyNodeRef::ExprTuple(tuple)
-                // Only fold parenthesized tuples.
-                if tuple.parenthesized => {
-                    self.add_delimited_expression_range(node.range(), PARENTHESES);
-                }
+            // Only fold parenthesized tuples.
+            AnyNodeRef::ExprTuple(tuple) if tuple.parenthesized => {
+                self.add_delimited_expression_range(node.range(), PARENTHESES);
+            }
             AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprSetComp(_)
@@ -2579,7 +2578,11 @@ with open("file.txt") as f:
 
     impl CursorTest {
         fn folding_ranges(&self) -> String {
-            let ranges = folding_ranges(&self.db, self.python_file(self.cursor.file), None);
+            let ranges = folding_ranges(
+                &self.db,
+                self.program_file(self.cursor.file).python_file(&self.db),
+                None,
+            );
 
             if ranges.is_empty() {
                 return "No folding ranges found".to_string();

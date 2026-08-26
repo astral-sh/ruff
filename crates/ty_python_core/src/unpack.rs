@@ -7,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
 use crate::EvaluationMode;
+use crate::ProgramFile;
 use crate::ast_node_ref::AstNodeRef;
 use crate::expression::Expression;
 use crate::scope::{FileScopeId, ScopeId};
@@ -32,7 +33,7 @@ use crate::scope::{FileScopeId, ScopeId};
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Unpack<'db> {
     #[returns(copy)]
-    pub python_file: PythonFile<'db>,
+    pub program_file: ProgramFile<'db>,
 
     #[returns(copy)]
     pub(crate) value_file_scope: FileScopeId,
@@ -58,7 +59,11 @@ impl get_size2::GetSize for Unpack<'_> {}
 
 impl<'db> Unpack<'db> {
     pub fn file(self, db: &'db dyn Db) -> File {
-        self.python_file(db).file(db)
+        self.program_file(db).file(db)
+    }
+
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.program_file(db).python_file(db)
     }
 
     pub fn target<'ast>(self, db: &'db dyn Db, parsed: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -68,10 +73,10 @@ impl<'db> Unpack<'db> {
     /// Returns the scope where the unpack target expression belongs to.
     pub fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.target_file_scope(db)
-            .to_scope_id(db, self.python_file(db))
+            .to_scope_id(db, self.program_file(db))
     }
 
-    pub fn program(self, db: &'db dyn Db) -> Program {
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
         self.target_scope(db).program(db)
     }
 

@@ -1642,22 +1642,26 @@ class C3(A3):
 class D3(A3):
     def method(self: Self) -> Self: ...  # fine
 
+# These overrides would otherwise be valid, but a method returning `Self` must leave `self`
+# unannotated or annotate it as `Self`.
 class E3(A3):
-    def method(self: E3) -> Self: ...  # fine
+    def method(self: E3) -> Self: ...  # error: [invalid-type-form]
 
 class F3(A3):
-    def method(self: A3) -> Self: ...  # fine
+    def method(self: A3) -> Self: ...  # error: [invalid-type-form]
 
 class G3(A3):
-    def method(self: object) -> Self: ...  # fine
+    def method(self: object) -> Self: ...  # error: [invalid-type-form]
 
 class H3(A3):
     # `A3.method()` can be called on any subtype of `A3`, but `H3.method()` can only be called on
     # objects that are subtypes of `str`.
+    # error: [invalid-type-form]
     def method(self: str) -> Self: ...  # error: [invalid-method-override]
 
 class I3(A3):
     # `I3.method()` cannot be called with any inhabited type.
+    # error: [invalid-type-form]
     def method(self: Never) -> Self: ...  # error: [invalid-method-override]
 
 class A4:

@@ -171,7 +171,7 @@ export default function Chrome({
           <PanelGroup
             id="main-group"
             orientation="horizontal"
-            className="h-full"
+            className="grow min-h-0"
           >
             <Panel id="main" minSize={100}>
               <PanelGroup
@@ -355,7 +355,7 @@ function useCheckResult(
     }
     // Monaco document edits mutate the workspace in place. The deferred
     // revision is an invalidation token for this memoized check.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [
     files,
     workspace,

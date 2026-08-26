@@ -161,7 +161,7 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_return_type_impl<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
@@ -313,6 +313,24 @@ pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindin
 impl<'db> CallError<'db> {
     pub(crate) fn return_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         self.1.return_type(db, env)
+    }
+
+    /// Returns `Some(property)` if the call error was caused by an attempt to read a property
+    /// that has no getter, and `None` otherwise.
+    pub(crate) fn as_attempt_to_get_property_with_no_getter(
+        &self,
+    ) -> Option<PropertyInstanceType<'db>> {
+        if self.0 != CallErrorKind::BindingError {
+            return None;
+        }
+        self.1
+            .iter_flat()
+            .flatten()
+            .flat_map(bind::Binding::errors)
+            .find_map(|error| match error {
+                BindingError::PropertyHasNoGetter(property) => Some(*property),
+                _ => None,
+            })
     }
 
     /// Returns `Some(property)` if the call error was caused by an attempt to set a property

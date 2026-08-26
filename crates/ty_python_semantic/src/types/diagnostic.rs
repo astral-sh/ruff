@@ -3,14 +3,14 @@ use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
-    StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
+    ModuleLiteralType, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
-use crate::diagnostic::did_you_mean;
-use crate::diagnostic::format_enumeration;
+use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
-use crate::types::call::{CallDiagnosticOverride, CallError};
+use crate::types::call::bind::CallableDescription;
+use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
@@ -26,17 +26,19 @@ use crate::types::string_annotation::{
 use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
+use crate::types::unpacker::{starred_assignment_values, unpacked_assignment_value};
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard,
     SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance, binding_type,
     protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
-use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, declare_lint};
+use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    files::File,
     parsed::parsed_module,
 };
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
@@ -47,10 +49,10 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{self, Formatter};
-use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_module_resolver::{KnownModule, Module, ModuleName, SearchPath, file_to_module};
+use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
-use ty_python_core::{global_scope, place_table, use_def_map};
+use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -69,6 +71,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CYCLIC_TYPE_ALIAS_DEFINITION);
     registry.register_lint(&DEPRECATED);
     registry.register_lint(&DIVISION_BY_ZERO);
+    registry.register_lint(&DYNAMIC_FUNCTION_DECORATOR_RETURN);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&DATACLASS_FIELD_ORDER);
@@ -82,8 +85,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&UNSOUND_RETURN_STATEMENT);
     registry.register_lint(&INVALID_YIELD);
+    registry.register_lint(&UNSOUND_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
+    registry.register_lint(&UNSOUND_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
@@ -92,6 +98,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
+    registry.register_lint(&INVALID_MODULE_GETATTR_CALL);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
@@ -147,6 +154,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    registry.register_lint(&MISSING_SLOT);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_BASE);
@@ -427,11 +435,40 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/dynamic-function-decorator-return.md")]
+    pub(crate) static DYNAMIC_FUNCTION_DECORATOR_RETURN = {
+        summary: "detects decorators that replace a function with a dynamic type such as `Any`",
+        status: LintStatus::stable("0.0.73"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[expect(clippy::doc_link_with_quotes)]
+    #[doc = include_str!("../../resources/lint_docs/unsound-return-statement.md")]
+    pub(crate) static UNSOUND_RETURN_STATEMENT = {
+        summary: "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
+        status: LintStatus::stable("0.0.70"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-yield.md")]
     pub(crate) static INVALID_YIELD = {
         summary: "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
         status: LintStatus::stable("0.0.25"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[expect(clippy::doc_link_with_quotes)]
+    #[doc = include_str!("../../resources/lint_docs/unsound-yield.md")]
+    pub(crate) static UNSOUND_YIELD = {
+        summary: "detects yield expressions that unsoundly yield a type that is not a subtype of the generator's annotated yield type",
+        status: LintStatus::stable("0.0.70"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -450,6 +487,16 @@ declare_lint! {
         summary: "detects invalid assignments",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[expect(clippy::doc_link_with_quotes)]
+    #[doc = include_str!("../../resources/lint_docs/unsound-assignment.md")]
+    pub(crate) static UNSOUND_ASSIGNMENT = {
+        summary: "detects assignments that unsoundly assign a type that is not a subtype of the declared type",
+        status: LintStatus::stable("0.0.73"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -539,6 +586,15 @@ declare_lint! {
     pub(crate) static INVALID_GENERIC_CLASS = {
         summary: "detects invalid generic classes",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-module-getattr-call.md")]
+    pub(crate) static INVALID_MODULE_GETATTR_CALL = {
+        summary: "detects imports that fail while calling module-level `__getattr__`",
+        status: LintStatus::stable("0.0.72"),
         default_level: Level::Error,
     }
 }
@@ -1101,6 +1157,15 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-slot.md")]
+    pub(crate) static MISSING_SLOT = {
+        summary: "detects assignments to declared attributes without instance storage",
+        status: LintStatus::stable("0.0.75"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/unresolved-import.md")]
     pub(crate) static UNRESOLVED_IMPORT = {
         summary: "detects unresolved imports",
@@ -1442,13 +1507,14 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
 
 // We avoid emitting invalid assignment diagnostic for literal assignments to a `TypedDict`, as
 // they can only occur if we already failed to validate the dict (and emitted some diagnostic).
-pub(crate) fn is_invalid_typed_dict_literal(
-    db: &dyn Db,
-    target_ty: Type,
+pub(crate) fn is_invalid_typed_dict_literal<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    target_ty: Type<'db>,
     source: AnyNodeRef<'_>,
 ) -> bool {
     target_ty
-        .filter_union(db, Type::is_typed_dict)
+        .filter_union(db, env, Type::is_typed_dict)
         .as_typed_dict()
         .is_some()
         && matches!(source, AnyNodeRef::ExprDict(_))
@@ -1477,8 +1543,8 @@ pub(super) fn note_numbers_module_not_supported<'db>(
         let file = target_instance
             .class(db, env)
             .class_literal(db)
-            .python_file(db);
-        if let Some(module) = file_to_module(db, file)
+            .program_file(db);
+        if let Some(module) = file_to_module(db, file.resolver_file(db))
             && module.is_known(db, KnownModule::Numbers)
         {
             let is_numeric = value_ty.is_subtype_of(
@@ -1522,7 +1588,8 @@ fn covariant_supertype_hint<'db>(
             ),
             [1],
         ) => Some(
-            "Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type",
+            "Consider using the supertype `collections.abc.Mapping`, \
+            which is covariant in its value type",
         ),
         _ => None,
     }
@@ -1601,54 +1668,350 @@ pub(super) fn add_invariant_generic_hints<'db>(
     );
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum DeclarationKind {
+    VariadicParameter,
+    KeywordVariadicParameter,
+    Regular,
+}
+
+struct AssignmentDeclarationAnnotation {
+    range: TextRange,
+    declaration_kind: DeclarationKind,
+}
+
+impl AssignmentDeclarationAnnotation {
+    fn into_annotation(
+        self,
+        context: &InferContext,
+        target_type_display: impl fmt::Display,
+        ordinary_message: impl fmt::Display,
+    ) -> Annotation {
+        let annotation = context.secondary(self.range);
+
+        match self.declaration_kind {
+            DeclarationKind::KeywordVariadicParameter => annotation.message(format_args!(
+                "Keyword-variadic parameter annotation declares the type as `{target_type_display}`"
+            )),
+            DeclarationKind::VariadicParameter => annotation.message(format_args!(
+                "Variadic parameter annotation declares the type as `{target_type_display}`"
+            )),
+            DeclarationKind::Regular => annotation.message(ordinary_message),
+        }
+    }
+}
+
+/// Locate the annotation that uniquely declares an assignment target's type.
+fn assignment_declaration_annotation<'db>(
+    context: &InferContext<'db, '_>,
+    definition_kind: &DefinitionKind<'db>,
+    declaration: Option<Definition<'db>>,
+) -> Option<AssignmentDeclarationAnnotation> {
+    let db = context.db();
+    let declaration_definition_kind =
+        if matches!(definition_kind, DefinitionKind::AnnotatedAssignment(_)) {
+            definition_kind
+        } else {
+            declaration?.kind(db)
+        };
+
+    let (annotation, declaration_kind) = match declaration_definition_kind {
+        DefinitionKind::AnnotatedAssignment(assignment) => Some((
+            assignment.annotation(context.module()),
+            DeclarationKind::Regular,
+        )),
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => parameter
+            .node(context.module())
+            .parameter
+            .annotation
+            .as_deref()
+            .map(|annotation| (annotation, DeclarationKind::Regular)),
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicPositionalParameter(
+            parameter,
+        )) => parameter
+            .node(context.module())
+            .annotation
+            .as_deref()
+            .map(|annotation| (annotation, DeclarationKind::VariadicParameter)),
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(
+            parameter,
+        )) => parameter
+            .node(context.module())
+            .annotation
+            .as_deref()
+            .map(|annotation| (annotation, DeclarationKind::KeywordVariadicParameter)),
+        DefinitionKind::Import(_)
+        | DefinitionKind::ImportFrom(_)
+        | DefinitionKind::ImportFromSubmodule(_)
+        | DefinitionKind::StarImport(_)
+        | DefinitionKind::Function(_)
+        | DefinitionKind::Class(_)
+        | DefinitionKind::TypeAlias(_)
+        | DefinitionKind::NamedExpression(_)
+        | DefinitionKind::Assignment(_)
+        | DefinitionKind::AugmentedAssignment(_)
+        | DefinitionKind::DictKeyAssignment(_)
+        | DefinitionKind::For(_)
+        | DefinitionKind::Comprehension(_)
+        | DefinitionKind::LambdaParameter(_)
+        | DefinitionKind::WithItem(_)
+        | DefinitionKind::MatchPattern(_)
+        | DefinitionKind::ExceptHandler(_)
+        | DefinitionKind::TypeVar(_)
+        | DefinitionKind::ParamSpec(_)
+        | DefinitionKind::TypeVarTuple(_)
+        | DefinitionKind::LoopHeader(_)
+        | DefinitionKind::NestedBindings(_) => None,
+    }?;
+
+    Some(AssignmentDeclarationAnnotation {
+        range: annotation.range(),
+        declaration_kind,
+    })
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum AssignmentDiagnosticKind {
+    Invalid,
+    Unsound,
+}
+
+/// Return the expression assigned by an ordinary or named assignment.
+fn assignment_value_node<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    definition_kind: &DefinitionKind<'db>,
+) -> Option<&'ast ast::Expr> {
+    match definition_kind {
+        DefinitionKind::Assignment(assignment) if let Some(unpack) = assignment.unpack() => {
+            let module = context.module();
+            let value = assignment.value(module);
+
+            Some(
+                unpacked_assignment_value(
+                    unpack.target(context.db(), module),
+                    value,
+                    assignment.target(module),
+                )
+                .unwrap_or(value),
+            )
+        }
+        DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_) => {
+            definition_kind.value(context.module())
+        }
+        DefinitionKind::NamedExpression(assignment) => {
+            Some(&*assignment.node(context.module()).value)
+        }
+        DefinitionKind::Import(_)
+        | DefinitionKind::ImportFrom(_)
+        | DefinitionKind::ImportFromSubmodule(_)
+        | DefinitionKind::StarImport(_)
+        | DefinitionKind::Function(_)
+        | DefinitionKind::Class(_)
+        | DefinitionKind::TypeAlias(_)
+        | DefinitionKind::AugmentedAssignment(_)
+        | DefinitionKind::DictKeyAssignment(_)
+        | DefinitionKind::For(_)
+        | DefinitionKind::Comprehension(_)
+        | DefinitionKind::Parameter(_)
+        | DefinitionKind::LambdaParameter(_)
+        | DefinitionKind::WithItem(_)
+        | DefinitionKind::MatchPattern(_)
+        | DefinitionKind::ExceptHandler(_)
+        | DefinitionKind::TypeVar(_)
+        | DefinitionKind::ParamSpec(_)
+        | DefinitionKind::TypeVarTuple(_)
+        | DefinitionKind::LoopHeader(_)
+        | DefinitionKind::NestedBindings(_) => None,
+    }
+}
+
+/// Return the range of an assignment's value, including any surrounding parentheses.
+fn assignment_diagnostic_range(
+    context: &InferContext,
+    target_node: AnyNodeRef,
+    value_node: Option<&ast::Expr>,
+    starred_element: Option<&StarredAssignmentElement>,
+) -> TextRange {
+    if let Some(starred_element) = starred_element {
+        return starred_element.collected_range;
+    }
+
+    value_node
+        .map(|value_node| {
+            // Expand the range to include parentheses around the value, if any. This allows
+            // assignment diagnostics to be suppressed on the opening or closing parenthesis:
+            // ```py
+            // x: str = ( # ty: ignore <- here
+            //     1 + 2 + 3
+            // )  # ty: ignore <- or here
+            // ```
+            parentheses_iterator(value_node.into(), None, context.module().tokens())
+                .last()
+                .unwrap_or(value_node.range())
+        })
+        .unwrap_or_else(|| target_node.range())
+}
+
+/// The incompatible element type and source range collected into a starred unpacking target.
+#[derive(Debug)]
+struct StarredAssignmentElement<'db> {
+    collected_range: TextRange,
+    actual_type: Type<'db>,
+    expected_type: Type<'db>,
+}
+
+fn assignment_display_settings<'db>(
+    context: &InferContext<'db, '_>,
+    target_type: Type<'db>,
+    value_type: Type<'db>,
+    starred_element: Option<&StarredAssignmentElement<'db>>,
+) -> DisplaySettings<'db> {
+    DisplaySettings::from_possibly_ambiguous_types(
+        context.db(),
+        context.program_environment(),
+        starred_element
+            .into_iter()
+            .flat_map(|element| [element.actual_type, element.expected_type])
+            .chain([target_type, value_type]),
+    )
+}
+
+fn starred_assignment_element<'db>(
+    context: &InferContext<'db, '_>,
+    definition_kind: &DefinitionKind<'db>,
+    target_type: Type<'db>,
+    value_type: Type<'db>,
+    diagnostic_kind: AssignmentDiagnosticKind,
+) -> Option<StarredAssignmentElement<'db>> {
+    let DefinitionKind::Assignment(assignment) = definition_kind else {
+        return None;
+    };
+    let unpack = assignment.unpack()?;
+    let db = context.db();
+    let env = context.program_environment();
+    let module = context.module();
+    let collected = starred_assignment_values(
+        unpack.target(db, module),
+        assignment.value(module),
+        assignment.target(module),
+    )?;
+    let expected_type = target_type
+        .try_iterate(db, env)
+        .ok()?
+        .homogeneous_element_type(db, env);
+    let actual_type = value_type
+        .try_iterate(db, env)
+        .ok()?
+        .homogeneous_element_type(db, env);
+
+    let compatible = match diagnostic_kind {
+        AssignmentDiagnosticKind::Invalid => actual_type.is_assignable_to(db, env, expected_type),
+        AssignmentDiagnosticKind::Unsound => {
+            actual_type.is_pure_redundant_with(db, env, expected_type)
+        }
+    };
+    if compatible {
+        return None;
+    }
+
+    Some(StarredAssignmentElement {
+        collected_range: collected.first()?.range().cover(collected.last()?.range()),
+        actual_type,
+        expected_type,
+    })
+}
+
+fn annotate_unpacked_assignment_target(
+    context: &InferContext,
+    diagnostic: &mut LintDiagnosticGuard,
+    target: AnyNodeRef,
+    definition_kind: &DefinitionKind,
+) {
+    if let DefinitionKind::Assignment(assignment) = definition_kind
+        && assignment.unpack().is_some()
+    {
+        diagnostic.annotate(
+            context
+                .secondary(target)
+                .message("Assigned to this variable"),
+        );
+    }
+}
+
+/// Set an assignment's primary message and return whether a message was added.
+fn set_assignment_primary_annotation(
+    diagnostic: &mut LintDiagnosticGuard,
+    definition_kind: &DefinitionKind,
+    value_node: Option<&ast::Expr>,
+    value_type_display: impl fmt::Display,
+    diagnostic_kind: AssignmentDiagnosticKind,
+) -> bool {
+    match (value_node, definition_kind, diagnostic_kind) {
+        (None, DefinitionKind::AugmentedAssignment(_), _) => {
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Augmented assignment produces a value of type `{value_type_display}`"
+            ));
+            true
+        }
+        (Some(_), _, AssignmentDiagnosticKind::Invalid) => {
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Incompatible value of type `{value_type_display}`"
+            ));
+            true
+        }
+        (_, _, AssignmentDiagnosticKind::Unsound) => {
+            diagnostic
+                .set_primary_annotation_message(format_args!("Inferred as `{value_type_display}`"));
+            true
+        }
+        (None, _, AssignmentDiagnosticKind::Invalid) => false,
+    }
+}
+
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
     definition: Definition<'db>,
+    declaration: Option<Definition<'db>>,
     target_ty: Type,
     value_ty: Type<'db>,
 ) {
     let db = context.db();
     let definition_kind = definition.kind(context.db());
-    let value_node = match definition_kind {
-        DefinitionKind::Assignment(def) => Some(def.value(context.module())),
-        DefinitionKind::AnnotatedAssignment(def) => def.value(context.module()),
-        DefinitionKind::NamedExpression(def) => Some(&*def.node(context.module()).value),
-        _ => None,
-    };
+    let value_node = assignment_value_node(context, definition_kind);
+    let original_value_node = definition_kind.value(context.module()).or(value_node);
 
-    if let Some(value_node) = value_node
-        && is_invalid_typed_dict_literal(db, target_ty, value_node.into())
+    if let Some(value_node) = original_value_node
+        && is_invalid_typed_dict_literal(
+            db,
+            context.program_environment(),
+            target_ty,
+            value_node.into(),
+        )
     {
         return;
     }
 
     let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [target_ty, value_ty]);
+    let invalid_element = starred_assignment_element(
+        context,
+        definition_kind,
+        target_ty,
+        value_ty,
+        AssignmentDiagnosticKind::Invalid,
+    );
+    let settings =
+        assignment_display_settings(context, target_ty, value_ty, invalid_element.as_ref());
 
-    let diagnostic_range = if let Some(value_node) = value_node {
-        // Expand the range to include parentheses around the value, if any. This allows
-        // invalid-assignment diagnostics to be suppressed on the opening or closing parenthesis:
-        // ```py
-        // x: str = ( # ty: ignore <- here
-        //     1 + 2 + 3
-        // )  # ty: ignore <- or here
-        // ```
-
-        parentheses_iterator(value_node.into(), None, context.module().tokens())
-            .last()
-            .unwrap_or(value_node.range())
-    } else {
-        target_node.range()
-    };
-
+    let diagnostic_range =
+        assignment_diagnostic_range(context, target_node, value_node, invalid_element.as_ref());
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         diagnostic_range,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
             value_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings)
+            target_ty.display_with(db, env, settings.clone())
         ),
     ) else {
         return;
@@ -1658,13 +2021,15 @@ pub(super) fn report_invalid_assignment<'db>(
         match target_ty {
             Type::ClassLiteral(class) => {
                 diag.info(format_args!(
-                    "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
+                    "Implicit shadowing of class `{}`. \
+                    Add an annotation to make it explicit if this is intentional",
                     class.name(context.db()),
                 ));
             }
             Type::FunctionLiteral(function) => {
                 diag.info(format_args!(
-                    "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
+                    "Implicit shadowing of function `{}`. \
+                    Add an annotation to make it explicit if this is intentional",
                     function.name(context.db()),
                 ));
             }
@@ -1672,33 +2037,47 @@ pub(super) fn report_invalid_assignment<'db>(
         }
     }
 
-    if value_node.is_some() {
-        match definition_kind {
-            DefinitionKind::AnnotatedAssignment(assignment) => {
-                // For annotated assignments, just point to the annotation in the source code.
-                diag.annotate(
-                    context
-                        .secondary(assignment.annotation(context.module()))
-                        .message("Declared type"),
-                );
-            }
-            _ => {
-                // Otherwise, annotate the target with its declared type.
-                diag.annotate(context.secondary(target_node).message(format_args!(
-                    "Declared type `{}`",
-                    target_ty.display(db, env)
-                )));
-            }
-        }
-
-        diag.set_primary_annotation_message(format_args!(
-            "Incompatible value of type `{}`",
-            value_ty.display(db, env),
+    if let Some(declaration_annotation) =
+        assignment_declaration_annotation(context, definition_kind, declaration)
+    {
+        diag.annotate(declaration_annotation.into_annotation(
+            context,
+            target_ty.display_with(db, env, settings.clone()),
+            "Declared type",
         ));
+        annotate_unpacked_assignment_target(context, &mut diag, target_node, definition_kind);
+    } else if value_node.is_some() {
+        diag.annotate(context.secondary(target_node).message(format_args!(
+            "Declared type `{}`",
+            target_ty.display_with(db, env, settings.clone())
+        )));
+    }
 
+    let has_primary_annotation = if let Some(element) = invalid_element {
+        diag.set_primary_annotation_message(format_args!(
+            "Incompatible iterable element of type `{}` (expected `{}`)",
+            element.actual_type.display_with(db, env, settings.clone()),
+            element
+                .expected_type
+                .display_with(db, env, settings.clone()),
+        ));
+        true
+    } else {
+        set_assignment_primary_annotation(
+            &mut diag,
+            definition_kind,
+            value_node,
+            value_ty.display_with(db, env, settings),
+            AssignmentDiagnosticKind::Invalid,
+        )
+    };
+
+    if value_node.is_some() {
         let error_context = value_ty.assignability_error_context(db, env, target_ty);
         error_context.attach_to(db, env, &mut diag);
+    }
 
+    if has_primary_annotation {
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.headline_message().to_string();
         diag.set_concise_message(message);
@@ -1707,6 +2086,95 @@ pub(super) fn report_invalid_assignment<'db>(
     // special case message
     note_numbers_module_not_supported(db, env, &mut diag, target_ty, value_ty);
     add_invariant_generic_hints(db, env, &mut diag, target_ty, value_ty);
+}
+
+/// Report an assignment whose value is not a subtype of its declared type.
+pub(super) fn report_unsound_assignment<'db>(
+    context: &InferContext<'db, '_>,
+    target_node: AnyNodeRef,
+    definition: Definition<'db>,
+    declaration: Option<Definition<'db>>,
+    target_ty: Type<'db>,
+    value_ty: Type<'db>,
+    expression_type: impl FnOnce(&ast::Expr) -> Type<'db>,
+) {
+    let db = context.db();
+    let env = context.program_environment();
+    let definition_kind = definition.kind(db);
+    let (target_node, value_node) =
+        if let DefinitionKind::AugmentedAssignment(assignment) = definition_kind {
+            let assignment = assignment.node(context.module());
+
+            if expression_type(&assignment.value).is_equivalent_to(db, env, value_ty) {
+                (target_node, Some(assignment.value.as_ref()))
+            } else {
+                (assignment.into(), None)
+            }
+        } else {
+            (target_node, assignment_value_node(context, definition_kind))
+        };
+
+    let unsound_element = starred_assignment_element(
+        context,
+        definition_kind,
+        target_ty,
+        value_ty,
+        AssignmentDiagnosticKind::Unsound,
+    );
+    let diagnostic_range =
+        assignment_diagnostic_range(context, target_node, value_node, unsound_element.as_ref());
+
+    let Some(builder) = context.report_lint(&UNSOUND_ASSIGNMENT, diagnostic_range) else {
+        return;
+    };
+
+    let settings =
+        assignment_display_settings(context, target_ty, value_ty, unsound_element.as_ref());
+    let actual_display = value_ty.display_with(db, env, settings.clone());
+    let expected_display = target_ty.display_with(db, env, settings.clone());
+
+    let mut diagnostic = builder.into_diagnostic("Unsound assignment");
+    diagnostic.set_concise_message(format_args!(
+        "Unsound assignment: `{actual_display}` is not a subtype of `{expected_display}`"
+    ));
+    if let Some(element) = unsound_element {
+        diagnostic.set_primary_annotation_message(format_args!(
+            "Iterable element inferred as `{}` (expected a subtype of `{}`)",
+            element.actual_type.display_with(db, env, settings.clone()),
+            element.expected_type.display_with(db, env, settings),
+        ));
+    } else {
+        set_assignment_primary_annotation(
+            &mut diagnostic,
+            definition_kind,
+            value_node,
+            &actual_display,
+            AssignmentDiagnosticKind::Unsound,
+        );
+    }
+
+    if let Some(declaration_annotation) =
+        assignment_declaration_annotation(context, definition_kind, declaration)
+    {
+        diagnostic.annotate(declaration_annotation.into_annotation(
+            context,
+            &expected_display,
+            format_args!("Expected a subtype of `{expected_display}` because of this annotation"),
+        ));
+        annotate_unpacked_assignment_target(context, &mut diagnostic, target_node, definition_kind);
+    } else if value_node.is_some() {
+        diagnostic.annotate(context.secondary(target_node).message(format_args!(
+            "Expected a subtype of `{expected_display}` because of its declared type"
+        )));
+    }
+
+    diagnostic.info(format_args!(
+        "`{actual_display}` is assignable to `{expected_display}`, \
+        but not a subtype of `{expected_display}`"
+    ));
+    let error_context = value_ty.pure_redundancy_error_context(db, env, target_ty);
+    error_context.attach_to(db, env, &mut diagnostic);
+    diagnostic.help("Consider using an `assert` to narrow the type before assigning it");
 }
 
 pub(super) fn report_invalid_attribute_assignment(
@@ -1723,13 +2191,14 @@ pub(super) fn report_invalid_attribute_assignment(
     // diagnostic being emitted here.
 
     let env = &context.program_environment();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display(db, env),
-            target_ty.display(db, env),
+            source_ty.display_with(db, env, settings.clone()),
+            target_ty.display_with(db, env, settings),
         ),
     ) else {
         return;
@@ -1737,6 +2206,145 @@ pub(super) fn report_invalid_attribute_assignment(
 
     let error_context = source_ty.assignability_error_context(db, env, target_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+/// Reports an invalid implicit call to a descriptor's `__get__` method.
+pub(super) fn report_bad_dunder_get_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    descriptor_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+    if let Some(property) = failure.as_attempt_to_get_property_with_no_getter() {
+        let Some(builder) = context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) else {
+            return;
+        };
+        let object_type = object_type.display(db, env);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot read property `{attribute}` \
+            on object of type `{object_type}` \
+            because it has no getter",
+        ));
+        if let Some(file_range) = property
+            .setter(db)
+            .and_then(|setter| setter.definition(db, env))
+            .or_else(|| {
+                property
+                    .deleter(db)
+                    .and_then(|deleter| deleter.definition(db, env))
+            })
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no getter"),
+            ));
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Attempted access to `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        failure.report_diagnostics_with_override(
+            context,
+            target.into(),
+            &CallDiagnosticOverride {
+                lint: &INVALID_ATTRIBUTE_ACCESS,
+                message: format!(
+                    "Invalid access to descriptor attribute `{attribute}` on type `{}`",
+                    object_type.display(db, env),
+                ),
+                info: &format!(
+                    "This access implicitly calls `__get__` on a descriptor of type `{}`",
+                    descriptor_type.display(db, env),
+                ),
+                argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+            },
+        );
+    }
+}
+
+/// A special method invoked implicitly while accessing an attribute.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AttributeAccessMethod {
+    GetAttr,
+    GetAttribute,
+}
+
+impl AttributeAccessMethod {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::GetAttr => "__getattr__",
+            Self::GetAttribute => "__getattribute__",
+        }
+    }
+}
+
+/// Reports an invalid implicit `__getattr__` or `__getattribute__` call.
+///
+/// ```python
+/// class C:
+///     def __getattr__(self) -> int: ...
+///
+/// C().missing  # Invalid: Python passes the attribute name to __getattr__.
+/// ```
+///
+/// Preserves the underlying call diagnostic and explains why attribute access invoked the method.
+pub(super) fn report_bad_attribute_access_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+    method: AttributeAccessMethod,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+
+    failure.report_diagnostics_with_override(
+        context,
+        target.into(),
+        &CallDiagnosticOverride {
+            lint: &INVALID_ATTRIBUTE_ACCESS,
+            message: format!(
+                "Invalid access to attribute `{attribute}` on type `{}`",
+                object_type.display(db, env),
+            ),
+            info: &format!("This access implicitly calls `{}`", method.as_str()),
+            argument_ranges: &[target.range()],
+        },
+    );
+}
+
+/// Reports an import that fails while implicitly calling module-level `__getattr__`.
+///
+/// ```python
+/// from package import missing  # Calls package.__getattr__("missing").
+/// ```
+pub(super) fn report_bad_import_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    module: ModuleLiteralType<'db>,
+    target: &ast::Alias,
+    name: &str,
+) {
+    let db = context.db();
+
+    failure.report_diagnostics_with_override(
+        context,
+        target.into(),
+        &CallDiagnosticOverride {
+            lint: &INVALID_MODULE_GETATTR_CALL,
+            message: format!(
+                "Cannot import `{name}` from module `{}`",
+                module.module(db).name(db),
+            ),
+            info: "This import implicitly calls a module-level `__getattr__` function",
+            argument_ranges: &[target.range()],
+        },
+    );
 }
 
 pub(super) fn report_bad_dunder_set_call<'db>(
@@ -1857,13 +2465,168 @@ pub(super) fn report_bad_dunder_delattr_call(
     ));
     if binding_error {
         diagnostic.info(format_args!(
-            "Type `{}` has a `__delattr__` method, but it cannot be called with the expected arguments",
+            "Type `{}` has a `__delattr__` method, \
+            but it cannot be called with the expected arguments",
             object_type.display(db, env)
         ));
         diagnostic.info(
             "Expected a signature at least as permissive as \
             `def __delattr__(self, name: str, /) -> None`",
         );
+    }
+}
+
+pub(super) fn report_dynamic_function_decorator_return<'db>(
+    context: &InferContext<'db, '_>,
+    decorator: &ast::Decorator,
+    decorated_ty: Type<'db>,
+    decorator_bindings: &Bindings<'db>,
+    decorated_function: &ast::StmtFunctionDef,
+    return_ty: Type<'db>,
+) {
+    let Some(builder) = context.report_lint(&DYNAMIC_FUNCTION_DECORATOR_RETURN, decorator) else {
+        return;
+    };
+
+    let db = context.db();
+    let env = context.program_environment();
+    let returned = return_ty.display(db, env);
+
+    let mut diagnostic = builder.into_diagnostic(format_args!("Decorator returns `{returned}`"));
+
+    let mut secondary_annotation = context.secondary(&decorated_function.name);
+
+    // A function literal is already known to be callable. Resolving its signature here can
+    // create a cycle if an annotation refers back to the decorated name, as in
+    // `def f(x: lambda: f): ...`.
+    secondary_annotation = if decorated_ty.is_function_literal()
+        || decorated_ty.try_upcast_to_callable(db, env).is_some()
+    {
+        secondary_annotation.message(format_args!(
+            "Signature of `{}` will be obscured by the decorator",
+            decorated_function.name.id
+        ))
+    } else {
+        secondary_annotation.message(format_args!(
+            "Previous type of `{}` will be obscured by the decorator",
+            decorated_function.name.id
+        ))
+    };
+
+    diagnostic.annotate(secondary_annotation);
+
+    // Union and intersection bindings can refer to different callables, so there is no single
+    // decorator definition or set of overloads that can be safely highlighted.
+    let Some(decorator_binding) = decorator_bindings.single_element() else {
+        return;
+    };
+
+    let decorator_function = match decorator_binding.signature_type {
+        Type::FunctionLiteral(function) => function,
+        Type::BoundMethod(method) => method.function(db),
+        _ => return,
+    };
+
+    let decorator_definition = decorator_function.definition(db);
+    let (overloads, _) = decorator_function.overloads_and_implementation(db);
+
+    let mut matching_overloads =
+        decorator_binding
+            .matching_overloads()
+            .filter_map(|(overload_index, binding)| {
+                let overload_index = binding
+                    .signature
+                    .source_overload_index()
+                    .unwrap_or(overload_index);
+                overloads.get(overload_index).copied()
+            });
+
+    let matched_overload = matching_overloads.next();
+    let next_matching_overload = matching_overloads.next();
+    let has_multiple_matching_overloads = next_matching_overload.is_some();
+
+    let definition_span = match (overloads, has_multiple_matching_overloads) {
+        ([first, .., last], true) => {
+            let first_span = first.spans(db).decorators_and_header;
+            let last_span = last.spans(db).decorators_and_header;
+            match (first_span.range(), last_span.range()) {
+                (Some(first_range), Some(last_range)) => {
+                    first_span.with_range(first_range.cover(last_range))
+                }
+                _ => decorator_function.spans(db).signature,
+            }
+        }
+        _ => matched_overload
+            .map(|overload| overload.spans(db).signature)
+            .unwrap_or_else(|| decorator_function.spans(db).signature),
+    };
+
+    let definition_annotation = Annotation::secondary(definition_span);
+
+    let missing_return_annotations = if let Some(matched_overload) = matched_overload {
+        !matched_overload.has_explicit_return_annotation(db)
+            || next_matching_overload
+                .into_iter()
+                .chain(matching_overloads)
+                .any(|overload| !overload.has_explicit_return_annotation(db))
+    } else {
+        !decorator_function.has_explicit_return_annotation(db)
+    };
+
+    let should_add_hint = missing_return_annotations
+        && (decorator_definition.file(db) == context.file()
+            || file_to_module(db, decorator_definition.program_file(db).resolver_file(db))
+                .and_then(|module| module.search_path(db))
+                .is_some_and(SearchPath::is_first_party));
+
+    match decorator_definition.name(db) {
+        Some(name) => {
+            let decorator_description =
+                CallableDescription::new(db, Type::FunctionLiteral(decorator_function));
+            let name = decorator_description
+                .as_ref()
+                .map(CallableDescription::name)
+                .unwrap_or_else(|| name.as_str());
+
+            if has_multiple_matching_overloads {
+                diagnostic.annotate(
+                    definition_annotation
+                        .message(format_args!("Overloads of `{name}` defined here")),
+                );
+            } else if matched_overload.is_some() {
+                diagnostic
+                    .annotate(definition_annotation.message("Matching overload defined here"));
+            } else {
+                diagnostic
+                    .annotate(definition_annotation.message(format_args!("`{name}` defined here")));
+            }
+            if should_add_hint {
+                if has_multiple_matching_overloads {
+                    diagnostic.help(format_args!(
+                        "Ensure all `{name}` overloads have a return annotation"
+                    ));
+                } else {
+                    diagnostic.help(format_args!("Add a return type annotation to `{name}`"));
+                }
+            }
+        }
+        None => {
+            diagnostic.annotate(definition_annotation.message(
+                if has_multiple_matching_overloads {
+                    "Decorator overloads defined here"
+                } else {
+                    "Decorator defined here"
+                },
+            ));
+
+            if should_add_hint {
+                diagnostic.help(if has_multiple_matching_overloads {
+                    "Ensure all overloads have a return annotation"
+                } else {
+                    "Add a return type annotation to the decorator"
+                });
+            }
+        }
     }
 }
 
@@ -1899,6 +2662,53 @@ pub(super) fn report_invalid_return_type(
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+pub(super) fn report_unsound_return_statement(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_range: impl Ranged,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&UNSOUND_RETURN_STATEMENT, object_range) else {
+        return;
+    };
+
+    let env = &context.program_environment();
+
+    // `TypeIs`-annotated functions are expected to return `bool`;
+    // this needs to be normalized before we figure out the error context
+    // and before we display the types.
+    let expected_ty = match expected_ty.resolve_type_alias(db) {
+        Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
+        _ => expected_ty,
+    };
+
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+
+    let mut diag = builder.into_diagnostic("Unsound return statement");
+    let actual_ty_display = actual_ty.display_with(db, env, settings.clone());
+    let expected_ty_display = expected_ty.display_with(db, env, settings);
+
+    diag.set_concise_message(format_args!(
+        "Unsound return statement: `{actual_ty_display}` is not a subtype \
+        of `{expected_ty_display}`"
+    ));
+    diag.set_primary_annotation_message(format_args!("Inferred as `{actual_ty_display}`"));
+    diag.annotate(context.secondary(return_type_range).message(format_args!(
+        "Expected a subtype of `{expected_ty_display}` because of the return type",
+    )));
+
+    diag.info(format_args!(
+        "`{actual_ty_display}` is assignable to `{expected_ty_display}`, \
+        but not a subtype of `{expected_ty_display}`",
+    ));
+    let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diag);
+    diag.help("Consider using an `assert` to narrow the type prior to the `return` statement");
 }
 
 pub(super) fn report_invalid_generator_function_return_type(
@@ -1968,14 +2778,16 @@ pub(super) fn report_invalid_generator_yield_type(
             "yield",
             "Yield expression type does not match annotation",
             format!(
-                "Yield type `{actual_display}` does not match annotated yield type `{expected_display}`"
+                "Yield type `{actual_display}` does not match annotated yield type \
+                `{expected_display}`"
             ),
         ),
         GeneratorMismatchKind::SendType => (
             "send",
             "Send type does not match annotation",
             format!(
-                "Send type `{actual_display}` does not match annotated send type `{expected_display}`"
+                "Send type `{actual_display}` does not match annotated send type \
+                `{expected_display}`"
             ),
         ),
     };
@@ -2000,6 +2812,78 @@ pub(super) fn report_invalid_generator_yield_type(
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+pub(super) fn report_unsound_yield(
+    context: &InferContext,
+    yield_value: impl Ranged,
+    kind: YieldKind,
+    return_type_span: Option<Span>,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&UNSOUND_YIELD, yield_value) else {
+        return;
+    };
+
+    let env = context.program_environment();
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+    let actual_display = actual_ty.display_with(db, env, settings.clone());
+    let expected_display = expected_ty.display_with(db, env, settings);
+
+    let mut diagnostic = builder.into_diagnostic(format_args!("Unsound `{kind}`"));
+    diagnostic.set_concise_message(format_args!(
+        "Unsound `{kind}`: `{actual_display}` is not a subtype of `{expected_display}`"
+    ));
+
+    match kind {
+        YieldKind::Yield => diagnostic
+            .set_primary_annotation_message(format_args!("Inferred as `{actual_display}`")),
+        YieldKind::YieldFrom => diagnostic.set_primary_annotation_message(format_args!(
+            "Yielded elements inferred as `{actual_display}`"
+        )),
+    }
+
+    if let Some(return_type_span) = return_type_span {
+        diagnostic.annotate(
+            Annotation::secondary(return_type_span).message(format_args!(
+                "Expected a subtype of `{expected_display}` because of the yield type"
+            )),
+        );
+    }
+
+    diagnostic.info(format_args!(
+        "`{actual_display}` is assignable to `{expected_display}`, \
+        but not a subtype of `{expected_display}`"
+    ));
+    let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diagnostic);
+
+    match kind {
+        YieldKind::Yield => {
+            diagnostic.help("Consider using an `assert` to narrow the type before yielding it");
+        }
+        YieldKind::YieldFrom => diagnostic.help(
+            "Consider using `assert`s to narrow the types of the elements before yielding them",
+        ),
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(super) enum YieldKind {
+    Yield,
+    YieldFrom,
+}
+
+impl std::fmt::Display for YieldKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            YieldKind::Yield => f.write_str("yield"),
+            YieldKind::YieldFrom => f.write_str("yield from"),
+        }
+    }
 }
 
 pub(super) fn report_implicit_return_type(
@@ -2027,7 +2911,8 @@ pub(super) fn report_implicit_return_type(
     // If no return statement is defined in the function, then the function always returns `None`
     let mut diagnostic = if no_return {
         let mut diag = builder.into_diagnostic(format_args!(
-            "Function always implicitly returns `None`, which is not assignable to return type `{}`",
+            "Function always implicitly returns `None`, \
+            which is not assignable to return type `{}`",
             expected_ty.display(db, env),
         ));
         diag.info(
@@ -2126,6 +3011,24 @@ pub(super) fn report_possibly_missing_attribute(
     };
 }
 
+/// Add an autofix to `diagnostic` that replaces the given node with `NotImplementedError`
+/// iff `NotImplementedError` definitely has a builtin binding from the given scope.
+pub(crate) fn autofix_with_notimplementederror(
+    context: &InferContext,
+    diagnostic: &mut Diagnostic,
+    node: &ast::Expr,
+) {
+    if SemanticModel::new(context.db(), context.program_file())
+        .definitely_has_builtin_binding("NotImplementedError", node.into())
+    {
+        diagnostic.help("Use `NotImplementedError` instead");
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            "NotImplementedError".to_string(),
+            node.range(),
+        )));
+    }
+}
+
 pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     node: &'ast ast::ExprTuple,
@@ -2154,6 +3057,7 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
             diagnostic.annotate(
                 Annotation::secondary(span).message("Did you mean `NotImplementedError`?"),
             );
+            autofix_with_notimplementederror(context, &mut diagnostic, sub_node);
         }
     }
 
@@ -2173,6 +3077,7 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
         let mut diag =
             builder.into_diagnostic("Cannot catch `NotImplemented` in an exception handler");
         diag.set_primary_annotation_message("Did you mean `NotImplementedError`?");
+        autofix_with_notimplementederror(context, &mut diag, node);
         diag
     } else {
         let mut diag = builder.into_diagnostic(format_args!(
@@ -2209,6 +3114,7 @@ pub(crate) fn report_invalid_exception_raised(
         let mut diagnostic = builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`"));
         diagnostic.set_primary_annotation_message("Did you mean `NotImplementedError`?");
         diagnostic.info("Can only raise an instance or subclass of `BaseException`");
+        autofix_with_notimplementederror(context, &mut diagnostic, raised_node);
     } else {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot raise object of type `{}`",
@@ -2229,6 +3135,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
             "Cannot use `NotImplemented` as an exception cause",
         ));
         diag.set_primary_annotation_message("Did you mean `NotImplementedError`?");
+        autofix_with_notimplementederror(context, &mut diag, node);
         diag
     } else {
         builder.into_diagnostic(format_args!(
@@ -2287,14 +3194,15 @@ pub(crate) fn report_instance_layout_conflict(
             match disjoint_base.kind {
                 DisjointBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
-                        "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
+                        "`{base}` instances have a distinct memory layout \
+                        because `{base}` defines non-empty `__slots__`",
                         base = originating_base.name(db)
                     ));
                 }
                 DisjointBaseKind::DisjointBaseDecorator => {
                     annotation = annotation.message(format_args!(
-                        "`{base}` instances have a distinct memory layout because of the way `{base}` \
-                        is implemented in a C extension",
+                        "`{base}` instances have a distinct memory layout \
+                        because of the way `{base}` is implemented in a C extension",
                         base = originating_base.name(db)
                     ));
                 }
@@ -2313,8 +3221,8 @@ pub(crate) fn report_instance_layout_conflict(
 
             additional_annotation = match disjoint_base.kind {
                 DisjointBaseKind::DefinesSlots => additional_annotation.message(format_args!(
-                    "`{disjoint_base}` instances have a distinct memory layout because `{disjoint_base}` \
-                        defines non-empty `__slots__`",
+                    "`{disjoint_base}` instances have a distinct memory layout \
+                    because `{disjoint_base}` defines non-empty `__slots__`",
                     disjoint_base = disjoint_base.class.name(db),
                 )),
 
@@ -2590,7 +3498,8 @@ pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Too many positional subpatterns for `{class_display}`: expected {positional_limit}, got {positional_count}"
+        "Too many positional subpatterns for `{class_display}`: \
+        expected {positional_limit}, got {positional_count}"
     ));
 }
 
@@ -2640,8 +3549,9 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
     add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(format_args!(
-        "A protocol class can only be used in `{function_name}` checks if it is decorated \
-            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
+        "A protocol class can only be used in `{function_name}` checks \
+        if it is decorated with `@typing.runtime_checkable` \
+        or `@typing_extensions.runtime_checkable`"
     ));
     diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
 }
@@ -2718,7 +3628,8 @@ pub(crate) fn report_runtime_check_against_typed_dict(
     };
     let class_name = class.name(context.db());
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "`TypedDict` class `{class_name}` cannot be used as the second argument to `{function_name}`",
+        "`TypedDict` class `{class_name}` cannot be used as the second argument \
+        to `{function_name}`",
         function_name = function.name()
     ));
     diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
@@ -2740,8 +3651,9 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
     diagnostic.set_primary_annotation_message("This will raise `TypeError` at runtime");
     add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(
-        "A protocol class can only be used in a match class pattern if it is decorated \
-            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`",
+        "A protocol class can only be used in a match class pattern \
+        if it is decorated with `@typing.runtime_checkable` \
+        or `@typing_extensions.runtime_checkable`",
     );
     diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
 }
@@ -3110,7 +4022,8 @@ pub(crate) fn report_invalid_or_unsupported_base(
                 };
                 explain_mro_entries(&mut diagnostic);
                 diagnostic.info(format_args!(
-                    "Type `{}` has an `__mro_entries__` method, but it does not return a tuple of types",
+                    "Type `{}` has an `__mro_entries__` method, \
+                    but it does not return a tuple of types",
                     base_type.display(db, env)
                 ));
             }
@@ -3189,7 +4102,8 @@ pub(crate) fn report_unsupported_base(
         base_type.display(db, env)
     ));
     diagnostic.info(format_args!(
-        "ty cannot resolve a consistent method resolution order (MRO) for class `{}` due to this base",
+        "ty cannot resolve a consistent method resolution order (MRO) for class `{}` \
+        due to this base",
         class.name(db)
     ));
     diagnostic.info("Only class objects or `Any` are supported as class bases");
@@ -3275,14 +4189,16 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         ));
                     }
                     diagnostic.set_concise_message(format_args!(
-                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
+                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - \
+                        did you mean \"{suggestion}\"?",
                     ));
                 } else {
                     diagnostic
                         .set_primary_annotation_message(format_args!("Unknown key \"{key}\""));
                     if let Some(full_ty) = full_object_ty {
                         diagnostic.set_concise_message(format_args!(
-                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` (subscripted object has type `{full_ty}`)",
+                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` \
+                            (subscripted object has type `{full_ty}`)",
                             full_ty = full_ty.display(db, env),
                         ));
                     } else {
@@ -3484,7 +4400,8 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
             "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
         TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
-            "Cannot delete read-only extra item \"{field_name}\" from TypedDict `{typed_dict_name}`"
+            "Cannot delete read-only extra item \"{field_name}\" \
+            from TypedDict `{typed_dict_name}`"
         )),
         TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
             "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
@@ -3526,7 +4443,8 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     // Add hint about how to allow deletion
     if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey) {
         diagnostic.info(
-            "Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted",
+            "Only keys marked as `NotRequired` \
+            (or in a TypedDict with `total=False`) can be deleted",
         );
     }
 }
@@ -3553,8 +4471,9 @@ pub(crate) fn report_invalid_type_param_order<'db>(
             )
         })
         .expect(
-            "It should not be possible for a class to have a legacy generic context \
-            if it does not inherit from `Protocol[]` or `Generic[]`",
+            "It should not be possible for a class to have \
+            a legacy generic context if it does \
+            not inherit from `Protocol[]` or `Generic[]`",
         );
 
     let base_node = &node.bases()[base_index];
@@ -3807,10 +4726,12 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` \
+        already bound by an enclosing scope",
     ));
     diagnostic.set_concise_message(format_args!(
-        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` \
+        already bound by an enclosing scope",
     ));
     diagnostic.set_primary_annotation_message(format_args!(
         "`{typevar_name}` used in {kind} definition here"
@@ -4049,20 +4970,20 @@ pub(super) fn report_incompatible_base_method<'db>(
 
     let (selected_owner, selected_definition, selected_decorator) = selected;
     let (contract_owner, contract_definition, contract_decorator) = contract;
-    let (selected_name, contract_name) = if selected_owner.name(db) == contract_owner.name(db) {
-        (
-            selected_owner.qualified_name(db).to_string(),
-            contract_owner.qualified_name(db).to_string(),
-        )
-    } else {
-        (
-            selected_owner.name(db).to_string(),
-            contract_owner.name(db).to_string(),
-        )
-    };
+    let types = [
+        Type::from(class),
+        Type::from(selected_owner),
+        Type::from(contract_owner),
+    ];
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, context.program_environment(), types);
+    let class_name = ClassLiteral::Static(class).display_with(db, settings.clone());
+    let selected_name = selected_owner
+        .class_literal(db)
+        .display_with(db, settings.clone());
+    let contract_name = contract_owner.class_literal(db).display_with(db, settings);
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Base classes for class `{}` define method `{member}` incompatibly",
-        class.name(db)
+        "Base classes for class `{class_name}` define method `{member}` incompatibly",
     ));
     diagnostic.set_primary_annotation_message(format_args!(
         "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
@@ -4668,7 +5589,9 @@ pub(super) fn report_invalid_total_ordering_call(
     };
 
     let mut diagnostic = builder.into_diagnostic(
-        "`@functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined",
+        "`@functools.total_ordering` requires at least one ordering method \
+        (`__lt__`, `__le__`, `__gt__`, or `__ge__`) \
+        to be defined",
     );
     diagnostic.set_primary_annotation_message(format_args!(
         "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
@@ -4689,6 +5612,8 @@ pub(super) fn report_invalid_total_ordering_call(
 /// The function returns `true` if a hint was added, `false` otherwise.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
+    file: File,
+    env: &ProgramEnvironment<'_>,
     diagnostic: &mut Diagnostic,
     full_submodule_name: &ModuleName,
     parent_module: Module,
@@ -4701,7 +5626,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         return false;
     }
 
-    let program = ty_python_core::program::Program::get(db);
+    let program = env.program(db);
     let typeshed_versions = program.search_paths(db).typeshed_versions();
 
     let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {
@@ -4721,7 +5646,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(db, file, diagnostic, "resolving modules");
 
     true
 }
@@ -4736,6 +5661,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 /// misconfigured their Python version.
 pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
+    source_file: ProgramFile<'_>,
     mut diagnostic: LintDiagnosticGuard,
     value_type: Type,
     attr: &str,
@@ -4748,7 +5674,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
         return;
     };
     let module = module_ty.module(db);
-    let Some(file) = module.python_file(db) else {
+    let Some(module_file) = module.file(db) else {
         return;
     };
     let Some(search_path) = module.search_path(db) else {
@@ -4761,7 +5687,8 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // We populate place_table entries for stdlib items across all known versions and platforms,
     // so if this lookup succeeds then we know that this lookup *could* succeed with possible
     // configuration changes.
-    let symbol_table = place_table(db, global_scope(db, file));
+    let program_file = ProgramFile::new(db, module_file, source_file.program(db));
+    let symbol_table = place_table(db, global_scope(db, program_file));
     let Some(symbol) = symbol_table.symbol_by_name(attr) else {
         return;
     };
@@ -4776,7 +5703,12 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // TODO: determine what version they need to be on
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
+    add_inferred_python_version_hint_to_diagnostic(
+        db,
+        source_file.file(db),
+        &mut diagnostic,
+        action,
+    );
 }
 
 pub(super) fn report_invalid_concatenate_last_arg<'db>(

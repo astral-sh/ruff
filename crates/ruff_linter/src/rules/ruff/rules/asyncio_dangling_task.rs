@@ -49,9 +49,23 @@ use crate::checkers::ast::Checker;
 ///     task.add_done_callback(background_tasks.discard)
 /// ```
 ///
+/// Or, for Python 3.11 and later, use structured concurrency with
+/// `asyncio.TaskGroup` when the tasks should be awaited as part of the current
+/// operation:
+/// ```python
+/// import asyncio
+///
+///
+/// async def main() -> None:
+///     async with asyncio.TaskGroup() as tg:
+///         for i in range(10):
+///             tg.create_task(some_coro(param=i))
+/// ```
+///
 /// ## References
 /// - [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
-/// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
+/// - [Python documentation: `asyncio.create_task`](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
+/// - [Python documentation: `asyncio.TaskGroup`](https://docs.python.org/3/library/asyncio-task.html#asyncio.TaskGroup)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.247")]
 pub(crate) struct AsyncioDanglingTask {

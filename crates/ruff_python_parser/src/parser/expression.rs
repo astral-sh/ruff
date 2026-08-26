@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use bitflags::bitflags;
-use rustc_hash::{FxBuildHasher, FxHashSet};
 use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
@@ -248,9 +247,11 @@ impl<'src> Parser<'src> {
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
-        let start = self.node_start();
-        let lhs = self.parse_lhs_expression(left_precedence, context);
-        self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+        self.with_recursion(|parser| {
+            let start = parser.node_start();
+            let lhs = parser.parse_lhs_expression(left_precedence, context);
+            parser.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+        })
     }
 
     fn parse_binary_expression_or_higher_recursive(
@@ -303,22 +304,7 @@ impl<'src> Parser<'src> {
                 BinaryLikeOperator::Binary(bin_op) => {
                     self.bump(TokenKind::from(bin_op));
 
-                    let right = if new_precedence.is_right_associative() {
-                        // For right-associative operators (`**`), the right
-                        // operand recursion is unbounded in `a**a**a**...`,
-                        // and it bypasses the guard in `parse_lhs_expression`
-                        // (that scope is exited once the atom is parsed).
-                        if let Some(right) = self.with_recursion(|parser| {
-                            parser.parse_binary_expression_or_higher(new_precedence, context)
-                        }) {
-                            right
-                        } else {
-                            self.report_recursion_limit_exceeded(self.current_token_range());
-                            self.recursion_recovery_expr()
-                        }
-                    } else {
-                        self.parse_binary_expression_or_higher(new_precedence, context)
-                    };
+                    let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
                     Expr::BinOp(ast::ExprBinOp {
                         left: Box::new(left.expr),
@@ -349,59 +335,6 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        if !Self::token_starts_recursive_lhs(token) {
-            return self.parse_lhs_expression_inner(left_precedence, context, token);
-        }
-
-        if let Some(result) = self.with_recursion(|parser| {
-            parser.parse_lhs_expression_inner(left_precedence, context, token)
-        }) {
-            result
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
-        }
-    }
-
-    /// Returns whether parsing an expression that starts with `token` can
-    /// immediately recurse through another expression parse.
-    #[inline]
-    fn token_starts_recursive_lhs(token: TokenKind) -> bool {
-        token.as_unary_operator().is_some()
-            || matches!(
-                token,
-                TokenKind::Star
-                    | TokenKind::Await
-                    | TokenKind::Lambda
-                    | TokenKind::Yield
-                    | TokenKind::FStringStart
-                    | TokenKind::TStringStart
-                    | TokenKind::Lpar
-                    | TokenKind::Lsqb
-                    | TokenKind::Lbrace
-            )
-    }
-
-    /// The standard expression-recovery node returned when the recursion
-    /// limit is exceeded: an empty `Name` with the `Invalid` context.
-    fn recursion_recovery_expr(&mut self) -> ParsedExpr {
-        ParsedExpr {
-            expr: Expr::Name(ast::ExprName {
-                range: self.missing_node_range(),
-                id: Name::empty(),
-                ctx: ExprContext::Invalid,
-                node_index: AtomicNodeIndex::NONE,
-            }),
-            is_parenthesized: false,
-        }
-    }
-
-    fn parse_lhs_expression_inner(
-        &mut self,
-        left_precedence: OperatorPrecedence,
-        context: ExpressionContext,
-        token: TokenKind,
-    ) -> ParsedExpr {
         let start = self.node_start();
 
         if let Some(unary_op) = token.as_unary_operator() {
@@ -417,11 +350,11 @@ impl<'src> Parser<'src> {
                     );
                 }
             } else {
+                // > The power operator `**` binds less tightly than an arithmetic
+                // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
+                //
+                // Reference: https://docs.python.org/3/reference/expressions.html#id21
                 if left_precedence > OperatorPrecedence::PosNegBitNot
-                    // > The power operator `**` binds less tightly than an arithmetic
-                    // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
-                    //
-                    // Reference: https://docs.python.org/3/reference/expressions.html#id21
                     && left_precedence != OperatorPrecedence::Exponent
                 {
                     self.add_error(
@@ -754,20 +687,8 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
-                TokenKind::Lpar => {
-                    if self.tokens.nesting() > self.max_nesting_depth {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        break lhs;
-                    }
-                    Expr::Call(self.parse_call_expression(lhs, start))
-                }
-                TokenKind::Lsqb => {
-                    if self.tokens.nesting() > self.max_nesting_depth {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        break lhs;
-                    }
-                    Expr::Subscript(self.parse_subscript_expression(lhs, start))
-                }
+                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
+                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => {
                     Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
                 }
@@ -788,11 +709,12 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
     fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
         let arguments = self.parse_arguments(ArgumentsContext::Call);
+        debug_assert_eq!(self.node_range(start).end(), arguments.end());
 
         ast::ExprCall {
             func: Box::new(func),
             arguments,
-            range: self.node_range(start),
+            range_start: start,
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -1465,16 +1387,20 @@ impl<'src> Parser<'src> {
                 // We could convert the node into a string and mark it as invalid
                 // and would be clever to mark the type which is fewer in quantity.
 
+                // test_err mixed_tstring_and_bytes_literals
+                // t'first' b'second'
+                // b'first' t'second'
+                // t'first' br'second'
+                // 'first' b'second' t'third'
+                // b'first' 'second' t'third'
+                // 'first' t'second' 'third' b'fourth'
+                // b'first' t'second' f'third'
+
                 // test_err mixed_bytes_and_non_bytes_literals
                 // 'first' b'second'
                 // f'first' b'second'
                 // 'first' f'second' b'third'
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Bytes literal cannot be mixed with non-bytes literals".to_string(),
-                    ),
-                    range,
-                );
+                self.report_mixed_string_literal_error(&strings, range);
             }
             // Only construct a byte expression if all the literals are bytes
             // otherwise, we'll try either string, t-string, or f-string. This is to retain
@@ -1493,16 +1419,9 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 });
             }
-        }
-
-        if has_tstring {
+        } else if has_tstring {
             if tstring_count < strings.len() {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Cannot mix t-string literals with string or bytes literals".to_string(),
-                    ),
-                    range,
-                );
+                self.report_mixed_string_literal_error(&strings, range);
             }
             // Only construct a t-string expression if all the literals are t-strings
             // otherwise, we'll try either string or f-string. This is to retain
@@ -1584,6 +1503,26 @@ impl<'src> Parser<'src> {
         })
     }
 
+    fn report_mixed_string_literal_error(&mut self, strings: &[StringType], range: TextRange) {
+        // CPython reports the first incompatible pair. A t-string mismatch takes
+        // precedence over a bytes mismatch within that pair.
+        for pair in strings.windows(2) {
+            let message = match pair {
+                [StringType::TString(_), StringType::TString(_)]
+                | [StringType::Bytes(_), StringType::Bytes(_)] => continue,
+                [StringType::TString(_), _] | [_, StringType::TString(_)] => {
+                    "Cannot mix t-string literals with string or bytes literals"
+                }
+                [StringType::Bytes(_), _] | [_, StringType::Bytes(_)] => {
+                    "Bytes literal cannot be mixed with non-bytes literals"
+                }
+                _ => continue,
+            };
+            self.add_error(ParseErrorType::OtherError(message.to_string()), range);
+            break;
+        }
+    }
+
     /// Parses a single string or byte literal.
     ///
     /// This does not handle implicitly concatenated strings.
@@ -1592,7 +1531,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `String` token.
     ///
-    /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
+    /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
         let range = self.current_token_range();
         let flags = self.tokens.current_flags().as_any_string_flags();
@@ -1898,18 +1837,13 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = if let Some(elements) = self.with_recursion(|parser| {
+            let elements = self.with_recursion(|parser| {
                 parser.parse_interpolated_string_elements(
                     flags,
                     InterpolatedStringElementsKind::FormatSpec(string_kind),
                     string_kind,
                 )
-            }) {
-                elements
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                ast::InterpolatedStringElements::from(vec![])
-            };
+            });
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -2988,15 +2922,8 @@ impl<'src> Parser<'src> {
         // lambda x: yield y
         // lambda x: yield from y
 
-        // `lambda: lambda: lambda: ...` recurses through the lambda body at
-        // the conditional layer, bypassing the `parse_lhs_expression` guard.
-        let body =
-            if let Some(body) = self.with_recursion(Self::parse_conditional_expression_or_higher) {
-                body
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                self.recursion_recovery_expr()
-            };
+        // Lambda bodies recurse through the conditional layer without entering the binary parser.
+        let body = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -3020,17 +2947,8 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
-        // `a if b else a if b else ...` recurses through `orelse` at the
-        // conditional layer, which is not covered by the `parse_lhs_expression`
-        // guard (that scope is released once each atom is parsed). Guard here.
-        let orelse = if let Some(orelse) =
-            self.with_recursion(Self::parse_conditional_expression_or_higher)
-        {
-            orelse
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
-        };
+        // The binary-expression guard has already returned before parsing the `else` branch.
+        let orelse = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
         ast::ExprIf {
             body: Box::new(body),
@@ -3072,31 +2990,13 @@ impl<'src> Parser<'src> {
     }
 
     /// Performs the following validations on the arguments:
-    /// 1. There aren't any duplicate keyword argument
-    /// 2. Generator expressions are parenthesized when required by the argument context.
+    /// - Generator expressions are parenthesized when required by the argument context.
     fn validate_arguments(
         &mut self,
         arguments: &ast::Arguments,
         has_trailing_comma: bool,
         context: ArgumentsContext,
     ) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
-
-        for (name, range) in arguments
-            .keywords
-            .iter()
-            .filter_map(|argument| argument.arg.as_ref().map(|arg| (arg, argument.range)))
-        {
-            let arg_name = name.as_str();
-            if !all_arg_names.insert(arg_name) {
-                self.add_error(
-                    ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
-                    range,
-                );
-            }
-        }
-
         let generator_must_be_parenthesized = match context {
             ArgumentsContext::Call => has_trailing_comma || arguments.len() > 1,
             // CPython rejects an unparenthesized generator expression as a class base even though

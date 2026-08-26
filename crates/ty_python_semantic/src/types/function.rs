@@ -63,7 +63,7 @@ use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
-use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
+use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
@@ -101,7 +101,7 @@ use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
+use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct RecursiveTypeNormalizationKey {
@@ -336,6 +336,10 @@ impl<'db> OverloadLiteral<'db> {
         self.body_scope(db).python_file(db)
     }
 
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.body_scope(db).program_file(db)
+    }
+
     pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
     }
@@ -441,7 +445,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.python_file(db));
+        let index = semantic_index(db, body_scope.program_file(db));
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
@@ -453,14 +457,14 @@ impl<'db> OverloadLiteral<'db> {
         let scope = self.definition(db).scope(db);
         let module = parsed_module(db, self.python_file(db)).load(db);
         let use_def =
-            semantic_index(db, scope.python_file(db)).use_def_map(scope.file_scope_id(db));
+            semantic_index(db, scope.program_file(db)).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
             .node(db)
             .expect_function()
             .node(&module)
             .name
-            .scoped_use_id(db, self.python_file(db));
+            .scoped_use_id(db, self.program_file(db));
 
         let env = ProgramEnvironment::from_scope(scope);
         let Place::Defined(DefinedPlace {
@@ -513,16 +517,17 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
-        let python_file = self.python_file(db);
+        let program_file = self.program_file(db);
+        let python_file = program_file.python_file(db);
         let mut signature = self.raw_signature(db, ReturnCallableTypeVarScope::Public);
         let module = parsed_module(db, python_file).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
-        let index = semantic_index(db, python_file);
+        let index = semantic_index(db, program_file);
         let file_scope_id = scope.file_scope_id(db);
         let is_generator = file_scope_id.is_generator_function(index);
 
         if function_node.is_async && !is_generator {
-            let env = ProgramEnvironment::from_file(python_file);
+            let env = ProgramEnvironment::from_file(program_file);
             signature = signature.wrap_coroutine_return_type(db, &env);
         }
 
@@ -615,11 +620,12 @@ impl<'db> OverloadLiteral<'db> {
 
         let env = &ProgramEnvironment::from_scope(self.body_scope(db));
         let scope = self.body_scope(db);
-        let python_file = self.python_file(db);
+        let program_file = self.program_file(db);
+        let python_file = program_file.python_file(db);
         let module = parsed_module(db, python_file).load(db);
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
-        let index = semantic_index(db, python_file);
+        let index = semantic_index(db, program_file);
         let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
@@ -685,7 +691,7 @@ impl<'db> OverloadLiteral<'db> {
             if method_has_explicit_self || class_is_generic || class_is_fallback {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
-                let index = semantic_index(db, scope_id.python_file(db));
+                let index = semantic_index(db, scope_id.program_file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
                 let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
@@ -1016,8 +1022,9 @@ impl<'db> FunctionLiteral<'db> {
             implementation: OverloadLiteral<'db>,
         ) -> FunctionBodyKind {
             let definition = implementation.definition(db);
-            let python_file = definition.python_file(db);
-            let env = ProgramEnvironment::from_file(python_file);
+            let program_file = definition.program_file(db);
+            let python_file = program_file.python_file(db);
+            let env = ProgramEnvironment::from_file(program_file);
             let file = python_file.file(db);
             let module = parsed_module(db, python_file).load(db);
             let node = implementation.node(db, file, &module);
@@ -1343,6 +1350,10 @@ impl<'db> FunctionType<'db> {
         self.literal(db).last_definition.python_file(db)
     }
 
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.literal(db).last_definition.program_file(db)
+    }
+
     /// Returns the AST node for this function.
     pub(super) fn node<'ast>(
         self,
@@ -1378,18 +1389,26 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_known_decorator(db, decorator)
     }
 
-    /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
-    /// classmethod.
+    /// Returns true if every definition of this method uses `@classmethod`, or is implicitly a
+    /// classmethod. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        self.iter_overloads_and_implementation(db)
-            .any(|overload| overload.is_classmethod(db))
+        let mut overloads = self.iter_overloads_and_implementation(db);
+        // Overload discovery can return no definitions during cycle recovery.
+        overloads
+            .next()
+            .is_some_and(|overload| overload.is_classmethod(db))
+            && overloads.all(|overload| overload.is_classmethod(db))
     }
 
-    /// Returns true if this method is decorated with `@staticmethod`, or if it is implicitly a
-    /// static method.
+    /// Returns true if every definition of this method uses `@staticmethod`, or is implicitly a
+    /// static method. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
-        self.iter_overloads_and_implementation(db)
-            .any(|overload| overload.is_staticmethod(db))
+        let mut overloads = self.iter_overloads_and_implementation(db);
+        // Overload discovery can return no definitions during cycle recovery.
+        overloads
+            .next()
+            .is_some_and(|overload| overload.is_staticmethod(db))
+            && overloads.all(|overload| overload.is_staticmethod(db))
     }
 
     /// Returns true if this function has an implicit `self` or `cls` receiver parameter.
@@ -1654,7 +1673,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         self_instance: Type<'db>,
     ) -> BoundMethodType<'db> {
-        BoundMethodType::new(db, self, self_instance)
+        BoundMethodType::new(db, self, self_instance, self_instance)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -2057,6 +2076,7 @@ fn is_instance_truthiness<'db>(
         | Type::SpecialForm(..)
         | Type::KnownInstance(..)
         | Type::PropertyInstance(..)
+        | Type::SlotDescriptor(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::BoundSuper(..)
@@ -2294,6 +2314,13 @@ pub enum KnownFunction {
     #[strum(serialize = "field_validator")]
     PydanticFieldValidator,
 
+    /// `_pytest.fixtures.fixture`
+    #[strum(serialize = "fixture")]
+    PytestFixture,
+    /// `_pytest.fixtures.yield_fixture`
+    #[strum(serialize = "yield_fixture")]
+    PytestYieldFixture,
+
     /// `functools.total_ordering`
     TotalOrdering,
 
@@ -2376,7 +2403,9 @@ impl KnownFunction {
 
         let candidate = Self::from_str(name).ok()?;
         candidate
-            .check_module(file_to_module(db, definition.python_file(db))?.known(db)?)
+            .check_module(
+                file_to_module(db, definition.program_file(db).resolver_file(db))?.known(db)?,
+            )
             .then_some(candidate)
     }
 
@@ -2413,6 +2442,9 @@ impl KnownFunction {
             Self::PydanticField => matches!(module, KnownModule::PydanticFields),
             Self::PydanticFieldValidator => {
                 matches!(module, KnownModule::PydanticFunctionalValidators)
+            }
+            Self::PytestFixture | Self::PytestYieldFixture => {
+                matches!(module, KnownModule::PytestFixtures)
             }
             Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
@@ -2505,9 +2537,14 @@ impl KnownFunction {
                     &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
                 };
                 if let Some(builder) = context.report_lint(diagnostic, call_expression) {
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(
+                        db,
+                        env,
+                        [*actual_ty, asserted_ty],
+                    );
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
-                        asserted_ty.display(db, env),
+                        asserted_ty.display_with(db, env, settings.clone()),
                     ));
 
                     diagnostic.annotate(
@@ -2519,28 +2556,28 @@ impl KnownFunction {
                         )
                         .message(format_args!(
                             "Inferred type is `{}`",
-                            actual_ty.display(db, env)
+                            actual_ty.display_with(db, env, settings.clone())
                         )),
                     );
 
                     if actual_ty.is_subtype_of(db, env, asserted_ty) {
                         diagnostic.info(format_args!(
                             "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
-                            asserted_type = asserted_ty.display(db, env),
-                            inferred_type = actual_ty.display(db, env),
+                            asserted_type = asserted_ty.display_with(db, env, settings.clone()),
+                            inferred_type = actual_ty.display_with(db, env, settings.clone()),
                         ));
                     } else {
                         diagnostic.info(format_args!(
                             "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                            asserted_type = asserted_ty.display(db, env),
-                            inferred_type = actual_ty.display(db, env),
+                            asserted_type = asserted_ty.display_with(db, env, settings.clone()),
+                            inferred_type = actual_ty.display_with(db, env, settings.clone()),
                         ));
                     }
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
-                        actual_ty.display(db, env),
-                        asserted_ty.display(db, env),
+                        actual_ty.display_with(db, env, settings.clone()),
+                        asserted_ty.display_with(db, env, settings),
                     ));
                 }
             }
@@ -2894,11 +2931,15 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let Some(module) = resolve_module(db, context.python_file(), &module_name) else {
+                let importing_file = ImportingFile::File(
+                    context.file(),
+                    context.program_environment().resolver_environment(db),
+                );
+                let Some(module) = resolve_module(db, importing_file, &module_name) else {
                     return;
                 };
 
-                overload.set_return_type(Type::module_literal(db, context.python_file(), module));
+                overload.set_return_type(Type::module_literal(db, context.program_file(), module));
             }
 
             KnownFunction::TotalOrdering => {
@@ -2945,11 +2986,7 @@ pub(super) fn report_revealed_type<'db>(
         diag.annotate(
             Annotation::primary(context.span(argument_node)).message(format_args!(
                 "`{}`",
-                revealed_type.display_with(
-                    db,
-                    env,
-                    DisplaySettings::default().preserve_long_unions()
-                )
+                revealed_type.display(db, env).preserve_long_unions()
             )),
         );
     }
@@ -2984,6 +3021,9 @@ pub(crate) mod tests {
 
                 KnownFunction::PydanticField => KnownModule::PydanticFields,
                 KnownFunction::PydanticFieldValidator => KnownModule::PydanticFunctionalValidators,
+                KnownFunction::PytestFixture | KnownFunction::PytestYieldFixture => {
+                    KnownModule::PytestFixtures
+                }
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 

@@ -100,6 +100,27 @@ class ConstraintSetSolution:
 
 class ConstraintSet:
     @staticmethod
+    def lower_bound(
+        lower_bound: TypeForm[object],
+        typevar: TypeForm[object],
+    ) -> ConstraintSet:
+        """Returns a constraint set requiring `typevar` to be a supertype of `lower_bound`."""
+
+    @staticmethod
+    def upper_bound(
+        typevar: TypeForm[object],
+        upper_bound: TypeForm[object],
+    ) -> ConstraintSet:
+        """Returns a constraint set requiring `typevar` to be a subtype of `upper_bound`."""
+
+    @staticmethod
+    def equality(
+        typevar: TypeForm[object],
+        value: TypeForm[object],
+    ) -> ConstraintSet:
+        """Returns a constraint set requiring `typevar` to specialize exactly to `value`."""
+
+    @staticmethod
     def range(
         lower_bound: TypeForm[object],
         typevar: TypeForm[object],
@@ -141,16 +162,6 @@ class ConstraintSet:
     def for_all(self, typevars: TypeForm[tuple[object, ...]]) -> Self:
         """
         Universally abstracts the given type variables from this constraint set.
-        """
-
-    def satisfied_by_all_typevars(
-        self, *, inferable: TypeForm[tuple[object, ...]] | None = None
-    ) -> bool:
-        """
-        Returns whether this constraint set is satisfied by all of the typevars
-        that it mentions. You must provide a tuple of the typevars that should
-        be considered `inferable`. All other typevars mentioned in the
-        constraint set will be considered non-inferable.
         """
 
     def solutions_for(

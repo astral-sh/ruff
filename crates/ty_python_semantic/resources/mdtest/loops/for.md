@@ -66,6 +66,45 @@ for from_count in range(count):
 reveal_type(from_count)  # revealed: int
 ```
 
+Narrowing established by a non-empty loop remains available after the loop.
+
+```py
+def narrowing_after_non_empty_range(value: int | None) -> None:
+    for _ in range(1):
+        if value is None:
+            return
+
+    reveal_type(value)  # revealed: int
+```
+
+The same narrowing is preserved at module scope.
+
+```py
+def get_value() -> int | None:
+    return None
+
+module_value = get_value()
+
+for _ in range(1):
+    if module_value is None:
+        raise RuntimeError
+
+reveal_type(module_value)  # revealed: int
+```
+
+It also works in a class body.
+
+```py
+class Example:
+    value = get_value()
+
+    for _ in range(1):
+        if value is None:
+            raise RuntimeError
+
+    reveal_type(value)  # revealed: int
+```
+
 The emptiness refinement is independent of the order in which range values are assigned:
 
 ```py
@@ -679,14 +718,13 @@ def _(x: Sequence[int], y: object):
         reveal_type(item)  # revealed: int
 
     if isinstance(y, list):
-        reveal_type(y)  # revealed: Top[list[Unknown]]
+        reveal_type(y)  # revealed: list[Unknown]
         for item in y:
-            reveal_type(item)  # revealed: object
+            reveal_type(item)  # revealed: Unknown
 
     if isinstance(x, list):
-        reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
+        reveal_type(x)  # revealed: list[int]
         for item in x:
-            # int & object simplifies to int
             reveal_type(item)  # revealed: int
 ```
 
@@ -1541,12 +1579,10 @@ simplify to `Never`, leaving only the iterable parts.
 ```py
 def f[T: tuple[int, ...] | int](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@f & tuple[object, ...]
+        reveal_type(x)  # revealed: T@f & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | int) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (int & tuple[object, ...])`
-            # which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`.
+            # The `int` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 
@@ -1558,13 +1594,10 @@ constraint, those parts should also simplify to `Never`.
 ```py
 def g[T: tuple[int, ...] | list[str]](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@g & tuple[object, ...]
+        reveal_type(x)  # revealed: T@g & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | list[str]) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
-            # Since `list[str]` is disjoint from `tuple[object, ...]`, this simplifies to:
-            # `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`, NOT `int | str`.
+            # The `list[str]` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 
@@ -1935,7 +1968,7 @@ for _ in range(1_000_000):
         break
     node = node.next
 reveal_type(node)  # revealed: Node
-reveal_type(node.next)  # revealed: Node | None
+reveal_type(node.next)  # revealed: None | Node
 ```
 
 ### Nested collection cycles do not panic
