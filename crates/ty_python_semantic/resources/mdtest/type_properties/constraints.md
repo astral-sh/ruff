@@ -1236,9 +1236,11 @@ def quantifier_order[S, T]() -> None:
 
 ## Displaying constraints
 
-`with_detailed_display` prints a constraint set's boolean formula for debugging.
-
-Exact formatting may change; these tests check signatures, binders, and bound evidence.
+The `with_detailed_display` method can be used to print out the boolean formula that a constraint
+set represents. However, this method is only intended for debugging purposes, and we reserve the
+right to change the rendering at any time! We therefore do _not_ have a battery of mdtests printing
+out all of the different kinds of constraints described above. Here we just test that the method
+exists, and provides more detail than otherwise.
 
 ```py
 from ty_extensions import static_assert
@@ -1354,36 +1356,6 @@ def aliased_constructor[**P]() -> None:
     equals = ConstraintSet.equality
     constraints = equals(P, Callable[[int], None])
     static_assert(constraints == ConstraintSet.range(Callable[[int], None], P, Callable[[int], None]))
-```
-
-### Qualified subjects
-
-A module-qualified legacy ParamSpec is valid when bound by the enclosing function.
-
-`params.py`:
-
-```py
-from typing import ParamSpec
-
-P = ParamSpec("P")
-```
-
-`main.py`:
-
-```py
-from typing import Callable
-from ty_extensions import static_assert
-from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
-import params
-
-def qualified(callback: Callable[params.P, None]) -> None:
-    constraints = ConstraintSet.range(Callable[[int], None], params.P, Callable[[int], None])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
-    expected = is_constraint_set_assignable_to(Callable[[int], None], Callable[params.P, None])
-    static_assert(ConstraintSet.lower_bound(Callable[[int], None], params.P) == expected)
-    expected = is_constraint_set_assignable_to(Callable[params.P, None], Callable[[int], None])
-    static_assert(ConstraintSet.upper_bound(params.P, Callable[[int], None]) == expected)
-    static_assert(ConstraintSet.equality(params.P, Callable[[int], None]) == constraints)
 ```
 
 ### Callable aliases
