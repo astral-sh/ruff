@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use crate::Violation;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `os.path.join`.
@@ -210,6 +210,8 @@ impl Violation for PyPath {
 pub(crate) struct OsListdir;
 
 impl Violation for OsListdir {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use `pathlib.Path.iterdir()` instead.".to_string()
