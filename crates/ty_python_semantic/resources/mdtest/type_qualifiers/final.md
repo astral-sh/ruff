@@ -853,7 +853,7 @@ from __future__ import annotations
 
 from typing import Final, Protocol, TypeVar
 
-T = TypeVar("T", covariant=True)
+T = TypeVar("T")
 
 class Owned(Protocol[T]):
     owner: Final[T]

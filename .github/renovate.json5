@@ -1,6 +1,9 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["github>astral-sh/renovate-config"],
+  extends: [
+    "github>astral-sh/renovate-config",
+    "customManagers:githubActionsVersions",
+  ],
   schedule: ["before 4am on Wednesday"],
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm", "custom.regex"],
   pep621: {
@@ -41,6 +44,13 @@
       groupName: "prek dependencies",
       matchManagers: ["pre-commit"],
       description: "Weekly update of prek dependencies",
+    },
+    {
+      matchFileNames: ["pyproject.toml"],
+      matchPackageNames: ["pygls"],
+      matchJsonata: ["depType = 'dependency-groups' and managerData.depGroup = 'ruff-lsp-test'"],
+      description: "ruff-lsp compatibility tests require the pygls 1.x server API",
+      rangeStrategy: "in-range-only",
     },
     {
       groupName: "NPM Development dependencies",

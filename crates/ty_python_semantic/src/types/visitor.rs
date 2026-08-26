@@ -416,7 +416,7 @@ pub(super) enum DynamicContent {
     Absent,
     /// The type contains a matching dynamic type.
     Present,
-    /// Recursive specialization prevented the type from being fully inspected.
+    /// Lazy type information or recursive specialization prevented a complete inspection.
     Indeterminate,
 }
 
@@ -426,13 +426,34 @@ impl DynamicContent {
     }
 }
 
+#[derive(Clone, Copy)]
+enum DynamicContentMode {
+    All,
+    NonAny,
+    /// Require enough information to prove that materialization preserves type requirements.
+    Materialization,
+}
+
 /// Determine whether `ty` contains any dynamic type.
 pub(super) fn dynamic_content<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
-    dynamic_content_impl(db, env, ty, true)
+    dynamic_content_impl(db, env, ty, DynamicContentMode::All)
+}
+
+/// Whether both materializations preserve the requirements described by `ty`.
+///
+/// Unlike ordinary static-content checks, this proof cannot ignore lazy function signatures or
+/// the wrapped callable of a partial. It does not compare metadata such as parameter-default types,
+/// which do not affect whether one callable satisfies another's requirements.
+pub(super) fn materialization_is_noop<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    dynamic_content_impl(db, env, ty, DynamicContentMode::Materialization).is_absent()
 }
 
 /// Determine whether `ty` contains a dynamic type other than `Any`.
@@ -456,14 +477,14 @@ pub(super) fn non_any_dynamic_content<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
-    dynamic_content_impl(db, env, ty, false)
+    dynamic_content_impl(db, env, ty, DynamicContentMode::NonAny)
 }
 
 fn dynamic_content_impl<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
-    include_any: bool,
+    mode: DynamicContentMode,
 ) -> DynamicContent {
     struct DynamicContentVisitor<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
@@ -472,7 +493,7 @@ fn dynamic_content_impl<'db>(
         active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
         active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
         content: Cell<DynamicContent>,
-        include_any: bool,
+        mode: DynamicContentMode,
     }
 
     impl DynamicContentVisitor<'_, '_> {
@@ -497,8 +518,13 @@ fn dynamic_content_impl<'db>(
                 return;
             }
 
+            if matches!(self.mode, DynamicContentMode::Materialization) && ty.is_divergent() {
+                self.record(DynamicContent::Indeterminate);
+                return;
+            }
+
             if ty.is_dynamic()
-                && (self.include_any
+                && (!matches!(self.mode, DynamicContentMode::NonAny)
                     || !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any)))
             {
                 self.record(DynamicContent::Present);
@@ -506,6 +532,34 @@ fn dynamic_content_impl<'db>(
             }
 
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+            if !self.content.get().is_absent() {
+                return;
+            }
+
+            if matches!(self.mode, DynamicContentMode::Materialization) {
+                // The ordinary walker only visits updated signatures. Inferring an original
+                // signature here could re-enter recursive `TypeOf` evaluation, so do not claim
+                // that materialization leaves this function's requirements unchanged.
+                self.record(DynamicContent::Indeterminate);
+            } else {
+                walk_function_type(db, function, self);
+            }
+        }
+
+        fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
+            if matches!(self.mode, DynamicContentMode::Materialization)
+                && let KnownInstanceType::FunctoolsPartial(partial)
+                | KnownInstanceType::FunctoolsPartialCall(partial) = known
+            {
+                // Materialization maps both the reduced signature and the wrapped callable.
+                self.visit_type(db, partial.wrapped(db).inner(db));
+            }
+            if self.content.get().is_absent() {
+                walk_known_instance_type(db, known, self);
+            }
         }
 
         fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
@@ -584,7 +638,7 @@ fn dynamic_content_impl<'db>(
         active_class_typed_dicts: ActiveRecursionDetector::default(),
         active_type_aliases: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
-        include_any,
+        mode,
     };
     visitor.visit_type(db, ty);
     visitor.content.get()
@@ -725,9 +779,74 @@ where
 
 #[cfg(test)]
 mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::ProgramFile;
+
+    use crate::db::tests::setup_db;
+    use crate::place::global_symbol;
     use crate::types::{DynamicType, SpecialFormType, Type};
 
-    use super::CollectedTypes;
+    use super::{CollectedTypes, materialization_is_noop};
+
+    #[test]
+    fn materialization_noop_checks_hidden_function_types() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from __future__ import annotations
+            from functools import partial
+            from typing import Any, Protocol
+            from ty_extensions._internal import TypeOf
+
+            def gradual_callback(value: Any) -> None: ...
+
+            class Callbacks(Protocol):
+                @property
+                def callback(self) -> TypeOf[gradual_callback]: ...
+
+            class Recursive[T](Protocol):
+                @property
+                def value(self) -> T: ...
+                @property
+                def child(self) -> Recursive[T]: ...
+
+            plain: Recursive[int]
+            callbacks: Recursive[Callbacks]
+            partial_callback = partial(gradual_callback, 0)
+            partial_call = partial_callback.__call__
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        for (name, expected) in [
+            ("plain", true),
+            ("callbacks", false),
+            ("partial_callback", false),
+            ("partial_call", false),
+        ] {
+            let ty = global_symbol(&db, module, name).place.expect_type();
+            assert_eq!(materialization_is_noop(&db, &env, ty), expected, "{name}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn materialization_noop_rejects_divergent_markers() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+        for ty in [
+            divergent,
+            divergent.top_materialization(&db, &env),
+            divergent.bottom_materialization(&db, &env),
+        ] {
+            assert!(!materialization_is_noop(&db, &env, ty));
+        }
+    }
 
     #[test]
     fn collected_types_spills_without_losing_deduplication() {

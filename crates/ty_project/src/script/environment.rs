@@ -187,7 +187,7 @@ impl ScriptEnvironments {
     }
 
     /// Returns whether `file`'s environment is [`Pending`](ScriptEnvironmentAvailability::Pending).
-    pub fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
+    pub(crate) fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
         if !self.is_enabled() || script_tag(db, file).is_none() {
             return false;
         }
@@ -876,7 +876,13 @@ mod tests {
         #[test]
         fn initial_background_synchronization_is_pending_until_completion() -> anyhow::Result<()> {
             let mut case = UvTestCase::new(
-                "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = ["attrs==25.4.0"]
+                # ///
+                from attrs import define
+                "#,
             )?;
             let environments = case.db.script_environments().clone();
 
@@ -899,7 +905,13 @@ mod tests {
         fn existing_environment_remains_available_during_background_synchronization()
         -> anyhow::Result<()> {
             let mut case = UvTestCase::new(
-                "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = ["attrs==25.4.0"]
+                # ///
+                from attrs import define
+                "#,
             )?;
             let environments = case.db.script_environments().clone();
             let environment = script_environment(&case.db, case.file)
@@ -923,7 +935,13 @@ mod tests {
 
         #[test]
         fn returning_to_previous_metadata_resynchronizes_the_environment() -> anyhow::Result<()> {
-            let initial = "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n";
+            let initial = r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#;
             let mut case = UvTestCase::new(initial)?;
             let environments = case.db.script_environments().clone();
             environments.request_sync(
@@ -935,9 +953,15 @@ mod tests {
             assert_eq!(case.wait_for_synchronizations()?, vec![case.file]);
             case.assert_can_import("attrs")?;
 
-            case.db.write_file(
-                &case.path,
-                "# /// script\n# dependencies = ['anyio']\n# ///\nfrom attrs import define\n",
+            case.db.write_dedented(
+                case.path.as_str(),
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = ["anyio"]
+                # ///
+                from attrs import define
+                "#,
             )?;
             let wakeups = environments.sync_wakeups();
             environments.request_sync(
@@ -954,7 +978,7 @@ mod tests {
 
             // Restoring the original metadata must reinstall its dependencies, even though its
             // cache key matches the last synchronization whose result was applied.
-            case.db.write_file(&case.path, initial)?;
+            case.db.write_dedented(case.path.as_str(), initial)?;
             environments.request_sync(
                 &mut case.db,
                 case.file,
@@ -972,7 +996,14 @@ mod tests {
 
         #[test]
         fn background_result_cancels_snapshots_before_locking_entry() -> anyhow::Result<()> {
-            let mut case = UvTestCase::new("# /// script\n# dependencies = []\n# ///\n")?;
+            let mut case = UvTestCase::new(
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = []
+                # ///
+                "#,
+            )?;
             let environments = case.db.script_environments().clone();
             environments.request_sync(
                 &mut case.db,
@@ -1043,7 +1074,7 @@ mod tests {
                 }
 
                 let path = root.join("script.py");
-                db.write_file(&path, source)?;
+                db.write_dedented(path.as_str(), source)?;
                 let file = system_path_to_file(&db, &path)?;
 
                 Ok(Self {

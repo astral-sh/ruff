@@ -220,14 +220,14 @@ class Slotted:
     value: int
     __slots__ = ()
 
-Slotted().value = 1  # snapshot: unresolved-attribute
+Slotted().value = 1  # snapshot: missing-slot
 ```
 
 ```snapshot
-error[unresolved-attribute]: Cannot assign to attribute `value`: `Slotted` has no slot or instance dictionary
+error[missing-slot]: Cannot assign to attribute `value`: `Slotted` has no slot or instance dictionary
  --> src/mdtest_snippet.py:5:1
   |
-5 | Slotted().value = 1  # snapshot: unresolved-attribute
+5 | Slotted().value = 1  # snapshot: missing-slot
   | ^^^^^^^^^^^^^^^
 info: Attribute `value` is declared but is not included in `__slots__`
 ```
@@ -244,7 +244,7 @@ An inherited annotation also does not provide storage for a slotted subclass.
 class SlottedChild(Slotted):
     __slots__ = ()
 
-# error: [unresolved-attribute] "Cannot assign to attribute `value`: `SlottedChild` has no slot or instance dictionary"
+# error: [missing-slot] "Cannot assign to attribute `value`: `SlottedChild` has no slot or instance dictionary"
 SlottedChild().value = 1
 ```
 

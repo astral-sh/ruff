@@ -1142,6 +1142,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     if let Some(protocol) = class.into_protocol_class(db) {
         protocol.validate_members(context);
+        protocol.validate_type_parameter_variance(context);
     }
 
     if class.is_typed_dict(db) {

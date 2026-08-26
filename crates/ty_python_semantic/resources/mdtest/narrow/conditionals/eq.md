@@ -2639,6 +2639,10 @@ class B:
     tag: Literal["b"]
     field_b: str
 
+class C1:
+    tag: Literal["c", 1]
+    field_c1: str
+
 class Marker(Protocol):
     marked: bool
 
@@ -2653,6 +2657,12 @@ class TaggedB(Protocol):
 
     @property
     def tag(self) -> Literal["b"]: ...
+
+class TaggedC1(Protocol):
+    field_c1: str
+
+    @property
+    def tag(self) -> Literal["c", 1]: ...
 
 class Container:
     value: A | B | None
@@ -2674,6 +2684,34 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
     else:
         reveal_type(x)  # revealed: A
+
+def multiple_tags(x: A | C1):
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+        reveal_type(x.field_a)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: C1
+        reveal_type(x.field_c1)  # revealed: str
+
+    if "a" == x.tag:
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: C1
+
+    if x.tag != "a":
+        reveal_type(x)  # revealed: C1
+    else:
+        reveal_type(x)  # revealed: A
+
+    if x.tag == "c":
+        reveal_type(x)  # revealed: C1
+    else:
+        reveal_type(x)  # revealed: A | C1
+
+    if x.tag != "c":
+        reveal_type(x)  # revealed: A | C1
+    else:
+        reveal_type(x)  # revealed: C1
 
 def truthiness_guard(value: A | B | None):
     if not value:
@@ -2712,6 +2750,14 @@ def protocol_union(value: TaggedA | TaggedB):
     else:
         reveal_type(value)  # revealed: TaggedB
         reveal_type(value.field_b)  # revealed: str
+
+def protocol_union_multiple_tags(value: TaggedA | TaggedC1):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: TaggedA
+        reveal_type(value.field_a)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: TaggedC1
+        reveal_type(value.field_c1)  # revealed: str
 ```
 
 Enum literals are also supported as attribute tags:
