@@ -496,22 +496,6 @@ reason = "the public semantic model exposes its file identity and source locatio
 
 [[override]]
 lint = "hawk::dead_public"
-crate = "ty_python_semantic"
-item = "types::instance::NominalInstanceType::<'db>::class_name"
-kind = "inherent_method"
-level = "expect"
-reason = "unused in the Ruff workspace but retained for external ty_python_semantic consumers"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ty_python_semantic"
-item = "types::instance::NominalInstanceType::<'db>::class_module_name"
-kind = "inherent_method"
-level = "expect"
-reason = "unused in the Ruff workspace but retained for external ty_python_semantic consumers"
-
-[[override]]
-lint = "hawk::dead_public"
 crate = "ruff_formatter"
 item = "formatter::Formatter::<'_, Context>::state_snapshot"
 kind = "inherent_method"
