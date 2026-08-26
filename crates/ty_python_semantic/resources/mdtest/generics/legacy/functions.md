@@ -339,6 +339,7 @@ from typing import TypeVar
 class A: ...
 class B: ...
 class C: ...
+class D: ...
 
 T = TypeVar("T")
 
@@ -363,8 +364,8 @@ U = TypeVar("U")
 def swap(values: tuple[U, T]) -> tuple[T, U]:
     return values[1], values[0]
 
-def _(pairs: tuple[A, B] | tuple[B, C]):
-    reveal_type(swap(pairs))  # revealed: tuple[B | C, A | B]
+def _(pairs: tuple[A, B] | tuple[C, D]):
+    reveal_type(swap(pairs))  # revealed: tuple[B | D, A | C]
 
 def tail(values: tuple[A, *tuple[T, ...]]) -> tuple[T, ...]:
     return values[1:]
