@@ -8528,13 +8528,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
         let test_truthiness = match test_ty.try_bool(db, env) {
-            Ok(Truthiness::Ambiguous) => analyze_condition_expression(test, &|node| {
+            Ok(_) => analyze_condition_expression(test, &|node| {
                 self.comparison_truthiness
                     .get(&node.into())
                     .copied()
-                    .unwrap_or_else(|| self.expression_type(node).bool(db, env))
-            }),
-            Ok(truthiness) => truthiness,
+                    .or_else(|| {
+                        let ty = self.expression_type(node);
+                        (!ty.is_equivalent_to(db, env, Type::Never)).then(|| ty.bool(db, env))
+                    })
+            })
+            .unwrap_or(Truthiness::Ambiguous),
             Err(err) => {
                 err.report_diagnostic(&self.context, &**test);
                 err.fallback_truthiness()

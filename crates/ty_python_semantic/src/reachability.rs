@@ -1594,41 +1594,53 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
 }
 
 /// Evaluate a condition without re-testing intermediate short-circuit results.
+///
+/// `None` means evaluation cannot produce a result, as for an operand narrowed to `Never`.
+/// This differs from ambiguous truthiness: in `flag and raises()`, where `raises()` returns
+/// `Never`, only the falsy short-circuit path can complete. For `flag or raises()`, only the
+/// truthy path can complete. Callers that cannot represent the absence of a result can
+/// conservatively map `None` to [`Truthiness::Ambiguous`].
 pub(crate) fn analyze_condition_expression(
     node: &ast::Expr,
-    leaf_truthiness: &impl Fn(&ast::Expr) -> Truthiness,
-) -> Truthiness {
+    leaf_truthiness: &impl Fn(&ast::Expr) -> Option<Truthiness>,
+) -> Option<Truthiness> {
     match node {
         ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
             let short_circuit = Truthiness::from(*op == ast::BoolOp::Or);
             let mut result = short_circuit.negate();
             for value in values {
-                let truthiness = analyze_condition_expression(value, leaf_truthiness);
+                let Some(truthiness) = analyze_condition_expression(value, leaf_truthiness) else {
+                    return result.is_ambiguous().then_some(short_circuit);
+                };
                 if truthiness == short_circuit {
-                    return short_circuit;
+                    return Some(short_circuit);
                 }
                 if truthiness.is_ambiguous() {
                     result = Truthiness::Ambiguous;
                 }
             }
-            result
+            Some(result)
         }
         ast::Expr::UnaryOp(ast::ExprUnaryOp {
             op: ast::UnaryOp::Not,
             operand,
             ..
-        }) => analyze_condition_expression(operand, leaf_truthiness).negate(),
+        }) => analyze_condition_expression(operand, leaf_truthiness).map(Truthiness::negate),
         ast::Expr::If(ast::ExprIf {
             test, body, orelse, ..
-        }) => match analyze_condition_expression(test, leaf_truthiness) {
+        }) => match analyze_condition_expression(test, leaf_truthiness)? {
             Truthiness::AlwaysTrue => analyze_condition_expression(body, leaf_truthiness),
             Truthiness::AlwaysFalse => analyze_condition_expression(orelse, leaf_truthiness),
             Truthiness::Ambiguous => {
                 let body_truthiness = analyze_condition_expression(body, leaf_truthiness);
-                if body_truthiness == analyze_condition_expression(orelse, leaf_truthiness) {
-                    body_truthiness
-                } else {
-                    Truthiness::Ambiguous
+                let orelse_truthiness = analyze_condition_expression(orelse, leaf_truthiness);
+                match (body_truthiness, orelse_truthiness) {
+                    (None, truthiness) | (truthiness, None) => truthiness,
+                    (Some(body), Some(orelse)) => Some(if body == orelse {
+                        body
+                    } else {
+                        Truthiness::Ambiguous
+                    }),
                 }
             }
         },
@@ -1646,10 +1658,12 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truth
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     analyze_condition_expression(expression.node_ref(db).node(&module), &|node| {
-        inference
-            .comparison_truthiness(node)
-            .unwrap_or_else(|| inference.expression_type(node).bool(db, &env))
+        inference.comparison_truthiness(node).or_else(|| {
+            let ty = inference.expression_type(node);
+            (!ty.is_equivalent_to(db, &env, Type::Never)).then(|| ty.bool(db, &env))
+        })
     })
+    .unwrap_or(Truthiness::Ambiguous)
 }
 
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {

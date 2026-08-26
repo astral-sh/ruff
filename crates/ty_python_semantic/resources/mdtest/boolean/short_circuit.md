@@ -284,6 +284,83 @@ def other_conditions(value: object):
     reveal_type(value)  # revealed: Never
 ```
 
+## Conditions with impossible operands
+
+Narrowing can make a later operand impossible to evaluate. A `bool` cannot also be a `str`, so
+`value` has type `Never` when it is tested again in each condition below. Only the earlier
+short-circuit path can complete: falsy for `and`, truthy for `or`. We reveal an unrelated `marker`
+to check that the whole branch is unreachable, independently of narrowing `value` itself.
+
+```py
+def impossible_operands(value: bool, marker: int):
+    if isinstance(value, str) and value:
+        reveal_type(marker)  # revealed: Never
+
+    if not isinstance(value, str) or value:
+        pass
+    else:
+        reveal_type(marker)  # revealed: Never
+
+    if isinstance(value, str) and not value:
+        reveal_type(marker)  # revealed: Never
+```
+
+These outcomes are preserved inside larger conditions, even when another operand has mutable
+truthiness.
+
+```py
+def nested_impossible_operands(other: object, value: bool, marker: int):
+    if other and (isinstance(value, str) and value):
+        reveal_type(marker)  # revealed: Never
+
+    if other or (not isinstance(value, str) or value):
+        pass
+    else:
+        reveal_type(marker)  # revealed: Never
+```
+
+## Conditions with aliased `Never` operands
+
+A call cannot produce a result when its return type is an alias of `Never`. Only the preceding
+short-circuit path can complete.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never
+
+type Bottom = Never
+
+def stop() -> Bottom:
+    raise RuntimeError
+
+def aliased_operand(flag: bool, marker: int):
+    if flag and stop():
+        reveal_type(marker)  # revealed: Never
+
+    if flag or stop():
+        pass
+    else:
+        reveal_type(marker)  # revealed: Never
+```
+
+A union of aliases of `Never` still cannot produce a result.
+
+```py
+type OtherBottom = Never
+type BottomUnion = Bottom | OtherBottom
+
+def stop_union() -> BottomUnion:
+    raise RuntimeError
+
+def union_operand(flag: bool, marker: int):
+    if flag and stop_union():
+        reveal_type(marker)  # revealed: Never
+```
+
 ## Conditional expressions used as conditions
 
 When a conditional expression (an `if/else` expression) is itself a condition, its selected branch
@@ -302,6 +379,20 @@ def conditional_expressions(value: object, flag: bool):
 
     if True if value and False else False:
         reveal_type(value)  # revealed: Never
+```
+
+A branch narrowed to `Never` cannot contribute a result. The other branch alone determines the
+conditional expression's truthiness.
+
+```py
+def impossible_branches(value: bool, marker: int):
+    if value if isinstance(value, str) else False:
+        reveal_type(marker)  # revealed: Never
+
+    if True if not isinstance(value, str) else value:
+        pass
+    else:
+        reveal_type(marker)  # revealed: Never
 ```
 
 ## Chained comparison conditions
