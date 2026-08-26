@@ -6938,9 +6938,9 @@ static_assert(is_constraint_set_assignable_to(Consumer[Consumer[int]], Consumer[
 ### Recursive members in the source specialization
 
 A protocol member can contain the same protocol in the source specialization but remain finite in
-the target specialization. Its structural requirements must still contribute all valid solutions,
-even when nominal inheritance alone would infer a narrower type. The same members also establish
-assignability when no type variables need to be inferred.
+the target specialization. Its structural requirements still contribute to inference, and each
+retained specialization must accept the original argument. Here, `extract` infers `Consumer[int]`
+for `T`. The same members also establish assignability when no type variables need to be inferred.
 
 ```toml
 [environment]
@@ -6966,8 +6966,7 @@ def extract[T](consumer: Consumer[T]) -> T:
     raise NotImplementedError
 
 def check(value: Consumer[Consumer[int]]) -> None:
-    # TODO: Validate and refine individual specializations to reveal Consumer[int].
-    reveal_type(extract(value))  # revealed: Consumer[int] | int
+    reveal_type(extract(value))  # revealed: Consumer[int]
 ```
 
 An explicit receiver annotation introduces constraints when comparing a bound method with a
@@ -7279,8 +7278,9 @@ bad_assignment: Node[int] = Mismatched(1)  # error: [invalid-assignment]
 def extract[U](node: Node[U]) -> U:
     raise NotImplementedError
 
-# TODO: Refine the structural and inherited specializations separately to reveal str | Literal[1].
-reveal_type(extract(Mismatched(1)))  # revealed: object
+# The structural solution includes both `value`'s `Literal[1]` and `child`'s `str`.
+# Intersecting it with the inherited `Node[object]` solution preserves that precision.
+reveal_type(extract(Mismatched(1)))  # revealed: str | Literal[1]
 ```
 
 ### Recursive legacy generic protocol
