@@ -228,10 +228,37 @@ impl ConditionFlowSnapshot {
     }
 }
 
+/// Whether evaluation produces a result object or chooses a control-flow path.
+///
+/// In `Value` context, the enclosing code receives the expression's result object. For example,
+/// `result = x and y` produces `x` if `x` is falsy, or `y` otherwise. This also applies to expressions
+/// that return `bool`: the comparison in `result = x > 0` has value context.
+///
+/// In `Condition` context, the enclosing code only needs to know which branch to take. For example,
+/// CPython evaluates `if x and y` by testing `x` and, only if `x` is truthy, testing `y`. If `x` tests
+/// falsy, that one truthiness check is enough to skip the body: `x` is not tested again as the
+/// result of `x and y`.
+///
+/// This distinction matters when an operand's `__bool__` can change between calls:
+///
+/// ```python
+/// if x and False:      # A falsy x skips the body; a truthy x reaches False.
+///     ...              # Unreachable in either case.
+/// saved = x and False  # Can produce x after checking that it is falsy.
+/// if saved:            # Can call x.__bool__ again, which may now return True.
+///     ...              # Reachable.
+/// ```
+///
+/// The context propagates through `and`, `or`, `not`, and the branches of conditional expressions.
+/// Condition context does not propagate through calls or assignment expressions: in
+/// `if f(x and False)`, the call's result controls the branch, but its argument is evaluated in
+/// value context.
 #[derive(Clone, Copy, Debug, Default)]
 enum ExpressionContext {
+    /// Produce the expression's result object for the enclosing code to use.
     #[default]
     Value,
+    /// Choose the truthy or falsy control-flow path without preserving the result object.
     Condition,
 }
 

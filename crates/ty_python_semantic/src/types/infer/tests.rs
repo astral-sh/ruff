@@ -520,6 +520,16 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
     assert_eq!(cycles, Vec::<String>::new());
 }
 
+/// Checks widening when a comparison truthiness override is present in only one iteration.
+///
+/// A missing override falls back to the expression type's truthiness. Widening must compare the
+/// effective truthiness from both iterations, including this fallback. Discarding an override from
+/// the previous iteration could otherwise make a previously ambiguous condition definite again.
+///
+/// We construct inference results directly because mdtests cannot prescribe intermediate Salsa
+/// results. A Python cycle can converge before widening starts, or drop an override without
+/// changing any final types or diagnostics. No known Python example exposes the failures checked
+/// here, so this is defensive coverage of the widening invariant.
 #[test]
 fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<()> {
     let mut db = setup_db();
@@ -563,7 +573,8 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
         Some(Truthiness::Ambiguous)
     );
 
-    // Removing an override does not widen an unchanged effective truthiness.
+    // Matching effective truthiness stays precise. Keep the override even though it agrees with
+    // the current type: subsequent type widening can make that fallback ambiguous again.
     let previous = inference(Type::unknown(), Some(Truthiness::AlwaysFalse));
     let mut current = inference(Type::bool_literal(false), None);
     current.widen_comparison_truthiness(&db, &env, &previous);

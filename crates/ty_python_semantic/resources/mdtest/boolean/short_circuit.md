@@ -195,27 +195,56 @@ def comprehension_filter(flag: bool):
 
 ## Reachability of compound conditions
 
-An `and` condition with an always-falsy operand cannot take the truthy branch. Similarly, an `or`
-condition with an always-truthy operand cannot take the falsy branch. This holds even when another
-operand has mutable truthiness, and when conditions contain nested boolean operations or `not`.
+An `and` condition with an always-falsy operand cannot ever take the truthy branch. Similarly, an
+`or` condition with an always-truthy operand cannot ever take the falsy branch.
+
+This perhaps seems obvious, but it's not! Given the expression `value and False`, `value` could be
+some object whose `__bool__` can return `False` on one call and `True` on the next. The evaluation
+of `value and False` tests `value`, gets `False`, and short-circuits, meaning the entire expression
+`value and False` evaluates to `value`. Now if we re-check truthiness of `value`, we can't
+necessarily assume we get `False` again.
+
+For code which saves the `and` expression to a variable, this is correct, and we do model this
+possibility:
+
+```py
+def saved_condition(value: object):
+    saved = value and False
+
+    # We know that `saved` is not always truthy; we don't know that it's always falsy.
+    reveal_type(saved)  # revealed: ~AlwaysTruthy
+
+    if saved:
+        # So this branch is reachable:
+        reveal_type(value)  # revealed: object
+```
+
+But if the condition is tested directly, it works differently (at least in CPython). A short-circuit
+within a branch condition doesn't just short-circuit to an evaluation of the expression; it
+short-circuits directly to a control-flow decision, bypassing a final evaluation of the entire
+condition expression, and avoiding the need for a second `__bool__` check. We model this
+distinction:
 
 ```py
 def conditions(value: object):
     if value and False:
-        "".missing
+        # This branch is not reachable; `value.__bool__` is only tested once. If it's false, this
+        # branch is skipped immediately, if it's true, `False` is always false and this branch is
+        # still skipped.
+        reveal_type(value)  # revealed: Never
 
     if value or True:
         pass
     else:
-        "".missing
+        reveal_type(value)  # revealed: Never
 
     if not (value and False):
         pass
     else:
-        "".missing
+        reveal_type(value)  # revealed: Never
 
     if (value and False) or not (value or True):
-        "".missing
+        reveal_type(value)  # revealed: Never
 ```
 
 Short-circuiting also skips later operands within a condition, including after nested boolean
@@ -223,13 +252,13 @@ operations.
 
 ```py
 def nested_operands(value: object):
-    if (value and False) and "".missing:
+    if (value and False) and reveal_type(value):  # revealed: Never
         pass
 
-    if (value or True) or "".missing:
+    if (value or True) or reveal_type(value):  # revealed: Never
         pass
 
-    if not (value or True) and "".missing:
+    if not (value or True) and reveal_type(value):  # revealed: Never
         pass
 ```
 
@@ -239,39 +268,40 @@ comprehension filters, and match guards.
 ```py
 def other_conditions(value: object):
     while value and False:
-        "".missing
+        reveal_type(value)  # revealed: Never
 
-    assert value or True, value.missing
+    assert value or True, reveal_type(value)  # revealed: Never
 
-    "".missing if value and False else None
+    reveal_type(value) if value and False else None  # revealed: Never
 
-    [item.missing for item in range(1) if value and False]
+    [reveal_type(item) for item in range(1) if value and False]  # revealed: Never
 
     match value:
         case _ if value and False:
-            "".missing
+            reveal_type(value)  # revealed: Never
 
     assert value and False
-    "".missing
+    reveal_type(value)  # revealed: Never
 ```
 
 ## Conditional expressions used as conditions
 
-When a conditional expression is itself a condition, its selected branch is evaluated as a condition
-too. The unselected branch does not affect whether the condition is truthy.
+When a conditional expression (an `if/else` expression) is itself a condition, its selected branch
+is evaluated as a condition too. The unselected branch does not affect whether the condition is
+truthy.
 
 ```py
 def conditional_expressions(value: object, flag: bool):
     if (value and False) if flag else False:
-        "".missing
+        reveal_type(value)  # revealed: Never
 
     if True if flag else (value or True):
         pass
     else:
-        "".missing
+        reveal_type(value)  # revealed: Never
 
     if True if value and False else False:
-        "".missing
+        reveal_type(value)  # revealed: Never
 ```
 
 ## Chained comparison conditions
@@ -286,31 +316,33 @@ class Comparable:
 
 def comparisons(value: Comparable):
     if value < 1 < 0:
-        "".missing
+        reveal_type(value)  # revealed: Never
 
     if value < 1 < 0 < 1:
-        "".missing
+        reveal_type(value)  # revealed: Never
 
-    if (value < 1 < 0) and "".missing:
+    if (value < 1 < 0) and reveal_type(value):  # revealed: Never
         pass
 
     if not (value < 1 < 0):
         pass
     else:
-        "".missing
+        reveal_type(value)  # revealed: Never
 ```
 
 Saving the result of a comparison chain can cause a non-boolean comparison result to be tested
 twice. Its truthiness can change between those tests, so the truthy branch remains reachable.
+References to `value` in these branches retain its type; in unreachable code they would have type
+`Never`.
 
 ```py
 def saved_comparison(value: Comparable):
     result = value < 1 < 0
     if result:
-        "".missing  # error: [unresolved-attribute]
+        reveal_type(value)  # revealed: Comparable
 
     if result := value < 1 < 0:
-        "".missing  # error: [unresolved-attribute]
+        reveal_type(value)  # revealed: Comparable
 ```
 
 An unreachable assignment does not affect the inferred type of a loop variable. Inferring `value`
@@ -343,17 +375,17 @@ class MutableTruthiness:
 def expressions(value: MutableTruthiness, flag: bool):
     saved = value and False
     if saved:
-        "".missing  # error: [unresolved-attribute]
+        reveal_type(value)  # revealed: MutableTruthiness
 
     if saved := value and False:
-        "".missing  # error: [unresolved-attribute]
+        reveal_type(value)  # revealed: MutableTruthiness & ~AlwaysFalsy
 
     saved = (value and False) if flag else False
     if saved:
-        "".missing  # error: [unresolved-attribute]
+        reveal_type(value)  # revealed: MutableTruthiness
 
-    result = (value and False) and "".missing  # error: [unresolved-attribute]
-    result = (not (value or True)) or "".missing  # error: [unresolved-attribute]
+    result = (value and False) and reveal_type(value)  # revealed: MutableTruthiness & ~AlwaysFalsy
+    result = (not (value or True)) or reveal_type(value)  # revealed: MutableTruthiness
 ```
 
 Call arguments are evaluated as values, even when the call is itself used as a condition. Nested
@@ -361,6 +393,6 @@ boolean operations in an argument can therefore re-test an intermediate result.
 
 ```py
 def call_argument(value: MutableTruthiness):
-    if bool((value and False) and "".missing):  # error: [unresolved-attribute]
+    if bool((value and False) and reveal_type(value)):  # revealed: MutableTruthiness & ~AlwaysFalsy
         pass
 ```
