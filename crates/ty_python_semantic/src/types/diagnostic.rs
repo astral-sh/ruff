@@ -1928,7 +1928,8 @@ fn starred_assignment_element<'db>(
         AssignmentDiagnosticKind::Invalid => {
             // The collected list's element type can include both contextual types and
             // promotion. Describe the captured source values using their own inferred types.
-            let inference = infer_unpack_types(db, unpack).value_inference()?;
+            let inference =
+                infer_unpack_types(db, unpack).value_inference(db, unpack.value(db).expression());
             UnionType::from_elements_leave_aliases(
                 db,
                 env,

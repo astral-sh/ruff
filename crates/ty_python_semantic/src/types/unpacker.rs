@@ -23,6 +23,7 @@ use crate::types::{
 };
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::ProgramFile;
+use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
@@ -392,6 +393,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 pub(crate) struct UnpackResult<'db> {
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
+    /// Only contextual inference needs a separate expression map. When no target supplies
+    /// context, reuse the cached result of `infer_expression_types`.
     value_inference: Option<ExpressionInference<'db>>,
     /// Expressions that were inferred with their target's annotation. Diagnostic
     /// deduplication must not assume that every structurally matched value received context.
@@ -408,8 +411,16 @@ impl<'db> UnpackResult<'db> {
         self.contextual_expressions.contains(&expression.into())
     }
 
-    pub(crate) fn value_inference(&self) -> Option<&ExpressionInference<'db>> {
-        self.value_inference.as_ref()
+    /// Return the contextual results, or reuse ordinary inference when no target supplies context.
+    /// `value` must be the expression that was unpacked.
+    pub(crate) fn value_inference(
+        &self,
+        db: &'db dyn Db,
+        value: Expression<'db>,
+    ) -> &ExpressionInference<'db> {
+        self.value_inference
+            .as_ref()
+            .unwrap_or_else(|| infer_expression_types(db, value, TypeContext::default()))
     }
 
     /// Returns the inferred type for a given sub-expression of the left-hand side target
@@ -462,7 +473,7 @@ impl<'db> UnpackResult<'db> {
         }
 
         self.value_inference = self.value_inference.map(|inference| {
-            if let Some(previous) = previous_cycle_result.value_inference() {
+            if let Some(previous) = previous_cycle_result.value_inference.as_ref() {
                 inference.cycle_normalized(db, env, previous, cycle)
             } else {
                 inference

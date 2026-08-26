@@ -2926,9 +2926,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Reuse those expression types here; inferring the right-hand side again without
                 // context would lose information such as the element type of an empty list literal.
                 let unpacked = infer_unpack_types(self.db(), unpack);
-                if let Some(inference) = unpacked.value_inference() {
-                    self.extend_expression_without_bindings(inference);
-                }
+                self.extend_expression_without_bindings(
+                    unpacked.value_inference(self.db(), shared_value),
+                );
                 self.context.extend(unpacked.diagnostics());
                 self.infer_unpacked_assignment_target(target, value, unpacked);
             } else {
@@ -11407,6 +11407,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer an assignment's right-hand side with context from its unpacking targets.
     ///
+    /// Return `None` when no target supplies context, so the caller can reuse the cached
+    /// ordinary expression inference without storing another copy of its results.
+    ///
     /// A starred target receives a new list that has no corresponding expression on the
     /// right-hand side:
     ///
@@ -11425,7 +11428,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         mut self,
         target: &ast::Expr,
         value: &ast::Expr,
-    ) -> UnpackValueInference<'db> {
+    ) -> Option<UnpackValueInference<'db>> {
+        if self.unpack_target_type_context(target).annotation.is_none() {
+            self.context.defuse();
+            return None;
+        }
+
         // Calls to dataclass field specifiers carry metadata such as `init=False`, which
         // controls the generated constructor. That metadata also matters when a field
         // specifier is assigned through unpacking:
@@ -11452,11 +11460,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut starred_types,
             &mut contextual_expressions,
         );
-        UnpackValueInference {
+        Some(UnpackValueInference {
             value: self.into_expression_inference(),
             starred_types,
             contextual_expressions,
-        }
+        })
     }
 
     /// Infer each literal element with the declaration of the target that receives it.

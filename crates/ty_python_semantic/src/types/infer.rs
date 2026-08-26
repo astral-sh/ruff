@@ -790,8 +790,8 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     let target = unpack.target(db, &module);
     let value = unpack.value(db);
     let (value_inference, starred_types, contextual_expressions) =
-        if matches!(value.kind(), UnpackKind::Assign) {
-            let inference = TypeInferenceBuilder::new(
+        if matches!(value.kind(), UnpackKind::Assign)
+            && let Some(inference) = TypeInferenceBuilder::new(
                 db,
                 &env,
                 InferenceRegion::Expression(value.expression(), TypeContext::default()),
@@ -800,7 +800,8 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
                 semantic_index(db, program_file),
                 &module,
             )
-            .finish_unpack_value(target, value.expression().node_ref(db).node(&module));
+            .finish_unpack_value(target, value.expression().node_ref(db).node(&module))
+        {
             (
                 Some(inference.value),
                 inference.starred_types,
