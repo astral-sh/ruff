@@ -50,7 +50,7 @@ enum Command {
     /// Generate JSON schema for the ty TOML configuration file.
     GenerateTySchema(generate_ty_schema::Args),
     /// Generate a Markdown-compatible table of supported lint rules.
-    GenerateRulesTable,
+    GenerateRulesTable(generate_rules_table::Args),
     /// Generate a Markdown-compatible listing of default lint rules.
     GenerateDefaultRules,
     GenerateTyRules(generate_ty_rules::Args),
@@ -100,7 +100,7 @@ fn main() -> Result<ExitCode> {
         Command::GenerateAll(args) => generate_all::main(&args)?,
         Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
         Command::GenerateTySchema(args) => generate_ty_schema::main(&args)?,
-        Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
+        Command::GenerateRulesTable(args) => println!("{}", generate_rules_table::generate(&args)),
         Command::GenerateDefaultRules => println!("{}", generate_default_rules::generate()),
         Command::GenerateTyRules(args) => generate_ty_rules::main(&args)?,
         Command::GenerateOptions => println!("{}", generate_options::generate()),
