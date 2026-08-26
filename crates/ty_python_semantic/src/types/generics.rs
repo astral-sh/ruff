@@ -2088,14 +2088,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         );
 
         let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
-            // TODO:
-            // This should be removed and properly handled in the respective
+            // Lazy comparisons must record the bounds imposed on a type variable by each
+            // materialization. Otherwise, for example, `Top[Inv[Any]] <: Top[Inv[T]]` loses
+            // the incompatible requirements `object <: T` and `T <: Never`.
+            // TODO: Remove the eager workaround and handle it in the respective
             // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
             // `TypeRelationChecker::check_type_pair`. Right now, we cannot generally
             // return `self.always()` from that branch, as that leads to union
             // simplification, which means that we lose track of type variables
             // without recording the constraints under which the relation holds.
-            if matches!(target, Type::TypeVar(_)) || matches!(source, Type::TypeVar(_)) {
+            if self.typevar_evaluation == TypeVarEvaluation::Eager
+                && (target.is_type_var() || source.is_type_var())
+            {
                 return self.always();
             }
 

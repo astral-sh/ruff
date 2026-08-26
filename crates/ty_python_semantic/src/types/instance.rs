@@ -33,7 +33,8 @@ use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, materialization_is_noop,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -672,6 +673,49 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         result.or(db, self.constraints, || structurally_satisfied)
     }
 
+    /// Try a nominal proof when a materialized recursive protocol changes specialization.
+    ///
+    /// A recursive child can stabilize at a specialization that relates nominally even when its
+    /// parent only relates structurally. Keep the child's constraints without retrying the
+    /// structural comparison that reached the recursion guard.
+    pub(super) fn try_check_nominal_protocol_cycle(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let source = source.as_protocol_instance()?;
+        let target = target.as_protocol_instance()?;
+        if source.materialization_kind(db).is_none() && target.materialization_kind(db).is_none() {
+            return None;
+        }
+        let source_origin = source.class_origin(db)?;
+        let target_origin = target.class_origin(db)?;
+        if source_origin.class_literal(db) != target_origin.class_literal(db) {
+            return None;
+        }
+
+        // Nominal arguments alone do not describe materialized requirements such as a fixed
+        // `Any` member. Only use the nominal proof when the pending wrappers are harmless.
+        for protocol in [source, target] {
+            if let Some(origin) = protocol.materialized_origin(db)
+                && !materialization_is_noop(
+                    db,
+                    self.env,
+                    Type::ProtocolInstance(ProtocolInstanceType::from_class(origin)),
+                )
+            {
+                return None;
+            }
+        }
+
+        Some(self.check_type_pair(
+            db,
+            Type::NominalInstance(source.nominal_origin_instance(db)?),
+            Type::NominalInstance(target.nominal_origin_instance(db)?),
+        ))
+    }
+
     /// Avoid recursive requirements that cannot add solutions beyond explicit inheritance.
     fn try_check_nominal_recursive_protocol_members(
         &self,
@@ -786,6 +830,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source_alias.origin(db) != target_alias.origin(db) {
             return None;
         }
+
+        // A materialized recursive member can impose bounds that finite members do not
+        // capture, even when the nominal relation is impossible. Check the full interface.
+        if source_protocol.materialization_kind(db).is_some()
+            || protocol.materialization_kind(db).is_some()
+        {
+            return None;
+        }
+
         let identity_protocol = target_alias
             .origin(db)
             .identity_specialization(db)
