@@ -995,7 +995,6 @@ mod tests {
         	loop-iterator-mutation (B909),
         	trailing-comma-on-bare-tuple (COM818),
         	unnecessary-dict-comprehension-for-iterable (C420),
-        	django-nullable-model-string-field (DJ001),
         	django-model-without-dunder-str (DJ008),
         	django-unordered-body-content-in-model (DJ012),
         	django-non-leading-receiver-decorator (DJ013),
