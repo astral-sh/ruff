@@ -322,6 +322,77 @@ reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
 reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 ```
 
+## Inferring tuple parameter types from unions
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Every member of a union argument contributes to the inferred element type of a homogeneous tuple
+parameter. Different tuple lengths do not prevent inference, and an empty tuple contributes no
+element types.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def elements(values: tuple[T, ...]) -> tuple[T, ...]:
+    return values
+
+def _(
+    same: tuple[str, str] | tuple[str, str, str],
+    mixed: tuple[int] | tuple[str, str],
+    possibly_empty: tuple[()] | tuple[str, str],
+):
+    reveal_type(elements(same))  # revealed: tuple[str, ...]
+    reveal_type(elements(mixed))  # revealed: tuple[int | str, ...]
+    reveal_type(elements(possibly_empty))  # revealed: tuple[str, ...]
+```
+
+Fixed-length and mixed tuples infer type parameters from their corresponding element positions.
+
+```py
+U = TypeVar("U")
+
+def pair(values: tuple[T, U]) -> tuple[T, U]:
+    return values
+
+def _(pairs: tuple[int, str] | tuple[str, int]):
+    reveal_type(pair(pairs))  # revealed: tuple[int | str, str | int]
+
+def tail(values: tuple[int, *tuple[T, ...]]) -> tuple[T, ...]:
+    return values[1:]
+
+def _(tails: tuple[int, str] | tuple[int, bytes, bytes]):
+    reveal_type(tail(tails))  # revealed: tuple[str | bytes, ...]
+```
+
+Gradual elements remain gradual in the inferred result rather than being discarded in favor of the
+fully static elements from another union member.
+
+```py
+from typing import Any
+
+def _(values: tuple[str] | tuple[Any, Any]):
+    reveal_type(elements(values))  # revealed: tuple[str | Any, ...]
+```
+
+Inference still respects type-variable bounds and the required tuple length.
+
+```py
+StringT = TypeVar("StringT", bound=str)
+
+def strings(values: tuple[StringT, ...]) -> tuple[StringT, ...]:
+    return values
+
+def _(valid: tuple[str] | tuple[str, str], invalid: tuple[str] | tuple[int, int]):
+    reveal_type(strings(valid))  # revealed: tuple[str, ...]
+    strings(invalid)  # error: [invalid-argument-type]
+    pair(valid)  # error: [invalid-argument-type]
+```
+
 ## Inferring a bound typevar
 
 ```py
