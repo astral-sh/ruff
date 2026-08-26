@@ -186,6 +186,9 @@ def narrow_sequence_to_list(value: Sequence[int]) -> None:
 A generic class pattern matches every runtime specialization, not only the specialization described
 by its type parameter's default.
 
+The `T` alternative can itself be a subclass of both `str` and `Box`, with a different type
+argument. Matching `Box()` does not establish that this alternative is a `Box[T]`.
+
 ```toml
 [environment]
 python-version = "3.13"
@@ -205,8 +208,8 @@ class Box[T: str = str]:
 def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
     match value:
         case Box():
-            reveal_type(value)  # revealed: Box[T@box_with_default]
-            return value
+            reveal_type(value)  # revealed: Box[T@box_with_default] | (T@box_with_default & Top[Box[Unknown]])
+            return value  # error: [invalid-return-type]
         case remaining:
             reveal_type(remaining)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
             return Box[T](remaining)

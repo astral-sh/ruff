@@ -1452,6 +1452,10 @@ def _(x: object):
 Narrowing must therefore preserve the original type argument instead of substituting `Box`'s
 default.
 
+The `T` alternative can itself be a subclass of both `str` and `Box`, with a different type
+argument. That alternative remains possible in the positive branch, so returning `value` as `Box[T]`
+is unsafe.
+
 ```py
 from typing import assert_never
 
@@ -1462,8 +1466,8 @@ class Box[T: str = str]:
 
 def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
     if isinstance(value, Box):
-        reveal_type(value)  # revealed: Box[T@box_with_default]
-        return value
+        reveal_type(value)  # revealed: Box[T@box_with_default] | (T@box_with_default & Top[Box[Unknown]])
+        return value  # error: [invalid-return-type]
 
     if not isinstance(value, Box):
         reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]

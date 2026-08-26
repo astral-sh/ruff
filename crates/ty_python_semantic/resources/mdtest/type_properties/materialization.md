@@ -1463,6 +1463,31 @@ static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[bool | Any]
 static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[Any]]))
 ```
 
+An unresolved type variable does not necessarily satisfy a materialization's bounds. In particular,
+`list[T]` is not always a subtype of a list whose elements are integers, so both alternatives remain
+in their union.
+
+```pyi
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def unresolved(values: list[T] | Top[list[int & Any]]):
+    static_assert(not is_subtype_of(list[T], Top[list[int & Any]]))
+    static_assert(not is_subtype_of(Top[list[Any]], list[T]))
+    reveal_type(values)  # revealed: list[T@unresolved] | Top[list[int & Any]]
+```
+
+A declared upper bound can establish the required relation without fixing the type variable to one
+particular specialization.
+
+```pyi
+IntT = TypeVar("IntT", bound=int)
+
+def bounded(values: list[IntT]):
+    static_assert(is_subtype_of(list[IntT], Top[list[int & Any]]))
+```
+
 ## Assignability
 
 ### General

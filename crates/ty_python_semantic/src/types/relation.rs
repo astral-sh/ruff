@@ -14,7 +14,7 @@ use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::signatures::{Parameters, ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
@@ -1761,14 +1761,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Any concrete specialization of a `ParamSpec` is a subtype of the top
-            // materialization of a `ParamSpec` value.
+            // Compare fixed `ParamSpec`s through their callable-shaped parameter values. This
+            // preserves both ends of the materialization range of `...`: its bottom is below
+            // every `ParamSpec`, and its top is above every `ParamSpec`.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
+            | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_paramspec(db)
-                    && Self::is_top_paramspec_value(db, other) =>
+                    && other.kind(db) == CallableTypeKind::ParamSpecValue =>
             {
-                self.always()
+                let paramspec =
+                    Type::paramspec_value_callable(db, Parameters::paramspec(db, bound_typevar));
+                let (source, target) = if source.is_type_var() {
+                    (paramspec, target)
+                } else {
+                    (source, paramspec)
+                };
+                self.check_type_pair(db, source, target)
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -2762,15 +2771,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .signatures(db)
                 .iter()
                 .all(|signature| signature.parameters().kind() == ParametersKind::Gradual)
-    }
-
-    /// Returns `true` if `callable` is the top materialization of a `ParamSpec` value.
-    fn is_top_paramspec_value(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
-        callable.kind(db) == CallableTypeKind::ParamSpecValue
-            && callable
-                .signatures(db)
-                .iter()
-                .all(|signature| signature.parameters().kind() == ParametersKind::Top)
     }
 }
 

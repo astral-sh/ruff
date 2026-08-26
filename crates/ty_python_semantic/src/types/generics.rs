@@ -1706,15 +1706,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             })
         ) && (
-            // Avoid the `self.always()` type-variable shortcut in
-            // `check_subtyping_in_invariant_position`: it would incorrectly conclude
-            // that `Top[Inv[Any]] <: Inv[T]` for an unresolved `T`.
-            // TODO: remove this once that shortcut is removed.
-            target
-                .types(db)
-                .iter()
-                .all(|ty| !ty.has_typevar_or_typevar_instance(db, env))
-        ) && (
             // Only non-pure redundancy needs a target already equal to its top.
             // Materializing the source otherwise loses the bottom needed to
             // simplify `Covariant[Any] | Covariant[Any | str]`. Comparing both
@@ -2085,24 +2076,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.materialization_visitor,
         );
 
-        let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
-            // Lazy comparisons must record the bounds imposed on a type variable by each
-            // materialization. Otherwise, for example, `Top[Inv[Any]] <: Top[Inv[T]]` loses
-            // the incompatible requirements `object <: T` and `T <: Never`.
-            // TODO: Remove the eager workaround and handle it in the respective
-            // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
-            // `TypeRelationChecker::check_type_pair`. Right now, we cannot generally
-            // return `self.always()` from that branch, as that leads to union
-            // simplification, which means that we lose track of type variables
-            // without recording the constraints under which the relation holds.
-            if self.typevar_evaluation == TypeVarEvaluation::Eager
-                && (target.is_type_var() || source.is_type_var())
-            {
-                return self.always();
-            }
-
-            self.check_type_pair(db, source, target)
-        };
+        // Lazy comparisons record the bounds imposed by each materialization. Eager comparisons
+        // must also respect type variables: treating them as unconditional matches can discard
+        // valid alternatives from unions such as `list[T] | Top[list[Any & int]]`.
+        let is_subtype_of = |source, target| self.check_type_pair(db, source, target);
         match (source_materialization, target_materialization) {
             // `source` is a subtype of `target` if the range of materializations covered by `source`
             // is a subset of the range covered by `target`.
@@ -2193,6 +2170,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 TypeVarVariance::Invariant => {
                     let left_type = left_type.resolve_type_alias(db);
                     let right_type = right_type.resolve_type_alias(db);
+
+                    // Failing to prove equality does not establish disjointness when an argument
+                    // contains a type variable: `list[T]` and `list[int]` overlap if `T = int`.
+                    // Even `Never` is a possible specialization, so argument disjointness alone
+                    // cannot rule out overlap between the enclosing generic types.
+                    if left_type.has_typevar(db, self.env) || right_type.has_typevar(db, self.env) {
+                        return self.never();
+                    }
 
                     // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
                     // and `R` have any common materialization, so this is symmetric despite

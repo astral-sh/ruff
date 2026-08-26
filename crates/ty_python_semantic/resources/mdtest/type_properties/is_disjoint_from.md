@@ -1169,6 +1169,8 @@ type Id[V] = V
 def _[U]():
     static_assert(not is_disjoint_from(Invariant[U], Invariant[int]))
     static_assert(not is_disjoint_from(Invariant[Id[U]], Invariant[int]))
+    static_assert(not is_disjoint_from(Invariant[list[U]], Invariant[list[int]]))
+    static_assert(not is_disjoint_from(Invariant[U], Invariant[Never]))
 
 static_assert(not is_disjoint_from(Invariant[Id[int]], Invariant[int]))
 static_assert(is_disjoint_from(Invariant[Id[int]], Invariant[str]))
