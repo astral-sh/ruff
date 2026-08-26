@@ -979,6 +979,7 @@ struct ConstraintSetStorage<'db> {
     constraint_bound_depth_cache: FxHashMap<ConstraintId, (u16, u16)>,
     source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
+    constraint_set_assignable_cache: FxHashMap<(Type<'db>, Type<'db>), bool>,
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
     /// source order used to traverse it.
@@ -1466,6 +1467,23 @@ impl<'db> ConstraintSetStorage<'db> {
 
         let result = ante.implies(db, env, self, post);
         self.constraint_implication_cache.insert(key, result);
+        result
+    }
+
+    fn cached_is_constraint_set_assignable_to(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let key = (source, target);
+        if let Some(result) = self.constraint_set_assignable_cache.get(&key) {
+            return *result;
+        }
+
+        let result = source.is_constraint_set_assignable_to(db, env, target);
+        self.constraint_set_assignable_cache.insert(key, result);
         result
     }
 
@@ -2671,8 +2689,8 @@ impl ConstraintId {
         let self_lower = self_constraint.bounds.lower_bound().ty();
         let self_upper = self_constraint.bounds.upper_bound().ty();
         let other_upper = other_constraint.bounds.upper_bound().ty();
-        other_lower.is_constraint_set_assignable_to(db, env, self_lower)
-            && self_upper.is_constraint_set_assignable_to(db, env, other_upper)
+        storage.cached_is_constraint_set_assignable_to(db, env, other_lower, self_lower)
+            && storage.cached_is_constraint_set_assignable_to(db, env, self_upper, other_upper)
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -2715,6 +2733,14 @@ impl ConstraintId {
             merged_upper.add_clause(upper);
         }
         let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
+
+        if !effective_lower.is_static_sequent_eligible(db, env)
+            || merged_upper
+                .iter_clauses()
+                .any(|upper| !upper.ty().is_static_sequent_eligible(db, env))
+        {
+            return IntersectionResult::CannotSimplify;
+        }
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
         // empty, since there is no type that is both greater than `lower`, and less than `upper`.
@@ -3469,6 +3495,19 @@ impl NodeId {
         searcher.clauses
     }
 
+    fn path_assignments<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_order: Option<SourceOrderId>,
+    ) -> PathAssignments {
+        match self.node() {
+            Node::AlwaysFalse | Node::AlwaysTrue => PathAssignments::default(),
+            Node::Interior(interior) => interior.path_assignments(db, env, storage, source_order),
+        }
+    }
+
     fn display<'db, 'a>(
         self,
         db: &'db dyn Db,
@@ -4059,37 +4098,38 @@ impl<'db> PathBounds<'db> {
             return ControlFlow::Continue(path_bounds);
         }
 
+        let node_support = storage.node_support(node).cloned();
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
-        let interior = match node.node() {
-            Node::AlwaysTrue => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(PathBounds::Unconstrained);
-            }
-            Node::AlwaysFalse => {
-                limits.visit_node()?;
-                return ControlFlow::Continue(PathBounds::Unsatisfiable);
-            }
-            Node::Interior(interior) => interior,
-        };
 
         let mut walker = SolutionWalker::new(source_orders);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(db, env, storage, path_source_order);
-        walker.visit_node(db, env, storage, &mut path, node, limits)?;
+        let mut path = node.path_assignments(db, env, storage, path_source_order);
+        walker.visit_node(
+            db,
+            env,
+            storage,
+            limits,
+            &mut path,
+            node_support.as_ref(),
+            node,
+        )?;
         ControlFlow::Continue(walker.finish(db, env, storage))
     }
 
-    /// Accumulates a conjunction of concrete bound constraints without constructing a
-    /// [`PathAssignments`] or its sequent map.
+    /// Solves a constraint set when it represents a _simple conjunction_: it can be expressed as a
+    /// single conjunction of constraints, and the lower/upper bounds of those constraints do not
+    /// mention any other typevars. That lets us use a fast path that doesn't require constructing
+    /// a [`PathAssignments`] or its sequent map.
     ///
-    /// There are no relationships to derive between these constraints, as the upper and lower
-    /// bounds do not contain typevars. The normal solution-selection logic still validates each
-    /// accumulated bound against the typevar's declared bound or constraints.
+    /// We do still have to consider the declared upper bound/constraints of the typevars in the
+    /// constraint set. To be eligible for this fast path, the solution cannot mention any
+    /// _constrained_ typevars, since those introduce a disjunction. And like the constraints in
+    /// the BDD itself, the declared upper bound of each type cannot mention any other typevars.
     fn compute_simple_bound_conjunction<L: SolutionLimits>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4099,6 +4139,9 @@ impl<'db> PathBounds<'db> {
         inferable: TypeVarSet<'db>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, Option<Self>> {
+        let bound_is_ineligible =
+            |ty: Type<'db>| ty.has_typevar(db, env) || ty.has_unspecialized_type_var(db, env);
+
         let mut constraints = Vec::default();
         let mut current = node;
         loop {
@@ -4108,7 +4151,6 @@ impl<'db> PathBounds<'db> {
                     if constraints.is_empty() {
                         return ControlFlow::Continue(Some(PathBounds::Unconstrained));
                     }
-                    limits.satisfied_path()?;
                     break;
                 }
                 Node::AlwaysFalse => {
@@ -4129,9 +4171,7 @@ impl<'db> PathBounds<'db> {
 
                     let mut bounds = iter::chain(constraint.bounds.lower, constraint.bounds.upper)
                         .map(ConstraintBound::ty);
-                    if bounds.any(|bound| {
-                        bound.has_typevar(db, env) || bound.has_unspecialized_type_var(db, env)
-                    }) {
+                    if bounds.any(bound_is_ineligible) {
                         return ControlFlow::Continue(None);
                     }
 
@@ -4160,6 +4200,39 @@ impl<'db> PathBounds<'db> {
             }
         }
 
+        // Add the declared upper bounds of each typevar in this fast-path solution. This fast path
+        // only engages for _simple conjunctions_. That means we should give up if we find any
+        // _constrained_ typevars, since those introduce a disjunction into the solution.
+        //
+        // Unlike the more general `SolutionWalker`, here we only have to consider the typevars
+        // that are actually mentioned in the solution we found, rather than incorporating the
+        // validity constraints of _every_ typevar. For this fast path, we have already ensured
+        // that the solution does not depend on any cross-typevar relationships, so the validity
+        // bounds of unmentioned typevars cannot affect the solution of the typevars we have
+        // evidence for.
+        for (bound_typevar, bounds) in &mut mappings {
+            let bound = match bound_typevar.typevar(db).bound_or_constraints(db, env) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
+                // A constrained typevar introduces a disjunction over its declared constraints,
+                // which means we can't engage this fast path.
+                Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+                    return ControlFlow::Continue(None);
+                }
+                // An unconstrained typevar does not add any additional constraints on its
+                // solutions, other than the evidence we already have in the BDD.
+                None => continue,
+            };
+
+            if bound_is_ineligible(bound) {
+                // If this declared upper bound mentions other typevars, we don't have a simple
+                // conjunction that's eligible for this fast path.
+                return ControlFlow::Continue(None);
+            }
+
+            bounds.add_upper(db, env, ConstraintBound::Validity(bound));
+        }
+
+        limits.satisfied_path()?;
         let path = mappings
             .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
@@ -4294,8 +4367,7 @@ impl<'db> PathBounds<'db> {
     ) -> PathBoundSolution<'db> {
         // Choose a solution type that satisfies the constraints on this path, as well as any upper
         // bound or constraints of the typevar itself.
-        // TODO: Handle the upper bound/constraints by conjoining them with the constraint set
-        // before solving.
+        // TODO: Handle the constraints by conjoining them with the constraint set before solving.
 
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.effective_lower(db, env);
@@ -4304,9 +4376,7 @@ impl<'db> PathBounds<'db> {
             .typevar(db)
             .require_bound_or_constraints(db, env)
         {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                let declared_upper = bound.top_materialization(db, env);
-
+            TypeVarBoundOrConstraints::UpperBound(_) => {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
@@ -4324,15 +4394,6 @@ impl<'db> PathBounds<'db> {
                         }
                     }
 
-                    if !is_possibly_constraint_set_assignable(
-                        db,
-                        TypePair::new(db, env.program(db), lower, declared_upper),
-                    ) {
-                        // This path does not satisfy the typevar's declared upper bound, and is
-                        // therefore not a valid specialization.
-                        return PathBoundSolution::Unsatisfiable;
-                    }
-
                     return PathBoundSolution::Solved(lower);
                 }
 
@@ -4340,10 +4401,7 @@ impl<'db> PathBounds<'db> {
                     return IntersectionType::bounded_from_elements(
                         db,
                         env,
-                        iter::chain(
-                            path_bound.upper.iter_clauses().map(ConstraintBound::ty),
-                            [declared_upper],
-                        ),
+                        path_bound.upper.iter_clauses().map(ConstraintBound::ty),
                     )
                     .map_or(
                         PathBoundSolution::BudgetExceeded { fallback: None },
@@ -5285,7 +5343,9 @@ impl SequentMap {
         }
 
         // If either antecedent implies the consequent on its own, this new sequent is redundant.
-        if ante1.implies(db, env, storage, post) || ante2.implies(db, env, storage, post) {
+        if storage.cached_constraint_implies(db, env, ante1, post)
+            || storage.cached_constraint_implies(db, env, ante2, post)
+        {
             return;
         }
 
@@ -6697,6 +6757,8 @@ impl PathFold for IsNeverSatisfiedVisitor {
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent>,
+    /// The sequents that can fire when a particular assignment is added to the path.
+    sequent_antecedents: FxHashMap<ConstraintAssignment, Vec<usize>>,
     /// Each assignment's source constraint and the first per-path fuel value with which it was
     /// derived.
     assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
@@ -6781,6 +6843,23 @@ impl Ord for AssignmentFuel {
     }
 }
 
+impl Default for PathAssignments {
+    fn default() -> Self {
+        Self {
+            sequents: Vec::default(),
+            sequent_antecedents: FxHashMap::default(),
+            assignments: FxIndexMap::default(),
+            additional_fuels: Vec::default(),
+            discovered: FxIndexMap::default(),
+            elaborated_pairs: FxHashSet::default(),
+            independent_typevars: FxHashSet::default(),
+            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
+            assignment_queue: VecDeque::default(),
+            new_assignments: FxIndexMap::default(),
+        }
+    }
+}
+
 impl PathAssignments {
     fn new(
         constraints: impl IntoIterator<Item = ConstraintId>,
@@ -6792,6 +6871,7 @@ impl PathAssignments {
             .collect();
         Self {
             sequents: Vec::default(),
+            sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
             discovered,
@@ -7083,6 +7163,35 @@ impl PathAssignments {
         Some(max_fuel)
     }
 
+    fn extend_sequents(
+        existing: &mut Vec<Sequent>,
+        antecedents: &mut FxHashMap<ConstraintAssignment, Vec<usize>>,
+        sequents: &[Sequent],
+    ) {
+        for sequent in sequents {
+            let sequent_index = existing.len();
+            existing.push(*sequent);
+
+            let mut add_antecedent = |assignment| {
+                antecedents
+                    .entry(assignment)
+                    .or_default()
+                    .push(sequent_index);
+            };
+            match *sequent {
+                Sequent::SingleTautology { ante } => add_antecedent(ante.when_false()),
+                Sequent::SingleImplication { ante, .. } => add_antecedent(ante.when_true()),
+                Sequent::PairImpossibility { ante1, ante2 }
+                | Sequent::PairImplication { ante1, ante2, .. } => {
+                    add_antecedent(ante1.when_true());
+                    if ante1 != ante2 {
+                        add_antecedent(ante2.when_true());
+                    }
+                }
+            }
+        }
+    }
+
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
     /// constraint. We do not calculate the new sequents directly. Instead, we call
     /// [`SequentMap::for_constraint`] and [`for_constraint_pair`][SequentMap::for_constraint_pair]
@@ -7103,7 +7212,11 @@ impl PathAssignments {
         }
 
         let single_map = SequentMap::for_constraint(db, env, storage, constraint);
-        self.sequents.extend_from_slice(&single_map.sequents);
+        Self::extend_sequents(
+            &mut self.sequents,
+            &mut self.sequent_antecedents,
+            &single_map.sequents,
+        );
 
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
             if *existing == constraint {
@@ -7141,7 +7254,11 @@ impl PathAssignments {
             }
 
             let pair_map = SequentMap::for_constraint_pair(db, env, storage, a, b);
-            self.sequents.extend_from_slice(&pair_map.sequents);
+            Self::extend_sequents(
+                &mut self.sequents,
+                &mut self.sequent_antecedents,
+                &pair_map.sequents,
+            );
         }
     }
 
@@ -7262,10 +7379,27 @@ impl PathAssignments {
         // brute-force search.
 
         self.new_assignments.clear();
+        let previous_sequents_len = self.sequents.len();
+        let previous_antecedents_len = self
+            .sequent_antecedents
+            .get(&assignment)
+            .map_or(0, Vec::len);
         self.discover_constraint(db, env, storage, assignment.constraint());
+        let sequents_len = self.sequents.len();
 
-        for i in 0..self.sequents.len() {
-            let sequent = self.sequents[i];
+        // Previously discovered sequents can only start firing if the assignment that we just
+        // added is one of their antecedents.
+        for index in 0..previous_antecedents_len {
+            let sequent_index = self.sequent_antecedents[&assignment][index];
+            let sequent = self.sequents[sequent_index];
+            self.check_sequent(db, env, storage, sequent)?;
+        }
+
+        // Sequent elaboration can produce rules whose antecedents do not include the constraint
+        // that caused us to discover them. Check every newly discovered sequent once against the
+        // complete set of assignments on the current path.
+        for sequent_index in previous_sequents_len..sequents_len {
+            let sequent = self.sequents[sequent_index];
             self.check_sequent(db, env, storage, sequent)?;
         }
 
@@ -7725,6 +7859,38 @@ mod tests {
             assert_eq!(mentioned, vec![t, u]);
             assert!(support.is_complete());
         }
+    }
+
+    #[test]
+    fn validity_closes_over_typevars_in_declared_upper_bounds() {
+        // Both evidence paths violate `T ≤ U ≤ int`. `U` occurs only in `T`'s declared upper bound,
+        // so rejecting them requires validity traversal to add `U` to its worklist.
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let u = create_typevar(db, "U")
+            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(int)));
+        let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
+        });
+        let builder = ConstraintSetBuilder::new();
+        let set = create_constraint(db, &builder, t, KnownClass::Str).or(db, &builder, || {
+            create_constraint(db, &builder, t, KnownClass::Bytes)
+        });
+        let inferable = TypeVarSet::from_typevars(db, [t]);
+
+        assert_eq!(
+            PathBounds::compute(
+                db,
+                &env,
+                &mut builder.storage.borrow_mut(),
+                set.node,
+                inferable,
+                set.source_order,
+            ),
+            PathBounds::Unsatisfiable
+        );
     }
 
     #[test]
@@ -9484,22 +9650,6 @@ class E: ...
         }
     }
 
-    fn path_assignments_for<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-        node: NodeId,
-        source_order: Option<SourceOrderId>,
-    ) -> PathAssignments {
-        let mut storage = builder.storage.borrow_mut();
-        match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([], FxHashSet::default()),
-            Node::Interior(interior) => {
-                interior.path_assignments(db, env, &mut storage, source_order)
-            }
-        }
-    }
-
     #[test]
     fn path_assignments_follow_constraint_source_order() {
         let db = setup_db();
@@ -9514,8 +9664,10 @@ class E: ...
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
-        let path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-        let storage = builder.storage.borrow();
+        let mut storage = builder.storage.borrow_mut();
+        let path = set
+            .node
+            .path_assignments(db, &env, &mut storage, set.source_order);
         let expected =
             [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
         let actual: Vec<_> = path.discovered.keys().copied().collect();
@@ -9572,9 +9724,11 @@ class E: ...
             tautology,
             transitive,
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-            let mut fold = ReconstructPathFold { break_at: None };
             let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
+            let mut fold = ReconstructPathFold { break_at: None };
             let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
                 path.visit(db, &env, &mut storage, set.node, &mut fold)
             else {
@@ -9609,11 +9763,13 @@ class E: ...
             PathFoldBreak::Impossible,
             PathFoldBreak::Combine,
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
+            let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
             let mut aborting_fold = ReconstructPathFold {
                 break_at: Some(break_at),
             };
-            let mut storage = builder.storage.borrow_mut();
             assert_eq!(
                 path.visit(db, &env, &mut storage, set.node, &mut aborting_fold),
                 ControlFlow::Break(break_at)
@@ -9664,23 +9820,40 @@ class E: ...
             (usize::MAX, 1, ProjectionError::TraversalBudgetExceeded),
             (1, usize::MAX, ProjectionError::PathBudgetExceeded),
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
             let mut limits = BoundedSolutionLimits {
                 remaining_paths,
                 remaining_visits,
             };
             let mut walker = SolutionWalker::new(source_orders.clone());
             assert_eq!(
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits),
+                walker.visit_node(
+                    db,
+                    &env,
+                    &mut storage,
+                    &mut limits,
+                    &mut path,
+                    None,
+                    set.node
+                ),
                 ControlFlow::Break(error)
             );
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
             let mut walker = SolutionWalker::new(source_orders.clone());
-            let ControlFlow::Continue(()) =
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits);
+            let ControlFlow::Continue(()) = walker.visit_node(
+                db,
+                &env,
+                &mut storage,
+                &mut limits,
+                &mut path,
+                None,
+                set.node,
+            );
             assert_eq!(walker.finish(db, &env, &mut storage), expected);
         }
     }

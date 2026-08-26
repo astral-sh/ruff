@@ -6,7 +6,7 @@
 //! The support of a node is the union of the supports of every constraint reachable from that
 //! node.
 
-use std::ops::BitOrAssign;
+use std::ops::{BitOrAssign, Sub};
 
 use crate::types::constraints::TypeVarId;
 
@@ -38,6 +38,26 @@ impl Support {
         let bit_index_within_chunk = index % CHUNK_SIZE;
         let bit_mask_within_chunk = 1 << bit_index_within_chunk;
         self.chunks[chunk_index] |= bit_mask_within_chunk;
+    }
+
+    /// Removes and returns an arbitrary typevar from this support.
+    pub(super) fn pop(&mut self) -> Option<TypeVarId> {
+        let (idx, first_nonempty_chunk) = self
+            .chunks
+            .iter_mut()
+            .enumerate()
+            .find(|(_, chunk)| **chunk != 0)?;
+        let first_set_bit_in_chunk = first_nonempty_chunk.trailing_zeros() as usize;
+        debug_assert!(
+            first_set_bit_in_chunk != CHUNK_SIZE,
+            "nonempty chunk should not be empty"
+        );
+
+        // Clear out the bit we just found, and then return it
+        *first_nonempty_chunk ^= 1 << first_set_bit_in_chunk;
+        Some(TypeVarId::from_usize(
+            CHUNK_SIZE * idx + first_set_bit_in_chunk,
+        ))
     }
 
     /// Returns an iterator of all of the typevars in this support.
@@ -99,5 +119,17 @@ impl BitOrAssign<Option<&Self>> for Support {
         if let Some(rhs) = rhs {
             *self |= rhs;
         }
+    }
+}
+
+impl Sub<&Support> for &Support {
+    type Output = Support;
+
+    fn sub(self, rhs: &Support) -> Support {
+        let mut result = self.clone();
+        for (lhs, rhs) in std::iter::zip(&mut result.chunks, &rhs.chunks) {
+            *lhs &= !(*rhs);
+        }
+        result
     }
 }
