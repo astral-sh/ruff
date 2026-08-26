@@ -298,8 +298,8 @@ def _(cls: type) -> None:
         reveal_type(cls())  # revealed: Top[list[Unknown]]
 ```
 
-When narrowing from a generic superclass to a generic subclass, we retain the subclass's top
-materialization while combining its gradual type argument with the known superclass argument:
+When narrowing from a generic superclass to a generic subclass, we intersect with the top
+materialization of the subclass:
 
 ```py
 from typing import Sequence

@@ -301,10 +301,10 @@ static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
 ```
 
-In `isinstance` narrowing, where we intersect with the top-materialization of generic classes, we
-can end up with intersections like `C[P] & Top[D[Any]]`, where `C` and `D` are generic classes in a
-subtyping relationship. If `C[T] = Sub[T]` is a subtype of `D[T] = Base[T]`, we can immediately
-simplify:
+In strict-mode `isinstance` narrowing, where we intersect with the top-materialization of generic
+classes, we can end up with intersections like `C[P] & Top[D[Any]]`, where `C` and `D` are generic
+classes in a subtyping relationship. If `C[T] = Sub[T]` is a subtype of `D[T] = Base[T]`, we can
+immediately simplify:
 
 ```ignore
 Sub[P] & Top[Base[Any]] = Sub[P]
@@ -471,7 +471,8 @@ Base[P] & Top[Sub[Any]] = Top[Sub[P | Any]]    (Base: contravariant, Sub: invari
 
 ### Multi-parameter and mixed-variance generics
 
-The results above naturally extend to multi-parameter generics and mixed variances:
+The same-class intersection relations (4b), (5b), and (6) can apply simultaneously to the covariant,
+contravariant, and invariant type parameters of a multi-parameter generic class:
 
 ```pyi
 from typing import Any, Generic, TypeVar

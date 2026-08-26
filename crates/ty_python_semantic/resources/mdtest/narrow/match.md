@@ -152,8 +152,7 @@ def narrow_sequence_to_list(value: Sequence[int]) -> None:
 
 ### Strict mode
 
-With strict generic narrowing enabled, class patterns retain their top materializations while
-combining gradual type arguments with known arguments from the narrowed type.
+With strict generic narrowing enabled, class patterns retain their top materializations.
 
 ```toml
 [environment]
@@ -163,7 +162,10 @@ python-version = "3.12"
 strict-generic-narrowing = true
 ```
 
-A `list()` pattern transfers the known `Sequence` element type into the top-materialized list.
+A `list()` pattern leads to a type that retains the known element type (`int`), but prevents
+`.append` from accepting any type: `value` could be a list of `int`s, or a list of `bool`s, or a
+list of `Literal[1]`, etc. So whatever we would try to append might be incompatible with the actual
+element type of the list.
 
 ```py
 from typing import Sequence
@@ -172,6 +174,9 @@ def narrow_sequence_to_list(value: Sequence[int]) -> None:
     match value:
         case list():
             reveal_type(value)  # revealed: Top[list[Unknown & int]]
+            reveal_type(value[0])  # revealed: int
+
+            value.append(1)  # error: [invalid-argument-type] "Expected `Never`, found `Literal[1]`"
         case _:
             reveal_type(value)  # revealed: Sequence[int] & ~Top[list[Unknown]]
 ```
