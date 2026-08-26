@@ -979,6 +979,7 @@ struct ConstraintSetStorage<'db> {
     constraint_bound_depth_cache: FxHashMap<ConstraintId, (u16, u16)>,
     source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
+    constraint_set_assignable_cache: FxHashMap<(Type<'db>, Type<'db>), bool>,
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
     /// source order used to traverse it.
@@ -1466,6 +1467,23 @@ impl<'db> ConstraintSetStorage<'db> {
 
         let result = ante.implies(db, env, self, post);
         self.constraint_implication_cache.insert(key, result);
+        result
+    }
+
+    fn cached_is_constraint_set_assignable_to(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let key = (source, target);
+        if let Some(result) = self.constraint_set_assignable_cache.get(&key) {
+            return *result;
+        }
+
+        let result = source.is_constraint_set_assignable_to(db, env, target);
+        self.constraint_set_assignable_cache.insert(key, result);
         result
     }
 
@@ -2671,8 +2689,8 @@ impl ConstraintId {
         let self_lower = self_constraint.bounds.lower_bound().ty();
         let self_upper = self_constraint.bounds.upper_bound().ty();
         let other_upper = other_constraint.bounds.upper_bound().ty();
-        other_lower.is_constraint_set_assignable_to(db, env, self_lower)
-            && self_upper.is_constraint_set_assignable_to(db, env, other_upper)
+        storage.cached_is_constraint_set_assignable_to(db, env, other_lower, self_lower)
+            && storage.cached_is_constraint_set_assignable_to(db, env, self_upper, other_upper)
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -5325,7 +5343,9 @@ impl SequentMap {
         }
 
         // If either antecedent implies the consequent on its own, this new sequent is redundant.
-        if ante1.implies(db, env, storage, post) || ante2.implies(db, env, storage, post) {
+        if storage.cached_constraint_implies(db, env, ante1, post)
+            || storage.cached_constraint_implies(db, env, ante2, post)
+        {
             return;
         }
 
