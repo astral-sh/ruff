@@ -11487,7 +11487,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value: &ast::Expr,
         starred_types: &mut FxHashMap<ExpressionNodeKey, Type<'db>>,
         contextual_expressions: &mut FxHashSet<ExpressionNodeKey>,
-    ) -> Type<'db> {
+    ) {
         // We can pass context to individual source expressions when both sides have tuple
         // or list syntax. For `first, *rest = (0, 1, 2)`, `sequence_elts` returns the target
         // slice `[first, *rest]` and the value slice `[0, 1, 2]`. `Option::zip` obtains both
@@ -11614,7 +11614,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => Type::unknown(),
                 };
                 self.store_expression_type(value, ty);
-                return ty;
+                return;
             }
         }
 
@@ -11658,7 +11658,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if tcx.annotation.is_some() {
             self.contextualize_unpacked_captures(target, value, ty, starred_types);
         }
-        ty
     }
 
     /// Even when the source has no literal elements, a starred target receives a fresh list.
@@ -11786,56 +11785,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// items, other = pair()
     /// ```
     fn unpack_target_type_context(&self, target: &ast::Expr) -> TypeContext<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        if let Some(elts) = sequence_elts(target) {
+            let mut tuple = TupleSpecBuilder::with_capacity(elts.len());
+            let mut has_context = false;
+            let mut has_starred = false;
+            for elt in elts {
+                if let ast::Expr::Starred(starred) = elt {
+                    if has_starred {
+                        // Multiple starred targets can occur in a recovered AST, but
+                        // `*left, *right = source` has no valid combined tuple context.
+                        return TypeContext::default();
+                    }
+                    has_starred = true;
+                    let annotation = self.unpack_target_type_context(&starred.value).annotation;
+                    has_context |= annotation.is_some();
+                    // A starred target contributes context for individual source elements:
+                    //
+                    //     def unpack(source: tuple[int, *tuple[str, ...]]):
+                    //         first: int
+                    //         rest: list[str]
+                    //         first, *rest = source
+                    //
+                    // The target annotations combine into `tuple[int, *tuple[str, ...]]`
+                    // context for `source`. Extract `str` from `rest`'s `list[str]`
+                    // annotation: the source yields individual strings, and unpacking
+                    // collects them into a new list.
+                    let element_type = annotation
+                        .and_then(|ty| ty.try_iterate(db, env).ok())
+                        .map(|elements| elements.homogeneous_element_type(db, env))
+                        .unwrap_or_else(Type::unknown);
+                    tuple = tuple.concat(db, env, &TupleSpec::homogeneous(element_type));
+                } else {
+                    let annotation = self.unpack_target_type_context(elt).annotation;
+                    has_context |= annotation.is_some();
+                    tuple.push(annotation.unwrap_or_else(Type::unknown));
+                }
+            }
+            // `a, b = source` with no target declarations should retain ordinary
+            // unannotated inference, rather than introducing a tuple of unknown types
+            // as a new source of context.
+            return TypeContext::new(
+                has_context.then(|| Type::tuple(TupleType::new(db, env, &tuple.build()))),
+            );
+        }
+
         // This pass only needs declarations. Ordinary target inference later checks the
         // actual assignment, so looking up context must not commit bindings or diagnostics.
         let mut lookup = self.speculate_without_diagnostics();
-        let db = self.db();
-        let env = self.program_environment();
         match target {
-            ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-            | ast::Expr::List(ast::ExprList { elts, .. }) => {
-                let mut tuple = TupleSpecBuilder::with_capacity(elts.len());
-                let mut has_context = false;
-                let mut has_starred = false;
-                for elt in elts {
-                    if let ast::Expr::Starred(starred) = elt {
-                        if has_starred {
-                            // Multiple starred targets can occur in a recovered AST, but
-                            // `*left, *right = source` has no valid combined tuple context.
-                            return TypeContext::default();
-                        }
-                        has_starred = true;
-                        let annotation = self.unpack_target_type_context(&starred.value).annotation;
-                        has_context |= annotation.is_some();
-                        // A starred target contributes context for individual source elements:
-                        //
-                        //     def unpack(source: tuple[int, *tuple[str, ...]]):
-                        //         first: int
-                        //         rest: list[str]
-                        //         first, *rest = source
-                        //
-                        // The target annotations combine into `tuple[int, *tuple[str, ...]]`
-                        // context for `source`. Extract `str` from `rest`'s `list[str]`
-                        // annotation: the source yields individual strings, and unpacking
-                        // collects them into a new list.
-                        let element_type = annotation
-                            .and_then(|ty| ty.try_iterate(db, env).ok())
-                            .map(|elements| elements.homogeneous_element_type(db, env))
-                            .unwrap_or_else(Type::unknown);
-                        tuple = tuple.concat(db, env, &TupleSpec::homogeneous(element_type));
-                    } else {
-                        let annotation = self.unpack_target_type_context(elt).annotation;
-                        has_context |= annotation.is_some();
-                        tuple.push(annotation.unwrap_or_else(Type::unknown));
-                    }
-                }
-                // `a, b = source` with no target declarations should retain ordinary
-                // unannotated inference, rather than introducing a tuple of unknown types
-                // as a new source of context.
-                TypeContext::new(
-                    has_context.then(|| Type::tuple(TupleType::new(db, env, &tuple.build()))),
-                )
-            }
             // Use the ordinary binding machinery to find a name's declaration. Reading its
             // inferred value instead could use the very assignment we are trying to infer.
             // The declaration remains available even when the assignment reads its own target:
