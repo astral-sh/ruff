@@ -526,15 +526,15 @@ wheels = [
 
 [[package]]
 name = "lsprotocol"
-version = "2023.0.0"
+version = "2025.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "cattrs" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3e/fe/f7671a4fb28606ff1663bba60aff6af21b1e43a977c74c33db13cb83680f/lsprotocol-2023.0.0.tar.gz", hash = "sha256:c9d92e12a3f4ed9317d3068226592860aab5357d93cf5b2451dc244eee8f35f2", size = 69399, upload-time = "2023-11-16T18:32:44.964Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/26/67b84e6ec1402f0e6764ef3d2a0aaf9a79522cc1d37738f4e5bb0b21521a/lsprotocol-2025.0.0.tar.gz", hash = "sha256:e879da2b9301e82cfc3e60d805630487ac2f7ab17492f4f5ba5aaba94fe56c29", size = 74896, upload-time = "2025-06-17T21:30:18.156Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/5b/f18eb1823a4cee9bed70cdcc25eed5a75845367c42e63a79010a7c34f8a7/lsprotocol-2023.0.0-py3-none-any.whl", hash = "sha256:e85fc87ee26c816adca9eb497bb3db1a7c79c477a11563626e712eaccf926a05", size = 70789, upload-time = "2023-11-16T18:32:46.479Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/f0/92f2d609d6642b5f30cb50a885d2bf1483301c69d5786286500d15651ef2/lsprotocol-2025.0.0-py3-none-any.whl", hash = "sha256:f9d78f25221f2a60eaa4a96d3b4ffae011b107537facee61d3da3313880995c7", size = 76250, upload-time = "2025-06-17T21:30:19.455Z" },
 ]
 
 [[package]]
@@ -1234,14 +1234,16 @@ wheels = [
 
 [[package]]
 name = "pygls"
-version = "1.2.1"
+version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "attrs" },
+    { name = "cattrs" },
     { name = "lsprotocol" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e6/94/534c11ba5475df09542e48d751a66e0448d52bbbb92cbef5541deef7760d/pygls-1.2.1.tar.gz", hash = "sha256:04f9b9c115b622dcc346fb390289066565343d60245a424eca77cb429b911ed8", size = 45274, upload-time = "2023-11-30T14:13:28.792Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/2e/7bbe061d175c0baddde8fc9edb908a4c31ba5d9165b8c68e3439c3a9f138/pygls-2.1.1.tar.gz", hash = "sha256:1da03ba9053201bb337dcdd8d121df70feb2a91e1a0dcc74de5da79755b1a201", size = 55091, upload-time = "2026-03-25T11:19:10.541Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/36/31/3799444d3f072ffca1a35eb02a48f964384cc13f001125e87d9f0748687b/pygls-1.2.1-py3-none-any.whl", hash = "sha256:7dcfcf12b6f15beb606afa46de2ed348b65a279c340ef2242a9a35c22eeafe94", size = 55983, upload-time = "2023-11-30T14:13:23.233Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/1a/208293b6c350f5abea6941d5606080d4a492644052504f5312e5de30a902/pygls-2.1.1-py3-none-any.whl", hash = "sha256:510a6dea2476177230c7d851125e5948efdf3fdb9ebfd8543fc434972f8faed4", size = 68975, upload-time = "2026-03-25T11:19:11.374Z" },
 ]
 
 [[package]]
@@ -1574,7 +1576,7 @@ release = [{ name = "rooster", marker = "python_full_version >= '3.12'", specifi
 ruff-lsp-test = [
     { name = "lsprotocol", marker = "python_full_version >= '3.12'", specifier = ">=2023.0.0" },
     { name = "packaging", marker = "python_full_version >= '3.12'", specifier = ">=23.1" },
-    { name = "pygls", marker = "python_full_version >= '3.12'", specifier = ">=1.1.0,<2" },
+    { name = "pygls", marker = "python_full_version >= '3.12'", specifier = ">=2.1.1,<3" },
     { name = "pytest", marker = "python_full_version >= '3.12'", specifier = ">=9.0.3,<10" },
     { name = "pytest-asyncio", marker = "python_full_version >= '3.12'", specifier = ">=0.21.2" },
     { name = "python-lsp-jsonrpc", marker = "python_full_version >= '3.12'", specifier = ">=1.0.0" },
