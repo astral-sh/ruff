@@ -751,8 +751,8 @@ fn fixture_declaration<'db>(
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let function = function_ref.node(&module);
-    let inference = function_known_decorators(db, definition);
     let first_decorator = &function.decorator_list.first()?.expression;
+    let inference = function_known_decorators(db, definition);
     let expression = if definition.scope(db).node(db).scope_kind() == ScopeKind::Class
         && matches!(
             inference.expression_type(first_decorator),
