@@ -751,8 +751,8 @@ fn fixture_declaration<'db>(
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let function = function_ref.node(&module);
-    let inference = function_known_decorators(db, definition);
     let first_decorator = &function.decorator_list.first()?.expression;
+    let inference = function_known_decorators(db, definition);
     let expression = if definition.scope(db).node(db).scope_kind() == ScopeKind::Class
         && matches!(
             inference.expression_type(first_decorator),
@@ -822,11 +822,18 @@ fn fixture_candidates_from_definition<'db>(
         }
     }
 
+    let kind = definition.kind(db);
+    if !matches!(
+        &kind,
+        DefinitionKind::Function(_) | DefinitionKind::ImportFrom(_) | DefinitionKind::StarImport(_)
+    ) {
+        return Vec::new();
+    }
     if !exists_at_runtime(db, definition) {
         return Vec::new();
     }
 
-    match definition.kind(db) {
+    match kind {
         DefinitionKind::Function(_) => vec![definition],
         DefinitionKind::ImportFrom(import) => {
             let parsed = parsed_module(db, definition.python_file(db)).load(db);
@@ -1100,17 +1107,19 @@ fn directly_parametrized<'db>(
     index: &ty_python_core::SemanticIndex<'_>,
     parameter_name: &str,
 ) -> bool {
-    let decorators = function_known_decorators(db, function_definition);
-    if function.decorator_list.iter().any(|decorator| {
-        mark_excludes_fixture(
-            db,
-            function_definition,
-            &decorator.expression,
-            parameter_name,
-            |expression| decorators.expression_type(expression),
-        )
-    }) {
-        return true;
+    if !function.decorator_list.is_empty() {
+        let decorators = function_known_decorators(db, function_definition);
+        if function.decorator_list.iter().any(|decorator| {
+            mark_excludes_fixture(
+                db,
+                function_definition,
+                &decorator.expression,
+                parameter_name,
+                |expression| decorators.expression_type(expression),
+            )
+        }) {
+            return true;
+        }
     }
 
     std::iter::successors(class_scope, |class_scope| {
