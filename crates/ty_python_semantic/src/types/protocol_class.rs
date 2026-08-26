@@ -79,6 +79,17 @@ impl<'db> ProtocolClass<'db> {
         cached_protocol_interface(db, *self)
     }
 
+    /// Structural variance inference currently excludes recursive protocol and type-alias
+    /// dependencies: validating a cycle requires inferring variance independently of the
+    /// declarations being checked. Descriptor writes are also excluded when their accepted values
+    /// cannot be represented by a single type, leaving no write domain to use contravariantly.
+    ///
+    /// TODO: Support these recursive dependencies and descriptor write domains.
+    pub(super) fn supports_variance_inference(self, db: &'db dyn Db) -> bool {
+        self.static_class_literal(db)
+            .is_some_and(|(class, _)| supports_protocol_variance_inference(db, class))
+    }
+
     /// Returns the interface before an invariant specialization is materialized.
     ///
     /// A materialized generic origin retains its specialization for nominal identity and display.
@@ -317,7 +328,7 @@ impl<'db> ProtocolClass<'db> {
         let Some(protocol) = class.identity_specialization(db).into_protocol_class(db) else {
             return;
         };
-        if !protocol.interface(db).supports_variance_inference(db) {
+        if !protocol.supports_variance_inference(db) {
             return;
         }
 
@@ -851,26 +862,24 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db).contains_key(name)
     }
 
-    /// Return whether this interface is currently supported by structural variance inference.
-    ///
-    /// The finite-member guard conservatively rejects any member type containing a protocol,
-    /// including unrelated protocols and explicit receiver annotations that refer to this protocol.
-    /// This skips declared-variance validation and falls back to ordinary class variance inference
-    /// for inferred parameters, even when the interface is not recursive.
-    ///
-    /// TODO: Narrow the guard to actual recursion, and support recursive interfaces and descriptor
-    /// writes with unrepresentable domains.
-    pub(super) fn supports_variance_inference(self, db: &'db dyn Db) -> bool {
-        ProtocolInterfaceView::new(self, None).has_only_finite_members(db)
-            && self.members(db).all(|member| {
-                !matches!(
-                    member.data.kind,
-                    ProtocolMemberKind::Property {
-                        write: Some(ProtocolMemberWrite::Descriptor { domain: None, .. }),
-                        ..
-                    }
-                )
-            })
+    /// The exposed read and write types, with their positions in variance inference.
+    fn variance_types<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+    ) -> impl Iterator<Item = (Type<'db>, TypeVarVariance)> + 'a {
+        self.members(db).flat_map(move |member| {
+            let capabilities = member.capabilities(db, env);
+            // Instance methods are checked only through their bound instance signature.
+            let class_access = if member.is_instance_method() {
+                ProtocolMemberAccess::NONE
+            } else {
+                capabilities.class
+            };
+            [capabilities.instance, class_access]
+                .into_iter()
+                .flat_map(|access| access.variances(db, env))
+        })
     }
 
     /// Returns whether `name` has an instance-write requirement of `type[T]`, where `T` belongs
@@ -1214,19 +1223,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        self.members(db)
-            .flat_map(|member| {
-                let capabilities = member.capabilities(db, env);
-                // Instance methods are checked only through their bound instance signature.
-                let class_access = if member.is_instance_method() {
-                    ProtocolMemberAccess::NONE
-                } else {
-                    capabilities.class
-                };
-                [capabilities.instance, class_access]
-                    .into_iter()
-                    .flat_map(|access| access.variances(db, env))
-            })
+        self.variance_types(db, env)
             .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar))
             .collect()
     }
@@ -3668,6 +3665,59 @@ fn non_object_protocol_member_count<'db>(
         .filter(|name| name.as_str() != "__hash__" && interface.includes_member(db, name))
         .count();
     interface.member_count(db) - inherited_member_count
+}
+
+/// Check variance dependencies by definition, so expanding specializations such as `P[list[T]]`
+/// cannot hide a cycle. Nonrecursive protocol references do not prevent variance inference.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _| false,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn supports_protocol_variance_inference<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> bool {
+    let Some(protocol) = class.identity_specialization(db).into_protocol_class(db) else {
+        return false;
+    };
+    let interface = protocol.interface(db);
+    if interface.members(db).any(|member| {
+        matches!(
+            member.data.kind,
+            ProtocolMemberKind::Property {
+                write: Some(ProtocolMemberWrite::Descriptor { domain: None, .. }),
+                ..
+            }
+        )
+    }) {
+        return false;
+    }
+
+    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    let supports_type = |ty| {
+        !any_over_type_expanding_aliases(db, &env, ty, |nested| {
+            matches!(nested, Type::ProtocolInstance(protocol) if protocol
+                .class_origin(db)
+                .is_none_or(|class| !class.supports_variance_inference(db)))
+        })
+    };
+    interface.variance_types(db, &env).all(|(ty, _)| {
+        if let Type::Callable(callable) = ty {
+            // Bound receivers constrain when a method can be called, but they are not input
+            // or output positions in variance inference. Match `Signature::variance_of`.
+            callable.signatures(db).iter().all(|signature| {
+                signature
+                    .parameters()
+                    .iter()
+                    .map(Parameter::annotated_type)
+                    .chain(std::iter::once(signature.return_ty))
+                    .all(supports_type)
+            })
+        } else {
+            supports_type(ty)
+        }
+    })
 }
 
 /// Inner Salsa query for [`ProtocolClass::interface`].

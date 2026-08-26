@@ -411,6 +411,36 @@ static_assert(is_subtype_of(Covariant[int], Covariant[object]))
 static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
 ```
 
+## Nested nonrecursive protocols
+
+Using a generic protocol inside another specialization of the same protocol is not a recursive
+definition, including through a type alias. The nested `Reader` specializations do not prevent
+structural variance inference for `Source`: its writable `_value` attribute makes it invariant.
+Returning `Source[T]` from a nominal wrapper preserves that invariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+
+type NestedReader[T] = Reader[Reader[T]]
+
+class Source[T](Protocol):
+    _value: T
+
+    def reader(self) -> NestedReader[T]: ...
+
+class Wrapper[T]:
+    def source(self) -> Source[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,
@@ -561,10 +591,9 @@ def unsound(value: WritableProtocol[int]) -> None:
 
 ### Mutable protocol attributes with unrelated protocol members
 
-The recursion guard currently disables structural variance inference whenever a member type contains
-a protocol, even if the interface is not recursive. The fallback to ordinary class inference treats
-`_value` as private and incorrectly infers covariance. This also makes a class that returns the
-protocol covariant, allowing callers to mutate `_value` through a wider specialization.
+An unrelated protocol in a member type does not change the invariance of a writable attribute. A
+class that returns this protocol is also invariant, preventing callers from mutating `_value`
+through a wider specialization.
 
 ```py
 from typing import Protocol
@@ -583,9 +612,8 @@ class Wrapper[T]:
     def value(self) -> WritableProtocol[T]:
         raise NotImplementedError
 
-# TODO: Both assertions should hold: the writable protocol attribute makes `Wrapper` invariant.
-static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Wrapper[int], Wrapper[object]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_assignable_to(Wrapper[int], Wrapper[object]))
 ```
 
 ### Immutable Attributes

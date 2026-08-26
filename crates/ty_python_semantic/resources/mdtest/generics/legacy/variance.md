@@ -484,10 +484,9 @@ class ConstructorOnly(Protocol[T]):
 
 ## Protocol method receivers
 
-Explicit receiver annotations that reference the protocol trigger the recursion guard, so these
-examples currently skip declared-variance validation. The covariant version should be rejected
-because `send` consumes its type parameter, but it is also accepted. This demonstrates the guard's
-limitation rather than correct handling of receiver variance.
+Explicit receiver annotations do not add an input or output position to a bound method. Both
+protocols consume their type parameter through `send`, so only the contravariant declaration is
+valid.
 
 ```py
 from typing import Protocol, TypeVar
@@ -500,7 +499,7 @@ class ExplicitReceivers(Protocol[T_contra]):
     @classmethod
     def configure(cls: "type[ExplicitReceivers[T_contra]]") -> None: ...
 
-# TODO: Reject the covariant declaration; this protocol should be contravariant.
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantExplicitReceivers` should be contravariant, but is covariant"
 class CovariantExplicitReceivers(Protocol[T_co]):
     def send(self: "CovariantExplicitReceivers[T_co]", value: T_co) -> None: ...
     @classmethod
@@ -538,8 +537,7 @@ static_assert(not is_assignable_to(WritableProtocol[int], WritableProtocol[objec
 
 ## Protocol members referencing other protocols
 
-The recursion guard currently skips declared-variance validation whenever a member type contains a
-protocol, even if that protocol is unrelated and the interface is not recursive. `Source` should be
+An unrelated protocol in a member type does not prevent declared-variance validation. `Source` is
 covariant because only `read` uses `T`, in a return position.
 
 ```py
@@ -550,10 +548,74 @@ T = TypeVar("T")
 class Marker(Protocol):
     def ready(self) -> bool: ...
 
-# TODO: Reject the invariant declaration even though `marker` returns another protocol.
+# error: [invalid-protocol] "Type variable `T` in protocol `Source` should be covariant, but is invariant"
 class Source(Protocol[T]):
     def read(self) -> T: ...
     def marker(self) -> Marker: ...
+```
+
+## Nested protocol variance
+
+Variance composes through nonrecursive generic protocols. Returning a covariant protocol produces
+its type parameter, while accepting it as an argument consumes that parameter.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Reader(Protocol[T_co]):
+    def read(self) -> T_co: ...
+
+class NestedReader(Protocol[T_co]):
+    def reader(self) -> Reader[T_co]: ...
+
+# error: [invalid-protocol] "Type variable `T` in protocol `Source` should be covariant, but is invariant"
+class Source(Protocol[T]):
+    def reader(self) -> NestedReader[T]: ...
+
+class Sink(Protocol[T_contra]):
+    def write(self, reader: NestedReader[T_contra]) -> None: ...
+```
+
+## Recursive protocol variance
+
+Declared-variance validation still skips recursive protocol interfaces. Each protocol below exposes
+a method that consumes its type parameter, either directly or through another protocol, so a
+covariant declaration is invalid.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+# TODO: Reject the covariant declaration even though `next` refers to this protocol.
+class Recursive(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def next(self) -> "Recursive[T_co]": ...
+```
+
+The guard also recognizes recursion when each reference changes the specialization.
+
+```py
+# TODO: Reject the covariant declaration despite the expanding recursive reference.
+class Expanding(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def next(self) -> "Expanding[list[T_co]]": ...
+```
+
+Mutually recursive interfaces are also skipped, regardless of which protocol is checked first.
+
+```py
+# TODO: Reject the covariant declarations in this recursive pair.
+class Left(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def right(self) -> "Right[T_co]": ...
+
+class Right(Protocol[T_co]):
+    def left(self) -> Left[T_co]: ...
 ```
 
 ## Inherited protocol variance
