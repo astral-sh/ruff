@@ -1857,15 +1857,15 @@ pub(crate) enum ConstraintBound<'db> {
 }
 
 impl<'db> ConstraintBound<'db> {
-    pub(crate) const fn missing_lower() -> Self {
+    const fn missing_lower() -> Self {
         Self::Validity(Type::Never)
     }
 
-    pub(crate) const fn missing_upper() -> Self {
+    const fn missing_upper() -> Self {
         Self::Validity(Type::object())
     }
 
-    pub(crate) fn ty(self) -> Type<'db> {
+    fn ty(self) -> Type<'db> {
         match self {
             Self::Validity(ty) | Self::Evidence(ty) => ty,
         }
@@ -2011,11 +2011,11 @@ impl<'db> ConstraintBounds<'db> {
         )
     }
 
-    pub(crate) fn lower_bound(self) -> ConstraintBound<'db> {
+    fn lower_bound(self) -> ConstraintBound<'db> {
         self.lower.unwrap_or_else(ConstraintBound::missing_lower)
     }
 
-    pub(crate) fn upper_bound(self) -> ConstraintBound<'db> {
+    fn upper_bound(self) -> ConstraintBound<'db> {
         self.upper.unwrap_or_else(ConstraintBound::missing_upper)
     }
 
@@ -2078,7 +2078,7 @@ impl<'db> UpperBound<'db> {
         self.validity.iter().copied().map(ConstraintBound::Validity)
     }
 
-    pub(crate) fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+    fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
         iter::chain(self.iter_evidence(), self.iter_validity())
     }
 
@@ -3764,7 +3764,7 @@ impl<'db> PathBoundSolution<'db> {
 pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) evidence_lower: Option<Type<'db>>,
-    pub(crate) validity_lower: Type<'db>,
+    validity_lower: Type<'db>,
     pub(crate) upper: UpperBound<'db>,
     /// Whether the path contains gradual evidence and no static evidence.
     has_only_gradual_evidence: bool,
@@ -3781,11 +3781,7 @@ impl<'db> PathBound<'db> {
         }
     }
 
-    pub(crate) fn effective_lower(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    fn effective_lower(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         let Some(evidence_lower) = self.evidence_lower else {
             return self.validity_lower;
         };

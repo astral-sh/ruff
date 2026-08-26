@@ -402,7 +402,7 @@ impl File {
     ///
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
-    pub fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
+    pub(crate) fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
         let path = self.path(db);
 
         match path {

@@ -56,7 +56,7 @@ impl<'db> Module<'db> {
     }
 
     /// The resolver environment used to resolve this module.
-    pub fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
+    fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
         match self {
             Module::File(module) => module.resolver_environment(db),
             Module::Namespace(module) => module.resolver_environment(db),

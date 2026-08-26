@@ -187,7 +187,7 @@ impl ScriptEnvironments {
     }
 
     /// Returns whether `file`'s environment is [`Pending`](ScriptEnvironmentAvailability::Pending).
-    pub fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
+    pub(crate) fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
         if !self.is_enabled() || script_tag(db, file).is_none() {
             return false;
         }

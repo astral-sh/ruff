@@ -1,6 +1,9 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["github>astral-sh/renovate-config"],
+  extends: [
+    "github>astral-sh/renovate-config",
+    "customManagers:githubActionsVersions",
+  ],
   schedule: ["before 4am on Wednesday"],
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm", "custom.regex"],
   pep621: {
