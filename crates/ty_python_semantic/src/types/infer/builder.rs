@@ -9724,8 +9724,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // expression are those of the *iterator*. If `x` is itself a generator, that's `x`.
         // Otherwise, e.g. for an instance of a class whose `__iter__` method is a
         // generator function, we look at the return type of `x.__iter__()`.
-        let inner_generator_types = iterable_type
+        let inner_generator = iterable_type
             .generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
+            .map(|types| (iterable_type, types))
             .or_else(|| {
                 let iterator_type = match iterable_type.try_call_dunder(
                     db,
@@ -9743,14 +9744,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Err(err) => err.return_type(db, env),
                 }?;
                 // `Iterator` has no type parameter for `StopIteration.value`.
-                iterator_type.generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
+                iterator_type
+                    .generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
+                    .map(|types| (iterator_type, types))
             });
 
         if let Some(outer_send_ty) = outer_expected.send_ty {
-            let inner_send_ty = inner_generator_types
-                .and_then(|generator_types| generator_types.send_ty)
-                .unwrap_or_else(|| Type::none(db, env));
-            if !outer_send_ty.is_assignable_to(db, env, inner_send_ty) {
+            let incompatible_send_ty = match inner_generator {
+                Some((iterator_type, _)) => {
+                    iterator_type.incompatible_yield_from_send_type(db, env, outer_send_ty)
+                }
+                None => {
+                    let none = Type::none(db, env);
+                    (!outer_send_ty.is_assignable_to(db, env, none)).then_some(none)
+                }
+            };
+            if let Some(inner_send_ty) = incompatible_send_ty {
                 report_invalid_generator_yield_type(
                     &self.context,
                     value.as_ref(),
@@ -9762,8 +9771,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        inner_generator_types
-            .and_then(|generator_types| generator_types.return_ty)
+        inner_generator
+            .and_then(|(_, generator_types)| generator_types.return_ty)
             .unwrap_or_else(Type::unknown)
     }
 

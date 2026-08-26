@@ -178,6 +178,72 @@ def mixed_send(value: Wrapped | Sequence) -> Generator[int, int, None]:
     yield from value
 ```
 
+## `yield from` with union send types
+
+The outer generator's send type must be accepted by every possible delegated generator. An `int`
+cannot be forwarded to an iterator that might require `str`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generator
+
+class IntBox:
+    def __iter__(self) -> Generator[int, int, None]:
+        yield 1
+
+class StrBox:
+    def __iter__(self) -> Generator[int, str, None]:
+        yield 1
+
+def incompatible_boxes(box: IntBox | StrBox) -> Generator[int, int, None]:
+    yield from box  # error: [invalid-yield]
+```
+
+The same check applies when `__iter__` itself returns a union, including through a type alias, or
+when the operand is already a union of generators:
+
+```py
+type EitherGenerator = Generator[int, int, None] | Generator[int, str, None]
+
+class UnionBox:
+    def __iter__(self) -> EitherGenerator:
+        yield 1
+
+def incompatible_iterators() -> Generator[int, int, None]:
+    yield from UnionBox()  # error: [invalid-yield]
+
+def incompatible_generators(inner: EitherGenerator) -> Generator[int, int, None]:
+    yield from inner  # error: [invalid-yield]
+```
+
+Delegation is valid when every alternative accepts the outer send type, even if the alternatives
+also accept different additional types:
+
+```py
+class OverlappingBox:
+    def __iter__(self) -> Generator[int, int | str, None] | Generator[int, int | bytes, None]:
+        yield 1
+
+def compatible_iterators() -> Generator[int, int, None]:
+    yield from OverlappingBox()
+```
+
+Gradual send types are checked against each alternative separately. `list[Any]` is assignable to
+both `list[int]` and `list[str]`, so this delegation is accepted:
+
+```py
+from typing import Any
+
+def gradual_send(
+    inner: Generator[int, list[int], None] | Generator[int, list[str], None],
+) -> Generator[int, list[Any], None]:
+    yield from inner
+```
+
 ## `yield from` with a generator that return `types.GeneratorType`
 
 `types.GeneratorType` is a nominal type that implements the `typing.Generator` protocol:
