@@ -151,13 +151,13 @@ groups described above. These categories organize rules by the types of issues t
 determine whether rules are enabled by default. These categories and their descriptions, in
 order of decreasing severity, are:
 
-- **Correctness**: These rules flag code that is outright wrong or useless as written. If you
-  encounter a correctness issue, you should try to fix it rather than suppressing the error with
-  `noqa` or `ruff: ignore`.
-- **Suspicious**: These rules are similar to `correctness` lints in that the code is likely wrong or
-  useless, but `suspicious` lints acknowledge that there are valid reasons for the code to be
-  written in this way. You will still typically want to fix these issues, but using a suppression
-  comment may occasionally be necessary. Deprecations generally also fit into this category.
+- **Correctness**: These rules flag code that is outright wrong as written. If you encounter a
+  correctness issue, you should try to fix it rather than suppressing the error with `noqa` or
+  `ruff: ignore`.
+- **Suspicious**: These rules are similar to `correctness` lints in that the code is likely wrong,
+  but `suspicious` lints acknowledge that there are valid reasons for the code to be written in this
+  way. You will still typically want to fix these issues, but using a suppression comment may
+  occasionally be necessary. Deprecations generally also fit into this category.
 - **Complexity**: These rules detect code that can be written in a simpler or more readable way
   without changing its semantics.
 - **Performance**: These rules detect code that can be written in a more efficient way, without changing its semantics or significantly degrading readability.
