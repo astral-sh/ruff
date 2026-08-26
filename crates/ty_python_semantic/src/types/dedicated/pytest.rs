@@ -822,11 +822,18 @@ fn fixture_candidates_from_definition<'db>(
         }
     }
 
+    let kind = definition.kind(db);
+    if !matches!(
+        &kind,
+        DefinitionKind::Function(_) | DefinitionKind::ImportFrom(_) | DefinitionKind::StarImport(_)
+    ) {
+        return Vec::new();
+    }
     if !exists_at_runtime(db, definition) {
         return Vec::new();
     }
 
-    match definition.kind(db) {
+    match kind {
         DefinitionKind::Function(_) => vec![definition],
         DefinitionKind::ImportFrom(import) => {
             let parsed = parsed_module(db, definition.python_file(db)).load(db);
