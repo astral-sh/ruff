@@ -76,7 +76,7 @@ therefore determined by the iterator returned by `x.__iter__()`, even if `x` its
 generator:
 
 ```py
-from typing import Generator, Iterator
+from typing import Generator
 
 class Box:
     def __iter__(self) -> Generator[str, None, int]:
@@ -106,20 +106,44 @@ def outer_ok() -> Generator[int, int, None]:
     yield from SendBox()
 ```
 
-If `__iter__` returns a plain `Iterator`, the value of the `yield from` expression is `None`, just
-like for a generator annotated as returning an `Iterator`:
+## `yield from` with a plain `Iterator`
+
+An `Iterator` annotation specifies the yielded type, but not the value of `StopIteration.value`. The
+result of delegating to such an iterator is therefore `Unknown`, even when it is returned by a
+custom iterable's `__iter__` method:
 
 ```py
+from typing import Generator, Iterator
+
+class Finished:
+    def __iter__(self) -> "Finished":
+        return self
+
+    def __next__(self) -> str:
+        raise StopIteration(42)
+
 class Plain:
     def __iter__(self) -> Iterator[str]:
-        yield "a"
+        return Finished()
 
-def plain() -> Generator[str, None, None]:
+def plain() -> Generator[str, None, int]:
     result = yield from Plain()
-    reveal_type(result)  # revealed: None
+    reveal_type(result)  # revealed: Unknown
+    return result
+```
 
+The same applies to an iterator used directly and to a built-in iterable whose `__iter__` method
+returns a plain `Iterator`:
+
+```py
+def direct(iterator: Iterator[str]) -> Generator[str, None, int]:
+    result = yield from iterator
+    reveal_type(result)  # revealed: Unknown
+    return result
+
+def builtin() -> Generator[str, None, None]:
     result = yield from ["a", "b"]
-    reveal_type(result)  # revealed: None
+    reveal_type(result)  # revealed: Unknown
 ```
 
 ## `yield from` with a generator that return `types.GeneratorType`
