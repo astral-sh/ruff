@@ -79,7 +79,12 @@ impl<'db> ProtocolClass<'db> {
         cached_protocol_interface(db, *self)
     }
 
-    /// Whether the protocol's member types support structural variance inference.
+    /// Structural variance inference currently excludes recursive protocol and type-alias
+    /// dependencies: validating a cycle requires inferring variance independently of the
+    /// declarations being checked. Descriptor writes are also excluded when their accepted values
+    /// cannot be represented by a single type, leaving no write domain to use contravariantly.
+    ///
+    /// TODO: Support these recursive dependencies and descriptor write domains.
     pub(super) fn supports_variance_inference(self, db: &'db dyn Db) -> bool {
         self.static_class_literal(db)
             .is_some_and(|(class, _)| supports_protocol_variance_inference(db, class))
@@ -3664,8 +3669,6 @@ fn non_object_protocol_member_count<'db>(
 
 /// Check variance dependencies by definition, so expanding specializations such as `P[list[T]]`
 /// cannot hide a cycle. Nonrecursive protocol references do not prevent variance inference.
-///
-/// TODO: Support recursive interfaces and descriptor writes with unrepresentable domains.
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, _, _| false,

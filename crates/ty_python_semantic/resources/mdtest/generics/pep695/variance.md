@@ -414,7 +414,9 @@ static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
 ## Nested nonrecursive protocols
 
 Using a generic protocol inside another specialization of the same protocol is not a recursive
-definition. Covariance composes through both specializations, including through a type alias.
+definition, including through a type alias. The nested `Reader` specializations do not prevent
+structural variance inference for `Source`: its writable `_value` attribute makes it invariant.
+Returning `Source[T]` from a nominal wrapper preserves that invariance.
 
 ```py
 from typing import Protocol
@@ -426,12 +428,17 @@ class Reader[T](Protocol):
 
 type NestedReader[T] = Reader[Reader[T]]
 
-class Source[T]:
-    def reader(self) -> NestedReader[T]:
+class Source[T](Protocol):
+    _value: T
+
+    def reader(self) -> NestedReader[T]: ...
+
+class Wrapper[T]:
+    def source(self) -> Source[T]:
         raise NotImplementedError
 
-static_assert(is_subtype_of(Source[int], Source[object]))
-static_assert(not is_subtype_of(Source[object], Source[int]))
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
 ```
 
 ## Mutual Recursion
