@@ -12,8 +12,11 @@ use ruff_text_size::Ranged;
 
 use crate::Db;
 use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{ResizeTupleError, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
+use crate::types::{
+    KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, infer_expression_types,
+};
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::ProgramFile;
 use ty_python_core::scope::ScopeId;
@@ -133,9 +136,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         self.unpack_inner(target, value_expr.into(), value_type);
     }
 
-    /// In regular tuple assignments like `a, b = 1, 2` {or even `a, (b, c) = 1, (2, 3)`}, map each
-    /// expression on the left individually to the corresponding element type on the right, rather
-    /// than trying to walk the tuple type of the entire RHS.
+    /// In assignments from tuple or list literals, map each target to the corresponding element
+    /// types on the right, including the elements collected by a starred target. This preserves
+    /// element positions in list literals, whose inferred type combines all element types.
     ///
     /// We avoid infinitely growing types in cycle resolution by preserving only the
     /// topmost/outermost part of types that have `Divergent` components. For example, if the
@@ -166,15 +169,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let Some(values) = fixed_sequence_elements(value_expr, elts.len()) else {
+                let Some(values) = sequence_elts(value_expr) else {
+                    // `first, *rest = items` has no literal elements to match against the
+                    // targets. Unpack the inferred type of `items` instead.
                     return false;
                 };
-
-                if elts.iter().any(ast::Expr::is_starred_expr) {
-                    return false;
-                }
-
-                self.unpack_fixed_sequence_from_inference(elts, values, value_inference)
+                self.unpack_fixed_sequence_from_inference(elts, values, value_expr, value_inference)
             }
             _ => false,
         }
@@ -184,16 +184,106 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         &mut self,
         targets: &[ast::Expr],
         values: &[ast::Expr],
+        value_expr: &ast::Expr,
         value_inference: &ExpressionInference<'db>,
     ) -> bool {
-        // Even `a, b = 1, 2` recurses through this helper. `.all()` short-circuits,
-        // so in nested cases an earlier element may update `self.targets` before a
-        // later element falls back to the general unpacking path. That's harmless
-        // because the fallback recomputes the full unpacking and overwrites any
-        // partial entries.
-        targets.iter().zip(values).all(|(target, value_expr)| {
-            self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
-        })
+        // For `first, *rest = [*items, "last"]`, `*items` can contribute zero or more
+        // elements, so AST positions alone cannot tell us which value is assigned to
+        // `first`. Fall back to unpacking the inferred sequence type.
+        if values.iter().any(ast::Expr::is_starred_expr) {
+            return false;
+        }
+
+        if let Some((starred_index, starred)) = targets
+            .iter()
+            .enumerate()
+            .find_map(|(index, target)| target.as_starred_expr().map(|starred| (index, starred)))
+        {
+            // `first, *rest = (1, 2, 3)` uses the inferred tuple type, which already retains
+            // element positions and the promotion applied during tuple inference. Only list
+            // literals need this path for starred targets.
+            if !value_expr.is_list_expr() {
+                return false;
+            }
+
+            let prefix_targets = &targets[..starred_index];
+            let suffix_targets = &targets[starred_index + 1..];
+
+            // `first, *rest, last = [1]` cannot fill both fixed targets. Recovered invalid
+            // syntax such as `first, *left, *right = [1, 2, 3]` has no unique starred target
+            // to collect the remaining values. Leave both cases to the general unpacker.
+            if values.len() < prefix_targets.len() + suffix_targets.len()
+                || suffix_targets.iter().any(ast::Expr::is_starred_expr)
+            {
+                return false;
+            }
+
+            let (prefix_values, remaining_values) = values.split_at(prefix_targets.len());
+            let (starred_values, suffix_values) =
+                remaining_values.split_at(remaining_values.len() - suffix_targets.len());
+            let db = self.db();
+            let env = self.context.program_environment();
+            // Preserve the promotion applied by list-literal inference, but restrict the element
+            // type to the values collected by this target.
+            let mut element_types = UnionBuilder::new(db, env).unpack_aliases(false);
+            let mut allow_tuple_size_promotion = true;
+            for value in starred_values {
+                let value_type = value_inference.expression_type(value).promote(db, env);
+                allow_tuple_size_promotion = allow_tuple_size_promotion
+                    && TupleSizePromotionConstraints::allows_expression(db, env, value, value_type);
+                element_types.add_in_place(value_type);
+            }
+            let element_type = if starred_values.is_empty() {
+                // `first, *rest = [1]` creates an empty list. As with `rest = []`, no captured
+                // value constrains its element type.
+                Type::unknown()
+            } else {
+                element_types.build()
+            };
+            let element_type = if allow_tuple_size_promotion {
+                element_type.promote_tuple_size_in_union(db, env)
+            } else {
+                element_type
+            };
+            let element_type = element_type.promote_singletons_recursively(db, env);
+            let list_type = KnownClass::List.to_specialized_instance(db, env, &[element_type]);
+            self.unpack_inner(&starred.value, value_expr.into(), list_type);
+
+            // `first, *rest, last = [1, 2, 3, 4]` is valid despite the different lengths.
+            // Once `rest` is handled, only the matching prefix and suffix remain.
+            return self.unpack_fixed_sequence_from_inference(
+                prefix_targets,
+                prefix_values,
+                value_expr,
+                value_inference,
+            ) && self.unpack_fixed_sequence_from_inference(
+                suffix_targets,
+                suffix_values,
+                value_expr,
+                value_inference,
+            );
+        }
+
+        // Without a starred target, `a, b = (1,)` and `a, b = (1, 2, 3)` cannot pair every
+        // target with exactly one value. Fall back to unpacking the inferred sequence type.
+        if targets.len() != values.len() {
+            return false;
+        }
+
+        for (target, value_expr) in targets.iter().zip(values) {
+            if !self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
+            {
+                // In `(first, *rest), (other,) = ([1, "two"], items)`, the second element
+                // needs type-based unpacking. Fall back only for that element, preserving
+                // the precise mapping of `first` and `rest` from the nested list literal.
+                self.unpack_inner(
+                    target,
+                    value_expr.into(),
+                    value_inference.expression_type(value_expr),
+                );
+            }
+        }
+        true
     }
 
     /// Records `Unknown` for a malformed unpack target and all of its descendant expressions.
