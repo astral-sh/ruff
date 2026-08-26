@@ -101,7 +101,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 /// ## References
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.118", category = Category::Style)]
+#[violation_metadata(stable_since = "v0.0.118", category = Category::Suspicious)]
 pub(crate) struct EmptyMethodWithoutAbstractDecorator {
     name: String,
 }
