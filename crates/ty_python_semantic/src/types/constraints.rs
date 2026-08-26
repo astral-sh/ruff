@@ -120,6 +120,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
+mod bitset;
 pub(crate) mod projection;
 mod solutions;
 mod support;
