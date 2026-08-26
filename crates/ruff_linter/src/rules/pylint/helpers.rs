@@ -12,7 +12,26 @@ use crate::settings::LinterSettings;
 /// Returns `true` if a module member is public despite having an
 /// underscore-prefixed name.
 pub(crate) fn is_underscore_prefixed_public_member(qualified_name: &QualifiedName) -> bool {
-    matches!(qualified_name.segments(), ["os", "_exit"])
+    matches!(
+        qualified_name.segments(),
+        ["os", "_exit"]
+            | ["sys", "_getframe"]
+            | ["sys", "_getframemodulename"]
+            | ["sys", "_current_frames"]
+            | ["sys", "_current_exceptions"]
+            | ["sys", "_clear_type_cache"]
+            | ["sys", "_debugmallocstats"]
+            | ["sys", "_is_gil_enabled"]
+            | ["sys", "_is_immortal"]
+            | ["sys", "_is_interned"]
+            | ["sys", "_xoptions"]
+            | ["__future__", "_Feature"]
+            | ["ctypes", "_CFuncPtr"]
+            | ["ctypes", "_CData"]
+            | ["ctypes", "_SimpleCData"]
+            | ["ctypes", "_Pointer"]
+            | ["ssl", "_create_unverified_context"]
+    )
 }
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
