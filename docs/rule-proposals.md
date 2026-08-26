@@ -95,9 +95,9 @@ flowchart TD
     A -->|No| C("Too noisy or opinionated?")
 
     C -->|Yes| D["Pedantic"]
-    C -->|No| E("Incorrect, dangerous,<br/>deprecated, or useless?")
+    C -->|No| E("Incorrect or deprecated?")
 
-    E -->|Yes| F("Definitely wrong<br/>or useless today?")
+    E -->|Yes| F("Definitely wrong<br/>today?")
     F -->|Yes| G["Correctness"]
     F -->|No| H["Suspicious"]
 
@@ -122,28 +122,21 @@ A large number of diagnostics doesn't immediately make a rule `pedantic`, but ma
 or diagnostics that reasonable Python users would disagree with do.
 
 If a rule is not overly pedantic, we next consider the intention of the rule. If the main goal is
-detecting code that is obviously incorrect or useless, the options narrow to `correctness` or
-`suspicious`. Rules in the `correctness` category typically cause immediate issues like syntax or
-runtime errors, or silently do something the user didn't intend. Similarly, `suspicious` lints flag
-the same kind of code, but in cases where Ruff can't be sure what the user intended. A perfect
-example of a `suspicious` rule is `mutable-argument-default` (`B006`). This classic footgun is
-almost always a mistake, but in some cases, it may be
-intentional, in which case a `noqa` or `ruff: ignore` comment should be used. Such suppression
-comments should essentially never be reasonable for a `correctness` lint but are fine for
-`suspicious` lints.
+detecting code that is incorrect, the options narrow to `correctness` or `suspicious`. Rules in the
+`correctness` category typically cause immediate issues like syntax or runtime errors, or silently
+do something the user didn't intend. Similarly, `suspicious` lints flag the same kind of code, but
+in cases where Ruff can't be sure what the user intended. A perfect example of a `suspicious` rule
+is `mutable-argument-default` (`B006`). This classic footgun is almost always a mistake, but in some
+cases, it may be intentional, in which case a `noqa` or `ruff: ignore` comment should be used. Such
+suppression comments should essentially never be reasonable for a `correctness` lint but are fine
+for `suspicious` lints. The `suspicious` category also includes deprecations, which aren't incorrect
+today but will cause errors in the future.
 
 The final branch of the flow chart deals with stylistic lints, which are again somewhat subjective
 to differentiate between changes that make code simpler often also make the code faster and
 more idiomatic. Thus, the question prompts you to consider the _primary_ improvement. Rules that
 primarily make code simpler are `complexity` lints, those that primarily make code faster or use
 less memory are `performance` lints, and those that primarily make code more idiomatic are `style`.
-
-Note that "useless" in the context of a `correctness` rule should be indicative of a mistake. For
-example, `useless-exception-statement` (`PLW0133`) flags exceptions that are constructed and never
-raised, suggesting that the user forgot to raise or otherwise use them. In contrast, code that is
-merely unnecessary but still working as intended may be a better fit for `complexity`, such as
-`useless-try-except` (`TRY203`). As described above, if the code is probably not intentional but may
-be in certain cases, `suspicious` can also be a good fit.
 
 ## Other guidelines
 
