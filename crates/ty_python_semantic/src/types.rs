@@ -7349,6 +7349,32 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Extract explicit send constraints from a generator function's return annotation.
+    ///
+    /// An iterator annotation does not expose `send`, but its presence in a union must not
+    /// discard the send constraints from other generator alternatives.
+    fn generator_annotation_send_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        if let Some(union) = self.as_union_like(db) {
+            let mut send_types = union
+                .elements(db)
+                .iter()
+                .filter_map(|ty| ty.generator_annotation_send_type(db, env));
+            let first = send_types.next()?;
+            return Some(
+                send_types
+                    .fold(UnionBuilder::new(db, env).add(first), UnionBuilder::add)
+                    .build(),
+            );
+        }
+
+        self.generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
+            .and_then(|types| types.send_ty)
+    }
+
     fn generator_return_type(
         self,
         db: &'db dyn Db,

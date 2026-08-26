@@ -344,8 +344,9 @@ def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGener
     return None
 ```
 
-`Iterator` has no send type or return type, It is equivalent to using `Generator` with send set to
-`None` and return type to `Unknown`.
+Within generator functions annotated as `Iterator` or `AsyncIterator`, we infer `None` for `yield`
+expressions. These annotations expose iteration with `next()` or `anext()`, not a `send` or `asend`
+method.
 
 ```py
 def iterator_send_none() -> Iterator[int]:
@@ -359,6 +360,52 @@ async def async_iterator_send_none() -> AsyncIterator[int]:
 def iterator_yield_from() -> Generator[int, None, int]:
     yield from iterator_send_none()
     return 1
+```
+
+## `yield from` with an `Iterator` return annotation
+
+An outer `Iterator` annotation does not expose a `send` method. Advancing the outer iterator with
+`next()` also advances the delegated generator with `next()`, so its send type does not restrict
+this delegation:
+
+```py
+from typing import Generator, Iterator
+
+class Wrapped:
+    def __iter__(self) -> Generator[int, str, None]:
+        yield 1
+
+def iterator() -> Iterator[int]:
+    yield from Wrapped()
+```
+
+The yielded values are still checked against the outer annotation:
+
+```py
+def invalid_yield() -> Iterator[str]:
+    # error: [invalid-yield] "Yield type `int` does not match annotated yield type `str`"
+    yield from Wrapped()
+```
+
+An explicit `Generator` annotation still constrains the values sent to the delegated generator:
+
+```py
+def invalid_send() -> Generator[int, int, None]:
+    # error: [invalid-yield] "Send type `str` does not match annotated send type `int`"
+    yield from Wrapped()
+```
+
+An `Iterator` member in a return-type union does not remove the other members' explicit send
+requirements. Here the yielded `int` values require the `Generator` alternative, whose send type
+must be compatible with the delegated generator:
+
+```py
+def mixed_annotation() -> Iterator[str] | Generator[int, int, None]:
+    # error: [invalid-yield] "Send type `str` does not match annotated send type `int`"
+    yield from Wrapped()
+
+def compatible_mixed_annotation() -> Iterator[str] | Generator[int, str, None]:
+    yield from Wrapped()
 ```
 
 ## Generator type aliases
@@ -392,6 +439,9 @@ type IteratorAlias[T] = Iterator[T]
 def invalid_iterator_return() -> IteratorAlias[int]:
     yield 42
     return "foo"  # error: [invalid-return-type]
+
+def aliased_iterator(inner: Generator[int, str, None]) -> IteratorAlias[int]:
+    yield from inner
 
 type AsyncGeneratorAlias[T] = AsyncGenerator[T]
 

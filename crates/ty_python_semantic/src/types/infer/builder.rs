@@ -9749,7 +9749,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|types| (iterator_type, types))
             });
 
-        if let Some(outer_send_ty) = outer_expected.send_ty {
+        // `Iterator` annotations constrain yielded values but do not expose a send method.
+        if let Some(outer_send_ty) = annotated_return_ty.generator_annotation_send_type(db, env) {
             let incompatible_send_ty = match inner_generator {
                 Some((iterator_type, _)) => {
                     iterator_type.incompatible_yield_from_send_type(db, env, outer_send_ty)
