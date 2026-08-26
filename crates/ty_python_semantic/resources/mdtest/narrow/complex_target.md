@@ -408,6 +408,40 @@ def _(x: tuple[Literal[IntTag.A], int] | tuple[Literal[IntTag.B], str]):
         reveal_type(x)  # revealed: tuple[Literal[IntTag.B], str]
 ```
 
+An `IntEnum` member compares equal to its integer value. A tuple whose tags are `IntTag.A` or `1`
+therefore always matches `1`, and is excluded from the other branch:
+
+```py
+def enum_tag_equal_to_integer(
+    x: tuple[Literal[IntTag.A, 1], int] | tuple[Literal[1], str] | tuple[Literal[2], bytes],
+):
+    if x[0] == 1:
+        reveal_type(x)  # revealed: tuple[Literal[IntTag.A, 1], int] | tuple[Literal[1], str]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[2], bytes]
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps tuples whose
+tag is that enum member in both branches, even when its literal type differs from the comparison
+value:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+def custom_inequality(
+    x: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["a"], str] | tuple[Literal["b"], bytes],
+):
+    if "a" != x[0]:
+        reveal_type(x)  # revealed: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["b"], bytes]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["a"], str]
+```
+
 Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the
 discriminating index, we can't safely narrow with equality:
 

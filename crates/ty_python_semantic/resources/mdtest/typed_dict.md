@@ -6505,6 +6505,64 @@ def _(u: WithAliasTagA | WithAliasTagAlsoA | WithAliasTagB):
         reveal_type(u)  # revealed: WithAliasTagB
 ```
 
+An `IntEnum` member compares equal to its integer value without having the same literal type. The
+enum and integer tags both match, so fields unique to one dictionary are not safe to access. The
+dictionary with the enum tag remains possible when equality is false because it also permits
+`"other"`:
+
+```py
+from enum import IntEnum
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag(TypedDict):
+    tag: Literal[Number.ONE, "other"]
+
+class IntegerTag(TypedDict):
+    tag: Literal[1]
+    integer_only: int
+
+def enum_tag(u: EnumTag | IntegerTag | Foo):
+    if u["tag"] == 1:
+        reveal_type(u)  # revealed: EnumTag | IntegerTag
+        u["integer_only"]  # error: [invalid-key]
+    else:
+        reveal_type(u)  # revealed: EnumTag | Foo
+```
+
+Integer tags can also match an enum member used as the comparison value:
+
+```py
+def enum_comparator(u: EnumTag | IntegerTag | Foo):
+    if u["tag"] == Number.ONE:
+        reveal_type(u)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(u)  # revealed: EnumTag | Foo
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps the
+dictionary with that enum tag in both branches, including the branch where the inequality is false:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+class UnequalTag(TypedDict):
+    tag: Literal[NeverUnequal.A]
+
+def custom_inequality(u: UnequalTag | Foo | Bar):
+    if u["tag"] != "foo":
+        reveal_type(u)  # revealed: UnequalTag | Bar
+    else:
+        reveal_type(u)  # revealed: UnequalTag | Foo
+```
+
 We can descend into intersections to discover `TypedDict` types that need narrowing:
 
 ```py
@@ -6882,6 +6940,40 @@ def match_enum_tags(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
             reveal_type(u)  # revealed: WithEnumTagB
         case _:
             reveal_type(u)  # revealed: WithEnumTagC
+```
+
+An integer pattern can match an `IntEnum` tag because matching uses runtime equality:
+
+```py
+from enum import IntEnum
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag(TypedDict):
+    tag: Literal[Number.ONE]
+
+class IntegerTag(TypedDict):
+    tag: Literal[1]
+
+def match_enum_and_integer_tags(u: EnumTag | IntegerTag | Foo):
+    match u["tag"]:
+        case 1:
+            reveal_type(u)  # revealed: EnumTag | IntegerTag
+        case _:
+            reveal_type(u)  # revealed: Foo
+```
+
+Conversely, an enum member used as a value pattern can match an integer tag:
+
+```py
+def match_integer_tags_with_enum(u: EnumTag | IntegerTag | Foo):
+    match u["tag"]:
+        case Number.ONE:
+            reveal_type(u)  # revealed: EnumTag | IntegerTag
+        case _:
+            reveal_type(u)  # revealed: Foo
 ```
 
 We can also narrow a single `TypedDict` type to `Never`:

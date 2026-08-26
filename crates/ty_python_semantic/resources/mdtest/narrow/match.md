@@ -4294,6 +4294,25 @@ def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
             reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
 ```
 
+Integer patterns also match `IntEnum` members with the same value:
+
+```py
+from enum import IntEnum
+
+class IntTag(IntEnum):
+    A = 1
+    B = 2
+
+def enum_tag_equal_to_integer(
+    x: tuple[Literal[IntTag.A], int] | tuple[Literal[1], str] | tuple[Literal[2], bytes],
+):
+    match x[0]:
+        case 1:
+            reveal_type(x)  # revealed: tuple[Literal[IntTag.A], int] | tuple[Literal[1], str]
+        case _:
+            reveal_type(x)  # revealed: tuple[Literal[2], bytes]
+```
+
 Narrowing is restricted to `Literal` tag elements:
 
 ```py
@@ -4385,4 +4404,56 @@ def _(x: A | B | C):
             reveal_type(x)  # revealed: A | B
         case _:
             reveal_type(x)  # revealed: B | C
+```
+
+An `IntEnum` value pattern can match both an enum tag and an equal integer tag. Neither alternative
+remains in the default branch:
+
+```py
+from enum import Enum, IntEnum
+
+class IntTag(IntEnum):
+    A = 1
+    B = 2
+
+class IntegerTag:
+    tag: Literal[1]
+
+class EnumTag:
+    tag: Literal[IntTag.A]
+
+class OtherTag:
+    tag: Literal[2]
+
+def integer_tag_equal_to_enum(x: IntegerTag | EnumTag | OtherTag):
+    match x.tag:
+        case IntTag.A:
+            reveal_type(x)  # revealed: IntegerTag | EnumTag
+        case _:
+            reveal_type(x)  # revealed: OtherTag
+```
+
+A failed value pattern uses the negation of equality, not `__ne__`. An enum member whose custom
+`__ne__` always returns false can still fail to match the pattern:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> Literal[False]:
+        return False
+
+class UnequalTag:
+    tag: Literal[NeverUnequal.A]
+
+class StringTag:
+    tag: Literal["a"]
+
+def custom_inequality(x: UnequalTag | StringTag):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: StringTag
+        case _:
+            reveal_type(x)  # revealed: UnequalTag
 ```
