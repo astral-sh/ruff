@@ -53,6 +53,8 @@ struct AssignmentIndex;
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent<ConstraintId, u16>>,
+    /// The sequents that can fire when a particular assignment is added to the path.
+    sequent_antecedents: FxHashMap<ConstraintAssignment, Vec<usize>>,
     /// Each assignment's source constraint and greatest remaining per-path fuel.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
     /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
@@ -146,6 +148,7 @@ impl Default for PathAssignments {
     fn default() -> Self {
         Self {
             sequents: Vec::default(),
+            sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
@@ -237,6 +240,7 @@ impl PathAssignments {
             .collect();
         Self {
             sequents: Vec::default(),
+            sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
@@ -584,68 +588,98 @@ impl PathAssignments {
             storage: &mut ConstraintSetStorage<'db>,
             sequents: &[Sequent<Constraint<'db>>],
             dest: &mut Vec<Sequent<ConstraintId, u16>>,
+            antecedents: &mut FxHashMap<ConstraintAssignment, Vec<usize>>,
         ) {
-            let sequents = sequents.iter().map(|sequent| match sequent {
-                Sequent::SingleTautology { ante } => {
-                    let ante = storage.intern_constraint(db, env, *ante);
-                    Sequent::SingleTautology { ante }
-                }
-                Sequent::PairImpossibility { ante1, ante2 } => {
-                    let ante1 = storage.intern_constraint(db, env, *ante1);
-                    let ante2 = storage.intern_constraint(db, env, *ante2);
-                    Sequent::PairImpossibility { ante1, ante2 }
-                }
-                Sequent::TripleImpossibility {
-                    ante1,
-                    ante2,
-                    ante3,
-                } => {
-                    let ante1 = storage.intern_constraint(db, env, *ante1);
-                    let ante2 = storage.intern_constraint(db, env, *ante2);
-                    let ante3 = storage.intern_constraint(db, env, *ante3);
+            for sequent in sequents {
+                let sequent_index = dest.len();
+                let mut add_antecedent = |assignment| {
+                    antecedents
+                        .entry(assignment)
+                        .or_default()
+                        .push(sequent_index);
+                };
+
+                let sequent = match sequent {
+                    Sequent::SingleTautology { ante } => {
+                        let ante = storage.intern_constraint(db, env, *ante);
+                        add_antecedent(ante.when_false());
+                        Sequent::SingleTautology { ante }
+                    }
+                    Sequent::PairImpossibility { ante1, ante2 } => {
+                        let ante1 = storage.intern_constraint(db, env, *ante1);
+                        let ante2 = storage.intern_constraint(db, env, *ante2);
+                        add_antecedent(ante1.when_true());
+                        add_antecedent(ante2.when_true());
+                        Sequent::PairImpossibility { ante1, ante2 }
+                    }
                     Sequent::TripleImpossibility {
                         ante1,
                         ante2,
                         ante3,
+                    } => {
+                        let ante1 = storage.intern_constraint(db, env, *ante1);
+                        let ante2 = storage.intern_constraint(db, env, *ante2);
+                        let ante3 = storage.intern_constraint(db, env, *ante3);
+                        add_antecedent(ante1.when_true());
+                        add_antecedent(ante2.when_true());
+                        add_antecedent(ante3.when_true());
+                        Sequent::TripleImpossibility {
+                            ante1,
+                            ante2,
+                            ante3,
+                        }
                     }
-                }
-                Sequent::PairImplication {
-                    ante1, ante2, post, ..
-                } => {
-                    let ante1 = storage.intern_constraint(db, env, *ante1);
-                    let ante2 = storage.intern_constraint(db, env, *ante2);
-                    let post = storage.intern_constraint(db, env, *post);
-                    let (ante1_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
-                    let (ante2_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
-                    let fuel_cost =
-                        storage.sequent_fuel_cost(db, env, post, ante1_depth.max(ante2_depth));
                     Sequent::PairImplication {
-                        ante1,
-                        ante2,
-                        post,
-                        fuel_cost,
+                        ante1, ante2, post, ..
+                    } => {
+                        let ante1 = storage.intern_constraint(db, env, *ante1);
+                        let ante2 = storage.intern_constraint(db, env, *ante2);
+                        let post = storage.intern_constraint(db, env, *post);
+                        add_antecedent(ante1.when_true());
+                        add_antecedent(ante2.when_true());
+                        let (ante1_depth, _) =
+                            storage.cached_constraint_bound_depth(db, env, ante1);
+                        let (ante2_depth, _) =
+                            storage.cached_constraint_bound_depth(db, env, ante2);
+                        let fuel_cost =
+                            storage.sequent_fuel_cost(db, env, post, ante1_depth.max(ante2_depth));
+                        Sequent::PairImplication {
+                            ante1,
+                            ante2,
+                            post,
+                            fuel_cost,
+                        }
                     }
-                }
-                Sequent::SingleImplication { ante, post, .. } => {
-                    let ante = storage.intern_constraint(db, env, *ante);
-                    let post = storage.intern_constraint(db, env, *post);
-                    let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
-                    let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante_depth);
-                    Sequent::SingleImplication {
-                        ante,
-                        post,
-                        fuel_cost,
+                    Sequent::SingleImplication { ante, post, .. } => {
+                        let ante = storage.intern_constraint(db, env, *ante);
+                        let post = storage.intern_constraint(db, env, *post);
+                        add_antecedent(ante.when_true());
+                        let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
+                        let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante_depth);
+                        Sequent::SingleImplication {
+                            ante,
+                            post,
+                            fuel_cost,
+                        }
                     }
-                }
-            });
-            dest.extend(sequents);
+                };
+
+                dest.push(sequent);
+            }
         }
 
         let start = self.sequents.len();
         for group in &map.sequents {
             match group {
                 SequentGroup::Ungrouped(sequents) => {
-                    intern_sequents(db, env, storage, sequents, &mut self.sequents);
+                    intern_sequents(
+                        db,
+                        env,
+                        storage,
+                        sequents,
+                        &mut self.sequents,
+                        &mut self.sequent_antecedents,
+                    );
                 }
                 SequentGroup::Grouped {
                     equivalence,
@@ -658,8 +692,22 @@ impl PathAssignments {
                     } else {
                         (rightwards, leftwards)
                     };
-                    intern_sequents(db, env, storage, first, &mut self.sequents);
-                    intern_sequents(db, env, storage, second, &mut self.sequents);
+                    intern_sequents(
+                        db,
+                        env,
+                        storage,
+                        first,
+                        &mut self.sequents,
+                        &mut self.sequent_antecedents,
+                    );
+                    intern_sequents(
+                        db,
+                        env,
+                        storage,
+                        second,
+                        &mut self.sequents,
+                        &mut self.sequent_antecedents,
+                    );
                 }
             }
         }
@@ -878,10 +926,27 @@ impl PathAssignments {
         // brute-force search.
 
         self.new_assignments.clear();
+        let previous_sequents_len = self.sequents.len();
+        let previous_antecedents_len = self
+            .sequent_antecedents
+            .get(&assignment)
+            .map_or(0, Vec::len);
         self.discover_constraint(db, env, storage, assignment.constraint());
+        let sequents_len = self.sequents.len();
 
-        for i in 0..self.sequents.len() {
-            let sequent = self.sequents[i];
+        // Previously discovered sequents can only start firing if the assignment that we just
+        // added is one of their antecedents.
+        for index in 0..previous_antecedents_len {
+            let sequent_index = self.sequent_antecedents[&assignment][index];
+            let sequent = self.sequents[sequent_index];
+            self.check_sequent(db, env, storage, sequent)?;
+        }
+
+        // Sequent elaboration can produce rules whose antecedents do not include the constraint
+        // that caused us to discover them. Check every newly discovered sequent once against the
+        // complete set of assignments on the current path.
+        for sequent_index in previous_sequents_len..sequents_len {
+            let sequent = self.sequents[sequent_index];
             self.check_sequent(db, env, storage, sequent)?;
         }
 
