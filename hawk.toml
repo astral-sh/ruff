@@ -967,49 +967,9 @@ level = "expect"
 reason = "semantic ingredients expose consistent file, scope, and program accessors"
 
 [[override]]
-lint = "hawk::unnecessary_public"
-crate = "ty_python_semantic"
-item = "FixtureBinding"
-kind = "reexport"
-level = "expect"
-reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ty_python_semantic"
-item = "fixture_bindings_for_parameter"
-kind = "reexport"
-level = "expect"
-reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ty_python_semantic"
-item = "types::FixtureBinding"
-kind = "reexport"
-level = "expect"
-reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ty_python_semantic"
-item = "types::fixture_bindings_for_parameter"
-kind = "reexport"
-level = "expect"
-reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
-
-[[override]]
 lint = "hawk::dead_public"
 crate = "ty_python_semantic"
 item = "types::dedicated::pytest::FixtureBinding::<'db>::request"
-kind = "inherent_method"
-level = "expect"
-reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ty_python_semantic"
-item = "types::dedicated::pytest::FixtureBinding::<'db>::fixture"
 kind = "inherent_method"
 level = "expect"
 reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
