@@ -146,6 +146,38 @@ def builtin() -> Generator[str, None, None]:
     reveal_type(result)  # revealed: Unknown
 ```
 
+## `yield from` with alternative iteration protocols
+
+An iterable union can mix a generator-returning `__iter__` with the sequence protocol. The
+`__getitem__` alternative contributes to the result of `yield from`, so the return type of the
+generator alone does not describe every possible result:
+
+```py
+from typing import Generator
+
+class Wrapped:
+    def __iter__(self) -> Generator[int, int | None, str]:
+        yield 1
+        return "done"
+
+class Sequence:
+    def __getitem__(self, index: int) -> int:
+        raise IndexError
+
+def mixed(value: Wrapped | Sequence) -> Generator[int, None, object]:
+    result = yield from value
+    reveal_type(result)  # revealed: Unknown
+    return result
+```
+
+The sequence iterator does not support sending a non-`None` value, even though the generator does:
+
+```py
+def mixed_send(value: Wrapped | Sequence) -> Generator[int, int, None]:
+    # error: [invalid-yield] "Send type `None` does not match annotated send type `int`"
+    yield from value
+```
+
 ## `yield from` with a generator that return `types.GeneratorType`
 
 `types.GeneratorType` is a nominal type that implements the `typing.Generator` protocol:

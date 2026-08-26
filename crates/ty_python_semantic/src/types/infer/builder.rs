@@ -9735,6 +9735,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     TypeContext::default(),
                 ) {
                     Ok(bindings) => Some(bindings.return_type(db, env)),
+                    Err(CallDunderError::PossiblyUnbound { .. }) => {
+                        // Iteration can fall back to `__getitem__` where `__iter__` is absent.
+                        // The available `__iter__` bindings do not describe those alternatives.
+                        None
+                    }
                     Err(err) => err.return_type(db, env),
                 }?;
                 // `Iterator` has no type parameter for `StopIteration.value`.
