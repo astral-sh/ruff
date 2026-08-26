@@ -45,7 +45,7 @@ use crate::{Db, FxIndexMap, ProgramEnvironment};
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
-    sequents: Vec<Sequent>,
+    sequents: Vec<Sequent<ConstraintId>>,
     /// Each assignment's source constraint and the first per-path fuel value with which it was
     /// derived.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
@@ -699,7 +699,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        sequent: Sequent,
+        sequent: Sequent<ConstraintId>,
     ) -> Result<(), PathAssignmentConflict> {
         match sequent {
             Sequent::SingleTautology { ante } => {

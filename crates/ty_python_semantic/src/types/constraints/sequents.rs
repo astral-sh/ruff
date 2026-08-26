@@ -36,52 +36,50 @@ use crate::{Db, ProgramEnvironment};
 /// new constraint, and then merges those cached sequents into its own sequent map. (That means we
 /// also share the work of calculating the sequent map across `PathAssignments` for _different_
 /// constraint sets.)
-#[derive(Debug, Default)]
-pub(super) struct SequentMap {
-    pub(super) sequents: Vec<Sequent>,
+#[derive(Debug)]
+pub(super) struct SequentMap<C> {
+    pub(super) sequents: Vec<Sequent<C>>,
+}
+
+impl<C> Default for SequentMap<C> {
+    fn default() -> Self {
+        Self {
+            sequents: Vec::default(),
+        }
+    }
 }
 
 /// Describes one rule for deriving new implicit constraints from existing constraints in a BDD
 /// path.
 #[derive(Clone, Copy, Debug)]
-pub(super) enum Sequent {
+pub(super) enum Sequent<C> {
     /// Sequent of the form `¬C → false`
     ///
     /// This indicates that `C` is always true. Any path that assumes it is false is impossible and
     /// can be pruned.
-    SingleTautology { ante: ConstraintId },
+    SingleTautology { ante: C },
 
     /// Sequent of the form `C₁ ∧ C₂ → false`
     ///
     /// This indicates that `C₁` and `C₂` are disjoint: it is not possible for both to hold. Any
     /// path that assumes both is impossible and can be pruned.
-    PairImpossibility {
-        ante1: ConstraintId,
-        ante2: ConstraintId,
-    },
+    PairImpossibility { ante1: C, ante2: C },
 
     /// Sequent of the form `C → D`
     ///
     /// This indicates that `C` on its own is enough to imply `D`. For any path that assumes `C`
     /// holds, we can add `D` to the path even if it doesn't appear in the BDD.
-    SingleImplication {
-        ante: ConstraintId,
-        post: ConstraintId,
-    },
+    SingleImplication { ante: C, post: C },
 
     /// Sequent of the form `C₁ ∧ C₂ → D`
     ///
     /// This indicates that if `C₁` and `C₂` are both true, then `D` is guaranteed to be true as
     /// well. For any path that assumes both `C₁` and `C₂` hold, we can add `D` to the path even if
     /// it doesn't appear in the BDD.
-    PairImplication {
-        ante1: ConstraintId,
-        ante2: ConstraintId,
-        post: ConstraintId,
-    },
+    PairImplication { ante1: C, ante2: C, post: C },
 }
 
-impl SequentMap {
+impl SequentMap<ConstraintId> {
     pub(super) fn consequents(&self) -> impl Iterator<Item = ConstraintId> + '_ {
         self.sequents.iter().filter_map(|sequent| match sequent {
             Sequent::SingleImplication { post, .. } | Sequent::PairImplication { post, .. } => {
