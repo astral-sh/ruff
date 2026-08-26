@@ -3397,6 +3397,14 @@ impl<'db> StaticClassLiteral<'db> {
         if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;
         }
+
+        if self.is_protocol(db)
+            && let Some(protocol) = self.identity_specialization(db).into_protocol_class(db)
+            && protocol.interface(db).supports_variance_inference(db)
+        {
+            return protocol.interface(db).variance_of(db, &env, typevar);
+        }
+
         let class_body_scope = self.body_scope(db);
         let program_file = class_body_scope.program_file(db);
         let python_version = env.python_version(db);

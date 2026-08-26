@@ -27,12 +27,13 @@ use crate::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericAlias,
         GenericContext, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
-        MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
-        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
-        TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
+        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
+        PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral,
+        Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+        VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
-        diagnostic::report_undeclared_protocol_member,
+        diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
         signatures::walk_signature,
     },
@@ -283,6 +284,70 @@ impl<'db> ProtocolClass<'db> {
             };
 
             report_undeclared_protocol_member(context, first_definition, self, class_place_table);
+        }
+    }
+
+    /// Validate explicitly declared type-variable variance against this protocol's interface.
+    pub(super) fn validate_type_parameter_variance(self, context: &InferContext) {
+        if !context.is_lint_enabled(&INVALID_PROTOCOL) {
+            return;
+        }
+
+        let db = context.db();
+        let Some((class, _)) = self.static_class_literal(db) else {
+            return;
+        };
+        // TODO: Validate protocols with inherited members too. This single-base pattern skips
+        // subclasses such as `class Child(Base[T], Protocol[T])`, even when their declared
+        // variance disagrees with the inherited interface.
+        let [Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context))] =
+            class.explicit_bases(db)
+        else {
+            return;
+        };
+        if class.has_pep_695_type_params(db) || class.try_mro(db, None).is_err() {
+            return;
+        }
+        let env = ProgramEnvironment::from_scope(class.body_scope(db));
+        if generic_context.variables(db).any(|typevar| {
+            typevar.is_typevartuple(db) || typevar.typevar(db).default_type(db, &env).is_some()
+        }) {
+            return;
+        }
+        let Some(protocol) = class.identity_specialization(db).into_protocol_class(db) else {
+            return;
+        };
+        if !protocol.interface(db).supports_variance_inference(db) {
+            return;
+        }
+
+        for typevar in generic_context.variables(db) {
+            if typevar.is_paramspec(db) {
+                continue;
+            }
+
+            let Some(declared_variance) = typevar.typevar(db).explicit_variance(db) else {
+                continue;
+            };
+
+            let inferred_variance = match class.variance_of(db, &env, typevar.identity(db)) {
+                TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
+                variance => variance,
+            };
+
+            if inferred_variance == declared_variance {
+                continue;
+            }
+
+            if let Some(builder) = context.report_lint(&INVALID_PROTOCOL, class.header_range(db)) {
+                builder.into_diagnostic(format_args!(
+                    "Type variable `{}` in protocol `{}` should be {}, but is {}",
+                    typevar.typevar(db).name(db),
+                    self.name(db),
+                    inferred_variance.as_str(),
+                    declared_variance.as_str(),
+                ));
+            }
         }
     }
 
@@ -786,6 +851,28 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db).contains_key(name)
     }
 
+    /// Return whether this interface is currently supported by structural variance inference.
+    ///
+    /// The finite-member guard conservatively rejects any member type containing a protocol,
+    /// including unrelated protocols and explicit receiver annotations that refer to this protocol.
+    /// This skips declared-variance validation and falls back to ordinary class variance inference
+    /// for inferred parameters, even when the interface is not recursive.
+    ///
+    /// TODO: Narrow the guard to actual recursion, and support recursive interfaces and descriptor
+    /// writes with unrepresentable domains.
+    pub(super) fn supports_variance_inference(self, db: &'db dyn Db) -> bool {
+        ProtocolInterfaceView::new(self, None).has_only_finite_members(db)
+            && self.members(db).all(|member| {
+                !matches!(
+                    member.data.kind,
+                    ProtocolMemberKind::Property {
+                        write: Some(ProtocolMemberWrite::Descriptor { domain: None, .. }),
+                        ..
+                    }
+                )
+            })
+    }
+
     /// Returns whether `name` has an instance-write requirement of `type[T]`, where `T` belongs
     /// to `generic_context`.
     pub(super) fn includes_generic_writable_instance_member(
@@ -1130,7 +1217,13 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
         self.members(db)
             .flat_map(|member| {
                 let capabilities = member.capabilities(db, env);
-                [capabilities.instance, capabilities.class]
+                // Instance methods are checked only through their bound instance signature.
+                let class_access = if member.is_instance_method() {
+                    ProtocolMemberAccess::NONE
+                } else {
+                    capabilities.class
+                };
+                [capabilities.instance, class_access]
                     .into_iter()
                     .flat_map(|access| access.variances(db, env))
             })

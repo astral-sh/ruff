@@ -1372,13 +1372,14 @@ from typing_extensions import Generic, ParamSpec, Protocol, TypeVar
 
 P = ParamSpec("P")
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
 class GenericClass(Generic[P, T]):
     def hint(self) -> Callable[P, T]:
         raise NotImplementedError
 
-class GenericProtocol(Protocol[P, T]):
-    def hint(self) -> Callable[P, T]: ...
+class GenericProtocol(Protocol[P, T_co]):
+    def hint(self) -> Callable[P, T_co]: ...
 
 def class_case(x: GenericClass[[int], str]) -> None:
     # revealed: bound method GenericClass[(int, /), str].hint() -> ((int, /) -> str)
