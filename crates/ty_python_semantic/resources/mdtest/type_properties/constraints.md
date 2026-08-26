@@ -1244,18 +1244,18 @@ def _[T]() -> None:
     reveal_type(ConstraintSet.range(Sub, T, Super).with_detailed_display())
 ```
 
-Explicit ParamSpec extrema remain visible as supplied bound evidence.
+Explicit bottom and top parameter-list bounds are shown in the constraint.
 
 ```py
 from typing import Callable, Never
 from ty_extensions import Bottom, Top
 
-def explicit_parameter_extrema[**P]() -> None:
+def explicit_bounds[**P]() -> None:
     lower = ConstraintSet.range(Bottom[Callable[..., Never]], P, Callable[[int], int])
-    # revealed: ConstraintSet[((*args: object, **kwargs: object) ≤ P@explicit_parameter_extrema ≤ (int, /))]
+    # revealed: ConstraintSet[((*args: object, **kwargs: object) ≤ P@explicit_bounds ≤ (int, /))]
     reveal_type(lower.with_detailed_display())
     upper = ConstraintSet.range(Callable[[int], int], P, Top[Callable[..., object]])
-    # revealed: ConstraintSet[((int, /) ≤ P@explicit_parameter_extrema ≤ Top[(...)])]
+    # revealed: ConstraintSet[((int, /) ≤ P@explicit_bounds ≤ Top[(...)])]
     reveal_type(upper.with_detailed_display())
 ```
 
@@ -1290,7 +1290,7 @@ A ParamSpec constraint describes parameter lists; callable returns are ignored.
 
 ### Construction
 
-A bound legacy ParamSpec works with every constructor; equality supplies both endpoints.
+Legacy ParamSpecs work with every constructor. A bound of `P ≤ P` adds no restriction.
 
 ```py
 from typing import Callable, ParamSpec
@@ -1299,17 +1299,26 @@ from ty_extensions._internal import ConstraintSet
 
 P = ParamSpec("P")
 
-def legacy(callback: Callable[P, None]) -> None:
+def legacy_range(callback: Callable[P, None]) -> None:
     constraints = ConstraintSet.range(Callable[[int, str], None], P, Callable[[int, str], None])
     reveal_type(constraints)  # revealed: ConstraintSet[bool]
     different_returns = ConstraintSet.range(Callable[[int, str], int], P, Callable[[int, str], str])
     static_assert(constraints == different_returns)
+
+def legacy_lower_bound(callback: Callable[P, None]) -> None:
+    lower = ConstraintSet.lower_bound(Callable[[int, str], int], P)
+    static_assert(lower == ConstraintSet.range(Callable[[int, str], None], P, P))
+
+def legacy_upper_bound(callback: Callable[P, None]) -> None:
+    upper = ConstraintSet.upper_bound(P, Callable[[int, str], str])
+    static_assert(upper == ConstraintSet.range(P, P, Callable[[int, str], None]))
+
+def legacy_equality(callback: Callable[P, None]) -> None:
+    exact = ConstraintSet.equality(P, Callable[[int, str], bytes])
+    constraints = ConstraintSet.range(Callable[[int, str], None], P, Callable[[int, str], None])
+    static_assert(exact == constraints)
     lower = ConstraintSet.lower_bound(Callable[[int, str], int], P)
     upper = ConstraintSet.upper_bound(P, Callable[[int, str], str])
-    exact = ConstraintSet.equality(P, Callable[[int, str], bytes])
-    static_assert(lower == ConstraintSet.range(Callable[[int, str], None], P, P))
-    static_assert(upper == ConstraintSet.range(P, P, Callable[[int, str], None]))
-    static_assert(exact == constraints)
     static_assert(exact == (lower & upper))
     static_assert(exact != lower)
     static_assert(exact != upper)
