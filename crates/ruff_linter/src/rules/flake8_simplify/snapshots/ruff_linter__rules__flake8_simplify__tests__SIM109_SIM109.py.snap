@@ -53,18 +53,37 @@ help: Replace with `a in (b, c)`
 note: This is an unsafe fix and may change runtime behavior
 
 SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
-  --> SIM109.py:14:4
+  --> SIM109.py:17:4
    |
-13 | # SIM109
-14 | if a == b or None or a == c:
+15 | # two merged comparisons, so it's moved after the merged `in` comparison
+16 | # instead of staying in its original position.
+17 | if a == b or None or a == c:
    |    ^^^^^^^^^^^^^^^^^^^^^^^^
-15 |     d
+18 |     d
    |
 help: Replace with `a in (b, c)`
    |
-13 | # SIM109
+16 | # instead of staying in its original position.
    - if a == b or None or a == c:
-14 + if a in (b, c) or None:
-15 |     d
+17 + if a in (b, c) or None:
+18 |     d
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+  --> SIM109.py:24:4
+   |
+22 | # comparisons, so it must stay first in the fix instead of being moved
+23 | # after the merged `in` comparison.
+24 | if None or a == b or a == c:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+25 |     d
+   |
+help: Replace with `a in (b, c)`
+   |
+23 | # after the merged `in` comparison.
+   - if None or a == b or a == c:
+24 + if None or a in (b, c):
+25 |     d
    |
 note: This is an unsafe fix and may change runtime behavior
