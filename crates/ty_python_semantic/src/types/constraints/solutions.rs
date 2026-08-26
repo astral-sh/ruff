@@ -250,7 +250,9 @@ impl<'db> SolutionWalker<'db> {
         for path in self.sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
-                let constraint = storage.constraint_data(constraint);
+                let Some(constraint) = storage.constraint_data(constraint).as_typevar() else {
+                    continue;
+                };
                 let typevar = constraint.typevar;
 
                 // A direct relationship between an inferable and non-inferable typevar must

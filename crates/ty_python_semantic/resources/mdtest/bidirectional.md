@@ -2333,6 +2333,8 @@ def _(dtype: FloatDtype):
     reveal_type(x)  # revealed: float
 ```
 
+Intersection bindings are similarly evaluated under fixpoint iteration:
+
 ```py
 from typing import Protocol, runtime_checkable
 
@@ -2380,6 +2382,21 @@ class Command: ...
 def _(command: Any):
     # revealed: dict[str, Any]
     mapping: DictLike[type[Command]] = reveal_type({"command": command})
+```
+
+Type context specialized to a gradual type should not be ignored:
+
+```py
+from ty_extensions._internal import Unknown
+
+def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def _(dynamic: Unknown):
+    # TODO: This should not error.
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Unknown, int | str | Unknown]
 ```
 
 Note that long chains of callables with constraint dependencies in reverse source-order may require
@@ -2863,6 +2880,19 @@ reveal_type(x23)  # revealed: list[float | str | None]
 x24 = {"a": 1}
 x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
+```
+
+A lambda's provisional parameter type must not prevent its callable type from constraining the keys
+of an unannotated dictionary:
+
+```py
+def _():
+    values = {}
+    values["first"] = 1
+    key = lambda value: value
+    reveal_type(values)  # revealed: dict[str | ((value) -> Unknown), int]
+    values[key] = 2
+    reveal_type(values[key])  # revealed: int
 ```
 
 ## Multi-inference diagnostics

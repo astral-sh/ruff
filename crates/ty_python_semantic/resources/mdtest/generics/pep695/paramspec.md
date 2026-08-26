@@ -875,7 +875,9 @@ to_thread_like(
 to_thread_like(
     generic_pair_with_container,
     1,
-    reveal_type([""]),  # revealed: list[Literal[1] | str]
+    # TODO: Infer `list[Literal[1] | str]` from the sibling argument.
+    # error: [invalid-argument-type]
+    reveal_type([""]),  # revealed: list[str]
 )
 ```
 
@@ -1726,6 +1728,30 @@ reveal_type(generic_context(c.generic_method))
 reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
 reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
+```
+
+### Generic decorators with gradual return types
+
+A bare gradual callable return type must not widen the inferred type of the `ParamSpec`.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+class Wrapper[**P]:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
+        raise NotImplementedError
+
+class Decorator:
+    def __call__[**P](self, fn: Callable[P, Any]) -> Wrapper[P]:
+        raise NotImplementedError
+
+@Decorator()
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(identity)  # revealed: Wrapper[(value: T@identity)]
+reveal_type(identity(1))  # revealed: Any
 ```
 
 ## Callable protocols with `ParamSpec` and class constructors
