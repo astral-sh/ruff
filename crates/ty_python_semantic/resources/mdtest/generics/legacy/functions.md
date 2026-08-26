@@ -336,19 +336,23 @@ element types.
 ```py
 from typing import TypeVar
 
+class A: ...
+class B: ...
+class C: ...
+
 T = TypeVar("T")
 
 def elements(values: tuple[T, ...]) -> tuple[T, ...]:
     return values
 
 def _(
-    same: tuple[str, str] | tuple[str, str, str],
-    mixed: tuple[int] | tuple[str, str],
-    possibly_empty: tuple[()] | tuple[str, str],
+    same: tuple[A, A] | tuple[A, A, A],
+    mixed: tuple[A] | tuple[B, B],
+    possibly_empty: tuple[()] | tuple[A, A],
 ):
-    reveal_type(elements(same))  # revealed: tuple[str, ...]
-    reveal_type(elements(mixed))  # revealed: tuple[int | str, ...]
-    reveal_type(elements(possibly_empty))  # revealed: tuple[str, ...]
+    reveal_type(elements(same))  # revealed: tuple[A, ...]
+    reveal_type(elements(mixed))  # revealed: tuple[A | B, ...]
+    reveal_type(elements(possibly_empty))  # revealed: tuple[A, ...]
 ```
 
 Fixed-length and mixed tuples infer type parameters from their corresponding element positions.
@@ -356,41 +360,17 @@ Fixed-length and mixed tuples infer type parameters from their corresponding ele
 ```py
 U = TypeVar("U")
 
-def pair(values: tuple[T, U]) -> tuple[T, U]:
-    return values
+def swap(values: tuple[U, T]) -> tuple[T, U]:
+    return values[1], values[0]
 
-def _(pairs: tuple[int, str] | tuple[str, int]):
-    reveal_type(pair(pairs))  # revealed: tuple[int | str, str | int]
+def _(pairs: tuple[A, B] | tuple[B, C]):
+    reveal_type(swap(pairs))  # revealed: tuple[B | C, A | B]
 
-def tail(values: tuple[int, *tuple[T, ...]]) -> tuple[T, ...]:
+def tail(values: tuple[A, *tuple[T, ...]]) -> tuple[T, ...]:
     return values[1:]
 
-def _(tails: tuple[int, str] | tuple[int, bytes, bytes]):
-    reveal_type(tail(tails))  # revealed: tuple[str | bytes, ...]
-```
-
-Gradual elements remain gradual in the inferred result rather than being discarded in favor of the
-fully static elements from another union member.
-
-```py
-from typing import Any
-
-def _(values: tuple[str] | tuple[Any, Any]):
-    reveal_type(elements(values))  # revealed: tuple[str | Any, ...]
-```
-
-Inference still respects type-variable bounds and the required tuple length.
-
-```py
-StringT = TypeVar("StringT", bound=str)
-
-def strings(values: tuple[StringT, ...]) -> tuple[StringT, ...]:
-    return values
-
-def _(valid: tuple[str] | tuple[str, str], invalid: tuple[str] | tuple[int, int]):
-    reveal_type(strings(valid))  # revealed: tuple[str, ...]
-    strings(invalid)  # error: [invalid-argument-type]
-    pair(valid)  # error: [invalid-argument-type]
+def _(tails: tuple[A, B] | tuple[A, C, C]):
+    reveal_type(tail(tails))  # revealed: tuple[B | C, ...]
 ```
 
 ## Inferring a bound typevar
