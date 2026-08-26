@@ -2173,7 +2173,7 @@ impl<'db> UpperBound<'db> {
         self.validity.iter().copied().map(ConstraintBound::Validity)
     }
 
-    fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+    pub(super) fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
         iter::chain(self.iter_evidence(), self.iter_validity())
     }
 
