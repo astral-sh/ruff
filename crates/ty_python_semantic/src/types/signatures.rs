@@ -5450,6 +5450,13 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    /// Set the inferred type without displaying it as an explicit annotation.
+    pub(super) fn with_inferred_type(mut self, inferred_type: Type<'db>) -> Self {
+        self.annotated_type = inferred_type;
+        self.inferred_annotation = true;
+        self
+    }
+
     pub(crate) fn with_starred_annotation(mut self) -> Self {
         self.annotation_kind = ParameterAnnotationKind::Starred;
         self

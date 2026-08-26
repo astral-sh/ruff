@@ -2,8 +2,8 @@ use crate::{
     Db, ProgramEnvironment,
     reachability::ReachabilityConstraintsExtension,
     types::{
-        KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
-        TypeContext, TypeVarKind, UnionType,
+        DynamicType, KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner,
+        SubclassOfType, Type, TypeContext, TypeVarKind, UnionType,
         constraints::ConstraintSetBuilder,
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
@@ -1330,19 +1330,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
         } = parameter_with_default;
 
-        let default_expr = default.as_ref();
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
-        } else if let Some(default_expr) = default_expr {
+        } else if let Some(default_expr) = default {
             let default_ty = self.file_expression_type(default_expr);
             UnionType::from_two_elements(
                 db,
                 self.program_environment(),
-                Type::unknown(),
+                Type::Dynamic(DynamicType::UnknownLambdaParameter),
                 default_ty,
             )
         } else {
-            Type::unknown()
+            Type::Dynamic(DynamicType::UnknownLambdaParameter)
         };
 
         self.add_binding(parameter.into(), definition)
@@ -1364,7 +1363,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
         } else {
-            Type::homogeneous_tuple(db, self.program_environment(), Type::unknown())
+            Type::homogeneous_tuple(
+                db,
+                self.program_environment(),
+                Type::Dynamic(DynamicType::UnknownLambdaParameter),
+            )
         };
         self.add_binding(parameter.into(), definition)
             .insert(self, ty);
@@ -1382,7 +1385,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferred_ty = KnownClass::Dict.to_specialized_instance(
             db,
             env,
-            &[KnownClass::Str.to_instance(db, env), Type::unknown()],
+            &[
+                KnownClass::Str.to_instance(db, env),
+                Type::Dynamic(DynamicType::UnknownLambdaParameter),
+            ],
         );
 
         self.add_binding(parameter.into(), definition)
@@ -1408,12 +1414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
-        if parameter_type.is_unknown()
-            || parameter_type.has_unspecialized_type_var(db, self.program_environment())
-        {
-            None
-        } else {
-            Some(parameter_type)
-        }
+        (!parameter_type.has_provisional_marker(db, self.program_environment()))
+            .then_some(parameter_type)
     }
 }

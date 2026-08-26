@@ -128,6 +128,17 @@ impl<'db> Type<'db> {
             matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
         })
     }
+
+    pub(crate) fn has_provisional_marker(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| {
+            ty.as_dynamic()
+                .is_some_and(DynamicType::is_provisional_marker)
+        })
+    }
 }
 
 /// A specific instance of a type variable that has not been bound to a generic context yet.
@@ -707,6 +718,7 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
+                    | DynamicType::UnknownLambdaParameter
                     | DynamicType::InvalidConcatenateUnknown
                     | DynamicType::AmbiguousOverload => Parameters::unknown(),
                 },

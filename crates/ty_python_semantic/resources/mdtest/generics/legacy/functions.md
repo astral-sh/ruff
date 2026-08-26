@@ -1414,6 +1414,15 @@ def list_caller(value: list[Any]) -> None:
     reveal_type(choose(value, [1]))  # revealed: int | list[int]
 ```
 
+The `Unknown` returned by a lambda without declared parameter types is also gradual evidence:
+
+```py
+lambda_identity = lambda value: value
+
+def lambda_caller(value: Any) -> None:
+    reveal_type(identity(lambda_identity(value)))  # revealed: Unknown
+```
+
 ## Ambiguous constrained TypeVar inference from a gradual callable return
 
 Constraint-set-native inference also preserves gradual evidence nested inside a callable. As above,

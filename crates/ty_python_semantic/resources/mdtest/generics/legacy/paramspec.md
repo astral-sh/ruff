@@ -975,7 +975,17 @@ def without_first(callback: Callback[Concatenate[object, P]]) -> Callable[P, Non
 
 def original(first: object, value: str) -> None: ...
 
-remaining = without_first(Callback(original))  # error: [invalid-argument-type]
+wrapped = Callback(original)
+remaining = without_first(wrapped)  # error: [invalid-argument-type]
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
+When constructed inline, `Callback` infers the positional-only prefix based on the outer type
+context:
+
+```py
+remaining = without_first(Callback(original))
 reveal_type(remaining)  # revealed: (value: str) -> None
 remaining(1)  # error: [invalid-argument-type]
 ```
