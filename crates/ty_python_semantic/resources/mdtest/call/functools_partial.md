@@ -712,17 +712,14 @@ def pep695_wrapper[**P](
 ) -> dict[str, Any]:
     return original(*args, **kwargs)
 
-class API:
-    callback: Callable[[str], dict[str, Any]]
-
-def patch(api: API, original: Callable[..., Any]) -> None:
+def patch(original: Callable[..., Any]) -> None:
     if original:
         legacy = partial(legacy_wrapper, original, "state")
         reveal_type(legacy)  # revealed: partial[(...) -> dict[str, Any]]
-        api.callback = legacy
+        callback: Callable[[str], dict[str, Any]] = legacy
         pep695 = partial(pep695_wrapper, original, "state")
         reveal_type(pep695)  # revealed: partial[(...) -> dict[str, Any]]
-        api.callback = pep695
+        callback = pep695
 ```
 
 Adding an unrelated intersection member does not change which arguments the callable accepts:
@@ -732,13 +729,13 @@ from ty_extensions import Intersection
 
 class Marker: ...
 
-def intersected(api: API, original: Intersection[Callable[..., Any], Marker]) -> None:
+def intersected(original: Intersection[Callable[..., Any], Marker]) -> None:
     legacy = partial(legacy_wrapper, original, "state")
     reveal_type(legacy)  # revealed: partial[(...) -> dict[str, Any]]
-    api.callback = legacy
+    callback: Callable[[str], dict[str, Any]] = legacy
     pep695 = partial(pep695_wrapper, original, "state")
     reveal_type(pep695)  # revealed: partial[(...) -> dict[str, Any]]
-    api.callback = pep695
+    callback = pep695
 ```
 
 ### ParamSpec callable with keyword-bound wrapper parameters

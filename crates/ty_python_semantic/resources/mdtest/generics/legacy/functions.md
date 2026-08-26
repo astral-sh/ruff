@@ -1997,8 +1997,8 @@ def narrowed(x: Sequence[int]) -> None:
         reveal_type(list(x))  # revealed: list[int | str]
 ```
 
-An outer covariant generic in the return type remains outside the intersection. A meet-preserving
-generic would satisfy `F[A & B] == F[A] & F[B]`; covariance only guarantees
+Intersecting covariant return types does not generally allow intersecting their type arguments. A
+meet-preserving generic would satisfy `F[A & B] == F[A] & F[B]`; covariance only guarantees
 `F[A & B] <: F[A] & F[B]`, not the reverse. Here, an object usable as both `F[A]` and `F[B]` can
 call its callback with an `A` or a `B`, respectively. It cannot safely accept a callback that only
 handles values that are both `A` and `B`, as `F[A & B]` would allow. Thus `F` is not
@@ -2059,14 +2059,6 @@ def _(
 def invariant_correlated(x: Box[ElementT], y: Box[ElementT]) -> ElementT:
     raise NotImplementedError
 
-def _(
-    x: Intersection[Box[A], Marker],
-    y: Intersection[Box[B], D],
-) -> None:
-    # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
-    # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
-    reveal_type(invariant_correlated(x, y))  # revealed: A | B
-
 P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
 
@@ -2080,6 +2072,9 @@ def _(
     x: Intersection[Box[A], Marker],
     y: Intersection[Box[B], D],
 ) -> None:
+    # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
+    # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
+    reveal_type(invariant_correlated(x, y))  # revealed: A | B
     # error: [invalid-argument-type] "Argument to function `invariant_paramspec` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
     # error: [invalid-argument-type] "Argument to function `invariant_paramspec` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
     reveal_type(invariant_paramspec(x, y, lambda value: None))  # revealed: A | B
@@ -2122,9 +2117,6 @@ def _(x: Intersection[Source[A], Source[B]], value: D, values: tuple[D, ...]) ->
 Intersection inference respects both generic variance and the polarity of nested comparisons:
 
 ```py
-def _(x: Intersection[ASource, BSource, object]) -> None:
-    reveal_type(element(x))  # revealed: A & B
-
 SinkT = TypeVar("SinkT", contravariant=True)
 
 class Sink(Generic[SinkT]):
@@ -2152,30 +2144,51 @@ def _(
     reveal_type(choose(x, sink))  # revealed: C
 ```
 
-Gradual positives can make an inference-relevant intersection relation unconditionally assignable,
-which hides its static specialization paths. Direct member access retains the static information
-that generic inference should also preserve:
+Generic inference keeps the known types contributed by gradual intersections, but does not yet
+preserve their gradual components or intersect the independently inferred return types. Direct
+member access shows the more precise types:
 
 ```py
 def _(x) -> None:
     assert isinstance(x, ASource)
     reveal_type(x.get())  # revealed: Unknown & A
     # TODO: revealed: Unknown & A
-    reveal_type(element(x))  # revealed: Unknown
+    reveal_type(element(x))  # revealed: A
     assert isinstance(x, BSource)
     reveal_type(x.get())  # revealed: Unknown & A & B
     # TODO: revealed: Unknown & A & B
-    reveal_type(element(x))  # revealed: Unknown
+    reveal_type(element(x))  # revealed: A | B
 
 def _(x: Any) -> None:
     assert isinstance(x, ASource)
     reveal_type(x.get())  # revealed: Any & A
     # TODO: revealed: Any & A
-    reveal_type(element(x))  # revealed: Unknown
+    reveal_type(element(x))  # revealed: A
     assert isinstance(x, BSource)
     reveal_type(x.get())  # revealed: Any & A & B
     # TODO: revealed: Any & A & B
-    reveal_type(element(x))  # revealed: Unknown
+    reveal_type(element(x))  # revealed: A | B
+```
+
+A narrowed gradual argument still contributes its known element type when another argument also
+constrains `ElementT`. Ignoring the source's element type would infer an integer-only result and
+hide an invalid attribute access:
+
+```py
+def element_with_value(value: ElementT, source: Source[ElementT]) -> ElementT:
+    return source.get()
+
+def _(unknown, any_: Any) -> None:
+    assert isinstance(unknown, StrSource)
+    assert isinstance(any_, StrSource)
+    unknown_result = element_with_value(1, unknown)
+    any_result = element_with_value(1, any_)
+    reveal_type(unknown_result)  # revealed: Literal[1] | str
+    reveal_type(any_result)  # revealed: Literal[1] | str
+    # error: [unresolved-attribute]
+    unknown_result.bit_length()
+    # error: [unresolved-attribute]
+    any_result.bit_length()
 ```
 
 Unrelated gradual arguments do not affect `ElementT` and should not prevent static paths from
@@ -2193,11 +2206,9 @@ def _(x: Intersection[Source[A], Source[B]], other) -> None:
     reveal_type(element_with_dynamic_formal(x, A()))  # revealed: A & B
 ```
 
-When a gradual argument does contribute to `ElementT`, it can hide a constraint from an otherwise
-complete solution. Checking `Unknown & Source[D]` against `Source[ElementT]` reduces to
-`Always | (D <= ElementT)`, and therefore loses the `D` constraint. The fallback both widens the
-static `A & B` contribution to `A | B`, causing false positives, and incorrectly drops the known `D`
-contribution entirely:
+A gradual argument's known element type also contributes when another argument is an intersection.
+The result includes `D`, but still unions the first argument's `A` and `B` contributions instead of
+intersecting them:
 
 ```py
 class DSource(Source[D]): ...
@@ -2208,9 +2219,60 @@ def _(x: Intersection[Source[A], Source[B]], unknown, any_: Any) -> None:
     reveal_type(unknown.get())  # revealed: Unknown & D
     reveal_type(any_.get())  # revealed: Any & D
     # TODO: revealed: (A & B) | (Unknown & D)
-    reveal_type(correlated(x, unknown))  # revealed: A | B
+    reveal_type(correlated(x, unknown))  # revealed: A | D | B
     # TODO: revealed: (A & B) | (Any & D)
-    reveal_type(correlated(x, any_))  # revealed: A | B
+    reveal_type(correlated(x, any_))  # revealed: A | D | B
+```
+
+A gradual intersection member can satisfy a declared bound or constraint even when its static
+sibling cannot:
+
+```py
+BoundedT = TypeVar("BoundedT", bound=int)
+ConstrainedT = TypeVar("ConstrainedT", int, bytes)
+
+def bounded_element(source: Source[BoundedT]) -> BoundedT:
+    return source.get()
+
+def constrained_element(source: Source[ConstrainedT]) -> ConstrainedT:
+    return source.get()
+
+def _(unknown, any_: Any) -> None:
+    assert isinstance(unknown, StrSource)
+    assert isinstance(any_, StrSource)
+    reveal_type(bounded_element(unknown))  # revealed: Unknown
+    reveal_type(constrained_element(unknown))  # revealed: Unknown
+    reveal_type(bounded_element(any_))  # revealed: Unknown
+    reveal_type(constrained_element(any_))  # revealed: Unknown
+```
+
+When both members specialize `Source`, their intersection simplifies to `Source[str & Any]`, and
+inference preserves that element type:
+
+```py
+def _(nested: Intersection[Source[Any], Source[str]]) -> None:
+    reveal_type(nested)  # revealed: Source[str & Any]
+    reveal_type(bounded_element(nested))  # revealed: str & Any
+    reveal_type(constrained_element(nested))  # revealed: str & Any
+```
+
+Calls also remain valid when concrete subclasses inherit gradual specializations of `Source`. These
+sibling classes remain separate intersection members:
+
+```py
+from ty_extensions._internal import Unknown
+
+class AnySource(Source[Any]): ...
+class UnknownSource(Source[Unknown]): ...
+
+def _(
+    any_: Intersection[AnySource, StrSource],
+    unknown: Intersection[UnknownSource, StrSource],
+) -> None:
+    reveal_type(bounded_element(any_))  # revealed: Any
+    reveal_type(constrained_element(any_))  # revealed: Any
+    reveal_type(bounded_element(unknown))  # revealed: Unknown
+    reveal_type(constrained_element(unknown))  # revealed: Unknown
 ```
 
 An untyped value narrowed to `list` remains gradual. `enumerate` should accept it and preserve the
