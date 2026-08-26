@@ -1,5 +1,8 @@
 # Non-inferable constraints and unconstrained solution paths
 
+`cast_to_call` accepts either a callback or an existing `Call`. The inferred return type preserves
+the caller's type variable, so `wait` can return the call's result as `T`.
+
 When inferring the inner `T` for the call to `cast_to_call`, the outer `T` from `wait` is
 non-inferable. A satisfiable path constraining only that outer type variable must be recognized as
 unconstrained for the inferable domain; otherwise, the inferred specialization degrades to
@@ -31,9 +34,8 @@ def cast_to_call(value: Callable[[], T | Awaitable[T]] | Call[T]) -> Call[T]:
 
 def wait(value: Callable[[], T] | Call[T]) -> T:
     call = cast_to_call(value)
-    # TODO: Refine the validated specializations to reveal Call[T@wait] and accept the return.
-    reveal_type(call)  # revealed: Call[Awaitable[T@wait] | T@wait]
-    return call.result()  # error: [invalid-return-type]
+    reveal_type(call)  # revealed: Call[T@wait]
+    return call.result()
 ```
 
 ## Rigid outer-scope relationships
