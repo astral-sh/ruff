@@ -1523,21 +1523,23 @@
           ]
         },
         "runtime-evaluated-base-classes": {
-          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, but can also support user-defined\nclasses that inherit from those base classes. For example, if you define\na common `DeclarativeBase` subclass that's used throughout your project\n(e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to\nthis list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.\n\nFor some use-cases like SQLAlchemy's `Mapped` it makes more sense to\nmark the class as runtime-ambiguous, by prefixing the qualified name with\na tilde (`~`). This way ruff will assume the annotations already contain\nall of the correct forward references, and will not attempt to move related\nimports and/or quote annotations.",
+          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, but can also support user-defined\nclasses that inherit from those base classes. For example, if you define\na common `DeclarativeBase` subclass that's used throughout your project\n(e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to\nthis list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.",
           "type": [
             "array",
             "null"
           ],
+          "deprecated": true,
           "items": {
             "type": "string"
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.\n\nJust like with `runtime-evaluated-base-classes` it's possible to mark\ndecorators as runtime-ambiguous by prefixing them with a tilde (`~`).",
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
           "type": [
             "array",
             "null"
           ],
+          "deprecated": true,
           "items": {
             "type": "string"
           }
@@ -2602,6 +2604,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/RuffOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runtime-evaluated-annotations": {
+          "description": "Targets the annotation for a set of specified objects and treats\nthem as either runtime-required or runtime-ambiguous.\n\nA common example for a runtime-required base class is Pydantic's\n`pydantic.BaseModel`, where all of the annotations need to be evaluated\nat runtime by pydantic. This prevents relevant imports from being\nmoved into type checking blocks and helps detect imports that need\nto be moved out of type checking blocks.\n\nA common example for a runtime-ambiguous base class is SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, where it requires `Mapped` and most\ntypes to be available at runtime, but models may be referenced via\ntheir name as a forward-reference. So some annotations are runtime-required\nbut others are not, hence runtime-ambiguous. This prevents relevant\nimports from being moved at all, it will be assumed they are already\ncorrect, the way they are.\n\n`base-classes` directly targets a specific base class and its direct\ndescendants, whereas `decorators` targets any classes or functions\ndecorated with one of the decorators.\n\n`decorators` also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RuntimeEvaluatedAnnotationLocations"
             },
             {
               "type": "null"
@@ -5525,6 +5538,54 @@
         "zip-instead-of-pairwise",
         "zip-without-explicit-strict"
       ]
+    },
+    "RuntimeEvaluatedAnnotationLocation": {
+      "type": "object",
+      "properties": {
+        "ambiguous": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "required": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuntimeEvaluatedAnnotationLocations": {
+      "type": "object",
+      "properties": {
+        "base-classes": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RuntimeEvaluatedAnnotationLocation"
+            }
+          ],
+          "default": {
+            "ambiguous": [],
+            "required": []
+          }
+        },
+        "decorators": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RuntimeEvaluatedAnnotationLocation"
+            }
+          ],
+          "default": {
+            "ambiguous": [],
+            "required": []
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "Strictness": {
       "oneOf": [

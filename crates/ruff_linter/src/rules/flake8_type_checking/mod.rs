@@ -285,13 +285,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    runtime_required_base_classes: vec!["pydantic.BaseModel".to_string()],
-                    runtime_ambiguous_base_classes: vec![
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
-                    ..Default::default()
-                },
+                runtime_evaluated_annotations:
+                    settings::types::RuntimeEvaluatedAnnotationLocations {
+                        base_classes: settings::types::RuntimeEvaluatedAnnotationLocation {
+                            required: vec!["pydantic.BaseModel".to_string()],
+                            ambiguous: vec!["sqlalchemy.orm.DeclarativeBase".to_string()],
+                        },
+                        ..Default::default()
+                    },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -324,15 +325,18 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    runtime_required_decorators: vec![
-                        "attrs.define".to_string(),
-                        "attrs.frozen".to_string(),
-                        "pydantic.validate_call".to_string(),
-                    ],
-                    runtime_ambiguous_decorators: vec!["sqlalchemy.orm.declared_attr".to_string()],
-                    ..Default::default()
-                },
+                runtime_evaluated_annotations:
+                    settings::types::RuntimeEvaluatedAnnotationLocations {
+                        decorators: settings::types::RuntimeEvaluatedAnnotationLocation {
+                            required: vec![
+                                "attrs.define".to_string(),
+                                "attrs.frozen".to_string(),
+                                "pydantic.validate_call".to_string(),
+                            ],
+                            ambiguous: vec!["sqlalchemy.orm.declared_attr".to_string()],
+                        },
+                        ..Default::default()
+                    },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -351,10 +355,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    runtime_required_base_classes: vec!["module.direct.MyBaseClass".to_string()],
-                    ..Default::default()
-                },
+                runtime_evaluated_annotations:
+                    settings::types::RuntimeEvaluatedAnnotationLocations {
+                        base_classes: settings::types::RuntimeEvaluatedAnnotationLocation {
+                            required: vec!["module.direct.MyBaseClass".to_string()],
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -369,19 +377,23 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                flake8_type_checking: super::settings::Settings {
-                    runtime_required_decorators: vec![
-                        "fastapi.FastAPI.get".to_string(),
-                        "fastapi.FastAPI.put".to_string(),
-                        "module.app.AppContainer.app.get".to_string(),
-                        "module.app.AppContainer.app.put".to_string(),
-                        "module.app.app.get".to_string(),
-                        "module.app.app.put".to_string(),
-                        "module.app.app_container.app.get".to_string(),
-                        "module.app.app_container.app.put".to_string(),
-                    ],
-                    ..Default::default()
-                },
+                runtime_evaluated_annotations:
+                    settings::types::RuntimeEvaluatedAnnotationLocations {
+                        decorators: settings::types::RuntimeEvaluatedAnnotationLocation {
+                            required: vec![
+                                "fastapi.FastAPI.get".to_string(),
+                                "fastapi.FastAPI.put".to_string(),
+                                "module.app.AppContainer.app.get".to_string(),
+                                "module.app.AppContainer.app.put".to_string(),
+                                "module.app.app.get".to_string(),
+                                "module.app.app.put".to_string(),
+                                "module.app.app_container.app.get".to_string(),
+                                "module.app.app_container.app.put".to_string(),
+                            ],
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

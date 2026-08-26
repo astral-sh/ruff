@@ -26,7 +26,7 @@ mod tests {
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
-    use crate::settings::{LinterSettings, flags};
+    use crate::settings::{LinterSettings, flags, types};
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
@@ -205,11 +205,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
-                flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
+                runtime_evaluated_annotations: types::RuntimeEvaluatedAnnotationLocations {
+                    base_classes: types::RuntimeEvaluatedAnnotationLocation {
+                        required: vec![
+                            "pydantic.BaseModel".to_string(),
+                            "sqlalchemy.orm.DeclarativeBase".to_string(),
+                        ],
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)

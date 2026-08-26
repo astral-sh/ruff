@@ -47,16 +47,19 @@ impl AnnotationContext {
             ScopeKind::Class(class_def) => {
                 if flake8_type_checking::helpers::runtime_required_class(
                     class_def,
-                    &settings.flake8_type_checking.runtime_required_base_classes,
-                    &settings.flake8_type_checking.runtime_required_decorators,
+                    &settings.runtime_evaluated_annotations.base_classes.required,
+                    &settings.runtime_evaluated_annotations.decorators.required,
                     semantic,
                 ) {
                     return Self::RuntimeRequired;
                 }
                 if flake8_type_checking::helpers::runtime_required_class(
                     class_def,
-                    &settings.flake8_type_checking.runtime_ambiguous_base_classes,
-                    &settings.flake8_type_checking.runtime_ambiguous_decorators,
+                    &settings
+                        .runtime_evaluated_annotations
+                        .base_classes
+                        .ambiguous,
+                    &settings.runtime_evaluated_annotations.decorators.ambiguous,
                     semantic,
                 ) {
                     return Self::RuntimeAmbiguous;
@@ -65,14 +68,14 @@ impl AnnotationContext {
             ScopeKind::Function(function_def) => {
                 if flake8_type_checking::helpers::runtime_required_function(
                     function_def,
-                    &settings.flake8_type_checking.runtime_required_decorators,
+                    &settings.runtime_evaluated_annotations.decorators.required,
                     semantic,
                 ) {
                     return Self::RuntimeRequired;
                 }
                 if flake8_type_checking::helpers::runtime_required_function(
                     function_def,
-                    &settings.flake8_type_checking.runtime_ambiguous_decorators,
+                    &settings.runtime_evaluated_annotations.decorators.ambiguous,
                     semantic,
                 ) {
                     return Self::RuntimeAmbiguous;
@@ -110,13 +113,13 @@ impl AnnotationContext {
     ) -> Self {
         if flake8_type_checking::helpers::runtime_required_function(
             function_def,
-            &settings.flake8_type_checking.runtime_required_decorators,
+            &settings.runtime_evaluated_annotations.decorators.required,
             semantic,
         ) {
             Self::RuntimeRequired
         } else if flake8_type_checking::helpers::runtime_required_function(
             function_def,
-            &settings.flake8_type_checking.runtime_ambiguous_decorators,
+            &settings.runtime_evaluated_annotations.decorators.ambiguous,
             semantic,
         ) {
             Self::RuntimeAmbiguous
