@@ -161,32 +161,23 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         value_expr: &ast::Expr,
         value_inference: &ExpressionInference<'db>,
     ) -> bool {
-        match target {
+        let targets = match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.targets
                     .insert(target.into(), value_inference.expression_type(value_expr));
-                true
+                return true;
             }
             ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let Some(values) = sequence_elts(value_expr) else {
-                    // `first, *rest = items` has no literal elements to match against the
-                    // targets. Unpack the inferred type of `items` instead.
-                    return false;
-                };
-                self.unpack_fixed_sequence_from_inference(elts, values, value_expr, value_inference)
-            }
-            _ => false,
-        }
-    }
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
+            _ => return false,
+        };
 
-    fn unpack_fixed_sequence_from_inference(
-        &mut self,
-        targets: &[ast::Expr],
-        values: &[ast::Expr],
-        value_expr: &ast::Expr,
-        value_inference: &ExpressionInference<'db>,
-    ) -> bool {
+        let Some(values) = sequence_elts(value_expr) else {
+            // `first, *rest = items` has no literal elements to match against the
+            // targets. Unpack the inferred type of `items` instead.
+            return false;
+        };
+
         // For `first, *rest = [*items, "last"]`, `*items` can contribute zero or more
         // elements, so AST positions alone cannot tell us which value is assigned to
         // `first`. Fall back to unpacking the inferred sequence type.
@@ -251,17 +242,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
             // `first, *rest, last = [1, 2, 3, 4]` is valid despite the different lengths.
             // Once `rest` is handled, only the matching prefix and suffix remain.
-            return self.unpack_fixed_sequence_from_inference(
-                prefix_targets,
-                prefix_values,
-                value_expr,
-                value_inference,
-            ) && self.unpack_fixed_sequence_from_inference(
-                suffix_targets,
-                suffix_values,
-                value_expr,
-                value_inference,
-            );
+            for (targets, values) in [
+                (prefix_targets, prefix_values),
+                (suffix_targets, suffix_values),
+            ] {
+                self.unpack_fixed_sequence_from_inference(targets, values, value_inference);
+            }
+            return true;
         }
 
         // Without a starred target, `a, b = (1,)` and `a, b = (1, 2, 3)` cannot pair every
@@ -269,6 +256,18 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         if targets.len() != values.len() {
             return false;
         }
+
+        self.unpack_fixed_sequence_from_inference(targets, values, value_inference);
+        true
+    }
+
+    fn unpack_fixed_sequence_from_inference(
+        &mut self,
+        targets: &[ast::Expr],
+        values: &[ast::Expr],
+        value_inference: &ExpressionInference<'db>,
+    ) {
+        debug_assert_eq!(targets.len(), values.len());
 
         for (target, value_expr) in targets.iter().zip(values) {
             if !self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
@@ -283,7 +282,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 );
             }
         }
-        true
     }
 
     /// Records `Unknown` for a malformed unpack target and all of its descendant expressions.

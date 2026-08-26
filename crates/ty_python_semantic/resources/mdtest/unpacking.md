@@ -166,10 +166,12 @@ reveal_type(f)  # revealed: Unknown
 
 ### Starred unpacking of a large tuple
 
-Unpacking preserves the literal promotion applied when inferring a tuple with more than 64 elements.
+For performance, ty widens inferred integer literal types to `int` in tuples with more than 64
+elements. Unpacking preserves that widening: this unannotated assignment infers `int` for `first`
+and `list[int]` for `rest`. Unpacking the small tuple `(0, 1, 2)` instead infers `Literal[0]` and
+`list[Literal[1, 2]]`.
 
 ```py
-rest: list[int]
 # fmt: off
 first, *rest = (
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
@@ -288,8 +290,7 @@ def _(value: list[int]):
 
 ### Starred expression with a list literal
 
-Unpacking a list literal assigns each element to its corresponding target. The starred target
-collects only the remaining elements, so their types do not affect the other targets.
+Unpacking a list literal assigns each element to its corresponding target.
 
 ```py
 first: int
