@@ -1636,8 +1636,13 @@ mod uv_metadata {
     fn synchronizes_multiple_scripts_with_one_worker() -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;
 
-        let script =
-            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n";
+        let script = r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["attrs==25.4.0"]
+        # ///
+        from attrs import define
+        "#;
         let case = CliTest::with_files([("first.py", script), ("second.py", script)])?;
 
         assert_cmd_snapshot!(

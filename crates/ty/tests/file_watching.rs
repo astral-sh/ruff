@@ -10,6 +10,7 @@ use ruff_db::system::{
     file_time_now,
 };
 use ruff_python_ast::PythonVersion;
+use ruff_python_trivia::textwrap::dedent;
 use ruff_ranged_value::{RangedValue, ValueSource};
 use ty_module_resolver::{Module, ModuleName};
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions};
@@ -319,7 +320,7 @@ impl<'a> SetupContext<'a> {
     ) -> anyhow::Result<()> {
         let relative_path = relative_path.as_ref();
         let absolute_path = self.join_project_path(relative_path);
-        Self::write_file_impl(absolute_path, content)
+        Self::write_file_impl(absolute_path, &dedent(content))
     }
 
     fn write_file(
@@ -2501,6 +2502,7 @@ mod uv_metadata {
     use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{OsSystem, System as _};
+    use ruff_python_trivia::textwrap::dedent;
     use ty_project::{Db, ScriptEnvironmentAvailability};
     use ty_static::EnvVars;
 
@@ -2512,14 +2514,28 @@ mod uv_metadata {
 
         let mut case = setup_script_uv([(
             "script.py",
-            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
         )])?;
 
         assert!(case.db().check().is_empty());
 
         assert!(!update_and_synchronize_script(
             &mut case,
-            "\n# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\nvalue = 2\n",
+            r#"
+
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            value = 2
+            "#,
         )?);
 
         assert!(case.db().check().is_empty());
@@ -2533,14 +2549,26 @@ mod uv_metadata {
 
         let mut case = setup_script_uv([(
             "script.py",
-            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
         )])?;
 
         assert!(case.db().check().is_empty());
 
         let synchronized = update_and_synchronize_script(
             &mut case,
-            "# /// script\n# requires-python = '>=3.11'\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+            r#"
+            # /// script
+            # requires-python = ">=3.11"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
         )?;
         assert!(synchronized);
 
@@ -2564,7 +2592,13 @@ mod uv_metadata {
 
         let synchronized = update_and_synchronize_script(
             &mut case,
-            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
         )?;
         assert!(!synchronized);
 
@@ -2579,7 +2613,13 @@ mod uv_metadata {
 
         let mut case = setup_script_uv([(
             "script.py",
-            "# /// script\n# dependencies = ['not a valid requirement ???']\n# ///\nvalue = 1\n",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["not a valid requirement ???"]
+            # ///
+            value = 1
+            "#,
         )])?;
 
         let initial = case.db().check();
@@ -2591,7 +2631,13 @@ mod uv_metadata {
 
         let synchronized = update_and_synchronize_script(
             &mut case,
-            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
         )?;
         assert!(synchronized);
 
@@ -2630,7 +2676,7 @@ mod uv_metadata {
     }
 
     fn update_and_synchronize_script(case: &mut TestCase, source: &str) -> anyhow::Result<bool> {
-        update_file(case.project_path("script.py"), source)?;
+        update_file(case.project_path("script.py"), &dedent(source))?;
         let changes = case.take_watch_changes(event_for_file("script.py"));
         case.apply_changes(&changes);
 
