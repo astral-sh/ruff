@@ -4,14 +4,14 @@ use std::debug_assert_matches;
 
 use ruff_db::parsed::ParsedModuleRef;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::Db;
-use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::infer::{ExpressionInference, FrozenMap, FrozenSet};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
@@ -29,10 +29,18 @@ use ty_python_core::unpack::{UnpackKind, UnpackValue};
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
 
+/// Contextual inference of an assignment value, before its type is unpacked into targets.
+pub(super) struct UnpackValueInference<'db> {
+    pub(super) value: ExpressionInference<'db>,
+    pub(super) starred_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    pub(super) contextual_expressions: FxHashSet<ExpressionNodeKey>,
+}
+
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
     targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    starred_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 }
 
 /// Records an `Unknown` type for every expression in a malformed unpack target subtree.
@@ -54,6 +62,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         target_scope: ScopeId<'db>,
         program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
+        starred_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
     ) -> Self {
         Self {
             context: InferContext::new(
@@ -65,6 +74,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 module,
             ),
             targets: FxHashMap::default(),
+            starred_types,
         }
     }
 
@@ -77,7 +87,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 
     /// Unpack the value to the target expression.
-    pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
+    pub(crate) fn unpack(
+        &mut self,
+        target: &ast::Expr,
+        value: UnpackValue<'db>,
+        value_inference: Option<&ExpressionInference<'db>>,
+    ) {
         let db = self.db();
         debug_assert_matches!(
             target,
@@ -85,11 +100,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference = infer_expression_types(
-            self.context.db(),
-            value.expression(),
-            TypeContext::default(),
-        );
+        let value_inference = value_inference.unwrap_or_else(|| {
+            infer_expression_types(
+                self.context.db(),
+                value.expression(),
+                TypeContext::default(),
+            )
+        });
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         let value_type = value_inference.expression_type(value_expr);
@@ -185,7 +202,17 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 return;
             }
             ast::Expr::Starred(starred) => {
-                self.unpack_inner(&starred.value, value_expr, value, value_inference);
+                let ty = self
+                    .starred_types
+                    .get(&starred.value.as_ref().into())
+                    .copied()
+                    .unwrap_or(value.ty);
+                self.unpack_inner(
+                    &starred.value,
+                    value_expr,
+                    UnpackElement { ty, ..value },
+                    value_inference,
+                );
                 return;
             }
             ast::Expr::List(ast::ExprList { elts, .. })
@@ -346,11 +373,17 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         }
     }
 
-    pub(crate) fn finish(self) -> UnpackResult<'db> {
+    pub(crate) fn finish(
+        self,
+        value_inference: Option<ExpressionInference<'db>>,
+        contextual_expressions: FxHashSet<ExpressionNodeKey>,
+    ) -> UnpackResult<'db> {
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: FrozenMap::from(self.targets),
             cycle_recovery: None,
+            value_inference,
+            contextual_expressions: FrozenSet::from(contextual_expressions),
         }
     }
 }
@@ -359,6 +392,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 pub(crate) struct UnpackResult<'db> {
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
+    value_inference: Option<ExpressionInference<'db>>,
+    /// Expressions that were inferred with their target's annotation. Diagnostic
+    /// deduplication must not assume that every structurally matched value received context.
+    contextual_expressions: FrozenSet<ExpressionNodeKey>,
 
     /// The fallback type for missing expressions.
     ///
@@ -367,6 +404,14 @@ pub(crate) struct UnpackResult<'db> {
 }
 
 impl<'db> UnpackResult<'db> {
+    pub(super) fn has_contextual_expression(&self, expression: &ast::Expr) -> bool {
+        self.contextual_expressions.contains(&expression.into())
+    }
+
+    pub(crate) fn value_inference(&self) -> Option<&ExpressionInference<'db>> {
+        self.value_inference.as_ref()
+    }
+
     /// Returns the inferred type for a given sub-expression of the left-hand side target
     /// of an unpacking assignment.
     ///
@@ -394,11 +439,13 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
-    pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
+    pub(crate) fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FrozenMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
+            value_inference: Some(ExpressionInference::cycle_initial(scope, cycle_recovery)),
+            contextual_expressions: FrozenSet::default(),
         }
     }
 
@@ -413,6 +460,14 @@ impl<'db> UnpackResult<'db> {
             let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
+
+        self.value_inference = self.value_inference.map(|inference| {
+            if let Some(previous) = previous_cycle_result.value_inference() {
+                inference.cycle_normalized(db, env, previous, cycle)
+            } else {
+                inference
+            }
+        });
 
         self
     }
@@ -708,7 +763,7 @@ fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
 }
 
 /// Extract the element slice from a list or tuple expression.
-fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+pub(super) fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
     match expr {
         ast::Expr::List(list) => Some(&list.elts),
         ast::Expr::Tuple(tuple) => Some(&tuple.elts),

@@ -430,17 +430,9 @@ bob["extra"] = True
 
 ## Unpacked assignments to `TypedDict` variables
 
-This is a regression test for a bug in an early implementation of precise annotations for unpacked
-assignments.
-
-When a dictionary literal is assigned directly to a `TypedDict` variable, ty checks the literal
-against the variable's type and suppresses the assignment diagnostic to avoid reporting the same
-error twice. A dictionary literal inside an unpacked value does not receive that type context, so
-this more specific diagnostic is never emitted.
-
-The early implementation passed the inner dictionary to the duplicate-diagnostic check after
-identifying it for the primary annotation. This incorrectly suppressed the assignment diagnostic as
-well, causing ty to report no error for an incompatible dictionary.
+An unpacking target supplies its `TypedDict` annotation as context for the corresponding dictionary
+literal. Invalid fields produce a diagnostic at the field value, without a second diagnostic for the
+assignment.
 
 ```py
 from typing import TypedDict
@@ -449,19 +441,41 @@ class Payload(TypedDict):
     value: int
 
 payload: Payload
-payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
+payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `dict[str, str]` is not assignable to `Payload`
- --> src/mdtest_snippet.py:7:19
+error[invalid-argument-type]: Invalid argument to key "value" with declared type `int` on TypedDict `Payload`
+ --> src/mdtest_snippet.py:7:29
   |
-6 | payload: Payload
-  |          ------- Declared type
-7 | payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
-  | -------           ^^^^^^^^^^^^^^^^^^ Incompatible value of type `dict[str, str]`
-  | |
-  | Assigned to this variable
+7 | payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-argument-type
+  |                   ----------^^^^^^^-
+  |                   ||        |
+  |                   ||        value of type `Literal["wrong"]`
+  |                   |key has declared type `int`
+  |                   TypedDict `Payload`
+info: Item declaration
+ --> src/mdtest_snippet.py:4:5
+  |
+4 |     value: int
+  |     ---------- Item declared here
+```
+
+If a starred expression on the right prevents contextual inference, the assignment still reports the
+incompatible dictionary. Locating the inner literal for a diagnostic does not by itself establish
+that the literal was checked against the annotation.
+
+```py
+# error: [invalid-assignment]
+payload, other = ({"value": "wrong"}, *(0,))
+```
+
+Unpacking a dictionary itself assigns its keys to the targets. The dictionary is not a `TypedDict`
+literal assigned to `payload`, so the incompatible key type still produces an assignment diagnostic.
+
+```py
+# error: [invalid-assignment]
+payload, other = {"value": 1, "other": 2}
 ```
 
 ## Nested `TypedDict`
