@@ -27,10 +27,11 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericAlias,
-        GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction, KnownInstanceType,
-        MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
-        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
-        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
+        GenericContext, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
+        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
+        PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral,
+        Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+        VarianceInferable, VarianceInferenceMode,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -79,12 +80,11 @@ impl<'db> ProtocolClass<'db> {
         cached_protocol_interface(db, *self)
     }
 
-    /// Structural variance inference currently excludes recursive protocol and type-alias
-    /// dependencies: validating a cycle requires inferring variance independently of the
-    /// declarations being checked. Descriptor writes are also excluded when their accepted values
-    /// cannot be represented by a single type, leaving no write domain to use contravariantly.
+    /// Structural variance inference currently excludes recursive type aliases and descriptor
+    /// writes whose accepted values cannot be represented by a single type, leaving no write
+    /// domain to use contravariantly.
     ///
-    /// TODO: Support these recursive dependencies and descriptor write domains.
+    /// TODO: Support recursive type aliases and descriptor writes with unrepresentable domains.
     pub(super) fn supports_variance_inference(self, db: &'db dyn Db) -> bool {
         self.static_class_literal(db)
             .is_some_and(|(class, _)| supports_protocol_variance_inference(db, class))
@@ -341,7 +341,12 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             };
 
-            let inferred_variance = match class.variance_of(db, &env, typevar.identity(db)) {
+            let inferred_variance = match class.variance_of_in_mode(
+                db,
+                &env,
+                typevar.identity(db),
+                VarianceInferenceMode::Structural,
+            ) {
                 TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
                 variance => variance,
             };
@@ -1217,14 +1222,18 @@ impl<'db> ProtocolMemberWrite<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         self.variance_types(db, env)
-            .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar))
+            .map(|(ty, variance)| {
+                ty.with_polarity(variance)
+                    .variance_of_in_mode(db, env, typevar, mode)
+            })
             .collect()
     }
 }
@@ -3538,10 +3547,12 @@ fn non_object_protocol_member_count<'db>(
 }
 
 /// Check variance dependencies by definition, so expanding specializations such as `P[list[T]]`
-/// cannot hide a cycle. Nonrecursive protocol references do not prevent variance inference.
+/// do not produce an unbounded number of queries. A recursive dependency is supported unless
+/// some member in the cycle has an unsupported type; variance itself is inferred by a separate
+/// fixed-point computation starting from bivariance.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, _, _| false,
+    cycle_initial=|_, _, _| true,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn supports_protocol_variance_inference<'db>(

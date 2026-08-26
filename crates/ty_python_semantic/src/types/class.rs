@@ -47,7 +47,7 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
-    TypingModule, UnionBuilder, VarianceInferable,
+    TypingModule, UnionBuilder, VarianceInferable, VarianceInferenceMode,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -508,13 +508,14 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar)
+        self.variance_of_owner(db, typevar, mode)
     }
 }
 
@@ -522,13 +523,14 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 impl<'db> GenericAlias<'db> {
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of_owner(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         let origin = self.origin(db);
         let env = ProgramEnvironment::from_file(origin.program_file(db));
@@ -542,26 +544,30 @@ impl<'db> GenericAlias<'db> {
             .variables(db)
             .zip(specialization.types(db))
             .map(|(generic_typevar, ty)| {
-                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
-                    ty.with_polarity(explicit_variance)
-                        .variance_of(db, &env, typevar)
-                } else {
-                    // `with_polarity` composes the passed variance with the
-                    // inferred one. The inference is done lazily, as we can
-                    // sometimes determine the result just from the passed
-                    // variance. This operation is commutative, so we could
-                    // infer either first.  We choose to make the `StaticClassLiteral`
-                    // variance lazy, as it is known to be expensive, requiring
-                    // that we traverse all members.
-                    //
-                    // If salsa let us look at the cache, we could check first
-                    // to see if the class literal query was already run.
+                // Composition is commutative, so infer the argument's variance first. If it is
+                // bivariant, we can avoid traversing the class's potentially expensive interface.
+                //
+                // If salsa let us look at the cache, we could check first
+                // to see if the class literal query was already run.
+                ty.variance_of_in_mode(db, &env, typevar, mode)
+                    .compose_thunk(|| {
+                        if let Some(explicit_variance) =
+                            generic_typevar.typevar(db).explicit_variance(db)
+                            && (mode == VarianceInferenceMode::Effective
+                                || generic_typevar.is_paramspec(db)
+                                || generic_typevar.is_typevartuple(db)
+                                || origin.into_protocol_class(db).is_none_or(|protocol| {
+                                    !protocol.supports_variance_inference(db)
+                                }))
+                        {
+                            return explicit_variance;
+                        }
 
-                    let typevar_variance_in_substituted_type = ty.variance_of(db, &env, typevar);
-                    origin
-                        .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, &env, generic_typevar.identity(db))
-                }
+                        // A recursive protocol's declaration cannot determine its own validation
+                        // result. Structural inference follows the interface instead, retaining
+                        // bivariance as the bottom of the fixed point until inference completes.
+                        origin.variance_of_in_mode(db, &env, generic_typevar.identity(db), mode)
+                    })
             })
             .collect()
     }
@@ -2588,21 +2594,24 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, env, typevar),
+            Self::NonGeneric(ClassLiteral::Static(class)) => {
+                class.variance_of_in_mode(db, env, typevar, mode)
+            }
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
             ) => TypeVarVariance::Bivariant,
-            Self::Generic(generic) => generic.variance_of(db, env, typevar),
+            Self::Generic(generic) => generic.variance_of_in_mode(db, env, typevar, mode),
         }
     }
 }
@@ -2813,14 +2822,15 @@ impl<'db> Field<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         match self {
-            Self::Static(class) => class.variance_of(db, env, typevar),
+            Self::Static(class) => class.variance_of_in_mode(db, env, typevar, mode),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)

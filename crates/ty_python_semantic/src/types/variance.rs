@@ -125,20 +125,40 @@ impl std::iter::FromIterator<Self> for TypeVarVariance {
     }
 }
 
+/// Controls whether protocol specializations use declared variance or their structural fixed point.
+///
+/// Ordinary type relationships must honor a protocol parameter's effective variance. Validating
+/// the declaration itself instead has to follow recursive protocol references structurally;
+/// otherwise the declaration being checked would determine its own inferred result.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum VarianceInferenceMode {
+    /// Honor explicit variance declarations, inferring variance only when no declaration exists.
+    Effective,
+    /// Infer supported protocols from their interfaces, even when variance is declared explicitly.
+    Structural,
+}
+
 pub(crate) trait VarianceInferable<'db>: Sized {
-    /// The variance of `typevar` in `self`
-    ///
-    /// Generally, one will implement this by traversing any types within `self`
-    /// in which `typevar` could occur, and calling `variance_of` recursively on
-    /// them.
-    ///
-    /// Sometimes the recursive calls will be in positions where you need to
-    /// specify a non-covariant polarity. See `with_polarity` for more details.
+    /// The variance of `typevar` in `self`, honoring explicit variance declarations.
     fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
+        self.variance_of_in_mode(db, env, typevar, VarianceInferenceMode::Effective)
+    }
+
+    /// Computes variance while preserving the inference mode through nested types and Salsa keys.
+    ///
+    /// Implementations traverse types within `self` in which `typevar` could occur, calling this
+    /// method recursively with the same mode. Use `with_polarity` for non-covariant positions.
+    fn variance_of_in_mode(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance;
 
     /// Creates a `VarianceInferable` that applies `polarity` (see
@@ -171,17 +191,18 @@ impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
 where
     T: VarianceInferable<'db>,
 {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of(db, env, typevar))
+        polarity.compose_thunk(|| variance_inferable.variance_of_in_mode(db, env, typevar, mode))
     }
 }

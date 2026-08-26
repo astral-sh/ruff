@@ -872,40 +872,209 @@ class Sink(Protocol[T_contra]):
 
 ## Recursive protocol variance
 
-Declared-variance validation still skips recursive protocol interfaces. Each protocol below exposes
-a method that consumes its type parameter, either directly or through another protocol, so a
-covariant declaration is invalid.
+Recursive protocol references use the variance inferred from their interfaces, so an incorrect
+declaration cannot justify itself. A protocol that only produces its type parameter remains
+covariant when it returns another instance of itself; a protocol that only consumes the parameter
+remains contravariant.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Source(Protocol[T_co]):
+    def read(self) -> T_co: ...
+    def next(self) -> "Source[T_co]": ...
+
+class Sink(Protocol[T_contra]):
+    def write(self, value: T_contra) -> None: ...
+    def next(self) -> "Sink[T_contra]": ...
+
+# error: [invalid-protocol] "Type variable `T` in protocol `InvariantSource` should be covariant, but is invariant"
+class InvariantSource(Protocol[T]):
+    def read(self) -> T: ...
+    def next(self) -> "InvariantSource[T]": ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Recursive` should be contravariant, but is covariant"
+class Recursive(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def next(self) -> "Recursive[T_co]": ...
+```
+
+An expanding recursive reference composes variance with its type arguments. `list[T_co]` makes
+`Expanding` invariant even though its only direct use of `T_co` is a method parameter.
+
+```py
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Expanding` should be invariant, but is covariant"
+class Expanding(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def next(self) -> "Expanding[list[T_co]]": ...
+```
+
+Passing the recursive protocol as an argument introduces the opposite variance as well. Together
+with the direct return of `T_co`, this makes the protocol invariant.
+
+```py
+# error: [invalid-protocol] "Type variable `T_co` in protocol `RecursiveArgument` should be invariant, but is covariant"
+class RecursiveArgument(Protocol[T_co]):
+    def combine(self, other: "RecursiveArgument[T_co]") -> T_co: ...
+```
+
+The input position in `Left.write` also makes `Right` contravariant through its return type. Both
+covariant declarations are rejected.
+
+```py
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Left` should be contravariant, but is covariant"
+class Left(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def right(self) -> "Right[T_co]": ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Right` should be contravariant, but is covariant"
+class Right(Protocol[T_co]):
+    def left(self) -> Left[T_co]: ...
+```
+
+## Recursive protocols without observable type parameters
+
+A parameter used only in recursive references has no observable input or output position. We accept
+a covariant declaration, just as for an unused parameter, even when the recursive reference is a
+method argument. Consumers still use that declared covariance when inferring their own variance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Recursive(Protocol[T_co]):
+    def accept(self, other: "Recursive[T_co]") -> None: ...
+
+class Source[T]:
+    def read(self) -> Recursive[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+
+class Sink[T]:
+    def write(self, value: Recursive[T]) -> None: ...
+
+static_assert(is_subtype_of(Sink[object], Sink[int]))
+static_assert(not is_subtype_of(Sink[int], Sink[object]))
+```
+
+## Recursive protocol variance through aliases and nominal classes
+
+Variance validation follows a recursive reference through a type alias and an inferred nominal
+class. The list in the alias makes `Recursive` invariant, even though it only directly produces its
+type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from typing import Protocol, TypeVar
 
 T_co = TypeVar("T_co", covariant=True)
 
-# TODO: Reject the covariant declaration even though `next` refers to this protocol.
+type Next[T] = Recursive[list[T]]
+
+class Wrapper[T]:
+    def value(self) -> Next[T]:
+        raise NotImplementedError
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Recursive` should be invariant, but is covariant"
 class Recursive(Protocol[T_co]):
-    def write(self, value: T_co) -> None: ...
-    def next(self) -> "Recursive[T_co]": ...
+    def read(self) -> T_co: ...
+    def next(self) -> Wrapper[T_co]: ...
 ```
 
-The guard also recognizes recursion when each reference changes the specialization.
+## Recursive protocols with unsupported member types
 
-```py
-# TODO: Reject the covariant declaration despite the expanding recursive reference.
-class Expanding(Protocol[T_co]):
-    def write(self, value: T_co) -> None: ...
-    def next(self) -> "Expanding[list[T_co]]": ...
+Declared-variance validation still skips recursive type aliases. This also applies when the alias
+appears in another protocol in a recursive cycle, so both covariant declarations below remain
+undiagnosed even though `Left.write` consumes the type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
 ```
 
-Mutually recursive interfaces are also skipped, regardless of which protocol is checked first.
-
 ```py
-# TODO: Reject the covariant declarations in this recursive pair.
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+type Nested = int | list[Nested]
+
+# TODO: Reject these covariant declarations once recursive type aliases are supported.
 class Left(Protocol[T_co]):
     def write(self, value: T_co) -> None: ...
     def right(self) -> "Right[T_co]": ...
 
 class Right(Protocol[T_co]):
     def left(self) -> Left[T_co]: ...
+    def nested(self) -> Nested: ...
+```
+
+## Declared variance of variadic protocol parameters
+
+Parameter specifications and type variable tuples retain their declared variance when used in a
+protocol specialization. They do not participate in the validation of ordinary protocol type
+variables. These invariant parameters also make the enclosing nominal classes invariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ParamSpec, Protocol, TypeVar, TypeVarTuple, Unpack
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+T = TypeVar("T")
+
+class Callback(Protocol[P]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class CallbackProtocol(Protocol[T]):
+    def callback(self) -> Callback[[T]]: ...
+
+class CallbackWrapper[T]:
+    def callback(self) -> Callback[[T]]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(CallbackWrapper[int], CallbackWrapper[object]))
+static_assert(not is_subtype_of(CallbackWrapper[object], CallbackWrapper[int]))
+```
+
+The same applies when a type variable is used as one element of a type variable tuple.
+
+```py
+class TupleProtocol(Protocol[Unpack[Ts]]):
+    def values(self) -> tuple[Unpack[Ts]]: ...
+
+class TupleMemberProtocol(Protocol[T]):
+    def value(self) -> TupleProtocol[T]: ...
+
+class TupleWrapper[T]:
+    def value(self) -> TupleProtocol[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(TupleWrapper[int], TupleWrapper[object]))
+static_assert(not is_subtype_of(TupleWrapper[object], TupleWrapper[int]))
 ```
 
 ## Inherited protocol variance
