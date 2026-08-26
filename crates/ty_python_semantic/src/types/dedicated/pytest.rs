@@ -1107,17 +1107,19 @@ fn directly_parametrized<'db>(
     index: &ty_python_core::SemanticIndex<'_>,
     parameter_name: &str,
 ) -> bool {
-    let decorators = function_known_decorators(db, function_definition);
-    if function.decorator_list.iter().any(|decorator| {
-        mark_excludes_fixture(
-            db,
-            function_definition,
-            &decorator.expression,
-            parameter_name,
-            |expression| decorators.expression_type(expression),
-        )
-    }) {
-        return true;
+    if !function.decorator_list.is_empty() {
+        let decorators = function_known_decorators(db, function_definition);
+        if function.decorator_list.iter().any(|decorator| {
+            mark_excludes_fixture(
+                db,
+                function_definition,
+                &decorator.expression,
+                parameter_name,
+                |expression| decorators.expression_type(expression),
+            )
+        }) {
+            return true;
+        }
     }
 
     std::iter::successors(class_scope, |class_scope| {
