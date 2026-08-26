@@ -1,12 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{Expr, ExprStringLiteral, Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
+use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability};
-use crate::{Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `pass` statements and ellipsis (`...`) literals in
@@ -87,25 +86,24 @@ pub(crate) fn unnecessary_placeholder(checker: &Checker, body: &[Stmt]) {
     }
 
     for (index, stmt) in body.iter().enumerate() {
-        let kind = match stmt {
-            Stmt::Pass(_) => Placeholder::Pass,
-            Stmt::Expr(expr) if expr.value.is_ellipsis_literal_expr() => {
-                // In a type-checking block, a trailing ellipsis might be meaningful.
-                // A user might be using the type-checking context to declare a stub.
-                if checker.semantic().in_type_checking_block() {
-                    return;
-                }
-
-                // Ellipses are significant in protocol methods and abstract methods.
-                // Specifically, Pyright uses the presence of an ellipsis to indicate that
-                // a method is a stub, rather than a default implementation.
-                if checker.semantic().in_protocol_or_abstract_method() {
-                    return;
-                }
-                Placeholder::Ellipsis
-            }
-            _ => continue,
+        let Some(kind) = Placeholder::from_stmt(stmt) else {
+            continue;
         };
+
+        if matches!(kind, Placeholder::Ellipsis) {
+            // In a type-checking block, a trailing ellipsis might be meaningful.
+            // A user might be using the type-checking context to declare a stub.
+            if checker.semantic().in_type_checking_block() {
+                return;
+            }
+
+            // Ellipses are significant in protocol methods and abstract methods.
+            // Specifically, Pyright uses the presence of an ellipsis to indicate that
+            // a method is a stub, rather than a default implementation.
+            if checker.semantic().in_protocol_or_abstract_method() {
+                return;
+            }
+        }
 
         let next_stmt = body.get(index + 1);
         add_diagnostic(checker, stmt, next_stmt, kind);
@@ -119,11 +117,12 @@ fn add_diagnostic(
     next_stmt: Option<&Stmt>,
     placeholder_kind: Placeholder,
 ) {
-    let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.source()) {
-        Edit::range_deletion(stmt.range().add_end(index))
-    } else {
-        fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())
-    };
+    let edit = fix::edits::delete_stmt_preserving_trailing_comment(
+        stmt,
+        None,
+        checker.locator(),
+        checker.indexer(),
+    );
     let applicability = match next_stmt {
         // Mark the fix as unsafe if the following statement is a string literal,
         // as it will become the module/class/function's docstring after the fix.
@@ -147,10 +146,23 @@ fn add_diagnostic(
         .set_fix(fix);
 }
 
+/// A statement that only exists to keep a block syntactically valid, and that does nothing at
+/// runtime: either `pass` or a bare `...`.
 #[derive(Debug, PartialEq, Eq)]
-enum Placeholder {
+pub(crate) enum Placeholder {
     Pass,
     Ellipsis,
+}
+
+impl Placeholder {
+    /// Return the kind of placeholder `stmt` is, or `None` if it isn't one.
+    pub(crate) fn from_stmt(stmt: &Stmt) -> Option<Self> {
+        match stmt {
+            Stmt::Pass(_) => Some(Self::Pass),
+            Stmt::Expr(expr) if expr.value.is_ellipsis_literal_expr() => Some(Self::Ellipsis),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Placeholder {
