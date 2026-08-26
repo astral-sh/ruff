@@ -2830,6 +2830,121 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
 ```
 
+## Attribute tags with enum equality
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+An `IntEnum` member compares equal to its integer value, so both `EnumTag` and `IntegerTag` match
+`1`. `EnumTag` also permits a different tag, leaving it possible in both branches:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from typing import Literal
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag:
+    tag: Literal[Number.ONE, "other"]
+
+class IntegerTag:
+    tag: Literal[1]
+
+class OtherTag:
+    tag: Literal[2]
+
+def equal_integer_tags(value: EnumTag | IntegerTag | OtherTag):
+    if value.tag == 1:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+
+    if value.tag != 1:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+```
+
+The enum can also be the comparison value. An integer literal can match the enum member without
+having the same literal type:
+
+```py
+def enum_comparator(value: EnumTag | IntegerTag | OtherTag):
+    if Number.ONE == value.tag:
+        reveal_type(value)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(value)  # revealed: EnumTag | OtherTag
+```
+
+`StrEnum` members likewise compare equal to strings with the same value:
+
+```py
+class Word(StrEnum):
+    A = "a"
+    B = "b"
+
+class EnumStringTag:
+    tag: Literal[Word.A]
+
+class StringTag:
+    tag: Literal["a"]
+
+class OtherStringTag:
+    tag: Literal["b"]
+
+def equal_string_tags(value: EnumStringTag | StringTag | OtherStringTag):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: EnumStringTag | StringTag
+    else:
+        reveal_type(value)  # revealed: OtherStringTag
+```
+
+Custom equality methods can make an enum member compare equal to unrelated values. An ambiguous
+comparison keeps the alternative containing that member in both branches:
+
+```py
+class Custom(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class CustomTag:
+    tag: Literal[Custom.A]
+
+def custom_equality(value: CustomTag | StringTag):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: CustomTag | StringTag
+    else:
+        reveal_type(value)  # revealed: CustomTag
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps the
+alternative with that enum tag in both branches, including the branch where the inequality is false:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+class UnequalTag:
+    tag: Literal[NeverUnequal.A]
+
+def custom_inequality(value: UnequalTag | StringTag | OtherStringTag):
+    if value.tag != "a":
+        reveal_type(value)  # revealed: UnequalTag | OtherStringTag
+    else:
+        reveal_type(value)  # revealed: UnequalTag | StringTag
+```
+
 ## Enabling strict equality narrowing
 
 Enabling `strict-equality-semantics` accounts for builtin subclasses that override `__eq__` or
