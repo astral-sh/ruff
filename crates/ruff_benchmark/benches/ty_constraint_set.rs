@@ -157,6 +157,64 @@ fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
     });
 }
 
+/// Benchmarks independent alternatives that constrain only non-inferable type variables.
+///
+/// Each binary alternative doubles the number of complete paths in the original decision diagram.
+/// Support-aware solution walking should avoid enumerating that cross product whether the
+/// inferable constraint appears before or after the hidden alternatives.
+fn benchmark_independent_noninferable_alternatives(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for alternative_count in [4, 8, 12, 16, 20] {
+        for inferable_first in [true, false] {
+            let mut code =
+                String::from("from ty_extensions._internal import ConstraintSet\n\ndef infer[I");
+            for index in 0..alternative_count {
+                write!(&mut code, ", N{index}").ok();
+            }
+            code.push_str("]() -> None:\n");
+
+            if inferable_first {
+                code.push_str("    constraints = ConstraintSet.range(int, I, int)\n");
+            } else {
+                code.push_str(
+                    "    constraints = ConstraintSet.range(str, N0, str) | ConstraintSet.range(bytes, N0, bytes)\n",
+                );
+            }
+
+            let first_hidden = usize::from(!inferable_first);
+            for index in first_hidden..alternative_count {
+                writeln!(
+                    &mut code,
+                    "    constraints &= ConstraintSet.range(str, N{index}, str) | ConstraintSet.range(bytes, N{index}, bytes)"
+                )
+                .ok();
+            }
+
+            if !inferable_first {
+                code.push_str("    constraints &= ConstraintSet.range(int, I, int)\n");
+            }
+            code.push_str("    constraints.solutions(inferable=tuple[I])\n");
+
+            let position = if inferable_first { "first" } else { "last" };
+            let benchmark_name = format!(
+                "ty_micro[independent_noninferable_alternatives/{position}/{alternative_count}]"
+            );
+            criterion.bench_function(&benchmark_name, |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |case| {
+                        let Case { db } = case;
+                        let result = db.check();
+                        assert_eq!(result.len(), 0);
+                    },
+                    BatchSize::SmallInput,
+                );
+            });
+        }
+    }
+}
+
 /// Guards against quadratic pruning when contravariant callbacks contribute many upper-only bounds.
 fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
     const NUM_CALLBACKS: usize = 1_200;
@@ -656,6 +714,7 @@ criterion_group!(
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,
     benchmark_factored_upper_bounds,
+    benchmark_independent_noninferable_alternatives,
     benchmark_many_upper_bound_callbacks,
     benchmark_pandas_tdd,
     benchmark_mixed_typed_dict_union_copy,

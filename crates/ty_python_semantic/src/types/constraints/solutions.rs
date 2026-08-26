@@ -1,26 +1,66 @@
-use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
+use rustc_hash::FxHashSet;
+
+use crate::types::constraints::support::Support;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
-    PathAssignments, PathBounds, SolutionLimits,
+    ALWAYS_FALSE, ConstraintAssignment, ConstraintBound, ConstraintBoundsBuilder, ConstraintId,
+    ConstraintSetStorage, Node, NodeId, PathAssignments, PathBounds, SolutionLimits,
 };
+use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 pub(super) struct SolutionWalker<'db> {
+    inferable: TypeVarSet<'db>,
+    inferable_support: Support,
     source_orders: FxIndexSet<ConstraintId>,
+    explored_nodes: FxHashSet<(NodeId, Vec<(ConstraintAssignment, ConstraintId)>)>,
     sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
-    _phantom: PhantomData<&'db ()>,
 }
 
 impl<'db> SolutionWalker<'db> {
-    pub(super) fn new(source_orders: FxIndexSet<ConstraintId>) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
+        source_orders: FxIndexSet<ConstraintId>,
+    ) -> Self {
+        let inferable_support = Support::from_typevar_set(db, storage, inferable);
         Self {
+            inferable,
+            inferable_support,
             source_orders,
+            explored_nodes: FxHashSet::default(),
             sorted_paths: Vec::default(),
-            _phantom: PhantomData,
         }
+    }
+
+    /// Returns an iterator of the positive and negative constraints on the current path
+    fn constrained_assignments(
+        path: &PathAssignments,
+    ) -> impl Iterator<Item = ConstraintId> + Clone {
+        path.assignments
+            .iter()
+            .filter_map(|(assignment, _)| assignment.as_constrained())
+    }
+
+    /// Returns an iterator of the constraints on the current path that mention any typevar in the
+    /// given support
+    fn constrained_assignments_mentioning(
+        storage: &ConstraintSetStorage<'db>,
+        path: &PathAssignments,
+        support: &Support,
+    ) -> impl Iterator<Item = (ConstraintAssignment, ConstraintId)> {
+        path.assignments
+            .iter()
+            .filter_map(|(assignment, (source_constraint, _))| {
+                let constraint = assignment.as_constrained()?;
+                let constraint_support = storage.constraint_support(constraint);
+                constraint_support
+                    .overlaps_with(support)
+                    .then_some((*assignment, *source_constraint))
+            })
     }
 
     pub(super) fn visit_node<L: SolutionLimits>(
@@ -37,10 +77,44 @@ impl<'db> SolutionWalker<'db> {
             return ControlFlow::Continue(());
         }
 
+        // First see if we've already visited this node on an "equivalent" path, where we only
+        // consider the typevars that can affect the solutions we'd find if we were to continue
+        // walking down the node.
+        let mut relevant_typevars = self.inferable_support.clone();
+        let node_support = storage.node_support(node);
+        if let Some(node_support) = node_support {
+            relevant_typevars |= node_support;
+        }
+        relevant_typevars.close_over_constraints(storage, &Self::constrained_assignments(path));
+        let mut relevant_path: Vec<_> =
+            Self::constrained_assignments_mentioning(storage, path, &relevant_typevars).collect();
+        relevant_path.sort_unstable_by_key(|(assignment, _)| assignment.constraint().ordering());
+        let key = (node, relevant_path);
+        if !self.explored_nodes.insert(key) {
+            return ControlFlow::Continue(());
+        }
+
         // If the current node is ALWAYS_TRUE, we can immediately report the current solution.
-        if node == ALWAYS_TRUE {
+        // (We'll only have a Some(node_support) is the node is non-terminal, and we ruled out
+        // ALWAYS_FALSE up above.)
+        let Some(node_support) = node_support else {
             limits.satisfied_path()?;
-            self.found_satisfied_path(path);
+            self.found_satisfied_path(storage, path, &relevant_typevars);
+            return ControlFlow::Continue(());
+        };
+
+        // Next see if anything in this node can affect the solution we've already calculated on
+        // the current path.
+        let mut visible_typevars = self.inferable_support.clone();
+        visible_typevars.close_over_constraints(storage, &Self::constrained_assignments(path));
+        if !visible_typevars.overlaps_with(node_support) {
+            // This node cannot affect the solution we've found. Make sure that the node has _at
+            // least one_ satisfiable path, without walking them all. As long as it does, we can
+            // report the solution we have so far as-is.
+            if Self::node_is_satisfiable_on_path(db, env, storage, path, node, limits)? {
+                limits.satisfied_path()?;
+                self.found_satisfied_path(storage, path, &visible_typevars);
+            }
             return ControlFlow::Continue(());
         }
 
@@ -68,17 +142,69 @@ impl<'db> SolutionWalker<'db> {
         ControlFlow::Continue(())
     }
 
-    fn found_satisfied_path(&mut self, path: &PathAssignments) {
-        let mut path: Vec<_> = path
-            .positive_constraints()
-            .map(|(constraint, source_constraint)| {
-                let source_order = self
-                    .source_orders
-                    .get_index_of(&source_constraint)
-                    .expect("every TDD constraint should have a source order");
-                (constraint, source_order)
-            })
-            .collect();
+    /// Returns if there is _any_ satisfiable path in `node`, assuming that the assignments in
+    /// `path` already hold. Avoids walking the entire subtree if possible, by returning early once
+    /// we find the first satisfied path.
+    fn node_is_satisfiable_on_path<L: SolutionLimits>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        node: NodeId,
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, bool> {
+        match node.node() {
+            Node::AlwaysTrue => return ControlFlow::Continue(true),
+            Node::AlwaysFalse => return ControlFlow::Continue(false),
+            Node::Interior(_) => {}
+        }
+
+        let interior = storage.interior_node_data(node);
+        let constraint = interior.constraint;
+        for (assignment, child) in [
+            (constraint.when_true(), interior.if_true),
+            (constraint.when_unconstrained(), interior.if_uncertain),
+            (constraint.when_false(), interior.if_false),
+        ] {
+            let is_satisfied = path.walk_edge(
+                db,
+                env,
+                storage,
+                assignment,
+                |storage, path, _new_range, found_conflict| {
+                    if found_conflict {
+                        return ControlFlow::Continue(false);
+                    }
+
+                    limits.visit_node()?;
+                    Self::node_is_satisfiable_on_path(db, env, storage, path, child, limits)
+                },
+            )?;
+            if is_satisfied {
+                return ControlFlow::Continue(true);
+            }
+        }
+
+        ControlFlow::Continue(false)
+    }
+
+    fn found_satisfied_path(
+        &mut self,
+        storage: &ConstraintSetStorage<'db>,
+        path: &PathAssignments,
+        visible_typevars: &Support,
+    ) {
+        let mut path: Vec<_> =
+            Self::constrained_assignments_mentioning(storage, path, visible_typevars)
+                .filter(|(assignment, _)| assignment.is_positive())
+                .map(|(assignment, source_constraint)| {
+                    let source_order = self
+                        .source_orders
+                        .get_index_of(&source_constraint)
+                        .expect("every TDD constraint should have a source order");
+                    (assignment.constraint(), source_order)
+                })
+                .collect();
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignments` with identical `source_order`s, but if they do, those
@@ -103,16 +229,47 @@ impl<'db> SolutionWalker<'db> {
             let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
             source_orders1.cmp(source_orders2)
         });
+        self.sorted_paths.dedup_by(|path1, path2| {
+            let source_orders1 = path1.iter();
+            let source_orders2 = path2.iter();
+            source_orders1.eq(source_orders2)
+        });
 
         let mut result = Vec::with_capacity(self.sorted_paths.len());
+        let mut any_constrained_solutions = false;
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
+        let is_bare_inferable_typevar = |bound: ConstraintBound<'db>| {
+            matches!(
+                bound,
+                ConstraintBound::Evidence(Type::TypeVar(typevar))
+                    if typevar.is_inferable(db, self.inferable)
+            )
+        };
 
         for path in self.sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
                 let typevar = constraint.typevar;
+
+                // A direct relationship between an inferable and non-inferable typevar must
+                // contribute bounds for both endpoints. Contextual inference relies on the
+                // reverse, non-inferable binding to preserve relationships to outer typevars.
+                // Constraints on unrelated non-inferable typevars must not contribute bindings.
+                if !typevar.is_inferable(db, self.inferable)
+                    && !constraint
+                        .bounds
+                        .lower
+                        .is_some_and(is_bare_inferable_typevar)
+                    && !constraint
+                        .bounds
+                        .upper
+                        .is_some_and(is_bare_inferable_typevar)
+                {
+                    continue;
+                }
+
                 if let Some(lower) = constraint.bounds.lower {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, env, lower);
@@ -134,11 +291,19 @@ impl<'db> SolutionWalker<'db> {
                 }
             }
 
+            if !mappings.is_empty() {
+                any_constrained_solutions = true;
+            }
+
             let path_bounds = mappings
                 .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
                 .collect();
             result.push(path_bounds);
+        }
+
+        if !any_constrained_solutions {
+            return PathBounds::Unconstrained;
         }
 
         PathBounds::Constrained(result.into_boxed_slice())

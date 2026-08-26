@@ -96,34 +96,24 @@ def nested_transitive[T, U, V]() -> None:
         ConstraintSet.upper_bound(T, list[U]) & ConstraintSet.upper_bound(U, int) & ConstraintSet.lower_bound(list[int], T)
     ) | ConstraintSet.lower_bound(bytes, V)
 
-    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never], Solution[]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]], Solution[]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[], Solution[]]
     # revealed: tuple[Solution[T=list[int]], Solution[]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
 
-    # TODO: sometimes: revealed tuple[Solution[U=int], Solution[U=Never], Solution[]]
-    # TODO: sometimes: revealed tuple[Solution[U=int], Solution[], Solution[]]
     # revealed: tuple[Solution[U=int], Solution[]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
 
-    # TODO: sometimes: revealed tuple[Solution[], Solution[V=bytes], Solution[V=bytes]]
     # revealed: tuple[Solution[], Solution[V=bytes]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
 
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[U=Never, V=bytes], Solution[V=bytes]]
     # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
 
 ## Negated alternatives do not infer positive evidence
 
-In `¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)`, the lhs of the union is a negation, and should not
-place any positive restriction on `T`. Like above, we are not obligated to produce a solution that
-includes both sides of the union, so any solution that includes `bytes ≤ U` should not include a
-solution for `T`.
+In `¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)`, the lhs of the union imposes no positive restriction on
+either typevar. That unconstrained alternative makes the entire constraint set unconstrained, so
+neither typevar has an inferred solution.
 
 ```py
 from ty_extensions._internal import ConstraintSet
@@ -132,15 +122,12 @@ def negated_alternative[T, U]() -> None:
     # ¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)
     constraints = ~(ConstraintSet.upper_bound(T, int) | ConstraintSet.upper_bound(T, str)) | ConstraintSet.lower_bound(bytes, U)
 
-    # TODO: sometimes: revealed tuple[Solution[], Solution[T=Never], Solution[]]
     # revealed: tuple[Solution[], Solution[]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
 
-    # TODO: sometimes: revealed tuple[Solution[], Solution[U=bytes], Solution[U=bytes]]
     # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
 
-    # TODO: sometimes: revealed tuple[Solution[], Solution[T=Never, U=bytes], Solution[U=bytes]]
     # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U]))
 ```
@@ -231,11 +218,41 @@ def chain_uts[U, T, S]() -> None:
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
+## Non-inferable constraint source order and typevar orientation
+
+A non-inferable constraint can appear before or after inferable constraints, and a bare relationship
+can be encoded with either variable as its subject. Unrelated non-inferable variables are omitted,
+but a directly related non-inferable variable must be retained regardless of its orientation.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_constraint_first[I, J, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def noninferable_constraint_last[I, J, N]() -> None:
+    constraints = ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes) & ConstraintSet.range(int, N, int)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def inferable_subject[I, N]() -> None:
+    constraints = ConstraintSet.range(N, I, N)
+    # revealed: tuple[Solution[N=I@inferable_subject, I=N@inferable_subject]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def noninferable_subject[N, I]() -> None:
+    constraints = ConstraintSet.range(I, N, I)
+    # revealed: tuple[Solution[I=N@noninferable_subject, N=I@noninferable_subject]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+```
+
 ## Abstraction and non-inferable typevars
 
-Removing non-inferable typevars rebuilds the TDD with `ite`; irrelevant positive decisions must not
-leak onto the surviving paths. Universal abstraction of an alternative must likewise leave only the
-unrelated branch.
+Irrelevant non-inferable typevars must not appear in reported solution bindings, and irrelevant
+positive decisions must not leak onto independent alternatives. Universal abstraction of an
+alternative must likewise leave only the unrelated branch.
 
 ```py
 from ty_extensions import static_assert
@@ -247,16 +264,10 @@ def noninferable_nested[T, U, V]() -> None:
     ) | ConstraintSet.lower_bound(bytes, V)
 
     # `U` is deliberately non-inferable here.
-    # TODO: We should not include a solution for non-inferable U.
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
-    # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
+    # revealed: tuple[Solution[T=list[int]], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, V]))
-    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never], Solution[]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]], Solution[]]
     # revealed: tuple[Solution[T=list[int]], Solution[]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, V]))
-    # TODO: sometimes: revealed tuple[Solution[], Solution[V=bytes], Solution[V=bytes]]
     # revealed: tuple[Solution[], Solution[V=bytes]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, V]))
 
@@ -362,8 +373,11 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
     raise NotImplementedError
 
 def typed_dict_union(value: ValueA | ValueB) -> None:
-    # TODO: sometimes: revealed object
-    # revealed: int
+    # TODO: Add declared bounds/constraints directly to the constraint set, rather than handling
+    # them specially in a cleanup pass. (That cleanup pass is not engaging for this example, which
+    # means our "prefer tightest constraint when both work" heuristic is not being applied.)
+    # TODO: revealed: int
+    # revealed: object
     reveal_type(get_value(value))
 ```
 

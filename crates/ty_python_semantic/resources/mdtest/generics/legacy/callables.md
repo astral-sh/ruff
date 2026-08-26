@@ -423,16 +423,15 @@ def callback(value):
 assert_type(infer_return(callback), object)
 ```
 
-## Generic inference after projection budget exhaustion
+## Generic inference with many partially annotated overloads
 
-The literal-specific overloads below produce more alternative bindings than generic inference can
-project within its limits. The precise type of `default=0` does not replace the missing callback
-evidence: we recover with `Unknown` in either argument order.
+The literal-specific overloads below do not require enumerating irrelevant combinations of bindings.
+Generic inference retains the catch-all overload's `object` return type even when the default has a
+more precise type, regardless of argument order.
 
 ```py
 from typing import Callable, Literal, TypeVar, overload
 from typing_extensions import assert_type
-from ty_extensions._internal import Unknown
 
 R = TypeVar("R")
 T = TypeVar("T")
@@ -471,8 +470,8 @@ def callback(value: object) -> object: ...
 def callback(value):
     raise NotImplementedError
 
-assert_type(infer_return(callback, 0), Unknown)
-assert_type(infer_return(default=0, callback=callback), Unknown)
+assert_type(infer_return(callback, 0), object)
+assert_type(infer_return(default=0, callback=callback), object)
 ```
 
 ## Multiple occurrences of a higher-order generic callable
