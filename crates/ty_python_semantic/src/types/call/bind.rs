@@ -6100,6 +6100,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 for solution in solutions.as_slice() {
                     for binding in solution {
                         let identity = binding.bound_typevar.identity(db);
+                        // A `ParamSpec` keeps its first binding, so seeding it here would discard
+                        // the inferred parameter list of the argument.
+                        if binding.bound_typevar.is_paramspec(db) {
+                            continue;
+                        }
+
                         if let Some(&ty) = preferred.get(&identity) {
                             builder.add_type_mapping(
                                 binding.bound_typevar,
@@ -6198,24 +6204,25 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         let mut choose = |typevar: BoundTypeVarInstance<'db>, bounds: Option<&PathBound<'db>>| {
-            let bounds = bounds?;
-            let lower = bounds.evidence_lower?;
+            let preferred_ty = preferred_type_mappings.get(&typevar.identity(db)).copied();
 
-            if let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(db))
-                && lower.is_assignable_to(db, self.env, preferred_ty)
-            {
-                // A contextual fallback remains incomplete when selected for the call.
-                return Some(if preferred_solutions_incomplete {
-                    PathBoundSolution::BudgetExceeded {
-                        fallback: Some(preferred_ty),
-                    }
-                } else {
-                    PathBoundSolution::Solved(preferred_ty)
-                });
+            if let Some(bounds) = bounds {
+                let lower = bounds.evidence_lower?;
+                if preferred_ty.is_none_or(|ty| !lower.is_assignable_to(db, self.env, ty)) {
+                    return maybe_promote(typevar, bounds);
+                }
             }
 
-            maybe_promote(typevar, bounds)
+            // A contextual fallback remains incomplete when selected for the call.
+            preferred_ty.map(|ty| {
+                if preferred_solutions_incomplete {
+                    PathBoundSolution::BudgetExceeded { fallback: Some(ty) }
+                } else {
+                    PathBoundSolution::Solved(ty)
+                }
+            })
         };
+
         let inference = match builder.build_inference_with(&mut choose) {
             Ok(inference) => inference,
             Err(()) => builder.build_diagnostic_inference_with(
