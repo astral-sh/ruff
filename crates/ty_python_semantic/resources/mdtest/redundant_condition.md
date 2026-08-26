@@ -1,6 +1,6 @@
 # Detection of boolean tests that are always truthy or always falsy
 
-A common error in Python is to accidentally test truthiness of the wrong object; for example
+A common error in Python is to accidentally test truthiness of the wrong object: for example
 `if func:` (which is always true) where `if func():` was intended, or `if coroutine():` where
 `if await coroutine():` was intended. By default, ty alerts the user to these errors with the error
 code `redundant-condition`, but only if the inferred type of the object is not assignable to `int`.
@@ -154,6 +154,8 @@ def test(
 
     assert never_empty  # TODO: should error
     assert also_never_empty  # TODO: should error
+    assert sometimes_empty  # no diagnostic
+    assert also_sometimes_empty  # no diagnostic
 ```
 
 and testing an object that is known to be always truthy due to it being `@final` and not defining
@@ -186,9 +188,9 @@ def f(choice: Choice):
 
 ## Other boolean contexts
 
-Redundant conditions are not merely detected in `if` tests. They are also detected in unary `not`
-operations, `while` loops, `if` expressions, `and` expressions, `or` expressions, `match` guards,
-and in comprehension `if` tests.
+Redundant conditions are not merely detected in `if`-statement tests. They are also detected in
+unary `not` operations, `while` loops, `if` expressions, `and` expressions, `or` expressions,
+`match` guards, and in comprehension `if` tests.
 
 ```py
 def coinflip() -> bool:
@@ -225,25 +227,25 @@ def function(flag: bool):
     elif func:  # TODO: should error
         pass
 
-assert func  # TODO: should error
+def _():
+    assert func  # TODO: should error
 
-while func and coinflip():  # TODO: should error
-    pass
+def _():
+    while func and coinflip():  # TODO: should error
+        pass
 
-while not (func and coinflip()):  # TODO: should error
-    pass
+def _():
+    while not (func and coinflip()):  # TODO: should error
+        pass
 
 def f(x: str | int):
     match x:
         case str() if func:  # TODO: should error
             pass
 
-# N.B. this `while` statement must come last in the test snippet,
-# as ty considers all code following it to be unreachable,
-# and does not emit any diagnostics in unreachable code!
-#
-while func:  # TODO: should error
-    pass
+def _():
+    while func:  # TODO: should error
+        pass
 ```
 
 ## Always truthy values appearing later in compound conditions
@@ -397,29 +399,20 @@ We maintain a special case for `while` loops, since `while True:` and `while 1:`
 used to create infinite loops in Python code. Complaining that the conditions `True` and `1` are
 "always truthy" in these contexts would obviously be absurd.
 
-Note that these need to be tested in separate files, as ty infers all code after a `while True` or
-`while 1` loop to be unreachable, and it does not emit any diagnostics in unreachable code!
-
-`while_true.py`:
-
 ```py
-while True:  # no error
-    pass
-```
+def _():
+    while True:  # no error
+        pass
 
-`while_1.py`:
-
-```py
-while 1:
-    pass  # no error
+def _():
+    while 1:
+        pass  # no error
 ```
 
 Similarly, some projects use literal `if False:` or `if 0:` in their source code, to mark a region
 that is intentionally unreachable, but which could be enabled for debugging purposes. If we see an
 *AST literal* used as a condition, rather than a place that is inferred as having a literal *type*,
 we suppress the diagnostic: it is assumed that this region is deliberately unreachable.
-
-`if_tests.py`:
 
 ```py
 if False:  # no diagnostic
@@ -430,8 +423,6 @@ if 0:  # no diagnostic
 ```
 
 For consistency, we do the same for `if True:`, `if 1:`, `if 2:`, etc.:
-
-`if_tests_2.py`:
 
 ```py
 if 1:  # no diagnostic
@@ -551,7 +542,6 @@ catch_exe_failure = "\n" if sys.platform == "win32" else ""
 
 reveal_type(catch_exe_failure)  # revealed: Literal[""]
 
-# This
 if catch_exe_failure:  # no diagnostic
     pass
 ```
@@ -1014,8 +1004,8 @@ def f11(x: str):
             assert False, "oh no"
 ```
 
-We also avoid emitting the diagnostic if the exhaustiveness check just follows the if check, and is
-not in an `else` branch:
+We also avoid emitting the diagnostic if the exhaustiveness check just follows the `if` check, and
+is not in an `else` branch:
 
 ```py
 def g(x: int | str):
@@ -1134,7 +1124,7 @@ class Foo:
 
 ## Tests that include walrus expressions
 
-Walrus expressions can have side effects, so an always-true walrus expression may not always be
+Walrus expressions always have side effects, so an always-true walrus expression may not always be
 redundant. Examples of this can be found in CPython's scripts, where deliberately true walrus
 expressions are used to continue the boolean-expression chain:
 
