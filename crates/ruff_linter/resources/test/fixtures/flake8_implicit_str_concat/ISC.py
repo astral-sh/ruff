@@ -231,3 +231,8 @@ x = (
     + " line"
     + " string."
 )
+
+x = (
+    "abc"  # not a continuation \
+    "def"
+)
