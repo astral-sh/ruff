@@ -306,6 +306,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pylint, "R6301") => rules::pylint::rules::NoSelfUse,
         #[cfg(any(feature = "test-rules", test))]
         (Pylint, "W0101") => rules::pylint::rules::UnreachableCode,
+        (Pylint, "W0105") => rules::pylint::rules::PointlessStringStatement,
         (Pylint, "W0108") => rules::pylint::rules::UnnecessaryLambda,
         (Pylint, "W0177") => rules::pylint::rules::NanComparison,
         (Pylint, "W0120") => rules::pylint::rules::UselessElseOnLoop,
