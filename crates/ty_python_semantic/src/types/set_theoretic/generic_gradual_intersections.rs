@@ -58,12 +58,6 @@ pub(super) fn generic_gradual_intersection<'db>(
 /// materializations instead of incorrectly collapsing, for example,
 /// `Sequence[int] & Top[list[Any]]` to `list[int]`.
 /// Subclass arguments that do not specialize the base retain their gradualness.
-///
-/// As a deliberately unsound exception, also allow `Iterable` as the base, and `Iterator`
-/// as its subclass. We assume containers and iterators obey their behavioral contracts,
-/// including agreement between iteration and indexing. Structural typing cannot enforce
-/// this: a `tuple[object, ...]` subclass can override `__iter__` to yield `int` while
-/// indexing still returns arbitrary objects.
 fn base_top_intersection<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -83,6 +77,9 @@ fn base_top_intersection<'db>(
     let (base_class, base_specialization) = base.class_specialization(db, env)?;
     let (subclass_class, subclass_specialization) = subclass.class_specialization(db, env)?;
 
+    // As a deliberately unsound exception, allow `Iterable` as the base when the subclass is
+    // nominal or is the `Iterator` protocol. We assume containers and iterators obey their
+    // behavioral contracts, including agreement between iteration and indexing.
     let is_iterable_special_case = base_class.known(db) == Some(KnownClass::Iterable)
         && (subclass.is_nominal_instance()
             || subclass_class.known(db) == Some(KnownClass::Iterator));
