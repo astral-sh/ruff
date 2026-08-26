@@ -7876,7 +7876,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = collection_alias
             .origin(self.db())
             .apply_specialization(db, |_| {
-                builder.build_with(|current_typevar, bounds| {
+                builder.build_merged_with(|current_typevar, bounds| {
                     let lower = bounds?.evidence_lower?;
 
                     let lower = if is_empty_collection_type_context(tcx) {
@@ -9520,7 +9520,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     for call_specialization in identity_bindings
                         .iter_flat()
                         .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, identity_overload)| identity_overload.specialization(db))
+                        .filter_map(|(_, identity_overload)| {
+                            identity_overload.merged_specialization(db)
+                        })
                     {
                         // Record the constraints on the receiver's generic context formed by
                         // the arguments to this bound method call.

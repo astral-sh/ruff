@@ -666,6 +666,25 @@ def f(val: str | bytes) -> None:
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
+When overloads exchange their input and output types, the inferred return tuple currently contains a
+union for each type variable.
+
+```py
+def infer_pair[T, U](converter: Callable[[T], U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+# TODO: Infer the intersection of `tuple[int, str]` and `tuple[str, int]`.
+# Both specializations validate the same call, so its result satisfies both return types.
+reveal_type(infer_pair(swap))  # revealed: tuple[int | str, str | int]
+```
+
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
 as a whole to satisfy `Callable[[T], T]`.
 
