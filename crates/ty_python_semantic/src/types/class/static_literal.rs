@@ -3384,6 +3384,12 @@ impl<'db> StaticClassLiteral<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let env = ProgramEnvironment::from_scope(self.body_scope(db));
+
+        if self.is_typed_dict(db) {
+            return TypedDictType::new(self.identity_specialization(db))
+                .variance_of_items(db, &env, typevar);
+        }
+
         let typevar_in_generic_context = self
             .generic_context(db)
             .is_some_and(|generic_context| generic_context.contains(db, typevar));
@@ -3503,23 +3509,8 @@ impl<'db> StaticClassLiteral<'db> {
                 })
             });
 
-        let extra_items_variance = TypedDictType::new(self.identity_specialization(db))
-            .explicit_extra_items(db)
-            .map(|extra_items| {
-                let polarity = if extra_items.is_read_only() {
-                    TypeVarVariance::Covariant
-                } else {
-                    TypeVarVariance::Invariant
-                };
-                extra_items
-                    .declared_ty
-                    .with_polarity(polarity)
-                    .variance_of(db, &env, typevar)
-            });
-
         attribute_variances
             .chain(explicit_bases_variances)
-            .chain(extra_items_variance)
             .collect()
     }
 }

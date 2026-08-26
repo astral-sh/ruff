@@ -9322,6 +9322,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::ProtocolInstance(protocol_instance_type) => {
                 protocol_instance_type.variance_of(db, env, typevar)
             }
+            Type::TypedDict(typed_dict) => typed_dict.variance_of(db, env, typevar),
             // unions are covariant in their disjuncts
             Type::Union(union_type) => union_type
                 .elements(db)
@@ -9387,7 +9388,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::AlwaysTruthy
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
-            | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
         };
 
