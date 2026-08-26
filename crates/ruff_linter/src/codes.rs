@@ -132,10 +132,10 @@ impl serde::Serialize for NoqaCode {
 #[strum(serialize_all = "kebab-case", const_into_str)]
 #[serde(rename_all = "kebab-case")]
 pub enum Category {
-    /// Rules that flag outright wrong or useless code
+    /// Rules that flag outright wrong code
     Correctness,
 
-    /// Rules that flag likely outright wrong or useless code but that could be intentional
+    /// Rules that flag likely outright wrong code but that could be intentional
     Suspicious,
 
     /// Rules that suggest rewriting code in a shorter and more readable way
@@ -1400,8 +1400,8 @@ mod tests {
         });
 
         assert_snapshot!(snapshot, @"
-        correctness: Rules that flag outright wrong or useless code
-        suspicious: Rules that flag likely outright wrong or useless code but that could be intentional
+        correctness: Rules that flag outright wrong code
+        suspicious: Rules that flag likely outright wrong code but that could be intentional
         complexity: Rules that suggest rewriting code in a shorter and more readable way
         performance: Rules that suggest rewriting code in a more efficient way
         style: Rules that suggest rewriting code in a more idiomatic way
