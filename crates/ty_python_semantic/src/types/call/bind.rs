@@ -33,6 +33,7 @@ use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
+use crate::types::constraints::projection::{ProjectionTypeBudget, SolutionBudget};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
     Solutions,
@@ -52,6 +53,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    TypeVarInferenceSolutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
@@ -64,8 +66,8 @@ use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_fr
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
+    TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
+    walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -5640,6 +5642,10 @@ struct ArgumentTypeChecker<'a, 'db> {
     inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
 
+    /// All matched argument relations were validated against the same alternatives used to
+    /// infer the return type. Checking their merged specialization could lose that correlation.
+    arguments_validated: bool,
+
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
     /// avoid duplicate diagnostics.
@@ -5763,6 +5769,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             is_partial_application,
             inferable_typevars: TypeVarSet::None,
             inference: None,
+            arguments_validated: false,
             constraint_set_errors: vec![false; arguments.len()],
         }
     }
@@ -5997,6 +6004,165 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let db = self.db;
         self.inference
             .map(|inference| inference.merged_specialization(db))
+    }
+
+    /// Intersects the returns of complete, static specializations that each validate all arguments.
+    ///
+    /// Returns `None` when correlated inference is unavailable or cannot safely replace the
+    /// merged projection. A single solution already has the same return under either projection.
+    fn intersected_return_type(&self, inference: TypeVarInference<'db>) -> Option<Type<'db>> {
+        let db = self.db;
+        let env = self.env;
+        // TODO: Project correlated alternatives through constructor stages and partial signatures.
+        // Their remaining parameters and return types must use the same specialization.
+        if self.is_partial_application || self.constructor_kind.is_some() {
+            return None;
+        }
+        let TypeVarInferenceSolutions::Alternatives(alternatives) = inference.solutions(db) else {
+            return None;
+        };
+        let generic_context = inference.generic_context(db);
+        let mentions_inferable = |ty| {
+            any_over_type_expanding_aliases(
+                db,
+                env,
+                ty,
+                |nested| matches!(nested, Type::TypeVar(variable) if variable.is_inferable(db, self.inferable_typevars)),
+            )
+        };
+        let return_variables: Vec<_> = generic_context
+            .variables(db)
+            .enumerate()
+            .filter_map(|(index, variable)| {
+                any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
+                    matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
+                })
+                .then_some((index, variable))
+            })
+            .collect();
+        // Intersecting `list[A]` and `list[B]` would produce `Never`, even when the generic
+        // function constructs an empty list. Keep the merged specialization for varying
+        // invariant returns, including containers inside an inferred type. TODO: Distinguish
+        // mutable invariant specializations from mixed variance, such as `Callable[[T], T]`,
+        // whose intersection can be meaningful.
+        let has_invariant_specialization = |ty| {
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                let specialization = match nested {
+                    Type::GenericAlias(alias) => Some(alias.specialization(db)),
+                    Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::TypedDict(_) => {
+                        nested
+                            .class_specialization(db, env)
+                            .map(|(_, specialization)| specialization)
+                    }
+                    _ => None,
+                };
+                specialization.is_some_and(|specialization| {
+                    specialization
+                        .generic_context(db)
+                        .variables(db)
+                        .any(|variable| variable.variance(db) == TypeVarVariance::Invariant)
+                })
+            })
+        };
+        if return_variables.iter().any(|(index, variable)| {
+            !alternatives.iter().map(|types| types[*index]).all_equal()
+                && (self.return_ty.variance_of(db, env, variable.identity(db))
+                    == TypeVarVariance::Invariant
+                    || alternatives
+                        .iter()
+                        .filter_map(|types| types[*index])
+                        .any(has_invariant_specialization))
+        }) {
+            return None;
+        }
+        let relations: Vec<_> = self
+            .argument_relations()
+            .map(|relation| {
+                let contributes_to_inference = [relation.declared_type, relation.argument_type]
+                    .into_iter()
+                    .any(mentions_inferable);
+                // TODO: Track gradual evidence per alternative. Assignability can discard
+                // constraints through a gradual member, even when another argument solves all
+                // variables. Unrelated gradual arguments do not affect this inference.
+                if contributes_to_inference
+                    && (relation.argument_type.bottom_materialization(db, env)
+                        != relation.argument_type.top_materialization(db, env)
+                        || relation.declared_type.has_dynamic(db, env))
+                {
+                    return None;
+                }
+                Some((relation, contributes_to_inference))
+            })
+            .collect::<Option<_>>()?;
+
+        let mut returns = Vec::with_capacity(alternatives.len());
+        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
+        for types in alternatives {
+            // An incomplete sibling can describe a valid return alternative. Do not silently
+            // drop it just because other specializations have fully inferred return types.
+            // TODO: Have solution extraction distinguish unresolved dependencies from closed
+            // mappings. `Some` can still contain another inferable variable; applying defaults
+            // could hide that missing evidence, or a cycle such as A = R, R = A.
+            if return_variables
+                .iter()
+                .any(|&(index, _)| types[index].is_none_or(mentions_inferable))
+                || types
+                    .iter()
+                    .flatten()
+                    .any(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
+            {
+                return None;
+            }
+
+            let specialization = generic_context.specialize_recursive(db, types.iter().copied());
+            // TODO: Remove revalidation once constraint generation and solution selection
+            // guarantee the original argument relations. Inference currently drops `None`
+            // from `list[int] | None` against `list[T]`, and can infer `T = str` from
+            // `tuple[str, str]` against `tuple[T, int]` without recording the second element's
+            // incompatibility. Recursive protocol inference can also omit some requirements.
+            // A solution of those partial constraints is not necessarily a valid call.
+            if !relations
+                .iter()
+                .all(|(relation, contributes_to_inference)| {
+                    let actual = relation
+                        .argument_type
+                        .apply_specialization(db, specialization);
+                    let formal = relation
+                        .declared_type
+                        .apply_specialization(db, specialization);
+                    if *contributes_to_inference {
+                        actual.is_subtype_of(db, env, formal)
+                    } else {
+                        actual.is_assignable_to(db, env, formal)
+                    }
+                })
+            {
+                continue;
+            }
+
+            // Every retained specialization validates the same whole call, so the return value
+            // satisfies every instantiated return type, regardless of what caused the alternatives.
+            let return_ty = self.return_ty.apply_specialization(db, specialization);
+            // TODO: Preserve alternatives through type-guard narrowing. Guard wrappers are not
+            // ordinary result types: their intersection can simplify to `Never` even though both
+            // specializations return booleans. They can also appear inside an inferred type.
+            if any_over_type_expanding_aliases(db, env, return_ty, |ty| {
+                matches!(ty, Type::TypeGuard(_) | Type::TypeIs(_))
+            }) {
+                return None;
+            }
+            budget.charge_type(db, return_ty).ok()?;
+            // Expose aliased unions to the intersection constructor's expansion budget.
+            returns.push(match return_ty.resolve_type_alias(db) {
+                Type::Union(union) => union.expand_aliases(db, env),
+                ty => ty,
+            });
+        }
+
+        if returns.is_empty() {
+            return None;
+        }
+        IntersectionType::bounded_from_elements(db, env, returns.iter().copied())
     }
 
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -6275,9 +6441,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 choose,
             ),
         };
-        let specialization = inference.merged_specialization(db);
-
-        self.return_ty = self.return_ty.apply_specialization(db, specialization);
+        if let Some(return_ty) = self.intersected_return_type(inference) {
+            self.return_ty = return_ty;
+            self.arguments_validated = true;
+        } else {
+            // Keep the merged projection for unsupported or incomplete correlated inference and
+            // for diagnostic recovery when no candidate validates the call. This fallback can
+            // shrink as the solver preserves gradual evidence and all consumers support alternatives.
+            self.return_ty = self
+                .return_ty
+                .apply_specialization(db, inference.merged_specialization(db));
+        }
         self.inference = Some(inference);
     }
 
@@ -6701,7 +6875,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // building them in an earlier separate step.
         //
         // An unresolved `*Ts` still has no per-element expected type.
-        if !self.constraint_set_errors[argument_index]
+        if !self.arguments_validated
+            && !self.constraint_set_errors[argument_index]
             && !constructor_receiver
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
