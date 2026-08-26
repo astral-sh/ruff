@@ -6737,6 +6737,8 @@ impl PathFold for IsNeverSatisfiedVisitor {
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent>,
+    /// The sequents that can fire when a particular assignment is added to the path.
+    sequent_antecedents: FxHashMap<ConstraintAssignment, Vec<usize>>,
     /// Each assignment's source constraint and the first per-path fuel value with which it was
     /// derived.
     assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
@@ -6825,6 +6827,7 @@ impl Default for PathAssignments {
     fn default() -> Self {
         Self {
             sequents: Vec::default(),
+            sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
             discovered: FxIndexMap::default(),
@@ -6848,6 +6851,7 @@ impl PathAssignments {
             .collect();
         Self {
             sequents: Vec::default(),
+            sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
             discovered,
@@ -7139,6 +7143,35 @@ impl PathAssignments {
         Some(max_fuel)
     }
 
+    fn extend_sequents(
+        existing: &mut Vec<Sequent>,
+        antecedents: &mut FxHashMap<ConstraintAssignment, Vec<usize>>,
+        sequents: &[Sequent],
+    ) {
+        for sequent in sequents {
+            let sequent_index = existing.len();
+            existing.push(*sequent);
+
+            let mut add_antecedent = |assignment| {
+                antecedents
+                    .entry(assignment)
+                    .or_default()
+                    .push(sequent_index);
+            };
+            match *sequent {
+                Sequent::SingleTautology { ante } => add_antecedent(ante.when_false()),
+                Sequent::SingleImplication { ante, .. } => add_antecedent(ante.when_true()),
+                Sequent::PairImpossibility { ante1, ante2 }
+                | Sequent::PairImplication { ante1, ante2, .. } => {
+                    add_antecedent(ante1.when_true());
+                    if ante1 != ante2 {
+                        add_antecedent(ante2.when_true());
+                    }
+                }
+            }
+        }
+    }
+
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
     /// constraint. We do not calculate the new sequents directly. Instead, we call
     /// [`SequentMap::for_constraint`] and [`for_constraint_pair`][SequentMap::for_constraint_pair]
@@ -7159,7 +7192,11 @@ impl PathAssignments {
         }
 
         let single_map = SequentMap::for_constraint(db, env, storage, constraint);
-        self.sequents.extend_from_slice(&single_map.sequents);
+        Self::extend_sequents(
+            &mut self.sequents,
+            &mut self.sequent_antecedents,
+            &single_map.sequents,
+        );
 
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
             if *existing == constraint {
@@ -7197,7 +7234,11 @@ impl PathAssignments {
             }
 
             let pair_map = SequentMap::for_constraint_pair(db, env, storage, a, b);
-            self.sequents.extend_from_slice(&pair_map.sequents);
+            Self::extend_sequents(
+                &mut self.sequents,
+                &mut self.sequent_antecedents,
+                &pair_map.sequents,
+            );
         }
     }
 
@@ -7318,10 +7359,27 @@ impl PathAssignments {
         // brute-force search.
 
         self.new_assignments.clear();
+        let previous_sequents_len = self.sequents.len();
+        let previous_antecedents_len = self
+            .sequent_antecedents
+            .get(&assignment)
+            .map_or(0, Vec::len);
         self.discover_constraint(db, env, storage, assignment.constraint());
+        let sequents_len = self.sequents.len();
 
-        for i in 0..self.sequents.len() {
-            let sequent = self.sequents[i];
+        // Previously discovered sequents can only start firing if the assignment that we just
+        // added is one of their antecedents.
+        for index in 0..previous_antecedents_len {
+            let sequent_index = self.sequent_antecedents[&assignment][index];
+            let sequent = self.sequents[sequent_index];
+            self.check_sequent(db, env, storage, sequent)?;
+        }
+
+        // Sequent elaboration can produce rules whose antecedents do not include the constraint
+        // that caused us to discover them. Check every newly discovered sequent once against the
+        // complete set of assignments on the current path.
+        for sequent_index in previous_sequents_len..sequents_len {
+            let sequent = self.sequents[sequent_index];
             self.check_sequent(db, env, storage, sequent)?;
         }
 
