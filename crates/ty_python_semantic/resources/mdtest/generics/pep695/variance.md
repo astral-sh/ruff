@@ -559,6 +559,35 @@ def unsound(value: WritableProtocol[int]) -> None:
     overwrite(value)  # error: [invalid-argument-type]
 ```
 
+### Mutable protocol attributes with unrelated protocol members
+
+The recursion guard currently disables structural variance inference whenever a member type contains
+a protocol, even if the interface is not recursive. The fallback to ordinary class inference treats
+`_value` as private and incorrectly infers covariance. This also makes a class that returns the
+protocol covariant, allowing callers to mutate `_value` through a wider specialization.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Marker(Protocol):
+    def ready(self) -> bool: ...
+
+class WritableProtocol[T](Protocol):
+    _value: T
+
+    def marker(self) -> Marker: ...
+
+class Wrapper[T]:
+    def value(self) -> WritableProtocol[T]:
+        raise NotImplementedError
+
+# TODO: Both assertions should hold: the writable protocol attribute makes `Wrapper` invariant.
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Wrapper[int], Wrapper[object]))  # error: [static-assert-error]
+```
+
 ### Immutable Attributes
 
 Immutable attributes can't be written to, and thus constrain the typevar to covariance, not

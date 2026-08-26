@@ -297,6 +297,9 @@ impl<'db> ProtocolClass<'db> {
         let Some((class, _)) = self.static_class_literal(db) else {
             return;
         };
+        // TODO: Validate protocols with inherited members too. This single-base pattern skips
+        // subclasses such as `class Child(Base[T], Protocol[T])`, even when their declared
+        // variance disagrees with the inherited interface.
         let [Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context))] =
             class.explicit_bases(db)
         else {
@@ -850,8 +853,13 @@ impl<'db> ProtocolInterface<'db> {
 
     /// Return whether this interface is currently supported by structural variance inference.
     ///
-    /// TODO: Support recursive protocol members and descriptor writes with unrepresentable domains
-    /// instead of skipping variance inference for these interfaces.
+    /// The finite-member guard conservatively rejects any member type containing a protocol,
+    /// including unrelated protocols and explicit receiver annotations that refer to this protocol.
+    /// This skips declared-variance validation and falls back to ordinary class variance inference
+    /// for inferred parameters, even when the interface is not recursive.
+    ///
+    /// TODO: Narrow the guard to actual recursion, and support recursive interfaces and descriptor
+    /// writes with unrepresentable domains.
     pub(super) fn supports_variance_inference(self, db: &'db dyn Db) -> bool {
         ProtocolInterfaceView::new(self, None).has_only_finite_members(db)
             && self.members(db).all(|member| {

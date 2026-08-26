@@ -326,9 +326,30 @@ class ContravariantSource(Protocol[T_contra]):
 class CovariantSource(Protocol[T_co]):
     def read(self) -> T_co: ...
 
+class ContravariantSink(Protocol[T_contra]):
+    def write(self, value: T_contra) -> None: ...
+
 class InvariantReadWrite(Protocol[T]):
     def read(self) -> T: ...
     def write(self, value: T) -> None: ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantReadWrite` should be invariant, but is covariant"
+class CovariantReadWrite(Protocol[T_co]):
+    def read(self) -> T_co: ...
+    def write(self, value: T_co) -> None: ...
+
+# error: [invalid-protocol] "Type variable `T_contra` in protocol `ContravariantReadWrite` should be invariant, but is contravariant"
+class ContravariantReadWrite(Protocol[T_contra]):
+    def read(self) -> T_contra: ...
+    def write(self, value: T_contra) -> None: ...
+```
+
+A type variable used in an invariant return type makes the protocol invariant, even though it only
+appears in a return position.
+
+```py
+class InvariantReturn(Protocol[T]):
+    def read(self) -> list[T]: ...
 ```
 
 ## Protocol properties and writable attributes
@@ -447,28 +468,43 @@ static_assert(is_subtype_of(Wrapper[int], Wrapper[object]))
 static_assert(is_assignable_to(Wrapper[int], Wrapper[object]))
 ```
 
-## Protocol constructors and method receivers
+## Protocol constructors
 
-Constructors are not protocol members. Explicit receiver annotations do not add another input or
-output position, while an invariant return type retains its own invariance.
+Constructors are not protocol members, so their parameters do not constrain protocol variance.
 
 ```py
 from typing import Protocol, TypeVar
 
 T = TypeVar("T")
-T_contra = TypeVar("T_contra", contravariant=True)
 
 # error: [invalid-protocol] "Type variable `T` in protocol `ConstructorOnly` should be covariant, but is invariant"
 class ConstructorOnly(Protocol[T]):
     def __init__(self, value: T) -> None: ...
+```
+
+## Protocol method receivers
+
+Explicit receiver annotations that reference the protocol trigger the recursion guard, so these
+examples currently skip declared-variance validation. The covariant version should be rejected
+because `send` consumes its type parameter, but it is also accepted. This demonstrates the guard's
+limitation rather than correct handling of receiver variance.
+
+```py
+from typing import Protocol, TypeVar
+
+T_contra = TypeVar("T_contra", contravariant=True)
+T_co = TypeVar("T_co", covariant=True)
 
 class ExplicitReceivers(Protocol[T_contra]):
     def send(self: "ExplicitReceivers[T_contra]", value: T_contra) -> None: ...
     @classmethod
     def configure(cls: "type[ExplicitReceivers[T_contra]]") -> None: ...
 
-class InvariantReturn(Protocol[T]):
-    def read(self) -> list[T]: ...
+# TODO: Reject the covariant declaration; this protocol should be contravariant.
+class CovariantExplicitReceivers(Protocol[T_co]):
+    def send(self: "CovariantExplicitReceivers[T_co]", value: T_co) -> None: ...
+    @classmethod
+    def configure(cls: "type[CovariantExplicitReceivers[T_co]]") -> None: ...
 ```
 
 ## Inferred legacy protocol variance
@@ -498,6 +534,45 @@ class WritableProtocol(Protocol[T]):
 
 static_assert(not is_subtype_of(WritableProtocol[int], WritableProtocol[object]))
 static_assert(not is_assignable_to(WritableProtocol[int], WritableProtocol[object]))
+```
+
+## Protocol members referencing other protocols
+
+The recursion guard currently skips declared-variance validation whenever a member type contains a
+protocol, even if that protocol is unrelated and the interface is not recursive. `Source` should be
+covariant because only `read` uses `T`, in a return position.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Marker(Protocol):
+    def ready(self) -> bool: ...
+
+# TODO: Reject the invariant declaration even though `marker` returns another protocol.
+class Source(Protocol[T]):
+    def read(self) -> T: ...
+    def marker(self) -> Marker: ...
+```
+
+## Inherited protocol variance
+
+A protocol's variance also depends on its inherited members. `Child` only produces `T` through
+`Base.read`, so it should be covariant. Declared-variance validation currently skips protocols with
+additional bases, leaving this mismatch undiagnosed.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Base(Protocol[T_co]):
+    def read(self) -> T_co: ...
+
+# TODO: Reject the invariant declaration; the inherited interface is covariant.
+class Child(Base[T], Protocol[T]): ...
 ```
 
 ## Inheriting from generic classes with explicit variance
