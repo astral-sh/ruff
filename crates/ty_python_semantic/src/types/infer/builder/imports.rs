@@ -79,7 +79,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             module.name(db),
             missing.distribution.name,
         ));
-        diagnostic.deduplicate_by_dependency(missing.id.clone());
         diagnostic.help(format_args!(
             "Declare `{}` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`",
             missing.distribution.name,

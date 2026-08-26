@@ -1,8 +1,7 @@
 ## What it does
 
 Checks for imports of installed distributions that the current project does not
-declare as direct dependencies. Each missing distribution is reported once per
-file, at its first unsuppressed import.
+declare as direct dependencies.
 
 ## Why is this bad?
 

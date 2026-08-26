@@ -160,7 +160,11 @@ dependencies = ["direct-dependency"]
         ),
         (
             "packages/member/member.py",
-            "import direct_module\nfrom indirect_module import value\n",
+            concat!(
+                "import direct_module\n",
+                "from indirect_module import value\n",
+                "import indirect_module\n",
+            ),
         ),
         ("packages/sibling/sibling.py", "import direct_module\n"),
     ])?;
@@ -199,6 +203,13 @@ dependencies = ["direct-dependency"]
       |      ^^^^^^^^^^^^^^^
     help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
 
+    error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+     --> packages/member/member.py:3:8
+      |
+    3 | import indirect_module
+      |        ^^^^^^^^^^^^^^^
+    help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
+
     error[missing-direct-dependency]: Import of `direct_module` requires a direct dependency on `direct-dependency`
      --> packages/sibling/sibling.py:1:8
       |
@@ -206,7 +217,7 @@ dependencies = ["direct-dependency"]
       |        ^^^^^^^^^^^^^
     help: Declare `direct-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
 
-    Found 2 diagnostics
+    Found 3 diagnostics
 
     ----- stderr -----
     ");
@@ -217,8 +228,9 @@ dependencies = ["direct-dependency"]
     exit_code: 1
     ----- stdout -----
     packages/member/member.py:2:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    packages/member/member.py:3:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
     packages/sibling/sibling.py:1:8: error[missing-direct-dependency] Import of `direct_module` requires a direct dependency on `direct-dependency`
-    Found 2 diagnostics
+    Found 3 diagnostics
 
     ----- stderr -----
     ");

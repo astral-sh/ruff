@@ -68,7 +68,6 @@ impl DependencyMetadata {
         }
 
         Some(MissingDependency {
-            id,
             distribution: self.distributions.get(id)?,
             group_dependency,
         })
@@ -196,7 +195,6 @@ pub struct DependencyDistribution {
 }
 
 pub(crate) struct MissingDependency<'a> {
-    pub(crate) id: &'a CompactString,
     pub(crate) distribution: &'a DependencyDistribution,
     pub(crate) group_dependency: bool,
 }

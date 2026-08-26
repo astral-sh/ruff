@@ -34,7 +34,6 @@ use crate::types::{
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, declare_lint};
-use compact_str::CompactString;
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
@@ -49,7 +48,6 @@ use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, StringFlags};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::{BTreeMap, btree_map};
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{KnownModule, Module, ModuleName, SearchPath, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
@@ -1367,12 +1365,6 @@ declare_lint! {
 pub struct TypeCheckDiagnostics {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
-    /// Keyed by opaque distribution ID, not by import name or display name.
-    #[expect(
-        clippy::box_collection,
-        reason = "Most inference results have no missing dependencies; keep the empty state small"
-    )]
-    missing_dependencies: Option<Box<BTreeMap<CompactString, Diagnostic>>>,
 }
 
 pub(crate) fn report_mismatched_type_name<'db>(
@@ -1407,36 +1399,9 @@ impl TypeCheckDiagnostics {
         self.diagnostics.push(diagnostic);
     }
 
-    pub(super) fn push_missing_dependency(
-        &mut self,
-        distribution: CompactString,
-        diagnostic: Diagnostic,
-    ) {
-        let dependencies = self.missing_dependencies.get_or_insert_default();
-        match dependencies.entry(distribution) {
-            btree_map::Entry::Vacant(entry) => {
-                entry.insert(diagnostic);
-            }
-            btree_map::Entry::Occupied(mut entry) => {
-                // Scopes are inferred and cached independently. Their diagnostics need not be
-                // combined in source order, so the first insertion need not be the first import.
-                if diagnostic.range().map(TextRange::start)
-                    < entry.get().range().map(TextRange::start)
-                {
-                    entry.insert(diagnostic);
-                }
-            }
-        }
-    }
-
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
         self.used_suppressions.extend(&other.used_suppressions);
-        if let Some(dependencies) = &other.missing_dependencies {
-            for (distribution, diagnostic) in dependencies.iter() {
-                self.push_missing_dependency(distribution.clone(), diagnostic.clone());
-            }
-        }
     }
 
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
@@ -1460,26 +1425,26 @@ impl TypeCheckDiagnostics {
         self.diagnostics.shrink_to_fit();
     }
 
-    pub(crate) fn into_diagnostics(mut self) -> Vec<Diagnostic> {
-        if let Some(dependencies) = self.missing_dependencies {
-            self.diagnostics.extend(dependencies.into_values());
-        }
+    pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
         self.diagnostics
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.diagnostics.is_empty()
-            && self.used_suppressions.is_empty()
-            && self
-                .missing_dependencies
-                .as_ref()
-                .is_none_or(|dependencies| dependencies.is_empty())
+        self.diagnostics.is_empty() && self.used_suppressions.is_empty()
+    }
+
+    fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
+        self.diagnostics().iter()
+    }
+
+    fn diagnostics(&self) -> &[Diagnostic] {
+        self.diagnostics.as_slice()
     }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_list().entries(self).finish()
+        self.diagnostics().fmt(f)
     }
 }
 
@@ -1494,20 +1459,11 @@ impl IntoIterator for TypeCheckDiagnostics {
 
 impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     type Item = &'a Diagnostic;
-    type IntoIter = std::iter::Chain<
-        std::slice::Iter<'a, Diagnostic>,
-        std::iter::Flatten<std::option::IntoIter<btree_map::Values<'a, CompactString, Diagnostic>>>,
-    >;
+    type IntoIter = std::slice::Iter<'a, Diagnostic>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.iter().chain(
-            self.missing_dependencies
-                .as_deref()
-                .map(BTreeMap::values)
-                .into_iter()
-                .flatten(),
-        )
+        self.iter()
     }
 }
 

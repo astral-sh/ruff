@@ -1,6 +1,5 @@
 use std::{cell::Cell, fmt, hint::cold_path, marker::PhantomData};
 
-use compact_str::CompactString;
 use drop_bomb::DebugDropBomb;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::DiagnosticTag;
@@ -410,15 +409,9 @@ pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
 
     source: LintSource,
     message_override: Option<String>,
-    dependency: Option<CompactString>,
 }
 
 impl LintDiagnosticGuard<'_, '_> {
-    /// Report only the earliest unsuppressed import of this distribution in each file.
-    pub(super) fn deduplicate_by_dependency(&mut self, distribution: CompactString) {
-        self.dependency = Some(distribution);
-    }
-
     /// Set the message on the primary annotation for this diagnostic.
     ///
     /// If a message already exists on the primary annotation, then this
@@ -546,12 +539,7 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
             });
         }
 
-        let mut diagnostics = self.ctx.diagnostics.borrow_mut();
-        if let Some(dependency) = self.dependency.take() {
-            diagnostics.push_missing_dependency(dependency, diag);
-        } else {
-            diagnostics.push(diag);
-        }
+        self.ctx.diagnostics.borrow_mut().push(diag);
     }
 }
 
@@ -703,7 +691,6 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
             source: self.source,
             diag: Some(diag),
             message_override,
-            dependency: None,
         }
     }
 
