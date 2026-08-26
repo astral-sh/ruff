@@ -4090,6 +4090,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            // Each alternative in a tuple union contributes constraints. The element-wise
+            // tuple path below only accepts a single actual tuple, while the constraint solver
+            // handles the entire union. Variadic type parameters still require legacy inference.
+            (formal @ Type::NominalInstance(formal_instance), actual @ Type::Union(_))
+                if formal_instance.tuple_spec(db, self.env).is_some()
+                    && !self
+                        .inferable
+                        .iter(db)
+                        .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db)) =>
+            {
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                return self.infer_from_constraint_set(when);
+            }
+
             // Special case: `formal` and `actual` are both tuples.
             (Type::NominalInstance(formal), Type::NominalInstance(actual))
                 if let Some(formal_tuple) = formal.tuple_spec(db, self.env)
