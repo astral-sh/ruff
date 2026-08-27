@@ -725,7 +725,9 @@ mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
-    use ruff_db::testing::assert_function_query_was_not_run_by_name;
+    use ruff_db::testing::{
+        assert_function_query_was_not_run_by_name, find_will_execute_event_by_name,
+    };
     use ruff_python_ast::PythonVersion;
     use ruff_ranged_value::ValueSource;
     use salsa::Setter as _;
@@ -786,7 +788,8 @@ mod tests {
                     "kind": "package", "name": "app",
                     "dependencies": dependencies.iter().map(|id| json!({"id": id})).collect::<Vec<_>>()
                 },
-                "dependency": {"kind": "package", "name": "dependency", "dependencies": []}
+                "dependency": {"kind": "package", "name": "dependency", "dependencies": []},
+                "unrelated": {"kind": "package", "name": "unrelated", "dependencies": []}
             },
             "module_owners": {"dependency": [{"package_id": "dependency"}]}
         });
@@ -815,7 +818,10 @@ mod tests {
         let project = db.project();
         let main = system_path_to_file(&db, project.root(&db).join("main.py"))?;
         assert!(db.check_file(main).is_empty());
-        db.take_salsa_events();
+        let events = db.take_salsa_events();
+        assert!(
+            find_will_execute_event_by_name(&db, "infer_scope_types_impl", None, &events).is_some()
+        );
 
         // Changing the project's display name does not change its dependency declarations.
         let mut metadata = project.metadata(&db).clone();
@@ -823,8 +829,19 @@ mod tests {
         project.set_metadata(&mut db).to(Box::new(metadata));
         assert!(db.check_file(main).is_empty());
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(&db, "infer_scope_types", None, &events);
+        assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
 
+        // A new declaration changes the metadata, but not whether this import is allowed.
+        set_dependency_metadata(&mut db, &["dependency", "unrelated"])?;
+        assert!(db.check_file(main).is_empty());
+        let events = db.take_salsa_events();
+        assert!(
+            find_will_execute_event_by_name(&db, "missing_direct_dependency", None, &events)
+                .is_some()
+        );
+        assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
+
+        // Removing the imported dependency must invalidate inference and report the import.
         set_dependency_metadata(&mut db, &[])?;
         let diagnostics = db.check_file(main);
         assert_eq!(diagnostics.len(), 1);
@@ -833,6 +850,20 @@ mod tests {
                 .id()
                 .is_lint_named("missing-direct-dependency")
         );
+        let events = db.take_salsa_events();
+        assert!(
+            find_will_execute_event_by_name(&db, "infer_scope_types_impl", None, &events).is_some()
+        );
+
+        // Unrelated declarations also preserve inference when the import is already an error.
+        set_dependency_metadata(&mut db, &["unrelated"])?;
+        assert_eq!(db.check_file(main), diagnostics);
+        let events = db.take_salsa_events();
+        assert!(
+            find_will_execute_event_by_name(&db, "missing_direct_dependency", None, &events)
+                .is_some()
+        );
+        assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
 
         set_dependency_metadata(&mut db, &["dependency"])?;
         assert!(db.check_file(main).is_empty());

@@ -1015,7 +1015,9 @@ mod tests {
 
         assert!(db.check_file(file).is_empty());
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(&db, "dependency_metadata", None, &events);
+        for query in ["missing_direct_dependency", "Project::dependency_metadata_"] {
+            assert_function_query_was_not_run_by_name(&db, query, None, &events);
+        }
 
         Ok(())
     }

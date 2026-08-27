@@ -11,6 +11,20 @@ use ty_python_core::ProgramFile;
 
 use crate::Db;
 
+/// Returns the missing dependency for this import, if one can be identified.
+///
+/// Cache the diagnostic details so metadata changes do not invalidate import inference when
+/// the result for this importing file and module is unchanged.
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn missing_direct_dependency<'db>(
+    db: &'db dyn Db,
+    importing_file: ProgramFile<'db>,
+    imported_module: Module<'db>,
+) -> Option<MissingDependency> {
+    let metadata = db.dependency_metadata(importing_file.file(db))?;
+    metadata.missing_dependency(db, importing_file, imported_module)
+}
+
 /// The dependency information needed to check imports, without source ranges or lockfile details.
 ///
 /// Distribution keys are opaque package-manager IDs. Keeping those IDs avoids conflating packages
@@ -31,12 +45,12 @@ impl DependencyMetadata {
     ///
     /// Return the missing dependency, or `None` if the import is allowed or its project or
     /// owning distribution cannot be identified.
-    pub(crate) fn missing_dependency<'db>(
-        &'db self,
+    fn missing_dependency<'db>(
+        &self,
         db: &'db dyn Db,
         importing_file: ProgramFile<'db>,
         imported_module: Module<'db>,
-    ) -> Option<MissingDependency<'db>> {
+    ) -> Option<MissingDependency> {
         let path = importing_file.file(db).path(db).as_system_path()?;
         let project = self
             .projects
@@ -68,7 +82,7 @@ impl DependencyMetadata {
         }
 
         Some(MissingDependency {
-            distribution: self.distributions.get(id)?,
+            distribution_name: self.distributions.get(id)?.name.clone(),
             group_dependency,
         })
     }
@@ -194,7 +208,8 @@ pub struct DependencyDistribution {
     pub editable_path: Option<SystemPathBuf>,
 }
 
-pub(crate) struct MissingDependency<'a> {
-    pub(crate) distribution: &'a DependencyDistribution,
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct MissingDependency {
+    pub(crate) distribution_name: CompactString,
     pub(crate) group_dependency: bool,
 }

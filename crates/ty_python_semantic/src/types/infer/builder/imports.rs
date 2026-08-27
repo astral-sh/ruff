@@ -7,6 +7,7 @@ use ty_module_resolver::{
 
 use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
+    dependency::missing_direct_dependency,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
@@ -63,10 +64,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
-        let Some(metadata) = db.dependency_metadata(self.file()) else {
-            return;
-        };
-        let Some(missing) = metadata.missing_dependency(db, self.program_file(), module) else {
+        let Some(missing) = missing_direct_dependency(db, self.program_file(), module) else {
             return;
         };
 
@@ -77,11 +75,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Import of `{}` requires a direct dependency on `{}`",
             module.name(db),
-            missing.distribution.name,
+            missing.distribution_name,
         ));
         diagnostic.help(format_args!(
             "Declare `{}` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`",
-            missing.distribution.name,
+            missing.distribution_name,
         ));
         if missing.group_dependency {
             diagnostic.info("Dependency groups are only available to non-package files");
