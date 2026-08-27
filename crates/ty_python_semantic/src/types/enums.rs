@@ -1531,9 +1531,27 @@ fn inherited_user_defined_mixin_new<'db>(
         .iter_mro(db, None)
         .skip(1)
         .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.class_literal(db).as_static())
-        .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
+        .find_map(|class_type| {
+            let (base, specialization) = class_type.static_class_literal(db)?;
+            if base.known(db).is_some() {
+                return None;
+            }
+            let binding = custom_enum_method(db, base.body_scope(db), "__new__")?;
+            // The mixin may be inherited as a specialized generic alias (`Mixin[str]`). Apply that
+            // specialization, so that members are checked against the specialized `__new__`
+            // signature instead of one with free typevars.
+            let EnumMethodBinding::Function(function) = binding else {
+                return Some(EnumMethodBinding::Opaque);
+            };
+            Some(
+                match Type::FunctionLiteral(function)
+                    .apply_optional_owner_specialization_to_member(db, specialization)
+                {
+                    Type::FunctionLiteral(function) => EnumMethodBinding::Function(function),
+                    _ => EnumMethodBinding::Opaque,
+                },
+            )
+        })
 }
 
 /// Looks up a resolvable method inherited from a known enum class.
