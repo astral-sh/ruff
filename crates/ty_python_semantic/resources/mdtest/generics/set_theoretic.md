@@ -626,3 +626,75 @@ class Child[T](Co[T]): ...
 def generic[T]() -> None:
     static_assert(is_equivalent_to(Co[T] & Child[object], Child[T]))
 ```
+
+### Specializations with indirect gradual types
+
+A type alias can introduce a gradual argument indirectly. Intersecting with a top-materialized
+subclass must not discard the base's gradual member types:
+
+```pyi
+from typing import Any, reveal_type
+from ty_extensions import Top
+
+class Co[T]:
+    def get(self) -> T: ...
+
+class Child[T](Co[T]):
+    def put(self, value: T) -> None: ...
+
+type Dynamic = Any
+
+def alias(value: Co[Dynamic] & Top[Child[Any]]) -> str:
+    reveal_type(value)  # revealed: Co[Dynamic] & Top[Child[Any]]
+    reveal_type(value.get())  # revealed: Any
+    return value.get()
+```
+
+### Specializations with recursive types
+
+Fully static recursive types still allow simplification. Evaluating protocol attributes and
+`TypedDict` fields can itself require simplifying intersections that refer back to those types:
+
+```pyi
+from typing import Protocol, TypedDict, reveal_type
+
+class Co[T]:
+    def get(self) -> T: ...
+
+class Child[T](Co[T]): ...
+
+type RecursiveAlias = int | list[RecursiveAlias]
+
+class RecursiveProtocol(Protocol):
+    child: Co[RecursiveProtocol] & Child[object]
+
+class RecursiveRecord(TypedDict):
+    child: Co[RecursiveRecord] & Child[object]
+
+def _(
+    alias: Co[RecursiveAlias] & Child[object],
+    protocol: Co[RecursiveProtocol] & Child[object],
+    record: Co[RecursiveRecord] & Child[object],
+):
+    reveal_type(alias)  # revealed: Child[int | list[RecursiveAlias]]
+    reveal_type(protocol)  # revealed: Child[RecursiveProtocol]
+    reveal_type(record)  # revealed: Child[RecursiveRecord]
+```
+
+Recursive generic specializations can grow on each step, so we conservatively leave these
+intersections unsimplified. Checking only for repeated specializations does not prevent infinite
+expansion:
+
+```pyi
+type GrowingAlias[T] = T | list[Co[GrowingAlias[list[T]]] & Child[object]]
+
+class GrowingRecord[T](TypedDict):
+    child: Co[GrowingRecord[list[T]]] & Child[object]
+
+def _(
+    alias: Co[GrowingAlias[int]] & Child[object],
+    record: Co[GrowingRecord[int]] & Child[object],
+):
+    reveal_type(alias)  # revealed: Co[GrowingAlias[int]] & Child[object]
+    reveal_type(record)  # revealed: Co[GrowingRecord[int]] & Child[object]
+```

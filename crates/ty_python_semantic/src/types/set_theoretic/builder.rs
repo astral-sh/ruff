@@ -39,9 +39,10 @@
 use std::hint::cold_path;
 
 use super::RecursivelyDefined;
-use super::generic_gradual_intersections::generic_gradual_intersection;
+use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
@@ -1071,6 +1072,17 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+                // Preserving aliases also excludes comparisons that expand aliases nested in
+                // type arguments. A recursive alias can rebuild this union during specialization.
+                if !self.unpack_aliases
+                    && [ty, element_type].into_iter().any(|ty| {
+                        any_over_type(db, &self.env, ty, false, |ty| {
+                            matches!(ty, Type::TypeAlias(_))
+                        })
+                    })
+                {
+                    continue;
+                }
                 if ty.is_redundant_with(db, &self.env, element_type) {
                     return;
                 }
@@ -1626,9 +1638,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 let mut replacement = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
-                    if let Some(merged) =
+                    if let Some(result) =
                         generic_gradual_intersection(db, env, new_positive, *existing_positive)
                     {
+                        let GenericIntersection::Simplified(merged) = result else {
+                            continue;
+                        };
                         if merged == *existing_positive {
                             return;
                         }
