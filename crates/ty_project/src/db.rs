@@ -18,7 +18,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::system_module_search_paths;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
+use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy};
 use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
@@ -120,18 +120,23 @@ impl ProjectDatabase {
         )
     }
 
-    /// Creates a new database, substituting default values for any misconfigured settings.
-    pub fn use_defaults<S>(project_metadata: ProjectMetadata, system: S) -> Self
+    /// Creates a database that records name loads during inference.
+    ///
+    /// The strategy determines how misconfigured settings are handled.
+    pub fn with_place_load_recording<S, Strategy: MisconfigurationStrategy>(
+        project_metadata: ProjectMetadata,
+        system: S,
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<anyhow::Error>>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let Ok(db) = Self::new(
+        Self::new(
             project_metadata,
             system,
-            PlaceLoadRecordingMode::default(),
-            &UseDefaultStrategy,
-        );
-        db
+            PlaceLoadRecordingMode::Enabled,
+            strategy,
+        )
     }
 
     /// Permanently freezes the most heavily read inputs that are immutable during a one-shot check.
