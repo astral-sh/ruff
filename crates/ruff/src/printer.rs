@@ -52,7 +52,7 @@ impl ExpandedStatistics<'_> {
     }
 }
 
-/// Accumulator type for grouping diagnostics by code or rule name.
+/// Accumulator type for grouping diagnostics by name.
 /// Format: (`code`, `representative_diagnostic`, `total_count`, `fixable_count`)
 type DiagnosticGroup<'a> = (Option<&'a SecondaryCode>, &'a Diagnostic, usize, usize);
 
