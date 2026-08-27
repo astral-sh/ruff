@@ -1243,6 +1243,36 @@ reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
 ```
 
+### Methods with default type parameters
+
+Methods on generic named tuples honor explicit type arguments that override their defaults,
+including when accessed through a subclass. The `_make` class method returns the specialized
+receiver type.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import NamedTuple
+
+class Box[T = int](NamedTuple):
+    value: T
+
+class Child[T = int](Box[T]):
+    pass
+
+def methods(box: Box[str], child: Child[str]) -> None:
+    reveal_type(box._asdict())  # revealed: dict[str, Any]
+    reveal_type(child._asdict())  # revealed: dict[str, Any]
+    reveal_type(Box[str]._make(("value",)))  # revealed: Box[str]
+    reveal_type(Child[str]._make(("value",)))  # revealed: Child[str]
+
+reveal_type(Box._make((1,)))  # revealed: Box[int]
+reveal_type(Child._make((1,)))  # revealed: Child[int]
+```
+
 ### Functional syntax with generics
 
 Generic namedtuples can also be defined using the functional syntax with type variables in the field
