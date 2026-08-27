@@ -40,6 +40,7 @@ help: Replace with `Path("file.txt").write_bytes(foobar)`
 17 + pathlib.Path("file.txt").write_bytes(foobar)
 18 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(b"abc")`
   --> FURB103_0.py:20:6
@@ -80,6 +81,7 @@ help: Replace with `Path("file.txt").write_text(foobar, encoding="utf8")`
 25 + pathlib.Path("file.txt").write_text(foobar, encoding="utf8")
 26 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, errors="ignore")`
   --> FURB103_0.py:28:6
@@ -100,6 +102,7 @@ help: Replace with `Path("file.txt").write_text(foobar, errors="ignore")`
 29 + pathlib.Path("file.txt").write_text(foobar, errors="ignore")
 30 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar)`
   --> FURB103_0.py:32:6
@@ -120,6 +123,7 @@ help: Replace with `Path("file.txt").write_text(foobar)`
 33 + pathlib.Path("file.txt").write_text(foobar)
 34 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 `open` and `write` should be replaced by `Path(foo()).write_bytes(bar())`
   --> FURB103_0.py:36:6
@@ -184,6 +188,7 @@ help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
 59 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
 60 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
   --> FURB103_0.py:66:6
@@ -205,6 +210,7 @@ help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
 67 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
 68 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
   --> FURB103_0.py:74:6
@@ -226,6 +232,7 @@ help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
 75 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
 76 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("test.json")....`
    --> FURB103_0.py:154:6
@@ -248,6 +255,7 @@ help: Replace with `Path("test.json")....`
 155 + pathlib.Path("test.json").write_bytes(json.dumps(data, indent=4).encode("utf-8"))
 156 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("tmp_path/pyproject.toml")....`
    --> FURB103_0.py:158:6
@@ -269,4 +277,93 @@ help: Replace with `Path("tmp_path/pyproject.toml")....`
     -     f.write(dedent(
 159 + pathlib.Path("tmp_path/pyproject.toml").write_text(dedent(
 160 |         """
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(x)`
+   --> FURB103_0.py:176:10
+    |
+174 | def annotated_str_arg(x: str):
+175 |     # FURB103 (safe fix: `x` is known to be `str`)
+176 |     with open("file.txt", "w") as f:
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+177 |         f.write(x)
+    |
+help: Replace with `Path("file.txt").write_text(x)`
+    |
+150 | import json
+151 + import pathlib
+152 |
+--------------------------------------------------------------------------------
+176 |     # FURB103 (safe fix: `x` is known to be `str`)
+    -     with open("file.txt", "w") as f:
+    -         f.write(x)
+177 +     pathlib.Path("file.txt").write_text(x)
+178 |
+    |
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(x)`
+   --> FURB103_0.py:182:10
+    |
+180 | def annotated_bytes_arg(x: bytes):
+181 |     # FURB103 (safe fix: `x` is known to be `bytes`)
+182 |     with open("file.txt", "wb") as f:
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+183 |         f.write(x)
+    |
+help: Replace with `Path("file.txt").write_bytes(x)`
+    |
+150 | import json
+151 + import pathlib
+152 |
+--------------------------------------------------------------------------------
+182 |     # FURB103 (safe fix: `x` is known to be `bytes`)
+    -     with open("file.txt", "wb") as f:
+    -         f.write(x)
+183 +     pathlib.Path("file.txt").write_bytes(x)
+184 |
+    |
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(x)`
+   --> FURB103_0.py:188:10
+    |
+186 | def annotated_int_arg(x: int):
+187 |     # FURB103 (unsafe fix: `x` is not a `str`)
+188 |     with open("file.txt", "w") as f:
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+189 |         f.write(x)
+    |
+help: Replace with `Path("file.txt").write_text(x)`
+    |
+150 | import json
+151 + import pathlib
+152 |
+--------------------------------------------------------------------------------
+188 |     # FURB103 (unsafe fix: `x` is not a `str`)
+    -     with open("file.txt", "w") as f:
+    -         f.write(x)
+189 +     pathlib.Path("file.txt").write_text(x)
+190 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(f"{1 / 0}")`
+   --> FURB103_0.py:197:6
+    |
+195 | # constructed before `Path.write_text` is ever called, so this doesn't introduce the
+196 | # truncation-ordering hazard the safety check above exists to catch.
+197 | with open("file.txt", "w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+198 |     f.write(f"{1 / 0}")
+    |
+help: Replace with `Path("file.txt").write_text(f"{1 / 0}")`
+    |
+150 | import json
+151 + import pathlib
+152 |
+--------------------------------------------------------------------------------
+197 | # truncation-ordering hazard the safety check above exists to catch.
+    - with open("file.txt", "w") as f:
+    -     f.write(f"{1 / 0}")
+198 + pathlib.Path("file.txt").write_text(f"{1 / 0}")
     |
