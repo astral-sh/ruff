@@ -12673,7 +12673,7 @@ impl<'a> Iterator for ArgumentsIter<'a> {
 
 /// The deferred state of a specific expression in an inference region.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) enum DeferredExpressionState {
+pub enum DeferredExpressionState {
     /// The expression is not deferred.
     #[default]
     None,
