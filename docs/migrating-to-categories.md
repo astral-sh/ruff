@@ -21,7 +21,8 @@ These are arranged in roughly descending order of severity, with `correctness` l
 most severe issues with the highest confidence and `restriction` lints preventing you from using
 basic features of the language like `assert` (`S101`) or `print` (`T201`). In line with that
 hierarchy, the first five categories (`correctness`, `suspicious`, `complexity`, `performance`, and
-`style`) are enabled by default.
+`style`) are enabled by default. See [Rules by Category](rules-by-category.md) for a full list of
+rules in each category.
 
 ## Rules of thumb
 
