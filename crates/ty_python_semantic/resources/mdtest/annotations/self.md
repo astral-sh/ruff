@@ -1453,6 +1453,19 @@ class Aliased:
 reveal_type(Aliased().copy)
 ```
 
+`Self` also binds in a parameter annotation when the return type does not contain `Self`:
+
+```py
+class ParameterOnly:
+    def consume(self, other: Identity[Self]) -> None: ...
+
+# revealed: bound method ParameterOnly.consume(other: ParameterOnly) -> None
+reveal_type(ParameterOnly().consume)
+
+ParameterOnly().consume(ParameterOnly())
+ParameterOnly().consume(object())  # error: [invalid-argument-type]
+```
+
 In nested functions `self` binds to the method. So in the following example the `self` in `C.b` is
 bound at `C.f`.
 
