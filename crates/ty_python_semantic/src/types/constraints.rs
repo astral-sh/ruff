@@ -1915,9 +1915,8 @@ impl<'db> Constraint<'db> {
 
     /// Returns the effective lower endpoint with its provenance.
     ///
-    /// [`Self::stored_lower_bound`] returns `None` when no lower bound is stored; this method
-    /// instead supplies `Validity(Never)`. A stored `Evidence(Never)` is returned unchanged.
-    /// Use the stored accessor to test for absence or copy bounds without inserting defaults.
+    /// An absent endpoint defaults to `Validity(Never)`. Explicit `Evidence(Never)` is returned
+    /// unchanged.
     fn lower_bound(self) -> ConstraintBound<'db> {
         self.stored_lower_bound()
             .unwrap_or_else(ConstraintBound::missing_lower)
@@ -1925,18 +1924,23 @@ impl<'db> Constraint<'db> {
 
     /// Returns the effective upper endpoint with its provenance.
     ///
-    /// [`Self::stored_upper_bound`] returns `None` when no upper bound is stored; this method
-    /// instead supplies `Validity(object)`. A stored `Evidence(object)` is returned unchanged.
-    /// Use the stored accessor to test for absence or copy bounds without inserting defaults.
+    /// An absent endpoint defaults to `Validity(object)`. Explicit `Evidence(object)` is returned
+    /// unchanged.
     fn upper_bound(self) -> ConstraintBound<'db> {
         self.stored_upper_bound()
             .unwrap_or_else(ConstraintBound::missing_upper)
     }
 
+    /// Returns the stored lower endpoint with its provenance, or `None` if absent.
+    ///
+    /// Use this to test for absence or copy bounds without inserting a default.
     fn stored_lower_bound(self) -> Option<ConstraintBound<'db>> {
         self.bounds.lower
     }
 
+    /// Returns the stored upper endpoint with its provenance, or `None` if absent.
+    ///
+    /// Use this to test for absence or copy bounds without inserting a default.
     fn stored_upper_bound(self) -> Option<ConstraintBound<'db>> {
         self.bounds.upper
     }
