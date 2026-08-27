@@ -3640,10 +3640,28 @@ def color_name_misses_one_variant(color: Color) -> str:
         assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 ```
 
+A functional enum inherits `object.__eq__`, so comparing members with `==` and `!=` narrows just as
+`is` does:
+
+```py
+def equality(color: Color) -> None:
+    if color == Color.RED:
+        reveal_type(color)  # revealed: Literal[Color.RED]
+    else:
+        reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def inequality(color: Color) -> None:
+    if color != Color.RED:
+        reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    else:
+        reveal_type(color)  # revealed: Literal[Color.RED]
+```
+
 ## `match` statements (function syntax)
 
-TODO: `match` exhaustiveness does not yet work for functional enums. The pattern matching narrowing
-path does not resolve functional enum members the same way `is` comparisons do.
+Value patterns narrow members of a functional enum exactly as they do for an enum declared with
+class syntax. A `match` that covers every member is exhaustive, so the wildcard case is unreachable
+and `assert_never` holds:
 
 ```toml
 [environment]
@@ -3656,19 +3674,22 @@ from typing_extensions import assert_never
 
 Color = Enum("Color", "RED GREEN BLUE")
 
-# TODO: `assert_never` should not fire here (exhaustive match).
 def color_name(color: Color) -> str:
     match color:
         case Color.RED:
+            reveal_type(color)  # revealed: Literal[Color.RED]
             return "Red"
         case Color.GREEN:
             return "Green"
         case Color.BLUE:
             return "Blue"
         case _:
-            assert_never(color)  # error: [type-assertion-failure]
+            assert_never(color)
+```
 
-# TODO: This should ideally emit `Literal[Color.BLUE]` in the assertion, not `Color`.
+When a member is left uncovered, the wildcard case receives exactly that member:
+
+```py
 def color_name_misses_one_variant(color: Color) -> str:
     match color:
         case Color.RED:
@@ -3676,7 +3697,7 @@ def color_name_misses_one_variant(color: Color) -> str:
         case Color.GREEN:
             return "Green"
         case _:
-            assert_never(color)  # error: [type-assertion-failure] "Type `Color` is not equivalent to `Never`"
+            assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 ```
 
 ## `__eq__` and `__ne__`

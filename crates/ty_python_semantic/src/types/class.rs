@@ -713,7 +713,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(class) => class.class_member(db, env, name, policy),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, env, name, policy),
             Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, env, name, policy),
-            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name),
+            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name, policy),
         }
     }
 
