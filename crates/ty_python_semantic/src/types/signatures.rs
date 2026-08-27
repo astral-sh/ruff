@@ -1326,7 +1326,7 @@ impl<'db> Signature<'db> {
             if let Some(bounds) = bounds
                 && let Some(lower) = bounds.evidence_lower()
                 && bounds.has_upper_evidence()
-                && let Some(upper) = bounds.single_upper_bound(db, env)
+                && let Some(upper) = bounds.as_single_upper_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
                     PathBounds::default_solve(db, env, &constraints, bounds).as_type()

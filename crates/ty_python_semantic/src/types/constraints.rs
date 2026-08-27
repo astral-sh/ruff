@@ -1913,13 +1913,21 @@ impl<'db> Constraint<'db> {
         self.typevar
     }
 
-    /// Returns the effective lower endpoint, supplying a validity bound when none was provided.
+    /// Returns the effective lower endpoint with its provenance.
+    ///
+    /// [`Self::stored_lower_bound`] returns `None` when no lower bound is stored; this method
+    /// instead supplies `Validity(Never)`. A stored `Evidence(Never)` is returned unchanged.
+    /// Use the stored accessor to test for absence or copy bounds without inserting defaults.
     fn lower_bound(self) -> ConstraintBound<'db> {
         self.stored_lower_bound()
             .unwrap_or_else(ConstraintBound::missing_lower)
     }
 
-    /// Returns the effective upper endpoint, supplying a validity bound when none was provided.
+    /// Returns the effective upper endpoint with its provenance.
+    ///
+    /// [`Self::stored_upper_bound`] returns `None` when no upper bound is stored; this method
+    /// instead supplies `Validity(object)`. A stored `Evidence(object)` is returned unchanged.
+    /// Use the stored accessor to test for absence or copy bounds without inserting defaults.
     fn upper_bound(self) -> ConstraintBound<'db> {
         self.stored_upper_bound()
             .unwrap_or_else(ConstraintBound::missing_upper)
@@ -2039,6 +2047,9 @@ impl<'db> ConstraintBound<'db> {
 
     /// Applies the source range's provenance to an evidence bound derived by comparing that range.
     /// Bounds not produced by the comparison retain their existing provenance.
+    ///
+    /// Missing source endpoints supply only validity bounds, so the derived bound remains evidence
+    /// exactly when at least one stored source endpoint is evidence.
     fn with_source_provenance(self, source: Constraint<'db>) -> Self {
         match self {
             Self::Evidence(ty)
@@ -3899,7 +3910,7 @@ impl<'db> PathBound<'db> {
     }
 
     /// Returns one effective upper bound without expanding factored intersections.
-    pub(crate) fn single_upper_bound(
+    pub(crate) fn as_single_upper_bound(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4585,7 +4596,7 @@ impl<'db> PathBounds<'db> {
 
                 if let (ty @ Type::TypeVar(_), _) | (_, Some(ty @ Type::TypeVar(_))) = (
                     path_bound.effective_lower(db, env),
-                    path_bound.single_upper_bound(db, env),
+                    path_bound.as_single_upper_bound(db, env),
                 ) {
                     // This path relates two TypeVars, such as passing `S` to a parameter typed as
                     // `T: (int, str)`. The compatibility check above has verified that at least
