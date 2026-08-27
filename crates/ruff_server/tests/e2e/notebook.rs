@@ -208,6 +208,11 @@ fn super_resolution_overview() -> Result<()> {
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_dir)?
+        .with_initialization_options(serde_json::json!({
+            "settings": {
+                "configurationPreference": "editorOnly"
+            }
+        }))
         .build();
 
     let (notebook_document, cell_text_documents) =
@@ -381,6 +386,11 @@ fn notebook_without_ipynb_extension() -> Result<()> {
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_dir)?
+        .with_initialization_options(serde_json::json!({
+            "settings": {
+                "configurationPreference": "editorOnly"
+            }
+        }))
         .build();
 
     let (notebook_document, cell_text_documents) =
