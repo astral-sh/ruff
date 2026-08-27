@@ -1130,7 +1130,7 @@ mod tests {
 
     fn make_exclusion(file_pattern: FilePattern) -> GlobSet {
         let mut builder = globset::GlobSetBuilder::new();
-        file_pattern.add_to(&mut builder).unwrap();
+        file_pattern.add_to(&mut builder, 0).unwrap();
         builder.build().unwrap()
     }
 
