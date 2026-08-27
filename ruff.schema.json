@@ -446,7 +446,7 @@
       ]
     },
     "ignore": {
-      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.",
+      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
       "type": [
         "array",
         "null"
@@ -691,7 +691,7 @@
       ]
     },
     "select": {
-      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
+      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
       "type": [
         "array",
         "null"
@@ -2451,7 +2451,7 @@
           ]
         },
         "ignore": {
-          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.",
+          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
           "type": [
             "array",
             "null"
@@ -2609,7 +2609,7 @@
           ]
         },
         "select": {
-          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
+          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
           "type": [
             "array",
             "null"
