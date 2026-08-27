@@ -487,3 +487,26 @@ def call_argument(value: MutableTruthiness):
     if bool((value and False) and reveal_type(value)):  # revealed: MutableTruthiness & ~AlwaysFalsy
         pass
 ```
+
+An assignment expression evaluates its right-hand side as a value before testing the assigned
+object. Nested boolean operations on that right-hand side can therefore re-test an intermediate
+result, even when the assignment expression is a condition.
+
+```py
+def assignment_expression(value: MutableTruthiness, marker: int):
+    if saved := (value and False) and reveal_type(marker):  # revealed: int
+        pass
+```
+
+A comprehension's filters are conditions, but its element is evaluated as a value, even when the
+comprehension itself controls a branch.
+
+```py
+def comprehension_element(value: MutableTruthiness, marker: int):
+    if [
+        (value and False) and reveal_type(marker)  # revealed: int
+        for _ in range(1)
+        if value or True
+    ]:
+        pass
+```
