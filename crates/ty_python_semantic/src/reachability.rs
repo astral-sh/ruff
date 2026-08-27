@@ -1658,10 +1658,9 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truth
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     analyze_condition_expression(expression.node_ref(db).node(&module), &|node| {
-        inference.comparison_truthiness(node).or_else(|| {
-            let ty = inference.expression_type(node);
-            (!ty.is_equivalent_to(db, &env, Type::Never)).then(|| ty.bool(db, &env))
-        })
+        inference
+            .comparison_truthiness(node)
+            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
     })
     .unwrap_or(Truthiness::Ambiguous)
 }
