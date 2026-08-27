@@ -638,6 +638,44 @@ static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 ```
 
+#### Final attributes in stubs
+
+Stub attributes declared as `Final` are read-only, whether their declarations omit an initializer or
+use an ellipsis placeholder. A type parameter used only in such an attribute is covariant, while one
+used in an ordinary writable attribute is invariant.
+
+`box.pyi`:
+
+```pyi
+from typing import Final
+
+class Box[T]:
+    value: Final[T]
+
+class BoxWithPlaceholder[T]:
+    value: Final[T] = ...
+
+class MutableBox[T]:
+    value: T
+```
+
+`main.py`:
+
+```py
+from box import Box, BoxWithPlaceholder, MutableBox
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+static_assert(is_subtype_of(Box[int], Box[object]))
+static_assert(not is_subtype_of(Box[object], Box[int]))
+
+static_assert(is_subtype_of(BoxWithPlaceholder[int], BoxWithPlaceholder[object]))
+static_assert(not is_subtype_of(BoxWithPlaceholder[object], BoxWithPlaceholder[int]))
+
+static_assert(not is_subtype_of(MutableBox[int], MutableBox[object]))
+static_assert(not is_subtype_of(MutableBox[object], MutableBox[int]))
+```
+
 #### Underscore-prefixed attributes
 
 Underscore-prefixed instance attributes are considered private, and thus are assumed not externally
