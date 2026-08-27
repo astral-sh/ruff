@@ -4452,6 +4452,51 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
+## `Self` in generic type aliases during protocol matching
+
+Wrapping `Self` in a generic type alias does not change what it denotes. Method parameters and
+return types are bound to the structural implementation before their signatures are compared.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+type Identity[T] = T
+
+class Cloneable(Protocol):
+    def clone(self, other: Identity[Self]) -> Identity[Self]: ...
+
+class AliasedClone:
+    def clone(self, other: Identity[Self]) -> Identity[Self]:
+        return other
+
+class DirectClone:
+    def clone(self, other: Self) -> Self:
+        return other
+
+aliased: Cloneable = AliasedClone()
+direct: Cloneable = DirectClone()
+```
+
+The same binding applies to a property return type:
+
+```py
+class Current(Protocol):
+    @property
+    def current(self) -> Identity[Self]: ...
+
+class CurrentImpl:
+    @property
+    def current(self) -> Identity[Self]:
+        return self
+
+current: Current = CurrentImpl()
+```
+
 ## `Self`-returning instance methods in `ParamSpec` protocols
 
 Specializing a protocol's `ParamSpec` preserves the meaning of `Self`: the return type names the

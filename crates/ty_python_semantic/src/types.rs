@@ -1921,8 +1921,19 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        any_over_type(db, env, self, false, |ty| {
-            ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
+        any_over_type(db, env, self, false, |ty| match ty {
+            Type::TypeVar(typevar) => typevar.typevar(db).is_self(db),
+            Type::TypeAlias(alias) => {
+                // Type alias bodies cannot declare `Self`, but their explicit type arguments can
+                // contain the `Self` from an enclosing method or class.
+                alias.specialization(db).is_some_and(|specialization| {
+                    specialization
+                        .types(db)
+                        .iter()
+                        .any(|ty| ty.contains_self(db, env))
+                })
+            }
+            _ => false,
         })
     }
 
