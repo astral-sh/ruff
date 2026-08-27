@@ -63,7 +63,7 @@ also goes for `restriction`, which contains even more restrictive rules.
 
 It's not quite a one-liner, but once you've upgraded to a Ruff version that supports categories, you
 can generate a report on your current usage of each category with a command like the following
-(assuming you're using a shell like bash or zsh and have jq installed):
+(assuming you're using a shell like bash or zsh and have [jq](https://jqlang.org/) installed):
 
 ```console
  $ jq -sr '
@@ -79,7 +79,7 @@ can generate a report on your current usage of each category with a command like
   <(ruff rule --all --output-format=json)
 ```
 
-On the Ruff repository itself, this produces output like:
+This produces output like:
 
 ```text
 correctness 74 (56%)
