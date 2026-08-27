@@ -710,6 +710,26 @@ def assign_read(value: LeftReadProtocol[int]) -> RightReadProtocol[int]:
     return value  # error: [invalid-return-type]
 ```
 
+A descriptor stored on a nominal class can also expose a recursively specialized instance through
+its getter. Checking that instance against a recursive protocol must terminate.
+
+```py
+class NominalDescriptor[T]:
+    def __get__(self, instance: object, owner: type | None = None) -> NominalImpl[list[T]]:
+        raise NotImplementedError
+
+class NominalImpl[T]:
+    child = NominalDescriptor[T]()
+
+class NominalProtocol[T](Protocol):
+    child: NominalProtocol[list[T]]
+
+def assign_nominal(value: NominalImpl[int]) -> NominalProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
 Writable descriptor members expose the recursive specialization contravariantly. The comparison
 therefore alternates direction before returning to the same pair of protocol definitions.
 
@@ -735,6 +755,62 @@ class RightWriteProtocol[T](Protocol):
     def child(self, value: object) -> None: ...
 
 def assign_write(value: LeftWriteProtocol[int]) -> RightWriteProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+A descriptor stored on a nominal class can expose the same recursive specialization through its
+setter. Checking its writable member against a protocol must terminate.
+
+```py
+class NominalWriteDescriptor[T]:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+    def __set__(self, instance: object, value: NominalWriteProtocol[list[T]]) -> None: ...
+
+class ProtocolWriteDescriptor[T]:
+    def __init__(self, setter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+    def __set__(self, instance: object, value: NominalWriteImpl[list[T]]) -> None: ...
+
+class NominalWriteImpl[T]:
+    child = NominalWriteDescriptor[T]()
+
+class NominalWriteProtocol[T](Protocol):
+    @ProtocolWriteDescriptor[T]
+    def child(self, value: object) -> None: ...
+
+def assign_nominal_write(
+    value: NominalWriteImpl[int],
+) -> NominalWriteProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+The setter of a `property` exposes its value parameter as the writable member type. Checking a
+recursive nominal property against a protocol property must terminate.
+
+```py
+class NominalPropertyImpl[T]:
+    @property
+    def child(self) -> int:
+        return 0
+
+    @child.setter
+    def child(self, value: NominalPropertyProtocol[list[T]]) -> None: ...
+
+class NominalPropertyProtocol[T](Protocol):
+    @property
+    def child(self) -> int: ...
+    @child.setter
+    def child(self, value: NominalPropertyImpl[list[T]]) -> None: ...
+
+def assign_nominal_property(
+    value: NominalPropertyImpl[int],
+) -> NominalPropertyProtocol[int]:
     # TODO: This should be accepted once recursive structural relations can represent an
     # indeterminate result instead of conservatively rejecting the recursive pair.
     return value  # error: [invalid-return-type]

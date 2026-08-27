@@ -32,10 +32,15 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
+use crate::types::attribute_write::{
+    AttributeWriteRequirement, ExplicitAttributeWriteRequirement, InstanceAttributeWriteMember,
+    attribute_write_requirement,
+};
 use crate::types::class::ClassLiteral;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::list_members::all_end_of_scope_members;
+use crate::types::protocol_class::property_set_type;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, StaticClassLiteral, SubclassOfInner,
@@ -659,9 +664,11 @@ impl<'db> SpecializationFlowVisitor<'db> {
             self.visit_type(db, *base);
         }
 
+        let instance = Type::instance(db, &self.env, origin.identity_specialization(db));
         let body_scope = origin.body_scope(db);
         for memberdef in all_end_of_scope_members(db, body_scope) {
-            self.visit_nominal_member(db, memberdef.member.name.as_str(), memberdef.member.ty);
+            let name = memberdef.member.name.as_str();
+            self.visit_nominal_member_types(db, instance, name);
         }
 
         // Instance attributes implicitly defined by `self.x = ...` assignments in methods.
@@ -680,6 +687,40 @@ impl<'db> SpecializationFlowVisitor<'db> {
         }
     }
 
+    fn visit_nominal_member_types(&self, db: &'db dyn Db, instance: Type<'db>, name: &str) {
+        if let Some(ty) = instance
+            .member(db, &self.env, name)
+            .place
+            .ignore_possibly_undefined()
+        {
+            self.visit_nominal_member(db, name, ty);
+        }
+
+        let AttributeWriteRequirement::Instance {
+            member:
+                InstanceAttributeWriteMember::Explicit {
+                    member:
+                        ExplicitAttributeWriteRequirement::Descriptor {
+                            descriptor_ty,
+                            setter_ty,
+                            ..
+                        },
+                    ..
+                },
+            ..
+        } = attribute_write_requirement(db, &self.env, instance, name)
+        else {
+            return;
+        };
+        if let Some(property) = descriptor_ty.as_property_instance()
+            && let Some(set_type) = property_set_type(db, &self.env, property, instance)
+        {
+            self.visit_type(db, set_type);
+        } else {
+            self.visit_callable_parameter_types(db, setter_ty, 2, descriptor_ty);
+        }
+    }
+
     fn visit_nominal_member(&self, db: &'db dyn Db, name: &str, ty: Type<'db>) {
         // These hooks determine the effective type of otherwise missing attributes.
         if matches!(name, "__getattr__" | "__getattribute__") {
@@ -689,6 +730,42 @@ impl<'db> SpecializationFlowVisitor<'db> {
             // Method relations have a separate declaration-based recursion guard.
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
             ty => self.visit_type(db, ty),
+        }
+    }
+
+    fn visit_callable_parameter_types(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        parameter_index: usize,
+        self_ty: Type<'db>,
+    ) {
+        let Some(callables) = ty.try_upcast_to_callable(db, &self.env) else {
+            return;
+        };
+        for callable in &callables {
+            for signature in callable.signatures(db) {
+                let parameters = signature.parameters();
+                let parameter = if let Some(parameter) = parameters.get_positional(parameter_index)
+                {
+                    Some(parameter)
+                } else if let Some((index, parameter)) = parameters.variadic()
+                    && index <= parameter_index
+                {
+                    Some(parameter)
+                } else {
+                    None
+                };
+                let Some(parameter) = parameter else {
+                    continue;
+                };
+                self.visit_type(
+                    db,
+                    parameter
+                        .annotated_type()
+                        .bind_self_typevars(db, &self.env, self_ty),
+                );
+            }
         }
     }
 
