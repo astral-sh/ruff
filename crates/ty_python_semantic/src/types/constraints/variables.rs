@@ -1,0 +1,624 @@
+//! The different conditions that can be checked by an interior node in a constraint set BDD
+#![expect(dead_code)]
+
+use std::marker::PhantomData;
+
+use itertools::Either;
+use salsa::plumbing::AsId;
+
+use crate::types::Type;
+use crate::types::constraints::wobble_index;
+use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
+use crate::{Db, ProgramEnvironment};
+
+/// The _provenance_ of a BDD constraint.
+///
+/// Most bounds come from specific relationships found at the call site — for instance, the
+/// relationship between the argument type and parameter annotation when invoking a generic
+/// function. These bounds express actual user intent, and are called _evidence_ bounds.
+///
+/// Other bounds are background limitations on which specializations are valid — for instance, a
+/// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
+/// don't want to choose a validity bound as a solution unless we have no other choice. There is
+/// often an evidence bound that is a better choice.
+///
+/// A bound derived only from validity remains validity. Any derivation that also depends on
+/// evidence is itself evidence.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum ConstraintProvenance {
+    Validity,
+    Evidence,
+}
+
+pub(super) struct UnsatisfiableBound;
+
+/// One condition that can be checked by an interior node in a constraint set BDD
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum Constraint<'db> {
+    ConcreteLower(ConcreteLowerBound<'db>),
+    ConcreteUpper(ConcreteUpperBound<'db>),
+    ConcreteEquivalence(ConcreteEquivalenceBound<'db>),
+    ParamSpecLower(ParamSpecLowerBound<'db>),
+    ParamSpecUpper(ParamSpecUpperBound<'db>),
+    ParamSpecEquivalence(ParamSpecEquivalenceBound<'db>),
+    TypeVarRange(TypeVarRangeBound<'db>),
+    TypeVarEquivalence(TypeVarEquivalenceBound<'db>),
+}
+
+impl<'db> Constraint<'db> {
+    /// Returns the constraints that model the requirement that `bound` must be assignable to
+    /// `typevar`. Union lower bounds are broken apart into separate constraints. Returns no
+    /// constraints when the relationship always holds (e.g. when comparing a typevar with itself).
+    pub(super) fn new_lower_bound(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
+        let choose_lower_bound = move |bound: Type<'db>| {
+            let bound = Self::normalize_bound(db, typevar, bound);
+            match bound {
+                // Two identical typevars must always solve to the same type, so it is not useful to
+                // have a lower bound that is the typevar being constrained.
+                Type::TypeVar(lower) if typevar.is_same_typevar_as(db, lower) => None,
+
+                // The same applies for a lower bound that's an intersection containing the typevar
+                // being constrained.
+                Type::Intersection(intersection)
+                    if intersection.positive(db).iter().any(|element| {
+                        element.as_typevar().is_some_and(|element_bound_typevar| {
+                            typevar.is_same_typevar_as(db, element_bound_typevar)
+                        })
+                    }) =>
+                {
+                    None
+                }
+
+                // And if we find the _negation_ of the typevar being constrained, the overall result
+                // is unsatisfiable.
+                Type::Intersection(intersection)
+                    if intersection.negative(db).iter().any(|element| {
+                        element.as_typevar().is_some_and(|element_bound_typevar| {
+                            typevar.is_same_typevar_as(db, element_bound_typevar)
+                        })
+                    }) =>
+                {
+                    Some(Err(UnsatisfiableBound))
+                }
+
+                // Otherwise we construct the correct lower-bound constraint.
+
+                // Comparing two typevars
+                Type::TypeVar(lower) if typevar.domain(db) == lower.domain(db) => {
+                    let constraint = TypeVarRangeBound::new(db, provenance, lower, typevar).into();
+                    Some(Ok(constraint))
+                }
+                Type::TypeVar(_) => Some(Err(UnsatisfiableBound)),
+
+                // Comparing a paramspec with a callable type
+                Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                    let constraint =
+                        ParamSpecLowerBound::new(db, provenance, typevar, bound).into();
+                    Some(Ok(constraint))
+                }
+
+                // Cannot compare a paramspec with a non-callable type
+                _ if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                    Some(Err(UnsatisfiableBound))
+                }
+
+                // Comparing a typevar with a type
+                _ => {
+                    let constraint = ConcreteLowerBound::new(db, provenance, typevar, bound).into();
+                    Some(Ok(constraint))
+                }
+            }
+        };
+
+        // It's not useful for a lower bound to be a union type. Because the following equivalence
+        // holds, we can break these bounds apart and create an equivalent BDD with more nodes but
+        // simpler constraints. (Fewer, simpler constraints mean that our sequent maps won't grow
+        // pathologically large.)
+        //
+        //   (α | β) ≤ T   ⇔ (α ≤ T) ∧ (β ≤ T)
+        match bound {
+            Type::Union(bound) => Either::Left(
+                bound
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .filter_map(choose_lower_bound),
+            ),
+            _ => Either::Right(choose_lower_bound(bound).into_iter()),
+        }
+    }
+
+    /// Returns the constraints that model the requirement that `typevar` must be assignable to
+    /// `bound`. Intersection upper bounds are broken apart into separate constraints. We also
+    /// return whether each constraint should hold (for positive intersection elements) or not hold
+    /// (for negative). Returns no constraints when the relationship always holds (e.g. when
+    /// comparing a typevar with itself).
+    pub(super) fn new_upper_bound(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
+        let choose_upper_bound = move |bound: Type<'db>| {
+            let bound = Self::normalize_bound(db, typevar, bound);
+            match bound {
+                // Two identical typevars must always solve to the same type, so it is not useful to
+                // have an upper bound that is the typevar being constrained.
+                Type::TypeVar(upper) if typevar.is_same_typevar_as(db, upper) => None,
+
+                // The same applies for an upper bound that's a union containing the typevar
+                // being constrained.
+                Type::Union(union)
+                    if union.elements(db).iter().any(|element| {
+                        element.as_typevar().is_some_and(|element_bound_typevar| {
+                            typevar.is_same_typevar_as(db, element_bound_typevar)
+                        })
+                    }) =>
+                {
+                    None
+                }
+
+                // Otherwise we construct the correct upper-bound constraint.
+
+                // Comparing two typevars
+                Type::TypeVar(upper) if typevar.domain(db) == upper.domain(db) => {
+                    let constraint = TypeVarRangeBound::new(db, provenance, typevar, upper).into();
+                    Some(Ok(constraint))
+                }
+                Type::TypeVar(_) => Some(Err(UnsatisfiableBound)),
+
+                // Comparing a paramspec with a callable type
+                Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                    let constraint =
+                        ParamSpecUpperBound::new(db, provenance, typevar, bound).into();
+                    Some(Ok(constraint))
+                }
+
+                // Cannot compare a paramspec with a non-callable type
+                _ if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                    Some(Err(UnsatisfiableBound))
+                }
+
+                // Comparing a typevar with a type
+                _ => {
+                    let constraint = ConcreteUpperBound::new(db, provenance, typevar, bound).into();
+                    Some(Ok(constraint))
+                }
+            }
+        };
+
+        // It's not useful for an upper bound to be an intersection type. Because the following
+        // equivalences hold, we can break these bounds apart and create an equivalent BDD with
+        // more nodes but simpler constraints. (Fewer, simpler constraints mean that our sequent
+        // maps won't grow pathologically large.)
+        //
+        //   T ≤ (α & β)   ⇔ (T ≤ α) ∧ (T ≤ β)
+        //   T ≤ (¬α & ¬β) ⇔ (T ≤ ¬α) ∧ (T ≤ ¬β)
+        match bound {
+            Type::Intersection(bound) => {
+                let positive = bound.iter_positive(db);
+                let negative = bound.iter_negative(db).map(|ty| ty.negate(db, env));
+                Either::Left(std::iter::chain(positive, negative).filter_map(choose_upper_bound))
+            }
+            _ => Either::Right(choose_upper_bound(bound).into_iter()),
+        }
+    }
+
+    /// Returns the constraints that model the requirement that `typevar` must be equivalent to
+    /// `bound`.
+    ///
+    /// A fully static equality is represented by one equivalence constraint when possible. Gradual
+    /// bounds are represented by separate lower and upper constraints. We also use the latter
+    /// representation when a top-level union or intersection refers to `typevar` itself, so that
+    /// the tautological half of the equality can be removed without discarding the other half.
+    pub(super) fn new_equivalence_bound(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
+        let is_same_typevar = |element: &Type<'db>| {
+            element
+                .as_typevar()
+                .is_some_and(|element| typevar.is_same_typevar_as(db, element))
+        };
+        let bound_refers_to_typevar = match bound {
+            Type::Union(union) => union.elements(db).iter().any(&is_same_typevar),
+            Type::Intersection(intersection) => {
+                intersection.positive(db).iter().any(&is_same_typevar)
+                    || intersection.negative(db).iter().any(is_same_typevar)
+            }
+            _ => false,
+        };
+
+        let normalized_bound = Self::normalize_bound(db, typevar, bound);
+        if normalized_bound.bottom_materialization(db, env)
+            != normalized_bound.top_materialization(db, env)
+            || bound_refers_to_typevar
+        {
+            return Either::Left(std::iter::chain(
+                Self::new_lower_bound(db, provenance, typevar, bound),
+                Self::new_upper_bound(db, env, provenance, typevar, bound),
+            ));
+        }
+
+        let constraint = match normalized_bound {
+            // Two identical typevars must always solve to the same type, so it is not useful to
+            // have an equivalence bound that is the typevar being constrained.
+            Type::TypeVar(bound_typevar) if typevar.is_same_typevar_as(db, bound_typevar) => None,
+
+            // Otherwise we construct the correct equivalence constraint.
+
+            // Comparing two typevars
+            Type::TypeVar(bound_typevar) if typevar.domain(db) == bound_typevar.domain(db) => {
+                let constraint =
+                    TypeVarEquivalenceBound::new(db, provenance, typevar, bound_typevar).into();
+                Some(Ok(constraint))
+            }
+            Type::TypeVar(_) => Some(Err(UnsatisfiableBound)),
+
+            // Comparing a paramspec with a callable type
+            Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                // We already normalized the callable into a paramspec_value above
+                let constraint =
+                    ParamSpecEquivalenceBound::new(db, provenance, typevar, normalized_bound)
+                        .into();
+                Some(Ok(constraint))
+            }
+
+            // Cannot compare a paramspec with a non-callable type
+            _ if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                Some(Err(UnsatisfiableBound))
+            }
+
+            // Comparing a typevar with a type
+            _ => {
+                let constraint =
+                    ConcreteEquivalenceBound::new(db, provenance, typevar, normalized_bound).into();
+                Some(Ok(constraint))
+            }
+        };
+        Either::Right(constraint.into_iter())
+    }
+
+    fn normalize_bound(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Type<'db> {
+        match bound {
+            Type::Callable(callable) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                if let [signature] = callable.signatures(db).overloads.as_slice()
+                    && signature.generic_context.is_none()
+                    && let Some(paramspec) = signature.parameters().as_paramspec()
+                {
+                    // Callable[P, anything] should be treated the same as P
+                    Type::TypeVar(paramspec)
+                } else {
+                    Type::Callable(callable.into_paramspec_value(db))
+                }
+            }
+            _ => bound,
+        }
+    }
+}
+
+/// Restricts a single typevar so that a concrete lower bound is assignable to it. (A concrete type
+/// is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability relationship
+/// between two typevars.)
+///
+/// The bound will never be a union type, since union lower bounds can be broken apart into
+/// separate constraints for each union element.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ConcreteLowerBound<'db> {
+    pub(super) provenance: ConstraintProvenance,
+    pub(super) typevar: BoundTypeVarInstance<'db>,
+    pub(super) bound: Type<'db>,
+    // Always construct via the `new` method
+    _phantom: PhantomData<()>,
+}
+
+impl<'db> ConcreteLowerBound<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Self {
+        // TODO: Handle TypeVarTuple separately
+        assert!(matches!(
+            typevar.domain(db),
+            TypeVarDomain::Type | TypeVarDomain::TypeTuple
+        ));
+        Self {
+            provenance,
+            typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> From<ConcreteLowerBound<'db>> for Constraint<'db> {
+    fn from(bound: ConcreteLowerBound<'db>) -> Constraint<'db> {
+        Constraint::ConcreteLower(bound)
+    }
+}
+
+/// Restricts a single typevar so that it is assignable to a concrete upper bound. (A concrete type
+/// is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability relationship
+/// between two typevars.)
+///
+/// The bound will never be an intersection type, since intersection upper bounds can be broken
+/// apart into separate constraints for each intersection element.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ConcreteUpperBound<'db> {
+    pub(super) provenance: ConstraintProvenance,
+    pub(super) typevar: BoundTypeVarInstance<'db>,
+    pub(super) bound: Type<'db>,
+    // Always construct via the `new` method
+    _phantom: PhantomData<()>,
+}
+
+impl<'db> ConcreteUpperBound<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Self {
+        // TODO: Handle TypeVarTuple separately
+        assert!(matches!(
+            typevar.domain(db),
+            TypeVarDomain::Type | TypeVarDomain::TypeTuple
+        ));
+        Self {
+            provenance,
+            typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> From<ConcreteUpperBound<'db>> for Constraint<'db> {
+    fn from(bound: ConcreteUpperBound<'db>) -> Constraint<'db> {
+        Constraint::ConcreteUpper(bound)
+    }
+}
+
+/// Restricts a single typevar so that it is equivalent to some concrete type. (A concrete type is
+/// not a bare typevar. [`TypeVarEquivalenceBound`] is used to model an equivalence relationship
+/// between two typevars.)
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ConcreteEquivalenceBound<'db> {
+    pub(super) provenance: ConstraintProvenance,
+    pub(super) typevar: BoundTypeVarInstance<'db>,
+    pub(super) bound: Type<'db>,
+    // Always construct via the `new` method
+    _phantom: PhantomData<()>,
+}
+
+impl<'db> ConcreteEquivalenceBound<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Self {
+        // TODO: Handle TypeVarTuple separately
+        assert!(matches!(
+            typevar.domain(db),
+            TypeVarDomain::Type | TypeVarDomain::TypeTuple
+        ));
+        Self {
+            provenance,
+            typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> From<ConcreteEquivalenceBound<'db>> for Constraint<'db> {
+    fn from(bound: ConcreteEquivalenceBound<'db>) -> Constraint<'db> {
+        Constraint::ConcreteEquivalence(bound)
+    }
+}
+
+/// Restricts a single paramspec so that a concrete lower bound signature is assignable to it. (A
+/// concrete type is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability
+/// relationship between two paramspecs.)
+///
+/// The bound will never be a union type, since union lower bounds can be broken apart into
+/// separate constraints for each union element.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ParamSpecLowerBound<'db> {
+    pub(super) provenance: ConstraintProvenance,
+    pub(super) typevar: BoundTypeVarInstance<'db>,
+    pub(super) bound: Type<'db>,
+    // Always construct via the `new` method
+    _phantom: PhantomData<()>,
+}
+
+impl<'db> ParamSpecLowerBound<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Self {
+        assert_eq!(typevar.domain(db), TypeVarDomain::ParameterSignature);
+        Self {
+            provenance,
+            typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> From<ParamSpecLowerBound<'db>> for Constraint<'db> {
+    fn from(bound: ParamSpecLowerBound<'db>) -> Constraint<'db> {
+        Constraint::ParamSpecLower(bound)
+    }
+}
+
+/// Restricts a single paramspec so that it is assignable to a concrete upper bound signature. (A
+/// concrete type is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability
+/// relationship between two paramspecs.)
+///
+/// The bound will never be an intersection type, since intersection upper bounds can be broken
+/// apart into separate constraints for each intersection element.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ParamSpecUpperBound<'db> {
+    pub(super) provenance: ConstraintProvenance,
+    pub(super) typevar: BoundTypeVarInstance<'db>,
+    pub(super) bound: Type<'db>,
+    // Always construct via the `new` method
+    _phantom: PhantomData<()>,
+}
+
+impl<'db> ParamSpecUpperBound<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Self {
+        assert_eq!(typevar.domain(db), TypeVarDomain::ParameterSignature);
+        Self {
+            provenance,
+            typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> From<ParamSpecUpperBound<'db>> for Constraint<'db> {
+    fn from(bound: ParamSpecUpperBound<'db>) -> Constraint<'db> {
+        Constraint::ParamSpecUpper(bound)
+    }
+}
+
+/// Restricts a single paramspec so that it is equivalent to some concrete signature. (A concrete
+/// type is not a bare typevar. [`TypeVarEquivalenceBound`] is used to model an equivalence
+/// relationship between two paramspecs.)
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ParamSpecEquivalenceBound<'db> {
+    pub(super) provenance: ConstraintProvenance,
+    pub(super) typevar: BoundTypeVarInstance<'db>,
+    pub(super) bound: Type<'db>,
+    // Always construct via the `new` method
+    _phantom: PhantomData<()>,
+}
+
+impl<'db> ParamSpecEquivalenceBound<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Self {
+        assert_eq!(typevar.domain(db), TypeVarDomain::ParameterSignature);
+        Self {
+            provenance,
+            typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> From<ParamSpecEquivalenceBound<'db>> for Constraint<'db> {
+    fn from(bound: ParamSpecEquivalenceBound<'db>) -> Constraint<'db> {
+        Constraint::ParamSpecEquivalence(bound)
+    }
+}
+
+/// Restricts two typevars so that `left` must be assignable to `right`. Both typevars must have
+/// the same domain.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct TypeVarRangeBound<'db> {
+    pub(super) provenance: ConstraintProvenance,
+    pub(super) left: BoundTypeVarInstance<'db>,
+    pub(super) right: BoundTypeVarInstance<'db>,
+    // Always construct via the `new` method
+    _phantom: PhantomData<()>,
+}
+
+impl<'db> TypeVarRangeBound<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        left: BoundTypeVarInstance<'db>,
+        right: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        assert_eq!(left.domain(db), right.domain(db));
+        Self {
+            provenance,
+            left,
+            right,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> From<TypeVarRangeBound<'db>> for Constraint<'db> {
+    fn from(bound: TypeVarRangeBound<'db>) -> Constraint<'db> {
+        Constraint::TypeVarRange(bound)
+    }
+}
+
+/// Restricts two typevars so that `left` must be equivalent to `right`. Both typevars must have
+/// the same domain.
+///
+/// (As an invariant, we canonicalize `left` and `right` so that these bounds are always created
+/// with a consistent typevar ordering across the process. This does _not_ affect the BDD variable
+/// ordering assigned to this constraint in a particular builder.)
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct TypeVarEquivalenceBound<'db> {
+    pub(super) provenance: ConstraintProvenance,
+    pub(super) left: BoundTypeVarInstance<'db>,
+    pub(super) right: BoundTypeVarInstance<'db>,
+    // Always construct via the `new` method
+    _phantom: PhantomData<()>,
+}
+
+impl<'db> TypeVarEquivalenceBound<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        left: BoundTypeVarInstance<'db>,
+        right: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        assert_eq!(left.domain(db), right.domain(db));
+        let left_id = left.as_id().as_bits();
+        let right_id = right.as_id().as_bits();
+        let (left, right) = if wobble_index(left_id) > wobble_index(right_id) {
+            (right, left)
+        } else {
+            (left, right)
+        };
+        Self {
+            provenance,
+            left,
+            right,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> From<TypeVarEquivalenceBound<'db>> for Constraint<'db> {
+    fn from(bound: TypeVarEquivalenceBound<'db>) -> Constraint<'db> {
+        Constraint::TypeVarEquivalence(bound)
+    }
+}
