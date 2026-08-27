@@ -16,7 +16,7 @@ use ty_module_resolver::{
 };
 
 use crate::Db;
-use crate::place::definitions::DefinitionResolution;
+use crate::place::definitions::{DefinitionResolution, definitions_for_module_global};
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
     builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
@@ -26,12 +26,13 @@ use crate::place_load::{
     ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind,
     resolve_place_load,
 };
+use crate::types::definition_resolution::source_backed_resolution;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, infer_definition_types, inferred_declaration,
-    is_discarded_dict_key_assignment,
+    is_discarded_dict_key_assignment, reaching_definitions_from_inference,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::PlaceExpr;
@@ -463,6 +464,49 @@ impl<'db> SemanticModel<'db> {
             .flat_map(move |scope| index.ancestor_scopes(scope))
     }
 
+    /// Returns the source definitions that may supply the value read by `name`.
+    ///
+    /// Infers the enclosing scope as needed, reusing its cached results for subsequent names.
+    ///
+    /// For names in string annotations, use the model from [`Self::enter_string_annotation`].
+    ///
+    /// Returns `None` if inference did not record reaching definitions for the name. Note however
+    /// that a result does not guarantee the name is bound: the caller must still inspect its
+    /// resolution flags before editing.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if reaching definitions recording is disabled in the database.
+    #[expect(dead_code, reason = "used by downstream IDE features")]
+    fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
+        assert!(
+            crate::db::should_record_reaching_definitions(self.db()),
+            "reaching definitions recording is disabled"
+        );
+
+        let scope = self
+            .scope(name.into())?
+            .to_scope_id(self.db(), self.program_file());
+        let reaching_definitions = reaching_definitions_from_inference(self.db(), scope)?;
+        let resolution = reaching_definitions.get(&ast::ExprRef::Name(name).into())?;
+        Some(source_backed_resolution(self.db(), resolution.clone()))
+    }
+
+    /// Returns the source definitions that may supply a module global at the end of its scope.
+    ///
+    /// Returns `None` if the module has no file or the name has no entry in its symbol table.
+    /// Note however that a result does not guarantee the name is bound: the caller must still
+    /// inspect its resolution flags before editing.
+    #[expect(dead_code, reason = "used by downstream IDE features")]
+    fn definitions_for_module_global(
+        &self,
+        module: Module<'db>,
+        name: &str,
+    ) -> Option<DefinitionResolution<'db>> {
+        definitions_for_module_global(self.db(), self.program(), module, name)
+            .map(|resolution| source_backed_resolution(self.db(), resolution))
+    }
+
     /// Returns the first local definition created by `covering_node`, if any.
     ///
     /// A local definition is a user-visible definition associated with `covering_node` itself, or
@@ -753,7 +797,7 @@ impl<'db> SemanticModel<'db> {
             return;
         }
 
-        let mut definitions = self.reaching_definitions_at(receiver);
+        let mut definitions = self.definitions_for_dictionary_key_completion(receiver);
         while let Some(definition) = definitions.pop() {
             if !visited.insert(definition) {
                 continue;
@@ -796,7 +840,10 @@ impl<'db> SemanticModel<'db> {
     ///
     /// Names follow Python's scope lookup rules, stopping at a definitely bound source.
     /// Other tracked places use the bindings recorded at their use site.
-    fn reaching_definitions_at(&self, receiver: &ast::Expr) -> Vec<Definition<'db>> {
+    fn definitions_for_dictionary_key_completion(
+        &self,
+        receiver: &ast::Expr,
+    ) -> Vec<Definition<'db>> {
         let index = semantic_index(self.db, self.file);
         let Some(scope) = index.try_expression_scope_id(receiver) else {
             return Vec::new();

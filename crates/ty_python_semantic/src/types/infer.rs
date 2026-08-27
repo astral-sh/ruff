@@ -163,6 +163,19 @@ pub(super) struct ImplicitAliasInference<'db> {
     pub(super) implicit_aliases: Box<[Definition<'db>]>,
 }
 
+/// Returns recorded reaching definitions, inferring the scope as needed.
+///
+/// Returns `None` if inference did not record any reaching definitions in the scope.
+pub(crate) fn reaching_definitions_from_inference<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Option<&'db FrozenMap<ExpressionNodeKey, DefinitionResolution<'db>>> {
+    infer_complete_scope_types(db, scope)
+        .extra
+        .as_deref()
+        .and_then(|extra| extra.reaching_definitions.as_deref())
+}
+
 bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
