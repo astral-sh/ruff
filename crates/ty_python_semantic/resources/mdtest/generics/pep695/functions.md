@@ -131,7 +131,7 @@ argument _explicitly_ implements the protocol by listing it as a base class.
 ```py
 from typing import Protocol, TypeVar
 
-S = TypeVar("S")
+S = TypeVar("S", covariant=True)
 
 class CanIndex(Protocol[S]):
     def __getitem__(self, index: int, /) -> S: ...
@@ -720,6 +720,47 @@ def _(x: tuple[str, int], y: tuple[bool, ...], z: tuple[int, str, *tuple[range, 
 
 reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
 reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
+```
+
+## Inferring tuple parameter types from unions
+
+Every member of a union argument contributes to the inferred element type of a homogeneous tuple
+parameter. Different tuple lengths do not prevent inference, and an empty tuple contributes no
+element types.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+def elements[T](values: tuple[T, ...]) -> tuple[T, ...]:
+    return values
+
+def _(
+    same: tuple[A, A] | tuple[A, A, A],
+    mixed: tuple[A] | tuple[B, B],
+    possibly_empty: tuple[()] | tuple[A, A],
+):
+    reveal_type(elements(same))  # revealed: tuple[A, ...]
+    reveal_type(elements(mixed))  # revealed: tuple[A | B, ...]
+    reveal_type(elements(possibly_empty))  # revealed: tuple[A, ...]
+```
+
+Fixed-length and mixed tuples infer type parameters from their corresponding element positions.
+
+```py
+def swap[T, U](values: tuple[U, T]) -> tuple[T, U]:
+    return values[1], values[0]
+
+def _(pairs: tuple[A, B] | tuple[C, D]):
+    reveal_type(swap(pairs))  # revealed: tuple[B | D, A | C]
+
+def tail[T](values: tuple[A, *tuple[T, ...]]) -> tuple[T, ...]:
+    return values[1:]
+
+def _(tails: tuple[A, B] | tuple[A, C, C]):
+    reveal_type(tail(tails))  # revealed: tuple[B | C, ...]
 ```
 
 ## Inferring a bound typevar

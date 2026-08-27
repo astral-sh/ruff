@@ -2560,7 +2560,7 @@ A legacy type variable in the protocol's type arguments still makes the enclosin
 from typing import Any, Protocol, TypeVar
 from ty_extensions import Top
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class LegacyProtocol(Protocol[T]):
     value: Any
@@ -2711,6 +2711,54 @@ def recursive_nested_materialization(
     reveal_type(nested_top.marker)  # revealed: object
     reveal_type(nested_bottom)  # revealed: Bottom[RecursiveProtocol]
     reveal_type(nested_bottom.marker)  # revealed: Never
+```
+
+### Recursive protocols with stable specializations
+
+These specializations have identical property types: both `value` properties return `str | int`, and
+both children have type `Recursive[str | int]`. Materializing either side leaves these fully static
+requirements unchanged, including when the materialization directions are opposite.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Recursive[T](Protocol):
+    @property
+    def value(self) -> T | int: ...
+    @property
+    def child(self) -> Recursive[T | int]: ...
+
+static_assert(is_assignable_to(Top[Recursive[str | int]], Recursive[str]))
+static_assert(is_assignable_to(Bottom[Recursive[str | int]], Recursive[str]))
+static_assert(is_assignable_to(Recursive[str | int], Top[Recursive[str]]))
+static_assert(is_assignable_to(Recursive[str | int], Bottom[Recursive[str]]))
+static_assert(is_assignable_to(Top[Recursive[str | int]], Bottom[Recursive[str]]))
+```
+
+### Recursive protocols with growing specializations
+
+Matching outer properties do not establish compatibility when a recursive child changes the
+requirements. Here, the children expose `list[str | int] | int` and `list[str] | int`, which are
+incompatible because `list` is invariant.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Growing[T](Protocol):
+    @property
+    def value(self) -> T | int: ...
+    @property
+    def child(self) -> Growing[list[T]]: ...
+
+static_assert(not is_assignable_to(Top[Growing[str | int]], Growing[str]))
 ```
 
 ### Display

@@ -41,7 +41,7 @@ pub enum UseUv {
 
 impl UseUv {
     /// Resolves the mode configured by the `TY_UV` environment variable.
-    pub fn from_system(system: &dyn System) -> Self {
+    pub(crate) fn from_system(system: &dyn System) -> Self {
         match system.env_var(EnvVars::TY_UV).as_deref() {
             Ok("1" | "true") => Self::On,
             Ok("scripts") => Self::Scripts,
@@ -97,7 +97,7 @@ impl Uv {
     /// This operation only requires a detached command executor, so it can run on a background
     /// worker.
     #[tracing::instrument(name = "Uv::execute", level = "debug", skip(self, executor))]
-    pub(crate) fn execute(
+    fn execute(
         &self,
         executor: &dyn CommandExecutor,
         target: MetadataTarget<'_>,

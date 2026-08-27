@@ -163,7 +163,7 @@ pub struct ScriptSourceMap {
 
 impl ScriptSourceMap {
     /// Maps a metadata offset to the corresponding offset in the Python source.
-    pub fn map_offset(&self, offset: TextSize) -> TextSize {
+    fn map_offset(&self, offset: TextSize) -> TextSize {
         let Some(index) = self
             .markers
             .partition_point(|marker| marker.metadata_offset <= offset)

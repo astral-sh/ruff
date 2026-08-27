@@ -1320,7 +1320,7 @@ impl<'db> Signature<'db> {
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
-        let specialization = builder.build_with(|typevar, bounds| {
+        let specialization = builder.build_merged_with(|typevar, bounds| {
             if let Some(bounds) = bounds
                 && let Some(lower) = bounds.evidence_lower
                 && bounds.has_upper_evidence()
@@ -1778,14 +1778,16 @@ impl<'db> Signature<'db> {
             .collect();
 
         if promoted_typevars.is_empty() {
-            return Some(inference.specialization(db));
+            return Some(inference.merged_specialization(db));
         }
 
-        Some(inference.specialization_with(db, |typevar, inferred| {
-            promoted_typevars
-                .contains(&typevar.identity(db))
-                .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db, env)))
-        }))
+        Some(
+            inference.merged_specialization_with(db, |typevar, inferred| {
+                promoted_typevars
+                    .contains(&typevar.identity(db))
+                    .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db, env)))
+            }),
+        )
     }
 
     fn needs_self_mapping(

@@ -1,0 +1,1393 @@
+# Keep intentional uniform field visibility audited instead of excluding whole files.
+
+preserve-uniform-field-visibility = true
+
+[[production]]
+package = "ruff"
+bin = "ruff"
+reason = "shipped Ruff binary"
+
+[[production]]
+package = "ty"
+bin = "ty"
+reason = "shipped ty type checker binary"
+
+[[production]]
+package = "ruff_python_formatter"
+bin = "ruff_python_formatter"
+reason = "workspace formatter development binary"
+
+[[production]]
+package = "ruff_dev"
+bin = "ruff_dev"
+reason = "workspace development binary"
+
+[[production]]
+package = "ty_completion_bench"
+bin = "ty_completion_bench"
+reason = "workspace completion benchmark binary"
+
+[[production]]
+package = "ty_completion_eval"
+bin = "ty_completion_eval"
+reason = "workspace completion evaluation binary"
+
+# Keep this list in sync with workspace packages that define doctests.
+
+[[doctest]]
+package = "ruff_annotate_snippets"
+
+[[doctest]]
+package = "ruff_cache"
+
+[[doctest]]
+package = "ruff_db"
+
+[[doctest]]
+package = "ruff_formatter"
+
+[[doctest]]
+package = "ruff_linter"
+
+[[doctest]]
+package = "ruff_notebook"
+
+[[doctest]]
+package = "ruff_options_metadata"
+
+[[doctest]]
+package = "ruff_python_ast"
+
+[[doctest]]
+package = "ruff_python_parser"
+
+[[doctest]]
+package = "ruff_python_stdlib"
+
+[[doctest]]
+package = "ruff_python_trivia"
+
+[[doctest]]
+package = "ruff_source_file"
+
+[[doctest]]
+package = "ruff_text_size"
+
+[[doctest]]
+package = "ruff_workspace"
+
+[[doctest]]
+package = "ty_module_resolver"
+
+[[doctest]]
+package = "ty_python_semantic"
+
+# Keep APIs used by targets outside Hawk's workspace analysis.
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_codegen"
+item = "generator::Generator::<'a>::unparse_suite"
+kind = "inherent_method"
+level = "expect"
+reason = "the standalone fuzz crate uses this method"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_trivia"
+item = "cursor::EOF_CHAR"
+kind = "constant"
+level = "expect"
+reason = "public cursor documentation links to this end-of-file sentinel"
+
+# Keep APIs referenced by public documentation or paired with sibling APIs.
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "format_element::BestFittingVariants::most_expanded"
+kind = "inherent_method"
+level = "expect"
+reason = "public best-fitting macro documentation links to this variant accessor"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "printer::printer_options::LineEnding::as_str"
+kind = "inherent_method"
+level = "expect"
+reason = "public line-ending settings documentation links to this representation accessor"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "settings::TargetVersion::linter_version"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the public parser and linter target-version accessor pair"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_parser"
+item = "Parsed::<T>::has_no_syntax_errors"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the public syntax-validity predicate API"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_workspace"
+item = "settings::FormatterSettings::resolve_target_version"
+kind = "inherent_method"
+level = "expect"
+reason = "public formatter settings fields direct callers to this resolver"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_python_semantic"
+item = "semantic_model::SemanticModel::<'db>::scope"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the documented semantic-model scope navigation API"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_python_semantic"
+item = "types::set_theoretic::UnionType::<'db>::from_two_elements"
+kind = "inherent_method"
+level = "expect"
+reason = "public union construction documentation recommends this optimized constructor"
+
+# Keep the public code-component accessor API symmetric.
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_linter"
+item = "codes::NoqaCode::prefix"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional symmetric prefix and suffix accessor API"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "codes::NoqaCode::suffix"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional symmetric prefix and suffix accessor API"
+
+# Keep the public edit-operation predicate API symmetric.
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_diagnostics"
+item = "edit::Edit::is_deletion"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional symmetric edit-operation predicate API"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_diagnostics"
+item = "edit::Edit::is_insertion"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional symmetric edit-operation predicate API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_diagnostics"
+item = "edit::Edit::is_replacement"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional symmetric edit-operation predicate API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "IndentStyle::is_space"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional symmetric indent-style predicate API"
+
+# Keep the public printer-options builder API uniform.
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "printer::printer_options::PrinterOptions::with_line_width"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional uniform printer-options builder API"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "printer::printer_options::PrinterOptions::with_indent"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional uniform printer-options builder API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "printer::printer_options::PrinterOptions::with_tab_width"
+kind = "inherent_method"
+level = "expect"
+reason = "preserves the intentional uniform printer-options builder API"
+
+# Keep public APIs retained during cleanup review.
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "buffer::VecBuffer::<'a, Context>::take_vec"
+kind = "inherent_method"
+level = "expect"
+reason = "formatter buffers support both consuming and reusable element extraction"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "format_element::LineMode::is_hard"
+kind = "inherent_method"
+level = "expect"
+reason = "public line modes retain their classification predicate"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "format_element::FormatElement::is_tag"
+kind = "inherent_method"
+level = "expect"
+reason = "public format elements retain their tag inspection API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "format_element::FormatElement::is_start_tag"
+kind = "inherent_method"
+level = "expect"
+reason = "public format elements retain their tag inspection API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "format_element::tag::Condition::if_fits_on_line"
+kind = "inherent_method"
+level = "expect"
+reason = "conditional formatting constructors intentionally cover fits and breaks variants"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "format_element::tag::VerbatimKind::is_bogus"
+kind = "inherent_method"
+level = "expect"
+reason = "public verbatim kinds retain their classification predicate"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "SimpleFormatContext::with_source_code"
+kind = "inherent_method"
+level = "expect"
+reason = "the public simple formatting context supports source-backed downstream tests and examples"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "Printed::new_empty"
+kind = "inherent_method"
+level = "expect"
+reason = "public formatter results retain their empty constructor"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "Printed::range"
+kind = "inherent_method"
+level = "expect"
+reason = "public formatter results expose their covered source range"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "Printed::into_sourcemap"
+kind = "inherent_method"
+level = "expect"
+reason = "formatter results expose borrowed, owned, and take-based source map access"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "Printed::take_sourcemap"
+kind = "inherent_method"
+level = "expect"
+reason = "formatter results expose borrowed, owned, and take-based source map access"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "Printed::verbatim"
+kind = "inherent_method"
+level = "expect"
+reason = "public formatter results expose verbatim text and range metadata"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "Printed::verbatim_ranges"
+kind = "inherent_method"
+level = "expect"
+reason = "formatter results expose borrowed and take-based verbatim range access"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "Printed::take_verbatim_ranges"
+kind = "inherent_method"
+level = "expect"
+reason = "formatter results expose borrowed and take-based verbatim range access"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "FormatOwnedWithRule::<T, R, C>::with_item"
+kind = "inherent_method"
+level = "expect"
+reason = "the public owned-format adapter retains its builder API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "FormatOwnedWithRule::<T, R, C>::with_options"
+kind = "inherent_method"
+level = "expect"
+reason = "the public owned-format adapter retains its builder API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "printer::printer_options::PrintWidth::new"
+kind = "inherent_method"
+level = "expect"
+reason = "the public print-width wrapper retains its explicit constructor"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "printer::printer_options::SourceMapGeneration::is_disabled"
+kind = "inherent_method"
+level = "expect"
+reason = "source map generation exposes symmetric enabled and disabled predicates"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_ast"
+item = "helpers::map_starred"
+kind = "function"
+level = "expect"
+reason = "AST helpers consistently unwrap callable, subscripted, and starred expressions"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_parser"
+item = "error::ParseError::error"
+kind = "inherent_method"
+level = "expect"
+reason = "downstream parser clients can consume a parse error into its error kind"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_parser"
+item = "Parsed::<T>::as_result"
+kind = "inherent_method"
+level = "expect"
+reason = "downstream parser clients retain borrowed result conversion"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_parser"
+item = "Parsed::<ruff_python_ast::ModExpression>::into_expr"
+kind = "inherent_method"
+level = "expect"
+reason = "parsed expressions retain borrowed and consuming accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "binding::Binding::<'a>::is_deleted"
+kind = "inherent_method"
+level = "expect"
+reason = "the public binding API retains its deleted-state query"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "cfg::graph::ControlFlowGraph::<'stmt>::predecessors"
+kind = "inherent_method"
+level = "expect"
+reason = "the public control-flow graph supports downstream predecessor inspection"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "model::SemanticModel::<'a>::node"
+kind = "inherent_method"
+level = "expect"
+reason = "the public semantic model retains node navigation for downstream analyses"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "model::SemanticModel::<'a>::in_runtime_required_annotation"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic model predicates intentionally expose each annotation context"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "model::SemanticModel::<'a>::in_simple_string_type_definition"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic model predicates intentionally expose each string type context"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "model::SemanticModel::<'a>::in_dunder_all_definition"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic model predicates retain the documented dunder-all context query"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "model::TypingOnlyBindingsStatus::is_allowed"
+kind = "inherent_method"
+level = "expect"
+reason = "typing-only binding status exposes symmetric allowed and disallowed predicates"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "reference::ResolvedReference::in_annotated_type_alias_value"
+kind = "inherent_method"
+level = "expect"
+reason = "resolved references expose their complete semantic context interface"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "semantic_model::SemanticModel::<'db>::file_path"
+kind = "inherent_method"
+level = "expect"
+reason = "the public semantic model exposes its file identity and source locations"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "semantic_model::SemanticModel::<'db>::line_index"
+kind = "inherent_method"
+level = "expect"
+reason = "the public semantic model exposes its file identity and source locations"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "formatter::Formatter::<'_, Context>::state_snapshot"
+kind = "inherent_method"
+level = "expect"
+reason = "formatter clients use snapshots to restore state after speculative formatting"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "formatter::Formatter::<'_, Context>::restore_state_snapshot"
+kind = "inherent_method"
+level = "expect"
+reason = "formatter clients use snapshots to restore state after speculative formatting"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_formatter"
+item = "formatter::FormatterSnapshot"
+kind = "struct"
+level = "expect"
+reason = "formatter clients use snapshots to restore state after speculative formatting"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "binding::Binding::<'a>::is_deferred_type_alias"
+kind = "inherent_method"
+level = "expect"
+reason = "binding predicates intentionally expose the distinct type-alias classifications"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
+item = "binding::Binding::<'a>::is_type_alias"
+kind = "inherent_method"
+level = "expect"
+reason = "binding predicates intentionally expose the distinct type-alias classifications"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_source_file"
+item = "line_index::OneIndexed::checked_add"
+kind = "inherent_method"
+level = "expect"
+reason = "one-indexed arithmetic intentionally provides checked and saturating operations"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_source_file"
+item = "line_index::OneIndexed::checked_sub"
+kind = "inherent_method"
+level = "expect"
+reason = "one-indexed arithmetic intentionally provides checked and saturating operations"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_text_size"
+item = "size::TextSize::saturating_add"
+kind = "inherent_method"
+level = "expect"
+reason = "TextSize intentionally provides both checked and saturating arithmetic"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_text_size"
+item = "size::TextSize::saturating_sub"
+kind = "inherent_method"
+level = "expect"
+reason = "TextSize intentionally provides both checked and saturating arithmetic"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_project"
+item = "db::changes::ChangeResult::custom_stdlib_changed"
+kind = "inherent_method"
+level = "expect"
+reason = "change results expose both project and custom-stdlib invalidation state"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_project"
+item = "watch::ChangeEvent::is_created"
+kind = "inherent_method"
+level = "expect"
+reason = "change event predicates intentionally cover created, changed, deleted, and rescan events"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_ast"
+item = "expression::StringLikePart::<'a>::as_string_literal"
+kind = "inherent_method"
+level = "expect"
+reason = "string-like AST parts intentionally expose consistent typed accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_ast"
+item = "name::Name::join"
+kind = "inherent_method"
+level = "expect"
+reason = "the AST name wrapper intentionally mirrors common string operations"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_ast"
+item = "token::TokenKind::is_non_soft_keyword"
+kind = "inherent_method"
+level = "expect"
+reason = "token kind predicates intentionally cover every keyword classification"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_ast"
+item = "token::tokens::TokenIterWithContext::<'a>::nesting"
+kind = "inherent_method"
+level = "expect"
+reason = "token iterator context intentionally exposes all tracked parser state"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_ide"
+item = "symbols::FlatSymbols::get"
+kind = "inherent_method"
+level = "expect"
+reason = "flat and hierarchical symbol collections intentionally share lookup APIs"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_ide"
+item = "symbols::FlatSymbols::len"
+kind = "inherent_method"
+level = "expect"
+reason = "flat and hierarchical symbol collections intentionally share collection APIs"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_ide"
+item = "symbols::HierarchicalSymbols::get"
+kind = "inherent_method"
+level = "expect"
+reason = "flat and hierarchical symbol collections intentionally share lookup APIs"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_ide"
+item = "symbols::HierarchicalSymbols::len"
+kind = "inherent_method"
+level = "expect"
+reason = "flat and hierarchical symbol collections intentionally share collection APIs"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_module_resolver"
+item = "module_glob::ModuleNameMatch::is_none"
+kind = "inherent_method"
+level = "expect"
+reason = "module glob match predicates intentionally cover every result variant"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::Level::is_error"
+kind = "inherent_method"
+level = "expect"
+reason = "lint level predicates intentionally cover every severity"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::Level::is_warn"
+kind = "inherent_method"
+level = "expect"
+reason = "lint level predicates intentionally cover every severity"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::Level::is_ignore"
+kind = "inherent_method"
+level = "expect"
+reason = "lint level predicates intentionally cover every severity"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::LintStatus::deprecated"
+kind = "inherent_method"
+level = "expect"
+reason = "lint status constructors intentionally cover every lifecycle state"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::LintRegistryBuilder::register_alias"
+kind = "inherent_method"
+level = "expect"
+reason = "the lint registry intentionally supports aliases before the first alias is added"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::LintRegistry::aliases"
+kind = "inherent_method"
+level = "expect"
+reason = "lint registry queries intentionally cover aliases and removed rules"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::LintRegistry::removed"
+kind = "inherent_method"
+level = "expect"
+reason = "lint registry queries intentionally cover aliases and removed rules"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::RuleSelection::enabled"
+kind = "inherent_method"
+level = "expect"
+reason = "rule selections intentionally support iteration with and without severity"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "lint::RuleSelection::iter"
+kind = "inherent_method"
+level = "expect"
+reason = "rule selections intentionally support iteration with and without severity"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "frozen::FrozenMap::<K, V>::iter_mut"
+kind = "inherent_method"
+level = "expect"
+reason = "the frozen map intentionally mirrors standard map iteration APIs"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "frozen::FrozenMap::<K, V>::values"
+kind = "inherent_method"
+level = "expect"
+reason = "the frozen map intentionally mirrors standard map iteration APIs"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "rank::RankBitBox::is_empty"
+kind = "inherent_method"
+level = "expect"
+reason = "the rank bit collection intentionally provides matching len and is_empty APIs"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_graph"
+item = "ModuleImports::is_empty"
+kind = "inherent_method"
+level = "expect"
+reason = "module import collections intentionally provide matching len and is_empty APIs"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "line_width::LineLengthFromIntError::0"
+kind = "field"
+level = "expect"
+reason = "the conversion error exposes the rejected line length to callers"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "rules::pep8_naming::settings::IgnoreNames::matches"
+kind = "inherent_method"
+level = "expect"
+reason = "public settings support downstream configuration and validation"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "rules::pep8_naming::settings::IgnoreNames::from_patterns"
+kind = "inherent_method"
+level = "expect"
+reason = "public settings support downstream configuration and validation"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "settings::LinterSettings::with_target_version"
+kind = "inherent_method"
+level = "expect"
+reason = "public test helpers use this builder from downstream crates"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "settings::LinterSettings::with_preview_mode"
+kind = "inherent_method"
+level = "expect"
+reason = "public test helpers use this builder from downstream crates"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "settings::LinterSettings::with_external_rules"
+kind = "inherent_method"
+level = "expect"
+reason = "public test helpers use this builder from downstream crates"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_workspace"
+item = "configuration::FormatConfiguration::from_options"
+kind = "inherent_method"
+level = "expect"
+reason = "workspace configuration types retain public constructors for downstream integrations"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_workspace"
+item = "configuration::AnalyzeConfiguration::from_options"
+kind = "inherent_method"
+level = "expect"
+reason = "workspace configuration types retain public constructors for downstream integrations"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_project"
+item = "db::testing::TestDb::take_salsa_events"
+kind = "inherent_method"
+level = "expect"
+reason = "the testing feature exposes database event assertions to downstream tests"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "completion::Completion::builtin"
+kind = "field"
+level = "expect"
+reason = "completion metadata remains visible to downstream test and protocol adapters"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "completion::Completion::is_type_check_only"
+kind = "field"
+level = "expect"
+reason = "completion metadata remains visible to downstream test and protocol adapters"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "completion::Completion::is_context_specific"
+kind = "field"
+level = "expect"
+reason = "completion metadata remains visible to downstream test and protocol adapters"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "symbols::HierarchicalSymbols::is_empty"
+kind = "inherent_method"
+level = "expect"
+reason = "symbol collections intentionally provide matching len and is_empty APIs"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "symbols::SymbolKind::to_string"
+kind = "inherent_method"
+level = "expect"
+reason = "symbol kinds expose their protocol-facing names to downstream adapters"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_static"
+item = "env_vars::EnvVars::XDG_CONFIG_HOME"
+kind = "inherent_associated_constant"
+level = "expect"
+reason = "consumed by the generated environment-variable reference"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_db"
+item = "system::command::Command::arg"
+kind = "inherent_method"
+level = "expect"
+reason = "command descriptions expose a complete argument builder and inspection API"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_db"
+item = "system::command::Command::get_current_dir"
+kind = "inherent_method"
+level = "expect"
+reason = "command descriptions expose a complete argument builder and inspection API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "expression::Expression::<'db>::python_file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "expression::Expression::<'db>::program"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "predicate::PatternPredicate::<'db>::file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "predicate::PatternPredicate::<'db>::python_file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "predicate::PatternPredicate::<'db>::program"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "statement::StatementInner::<'db>::file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "statement::StatementInner::<'db>::python_file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "statement::StatementInner::<'db>::program"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "unpack::Unpack::<'db>::file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "unpack::Unpack::<'db>::python_file"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_core"
+item = "unpack::Unpack::<'db>::program"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic ingredients expose consistent file, scope, and program accessors"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ty_python_semantic"
+item = "types::dedicated::pytest::FixtureBinding::<'db>::request"
+kind = "inherent_method"
+level = "expect"
+reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
+
+# Keep public APIs whose narrower visibility would break a uniform interface or
+# activate compiler lints that Rust intentionally suppresses for public APIs.
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "format_element::PrintMode::is_flat"
+kind = "inherent_method"
+level = "expect"
+reason = "print mode predicates intentionally expose a consistent public interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "format_element::PrintMode::is_expanded"
+kind = "inherent_method"
+level = "expect"
+reason = "print mode predicates intentionally expose a consistent public interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "format_element::tag::GroupMode::is_flat"
+kind = "inherent_method"
+level = "expect"
+reason = "group mode predicates intentionally expose a consistent public interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "formatter::Formatter::<'buf, Context>::intern_vec"
+kind = "inherent_method"
+level = "expect"
+reason = "the public formatter API supports interning prebuilt format elements"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_formatter"
+item = "IndentStyle::as_str"
+kind = "inherent_method"
+level = "expect"
+reason = "public indentation settings expose their stable string representation"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "registry::<impl codes::Rule>::url"
+kind = "inherent_method"
+level = "expect"
+reason = "public rule metadata includes its documentation URL"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_linter"
+item = "settings::types::PythonVersion::as_tuple"
+kind = "inherent_method"
+level = "expect"
+reason = "public Python version settings expose their numeric representation"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_codegen"
+item = "generator::Generator::<'a>::with_mode"
+kind = "inherent_method"
+level = "expect"
+reason = "the public generator builder intentionally exposes its output mode"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_codegen"
+item = "stylist::Indentation::new"
+kind = "inherent_method"
+level = "expect"
+reason = "the public indentation wrapper retains its explicit constructor"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_formatter"
+item = "AsFormat"
+kind = "reexport"
+level = "expect"
+reason = "generated formatter implementations expose this public extension trait"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_formatter"
+item = "FormattedIter"
+kind = "reexport"
+level = "expect"
+reason = "generated formatter implementations expose this public iterator adapter"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_formatter"
+item = "FormattedIterExt"
+kind = "reexport"
+level = "expect"
+reason = "generated formatter implementations expose this public extension trait"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_formatter"
+item = "IntoFormat"
+kind = "reexport"
+level = "expect"
+reason = "generated formatter implementations expose this public extension trait"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_formatter"
+item = "options::QuoteStyle::as_str"
+kind = "inherent_method"
+level = "expect"
+reason = "public quote-style settings expose their stable string representation"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_parser"
+item = "semantic_errors::YieldOutsideFunctionKind::is_await"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic error variants intentionally expose their classification predicate"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_semantic"
+item = "cfg::visualize::draw_cfg"
+kind = "function"
+level = "expect"
+reason = "the control-flow graph visualizer remains available to downstream debugging tools"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_semantic"
+item = "cfg::visualize::MermaidNode::with_content"
+kind = "inherent_method"
+level = "expect"
+reason = "the public control-flow graph visualization API retains its node constructor"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_semantic"
+item = "cfg::visualize::DirectedGraph"
+kind = "trait"
+level = "expect"
+reason = "the control-flow graph visualizer remains available to downstream debugging tools"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_source_file"
+item = "newlines::LineEnding::len"
+kind = "inherent_method"
+level = "expect"
+reason = "line-ending values expose consistent byte and text length APIs"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_source_file"
+item = "newlines::LineEnding::text_len"
+kind = "inherent_method"
+level = "expect"
+reason = "line-ending values expose consistent byte and text length APIs"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "all_symbols::AllSymbolInfo::<'db>::name_in_file"
+kind = "inherent_method"
+level = "expect"
+reason = "auto-import symbol results intentionally expose their complete metadata interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "all_symbols::AllSymbolInfo::<'db>::qualified"
+kind = "inherent_method"
+level = "expect"
+reason = "auto-import symbol results intentionally expose their complete metadata interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "all_symbols::AllSymbolInfo::<'db>::kind"
+kind = "inherent_method"
+level = "expect"
+reason = "auto-import symbol results intentionally expose their complete metadata interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "all_symbols::AllSymbolInfo::<'db>::deprecated"
+kind = "inherent_method"
+level = "expect"
+reason = "auto-import symbol results intentionally expose their complete metadata interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "all_symbols::AllSymbolInfo::<'db>::module"
+kind = "inherent_method"
+level = "expect"
+reason = "auto-import symbol results intentionally expose their complete metadata interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "all_symbols::AllSymbolInfo::<'db>::file"
+kind = "inherent_method"
+level = "expect"
+reason = "auto-import symbol results intentionally expose their complete metadata interface"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "AllSymbolInfo"
+kind = "reexport"
+level = "expect"
+reason = "the public auto-import API re-exports its result type"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_ide"
+item = "all_symbols"
+kind = "reexport"
+level = "expect"
+reason = "the public auto-import API re-exports its query function"
+
+# Keep the generated AST and its hand-written companion APIs consistent across
+# node types, visitors, and string literal kinds.
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/generated.rs"
+reason = "generated from crates/ruff_python_ast/ast.toml"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/nodes.rs"
+reason = "AST node APIs intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/comparable.rs"
+reason = "the comparable AST intentionally mirrors the full AST hierarchy"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/statement_visitor.rs"
+reason = "AST walk functions intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/visitor.rs"
+reason = "AST walk functions intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/visitor/source_order.rs"
+reason = "AST walk functions intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/visitor/transformer.rs"
+reason = "AST walk functions intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/str_prefix.rs"
+reason = "string prefix APIs intentionally provide a consistent interface across literal kinds"
+
+[[exclude]]
+crate = "ruff_python_literal"
+file = "crates/ruff_python_literal/src/escape.rs"
+reason = "string and bytes escape APIs intentionally provide a consistent interface"
+
+[[exclude]]
+crate = "ruff_python_literal"
+file = "crates/ruff_python_literal/src/cformat.rs"
+reason = "C-style string and bytes format APIs intentionally provide a consistent interface"
+
+# Preserve complete wrapper and DSL interfaces whose methods intentionally
+# mirror their underlying abstractions.
+
+[[exclude]]
+crate = "ruff_db"
+file = "crates/ruff_db/src/files/path.rs"
+reason = "file path variant accessors intentionally cover every backing path type"
+
+[[exclude]]
+crate = "ruff_db"
+file = "crates/ruff_db/src/system/path.rs"
+reason = "system path wrappers intentionally mirror the supported UTF-8 path API"
+
+[[exclude]]
+crate = "ruff_db"
+file = "crates/ruff_db/src/vendored/path.rs"
+reason = "vendored path wrappers intentionally mirror the supported UTF-8 path API"
+
+[[exclude]]
+crate = "ruff_db"
+file = "crates/ruff_db/src/system.rs"
+reason = "system abstractions intentionally expose a consistent interface across backends"
+
+[[exclude]]
+crate = "ruff_db"
+file = "crates/ruff_db/src/system/memory_fs.rs"
+reason = "the in-memory system intentionally mirrors the public filesystem interface"
+
+[[exclude]]
+crate = "ruff_db"
+file = "crates/ruff_db/src/system/walk_directory.rs"
+reason = "directory walking intentionally exposes a complete backend-neutral interface"
+
+[[exclude]]
+crate = "ruff_db"
+file = "crates/ruff_db/src/testing.rs"
+reason = "public test helpers are consumed by downstream crates with the testing feature"
+
+[[exclude]]
+crate = "ruff_db"
+file = "crates/ruff_db/src/vendored.rs"
+reason = "the vendored filesystem intentionally mirrors the public filesystem interface"
+
+[[exclude]]
+crate = "ruff_index"
+file = "crates/ruff_index/src/slice.rs"
+reason = "indexed slices intentionally mirror the supported slice API"
+
+[[exclude]]
+crate = "ruff_index"
+file = "crates/ruff_index/src/vec.rs"
+reason = "indexed vectors intentionally mirror the supported vector API"
+
+[[exclude]]
+crate = "ruff_linter"
+file = "crates/ruff_linter/src/source_kind.rs"
+reason = "source kind accessors intentionally cover every source representation"
+
+[[exclude]]
+crate = "ruff_linter"
+file = "crates/ruff_linter/src/test.rs"
+reason = "public test helpers are consumed by downstream crates with the testing feature"
+
+# Preserve interfaces that are consumed outside the native Rust workspace.
+
+[[exclude]]
+crate = "ruff_wasm"
+file = "crates/ruff_wasm/src/lib.rs"
+reason = "public exports are consumed by JavaScript"
+
+[[exclude]]
+crate = "ty_wasm"
+file = "crates/ty_wasm/src/lib.rs"
+reason = "public exports are consumed by JavaScript"
+
+# Keep generated and upstream-compatible APIs in sync with their sources.
+
+[[exclude]]
+crate = "ruff_notebook"
+file = "crates/ruff_notebook/src/schema.rs"
+reason = "generated from the Jupyter Notebook schema"
+
+[[exclude]]
+crate = "ruff_formatter"
+file = "crates/ruff_formatter/src/prelude.rs"
+reason = "the public formatter prelude intentionally provides a complete downstream import surface"
+
+[[exclude]]
+crate = "annotate_snippets"
+file = "crates/ruff_annotate_snippets/src/lib.rs"
+reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "annotate_snippets"
+file = "crates/ruff_annotate_snippets/src/level.rs"
+reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "annotate_snippets"
+file = "crates/ruff_annotate_snippets/src/renderer/mod.rs"
+reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "annotate_snippets"
+module = "renderer::render"
+reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "annotate_snippets"
+module = "renderer::source_map"
+reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "annotate_snippets"
+module = "renderer::styled_buffer"
+reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "annotate_snippets"
+file = "crates/ruff_annotate_snippets/src/snippet.rs"
+reason = "kept compatible with the upstream annotate-snippets crate"

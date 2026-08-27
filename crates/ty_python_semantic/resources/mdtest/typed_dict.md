@@ -3115,7 +3115,7 @@ from _collections_abc import dict_items
 from collections.abc import Callable
 from typing import Protocol, TypeVar, TypedDict, runtime_checkable
 
-ItemsT = TypeVar("ItemsT")
+ItemsT = TypeVar("ItemsT", covariant=True)
 
 class HasItems(Protocol[ItemsT]):
     def items(self) -> ItemsT: ...
@@ -3256,7 +3256,7 @@ Common constraints must preserve correlations in mutable protocols:
 ```py
 from typing import Any, Protocol, TypeVar, TypedDict
 
-Key = TypeVar("Key")
+Key = TypeVar("Key", contravariant=True)
 Value = TypeVar("Value")
 
 class SetAndGet(Protocol[Key, Value]):

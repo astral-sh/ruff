@@ -786,7 +786,7 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
-pub(crate) trait HasOptionalDefinition {
+trait HasOptionalDefinition {
     /// Returns the definition of `self`, if it has one.
     ///
     /// ## Panics

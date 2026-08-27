@@ -47,6 +47,7 @@ use ty_module_resolver::{
     ImportingFile, KnownModule, ModuleName, file_to_module, resolve_module_for_import_from,
     resolve_real_module_confident, stub_file_to_real_module,
 };
+use ty_python_core::ast_node_ref::AstNodeRef;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::scope::{FileScopeId, ScopeId, ScopeKind};
 use ty_python_core::{
@@ -333,6 +334,214 @@ struct FixtureRequest<'db> {
     name: Name,
 }
 
+/// Function-level information shared by all possible fixture requests in a signature.
+struct FixtureRequestContext<'db, 'ast> {
+    function_definition: Definition<'db>,
+    function_type: FunctionType<'db>,
+    function: &'ast ast::StmtFunctionDef,
+    module: &'ast ParsedModuleRef,
+    index: &'db ty_python_core::SemanticIndex<'db>,
+    class_scope: Option<FileScopeId>,
+    is_fixture_dependency: bool,
+    mock_patch_count: usize,
+}
+
+impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
+    /// Constructs a new context representing a function that can receive fixtures
+    /// through one or more parameters.
+    fn new(
+        db: &'db dyn Db,
+        function_ref: &'db AstNodeRef<ast::StmtFunctionDef>,
+        class_scope: Option<FileScopeId>,
+        module: &'ast ParsedModuleRef,
+        index: &'db ty_python_core::SemanticIndex<'db>,
+    ) -> Option<Self> {
+        let function_definition = index.expect_single_definition(function_ref);
+        let function = function_ref.node(module);
+        let file = function_definition.program_file(db);
+
+        // Parameters on fixture declarations request their values from other fixtures:
+        //
+        // ```py
+        // @pytest.fixture
+        // def database(): ...
+        //
+        // @pytest.fixture
+        // def service(database): ...  # `database` is a fixture request.
+        // ```
+        let is_fixture_dependency = !function.decorator_list.is_empty()
+            && fixture_declaration(db, function_definition).is_some();
+
+        if !is_fixture_dependency
+            && (!is_collected_test(db, file, function, class_scope, module)
+                || class_scope
+                    .is_some_and(|class_scope| is_unittest_test_case(db, file, class_scope)))
+        {
+            return None;
+        }
+
+        let function_type =
+            infer_definition_types(db, function_definition).function_type(function_definition)?;
+
+        Some(Self {
+            function_definition,
+            function_type,
+            function,
+            module,
+            index,
+            class_scope,
+            is_fixture_dependency,
+            mock_patch_count: mock_patch_count(db, function_definition, function),
+        })
+    }
+
+    /// Classifies the nearest non-type-parameter parent of a fixture-request function.
+    fn parent_scope(
+        index: &ty_python_core::SemanticIndex<'db>,
+        function_scope: FileScopeId,
+    ) -> Option<FixtureRequestParentScope> {
+        let parent_scope = non_type_parameter_parent(index, function_scope)?;
+        match index.scope(parent_scope).kind() {
+            ScopeKind::Module => Some(FixtureRequestParentScope::Module),
+            ScopeKind::Class => Some(FixtureRequestParentScope::Class(parent_scope)),
+            _ => None,
+        }
+    }
+
+    /// Returns the fixture request represented by `definition`, if it is eligible for injection.
+    fn fixture_request_for_parameter(
+        &self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<FixtureRequest<'db>> {
+        let signature_parameters = self
+            .function_type
+            .last_definition_signature(db)
+            .parameters();
+        let parameter = signature_parameters
+            .iter()
+            .find(|parameter| parameter.definition() == Some(definition))?;
+        let parameter_name = parameter.keyword_name()?;
+
+        // Match pytest's logic for only injecting fixtures for required
+        // parameters and by keyword:
+        // https://docs.pytest.org/en/9.0.x/how-to/fixtures.html#requesting-fixtures
+        // https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/compat.py#L145-L153
+        if parameter.has_default() {
+            return None;
+        }
+
+        if self.function_type.has_implicit_receiver(db)
+            && signature_parameters
+                .get_positional(0)
+                .is_some_and(|parameter| parameter.definition() == Some(definition))
+        {
+            return None;
+        }
+
+        if self.is_mock_patch_parameter(db, definition) {
+            return None;
+        }
+
+        if !self.is_fixture_dependency && self.directly_parametrized(db, parameter_name.as_str()) {
+            return None;
+        }
+
+        Some(FixtureRequest {
+            parameter_definition: definition,
+            function_definition: self.function_definition,
+            name: parameter_name.clone(),
+        })
+    }
+
+    /// Returns whether `parameter` is supplied by `unittest.mock.patch`.
+    fn is_mock_patch_parameter(
+        &self,
+        db: &'db dyn Db,
+        parameter_definition: Definition<'db>,
+    ) -> bool {
+        if self.mock_patch_count == 0 {
+            return false;
+        }
+
+        let signature = self.function_type.last_definition_signature(db);
+        let parameters = signature.parameters();
+        let is_source_keyword_parameter = |parameter: &SignatureParameter<'db>| {
+            parameter.keyword_name().is_some()
+                // ty applies PEP 484's legacy positional-only convention to leading `__name`
+                // parameters, but Python and pytest still inspect them as positional-or-keyword.
+                || (self.function.parameters.posonlyargs.is_empty()
+                    && parameter.is_positional_only())
+        };
+        let skips_receiver = self.function_type.has_implicit_receiver(db)
+            && parameters
+                .get_positional(0)
+                .is_some_and(is_source_keyword_parameter);
+
+        parameters
+            .iter()
+            .filter(|parameter| is_source_keyword_parameter(parameter) && !parameter.has_default())
+            .skip(usize::from(skips_receiver))
+            .take(self.mock_patch_count)
+            .any(|candidate| candidate.definition() == Some(parameter_definition))
+    }
+
+    /// Returns whether static parametrization on the function or an enclosing class prevents this
+    /// fixture request.
+    fn directly_parametrized(&self, db: &'db dyn Db, parameter_name: &str) -> bool {
+        if !self.function.decorator_list.is_empty() {
+            let decorators = function_known_decorators(db, self.function_definition);
+            if self.function.decorator_list.iter().any(|decorator| {
+                mark_excludes_fixture(
+                    db,
+                    self.function_definition,
+                    &decorator.expression,
+                    parameter_name,
+                    |expression| decorators.expression_type(expression),
+                )
+            }) {
+                return true;
+            }
+        }
+
+        std::iter::successors(self.class_scope, |class_scope| {
+            let parent = non_type_parameter_parent(self.index, *class_scope)?;
+            (self.index.scope(parent).kind() == ScopeKind::Class).then_some(parent)
+        })
+        .any(|class_scope| {
+            let class_ref = self.index.scope(class_scope).node().expect_class();
+            let definition = self.index.expect_single_definition(class_ref);
+            class_ref
+                .node(self.module)
+                .decorator_list
+                .iter()
+                .any(|decorator| {
+                    mark_excludes_fixture(
+                        db,
+                        definition,
+                        &decorator.expression,
+                        parameter_name,
+                        |expression| Some(definition_expression_type(db, definition, expression)),
+                    )
+                })
+        })
+    }
+}
+
+enum FixtureRequestParentScope {
+    Module,
+    Class(FileScopeId),
+}
+
+impl FixtureRequestParentScope {
+    fn class_scope(self) -> Option<FileScopeId> {
+        match self {
+            Self::Module => None,
+            Self::Class(scope) => Some(scope),
+        }
+    }
+}
+
 /// Returns the fixture request represented by `definition`, if it is eligible for injection.
 fn fixture_request_for_parameter<'db>(
     db: &'db dyn Db,
@@ -347,92 +556,25 @@ fn fixture_request_for_parameter<'db>(
     let index = semantic_index(db, file);
     let function_scope = definition.scope(db).file_scope_id(db);
     let function_ref = index.scope(function_scope).node().as_function()?;
-    let function_definition = index.expect_single_definition(function_ref);
-    let function_type =
-        infer_definition_types(db, function_definition).function_type(function_definition)?;
-    let signature_parameters = function_type.last_definition_signature(db).parameters();
-    let parameter = signature_parameters
-        .iter()
-        .find(|parameter| parameter.definition() == Some(definition))?;
-    let parameter_name = parameter.keyword_name()?;
-
-    // Match pytest's logic for only injecting fixtures for required
-    // parameters and by keyword:
-    // https://docs.pytest.org/en/9.0.x/how-to/fixtures.html#requesting-fixtures
-    // https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/compat.py#L145-L153
-    if parameter.has_default() {
-        return None;
-    }
-
-    let parent_scope = non_type_parameter_parent(index, function_scope)?;
-    let parent_kind = index.scope(parent_scope).kind();
-    if !matches!(parent_kind, ScopeKind::Module | ScopeKind::Class) {
-        return None;
-    }
-
-    let class_scope = (parent_kind == ScopeKind::Class).then_some(parent_scope);
-    if function_type.has_implicit_receiver(db)
-        && signature_parameters
-            .get_positional(0)
-            .is_some_and(|parameter| parameter.definition() == Some(definition))
-    {
-        return None;
-    }
-
+    let class_scope = FixtureRequestContext::parent_scope(index, function_scope)?.class_scope();
     let module = parsed_module(db, file.python_file(db)).load(db);
-    let function = function_ref.node(&module);
-    if is_mock_patch_parameter(db, function_definition, function_type, function, definition) {
-        return None;
-    }
+    let context = FixtureRequestContext::new(db, function_ref, class_scope, &module, index)?;
 
-    // Check whether the fixture request itself appears in a fixture declaration e.g.
-    //
-    // ```py
-    // @pytest.fixture
-    // def database(): ...
-    //
-    // @pytest.fixture
-    // def service(database): ...  # `database` is a fixture request.
-    // ```
-    let is_fixture_dependency = fixture_declaration(db, function_definition).is_some();
-    if !is_fixture_dependency
-        && (!is_collected_test(db, file, function, class_scope, &module)
-            || class_scope.is_some_and(|class_scope| is_unittest_test_case(db, file, class_scope)))
-    {
-        return None;
-    }
-
-    if !is_fixture_dependency
-        && directly_parametrized(
-            db,
-            function_definition,
-            function,
-            class_scope,
-            &module,
-            index,
-            parameter_name.as_str(),
-        )
-    {
-        return None;
-    }
-
-    Some(FixtureRequest {
-        parameter_definition: definition,
-        function_definition,
-        name: parameter_name.clone(),
-    })
+    context.fixture_request_for_parameter(db, definition)
 }
 
-/// Returns whether `parameter` is supplied by `unittest.mock.patch`.
-fn is_mock_patch_parameter<'db>(
+/// Returns the number of parameters supplied by `unittest.mock.patch`.
+fn mock_patch_count<'db>(
     db: &'db dyn Db,
     function_definition: Definition<'db>,
-    function_type: FunctionType<'db>,
     function: &ast::StmtFunctionDef,
-    parameter_definition: Definition<'db>,
-) -> bool {
+) -> usize {
+    if function.decorator_list.is_empty() {
+        return 0;
+    }
+
     let decorators = function_known_decorators(db, function_definition);
-    let patch_count = function
+    function
         .decorator_list
         .iter()
         .filter(|decorator| {
@@ -470,27 +612,7 @@ fn is_mock_patch_parameter<'db>(
                     matches!(decorators.expression_type(new), Some(Type::Dynamic(_)))
                 })
         })
-        .count();
-
-    let signature = function_type.last_definition_signature(db);
-    let parameters = signature.parameters();
-    let is_source_keyword_parameter = |parameter: &SignatureParameter<'db>| {
-        parameter.keyword_name().is_some()
-            // ty applies PEP 484's legacy positional-only convention to leading `__name`
-            // parameters, but Python and pytest still inspect them as positional-or-keyword.
-            || (function.parameters.posonlyargs.is_empty() && parameter.is_positional_only())
-    };
-    let skips_receiver = function_type.has_implicit_receiver(db)
-        && parameters
-            .get_positional(0)
-            .is_some_and(is_source_keyword_parameter);
-
-    parameters
-        .iter()
-        .filter(|parameter| is_source_keyword_parameter(parameter) && !parameter.has_default())
-        .skip(usize::from(skips_receiver))
-        .take(patch_count)
-        .any(|candidate| candidate.definition() == Some(parameter_definition))
+        .count()
 }
 
 /// A decorated fixture function.
@@ -751,8 +873,8 @@ fn fixture_declaration<'db>(
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let function = function_ref.node(&module);
-    let inference = function_known_decorators(db, definition);
     let first_decorator = &function.decorator_list.first()?.expression;
+    let inference = function_known_decorators(db, definition);
     let expression = if definition.scope(db).node(db).scope_kind() == ScopeKind::Class
         && matches!(
             inference.expression_type(first_decorator),
@@ -822,11 +944,18 @@ fn fixture_candidates_from_definition<'db>(
         }
     }
 
+    let kind = definition.kind(db);
+    if !matches!(
+        &kind,
+        DefinitionKind::Function(_) | DefinitionKind::ImportFrom(_) | DefinitionKind::StarImport(_)
+    ) {
+        return Vec::new();
+    }
     if !exists_at_runtime(db, definition) {
         return Vec::new();
     }
 
-    match definition.kind(db) {
+    match kind {
         DefinitionKind::Function(_) => vec![definition],
         DefinitionKind::ImportFrom(import) => {
             let parsed = parsed_module(db, definition.python_file(db)).load(db);
@@ -1086,53 +1215,6 @@ fn is_unittest_test_case(db: &dyn Db, file: ProgramFile<'_>, class_scope: FileSc
         ancestor.name(db) == "TestCase"
             && file_to_module(db, ancestor.program_file(db).resolver_file(db))
                 .is_some_and(|module| module.name(db).as_str() == "unittest.case")
-    })
-}
-
-/// Returns whether static parametrization on the function or an enclosing class prevents this
-/// fixture request.
-fn directly_parametrized<'db>(
-    db: &'db dyn Db,
-    function_definition: Definition<'db>,
-    function: &ast::StmtFunctionDef,
-    class_scope: Option<FileScopeId>,
-    module: &ParsedModuleRef,
-    index: &ty_python_core::SemanticIndex<'_>,
-    parameter_name: &str,
-) -> bool {
-    let decorators = function_known_decorators(db, function_definition);
-    if function.decorator_list.iter().any(|decorator| {
-        mark_excludes_fixture(
-            db,
-            function_definition,
-            &decorator.expression,
-            parameter_name,
-            |expression| decorators.expression_type(expression),
-        )
-    }) {
-        return true;
-    }
-
-    std::iter::successors(class_scope, |class_scope| {
-        let parent = non_type_parameter_parent(index, *class_scope)?;
-        (index.scope(parent).kind() == ScopeKind::Class).then_some(parent)
-    })
-    .any(|class_scope| {
-        let class_ref = index.scope(class_scope).node().expect_class();
-        let definition = index.expect_single_definition(class_ref);
-        class_ref
-            .node(module)
-            .decorator_list
-            .iter()
-            .any(|decorator| {
-                mark_excludes_fixture(
-                    db,
-                    definition,
-                    &decorator.expression,
-                    parameter_name,
-                    |expression| Some(definition_expression_type(db, definition, expression)),
-                )
-            })
     })
 }
 
@@ -2535,6 +2617,39 @@ def test_use(typing_only): ...
         ");
 
         assert_snapshot!(test_use.fixture_resolution("typing_only"), @"No fixture resolved for parameter `typing_only`");
+    }
+
+    #[test]
+    fn resolves_dependencies_for_fixture_declarations_unavailable_at_runtime() {
+        let test = PytestTestCase::new(
+            "/src/test_example.py",
+            r#"
+from typing import type_check_only
+import pytest
+
+@pytest.fixture
+def dependency(): ...
+
+@pytest.fixture
+@type_check_only
+def hidden(dependency): ...
+"#,
+        );
+
+        let hidden = test.function("hidden");
+
+        assert_snapshot!(hidden.fixture_resolution("dependency"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+          --> src/test_example.py:10:12
+           |
+        10 | def hidden(dependency): ...
+           |            ^^^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/test_example.py:6:5
+          |
+        6 | def dependency(): ...
+          |     ----------
+        ");
     }
 
     #[test]

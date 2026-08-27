@@ -336,7 +336,7 @@ impl<'db> OverloadLiteral<'db> {
         self.body_scope(db).python_file(db)
     }
 
-    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+    fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
         self.body_scope(db).program_file(db)
     }
 

@@ -439,7 +439,7 @@ impl<'db> Type<'db> {
     ///
     /// This is a separate method so that we can skip this expensive check when diagnostics
     /// are suppressed.
-    pub(crate) fn relation_error_context(
+    fn relation_error_context(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1223,14 +1223,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 (source, target, self.relation, self.typevar_evaluation),
                 work,
             )
-            .unwrap_or_else(|item| self.recursive_type_pair_fallback(item.0, item.1))
+            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
     }
 
     fn recursive_type_pair_fallback(
         &self,
-        _source: Type<'db>,
-        _target: Type<'db>,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(nominally_satisfied) = self.try_check_nominal_protocol_cycle(db, source, target)
+        {
+            return nominally_satisfied;
+        }
+
         // TODO: Recursively-specialized structural types can encode context-free languages,
         // whose inclusion and equivalence are undecidable. No complete fallback exists, but
         // more decidable cases can be recognized here before conservatively rejecting the pair.
@@ -2763,7 +2769,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 }
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
-    pub(super) env: &'a ProgramEnvironment<'db>,
+    env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,

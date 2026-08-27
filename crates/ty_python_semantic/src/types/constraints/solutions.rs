@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
+use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
-    PathAssignments, PathBounds, SolutionLimits,
+    PathBounds, SolutionLimits,
 };
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};

@@ -411,6 +411,36 @@ static_assert(is_subtype_of(Covariant[int], Covariant[object]))
 static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
 ```
 
+## Nested nonrecursive protocols
+
+Using a generic protocol inside another specialization of the same protocol is not a recursive
+definition, including through a type alias. The nested `Reader` specializations do not prevent
+structural variance inference for `Source`: its writable `_value` attribute makes it invariant.
+Returning `Source[T]` from a nominal wrapper preserves that invariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+
+type NestedReader[T] = Reader[Reader[T]]
+
+class Source[T](Protocol):
+    _value: T
+
+    def reader(self) -> NestedReader[T]: ...
+
+class Wrapper[T]:
+    def source(self) -> Source[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,
@@ -534,6 +564,56 @@ class DescriptorOwner[T]:
 
 static_assert(not is_subtype_of(DescriptorOwner[B], DescriptorOwner[A]))
 static_assert(not is_subtype_of(DescriptorOwner[A], DescriptorOwner[B]))
+```
+
+### Mutable protocol attributes
+
+Underscore-prefixed protocol attributes remain writable through their structural interface, so their
+inferred type parameters are invariant.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class WritableProtocol[T](Protocol):
+    _value: T
+
+static_assert(not is_subtype_of(WritableProtocol[int], WritableProtocol[object]))
+static_assert(not is_assignable_to(WritableProtocol[int], WritableProtocol[object]))
+
+def overwrite(value: WritableProtocol[object]) -> None:
+    value._value = object()
+
+def unsound(value: WritableProtocol[int]) -> None:
+    overwrite(value)  # error: [invalid-argument-type]
+```
+
+### Mutable protocol attributes with unrelated protocol members
+
+An unrelated protocol in a member type does not change the invariance of a writable attribute. A
+class that returns this protocol is also invariant, preventing callers from mutating `_value`
+through a wider specialization.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Marker(Protocol):
+    def ready(self) -> bool: ...
+
+class WritableProtocol[T](Protocol):
+    _value: T
+
+    def marker(self) -> Marker: ...
+
+class Wrapper[T]:
+    def value(self) -> WritableProtocol[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_assignable_to(Wrapper[int], Wrapper[object]))
 ```
 
 ### Immutable Attributes

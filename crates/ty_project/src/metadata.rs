@@ -102,7 +102,7 @@ impl ProjectMetadata {
     }
 
     /// Loads a project from a configuration file using the explicitly configured uv integrations.
-    pub fn from_config_file_with_uv(
+    fn from_config_file_with_uv(
         path: SystemPathBuf,
         root: &SystemPath,
         system: &dyn System,
@@ -198,7 +198,7 @@ impl ProjectMetadata {
     }
 
     /// Discovers the closest project using the explicitly configured uv integrations.
-    pub fn discover_with_uv(
+    fn discover_with_uv(
         path: &SystemPath,
         system: &dyn System,
         use_uv: UseUv,
@@ -403,7 +403,7 @@ impl ProjectMetadata {
 
     /// Configures which uv integrations are enabled for this project.
     #[must_use]
-    pub fn with_use_uv(mut self, use_uv: UseUv) -> Self {
+    pub(crate) fn with_use_uv(mut self, use_uv: UseUv) -> Self {
         self.use_uv = use_uv;
         self
     }

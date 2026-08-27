@@ -1366,7 +1366,7 @@ impl<'db> CallSignatureDetails<'db> {
         binding: &crate::types::call::Binding<'db>,
     ) -> Self {
         let argument_to_parameter_mapping = binding.argument_matches().to_vec();
-        let specialization = binding.specialization(db);
+        let specialization = binding.merged_specialization(db);
         let signature = binding.signature.clone();
         let display_details = signature.display(db, env).to_string_parts();
         let (parameters, parameter_to_displayed_parameter_mapping) =

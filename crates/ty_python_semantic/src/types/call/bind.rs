@@ -34,7 +34,8 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, PathBound, PathBounds, Solutions,
+    ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
+    Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
@@ -4134,8 +4135,10 @@ impl<'db> CallableBinding<'db> {
                             let raw_parameter_type = overload.signature.parameters()
                                 [matched_parameter.index]
                                 .annotated_type();
-                            let parameter_type = raw_parameter_type
-                                .apply_optional_specialization(db, overload.specialization(db));
+                            let parameter_type = raw_parameter_type.apply_optional_specialization(
+                                db,
+                                overload.merged_specialization(db),
+                            );
                             OverloadFilterSlot {
                                 parameter: parameter_type,
                                 // Argument types are cached by the raw parameter type, even when
@@ -5745,7 +5748,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             if let Type::Union(union) = declared_type.resolve_type_alias(db) {
                                 union.elements(db).iter().find_map(|candidate| {
                                     let specialized_candidate = candidate
-                                        .apply_optional_specialization(db, self.specialization());
+                                        .apply_optional_specialization(
+                                            db,
+                                            self.merged_specialization(),
+                                        );
                                     argument_type
                                         .is_assignable_to(db, env, specialized_candidate)
                                         .then_some(*candidate)
@@ -5817,9 +5823,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             })
     }
 
-    fn specialization(&self) -> Option<Specialization<'db>> {
+    fn merged_specialization(&self) -> Option<Specialization<'db>> {
         let db = self.db;
-        self.inference.map(|inference| inference.specialization(db))
+        self.inference
+            .map(|inference| inference.merged_specialization(db))
     }
 
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -5858,7 +5865,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // tension between type context preferences and argument constraints. If the combined set
         // is unsatisfiable, we will fall back to argument constraints alone (which the current
         // code does via `assignable_to_declared_type`).
-        let preferred_type_mappings = return_with_tcx
+        let (preferred_type_mappings, preferred_solutions_incomplete) = return_with_tcx
             .and_then(|(return_ty, tcx)| {
                 if !tcx
                     .filter_union(db, self.env, |ty| ty.may_prefer_declared_type(db, self.env))
@@ -5971,7 +5978,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     }
                 }
 
-                Some(preferred)
+                Some((
+                    preferred,
+                    matches!(solutions, SolutionPaths::BudgetExceeded(_)),
+                ))
             })
             .unwrap_or_default();
 
@@ -6004,7 +6014,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any promotable types assigned to the specialization.
-        // The hook receives (typevar, bounds) and returns Some(ty) to override the default
+        // The hook receives (typevar, bounds) and returns Some(solution) to override the default
         // solution, or None to keep it.
         let maybe_promote = |typevar: BoundTypeVarInstance<'db>, bounds: &PathBound<'db>| {
             let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, self.env);
@@ -6037,20 +6047,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return None;
             }
 
-            // The promotion override must not select an unsatisfiable solution.
-            let solution =
-                PathBounds::default_solve(db, self.env, constraints, bounds).as_type()?;
-            let promoted = solution.promote(db, self.env);
+            // Promotion must preserve unsatisfiable outcomes and the completeness of fallbacks.
+            Some(
+                PathBounds::default_solve(db, self.env, constraints, bounds).map(|solution| {
+                    let promoted = solution.promote(db, self.env);
 
-            // If the TypeVar has an upper bound, only use the promoted type if it
-            // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
-                if !promoted.is_assignable_to(db, self.env, bound) {
-                    return None;
-                }
-            }
+                    // If the TypeVar has an upper bound, only use the promoted type if it
+                    // still satisfies the bound.
+                    if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
+                        && !promoted.is_assignable_to(db, self.env, bound)
+                    {
+                        return solution;
+                    }
 
-            Some(promoted)
+                    promoted
+                }),
+            )
         };
 
         let mut choose = |typevar: BoundTypeVarInstance<'db>, bounds: Option<&PathBound<'db>>| {
@@ -6060,7 +6072,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             if let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(db))
                 && lower.is_assignable_to(db, self.env, preferred_ty)
             {
-                return Some(preferred_ty);
+                // A contextual fallback remains incomplete when selected for the call.
+                return Some(if preferred_solutions_incomplete {
+                    PathBoundSolution::BudgetExceeded {
+                        fallback: Some(preferred_ty),
+                    }
+                } else {
+                    PathBoundSolution::Solved(preferred_ty)
+                });
             }
 
             maybe_promote(typevar, bounds)
@@ -6073,7 +6092,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 choose,
             ),
         };
-        let specialization = inference.specialization(db);
+        let specialization = inference.merged_specialization(db);
 
         self.return_ty = self.return_ty.apply_specialization(db, specialization);
         self.inference = Some(inference);
@@ -6170,7 +6189,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         if self.signature.generic_context.is_some() {
-            let specialization = builder.build_with(|_, _| None);
+            let specialization = builder.build_merged_with(|_, _| None);
             let expected_ty = formal.apply_specialization(db, specialization);
 
             // The legacy solver keeps the first pack when another occurrence has a different length.
@@ -6438,8 +6457,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Mapper(callback, values)
         // ```
         //
-        // The overloads provide alternative, correlated solutions for `T` and `R`. The current
-        // solver merges each TypeVar's solutions separately, losing that correlation. Applying
+        // The overloads provide alternative, correlated solutions for `T` and `R`. Argument
+        // checking merges each TypeVar's solutions separately, losing that correlation. Applying
         // the merged specialization to `cls` a second time then changes the receiver from
         // `type[Mapper[frozenset[Never]]]` to
         // `type[Mapper[frozenset[frozenset[Never]]]]`, incorrectly rejecting the valid call.
@@ -6450,7 +6469,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // `U`, independently checking the class against `type[U]` again would reject the call
         // solely because `U` remains unsolved.
         //
-        // TODO: Remove this special case once solution extraction preserves correlations between
+        // TODO: Remove this special case once argument checking preserves correlations between
         // TypeVars across alternative inference paths and constructor calls are solved in a single
         // constraint set, so decorator-scoped receiver variables are not rechecked independently.
         let constructor_receiver = matches!(argument, Argument::Synthetic)
@@ -6461,7 +6480,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             );
 
         let mut expected_ty = declared_type;
-        if let Some(specialization) = self.specialization() {
+        if let Some(specialization) = self.merged_specialization() {
             if !constructor_receiver {
                 argument_type = argument_type.apply_specialization(db, specialization);
             }
@@ -6571,7 +6590,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     // TODO: Remove this workaround once call binding can infer a `TypeVarTuple` from `*args` and
-    // callable inference preserves correlations across overloads.
+    // callable argument checking preserves correlations across overloads.
     fn should_defer_typevartuple_callable_check(
         &self,
         declared_type: Type<'db>,
@@ -6757,7 +6776,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) -> bool {
         let db = self.db;
         let Some(Type::Callable(callable)) = self
-            .specialization()
+            .merged_specialization()
             .and_then(|specialization| specialization.get(db, paramspec))
         else {
             return false;
@@ -7501,7 +7520,7 @@ impl<'db> Binding<'db> {
             [specialized_parameter.index]
             .annotated_type();
         let parameter_type = specialized_overload
-            .specialization(db)
+            .merged_specialization(db)
             .map_or(parameter_type, |specialization| {
                 parameter_type.apply_specialization(db, specialization)
             });
@@ -7609,7 +7628,7 @@ impl<'db> Binding<'db> {
             .unwrap_or(original_parameter_type);
         let paramspec_callable = |paramspec| {
             let Type::Callable(callable) = self
-                .specialization(db)
+                .merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))
                 .or_else(|| {
                     specialization.and_then(|specialization| specialization.get(db, paramspec))
@@ -7755,7 +7774,7 @@ impl<'db> Binding<'db> {
 
                 let call_expression_constraints = return_type_solutions.get(&identity).copied();
                 let argument_constraints = self
-                    .specialization(db)
+                    .merged_specialization(db)
                     .and_then(|specialization| specialization.get(db, typevar))
                     .filter(|ty| !ty.has_dynamic(db, env))
                     .map(|ty| ty.promote(db, env));
@@ -8208,8 +8227,9 @@ impl<'db> Binding<'db> {
         &self.argument_matches
     }
 
-    pub(crate) fn specialization(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        self.inference.map(|inference| inference.specialization(db))
+    pub(crate) fn merged_specialization(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        self.inference
+            .map(|inference| inference.merged_specialization(db))
     }
 
     pub(crate) fn errors(&self) -> &[BindingError<'db>] {
@@ -9800,4 +9820,132 @@ fn all_arguments_range(node: AnyNodeRef) -> TextRange {
             )
         })
         .unwrap_or(node.range())
+}
+
+// TODO: Replace these tests with mdtests once correlated alternatives affect call inference's
+// return types or diagnostics, making retained correlations and completeness observable.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem;
+
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::global_symbol;
+    use crate::types::generics::TypeVarInferenceSolutions;
+
+    fn call_inference<'db>(
+        db: &'db TestDb,
+        callable: Type<'db>,
+        arguments: impl IntoIterator<Item = Type<'db>>,
+        type_context: TypeContext<'db>,
+    ) -> anyhow::Result<TypeVarInference<'db>> {
+        let env = db.program_environment();
+        let arguments = CallArguments::positional(arguments);
+        let constraints = ConstraintSetBuilder::new();
+        let bindings = callable
+            .bindings(db, &env)
+            .match_parameters(db, &env, &arguments)
+            .check_types(db, &env, &constraints, &arguments, type_context, &[])
+            .map_err(|error| anyhow::anyhow!("call binding failed: {error:?}"))?;
+        let (_, binding) = bindings
+            .iter_flat()
+            .flat_map(CallableBinding::matching_overloads)
+            .exactly_one()
+            .map_err(|_| anyhow::anyhow!("expected one matching call binding"))?;
+        binding
+            .inference
+            .ok_or_else(|| anyhow::anyhow!("expected generic call inference"))
+    }
+
+    #[test]
+    fn overloaded_argument_retains_correlated_inference() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from typing import Callable, overload
+
+# Restrict T to the overload inputs, excluding the vacuous T = Never solution.
+def infer_pair[T: (int, str), U](converter: Callable[[T], U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let callable = global_symbol(db, file, "infer_pair").place.expect_type();
+        let argument = global_symbol(db, file, "swap").place.expect_type();
+        let inference = call_inference(db, callable, [argument], TypeContext::default())?;
+        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
+            anyhow::bail!(
+                "expected correlated alternatives, got {:?}",
+                inference.solutions(db)
+            );
+        };
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+
+        assert_eq!(
+            paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
+            FxHashSet::from_iter([
+                [Some(int), Some(str)].as_slice(),
+                [Some(str), Some(int)].as_slice(),
+            ])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn contextual_preference_preserves_incomplete_inference() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+def make[T, U](value: T) -> tuple[list[T], U, U]:
+    raise NotImplementedError
+
+expected: tuple[list[object], A | B, C | D | E]
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let callable = global_symbol(db, file, "make").place.expect_type();
+        let expected = global_symbol(db, file, "expected").place.expect_type();
+        let int = KnownClass::Int.to_instance(db, &env);
+
+        // The contextual upper bound for U is (A | B) & (C | D | E): six non-disjoint
+        // terms exceed the four-term construction budget. T still has the preferred type object.
+        // Selecting that preference must preserve the contextual family's incompleteness,
+        // even though only one argument-inference alternative remains.
+        let inference = call_inference(db, callable, [int], expected.into())?;
+        let TypeVarInferenceSolutions::Incomplete(paths) = inference.solutions(db) else {
+            anyhow::bail!(
+                "expected incomplete inference, got {:?}",
+                inference.solutions(db)
+            );
+        };
+        assert_eq!(
+            paths.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
+            [[Some(Type::object()), None].as_slice()]
+        );
+        Ok(())
+    }
 }
