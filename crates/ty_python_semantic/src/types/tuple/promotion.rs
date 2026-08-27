@@ -30,7 +30,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         expression: &ast::Expr,
         ty: Type<'db>,
     ) {
-        if !Self::allows_expression(db, env, expression, ty) {
+        if !Self::allows_expression(db, env, Some(expression), ty) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
@@ -66,13 +66,15 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     ///
     /// The supplied `ty` should already have undergone literal promotion, so `(2, 3)` has the
     /// homogeneous type `tuple[int, int]` when checking its eligibility.
+    /// If no source expression is available, any tuple type blocks tuple-size promotion.
     pub(crate) fn allows_expression(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        expression: &ast::Expr,
+        expression: Option<&ast::Expr>,
         ty: Type<'db>,
     ) -> bool {
-        Self::is_promotable_tuple_literal(db, env, expression, ty)
+        expression
+            .is_some_and(|expression| Self::is_promotable_tuple_literal(db, env, expression, ty))
             || !any_over_type(db, env, ty, true, |ty| {
                 ty.tuple_instance_spec(db, env).is_some()
             })

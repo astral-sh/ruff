@@ -1790,6 +1790,23 @@ for _ in range(1_000_000):
     reveal_type(x)  # revealed: int
 ```
 
+### Unpacking alongside a recursively growing value
+
+The first element remains precise even when its sibling's type grows on each loop iteration. Reading
+each literal element independently preserves that information during cycle recovery.
+
+```py
+x = 0
+for _ in range(10):
+    first, x = (1, (x,))
+    reveal_type(first)  # revealed: Literal[1]
+
+x = 0
+for _ in range(10):
+    first, x = [1, (x,)]
+    reveal_type(first)  # revealed: Literal[1]
+```
+
 ### Avoid oscillations
 
 We need to avoid oscillating cycles in cases like the following, where the type of one of these loop

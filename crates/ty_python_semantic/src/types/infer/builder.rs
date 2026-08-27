@@ -108,13 +108,16 @@ use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
-use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
+use crate::types::tuple::{
+    MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE, Tuple, TupleLength, TupleSpecBuilder,
+    TupleType, VariableSegment,
+};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
-use crate::types::unpacker::{UnpackResult, fixed_sequence_elements};
+use crate::types::unpacker::{UnpackResult, fixed_sequence_elements, literal_iterable_length};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags,
@@ -6991,10 +6994,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tuple: &ast::ExprTuple,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        /// If a tuple literal has more elements than this constant,
-        /// we promote `Literal` types when inferring the elements of the tuple.
-        /// This provides a huge speedup on files that have very large unannotated tuple literals.
-        const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
         let db = self.db();
 
         let env = self.program_environment();
@@ -7087,20 +7086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // emitted in the `infer_element` call above.
                 let mut spec = element_type.iterate(db, env).into_owned();
 
-                let known_length = match &*starred.value {
-                    ast::Expr::List(ast::ExprList { elts, .. })
-                    | ast::Expr::Set(ast::ExprSet { elts, .. }) => elts
-                        .iter()
-                        .all(|elt| !elt.is_starred_expr())
-                        .then_some(elts.len()),
-                    ast::Expr::Dict(ast::ExprDict { items, .. }) => items
-                        .iter()
-                        .all(|item| item.key.is_some())
-                        .then_some(items.len()),
-                    _ => None,
-                };
-
-                if let Some(known_length) = known_length {
+                if let Some(known_length) = literal_iterable_length(&starred.value) {
                     spec = spec
                         .resize(db, env, TupleLength::Fixed(known_length))
                         .unwrap_or(spec);
@@ -7879,31 +7865,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.build_merged_with(|current_typevar, bounds| {
                     let lower = bounds?.evidence_lower?;
 
-                    let lower = if is_empty_collection_type_context(tcx) {
-                        // Constraints learned from later collection uses follow the same promotion
-                        // policy as literal elements: promote element literal types in invariant
-                        // position unless an explicit annotation made them unpromotable.
-                        lower.promote(db, env)
-                    } else {
-                        lower
-                    };
-
-                    let lower = if tuple_size_promotion_constraints
-                        .allow(current_typevar.identity(self.db()))
-                    {
-                        lower.promote_tuple_size_in_union(db, env)
-                    } else {
-                        lower
-                    };
-
-                    let lower = if is_empty_collection_type_context(tcx) {
-                        lower
-                            // Promote singleton types to `T | Unknown` in inferred type parameters,
-                            // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
-                            .promote_singletons_recursively(db, env)
-                    } else {
-                        lower
-                    };
+                    let lower = lower.promote_collection_element_type(
+                        db,
+                        env,
+                        tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
+                        is_empty_collection_type_context(tcx),
+                    );
 
                     Some(lower)
                 })

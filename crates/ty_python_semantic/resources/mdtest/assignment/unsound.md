@@ -432,10 +432,11 @@ error[unsound-assignment]: Unsound assignment
 6 | middle: list[int]
   |         --------- Expected a subtype of `list[int]` because of this annotation
 7 | first, *middle, last = (0, 1, returns_any(), 2, 3)  # snapshot: unsound-assignment
-  |         ------             ^^^^^^^^^^^^^^^^^^^ Iterable element inferred as `Literal[1, 2] | Any` (expected a subtype of `int`)
+  |         ------             ^^^^^^^^^^^^^^^^^^^ Iterable element inferred as `int | Any` (expected a subtype of `int`)
   |         |
   |         Assigned to this variable
-info: `list[Literal[1, 2] | Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
+info: `list[int | Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
+info: element `Any` of union `int | Any` is not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
 

@@ -710,7 +710,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: int
-reveal_type(c_instance.b)  # revealed: list[Literal[2, 3]]
+reveal_type(c_instance.b)  # revealed: list[int]
 ```
 
 #### Attributes defined in for-loop (unpacking)
