@@ -771,6 +771,21 @@ value.bit_count()
     Ok(())
 }
 
+#[test]
+fn redundant_cast_without_closing_parenthesis() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    // A final newline changes the recovered argument range, so these files deliberately omit it.
+    for suffix in ["", " # comment"] {
+        let source =
+            format!("from typing import cast\n\ndef f(x: int):\n    return cast(int, x{suffix}");
+        db.write_file("/src/main.py", &source)?;
+        assert_file_diagnostics(&db, "/src/main.py", &["Value is already of type `int`"]);
+    }
+
+    Ok(())
+}
+
 // Incremental inference tests
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
