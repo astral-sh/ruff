@@ -6206,7 +6206,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let preferred_ty = preferred_type_mappings.get(&typevar.identity(db)).copied();
 
             if let Some(bounds) = bounds {
-                let lower = bounds.evidence_lower?;
+                let lower = bounds.evidence_lower()?;
                 if preferred_ty.is_none_or(|ty| !lower.is_assignable_to(db, self.env, ty)) {
                     return maybe_promote(typevar, bounds);
                 }

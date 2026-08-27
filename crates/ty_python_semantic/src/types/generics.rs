@@ -13,9 +13,8 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::{
-    ConstraintBound, ConstraintBounds, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
-    Solutions, TypeVarSolution,
+    Constraint, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
+    PathBoundSolution, PathBounds, SolutionPaths, Solutions, TypeVarSolution,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -3332,25 +3331,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    fn intersect_pending_typevar_constraint(
-        &mut self,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        bounds: ConstraintBounds<'db>,
-    ) {
+    fn intersect_pending_typevar_constraint(&mut self, constraint: Constraint<'db>) {
         let db = self.db;
+        let bound_typevar = constraint.typevar();
         let identity = bound_typevar.identity(db);
         if bound_typevar.is_paramspec(db) && !self.paramspec_seen.insert(identity) {
             return;
         }
 
-        let constraint = ConstraintSet::constrain_typevar_with_bounds(
-            db,
-            self.env,
-            self.constraints,
-            bound_typevar,
-            bounds.lower,
-            bounds.upper,
-        );
+        let constraint = ConstraintSet::from_constraint(db, self.env, self.constraints, constraint);
         self.pending.intersect(db, self.constraints, constraint);
     }
 
@@ -3390,17 +3379,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ty: Type<'db>,
         variance: TypeVarVariance,
     ) {
-        let bounds = match variance {
-            TypeVarVariance::Covariant => {
-                ConstraintBounds::new(Some(ConstraintBound::Evidence(ty)), None)
-            }
+        let constraint = match variance {
+            TypeVarVariance::Covariant => Constraint::from_evidence(bound_typevar, Some(ty), None),
             TypeVarVariance::Contravariant => {
-                ConstraintBounds::new(None, Some(ConstraintBound::Evidence(ty)))
+                Constraint::from_evidence(bound_typevar, None, Some(ty))
             }
-            TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
+            TypeVarVariance::Invariant => Constraint::exact(bound_typevar, ty),
             TypeVarVariance::Bivariant => return,
         };
-        self.intersect_pending_typevar_constraint(bound_typevar, bounds);
+        self.intersect_pending_typevar_constraint(constraint);
     }
 
     /// Solves one relation without recording it or changing the legacy type mappings.
@@ -3473,7 +3460,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Option<ConstraintFailure<'db>> {
         let db = self.db;
         let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.evidence_lower?;
+        let argument = path_bound.evidence_lower()?;
         let variance = if path_bound.has_upper_evidence() {
             ConstraintFailureVariance::Invariant
         } else {
@@ -4753,7 +4740,7 @@ mod tests {
                 let inference = builder
                     .build_inference_with(|typevar, bounds| {
                         (typevar == t
-                            && bounds.is_some_and(|bound| bound.evidence_lower == Some(str)))
+                            && bounds.is_some_and(|bound| bound.evidence_lower() == Some(str)))
                         .then_some(PathBoundSolution::BudgetExceeded { fallback })
                     })
                     .map_err(|()| anyhow::anyhow!("incomplete alternatives remain satisfiable"))?;
@@ -5021,7 +5008,7 @@ mod tests {
 
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                (typevar == t && bounds.is_some_and(|bound| bound.evidence_lower == Some(str)))
+                (typevar == t && bounds.is_some_and(|bound| bound.evidence_lower() == Some(str)))
                     .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
             .map_err(|()| anyhow::anyhow!("expected satisfiable alternatives"))?;
@@ -5067,7 +5054,7 @@ mod tests {
         // individual path still contains the cycle after merging with object.
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                let ty = match (typevar, bounds?.evidence_lower) {
+                let ty = match (typevar, bounds?.evidence_lower()) {
                     (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
                     (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
                     _ => Type::object(),
