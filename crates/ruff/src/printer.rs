@@ -52,7 +52,7 @@ impl ExpandedStatistics<'_> {
     }
 }
 
-/// Accumulator type for grouping diagnostics by code.
+/// Accumulator type for grouping diagnostics by code or rule name.
 /// Format: (`code`, `representative_diagnostic`, `total_count`, `fixable_count`)
 type DiagnosticGroup<'a> = (Option<&'a SecondaryCode>, &'a Diagnostic, usize, usize);
 
@@ -280,15 +280,15 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .inner
             .iter()
-            .sorted_by_key(|diagnostic| diagnostic.secondary_code())
+            .sorted_by_key(|diagnostic| diagnostic.name())
             .fold(vec![], |mut acc: Vec<DiagnosticGroup>, diagnostic| {
                 let is_fixable = diagnostic
                     .fix()
                     .is_some_and(|fix| fix.applies(required_applicability));
                 let code = diagnostic.secondary_code();
 
-                if let Some((prev_code, _prev_message, count, fixable_count)) = acc.last_mut() {
-                    if *prev_code == code {
+                if let Some((_prev_code, prev_message, count, fixable_count)) = acc.last_mut() {
+                    if prev_message.name() == diagnostic.name() {
                         *count += 1;
                         if is_fixable {
                             *fixable_count += 1;

@@ -7,7 +7,7 @@ use strum_macros::EnumIter;
 
 use ruff_ranged_value::{RangedValue, ValueSource};
 
-use crate::codes::{Category, RuleCodePrefix, RuleIter, RuleStatus};
+use crate::codes::{Category, NoqaCode, RuleCodePrefix, RuleIter, RuleStatus};
 use crate::preview::{is_human_readable_names_enabled, is_rule_categories_enabled};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
@@ -243,7 +243,9 @@ impl RuleCodePrefix {
         }
 
         // The rule must match the selector exactly.
-        (rule.noqa_code().suffix() == self.short_code()).then_some(rule)
+        rule.noqa_code()
+            .is_some_and(|code| code.suffix() == self.short_code())
+            .then_some(rule)
     }
 }
 
@@ -265,7 +267,9 @@ impl RuleSelector {
             RuleSelector::Prefix { prefix, .. } => {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
-            RuleSelector::Rule { rule, .. } => rule.noqa_code().into_parts(),
+            RuleSelector::Rule { rule, .. } => rule
+                .noqa_code()
+                .map_or_else(|| ("", rule.name().as_str()), NoqaCode::into_parts),
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
         }
     }
@@ -396,6 +400,11 @@ mod schema {
                         (!prefix.is_empty()).then(|| prefix.to_string())
                     })),
             )
+            .chain(
+                Rule::iter()
+                    .filter(|rule| !rule.is_removed())
+                    .map(|rule| rule.name().to_string()),
+            )
             .filter(|p| {
                 // Exclude removed rules and prefixes where all of the rules are removed
                 match RuleSelector::parse_no_redirect(p) {
@@ -410,17 +419,15 @@ mod schema {
                 // Filter out all test-only rules
                 #[cfg(any(feature = "test-rules", test))]
                 #[expect(clippy::used_underscore_binding)]
-                if _rule.starts_with("RUF9") || _rule == "PLW0101" {
+                if _rule.starts_with("RUF9")
+                    || _rule == "PLW0101"
+                    || Rule::from_name(_rule)
+                        .is_ok_and(|rule| matches!(rule.category(), Category::Testing))
+                {
                     return false;
                 }
 
                 true
-            })
-            .flat_map(|code| {
-                Rule::from_code(&code)
-                    .map(|rule| rule.name().to_string())
-                    .into_iter()
-                    .chain(std::iter::once(code))
             })
             .sorted()
             .collect();
@@ -584,8 +591,12 @@ pub mod clap_completion {
                             None
                         }))
                         .chain(Rule::iter().map(|rule| {
-                            PossibleValue::new(rule.name().as_str())
-                                .help(rule.noqa_code().to_string())
+                            let value = PossibleValue::new(rule.name().as_str());
+                            if let Some(code) = rule.noqa_code() {
+                                value.help(code.to_string())
+                            } else {
+                                value
+                            }
                         }))
                         .chain(Category::iter().map(|category| {
                             PossibleValue::new(category.into_str()).help(category.description())

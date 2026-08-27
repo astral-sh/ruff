@@ -361,7 +361,12 @@ impl Suppressions {
         range: TextRange,
         parent: Option<TextSize>,
     ) -> bool {
-        self.check_suppression(Some(&rule.noqa_code()), rule.name().as_str(), range, parent)
+        self.check_suppression(
+            rule.noqa_code().as_ref(),
+            rule.name().as_str(),
+            range,
+            parent,
+        )
     }
 
     /// Check whether the given rule code or name corresponds to a valid suppression comment at

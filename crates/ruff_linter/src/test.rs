@@ -378,9 +378,12 @@ Source with applied fixes:
 
     let messages = messages
         .into_iter()
-        .filter_map(|msg| Some((msg.secondary_code()?.to_string(), msg)))
-        .map(|(code, mut diagnostic)| {
-            let rule = Rule::from_code(&code).unwrap();
+        .filter_map(|diagnostic| {
+            Rule::from_name(diagnostic.name())
+                .ok()
+                .map(|rule| (rule, diagnostic))
+        })
+        .map(|(rule, mut diagnostic)| {
             let fixable = diagnostic.fix().is_some_and(|fix| {
                 matches!(
                     fix.applicability(),

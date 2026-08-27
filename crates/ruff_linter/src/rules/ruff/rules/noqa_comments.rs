@@ -192,7 +192,9 @@ impl std::fmt::Display for Codes<'_> {
                 "{}",
                 rules
                     .iter()
-                    .map(Rule::noqa_code)
+                    .map(|rule| rule
+                        .noqa_code()
+                        .map_or_else(|| rule.name().to_string(), |code| code.to_string()))
                     .sorted()
                     .dedup()
                     .join(", ")
