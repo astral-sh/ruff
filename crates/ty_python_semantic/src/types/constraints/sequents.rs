@@ -14,7 +14,7 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
-use crate::types::{BoundTypeVarInstance, Parameters, Type, TypeVarVariance};
+use crate::types::{BoundTypeVarInstance, Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
 
 /// A collection of _sequents_ that describe how the constraints mentioned in a BDD relate to each
@@ -203,8 +203,8 @@ impl SequentMap {
     ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
         let post_data = storage.constraint_data(post);
-        let post_lower = post_data.lower_bound().ty();
-        let post_upper = post_data.upper_bound().ty();
+        let post_lower = post_data.lower_bound(db).ty();
+        let post_upper = post_data.upper_bound(db).ty();
         let (when, source_order) = storage.load(
             db,
             env,
@@ -244,9 +244,10 @@ impl SequentMap {
         // on any type, and the constraint is always satisfied.
         // For a ParamSpec, the bottom and top parameter lists likewise allow every specialization.
         // Record this fact without discarding the supplied bounds as inference evidence.
+        // Some internal producers still use the ordinary identities for ParamSpecs.
         let constraint_data = storage.constraint_data(constraint);
-        let lower = constraint_data.lower_bound().ty();
-        let upper = constraint_data.upper_bound().ty();
+        let lower = constraint_data.lower_bound(db).ty();
+        let upper = constraint_data.upper_bound(db).ty();
         if (constraint_data
             .stored_lower_bound()
             .is_none_or(|bound| bound.ty().is_never())
@@ -255,12 +256,8 @@ impl SequentMap {
                 .is_none_or(|bound| bound.ty().is_object()))
             || (constraint_data.typevar.is_paramspec(db)
                 && constraint_data.typevar.paramspec_attr(db).is_none()
-                && {
-                    let (lower, upper) = constraint_data.materialized_bounds(db);
-                    let bottom = Type::paramspec_value_callable(db, Parameters::bottom());
-                    let top = Type::paramspec_value_callable(db, Parameters::top());
-                    lower.is_equivalent_to(db, env, bottom) && upper.is_equivalent_to(db, env, top)
-                })
+                && lower.is_equivalent_to(db, env, constraint_data.default_lower_bound(db))
+                && upper.is_equivalent_to(db, env, constraint_data.default_upper_bound(db)))
         {
             self.add_single_tautology(constraint);
             return;
@@ -301,7 +298,8 @@ impl SequentMap {
         // implication. (That is, this check directly encodes `(L ≤ T ≤ U) → (L ≤ U)` as an
         // implication.)
 
-        // Missing endpoints add no relation to derive. Keep defaults out of stored evidence.
+        // Missing endpoints add no relation to derive. In particular, do not turn a synthetic
+        // ParamSpec default into stored evidence through a lazy comparison with another typevar.
         if constraint_data.stored_lower_bound().is_none()
             || constraint_data.stored_upper_bound().is_none()
             || lower.is_never()
@@ -497,8 +495,8 @@ impl SequentMap {
         let bound_upper_bound = bound_constraint_data.stored_upper_bound();
         // A pivot can equal a missing endpoint's identity, such as an alias of Never. That
         // comparison is useful even though there is no stored bound to copy.
-        let effective_bound_lower = bound_constraint_data.lower_bound();
-        let effective_bound_upper = bound_constraint_data.upper_bound();
+        let effective_bound_lower = bound_constraint_data.lower_bound(db);
+        let effective_bound_upper = bound_constraint_data.upper_bound(db);
 
         // Transitive pivots require subtyping; classes with dynamic bases can be assignable to
         // unrelated types without being subtypes.
@@ -727,8 +725,8 @@ impl SequentMap {
                 let constrained_data = storage.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
                 let constrained_identity = constrained_typevar.identity(db);
-                let constrained_lower_bound = constrained_data.lower_bound();
-                let constrained_upper_bound = constrained_data.upper_bound();
+                let constrained_lower_bound = constrained_data.lower_bound(db);
+                let constrained_upper_bound = constrained_data.upper_bound(db);
                 let constrained_lower = constrained_lower_bound.ty();
                 let constrained_upper = constrained_upper_bound.ty();
 
@@ -956,13 +954,13 @@ impl SequentMap {
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = storage.constraint_data(bound_constraint);
                 let bound_typevar = bound_data.typevar;
-                let bound_lower_bound = bound_data.lower_bound();
-                let bound_upper_bound = bound_data.upper_bound();
+                let bound_lower_bound = bound_data.lower_bound(db);
+                let bound_upper_bound = bound_data.upper_bound(db);
                 let bound_lower = bound_lower_bound.ty();
                 let constrained_data = storage.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
-                let constrained_lower_bound = constrained_data.lower_bound();
-                let constrained_upper_bound = constrained_data.upper_bound();
+                let constrained_lower_bound = constrained_data.lower_bound(db);
+                let constrained_upper_bound = constrained_data.upper_bound(db);
                 let constrained_lower = constrained_lower_bound.ty();
                 let constrained_upper = constrained_upper_bound.ty();
 

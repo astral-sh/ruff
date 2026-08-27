@@ -1915,20 +1915,36 @@ impl<'db> Constraint<'db> {
 
     /// Returns the effective lower endpoint with its provenance.
     ///
-    /// An absent endpoint defaults to `Validity(Never)`. Explicit `Evidence(Never)` is returned
-    /// unchanged.
-    fn lower_bound(self) -> ConstraintBound<'db> {
+    /// An absent endpoint defaults to `Validity(Never)`, or a validity bound for the bottom
+    /// parameter list of a bare `ParamSpec`. Explicit `Evidence(Never)` is returned unchanged.
+    fn lower_bound(self, db: &'db dyn Db) -> ConstraintBound<'db> {
         self.stored_lower_bound()
-            .unwrap_or_else(ConstraintBound::missing_lower)
+            .unwrap_or_else(|| ConstraintBound::Validity(self.default_lower_bound(db)))
     }
 
     /// Returns the effective upper endpoint with its provenance.
     ///
-    /// An absent endpoint defaults to `Validity(object)`. Explicit `Evidence(object)` is returned
-    /// unchanged.
-    fn upper_bound(self) -> ConstraintBound<'db> {
+    /// An absent endpoint defaults to `Validity(object)`, or a validity bound for the top
+    /// parameter list of a bare `ParamSpec`. Explicit `Evidence(object)` is returned unchanged.
+    fn upper_bound(self, db: &'db dyn Db) -> ConstraintBound<'db> {
         self.stored_upper_bound()
-            .unwrap_or_else(ConstraintBound::missing_upper)
+            .unwrap_or_else(|| ConstraintBound::Validity(self.default_upper_bound(db)))
+    }
+
+    fn default_lower_bound(self, db: &'db dyn Db) -> Type<'db> {
+        if self.typevar.is_paramspec(db) && self.typevar.paramspec_attr(db).is_none() {
+            Type::paramspec_value_callable(db, Parameters::bottom())
+        } else {
+            Type::Never
+        }
+    }
+
+    fn default_upper_bound(self, db: &'db dyn Db) -> Type<'db> {
+        if self.typevar.is_paramspec(db) && self.typevar.paramspec_attr(db).is_none() {
+            Type::paramspec_value_callable(db, Parameters::top())
+        } else {
+            Type::object()
+        }
     }
 
     /// Returns the stored lower endpoint with its provenance, or `None` if absent.
@@ -1973,8 +1989,9 @@ impl<'db> Constraint<'db> {
 /// A bound derived only from validity remains validity. Any derivation that also depends on
 /// evidence is itself evidence.
 ///
-/// Every type is a supertype of `Never` and a subtype of `object`, so `Validity(Never)` represents
-/// an absent lower bound and `Validity(object)` represents an absent upper bound.
+/// Missing endpoints are stored as `None`. [`Constraint`] supplies validity defaults appropriate
+/// for its typevar: `Never`/`object` for ordinary types, and bottom/top parameter lists for bare
+/// `ParamSpec`s.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum ConstraintBound<'db> {
     Validity(Type<'db>),
@@ -2072,7 +2089,7 @@ impl<'db> ConstraintBound<'db> {
 ///
 /// Missing bounds are stored as `None`, making equality and hashing cheaper for this common case.
 /// Ordinary validity identities (`Never`/`object`) are canonicalized to absence. The owning
-/// [`Constraint`] supplies effective defaults for missing endpoints.
+/// [`Constraint`] supplies effective defaults appropriate for its typevar.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct ConstraintBounds<'db> {
     lower: Option<ConstraintBound<'db>>,
@@ -2384,23 +2401,6 @@ fn max_constructor_and_typevar_depth<'db>(
 }
 
 impl<'db> Constraint<'db> {
-    /// Materialize missing bounds within the subject's domain when comparing constraints.
-    /// The stored options remain unchanged because absent bounds are not inference evidence.
-    fn materialized_bounds(self, db: &'db dyn Db) -> (Type<'db>, Type<'db>) {
-        if self.typevar.is_paramspec(db) && self.typevar.paramspec_attr(db).is_none() {
-            (
-                self.stored_lower_bound()
-                    .map(ConstraintBound::ty)
-                    .unwrap_or_else(|| Type::paramspec_value_callable(db, Parameters::bottom())),
-                self.stored_upper_bound()
-                    .map(ConstraintBound::ty)
-                    .unwrap_or_else(|| Type::paramspec_value_callable(db, Parameters::top())),
-            )
-        } else {
-            (self.lower_bound().ty(), self.upper_bound().ty())
-        }
-    }
-
     fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
         let both_bounds = self.iter_stored_bounds().map(ConstraintBound::ty);
         both_bounds.fold((0, 0), |(constructor_depth, typevar_depth), bound| {
@@ -2565,8 +2565,8 @@ impl<'db> Constraint<'db> {
         // `upper`. We use an existential check here ("is there *some* assignment where
         // `lower ≤ upper`?") rather than a universal check, because the bounds may mention
         // typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable when `int ≤ T`.
-        let effective_lower = constraint.lower_bound().ty();
-        let effective_upper = constraint.upper_bound().ty();
+        let effective_lower = constraint.lower_bound(db).ty();
+        let effective_upper = constraint.upper_bound(db).ty();
         if lower.is_some() && upper.is_some() {
             let when =
                 effective_lower.when_constraint_set_assignable_to_owned(db, env, effective_upper);
@@ -2747,8 +2747,10 @@ impl ConstraintId {
         {
             return false;
         }
-        let (self_lower, self_upper) = self_constraint.materialized_bounds(db);
-        let (other_lower, other_upper) = other_constraint.materialized_bounds(db);
+        let self_lower = self_constraint.lower_bound(db).ty();
+        let self_upper = self_constraint.upper_bound(db).ty();
+        let other_lower = other_constraint.lower_bound(db).ty();
+        let other_upper = other_constraint.upper_bound(db).ty();
         other_lower.is_constraint_set_assignable_to(db, env, self_lower)
             && self_upper.is_constraint_set_assignable_to(db, env, other_upper)
     }
@@ -5202,8 +5204,8 @@ impl ConstraintAssignment {
 
         std::fmt::from_fn(move |f| {
             let constraint_data = storage.constraint_data(self.constraint());
-            // Render supplied bounds, using the ordinary identities below only for the
-            // shorthand for omitted endpoints.
+            // Render supplied bounds, not the synthetic parameter-list defaults. The ordinary
+            // identities below retain the existing shorthand for omitted endpoints.
             let lower = constraint_data
                 .stored_lower_bound()
                 .map_or(Type::Never, ConstraintBound::ty);
