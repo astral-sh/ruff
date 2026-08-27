@@ -39,9 +39,6 @@ use ty_python_core::definition::Definition;
 
 pub(crate) mod promotion;
 
-/// Limit literal precision in large tuple expressions to avoid pathological inference costs.
-pub(crate) const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
     Fixed(usize),
@@ -1111,7 +1108,7 @@ impl<T, V> VariableLengthTuple<T, V> {
         }
     }
 
-    fn mixed(
+    pub(super) fn mixed(
         prefix: impl IntoIterator<Item = T>,
         variable: V,
         suffix: impl IntoIterator<Item = T>,
@@ -2347,12 +2344,28 @@ impl<T, V> Tuple<T, V> {
         }
     }
 
-    /// Matches sequence elements to an unpacking target's shape.
+    /// Matches the source sequence `self` to the target shape specified by `length`.
     ///
-    /// The returned variable segment contains all elements that may be collected by the starred
-    /// target. Keeping them separate lets callers retain source expressions and choose how to
-    /// infer the new list. `combine` is only needed when a fixed target has several possible
-    /// sources, as for `a, b, *rest = (1, *items, "last")`.
+    /// For `a, b = (1, "two")`, `length` is `TupleLength::Fixed(2)`, and each target gets one
+    /// element. For `first, *rest, last = [1, "two", 3, 4]`, `length` is
+    /// `TupleLength::Variable(1, 1)`: the returned prefix and suffix contain `1` and `4`, while
+    /// the variable segment keeps `"two"` and `3` separate. The caller uses those elements to
+    /// infer the new list for `rest`, retaining their source expressions when available.
+    ///
+    /// The source can itself have an unknown-length segment:
+    ///
+    /// ```python
+    /// def example(items: list[int]):
+    ///     first, second, *rest = (0, *items, "last")
+    /// ```
+    ///
+    /// `variable_elements` exposes the possible elements represented by that source segment.
+    /// For type inference in this example, it supplies `[int]`. `combine` produces one element
+    /// for a fixed target with multiple possible sources: `second` can receive an integer from
+    /// `items` or `"last"` when `items` is empty, so its type is `int | Literal["last"]`.
+    /// The returned variable segment still keeps the candidates for `rest` separate.
+    ///
+    /// A length error means the source's known length bounds cannot fit the targets.
     pub(crate) fn unpack(
         &self,
         length: TupleLength,
@@ -2362,14 +2375,20 @@ impl<T, V> Tuple<T, V> {
     where
         T: Clone,
     {
-        match (self, length) {
-            (Self::Fixed(values), TupleLength::Fixed(length)) => match values.len().cmp(&length) {
+        match (length, self) {
+            // Both lengths are fixed, as in `a, b = (1, "two")`; every target needs one value.
+            (TupleLength::Fixed(length), Self::Fixed(values)) => match values.len().cmp(&length) {
+                // `a, b = (1,)` leaves a target without a value.
                 Ordering::Less => Err(ResizeTupleError::TooFewValues),
+                // `a, b = (1, 2, 3)` leaves a value without a target.
                 Ordering::Greater => Err(ResizeTupleError::TooManyValues),
+                // `a, b = (1, "two")` pairs both targets with their corresponding values.
                 Ordering::Equal => Ok(Tuple::Fixed(values.clone())),
             },
-            (Self::Fixed(values), TupleLength::Variable(prefix, suffix)) => {
-                // `first, *rest, last = [1]` cannot fill both fixed targets.
+            // `first, *rest, last = [1, "two", 3, 4]` reserves `1` and `4` for the fixed
+            // targets and collects `"two"` and `3`. With `[1, 4]`, the capture is empty.
+            // `first, *rest, last = [1]` cannot fill both fixed targets.
+            (TupleLength::Variable(prefix, suffix), Self::Fixed(values)) => {
                 let Some(end) = values
                     .len()
                     .checked_sub(suffix)
@@ -2383,8 +2402,17 @@ impl<T, V> Tuple<T, V> {
                     values.0[end..].iter().cloned(),
                 ))
             }
-            (Self::Variable(values), TupleLength::Fixed(length)) => {
-                // In `a, b = (1, *items, 2, 3)`, even an empty `items` leaves too many values.
+            // The fixed ends supply `a` and `d`; a successful unpacking must take both
+            // `b` and `c` from `items`:
+            //
+            // ```python
+            // def example(items: list[str]):
+            //     a, b, c, d = (1, *items, 2)
+            // ```
+            //
+            // The source's length is unknown, but its fixed elements impose a minimum.
+            // With `a, b = (1, *items, 2, 3)` instead, even an empty `items` leaves too many values.
+            (TupleLength::Fixed(length), Self::Variable(values)) => {
                 let Some(count) = length.checked_sub(values.len().minimum()) else {
                     return Err(ResizeTupleError::TooManyValues);
                 };
@@ -2398,15 +2426,26 @@ impl<T, V> Tuple<T, V> {
                         .chain(values.suffix_elements().iter().cloned()),
                 ))
             }
-            (Self::Variable(values), TupleLength::Variable(prefix, suffix)) => {
-                // Overflow elements join the capture; underflow targets receive a combination
-                // of the possible elements in the variable portion.
+            // Extra fixed values overflow into the capture. Here `a` and `b` receive `1`
+            // and `4`, while `rest` collects `2`, the elements of `items`, and `3`:
+            //
+            // ```python
+            // def overflow(items: list[int]):
+            //     a, *rest, b = (1, 2, *items, 3, 4)
+            // ```
+            //
+            // Conversely, targets beyond the source's known prefix or suffix underflow
+            // into the variable portion. Such a target can also receive a fixed value
+            // that shifts across that portion when it is empty. Here `b` can be `"last"`:
+            //
+            // ```python
+            // def underflow(items: list[int]):
+            //     a, b, *rest = (1, *items, "last")
+            // ```
+            (TupleLength::Variable(prefix, suffix), Self::Variable(values)) => {
                 let prefix_underflow = prefix.saturating_sub(values.prefix_elements().len());
                 let suffix_overflow = values.suffix_elements().len().saturating_sub(suffix);
                 let suffix_underflow = suffix.saturating_sub(values.suffix_elements().len());
-                // An underflow position can receive an element from the variable portion or
-                // a fixed element that shifts across it when the variable portion is empty.
-                // For `a, b, *rest = (1, *items, "last")`, `b` can therefore be `"last"`.
                 let collected: Vec<_> = values
                     .prefix_elements()
                     .iter()
@@ -2894,7 +2933,36 @@ impl<T, V> TupleBuilder<T, V> {
         }
     }
 
-    /// Concatenates sequences, combining their middle portions only when both have unknown length.
+    /// Appends `other`, preserving the elements whose positions are known from either end.
+    ///
+    /// A literal expansion preserves every position:
+    ///
+    /// ```python
+    /// result = (1, *[2, 3])
+    /// ```
+    ///
+    /// An expansion of unknown length leaves the enclosing prefix and suffix fixed:
+    ///
+    /// ```python
+    /// def example(items: list[str]):
+    ///     return (1, *items, 2)
+    /// ```
+    ///
+    /// Here `1` and `2` remain fixed around the variable segment contributed by `items`.
+    ///
+    /// When both sequences have variable segments, they must share one in the result:
+    ///
+    /// ```python
+    /// def example(xs: list[int], ys: list[str]):
+    ///     return (1, *xs, 2, *(3, *ys, 4))
+    /// ```
+    ///
+    /// At the final expansion, the builder holds `(1, *xs, 2)` and `other` represents
+    /// `(3, *ys, 4)`. `merge` receives the left suffix `[2]`, the mutable left segment for
+    /// `xs`, the right segment for `ys`, and the right prefix `[3]`, in that order. It folds
+    /// the suffix, prefix, and right segment into the left segment. Only `1` and `4` remain
+    /// fixed in the result. The caller decides how to combine the segments' types or source
+    /// expressions; `merge` is not called unless both sequences have variable segments.
     pub(crate) fn concat_with(
         mut self,
         other: &Tuple<T, V>,
@@ -2905,10 +2973,22 @@ impl<T, V> TupleBuilder<T, V> {
         V: Clone,
     {
         match (&mut self, other) {
+            // Expanding the literal appends two known positions to the fixed prefix `1`:
+            //
+            // ```python
+            // result = (1, *[2, 3])
+            // ```
             (Self::Fixed(left), Tuple::Fixed(right)) => {
                 left.extend_from_slice(right.elements_slice());
                 self
             }
+            // The outer expansion extends the fixed prefix to `1, 2`, with the variable
+            // segment from `items` followed by the suffix `3`:
+            //
+            // ```python
+            // def example(items: list[str]):
+            //     return (1, *(2, *items, 3))
+            // ```
             (Self::Fixed(left), Tuple::Variable(right)) => {
                 left.extend_from_slice(right.prefix_elements());
                 Self::Variable {
@@ -2917,10 +2997,25 @@ impl<T, V> TupleBuilder<T, V> {
                     suffix: right.suffix_elements().to_vec(),
                 }
             }
+            // The final expansion extends the existing suffix `2` to `2, 3, 4`, without
+            // changing the prefix or variable segment:
+            //
+            // ```python
+            // def example(items: list[str]):
+            //     return (1, *items, 2, *[3, 4])
+            // ```
             (Self::Variable { suffix, .. }, Tuple::Fixed(right)) => {
                 suffix.extend_from_slice(right.elements_slice());
                 self
             }
+            // Neither `2` nor `3` has a fixed offset from either end, because both `xs`
+            // and `ys` have unknown length. They join the combined variable segment,
+            // leaving the outer prefix `1` and suffix `4`:
+            //
+            // ```python
+            // def example(xs: list[int], ys: list[str]):
+            //     return (1, *xs, 2, *(3, *ys, 4))
+            // ```
             (
                 Self::Variable {
                     segment, suffix, ..

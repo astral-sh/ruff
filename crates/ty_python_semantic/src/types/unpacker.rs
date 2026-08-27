@@ -14,8 +14,8 @@ use crate::Db;
 use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
-    MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE, ResizeTupleError, Tuple, TupleBuilder,
-    TupleElement, TupleLength, TupleSpec,
+    ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
+    VariableLengthTuple,
 };
 use crate::types::{
     KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
@@ -503,12 +503,7 @@ fn assignment_values_for_target<'ast>(
             if let Some(length) = known_length {
                 Tuple::heterogeneous(std::iter::repeat_n(None, length))
             } else {
-                TupleBuilder::Variable {
-                    prefix: vec![],
-                    segment: vec![None],
-                    suffix: vec![],
-                }
-                .build()
+                VariableLengthTuple::mixed([], vec![None], [])
             }
         },
     )?;
@@ -575,18 +570,11 @@ fn sequence_from_type<'db, 'ast>(
         Tuple::Fixed(values) => {
             Tuple::heterogeneous(values.iter_all_elements().map(UnpackElement::from_type))
         }
-        Tuple::Variable(values) => TupleBuilder::Variable {
-            prefix: values
-                .iter_prefix_elements()
-                .map(UnpackElement::from_type)
-                .collect(),
-            segment: vec![UnpackElement::from_type(values.variable().element_type(db))],
-            suffix: values
-                .iter_suffix_elements()
-                .map(UnpackElement::from_type)
-                .collect(),
-        }
-        .build(),
+        Tuple::Variable(values) => VariableLengthTuple::mixed(
+            values.iter_prefix_elements().map(UnpackElement::from_type),
+            vec![UnpackElement::from_type(values.variable().element_type(db))],
+            values.iter_suffix_elements().map(UnpackElement::from_type),
+        ),
     }
 }
 
@@ -658,6 +646,9 @@ fn literal_sequence_elements(
 /// Other starred iterables count as one item because their elements are not recovered from
 /// literal syntax. Stop counting as soon as the limit is exceeded.
 pub(super) fn tuple_literal_needs_promotion(values: &[ast::Expr]) -> bool {
+    /// Limit literal precision in large tuple expressions to avoid pathological inference costs.
+    const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
+
     fn remaining_budget(values: &[ast::Expr], remaining: usize) -> Option<usize> {
         values.iter().try_fold(remaining, |remaining, value| {
             if let ast::Expr::Starred(starred) = value
@@ -701,12 +692,10 @@ pub(super) fn sequence_from_literal_elements<'ast, T, V>(
 }
 
 /// The literal element count used when inferring expansions such as `(*{"key": 1},)`.
-/// An expansion within the literal, as in `[*items]` or `{**items}`, makes that count unknown.
+/// An expansion within a set or dictionary, as in `{*items}` or `{**items}`, makes that count unknown.
 fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
     match expression {
-        ast::Expr::List(ast::ExprList { elts, .. })
-        | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-        | ast::Expr::Set(ast::ExprSet { elts, .. }) => elts
+        ast::Expr::Set(ast::ExprSet { elts, .. }) => elts
             .iter()
             .all(|element| !element.is_starred_expr())
             .then_some(elts.len()),

@@ -44,9 +44,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
-        if any_over_type(db, env, ty, true, |ty| {
-            ty.tuple_instance_spec(db, env).is_some()
-        }) {
+        if !Self::allows_expression(db, env, None, ty) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
