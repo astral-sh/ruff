@@ -186,6 +186,70 @@ class Foo:
     def bar(self): ...  # error: [invalid-explicit-override]
 ```
 
+## Constructor signature compatibility
+
+Constructors can have different signatures from those on their superclasses. Decorating a
+constructor with `@override` opts into signature compatibility checks, so it must accept every
+argument combination accepted by the superclass constructor.
+
+```pyi
+from typing_extensions import override
+
+class Parent:
+    def __init__(self, value: int) -> None: ...
+    def __new__(cls, value: int) -> Parent: ...
+
+class Compatible(Parent):
+    @override
+    def __init__(self, value: int) -> None: ...
+    @override
+    def __new__(cls, value: int) -> Compatible: ...
+```
+
+Changing the parameter type from `int` to `str` is incompatible when the constructor is explicitly
+marked as an override:
+
+```pyi
+class Incompatible(Parent):
+    @override
+    def __init__(self, value: str) -> None: ...  # error: [invalid-method-override]
+    @override
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+```
+
+The same signatures are allowed without `@override`:
+
+```pyi
+class Undecorated(Parent):
+    def __init__(self, value: str) -> None: ...
+    def __new__(cls, value: str) -> Undecorated: ...
+```
+
+## Generic constructor overrides
+
+Constructor compatibility uses the superclass's specialized type parameters. A `Self` return
+annotation refers to the subclass being constructed:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import Self, override
+
+class Parent[T]:
+    def __new__(cls, value: T) -> Self: ...
+
+class Compatible(Parent[int]):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent[int]):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
 ## Missing `@override` decorator
 
 ```toml
