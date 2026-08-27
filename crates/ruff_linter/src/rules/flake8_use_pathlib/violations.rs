@@ -216,4 +216,8 @@ impl Violation for OsListdir {
     fn message(&self) -> String {
         "Use `pathlib.Path.iterdir()` instead.".to_string()
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `Path(...).iterdir()`".to_string())
+    }
 }

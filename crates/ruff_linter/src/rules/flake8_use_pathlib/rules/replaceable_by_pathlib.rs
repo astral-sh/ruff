@@ -1,7 +1,9 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::rules::flake8_use_pathlib::helpers::{
     is_file_descriptor, is_keyword_only_argument_non_default,
 };
@@ -85,21 +87,32 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         }
         // PTH208
         ["os", "listdir"] => {
-            if call
-                .arguments
-                .find_argument_value("path", 0)
-                .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-            {
+            let path = call.arguments.find_argument_value("path", 0);
+            if path.is_some_and(|expr| is_file_descriptor(expr, checker.semantic())) {
                 return;
             }
-            let mut diagnostic = checker.report_diagnostic(OsListdir, range);
-            if let Some(path) = call.arguments.find_argument_value("path", 0) {
-                diagnostic.set_fix(Fix::display_only_edit(Edit::range_replacement(
-                    format!("Path({}).iterdir()", checker.locator().slice(path)),
-                    call.range(),
-                )));
+
+            if let Some(mut diagnostic) = checker.report_diagnostic_if_enabled(OsListdir, range) {
+                if let Some(path) = path {
+                    diagnostic.try_set_fix(|| {
+                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                            &ImportRequest::import("pathlib", "Path"),
+                            call.start(),
+                            checker.semantic(),
+                        )?;
+
+                        Ok(Fix::applicable_edits(
+                            Edit::range_replacement(
+                                format!("{binding}({}).iterdir()", checker.locator().slice(path)),
+                                call.range(),
+                            ),
+                            [import_edit],
+                            Applicability::DisplayOnly,
+                        ))
+                    });
+                }
             }
-            Some(diagnostic)
+            None
         }
 
         _ => return,

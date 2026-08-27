@@ -10,11 +10,14 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   | ^^^^^^^^^^
 4 | os.listdir(b'.')
   |
+help: Replace with `Path(...).iterdir()`
   |
-2 |
+1 | import os
+2 + import pathlib
+3 |
   - os.listdir('.')
-3 + Path('.').iterdir()
-4 | os.listdir(b'.')
+4 + pathlib.Path('.').iterdir()
+5 | os.listdir(b'.')
   |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -27,11 +30,15 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
 5 |
 6 | string_path = '.'
   |
+help: Replace with `Path(...).iterdir()`
   |
-3 | os.listdir('.')
+1 | import os
+2 + import pathlib
+3 |
+4 | os.listdir('.')
   - os.listdir(b'.')
-4 + Path(b'.').iterdir()
-5 |
+5 + pathlib.Path(b'.').iterdir()
+6 |
   |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -44,11 +51,16 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
 8 |
 9 | bytes_path = b'.'
   |
+help: Replace with `Path(...).iterdir()`
   |
-6 | string_path = '.'
+1 | import os
+2 + import pathlib
+3 |
+--------------------------------------------------------------------------------
+7 | string_path = '.'
   - os.listdir(string_path)
-7 + Path(string_path).iterdir()
-8 |
+8 + pathlib.Path(string_path).iterdir()
+9 |
   |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -58,11 +70,16 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
  9 | bytes_path = b'.'
 10 | os.listdir(bytes_path)
    | ^^^^^^^^^^
+help: Replace with `Path(...).iterdir()`
    |
-9  | bytes_path = b'.'
+1  | import os
+2  + import pathlib
+3  |
+--------------------------------------------------------------------------------
+10 | bytes_path = b'.'
    - os.listdir(bytes_path)
-10 + Path(bytes_path).iterdir()
-11 |
+11 + pathlib.Path(bytes_path).iterdir()
+12 |
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -72,6 +89,7 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
 15 | path_path = Path('.')
 16 | os.listdir(path_path)
    | ^^^^^^^^^^
+help: Replace with `Path(...).iterdir()`
    |
 15 | path_path = Path('.')
    - os.listdir(path_path)
@@ -87,6 +105,7 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
    |    ^^^^^^^^^^
 20 |     ...
    |
+help: Replace with `Path(...).iterdir()`
    |
 18 |
    - if os.listdir("dir"):
@@ -104,6 +123,7 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
    |              ^^^^^^^^^^
 23 |     ...
    |
+help: Replace with `Path(...).iterdir()`
    |
 21 |
    - if "file" in os.listdir("dir"):
