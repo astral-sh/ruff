@@ -1506,6 +1506,20 @@ impl<'a> SemanticModel<'a> {
         self.current_expressions().nth(2)
     }
 
+    /// Returns an [`Iterator`] over the current expression hierarchy represented as [`NodeId`],
+    /// from the current [`NodeId`] through to any parents.
+    pub fn current_expression_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.node_id
+            .iter()
+            .flat_map(|id| self.nodes.ancestor_ids(*id))
+            .filter(|id| self.nodes[*id].is_expression())
+    }
+
+    /// Return the [`NodeId`] of the current [`Expr`], if any.
+    pub fn current_expression_id(&self) -> Option<NodeId> {
+        self.current_expression_ids().next()
+    }
+
     /// Returns an [`Iterator`] over the current statement hierarchy represented as [`NodeId`],
     /// from the current [`NodeId`] through to any parents.
     pub fn current_statement_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
@@ -1604,7 +1618,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
-    pub(crate) fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
         let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
         self.nodes[parent_node_id].as_expression()
     }
