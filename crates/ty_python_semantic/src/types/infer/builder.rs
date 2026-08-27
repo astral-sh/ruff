@@ -8525,6 +8525,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let callable_tcx = if let Some(tcx) = tcx.annotation
             && let Some(callable) = tcx
                 .filter_union(db, env, Type::is_callable_type)
+                .resolve_type_alias(db)
                 .as_callable()
         {
             match callable.signatures(self.db()).overloads.as_slice() {
