@@ -2290,8 +2290,11 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let subject_is_final = subject_ty
             .nominal_class(db, &self.env)
             .is_some_and(|class| class.is_final(db));
-        let specialized_pattern_class = if context.positional_sources.is_empty()
-            && kind.keywords.is_empty()
+        let use_generic_filtering = self.use_generic_filtering();
+        // Strict narrowing already includes the pattern's constraints in the subject type.
+        // Its full member type must not be replaced by one specialization from an intersection.
+        let specialized_pattern_class = if !use_generic_filtering
+            || (context.positional_sources.is_empty() && kind.keywords.is_empty())
         {
             None
         } else {
@@ -2332,7 +2335,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 && !specialized_member_ty.is_unknown()
             {
                 member_ty = Some(specialized_member_ty);
-            } else if let Some(pattern_class) = context.class
+            } else if use_generic_filtering
+                && let Some(pattern_class) = context.class
                 && pattern_class
                     .generic_context(db)
                     .and_then(|generic_context| {
