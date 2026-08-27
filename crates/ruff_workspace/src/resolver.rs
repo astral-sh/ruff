@@ -1146,7 +1146,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude),
+            &make_exclusion(&exclude),
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root);
