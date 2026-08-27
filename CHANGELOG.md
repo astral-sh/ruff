@@ -14,21 +14,16 @@ Released on 2026-08-27.
 
 - \[`flake8-async`\] Detect blocking generic HTTP requests (`ASYNC210`) ([#28024](https://github.com/astral-sh/ruff/pull/28024))
 - \[`flake8-datetimez`\] Allow timezone-safe `strptime` chains (`DTZ007`) ([#28023](https://github.com/astral-sh/ruff/pull/28023))
-- [flake8-simplify] Respect side effects in lambda defaults (SIM401) ([#28000](https://github.com/astral-sh/ruff/pull/28000))
+- \[`flake8-simplify`\] Respect side effects in `lambda` defaults (`SIM401`) ([#28000](https://github.com/astral-sh/ruff/pull/28000))
 
 ### Server
 
-- Fix duplicated "of" in ClientOptions doc comment ([#27978](https://github.com/astral-sh/ruff/pull/27978))
+- Fix duplicated "of" in `ClientOptions` doc comment ([#27978](https://github.com/astral-sh/ruff/pull/27978))
 
 ### Documentation
 
 - Document rule acceptance guidelines ([#27910](https://github.com/astral-sh/ruff/pull/27910))
 - Document the new category selectors ([#27906](https://github.com/astral-sh/ruff/pull/27906))
-
-### Other changes
-
-- Update Rust toolchain to 1.98 and MSRV to 1.96 ([#27954](https://github.com/astral-sh/ruff/pull/27954))
-- [ty] Add myself back to the reviewer pool ([#27997](https://github.com/astral-sh/ruff/pull/27997))
 
 ### Contributors
 
