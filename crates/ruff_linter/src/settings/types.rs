@@ -1028,7 +1028,7 @@ impl Display for RuntimeEvaluatedAnnotationLocations {
         writeln!(f, "{},", self.base_classes)?;
         write!(f, "\tdecorators = ")?;
         writeln!(f, "{}", self.decorators)?;
-        write!(f, "\n}}")
+        write!(f, "}}")
     }
 }
 

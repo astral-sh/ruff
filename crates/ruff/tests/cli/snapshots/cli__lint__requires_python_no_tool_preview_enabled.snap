@@ -118,7 +118,6 @@ linter.runtime_evaluated_annotations = {
 		required = [],
 		ambiguous = []
 	}
-
 }
 
 # Linter Plugins
