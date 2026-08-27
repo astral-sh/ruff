@@ -30,7 +30,7 @@ use ty_project::{
 };
 
 use index::DocumentError;
-use ty_python_core::program::UseDefaultStrategy;
+use ty_python_core::program::{FallibleStrategy, UseDefaultStrategy};
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -811,7 +811,13 @@ impl Session {
                     .apply_configuration_files(&system)
                     .context("Failed to apply configuration files"),
             )
-            .and_then(|()| ProjectDatabase::fallible(metadata.clone(), system.clone()));
+            .and_then(|()| {
+                ProjectDatabase::with_reaching_definitions_recording(
+                    metadata.clone(),
+                    system.clone(),
+                    &FallibleStrategy,
+                )
+            });
 
         let mut db = project.unwrap_or_else(|err| {
             tracing::error!(
@@ -822,7 +828,12 @@ impl Session {
                 "Failed to load project for workspace {uri}. {}",
                 self.client_name.log_guidance(),
             ));
-            ProjectDatabase::use_defaults(metadata, system)
+            let Ok(db) = ProjectDatabase::with_reaching_definitions_recording(
+                metadata,
+                system,
+                &UseDefaultStrategy,
+            );
+            db
         });
 
         // Carry forward diagnostic state if any exists
