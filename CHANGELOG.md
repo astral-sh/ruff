@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.16.5
+
+Released on 2026-08-27.
+
+### Preview features
+
+- Allow rules without codes ([#28049](https://github.com/astral-sh/ruff/pull/28049))
+- Introduce category selectors ([#27666](https://github.com/astral-sh/ruff/pull/27666))
+- Update preview default rules and categories ([#27877](https://github.com/astral-sh/ruff/pull/27877))
+
+### Bug fixes
+
+- \[`flake8-async`\] Detect blocking generic HTTP requests (`ASYNC210`) ([#28024](https://github.com/astral-sh/ruff/pull/28024))
+- \[`flake8-datetimez`\] Allow timezone-safe `strptime` chains (`DTZ007`) ([#28023](https://github.com/astral-sh/ruff/pull/28023))
+- \[`flake8-simplify`\] Respect side effects in `lambda` defaults (`SIM401`) ([#28000](https://github.com/astral-sh/ruff/pull/28000))
+
+### Server
+
+- Fix duplicated "of" in `ClientOptions` doc comment ([#27978](https://github.com/astral-sh/ruff/pull/27978))
+
+### Documentation
+
+- Document rule acceptance guidelines ([#27910](https://github.com/astral-sh/ruff/pull/27910))
+- Document the new category selectors ([#27906](https://github.com/astral-sh/ruff/pull/27906))
+
+### Contributors
+
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@sharkdp](https://github.com/sharkdp)
+- [@jelle-openai](https://github.com/jelle-openai)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@aarushkandukoori](https://github.com/aarushkandukoori)
+
 ## 0.16.4
 
 Released on 2026-08-20.
