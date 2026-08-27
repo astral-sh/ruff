@@ -1606,7 +1606,7 @@ pub(crate) fn analyze_condition_expression(
 ) -> Option<Truthiness> {
     match node {
         ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-            let short_circuit = Truthiness::from(*op == ast::BoolOp::Or);
+            let short_circuit = Truthiness::from(op.is_or());
             let mut result = short_circuit.negate();
             for value in values {
                 let Some(truthiness) = analyze_condition_expression(value, leaf_truthiness) else {

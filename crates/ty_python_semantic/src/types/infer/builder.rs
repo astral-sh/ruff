@@ -11167,7 +11167,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let mut done = false;
-        let mut preceding_truthiness = Truthiness::from(op == ast::BoolOp::And);
+        let mut preceding_truthiness = Truthiness::from(op.is_and());
         let mut peer_types: Option<UnionAccumulator<'db>> = None;
 
         let elements = operations
