@@ -106,9 +106,9 @@ fn nominal_top_intersection<'db>(
         is_generic
             && matches!(
                 ty.to_type_identity(db),
-                TypeIdentity::RecursiveTypeAlias(_)
-                    | TypeIdentity::RecursiveProtocol(_)
-                    | TypeIdentity::RecursiveTypedDict(_)
+                TypeIdentity::GrowingTypeAlias(_)
+                    | TypeIdentity::GrowingProtocol(_)
+                    | TypeIdentity::GrowingTypedDict(_)
             )
     }) {
         return Some(GenericIntersection::Recursive);
