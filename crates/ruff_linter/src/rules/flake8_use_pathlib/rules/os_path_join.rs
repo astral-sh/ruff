@@ -33,8 +33,8 @@ use crate::{
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.231", category = Category::Pedantic)]
 pub(crate) struct OsPathJoin {
-    pub(crate) module: String,
-    pub(crate) joiner: Joiner,
+    module: String,
+    joiner: Joiner,
 }
 
 impl Violation for OsPathJoin {
@@ -63,7 +63,7 @@ impl Violation for OsPathJoin {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Joiner {
+enum Joiner {
     Slash,
     Joinpath,
 }
