@@ -1763,7 +1763,6 @@ impl<'db> ProtocolMemberKind<'db> {
                         db,
                         signatures,
                         current_callable.kind(db),
-                        current_callable.provenance(db),
                     ))),
                     kind,
                 )

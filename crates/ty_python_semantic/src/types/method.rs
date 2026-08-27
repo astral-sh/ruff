@@ -7,13 +7,9 @@ use crate::{
     types::{
         CallableType, KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
         PropertyInstanceType, Signature, StringLiteralType, Type, TypeFormType, UnionType,
-        callable::{CallableFunctionProvenance, CallableTypeKind},
-        constraints::ConstraintSet,
-        function::FunctionType,
-        known_instance::InternedConstraintSet,
-        relation::TypeRelationChecker,
-        signatures::CallableSignature,
-        visitor,
+        callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
+        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
+        signatures::CallableSignature, visitor,
     },
 };
 
@@ -101,14 +97,10 @@ impl<'db> BoundMethodType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        let function = self.function(db);
         CallableType::new(
             db,
             self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
-            CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(db),
-            ),
         )
     }
 
@@ -120,15 +112,10 @@ impl<'db> BoundMethodType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
-        let function = self.function(db);
-
         CallableType::new(
             db,
             self.bound_signatures_with_receiver(db, env, receiver_type, typing_self_type),
             CallableTypeKind::FunctionLike,
-            CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(db),
-            ),
         )
     }
 
