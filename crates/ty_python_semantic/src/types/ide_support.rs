@@ -23,12 +23,14 @@ use ty_module_resolver::{ImportingFile, Module, ResolverFile};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::{ProgramFile, attribute_scopes, semantic_index, use_def_map};
 
+mod name_resolution;
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
 
 use crate::types::definition_resolution::{self, user_visible_definitions};
 pub use crate::types::definition_resolution::{ImportAliasResolution, ResolvedDefinition};
+pub use name_resolution::{InferredNameLoads, NameLoadInference};
 pub use stub_mapping::map_stub_definition;
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
