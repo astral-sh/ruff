@@ -265,8 +265,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
-    /// Direct-condition truthiness for chained comparisons, when it differs from the
-    /// truthiness of their resulting values.
+    /// Truthiness overrides for evaluating comparison chains directly as conditions.
+    /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
+    /// separately from expression types.
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
 
     /// An expression cache shared across builders during multi-inference.
@@ -11308,6 +11309,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         if ops.len() > 1 {
+            // Individual comparisons within a chain have no expression nodes whose result types
+            // reachability can look up later. Retain their combined condition truthiness here;
+            // `and`/`or` conditions can instead be reconstructed by walking their operand nodes.
+            // See `ExpressionInferenceExtra::comparison_truthiness` for why the chain's value
+            // type is not sufficient.
+            //
             // As a condition, the chain is truthy only if both its prefix and final comparison are
             // truthy. Skip the final comparison's truthiness computation when the prefix is
             // already always false.
