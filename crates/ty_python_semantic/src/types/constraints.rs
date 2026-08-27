@@ -2091,11 +2091,7 @@ impl<'db> UpperBound<'db> {
     /// Exact conversion to an ordinary [`Type`]. This may be expensive: if any stored clause is a
     /// union, [`IntersectionType::from_elements`] converts this factored CNF representation into
     /// ty's ordinary DNF representation by distributing intersections over unions.
-    pub(crate) fn materialize_exact(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    fn materialize_exact(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         IntersectionType::from_elements(db, env, self.iter_clauses().map(ConstraintBound::ty))
     }
 
