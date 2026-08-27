@@ -153,6 +153,7 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
+preview = true
 select = [
     "E", # pycodestyle (error)
     "F", # pyflakes
@@ -167,6 +168,11 @@ select = [
     "PYI", # flake8-pyi
     "RUF",
     "S602", # flake8-bandit: subprocess-popen-with-shell-equals-true
+    "correctness",
+    "suspicious",
+    "complexity",
+    "performance",
+    "style",
 ]
 
 ignore = [
@@ -175,7 +181,9 @@ ignore = [
     "B011",
     # Leave it to the formatter to split long lines and
     # the judgement of all of us.
-    "E501"
+    "E501",
+    # This is often more readable in our scripts.
+    "repeated-append",
 ]
 
 [tool.ruff.lint.isort]

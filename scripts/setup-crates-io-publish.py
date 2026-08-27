@@ -153,7 +153,7 @@ def publish_placeholder_crate(
 
         authors = workspace_package.get("authors", [])
         if not isinstance(authors, list):
-            raise RuntimeError("workspace.package.authors must be a list")
+            raise TypeError("workspace.package.authors must be a list")
 
         edition = workspace_package.get("edition")
         rust_version = workspace_package.get("rust-version")
@@ -202,6 +202,7 @@ def publish_placeholder_crate(
             ],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode != 0:
             print(result.stderr, file=sys.stderr, end="")
