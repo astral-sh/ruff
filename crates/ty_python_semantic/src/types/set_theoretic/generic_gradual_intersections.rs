@@ -23,12 +23,13 @@ pub(super) fn generic_gradual_intersection<'db>(
         .or_else(|| nominal_top_intersection(db, env, right, left))
 }
 
-/// Intersect a fully static nominal base with a top-materialized generic subclass.
+/// Intersect a fully static nominal base with a generic subclass.
 ///
 /// The subclass's identity MRO determines which subclass type variables specialize the base.
 /// Restricting those variables by the base's variance preserves invariant subclass
 /// materializations instead of incorrectly collapsing, for example,
 /// `Sequence[int] & Top[list[Any]]` to `list[int]`.
+/// Subclass arguments that do not specialize the base retain their gradualness.
 fn nominal_top_intersection<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -126,13 +127,17 @@ fn nominal_top_intersection<'db>(
     }
 
     let specialization = subclass_context.specialize(db, types);
+    let specialized = Type::instance(
+        db,
+        env,
+        subclass_class.apply_optional_specialization(db, Some(specialization)),
+    );
     Some(
-        Type::instance(
-            db,
-            env,
-            subclass_class.apply_optional_specialization(db, Some(specialization)),
-        )
-        .top_materialization(db, env),
+        if subclass_specialization.materialization_kind(db) == Some(MaterializationKind::Top) {
+            specialized.top_materialization(db, env)
+        } else {
+            specialized
+        },
     )
 }
 

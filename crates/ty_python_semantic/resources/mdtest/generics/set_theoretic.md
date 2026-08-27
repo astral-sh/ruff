@@ -491,6 +491,33 @@ class Mixed(Generic[T_co, T_contra, T_invariant]): ...
 static_assert(is_equivalent_to(Mixed[P, Q, R] & Mixed[Any, Any, Any], Mixed[P & Any, Q | Any, R]))
 ```
 
+### Unrelated subclass type parameters
+
+Intersecting with a specialized base preserves gradual subclass arguments that do not specialize
+that base. Here, `U` is covariant, `V` is contravariant, and `W` is invariant:
+
+```pyi
+from typing import Any
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Base[T]:
+    def get(self) -> T: ...
+
+class Child[T, U, V, W](Base[T]):
+    def extra(self) -> U: ...
+    def consume(self, value: V) -> None: ...
+    item: W
+
+static_assert(is_equivalent_to(Base[int] & Child[object, Any, Any, Any], Child[int, Any, Any, Any]))
+```
+
+If the subclass is already top-materialized, the result retains that materialization:
+
+```pyi
+static_assert(is_equivalent_to(Base[int] & Top[Child[Any, Any, Any, Any]], Top[Child[int, Any, Any, Any]]))
+```
+
 ### Tuples
 
 Tuple types are covariant in every type parameter, so the results derived for `Co[T]` above apply to
