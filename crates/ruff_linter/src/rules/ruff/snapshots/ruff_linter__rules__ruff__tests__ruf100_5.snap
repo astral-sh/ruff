@@ -16,7 +16,7 @@ help: Remove commented-out code
   -     # "key3": 789,
 7 | }
   |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 ERA001 [*] Found commented-out code
   --> RUF100_5.py:11:1
@@ -32,7 +32,7 @@ help: Remove commented-out code
    - #import os  # noqa: E501
 11 |
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_5.py:11:13
@@ -97,7 +97,7 @@ help: Remove commented-out code
    - # )
 25 | # )  # noqa: ERA001
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 ERA001 [*] Found commented-out code
   --> RUF100_5.py:28:1
@@ -114,4 +114,4 @@ help: Remove commented-out code
    - # (
 28 | # (  # noqa: ERA001
    |
-note: This is a display-only fix and is likely to be incorrect
+warning: This fix may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
