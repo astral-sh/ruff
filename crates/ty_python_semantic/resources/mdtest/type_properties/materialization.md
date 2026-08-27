@@ -1391,6 +1391,11 @@ def generic_recursive_materialization(value: Top[Covariant[GenericRecursive[int]
 
 ## Subtyping
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Any `list[T]` is a subtype of `Top[list[Any]]`, but with more restrictive gradual types, not all
 other specializations are subtypes.
 
@@ -1474,8 +1479,18 @@ T = TypeVar("T")
 
 def unresolved(values: list[T] | Top[list[int & Any]]):
     static_assert(not is_subtype_of(list[T], Top[list[int & Any]]))
-    static_assert(not is_subtype_of(Top[list[Any]], list[T]))
     reveal_type(values)  # revealed: list[T@unresolved] | Top[list[int & Any]]
+```
+
+Likewise, `Top[list[Unknown]]` includes lists with any element type, so it is not a subtype of
+`list[T]` for an arbitrary `T`. This is a regression test for
+[ty#4201](https://github.com/astral-sh/ty/issues/4201).
+
+```pyi
+from ty_extensions._internal import Unknown
+
+def _[T](value: T):
+    static_assert(not is_subtype_of(Top[list[Unknown]], list[T]))
 ```
 
 A declared upper bound can establish the required relation without fixing the type variable to one
