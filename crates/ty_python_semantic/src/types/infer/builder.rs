@@ -11193,10 +11193,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         err.fallback_truthiness()
                     });
                     preceding_truthiness = match op {
-                        ast::BoolOp::And => preceding_truthiness
-                            .negate()
-                            .or(truthiness.negate())
-                            .negate(),
+                        ast::BoolOp::And => preceding_truthiness.and(truthiness),
                         ast::BoolOp::Or => preceding_truthiness.or(truthiness),
                     };
 
@@ -11311,14 +11308,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         if ops.len() > 1 {
+            // As a condition, the chain is truthy only if both its prefix and final comparison are
+            // truthy. Skip the final comparison's truthiness computation when the prefix is
+            // already always false.
             let truthiness = preceding_truthiness
-                .negate()
-                .or_else(|| {
-                    last_comparison_ty
-                        .bool(db, self.program_environment())
-                        .negate()
-                })
-                .negate();
+                .and_else(|| last_comparison_ty.bool(db, self.program_environment()));
             let expression = ast::ExprRef::Compare(compare).into();
             if truthiness != ty.bool(db, self.program_environment()) {
                 self.comparison_truthiness.insert(expression, truthiness);
