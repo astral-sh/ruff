@@ -203,7 +203,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             literal_sequence(
                 expression,
                 value.promote_literals,
-                &mut |expression, promote| {
+                &|expression, promote| {
                     let ty = value_inference.expression_type(expression);
                     UnpackElement {
                         ty: if promote { ty.promote(db, env) } else { ty },
@@ -211,7 +211,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         promote_literals: promote,
                     }
                 },
-                &mut |expression, promote, known_length| {
+                &|expression, promote, known_length| {
                     // The starred expression's inference has already reported iteration errors.
                     // For `a, *rest = [1, *items]`, retain the shape of `items`' iterator even
                     // though the enclosing list's type has erased positions and length.
@@ -498,8 +498,8 @@ fn assignment_values_for_target<'ast>(
     let values = literal_sequence(
         value,
         false,
-        &mut |expression, _| Some(expression),
-        &mut |_, _, known_length| {
+        &|expression, _| Some(expression),
+        &|_, _, known_length| {
             if let Some(length) = known_length {
                 Tuple::heterogeneous(std::iter::repeat_n(None, length))
             } else {
@@ -621,39 +621,88 @@ pub(super) fn collected_list_type<'db, 'ast>(
 /// recursively; other starred expressions contribute the shape supplied by the caller. For
 /// `first, *rest, last = [1, *items, 2]`, the unknown width of `items` leaves both ends intact.
 fn literal_sequence<'ast, T: Clone>(
-    mut expression: &'ast ast::Expr,
+    expression: &'ast ast::Expr,
     promote: bool,
-    element: &mut impl FnMut(&'ast ast::Expr, bool) -> T,
-    spread: &mut impl FnMut(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, Vec<T>>,
+    element: &impl Fn(&'ast ast::Expr, bool) -> T,
+    spread: &impl Fn(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, Vec<T>>,
 ) -> Option<Tuple<T, Vec<T>>> {
-    // `a, *rest = (items := [1, "two"])` has the same elements as the list itself.
-    while let ast::Expr::Named(named) = expression {
-        expression = &named.value;
-    }
-    let values = sequence_elts(expression)?;
-    let promote = promote
-        || (expression.is_tuple_expr()
-            && values.len() > MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE);
-    let mut builder = TupleBuilder::with_capacity(values.len());
-    for value in values {
-        if let ast::Expr::Starred(starred) = value {
-            let unpacked = literal_sequence(&starred.value, promote, element, spread)
-                .unwrap_or_else(|| spread(value, promote, literal_iterable_length(&starred.value)));
-            builder = builder.concat_with(&unpacked, |suffix, left, right, prefix| {
+    let (values, promote) = literal_sequence_elements(expression, promote)?;
+    Some(sequence_from_literal_elements(
+        values,
+        promote,
+        element,
+        spread,
+        &|builder, unpacked| {
+            builder.concat_with(unpacked, |suffix, left, right, prefix| {
                 // For `[*a, *b, *c, ...]`, retain the accumulated elements instead of copying
                 // them again for every expansion. Positions within this segment are unknown.
                 left.extend(suffix.iter().chain(prefix).chain(right).cloned());
-            });
+            })
+        },
+    ))
+}
+
+fn literal_sequence_elements(
+    expression: &ast::Expr,
+    promote: bool,
+) -> Option<(&[ast::Expr], bool)> {
+    // `a, *rest = (items := [1, "two"])` has the same elements as the list itself.
+    let expression = expression.expression_value();
+    let values = sequence_elts(expression)?;
+    let promote = promote || (expression.is_tuple_expr() && tuple_literal_needs_promotion(values));
+    Some((values, promote))
+}
+
+/// Applies the tuple precision limit after expanding literal elements. For `(*[1, 2], 3)`,
+/// all three positions count, even though the outer tuple has only two AST elements.
+/// Other starred iterables count as one item because their elements are not recovered from
+/// literal syntax. Stop counting as soon as the limit is exceeded.
+pub(super) fn tuple_literal_needs_promotion(values: &[ast::Expr]) -> bool {
+    fn remaining_budget(values: &[ast::Expr], remaining: usize) -> Option<usize> {
+        values.iter().try_fold(remaining, |remaining, value| {
+            if let ast::Expr::Starred(starred) = value
+                && let Some(values) = sequence_elts(starred.value.expression_value())
+            {
+                remaining_budget(values, remaining)
+            } else {
+                remaining.checked_sub(1)
+            }
+        })
+    }
+
+    remaining_budget(values, MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE).is_none()
+}
+
+/// Builds a literal's sequence shape from already-inferred elements and iterable shapes.
+/// In `source = (*[1, "two"],)`, expanding the list syntax preserves both tuple positions.
+/// The caller chooses the variable-segment representation and how to concatenate it: tuple
+/// inference retains symbolic `TypeVarTuple` segments, while unpacking retains source expressions.
+pub(super) fn sequence_from_literal_elements<'ast, T, V>(
+    values: &'ast [ast::Expr],
+    promote: bool,
+    element: &impl Fn(&'ast ast::Expr, bool) -> T,
+    spread: &impl Fn(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, V>,
+    concat: &impl Fn(TupleBuilder<T, V>, &Tuple<T, V>) -> TupleBuilder<T, V>,
+) -> Tuple<T, V> {
+    let mut builder = TupleBuilder::with_capacity(values.len());
+    for value in values {
+        if let ast::Expr::Starred(starred) = value {
+            let unpacked = literal_sequence_elements(&starred.value, promote)
+                .map(|(values, promote)| {
+                    sequence_from_literal_elements(values, promote, element, spread, concat)
+                })
+                .unwrap_or_else(|| spread(value, promote, literal_iterable_length(&starred.value)));
+            builder = concat(builder, &unpacked);
         } else {
             builder.push(element(value, promote));
         }
     }
-    Some(builder.build())
+    builder.build()
 }
 
 /// The literal element count used when inferring expansions such as `(*{"key": 1},)`.
 /// An expansion within the literal, as in `[*items]` or `{**items}`, makes that count unknown.
-pub(super) fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
+fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
     match expression {
         ast::Expr::List(ast::ExprList { elts, .. })
         | ast::Expr::Tuple(ast::ExprTuple { elts, .. })

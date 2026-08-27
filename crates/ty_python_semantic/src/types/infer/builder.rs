@@ -108,16 +108,16 @@ use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
-use crate::types::tuple::{
-    MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE, Tuple, TupleLength, TupleSpecBuilder,
-    TupleType, VariableSegment,
-};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
-use crate::types::unpacker::{UnpackResult, fixed_sequence_elements, literal_iterable_length};
+use crate::types::unpacker::{
+    UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
+    tuple_literal_needs_promotion,
+};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags,
@@ -7054,7 +7054,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .unwrap_or_default();
         let mut annotated_elt_tys = annotated_elt_tys.into_iter();
 
-        let mut infer_element = |elt: &ast::Expr| {
+        for elt in elts {
             let annotated_elt_ty = annotated_elt_tys.by_ref().next();
             let element_tcx = if can_use_type_context {
                 let expected = if elt.is_starred_expr() {
@@ -7067,38 +7067,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 TypeContext::default()
             };
-            if tuple.len() > MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE {
-                // Promote literals for very large unannotated tuples,
-                // to avoid pathological performance issues
-                self.infer_expression(elt, element_tcx).promote(db, env)
-            } else {
-                self.infer_expression(elt, element_tcx)
-            }
-        };
-
-        let mut builder = TupleSpecBuilder::with_capacity(elts.len());
-
-        for element in elts {
-            if let ast::Expr::Starred(starred) = element {
-                let element_type = infer_element(element);
-                // Fine to use `iterate` rather than `try_iterate` here:
-                // errors from iterating over something not iterable will have been
-                // emitted in the `infer_element` call above.
-                let mut spec = element_type.iterate(db, env).into_owned();
-
-                if let Some(known_length) = literal_iterable_length(&starred.value) {
-                    spec = spec
-                        .resize(db, env, TupleLength::Fixed(known_length))
-                        .unwrap_or(spec);
-                }
-
-                builder = builder.concat(db, env, &spec);
-            } else {
-                builder.push(infer_element(element));
-            }
+            self.infer_expression(elt, element_tcx);
         }
 
-        Type::tuple(TupleType::new(db, env, &builder.build()))
+        // Infer expressions once, in evaluation order and with their type context, before
+        // recovering literal positions. For `(*[(item := 1), item],)`, both list elements
+        // must be inferred before the traversal reads their types.
+        let inferred_type = |expression: &ast::Expr, promote| {
+            let ty = self.expression_type(expression);
+            if promote { ty.promote(db, env) } else { ty }
+        };
+        let spec = sequence_from_literal_elements(
+            elts,
+            tuple_literal_needs_promotion(elts),
+            &inferred_type,
+            &|expression, promote, known_length| {
+                // Starred-expression inference has already reported iteration errors.
+                let spec = inferred_type(expression, promote)
+                    .iterate(db, env)
+                    .into_owned();
+                known_length
+                    .and_then(|length| spec.resize(db, env, TupleLength::Fixed(length)).ok())
+                    .unwrap_or(spec)
+            },
+            &|builder, unpacked| builder.concat(db, env, unpacked),
+        );
+        Type::tuple(TupleType::new(db, env, &spec))
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {

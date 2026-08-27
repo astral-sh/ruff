@@ -168,12 +168,13 @@ reveal_type(f)  # revealed: Unknown
 
 For performance, ty widens inferred integer literal types to `int` in tuples with more than 64
 elements. Unpacking preserves that widening: this unannotated assignment infers `int` for `first`
-and `list[int]` for `rest`. Widening also applies inside nested tuple elements. Unpacking the small
-tuple `(0, (1,), 2)` instead infers `Literal[0]` and `Literal[1]` for the fixed targets.
+and `list[int]` for `rest`, including when the elements come from a list literal expansion. Widening
+also applies inside nested tuple elements. Unpacking the small tuple `(0, (1,), 2)` instead infers
+`Literal[0]` and `Literal[1]` for the fixed targets.
 
 ```py
 # fmt: off
-first, (second,), *rest = (
+first, (second,), *rest = (*[
     0, (1,), 2, 3, 4, 5, 6, 7, 8, 9,
     10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
     20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
@@ -181,7 +182,7 @@ first, (second,), *rest = (
     40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
     50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
     60, 61, 62, 63, 64,
-)
+],)
 # fmt: on
 reveal_type(first)  # revealed: int
 reveal_type(second)  # revealed: int
