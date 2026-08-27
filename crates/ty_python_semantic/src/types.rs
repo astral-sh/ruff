@@ -8366,10 +8366,7 @@ impl<'db> Type<'db> {
                         if mapped == self || alias.value_type(db) == mapped {
                             self
                         } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                            && matches!(
-                                self.to_type_identity(db),
-                                cyclic::TypeIdentity::RecursiveTypeAlias(_)
-                            )
+                            && alias.is_recursive(db)
                         {
                             Type::TypeAlias(
                                 alias.with_materialization_kind(db, Some(*materialization_kind)),
