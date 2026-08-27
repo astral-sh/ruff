@@ -985,9 +985,9 @@ fn site_packages_editables<'db>(
     let system = db.system();
 
     for site_packages in &environment.search_paths(db).site_packages {
-        let Some(site_packages_dir) = site_packages.as_system_path() else {
-            continue;
-        };
+        let site_packages_dir = site_packages
+            .as_system_path()
+            .expect("Expected site package path to be a system path");
 
         // As well as modules installed directly into `site-packages`,
         // the directory may also contain `.pth` files.
@@ -1107,9 +1107,10 @@ pub(crate) fn dynamic_resolution_paths<'db>(
     let files = db.files();
 
     for paths in site_packages {
-        let Some(site_packages_dir) = paths.site_packages.as_system_path() else {
-            continue;
-        };
+        let site_packages_dir = paths
+            .site_packages
+            .as_system_path()
+            .expect("Expected site package path to be a system path");
         if !existing_paths.insert(site_packages_dir) {
             continue;
         }
