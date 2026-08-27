@@ -1121,7 +1121,7 @@ static_assert(not is_subtype_of(AlternatingLeft[int, str], AlternatingRight[int,
 type OuterLeft[A, B] = NodeLeft[A, B]
 type NodeLeft[A, B] = tuple[A, NodeLeft[list[A], B], OuterLeft[B, None]]
 type OuterRight[A, B] = NodeRight[A, B]
-type NodeRight[A, B] = tuple[A, NodeRight[list[A], B], OuterRight[None, B]]
+type NodeRight[A, B] = tuple[A, NodeRight[list[A], B], OuterRight[B, None]]
 
 # TODO: These structurally equivalent aliases should be recognized as subtypes.
 static_assert(not is_subtype_of(OuterLeft[int, str], OuterRight[int, str]))
