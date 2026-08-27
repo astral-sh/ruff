@@ -3,14 +3,13 @@
 //! Used for <https://docs.astral.sh/ruff/rules/>.
 
 use itertools::Itertools;
-use ruff_linter::codes::{Category, RuleStatus};
+use ruff_linter::codes::RuleStatus;
 use std::borrow::Cow;
 use std::fmt::Write;
 use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
-use ruff_linter::rule_selector::RuleSelector;
 use ruff_linter::settings::LinterSettings;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
@@ -29,36 +28,18 @@ const SYMBOL_STYLE: &str = "style='width: 1em; display: inline-block;'";
 /// Style for the container wrapping the default selection, fixability, and status icons.
 const SYMBOLS_CONTAINER: &str = "style='display: flex; gap: 0.5rem; justify-content: end;'";
 
-#[derive(clap::Args)]
-pub(crate) struct Args {
-    /// Group rules by category instead of their upstream linter.
-    #[arg(long)]
-    by_category: bool,
-}
-
-#[derive(Clone, Copy)]
-enum TableKind<'a> {
-    Linter(&'a Linter),
-    Category,
-    Codeless,
-}
-
 fn generate_table(
     table_out: &mut String,
     rules: impl IntoIterator<Item = Rule>,
-    kind: TableKind<'_>,
-    default_rules: Option<&RuleTable>,
+    linter: Option<&Linter>,
+    default_rules: &RuleTable,
 ) {
-    if !matches!(kind, TableKind::Codeless) {
+    if linter.is_some() {
         table_out.push_str("| Code { scope='col' } ");
     }
-    table_out.push_str("| Name { scope='col' } | Message { scope='col' } | Status/Fix");
-    if default_rules.is_some() {
-        table_out.push_str("/Default");
-    }
-    table_out.push_str(" { scope='col' .sr-only } |");
+    table_out.push_str("| Name { scope='col' } | Message { scope='col' } | Status/Fix/Default { scope='col' .sr-only } |");
     table_out.push('\n');
-    if !matches!(kind, TableKind::Codeless) {
+    if linter.is_some() {
         table_out.push_str("| ---- ");
     }
     table_out.push_str("| ---- | ------- | -: |");
@@ -96,12 +77,12 @@ fn generate_table(
             FixAvailability::None => format!("<span {SYMBOL_STYLE}></span>"),
         };
 
-        let default_token = match default_rules {
-            Some(default_rules) if default_rules.enabled(rule) => format!(
+        let default_token = if default_rules.enabled(rule) {
+            format!(
                 "<span aria-hidden='true' {SYMBOL_STYLE} title='Enabled by default'>{DEFAULT_SYMBOL}</span><span class='sr-only'>Enabled by default</span>"
-            ),
-            Some(_) => format!("<span {SYMBOL_STYLE}></span>"),
-            None => String::new(),
+            )
+        } else {
+            format!("<span {SYMBOL_STYLE}></span>")
         };
 
         let rule_name = rule.name();
@@ -127,23 +108,13 @@ fn generate_table(
             se = "</span>";
         }
 
-        match kind {
-            TableKind::Linter(linter) => {
-                let _ = write!(
-                    table_out,
-                    "| {ss}{prefix}{code}{se} {{ #{prefix}{code} }} ",
-                    prefix = linter.common_prefix(),
-                    code = linter.code_for_rule(rule).unwrap(),
-                );
-            }
-            TableKind::Category => {
-                if let Some(code) = rule.noqa_code() {
-                    let _ = write!(table_out, "| {ss}{code}{se} {{ #{code} }} ");
-                } else {
-                    table_out.push_str("| — ");
-                }
-            }
-            TableKind::Codeless => {}
+        if let Some(linter) = linter {
+            let _ = write!(
+                table_out,
+                "| {ss}{prefix}{code}{se} {{ #{prefix}{code} }} ",
+                prefix = linter.common_prefix(),
+                code = linter.code_for_rule(rule).unwrap(),
+            );
         }
 
         #[expect(clippy::or_fun_call)]
@@ -161,7 +132,7 @@ fn generate_table(
     table_out.push('\n');
 }
 
-pub(crate) fn generate(args: &Args) -> String {
+pub(crate) fn generate() -> String {
     // Generate the table string.
     let mut table_out = String::new();
 
@@ -190,34 +161,15 @@ pub(crate) fn generate(args: &Args) -> String {
         &mut table_out,
         "{SPACER}{FIX_SYMBOL}{SPACER} The rule is automatically fixable by the `--fix` command-line option."
     );
-    if !args.by_category {
-        table_out.push_str("<br />");
-        let _ = write!(
-            &mut table_out,
-            "{SPACER}{DEFAULT_SYMBOL}{SPACER} The rule is enabled by default."
-        );
-    }
+    table_out.push_str("<br />");
+
+    let _ = write!(
+        &mut table_out,
+        "{SPACER}{DEFAULT_SYMBOL}{SPACER} The rule is enabled by default."
+    );
     table_out.push_str("\n\n");
     table_out.push_str("All rules not marked as preview, deprecated or removed are stable.");
     table_out.push('\n');
-
-    if args.by_category {
-        for category in Category::iter() {
-            let _ = writeln!(
-                table_out,
-                "### `{category}` {{ #{category} }}\n\n{}.\n",
-                category.description(),
-            );
-            generate_table(
-                &mut table_out,
-                RuleSelector::Category(category).all_rules(),
-                TableKind::Category,
-                None,
-            );
-        }
-
-        return table_out;
-    }
 
     let default_rules = LinterSettings::default().rules;
     for linter in Linter::iter() {
@@ -306,19 +258,14 @@ pub(crate) fn generate(args: &Args) -> String {
                 }
                 table_out.push('\n');
                 table_out.push('\n');
-                generate_table(
-                    &mut table_out,
-                    rules.clone(),
-                    TableKind::Linter(&linter),
-                    Some(&default_rules),
-                );
+                generate_table(&mut table_out, rules.clone(), Some(&linter), &default_rules);
             }
         } else {
             generate_table(
                 &mut table_out,
                 linter.all_rules(),
-                TableKind::Linter(&linter),
-                Some(&default_rules),
+                Some(&linter),
+                &default_rules,
             );
         }
     }
@@ -328,12 +275,7 @@ pub(crate) fn generate(args: &Args) -> String {
         .peekable();
     if codeless_rules.peek().is_some() {
         table_out.push_str("### Rules without codes\n\n");
-        generate_table(
-            &mut table_out,
-            codeless_rules,
-            TableKind::Codeless,
-            Some(&default_rules),
-        );
+        generate_table(&mut table_out, codeless_rules, None, &default_rules);
     }
 
     table_out
