@@ -3,6 +3,7 @@ This module principally provides several routines for resolving a particular mod
 name to a `Module`:
 
 * [`file_to_module`][]: resolves the module `.<self>` (often as the first step in resolving `.`)
+* [`stub_file_to_real_module`][]: resolves the runtime module corresponding to a stub file
 * [`resolve_module`][]: resolves an absolute module name
 
 You may notice that we actually provide `resolve_(real)_(shadowable)_module_(confident)`.
@@ -364,6 +365,31 @@ pub fn file_to_module<'db>(
             relative_desperate_search_paths(db, resolver_file).iter(),
         )
     })
+}
+
+/// Resolves the runtime module corresponding to a stub file.
+///
+/// Modules that are only available as stubs, including built-in modules, return `None`.
+pub fn stub_file_to_real_module<'db>(
+    db: &'db dyn Db,
+    resolver_file: ResolverFile<'db>,
+) -> Option<Module<'db>> {
+    debug_assert!(resolver_file.file(db).is_stub(db));
+
+    let module = file_to_module(db, resolver_file)?;
+    // Built-in modules have no source file to find. Checking here also avoids a failed
+    // resolution attempt that would emit misleading logs.
+    if ruff_python_stdlib::sys::is_builtin_module(module.python_version(db).minor, module.name(db))
+    {
+        return None;
+    }
+    // This lookup is equivalent to resolving `.<self>` from the stub, so the stub is the correct
+    // importing file.
+    resolve_real_module(
+        db,
+        ImportingFile::ResolverFile(resolver_file),
+        module.name(db),
+    )
 }
 
 fn file_to_module_impl<'db, 'a>(
@@ -879,6 +905,14 @@ impl SearchPaths {
             site_packages: vec![],
             typeshed_versions: vendored_typeshed_versions(vendored),
         }
+    }
+
+    /// Returns the configured roots for first-party modules.
+    pub fn first_party_roots(&self) -> impl Iterator<Item = &SystemPath> {
+        self.static_paths
+            .iter()
+            .filter(|path| path.is_first_party())
+            .filter_map(SearchPath::as_system_path)
     }
 
     /// Registers file roots for all non-dynamically discovered search paths.
@@ -3417,6 +3451,31 @@ not_a_directory
             !search_paths.contains(
                 &&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()
             )
+        );
+    }
+
+    #[test]
+    fn first_party_roots_exclude_dynamic_search_paths() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "")])
+            .with_site_packages_files(&[("_foo.pth", "/editable")])
+            .build();
+        db.memory_file_system()
+            .create_directory_all("/editable")
+            .expect("valid editable directory");
+
+        let all_paths: Vec<_> =
+            search_paths(&db, db.resolver_environment(), ModuleResolveMode::Typing).collect();
+        assert!(
+            all_paths.contains(
+                &&SearchPath::editable(db.system(), SystemPathBuf::from("/editable"))
+                    .expect("valid editable search path")
+            )
+        );
+
+        assert_eq!(
+            db.search_paths().first_party_roots().collect::<Vec<_>>(),
+            [&*src]
         );
     }
 

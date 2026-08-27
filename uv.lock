@@ -387,7 +387,7 @@ dependencies = [
 [[package]]
 name = "ecosystem-analyzer"
 version = "0.1.0"
-source = { git = "https://github.com/astral-sh/ecosystem-analyzer#ef0bbe10e9e28c887e74b5a4101a511e65c783b4" }
+source = { git = "https://github.com/astral-sh/ecosystem-analyzer#74af2b661a70a3bfcf76f5bc12ba6c6296d5dc68" }
 dependencies = [
     { name = "click" },
     { name = "gitpython" },

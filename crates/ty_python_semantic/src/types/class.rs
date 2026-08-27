@@ -3390,7 +3390,7 @@ impl<'db> ClassMetaclass<'db> {
         }
     }
 
-    pub(super) fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             Self::Selected(metaclass) => metaclass,
             Self::ProtocolFallback => KnownClass::ABCMeta.to_class_literal(db, env),

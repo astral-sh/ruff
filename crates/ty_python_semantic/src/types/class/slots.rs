@@ -498,7 +498,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Returns whether instance dictionary storage exists or cannot be ruled out.
-    pub(crate) fn has_instance_dictionary(self, db: &'db dyn Db) -> bool {
+    fn has_instance_dictionary(self, db: &'db dyn Db) -> bool {
         if !self.has_explicit_slots(db) && !self.has_generated_slots(db) && self.known(db).is_none()
         {
             return true;

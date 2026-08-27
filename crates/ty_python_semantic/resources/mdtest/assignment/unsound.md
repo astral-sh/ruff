@@ -333,10 +333,7 @@ info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
 
-As do unpacked assignments.
-
-TODO: ideally the annotation would highlight only the call to `returns_any()` here, not the whole
-tuple.
+An unpacked assignment points to the individual expression that supplies its unsound value.
 
 ```py
 unpacked_value: int
@@ -345,13 +342,100 @@ unpacked_value, other_value = (returns_any(), "hello")  # snapshot: unsound-assi
 
 ```snapshot
 error[unsound-assignment]: Unsound assignment
-  --> src/mdtest_snippet.py:11:31
+  --> src/mdtest_snippet.py:11:32
    |
 10 | unpacked_value: int
    |                 --- Expected a subtype of `int` because of this annotation
 11 | unpacked_value, other_value = (returns_any(), "hello")  # snapshot: unsound-assignment
-   |                               ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred as `Any`
+   | --------------                 ^^^^^^^^^^^^^ Inferred as `Any`
+   | |
+   | Assigned to this variable
 info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to nested unpacking targets
+
+A nested tuple target points to the corresponding dynamic expression in the nested value.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+value: int
+other, (value, last) = (0, (returns_any(), 1))  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:29
+  |
+6 | value: int
+  |        --- Expected a subtype of `int` because of this annotation
+7 | other, (value, last) = (0, (returns_any(), 1))  # snapshot: unsound-assignment
+  |         -----               ^^^^^^^^^^^^^ Inferred as `Any`
+  |         |
+  |         Assigned to this variable
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Unsound assignments to starred unpacking targets
+
+A starred unpacking target identifies the dynamic expression collected into the assigned list.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+middle: list[int]
+first, *middle, last = (0, returns_any(), 1)  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:28
+  |
+6 | middle: list[int]
+  |         --------- Expected a subtype of `list[int]` because of this annotation
+7 | first, *middle, last = (0, returns_any(), 1)  # snapshot: unsound-assignment
+  |         ------             ^^^^^^^^^^^^^ Iterable element inferred as `Any` (expected a subtype of `int`)
+  |         |
+  |         Assigned to this variable
+info: `list[Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
+help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Multiple unsound values assigned to starred unpacking targets
+
+When a starred target collects multiple values, the unsound-assignment diagnostic covers the entire
+collected slice without including the surrounding unpacked values.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+middle: list[int]
+first, *middle, last = (0, 1, returns_any(), 2, 3)  # snapshot: unsound-assignment
+```
+
+```snapshot
+error[unsound-assignment]: Unsound assignment
+ --> src/mdtest_snippet.py:7:28
+  |
+6 | middle: list[int]
+  |         --------- Expected a subtype of `list[int]` because of this annotation
+7 | first, *middle, last = (0, 1, returns_any(), 2, 3)  # snapshot: unsound-assignment
+  |         ------             ^^^^^^^^^^^^^^^^^^^ Iterable element inferred as `Literal[1, 2] | Any` (expected a subtype of `int`)
+  |         |
+  |         Assigned to this variable
+info: `list[Literal[1, 2] | Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
 

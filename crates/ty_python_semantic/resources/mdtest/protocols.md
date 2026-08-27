@@ -315,7 +315,7 @@ The same applies to generic protocols and the `typing_extensions` backport.
 from typing import TypeVar
 from typing_extensions import Protocol as ExtensionsProtocol
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class GenericProtocol(Protocol[T]): ...
 class BackportedProtocol(ExtensionsProtocol): ...
@@ -3984,8 +3984,8 @@ reveal_type(abs(5))  # revealed: int
 def f(x: Literal[5]) -> None:
     reveal_type(abs(x))  # revealed: int
 
-InT = TypeVar("InT")
-OutT = TypeVar("OutT")
+InT = TypeVar("InT", contravariant=True)
+OutT = TypeVar("OutT", covariant=True)
 
 class CanMul(Protocol[InT, OutT]):
     def __mul__(self, x: InT, /) -> OutT: ...
@@ -4233,7 +4233,7 @@ from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subty
 class NewStyleClassScoped[T](Protocol):
     def method(self, input: T) -> None: ...
 
-S = TypeVar("S")
+S = TypeVar("S", contravariant=True)
 
 class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
@@ -4450,6 +4450,70 @@ class BadReturnType:
 
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
+```
+
+## `Self`-returning instance methods in `ParamSpec` protocols
+
+Specializing a protocol's `ParamSpec` preserves the meaning of `Self`: the return type names the
+structural implementation, even when the specialized parameter list is empty.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+class Copier[**P](Protocol):
+    def copy(self, *args: P.args, **kwargs: P.kwargs) -> Self: ...
+
+class Copyable:
+    def copy(self) -> Self:
+        return self
+
+copier: Copier[[]] = Copyable()
+copier_class: type[Copier[[]]] = Copyable
+```
+
+## `Self`-returning class methods in `ParamSpec` protocols
+
+A class method returning `Self` also satisfies a specialized protocol, whether the implementation is
+assigned as an instance or as a class object. The implementation does not need to inherit from the
+protocol.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+class FactoryP[**P](Protocol):
+    @classmethod
+    def bind(cls, *args: P.args, **kwargs: P.kwargs) -> Self: ...
+
+class Factory:
+    @classmethod
+    def bind(cls, value: int) -> Self:
+        return cls()
+
+factory: FactoryP[[int]] = Factory()
+factory_class: type[FactoryP[[int]]] = Factory
+```
+
+A matching parameter list is not enough: returning an unrelated type does not satisfy the protocol's
+`Self` return type.
+
+```py
+class BadFactory:
+    @classmethod
+    def bind(cls, value: int) -> int:
+        return value
+
+bad_factory: FactoryP[[int]] = BadFactory()  # error: [invalid-assignment]
+bad_factory_class: type[FactoryP[[int]]] = BadFactory  # error: [invalid-assignment]
 ```
 
 ## Module objects with static-method protocol members
@@ -5944,7 +6008,7 @@ Other type variables in the same call are still inferred from their correspondin
 ```py
 from typing import Protocol, TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 U = TypeVar("U")
 
 class Box(Protocol[T]):
@@ -7610,8 +7674,8 @@ Protocols can have TypeVars with forward reference bounds that form cycles.
 ```py
 from typing import Any, Protocol, TypeVar
 
-T1 = TypeVar("T1", bound="A2[Any]")
-T2 = TypeVar("T2", bound="A1[Any]")
+T1 = TypeVar("T1", bound="A2[Any]", covariant=True)
+T2 = TypeVar("T2", bound="A1[Any]", covariant=True)
 T3 = TypeVar("T3", bound="B2[Any]")
 T4 = TypeVar("T4", bound="B1[Any]")
 

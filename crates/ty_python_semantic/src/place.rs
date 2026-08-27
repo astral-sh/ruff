@@ -1,3 +1,5 @@
+pub(crate) mod definitions;
+
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_index::IndexSlice;
@@ -307,7 +309,7 @@ impl<'db> Place<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
+    fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
             Place::Defined(defined) => Place::Defined(DefinedPlace {
                 ty: f(defined.ty),

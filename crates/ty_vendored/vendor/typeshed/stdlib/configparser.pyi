@@ -145,7 +145,7 @@ ConfigParser -- responsible for parsing a list of
 
 import sys
 from _typeshed import BytesPath, GenericPath, MaybeNone, StrOrBytesPath, StrPath, SupportsWrite
-from collections.abc import Callable, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Sequence
+from collections.abc import Callable, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Sequence, ValuesView
 from re import Pattern
 from typing import Any, AnyStr, ClassVar, Final, Literal, TypeAlias, TypeVar, overload, type_check_only
 from typing_extensions import deprecated
@@ -581,6 +581,9 @@ class RawConfigParser(_Parser):
         """
     @overload
     def items(self, section: _SectionName, raw: bool = False, vars: _Section | None = None) -> list[tuple[str, str]]: ...
+
+    def values(self) -> ValuesView[SectionProxy]:
+        """D.values() -> an object providing a view on D's values"""
 
     def set(self, section: _SectionName, option: str, value: str | None = None) -> None:
         """Set an option."""

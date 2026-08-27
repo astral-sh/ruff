@@ -36,7 +36,7 @@ use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
 /// Represents the difference between two diagnostic runs.
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) struct DiagnosticsDiff {
     /// Diagnostics that were removed (present in 'before' but not in 'after')
@@ -49,7 +49,7 @@ pub(crate) struct DiagnosticsDiff {
     settings_after: LinterSettings,
 }
 
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 impl std::fmt::Display for DiagnosticsDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "--- Linter settings ---")?;
@@ -91,7 +91,7 @@ impl std::fmt::Display for DiagnosticsDiff {
 }
 
 /// Compare two sets of diagnostics and return the differences
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 fn diff_diagnostics(
     before: Vec<Diagnostic>,
     after: Vec<Diagnostic>,

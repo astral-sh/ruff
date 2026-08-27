@@ -1,7 +1,10 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
-use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
+use crate::place::loop_header_reachability;
+use crate::reachability::{
+    binding_reachability, narrow_type_by_constraint, type_narrowed_by_previous_patterns,
+};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
@@ -12,13 +15,15 @@ use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
-    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
+    callable_pattern_type, class_pattern_positional_sources,
+    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
+use ty_python_core::ast_ids::HasScopedUseId;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -28,6 +33,7 @@ use ty_python_core::predicate::{
     SubjectElementPatternPredicate,
 };
 use ty_python_core::scope::ScopeId;
+use ty_python_core::symbol::Symbol;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -1543,10 +1549,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let db = self.db;
         match expression_node {
-            ast::Expr::Name(_) => {
+            ast::Expr::Name(name) => {
                 let index = semantic_index(db, expression.program_file(db));
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
-                if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
+                if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node)
+                    && self.is_valid_alias(
+                        name,
+                        expression,
+                        alias_predicate.expression,
+                        is_positive,
+                    )
+                {
                     let aliased_constraints =
                         self.evaluate_expression_predicate(alias_predicate.expression, is_positive);
                     // For example, suppose we have an alias `is_none = x is None`.
@@ -1605,6 +1618,80 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.evaluate_expr_named(expr_named, expression, is_positive)
             }
             _ => None,
+        }
+    }
+
+    /// Check that every binding that can produce this outcome evaluates the recorded alias.
+    /// Reachability is not yet known when aliases are recorded in the semantic index.
+    fn is_valid_alias(
+        &self,
+        name: &ast::ExprName,
+        expression: Expression<'db>,
+        alias: Expression<'db>,
+        is_positive: bool,
+    ) -> bool {
+        let db = self.db;
+        let scope = expression.scope(db);
+        let index = semantic_index(db, expression.program_file(db));
+        let use_def = index.use_def_map(scope.file_scope_id(db));
+        let alias_key = ExpressionNodeKey::from(alias.node_ref(db).node(self.module));
+
+        // An unbound local raises before the condition is evaluated. Other scopes can fall back
+        // to a different binding, such as a global with the same name in a class body.
+        let unbound_is_terminal = scope.node(db).scope_kind().is_function_like()
+            && index
+                .place_table(scope.file_scope_id(db))
+                .symbol_by_name(name.id.as_str())
+                .is_some_and(Symbol::is_local);
+
+        use_def
+            .bindings_at_use(name.scoped_use_id(db, expression.program_file(db)))
+            .all(|binding| {
+                let Some(definition) = binding.binding.definition() else {
+                    return unbound_is_terminal
+                        || binding_reachability(db, use_def, &binding).is_always_false();
+                };
+                if self.binding_assigns_alias(definition, alias_key, unbound_is_terminal)
+                    || binding_reachability(db, use_def, &binding).is_always_false()
+                {
+                    return true;
+                }
+                if matches!(definition.kind(db), DefinitionKind::LoopHeader(_)) {
+                    // Inferring a mixed loop header could depend on this predicate itself.
+                    return false;
+                }
+
+                // A different binding need not prevent narrowing if it cannot produce this
+                // outcome: `if not check: check = x is None` still narrows `x` when `check` is false.
+                let ty = binding.narrowing_constraint.narrow(
+                    db,
+                    &self.env,
+                    binding_type(db, definition),
+                    definition.place(db),
+                );
+                // `Never` cannot produce either outcome, even though its truthiness is ambiguous.
+                ty.is_never() || ty.bool(db, &self.env) == Truthiness::from(!is_positive)
+            })
+    }
+
+    fn binding_assigns_alias(
+        &self,
+        definition: Definition<'db>,
+        alias: ExpressionNodeKey,
+        unbound_is_terminal: bool,
+    ) -> bool {
+        let db = self.db;
+        match definition.kind(db) {
+            DefinitionKind::LoopHeader(_) => {
+                let loop_header = loop_header_reachability(db, definition);
+                (unbound_is_terminal || loop_header.deleted_reachability.is_always_false())
+                    && loop_header.reachable_bindings.iter().all(|binding| {
+                        self.binding_assigns_alias(binding.definition, alias, unbound_is_terminal)
+                    })
+            }
+            kind => kind
+                .value(self.module)
+                .is_some_and(|value| ExpressionNodeKey::from(value) == alias),
         }
     }
 
@@ -2381,7 +2468,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 generic_context.inferable_typevars(db),
             )
             .solve_with(|variance, path_bound| {
-                let Some(lower) = path_bound.lower else {
+                let Some(lower) = path_bound.evidence_lower else {
                     return PathBoundSolution::Unsolved;
                 };
                 if variance != TypeVarVariance::Invariant
@@ -3402,7 +3489,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             _ => {
                 if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
                     match tuple.resize(db, env, TupleLength::Fixed(length)) {
-                        Ok(tuple) => Type::tuple(TupleType::new(db, env, &tuple)),
+                        Ok(resized) => {
+                            let narrowed = Type::tuple(TupleType::new(db, env, &resized));
+                            if let TupleSpec::Variable(variable) = tuple.as_ref()
+                                && variable.variable().typevartuple().is_some()
+                            {
+                                // Resizing forgets which TypeVarTuple these elements came from.
+                                // Retain that identity alongside the observed length and elements.
+                                IntersectionType::from_two_elements(db, env, resolved, narrowed)
+                            } else {
+                                narrowed
+                            }
+                        }
                         Err(_) => Type::Never,
                     }
                 } else {
@@ -4960,7 +5058,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .ignore_possibly_undefined()
                 .is_none_or(|attribute_type| match (comparison, is_positive) {
                     (NominalAttributeComparison::Equality, true) => {
-                        !is_supported_tag_literal(attribute_type)
+                        !is_supported_tag_literal_or_union(db, attribute_type)
                             || !attribute_type.is_disjoint_from(db, &self.env, rhs_type)
                     }
                     (NominalAttributeComparison::Equality, false) => {
@@ -5162,6 +5260,19 @@ fn is_supported_tag_literal(ty: Type) -> bool {
     )
 }
 
+/// Return true if the given type is a literal type with one or more supported literal values,
+/// e.g. `Literal[1, "A", "B"]`. These types are represented as `Type::Union(_)`.
+fn is_supported_tag_literal_or_union(db: &dyn Db, ty: Type) -> bool {
+    match ty {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(is_supported_tag_literal),
+        _ => is_supported_tag_literal(ty),
+    }
+}
+
 // Return true if the given type is a `TypedDict` whose `field_name` field has a supported tag literal
 // type, or a union in which all elements that are `TypedDict`s have a supported tag literal type
 // for that field, or an intersection in which all positive elements that are `TypedDict`s have a
@@ -5177,7 +5288,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         typeddict
             .items(db)
             .get(field_name)
-            .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
+            .is_none_or(|field| is_supported_tag_literal_or_union(db, field.declared_ty))
     };
 
     match ty {
@@ -5283,7 +5394,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     union.elements(db).iter().all(|elem| {
         elem.tuple_instance_spec(db, env)
             .and_then(|spec| spec.py_index(db, env, index).ok())
-            .is_none_or(is_supported_tag_literal)
+            .is_none_or(|ty| is_supported_tag_literal_or_union(db, ty))
     })
 }
 

@@ -426,7 +426,7 @@ class Base:
     __slots__ = ()
     value: int
 
-Base().value = 1  # error: [unresolved-attribute]
+Base().value = 1  # error: [missing-slot]
 ```
 
 A subclass can create the missing slot. Its inherited annotation controls both reads and writes.
@@ -523,7 +523,7 @@ class Slotted:
         self.extra = 2  # error: [unresolved-attribute]
 
 Slotted().other = 3  # error: [unresolved-attribute]
-Slotted().shared = 3  # error: [unresolved-attribute]
+Slotted().shared = 3  # error: [missing-slot]
 reveal_type(Slotted.value)  # revealed: MemberDescriptorType
 reveal_type(Slotted.shared)  # revealed: int
 reveal_type(Slotted.explicit_classvar)  # revealed: int
@@ -588,7 +588,7 @@ class SlottedPoint(Point):
     __slots__ = ()
     extra: int
 
-SlottedPoint(1).extra = 2  # error: [unresolved-attribute]
+SlottedPoint(1).extra = 2  # error: [missing-slot]
 ```
 
 Named tuples created with the functional syntax have the same empty-slot layout.
@@ -600,7 +600,7 @@ class SlottedFunctionalPoint(FunctionalPoint):
     __slots__ = ()
     extra: int
 
-SlottedFunctionalPoint(1).extra = 2  # error: [unresolved-attribute]
+SlottedFunctionalPoint(1).extra = 2  # error: [missing-slot]
 ```
 
 The `collections.namedtuple` factory also creates a class without an instance dictionary.
@@ -614,7 +614,7 @@ class SlottedLegacyPoint(LegacyPoint):
     __slots__ = ()
     extra: int
 
-SlottedLegacyPoint(1).extra = 2  # error: [unresolved-attribute]
+SlottedLegacyPoint(1).extra = 2  # error: [missing-slot]
 ```
 
 ## Dataclass-generated slots
@@ -1014,7 +1014,7 @@ class Slotted:
     value: int
     missing: int
 
-Slotted().missing = 1  # error: [unresolved-attribute]
+Slotted().missing = 1  # error: [missing-slot]
 ```
 
 A subclass can provide the missing slot and use the inherited annotation.

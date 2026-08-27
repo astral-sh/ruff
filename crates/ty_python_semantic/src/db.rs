@@ -220,6 +220,8 @@ pub(crate) mod tests {
         python_version: PythonVersion,
         /// Target Python platform
         python_platform: PythonPlatform,
+        /// Roots containing first-party modules.
+        src_roots: Vec<SystemPathBuf>,
         /// Path and content pairs for files that should be present
         files: Vec<(&'a str, &'a str)>,
         /// Whether module resolution should include packages from the synthetic virtual environment.
@@ -231,6 +233,7 @@ pub(crate) mod tests {
             Self {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
+                src_roots: vec![SystemPathBuf::from("/src")],
                 files: vec![],
                 third_party_packages: false,
             }
@@ -243,6 +246,11 @@ pub(crate) mod tests {
 
         pub(crate) fn with_python_platform(mut self, platform: PythonPlatform) -> Self {
             self.python_platform = platform;
+            self
+        }
+
+        pub(crate) fn with_src_roots(mut self, src_roots: Vec<SystemPathBuf>) -> Self {
+            self.src_roots = src_roots;
             self
         }
 
@@ -267,8 +275,9 @@ pub(crate) mod tests {
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
             let mut db = TestDb::new();
 
-            let src_root = SystemPathBuf::from("/src");
-            db.memory_file_system().create_directory_all(&src_root)?;
+            for src_root in &self.src_roots {
+                db.memory_file_system().create_directory_all(src_root)?;
+            }
 
             let site_packages = SystemPathBuf::from("/.venv/lib/python3.13/site-packages");
             if self.third_party_packages {
@@ -281,12 +290,12 @@ pub(crate) mod tests {
 
             let search_path_settings = if self.third_party_packages {
                 SearchPathSettings {
-                    src_roots: vec![src_root],
+                    src_roots: self.src_roots,
                     site_packages_paths: vec![site_packages],
                     ..SearchPathSettings::empty()
                 }
             } else {
-                SearchPathSettings::new(vec![src_root])
+                SearchPathSettings::new(self.src_roots)
             };
 
             let program_settings = ProgramSettings {

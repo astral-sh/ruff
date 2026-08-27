@@ -28,6 +28,7 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
     IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
@@ -466,16 +467,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // (or any other dynamic type), then the `...` is the _gradual choice_ of all
                 // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
                 // length.
-                let VariableSegment::Homogeneous(source_variable) = source.variable() else {
-                    // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
-                    // over all specializations rather than making a gradual choice of length.
-                    return self.never();
-                };
-                if !self.is_eager_assignability() || !source_variable.is_dynamic() {
+                //
+                // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
+                // over all specializations rather than making a gradual choice of length.
+                let env = self.env;
+                if !self.is_eager_assignability()
+                    || source.variable().gradual_element_type(db, env).is_none()
+                {
                     return self.never();
                 }
-
-                let env = self.env;
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
@@ -543,6 +543,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 let env = self.env;
 
+                // TODO: Extend lazy inference for mixed gradual tuples: let gradual segments
+                // supply fixed target elements, and generate constraints for source packs that
+                // overlap fixed target elements.
                 if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
                 {
@@ -583,8 +586,68 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     });
                 }
 
+                // These checks must hold for every specialization of a non-inferable pack.
+                // Lazy evaluation needs to retain pack constraints for later solving; its empty
+                // `inferable` set does not imply universal quantification.
+                if self.is_eager_assignability() {
+                    match (source.variable(), target.variable()) {
+                        (source_segment, VariableSegment::TypeVarTuple(target_pack))
+                            if !target_pack.is_inferable(db, self.inferable)
+                                && let Some(source_element) =
+                                    source_segment.gradual_element_type(db, env) =>
+                        {
+                            // The pack may be empty, so the source cannot require more elements
+                            // than the target's fixed ends. For longer packs, source endpoints
+                            // extending into the pack must be assignable to every element type,
+                            // which we check against `Never`. This also covers their overlap with
+                            // the opposite fixed end when the pack is short.
+                            if source.len().minimum() > target.len().minimum() {
+                                return self.never();
+                            }
+                            return self.check_tuple_boundaries(
+                                db,
+                                source,
+                                target,
+                                source_element,
+                                Type::Never,
+                            );
+                        }
+                        (VariableSegment::TypeVarTuple(source_pack), target_segment)
+                            if !source_pack.is_inferable(db, self.inferable)
+                                && let Some(target_element) =
+                                    target_segment.gradual_element_type(db, env) =>
+                        {
+                            // Conversely, the target's required elements must fit even with an
+                            // empty source pack. A target endpoint extending into the pack must
+                            // accept any possible element. An empty protocol expresses this without
+                            // inheriting `object`'s permissive assignability to hash protocols.
+                            if source.len().minimum() < target.len().minimum() {
+                                return self.never();
+                            }
+                            return self.check_tuple_boundaries(
+                                db,
+                                source,
+                                target,
+                                Type::protocol_with_methods(db, env, []),
+                                target_element,
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+
                 if matches!(target.variable(), VariableSegment::TypeVarTuple(_)) {
-                    return self.never();
+                    // A fully gradual source imposes no length or element constraints, even
+                    // when the target pack is inferable.
+                    return ConstraintSet::from_bool(
+                        self.constraints,
+                        self.is_eager_assignability()
+                            && source.len().minimum() == 0
+                            && matches!(
+                                source.variable(),
+                                VariableSegment::Homogeneous(Type::Dynamic(_))
+                            ),
+                    );
                 }
 
                 // When prenormalizing below, we assume that a dynamic variable-length portion of
@@ -681,6 +744,40 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             }
         }
+    }
+
+    /// Compare the fixed ends, pairing any overhanging elements with the provided variable types.
+    /// Use raw endpoints: a symbolic pack cannot be prenormalized as a homogeneous `object` segment.
+    fn check_tuple_boundaries(
+        &self,
+        db: &'db dyn Db,
+        source: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
+        target: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
+        source_variable: Type<'db>,
+        target_variable: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source
+            .iter_prefix_elements()
+            .zip_longest(target.iter_prefix_elements())
+            .chain(
+                source
+                    .iter_suffix_elements()
+                    .rev()
+                    .zip_longest(target.iter_suffix_elements().rev()),
+            )
+            .when_all(db, self.constraints, |pair| {
+                if let EitherOrBoth::Right(target) = pair
+                    && matches!(source.variable(), VariableSegment::TypeVarTuple(_))
+                {
+                    // The synthesized protocol stands for an arbitrary pack element. Diagnostics
+                    // should describe the original tuple types, not this internal placeholder.
+                    return self.without_context_collection(|| {
+                        self.check_type_pair(db, source_variable, target)
+                    });
+                }
+                let (source, target) = pair.or(source_variable, target_variable);
+                self.check_type_pair(db, source, target)
+            })
     }
 }
 
@@ -794,6 +891,20 @@ impl<'db> VariableSegment<'db> {
             Self::Homogeneous(element) => Some(element),
             Self::TypeVarTuple(_) => None,
         }
+    }
+
+    /// Return the homogeneous element type if this segment has gradual arity, including aliases.
+    fn gradual_element_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let element = self.homogeneous_type()?;
+        // A static constructor or an alias cycle rules out gradual arity, even if it contains Any.
+        (!any_over_type_expanding_aliases(db, env, element, |ty| {
+            !matches!(ty, Type::TypeAlias(_)) && !ty.is_dynamic()
+        }))
+        .then_some(element)
     }
 
     pub(crate) const fn typevartuple(self) -> Option<BoundTypeVarInstance<'db>> {

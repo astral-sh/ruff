@@ -379,7 +379,9 @@ impl<'db> CallableSignature<'db> {
                                     type_mapping.update_signature_generic_context(db, env, context)
                                 }),
                             ),
-                            definition: signature.definition,
+                            // Keep the enclosing method's definition for binding `Self` and
+                            // other receiver type variables after specializing its parameters.
+                            definition: self_signature.definition,
                             source_overload_index: signature.source_overload_index,
                             receiver_constraints: {
                                 let mapped = self_signature.map_receiver_constraints(
@@ -1277,7 +1279,8 @@ impl<'db> Signature<'db> {
     ///
     /// Matching the receiver can constrain type variables that occur elsewhere in the signature.
     /// Exact bounds determine an unambiguous specialization; one-sided constraints remain
-    /// available to normal call inference. The receiver remains in the returned signature so
+    /// available to normal call inference. A `ParamSpec` can capture multiple overloads, so one
+    /// signature can expand into several. The receiver remains in each returned signature so
     /// bound-method calls can still check it and report receiver-related diagnostics.
     pub(crate) fn specialize_for_bound_receiver(
         &self,
@@ -1285,11 +1288,11 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> Option<Self> {
+    ) -> Option<CallableSignature<'db>> {
         let bound_signature =
             self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
-            return Some(self.clone());
+            return Some(CallableSignature::single(self.clone()));
         };
 
         let constraints = ConstraintSetBuilder::new();
@@ -1298,26 +1301,29 @@ impl<'db> Signature<'db> {
 
         match when.solutions(db, env, inferable) {
             Ok(Solutions::Unsatisfiable) => return None,
-            Ok(Solutions::Unconstrained) | Err(_) => return Some(self.clone()),
+            Ok(Solutions::Unconstrained) | Err(_) => {
+                return Some(CallableSignature::single(self.clone()));
+            }
             // Each receiver path can leave a different type variable unconstrained. Preserve the
             // original relation instead of combining those independent solutions.
             Ok(Solutions::Constrained(solutions)) if solutions.as_slice().len() > 1 => {
-                return Some(self.clone());
+                return Some(CallableSignature::single(self.clone()));
             }
             Ok(Solutions::Constrained(_)) => {}
         }
 
         let Some(generic_context) = self.generic_context else {
-            return Some(self.clone());
+            return Some(CallableSignature::single(self.clone()));
         };
 
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
-        let specialization = builder.build_with(|typevar, bounds| {
+        let specialization = builder.build_merged_with(|typevar, bounds| {
             if let Some(bounds) = bounds
-                && let Some(lower) = bounds.lower
+                && let Some(lower) = bounds.evidence_lower
+                && bounds.has_upper_evidence()
                 && let Some(upper) = bounds.upper.as_single_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
@@ -1331,7 +1337,7 @@ impl<'db> Signature<'db> {
                 && bound_signature
                     .variance_of(db, env, typevar.identity(db))
                     .is_covariant()
-                && bounds.lower.is_some_and(|lower| !lower.is_never())
+                && bounds.evidence_lower.is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
                     PathBounds::default_solve(db, env, &constraints, bounds).as_type()
             {
@@ -1341,7 +1347,22 @@ impl<'db> Signature<'db> {
             Some(Type::TypeVar(typevar))
         });
 
-        Some(self.apply_specialization(db, specialization))
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
+        let mut specialized = CallableSignature::single(self.clone()).apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        );
+
+        // The captured `ParamSpec` can carry overload indices from another callable. Keep
+        // this method's overload index so call diagnostics refer to the correct declaration.
+        for signature in &mut specialized.overloads {
+            signature.source_overload_index = self.source_overload_index;
+        }
+
+        Some(specialized)
     }
 
     /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
@@ -1352,7 +1373,7 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> Option<Self> {
+    ) -> Option<CallableSignature<'db>> {
         if !self.can_bind_self_to(db, env, receiver_type) {
             return None;
         }
@@ -1757,14 +1778,16 @@ impl<'db> Signature<'db> {
             .collect();
 
         if promoted_typevars.is_empty() {
-            return Some(inference.specialization(db));
+            return Some(inference.merged_specialization(db));
         }
 
-        Some(inference.specialization_with(db, |typevar, inferred| {
-            promoted_typevars
-                .contains(&typevar.identity(db))
-                .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db, env)))
-        }))
+        Some(
+            inference.merged_specialization_with(db, |typevar, inferred| {
+                promoted_typevars
+                    .contains(&typevar.identity(db))
+                    .then(|| inferred.map_or(Type::TypeVar(typevar), |ty| ty.promote(db, env)))
+            }),
+        )
     }
 
     fn needs_self_mapping(

@@ -8,6 +8,7 @@ use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -68,9 +69,9 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_DEFAULT, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
     TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
     UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR,
-    UNUSED_AWAITABLE, YieldKind, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_call_to_abstract_method,
+    UNUSED_AWAITABLE, YieldKind, autofix_with_notimplementederror,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
     report_invalid_assignment, report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -113,19 +114,20 @@ use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
-use crate::types::unpacker::UnpackResult;
+use crate::types::unpacker::{UnpackResult, fixed_sequence_elements};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
-    Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType,
-    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags,
+    InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
+    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet};
+use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, BindingsOwner,
     ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
@@ -2387,12 +2389,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && let Some(node) = node
             {
                 if let ast::Expr::Tuple(tuple) = node
-                    && !tuple.iter().any(ast::Expr::is_starred_expr)
-                    && Some(tuple.len()) == tuple_spec.len().into_fixed_length()
+                    && let Some(tuple_length) = tuple_spec.len().into_fixed_length()
+                    && let Some(elements) = fixed_sequence_elements(node, tuple_length)
                 {
                     let invalid_elements = invalid_elements
                         .iter()
-                        .map(|(index, ty)| (&tuple.elts[*index], *ty));
+                        .map(|(index, ty)| (&elements[*index], *ty));
 
                     report_invalid_exception_tuple_caught(
                         &self.context,
@@ -7874,8 +7876,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = collection_alias
             .origin(self.db())
             .apply_specialization(db, |_| {
-                builder.build_with(|current_typevar, bounds| {
-                    let lower = bounds?.lower?;
+                builder.build_merged_with(|current_typevar, bounds| {
+                    let lower = bounds?.evidence_lower?;
 
                     let lower = if is_empty_collection_type_context(tcx) {
                         // Constraints learned from later collection uses follow the same promotion
@@ -9080,6 +9082,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diagnostic.set_concise_message(
                     "`NotImplemented` is not callable - did you mean `NotImplementedError`?",
                 );
+                autofix_with_notimplementederror(&self.context, &mut diagnostic, func);
             }
             return Type::unknown();
         }
@@ -9517,7 +9520,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     for call_specialization in identity_bindings
                         .iter_flat()
                         .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, identity_overload)| identity_overload.specialization(db))
+                        .filter_map(|(_, identity_overload)| {
+                            identity_overload.merged_specialization(db)
+                        })
                     {
                         // Record the constraints on the receiver's generic context formed by
                         // the arguments to this bound method call.
@@ -9636,7 +9641,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .return_ty;
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
-        let Some(generator_type_params) = declared_return_ty.generator_types(db, env) else {
+        let Some(generator_type_params) =
+            declared_return_ty.generator_types(db, env, GeneratorTypeMode::IteratorDefaults)
+        else {
             let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
@@ -9684,7 +9691,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
         .return_ty;
 
-        let Some(outer_expected) = annotated_return_ty.generator_types(db, env) else {
+        let Some(outer_expected) =
+            annotated_return_ty.generator_types(db, env, GeneratorTypeMode::IteratorDefaults)
+        else {
             let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
@@ -9715,11 +9724,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(outer_send_ty) = outer_expected.send_ty {
-            let inner_send_ty = iterable_type
-                .generator_send_type(db, env)
-                .unwrap_or_else(|| Type::none(db, env));
-            if !outer_send_ty.is_assignable_to(db, env, inner_send_ty) {
+        // `yield from x` delegates to `iter(x)`, so the send and return types of the
+        // expression are those of the *iterator*. If `x` is itself a generator, that's `x`.
+        // Otherwise, e.g. for an instance of a class whose `__iter__` method is a
+        // generator function, we look at the return type of `x.__iter__()`.
+        let inner_generator = iterable_type
+            .generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
+            .map(|types| (iterable_type, types))
+            .or_else(|| {
+                let iterator_type = match iterable_type.try_call_dunder(
+                    db,
+                    env,
+                    "__iter__",
+                    CallArguments::none(),
+                    TypeContext::default(),
+                ) {
+                    Ok(bindings) => Some(bindings.return_type(db, env)),
+                    Err(CallDunderError::PossiblyUnbound { .. }) => {
+                        // Iteration can fall back to `__getitem__` where `__iter__` is absent.
+                        // The available `__iter__` bindings do not describe those alternatives.
+                        None
+                    }
+                    Err(err) => err.return_type(db, env),
+                }?;
+                // `Iterator` has no type parameter for `StopIteration.value`.
+                iterator_type
+                    .generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
+                    .map(|types| (iterator_type, types))
+            });
+
+        // `Iterator` annotations constrain yielded values but do not expose a send method.
+        if let Some(outer_send_ty) = annotated_return_ty.generator_annotation_send_type(db, env) {
+            let incompatible_send_ty = match inner_generator {
+                Some((iterator_type, _)) => {
+                    iterator_type.incompatible_yield_from_send_type(db, env, outer_send_ty)
+                }
+                None => {
+                    let none = Type::none(db, env);
+                    (!outer_send_ty.is_assignable_to(db, env, none)).then_some(none)
+                }
+            };
+            if let Some(inner_send_ty) = incompatible_send_ty {
                 report_invalid_generator_yield_type(
                     &self.context,
                     value.as_ref(),
@@ -9731,8 +9776,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        iterable_type
-            .generator_return_type(db, env)
+        inner_generator
+            .and_then(|(_, generator_types)| generator_types.return_ty)
             .unwrap_or_else(Type::unknown)
     }
 
@@ -10224,6 +10269,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
                 diagnostic
                     .set_primary_annotation_message(format_args!("Did you mean `{builtin_name}`?"));
+                if SemanticModel::new(db, self.program_file())
+                    .definitely_has_builtin_binding(builtin_name, expr_name_node.into())
+                {
+                    diagnostic.help(format_args!("Replace with `{builtin_name}`"));
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                        builtin_name.to_string(),
+                        expr_name_node.range(),
+                    )));
+                }
             }
         }
 

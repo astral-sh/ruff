@@ -143,7 +143,7 @@ elif sys.version_info >= (3, 12):
 
         """
     @overload
-    @deprecated("The `isdst` parameter does nothing and will be removed in Python 3.14.")
+    @deprecated("The `isdst` parameter is ignored; removed in Python 3.14.")
     def localtime(dt: datetime.datetime | None = None, isdst: Unused = None) -> datetime.datetime: ...
 
 else:

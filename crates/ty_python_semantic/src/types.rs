@@ -100,11 +100,11 @@ use crate::types::tuple::TupleSpec;
 pub use crate::types::type_alias::TypeAliasType;
 pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
-pub(crate) use crate::types::typevar::TypeVarBoundOrConstraints;
-pub use crate::types::typevar::{
-    BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarKind,
+pub(crate) use crate::types::typevar::{
+    BindingContext, BoundTypeVarIdentity, ParamSpecAttrKind, TypeVarBoundOrConstraints,
     TypeVarNonce,
 };
+pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -1762,6 +1762,30 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
+/// Whether generator-type extraction supplies defaults for iterator annotations.
+///
+/// `Iterator[T]` and `AsyncIterator[T]` constrain yielded values but do not declare
+/// send or return types. Defaults used to check a generator body do not describe
+/// an arbitrary iterator's termination value or establish a send requirement.
+#[derive(Clone, Copy)]
+enum GeneratorTypeMode {
+    /// Extract parameters exposed by `Generator` or `AsyncGenerator`, without
+    /// supplying defaults for plain iterators.
+    ///
+    /// Use this when inferring a delegated iterator's `yield from` result or
+    /// determining whether an outer generator annotation declares a send type.
+    /// An `Iterator[T]` can terminate with `StopIteration(42)`, so its annotation
+    /// does not imply that the `yield from` result is `None`.
+    GeneratorOnly,
+    /// Also recognize `Iterator[T]` and `AsyncIterator[T]`, using `T` as the yield
+    /// type and `None` as both the send and return types.
+    ///
+    /// These defaults support inference of `yield` expressions and validation of
+    /// `yield` and `return` statements in generator bodies. Return-type extraction
+    /// also uses this mode, including when inferring `await` expressions.
+    IteratorDefaults,
+}
+
 #[derive(Debug, Clone, Copy)]
 #[expect(clippy::struct_field_names)]
 struct GeneratorTypes<'db> {
@@ -1856,7 +1880,7 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub(crate) fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
+    fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
         dynamic_content(db, env, self).is_absent()
     }
 
@@ -1954,7 +1978,7 @@ impl<'db> Type<'db> {
         self.cycle_normalized_impl(db, env, previous, cycle)
     }
 
-    pub(super) fn cycle_normalized_impl(
+    fn cycle_normalized_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4770,7 +4794,7 @@ impl<'db> Type<'db> {
     /// See also: [`Type::static_member`]
     ///
     #[must_use]
-    pub(crate) fn member(
+    fn member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -5750,7 +5774,7 @@ impl<'db> Type<'db> {
                 } else {
                     // Solve exact receiver constraints before checking the other arguments, but
                     // retain the receiver itself for call inference and receiver diagnostics.
-                    let overloads = signature.overloads.iter().map(|overload| {
+                    let overloads = signature.overloads.iter().flat_map(|overload| {
                         if overload.has_receiver_determined_method_typevar(db, env)
                             && let Some(specialized) = overload.specialize_for_bound_receiver(
                                 db,
@@ -5759,9 +5783,9 @@ impl<'db> Type<'db> {
                                 bound_method.typing_self_type(db),
                             )
                         {
-                            specialized
+                            specialized.overloads
                         } else {
-                            overload.clone()
+                            smallvec_inline![overload.clone()]
                         }
                     });
 
@@ -7180,14 +7204,12 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Get the return type of a `yield from …` expression where `self` is the type of the generator.
-    ///
-    /// This corresponds to the `ReturnT` parameter of the generic `typing.Generator[YieldT, SendT, ReturnT]`
-    /// protocol.
+    /// Extract the yield, send, and return types of a generator.
     fn generator_types(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        mode: GeneratorTypeMode,
     ) -> Option<GeneratorTypes<'db>> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
         // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
@@ -7217,8 +7239,9 @@ impl<'db> Type<'db> {
                     send_ty: Some(*send_ty),
                     return_ty: None,
                 })
-            } else if (class.is_known(db, KnownClass::Iterator)
-                || class.is_known(db, KnownClass::AsyncIterator))
+            } else if matches!(mode, GeneratorTypeMode::IteratorDefaults)
+                && (class.is_known(db, KnownClass::Iterator)
+                    || class.is_known(db, KnownClass::AsyncIterator))
                 && let [yield_ty] = specialization.types(db)
             {
                 let none = Type::none(db, env);
@@ -7245,14 +7268,14 @@ impl<'db> Type<'db> {
                         .materialization_kind(db)
                         .map_or(types, |kind| types.materialize(db, env, kind))
                 }),
-            Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env),
+            Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env, mode),
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(db, env));
                 let mut send_builder = Some(UnionBuilder::new(db, env));
                 let mut return_builder = Some(UnionBuilder::new(db, env));
 
                 for ty in union.elements(db) {
-                    let gt = ty.generator_types(db, env)?;
+                    let gt = ty.generator_types(db, env, mode)?;
                     match gt.yield_ty {
                         Some(ty) => yield_builder = yield_builder.map(|b| b.add(ty)),
                         None => yield_builder = None,
@@ -7283,7 +7306,7 @@ impl<'db> Type<'db> {
                 let mut any_success = false;
 
                 for ty in intersection.positive(db) {
-                    let Some(gt) = ty.generator_types(db, env) else {
+                    let Some(gt) = ty.generator_types(db, env, mode) else {
                         continue;
                     };
                     any_success = true;
@@ -7326,22 +7349,63 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Extract explicit send constraints from a generator function's return annotation.
+    ///
+    /// An iterator annotation does not expose `send`, but its presence in a union must not
+    /// discard the send constraints from other generator alternatives.
+    fn generator_annotation_send_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        if let Some(union) = self.as_union_like(db) {
+            let mut send_types = union
+                .elements(db)
+                .iter()
+                .filter_map(|ty| ty.generator_annotation_send_type(db, env));
+            let first = send_types.next()?;
+            return Some(
+                send_types
+                    .fold(UnionBuilder::new(db, env).add(first), UnionBuilder::add)
+                    .build(),
+            );
+        }
+
+        self.generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
+            .and_then(|types| types.send_ty)
+    }
+
     fn generator_return_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        self.generator_types(db, env)
+        self.generator_types(db, env, GeneratorTypeMode::IteratorDefaults)
             .and_then(|generator_types| generator_types.return_ty)
     }
 
-    fn generator_send_type(
+    /// Find a delegated generator's send type that cannot accept `send_ty`.
+    ///
+    /// Check union members independently to preserve gradual assignability. Intersecting
+    /// `list[int]` and `list[str]` would give `Never`, incorrectly rejecting `list[Any]`.
+    fn incompatible_yield_from_send_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        send_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        self.generator_types(db, env)
+        if let Some(union) = self.as_union_like(db) {
+            return union
+                .elements(db)
+                .iter()
+                .find_map(|ty| ty.incompatible_yield_from_send_type(db, env, send_ty));
+        }
+
+        let inner_send_ty = self
+            .generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
             .and_then(|generator_types| generator_types.send_ty)
+            .unwrap_or_else(|| Type::none(db, env));
+        (!send_ty.is_assignable_to(db, env, inner_send_ty)).then_some(inner_send_ty)
     }
 
     /// Return the instance approximation, discarding whether the projection is exact.
@@ -9319,6 +9383,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::ProtocolInstance(protocol_instance_type) => {
                 protocol_instance_type.variance_of(db, env, typevar)
             }
+            Type::TypedDict(typed_dict) => typed_dict.variance_of(db, env, typevar),
             // unions are covariant in their disjuncts
             Type::Union(union_type) => union_type
                 .elements(db)
@@ -9384,7 +9449,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::AlwaysTruthy
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
-            | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
         };
 

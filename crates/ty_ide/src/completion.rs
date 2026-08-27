@@ -5015,7 +5015,7 @@ C.<CURSOR>
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'C'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self]
+        __subclasses__ :: bound method <class 'C'>.__subclasses__[_T]() -> list[type[_T]]
         __subclasshook__ :: bound method <class 'C'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5084,7 +5084,7 @@ Meta.<CURSOR>
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: def __subclasscheck__(self, subclass: type, /) -> bool
-                __subclasses__ :: def __subclasses__[Self](self: Self) -> list[Self]
+                __subclasses__ :: def __subclasses__[_T](self: type[_T]) -> list[type[_T]]
                 __subclasshook__ :: bound method <class 'Meta'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5214,7 +5214,7 @@ Quux.<CURSOR>
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'Quux'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self]
+        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[_T]() -> list[type[_T]]
         __subclasshook__ :: bound method <class 'Quux'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5293,7 +5293,7 @@ Answer.<CURSOR>
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
-                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self]
+                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[_T]() -> list[type[_T]]
                 __subclasshook__ :: bound method <class 'Answer'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]

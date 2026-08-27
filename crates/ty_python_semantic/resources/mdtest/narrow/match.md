@@ -1361,6 +1361,73 @@ def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
             reveal_type(item)  # revealed: Unknown & int
 ```
 
+### Strict mode with a union type alias
+
+Strict generic narrowing preserves the specialization when an invariant generic subject is
+parameterized by a PEP 695 union type alias.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class AliasPatternBase(Generic[T]): ...
+
+class AliasPatternChild(AliasPatternBase[T]):
+    item: T
+
+type Item = int | str
+
+def test_union_alias_capture(value: AliasPatternBase[Item]) -> None:
+    match value:
+        case AliasPatternChild(item=item):
+            # revealed: int | str
+            reveal_type(item)
+
+            # error: [unresolved-attribute] "Object of type `int | str` has no attribute `nonexistent`"
+            item.nonexistent()
+```
+
+### Strict mode with a recursive type alias
+
+The inferred specialization also retains recursion instead of replacing a recursive alias with an
+unknown type.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class AliasPatternBase(Generic[T]): ...
+
+class AliasPatternChild(AliasPatternBase[T]):
+    item: T
+
+type RecursiveItem = int | list[RecursiveItem]
+
+def test_recursive_alias_capture(value: AliasPatternBase[RecursiveItem]) -> None:
+    match value:
+        case AliasPatternChild(item=item):
+            # revealed: int | list[RecursiveItem]
+            reveal_type(item)
+```
+
 ## Positional class patterns
 
 `__match_args__` is read through the pattern class and must identify literal attribute names. This
@@ -4066,6 +4133,20 @@ def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
             reveal_type(x)  # revealed: Never
 ```
 
+A tuple with several literal tags can match more than one case. Failing one of those tags leaves the
+tuple available to later cases:
+
+```py
+def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
+    match x[0]:
+        case "b":
+            reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
+        case "a":
+            reveal_type(x)  # revealed: tuple[Literal["a"], int]
+        case _:
+            reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
+```
+
 Narrowing is restricted to `Literal` tag elements:
 
 ```py
@@ -4121,6 +4202,20 @@ def _(x: A | B):
             reveal_type(x.field_b)  # revealed: str
         case _:
             reveal_type(x)  # revealed: Never
+```
+
+A class can also have several literal tags. A pattern outside that set of tags rules out the class:
+
+```py
+class MultipleTags:
+    tag: Literal["b", "c"]
+
+def multiple_tags(x: A | MultipleTags):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: A
+        case _:
+            reveal_type(x)  # revealed: MultipleTags
 ```
 
 Non-literal tag arms are preserved during positive narrowing:

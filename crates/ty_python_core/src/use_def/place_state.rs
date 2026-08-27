@@ -62,7 +62,7 @@ impl ScopedDefinitionId {
     /// unbound or undeclared at a given usage site.
     /// When creating a use-def-map builder, we always add an empty `DefinitionState::Undefined` definition
     /// at index 0, so this ID is always present.
-    pub(crate) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
+    const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
 
     pub(crate) fn is_unbound(self) -> bool {
         self == Self::UNBOUND

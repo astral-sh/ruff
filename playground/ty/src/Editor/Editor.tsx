@@ -367,9 +367,9 @@ class PlaygroundServer
   provideSignatureHelp(
     model: editor.ITextModel,
     position: Position,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _token: CancellationToken,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _context: languages.SignatureHelpContext,
   ): languages.ProviderResult<languages.SignatureHelpResult> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -392,7 +392,7 @@ class PlaygroundServer
   provideDocumentHighlights(
     model: editor.ITextModel,
     position: Position,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.DocumentHighlight[]> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -414,7 +414,7 @@ class PlaygroundServer
   provideInlayHints(
     model: editor.ITextModel,
     range: Range,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.InlayHintList> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -473,9 +473,9 @@ class PlaygroundServer
   }
 
   resolveInlayHint(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _hint: languages.InlayHint,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.InlayHint> {
     return undefined;
@@ -627,9 +627,9 @@ class PlaygroundServer
   provideCodeActions(
     model: editor.ITextModel,
     range: Range,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _context: languages.CodeActionContext,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.CodeActionList> {
     const actions: languages.CodeAction[] = [];
@@ -689,9 +689,9 @@ class PlaygroundServer
   provideHover(
     model: editor.ITextModel,
     position: Position,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _token: CancellationToken,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     context?: languages.HoverContext<languages.Hover> | undefined,
   ): languages.ProviderResult<languages.Hover> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -717,7 +717,7 @@ class PlaygroundServer
   provideTypeDefinition(
     model: editor.ITextModel,
     position: Position,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -736,7 +736,7 @@ class PlaygroundServer
   provideDeclaration(
     model: editor.ITextModel,
     position: Position,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -755,7 +755,7 @@ class PlaygroundServer
   provideDefinition(
     model: editor.ITextModel,
     position: Position,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -774,9 +774,9 @@ class PlaygroundServer
   provideReferences(
     model: editor.ITextModel,
     position: Position,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     context: languages.ReferenceContext,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Location[]> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -867,7 +867,7 @@ class PlaygroundServer
   resolveRenameLocation(
     model: editor.ITextModel,
     position: Position,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.RenameLocation & languages.Rejection> {
     const fileHandle = this.getFileHandleForModel(model);
@@ -896,7 +896,7 @@ class PlaygroundServer
     model: editor.ITextModel,
     position: Position,
     newName: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // oxlint-disable-next-line no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.WorkspaceEdit & languages.Rejection> {
     const fileHandle = this.getFileHandleForModel(model);

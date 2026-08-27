@@ -75,9 +75,10 @@ argument _explicitly_ implements the protocol by listing it as a base class.
 from typing import Protocol, TypeVar
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class CanIndex(Protocol[T]):
-    def __getitem__(self, index: int, /) -> T: ...
+class CanIndex(Protocol[T_co]):
+    def __getitem__(self, index: int, /) -> T_co: ...
 
 class ExplicitlyImplements(CanIndex[T]):
     def __getitem__(self, index: int, /) -> T:
@@ -320,6 +321,58 @@ def _(x: tuple[str, int], y: tuple[bool, ...], z: tuple[int, str, *tuple[range, 
 
 reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
 reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
+```
+
+## Inferring tuple parameter types from unions
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+Every member of a union argument contributes to the inferred element type of a homogeneous tuple
+parameter. Different tuple lengths do not prevent inference, and an empty tuple contributes no
+element types.
+
+```py
+from typing import TypeVar
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+T = TypeVar("T")
+
+def elements(values: tuple[T, ...]) -> tuple[T, ...]:
+    return values
+
+def _(
+    same: tuple[A, A] | tuple[A, A, A],
+    mixed: tuple[A] | tuple[B, B],
+    possibly_empty: tuple[()] | tuple[A, A],
+):
+    reveal_type(elements(same))  # revealed: tuple[A, ...]
+    reveal_type(elements(mixed))  # revealed: tuple[A | B, ...]
+    reveal_type(elements(possibly_empty))  # revealed: tuple[A, ...]
+```
+
+Fixed-length and mixed tuples infer type parameters from their corresponding element positions.
+
+```py
+U = TypeVar("U")
+
+def swap(values: tuple[U, T]) -> tuple[T, U]:
+    return values[1], values[0]
+
+def _(pairs: tuple[A, B] | tuple[C, D]):
+    reveal_type(swap(pairs))  # revealed: tuple[B | D, A | C]
+
+def tail(values: tuple[A, *tuple[T, ...]]) -> tuple[T, ...]:
+    return values[1:]
+
+def _(tails: tuple[A, B] | tuple[A, C, C]):
+    reveal_type(tail(tails))  # revealed: tuple[B | C, ...]
 ```
 
 ## Inferring a bound typevar

@@ -6,9 +6,6 @@ use std::cell::Cell;
 use std::debug_assert_matches;
 use std::marker::PhantomData;
 
-use ruff_python_ast::name::Name;
-use ty_module_resolver::{ModuleName, file_to_module};
-
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
@@ -33,7 +30,8 @@ use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, materialization_is_noop,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -230,36 +228,6 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => class.inherits_from_explicit_any(),
             _ => false,
         }
-    }
-
-    /// Returns the name of the class this is an instance of.
-    ///
-    /// For example, for an instance of `builtins.str`, this returns `"str"`.
-    ///
-    /// As of 2026-02-16, this method is not used in any crates in the Ruff
-    /// repo, but is exposed as a public API for external users of
-    /// `ty_python_semantic`.
-    pub fn class_name(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> &'db Name {
-        self.class(db, env).name(db)
-    }
-
-    /// Returns the fully qualified module name of the module in which the class
-    /// is defined, if it can be resolved.
-    ///
-    /// For example, for an instance of `pathlib.Path`, this returns
-    /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
-    /// to a known module (e.g. for classes defined in scripts or notebooks).
-    ///
-    /// As of 2026-02-16, this method is not used in any crates in the Ruff
-    /// repo, but is exposed as a public API for external users of
-    /// `ty_python_semantic`.
-    pub fn class_module_name(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<&'db ModuleName> {
-        let class = self.class(db, env).class_literal(db);
-        file_to_module(db, class.program_file(db).resolver_file(db)).map(|module| module.name(db))
     }
 
     pub(super) fn class(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ClassType<'db> {
@@ -672,6 +640,49 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         result.or(db, self.constraints, || structurally_satisfied)
     }
 
+    /// Try a nominal proof when a materialized recursive protocol changes specialization.
+    ///
+    /// A recursive child can stabilize at a specialization that relates nominally even when its
+    /// parent only relates structurally. Keep the child's constraints without retrying the
+    /// structural comparison that reached the recursion guard.
+    pub(super) fn try_check_nominal_protocol_cycle(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let source = source.as_protocol_instance()?;
+        let target = target.as_protocol_instance()?;
+        if source.materialization_kind(db).is_none() && target.materialization_kind(db).is_none() {
+            return None;
+        }
+        let source_origin = source.class_origin(db)?;
+        let target_origin = target.class_origin(db)?;
+        if source_origin.class_literal(db) != target_origin.class_literal(db) {
+            return None;
+        }
+
+        // Nominal arguments alone do not describe materialized requirements such as a fixed
+        // `Any` member. Only use the nominal proof when the pending wrappers are harmless.
+        for protocol in [source, target] {
+            if let Some(origin) = protocol.materialized_origin(db)
+                && !materialization_is_noop(
+                    db,
+                    self.env,
+                    Type::ProtocolInstance(ProtocolInstanceType::from_class(origin)),
+                )
+            {
+                return None;
+            }
+        }
+
+        Some(self.check_type_pair(
+            db,
+            Type::NominalInstance(source.nominal_origin_instance(db)?),
+            Type::NominalInstance(target.nominal_origin_instance(db)?),
+        ))
+    }
+
     /// Avoid recursive requirements that cannot add solutions beyond explicit inheritance.
     fn try_check_nominal_recursive_protocol_members(
         &self,
@@ -786,6 +797,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source_alias.origin(db) != target_alias.origin(db) {
             return None;
         }
+
+        // A materialized recursive member can impose bounds that finite members do not
+        // capture, even when the nominal relation is impossible. Check the full interface.
+        if source_protocol.materialization_kind(db).is_some()
+            || protocol.materialization_kind(db).is_some()
+        {
+            return None;
+        }
+
         let identity_protocol = target_alias
             .origin(db)
             .identity_specialization(db)

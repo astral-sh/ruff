@@ -505,7 +505,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Returns the generic context that should be inherited by any constructor methods of this class.
-    pub(super) fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+    fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
     }
 
@@ -1381,7 +1381,11 @@ impl<'db> StaticClassLiteral<'db> {
                     let member =
                         self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, None));
                     let specialization = generic_context.default_specialization(db, self.known(db));
-                    member.map_type(|ty| ty.apply_specialization(db, specialization))
+                    // An inherited method's `Self` bound can still contain this class's type
+                    // variables, so the default arguments must also specialize that bound.
+                    member.map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                    })
                 }
             }
         } else {
@@ -3380,6 +3384,12 @@ impl<'db> StaticClassLiteral<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let env = ProgramEnvironment::from_scope(self.body_scope(db));
+
+        if self.is_typed_dict(db) {
+            return TypedDictType::new(self.identity_specialization(db))
+                .variance_of_items(db, &env, typevar);
+        }
+
         let typevar_in_generic_context = self
             .generic_context(db)
             .is_some_and(|generic_context| generic_context.contains(db, typevar));
@@ -3387,6 +3397,14 @@ impl<'db> StaticClassLiteral<'db> {
         if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;
         }
+
+        if self.is_protocol(db)
+            && let Some(protocol) = self.identity_specialization(db).into_protocol_class(db)
+            && protocol.supports_variance_inference(db)
+        {
+            return protocol.interface(db).variance_of(db, &env, typevar);
+        }
+
         let class_body_scope = self.body_scope(db);
         let program_file = class_body_scope.program_file(db);
         let python_version = env.python_version(db);
@@ -3499,23 +3517,8 @@ impl<'db> StaticClassLiteral<'db> {
                 })
             });
 
-        let extra_items_variance = TypedDictType::new(self.identity_specialization(db))
-            .explicit_extra_items(db)
-            .map(|extra_items| {
-                let polarity = if extra_items.is_read_only() {
-                    TypeVarVariance::Covariant
-                } else {
-                    TypeVarVariance::Invariant
-                };
-                extra_items
-                    .declared_ty
-                    .with_polarity(polarity)
-                    .variance_of(db, &env, typevar)
-            });
-
         attribute_variances
             .chain(explicit_bases_variances)
-            .chain(extra_items_variance)
             .collect()
     }
 }

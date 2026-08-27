@@ -225,7 +225,7 @@ impl ScriptSyncRequest {
     }
 
     /// The `--python` argument
-    pub(crate) fn python(&self) -> Option<&ruff_db::system::SystemPath> {
+    fn python(&self) -> Option<&ruff_db::system::SystemPath> {
         self.0.python.as_deref()
     }
 

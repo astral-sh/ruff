@@ -277,3 +277,43 @@ InvalidEmptyAnnotated = Annotated[]
 def _(a: InvalidEmptyAnnotated):
     reveal_type(a)  # revealed: Unknown
 ```
+
+## Incomplete type parameter lists
+
+A generic protocol with an empty, unclosed type parameter list produces diagnostics without
+panicking while constructing an autofix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-syntax] "Type parameter list cannot be empty"
+# error: [invalid-generic-class]
+class P[(Protocol[T]): ...
+```
+
+## Incomplete type parameter lists with Unicode names
+
+An unclosed type parameter list can also contain a non-ASCII name. The missing closing bracket does
+not cause part of the name to be treated as a delimiter when constructing an autofix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-syntax] "Expected `]`, found `(`"
+# error: [invalid-generic-class]
+class P[Ä(Protocol[T]): ...
+```
