@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -7,7 +7,7 @@ use crate::rules::flake8_use_pathlib::helpers::{
 };
 use crate::rules::flake8_use_pathlib::{
     rules::Glob,
-    violations::{Joiner, OsListdir, OsPathJoin, OsPathSplitext, PyPath},
+    violations::{OsListdir, OsPathSplitext, PyPath},
 };
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
@@ -17,29 +17,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
 
     let range = call.func.range();
     match qualified_name.segments() {
-        // PTH118
-        ["os", "path", "join"] => checker.report_diagnostic_if_enabled(
-            OsPathJoin {
-                module: "path".to_string(),
-                joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
-                    Joiner::Joinpath
-                } else {
-                    Joiner::Slash
-                },
-            },
-            range,
-        ),
-        ["os", "sep", "join"] => checker.report_diagnostic_if_enabled(
-            OsPathJoin {
-                module: "sep".to_string(),
-                joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
-                    Joiner::Joinpath
-                } else {
-                    Joiner::Slash
-                },
-            },
-            range,
-        ),
         // PTH122
         ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
         // PTH124

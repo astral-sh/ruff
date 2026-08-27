@@ -226,6 +226,7 @@ PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
 33 | s.join((p, q))
 34 | s.join([p, q])
    |
+help: Replace with `Path(...) / ...`
 
 PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
   --> import_from_as.py:33:1
@@ -237,6 +238,7 @@ PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
 34 | s.join([p, q])
 35 | xbasename(p)
    |
+help: Replace with `Path(...) / ...`
 
 PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
   --> import_from_as.py:34:1
@@ -248,6 +250,7 @@ PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
 35 | xbasename(p)
 36 | xdirname(p)
    |
+help: Replace with `Path(...) / ...`
 
 PTH119 `os.path.basename()` should be replaced by `Path.name`
   --> import_from_as.py:35:1

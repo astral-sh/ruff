@@ -360,7 +360,7 @@ help: Replace with `Path(...).is_absolute()`
 28 | join(p, q)
    |
 
-PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
+PTH118 [*] `os.path.join()` should be replaced by `Path` with `/` operator
   --> import_from.py:27:1
    |
 25 | stat(p)
@@ -370,8 +370,20 @@ PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
 28 | sep.join((p, q))
 29 | sep.join([p, q])
    |
+help: Replace with `Path(...) / ...`
+   |
+4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+5  + import pathlib
+6  |
+--------------------------------------------------------------------------------
+27 | isabs(p)
+   - join(p, q)
+28 + pathlib.Path(p) / q
+29 | sep.join((p, q))
+   |
+note: This is an unsafe fix and may change runtime behavior
 
-PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+PTH118 [*] `os.sep.join()` should be replaced by `Path` with `/` operator
   --> import_from.py:28:1
    |
 26 | isabs(p)
@@ -381,8 +393,20 @@ PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
 29 | sep.join([p, q])
 30 | basename(p)
    |
+help: Replace with `Path(...) / ...`
+   |
+4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+5  + import pathlib
+6  |
+--------------------------------------------------------------------------------
+28 | join(p, q)
+   - sep.join((p, q))
+29 + pathlib.Path(p) / q
+30 | sep.join([p, q])
+   |
+note: This is an unsafe fix and may change runtime behavior
 
-PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+PTH118 [*] `os.sep.join()` should be replaced by `Path` with `/` operator
   --> import_from.py:29:1
    |
 27 | join(p, q)
@@ -392,6 +416,18 @@ PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
 30 | basename(p)
 31 | dirname(p)
    |
+help: Replace with `Path(...) / ...`
+   |
+4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+5  + import pathlib
+6  |
+--------------------------------------------------------------------------------
+29 | sep.join((p, q))
+   - sep.join([p, q])
+30 + pathlib.Path(p) / q
+31 | basename(p)
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 PTH119 [*] `os.path.basename()` should be replaced by `Path.name`
   --> import_from.py:30:1

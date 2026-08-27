@@ -226,6 +226,7 @@ PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
 26 | os.sep.join([p, q])
 27 | os.sep.join((p, q))
    |
+help: Replace with `Path(...) / ...`
 
 PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
   --> full_name.py:26:1
@@ -237,6 +238,7 @@ PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
 27 | os.sep.join((p, q))
 28 | os.path.basename(p)
    |
+help: Replace with `Path(...) / ...`
 
 PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
   --> full_name.py:27:1
@@ -248,6 +250,7 @@ PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
 28 | os.path.basename(p)
 29 | os.path.dirname(p)
    |
+help: Replace with `Path(...) / ...`
 
 PTH119 `os.path.basename()` should be replaced by `Path.name`
   --> full_name.py:28:1
@@ -341,6 +344,7 @@ PTH118 `os.path.join()` should be replaced by `Path.joinpath()`
    | ^^^^^^^^^^^^
 37 | os.sep.join(p, *q)
    |
+help: Replace with `Path(...).joinpath(...)`
 
 PTH118 `os.sep.join()` should be replaced by `Path.joinpath()`
   --> full_name.py:37:1
@@ -352,6 +356,7 @@ PTH118 `os.sep.join()` should be replaced by `Path.joinpath()`
 38 |
 39 | # https://github.com/astral-sh/ruff/issues/7620
    |
+help: Replace with `Path(...).joinpath(...)`
 
 PTH123 `open()` should be replaced by `Path.open()`
   --> full_name.py:46:1
