@@ -123,6 +123,7 @@ repos:
     rev: 1f1e8bf348ff38fc88619a38d3ca4d9c56abea49 # frozen: v0.16.5
     hooks:
       - id: ruff-format
+        types_or: [python, pyi, jupyter]
         exclude: crates/ty_python_semantic/resources/corpus/
         priority: 0
 
