@@ -861,12 +861,13 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            // `__new__` is a static method, but its implicit `cls` parameter must be bound when
-            // comparing constructor signatures, just as `self` is bound for instance methods.
-            let bind_dunder_new = |ty| {
-                if member.name == "__new__"
-                    && let Type::FunctionLiteral(function) = ty
-                {
+            // Compare constructor signatures on the subclass, including inherited `Self`
+            // annotations. Although `__new__` is static, its `cls` parameter must also be bound.
+            let bind_constructor = |ty| match ty {
+                Type::BoundMethod(method) if member.name == "__init__" => Type::BoundMethod(
+                    method.with_signature_receiver(db, instance_of_class, instance_of_class),
+                ),
+                Type::FunctionLiteral(function) if member.name == "__new__" => {
                     Type::Callable(CallableType::new(
                         db,
                         function.signature(db).bind_self_with_receiver(
@@ -877,16 +878,15 @@ fn check_class_declaration<'db>(
                         ),
                         function.callable_type_kind(db),
                     ))
-                } else {
-                    ty
                 }
+                _ => ty,
             };
 
             let Some((subclass_override_type, superclass_override_type)) = method_override_types(
                 db,
                 env,
-                bind_dunder_new(type_on_subclass_instance),
-                bind_dunder_new(superclass_type),
+                bind_constructor(type_on_subclass_instance),
+                bind_constructor(superclass_type),
             ) else {
                 continue;
             };
@@ -908,8 +908,8 @@ fn check_class_declaration<'db>(
                     if !is_assignable_method_override(
                         db,
                         env,
-                        bind_dunder_new(immediate_parent_type),
-                        bind_dunder_new(superclass_type),
+                        bind_constructor(immediate_parent_type),
+                        bind_constructor(superclass_type),
                     ) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.

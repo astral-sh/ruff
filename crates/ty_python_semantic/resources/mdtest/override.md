@@ -225,6 +225,34 @@ class Undecorated(Parent):
     def __new__(cls, value: str) -> Undecorated: ...
 ```
 
+## Constructor overrides with `Self` parameters
+
+When a constructor accepts another instance of `Self`, both the inherited and overriding signatures
+refer to the subclass being constructed. An explicit `self: Self` annotation does not change this:
+
+```pyi
+from typing_extensions import Self, override
+
+class Parent:
+    def __init__(self, other: Self) -> None: ...
+
+class Compatible(Parent):
+    @override
+    def __init__(self, other: Self) -> None: ...
+
+class ExplicitReceiver(Parent):
+    @override
+    def __init__(self: Self, other: Self) -> None: ...
+```
+
+A constructor that instead accepts an unrelated type is incompatible:
+
+```pyi
+class Incompatible(Parent):
+    @override
+    def __init__(self, other: int) -> None: ...  # error: [invalid-method-override]
+```
+
 ## Generic constructor overrides
 
 Constructor compatibility uses the superclass's specialized type parameters. A `Self` return
