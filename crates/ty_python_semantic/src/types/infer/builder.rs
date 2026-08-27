@@ -11137,7 +11137,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 (ty, value.range())
             },
         )
-        .0
+        .value_type
     }
 
     /// Computes the output of a chain of (one) boolean operation, consuming as input an iterator
@@ -11158,7 +11158,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         operations: Iterator,
         needs_peer_type: NeedsPeerType,
         mut infer_ty: InferType,
-    ) -> (Type<'db>, Truthiness)
+    ) -> ChainedBooleanResult<'db>
     where
         Iterator: IntoIterator<Item = Item>,
         NeedsPeerType: Fn(&Item) -> bool,
@@ -11233,8 +11233,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             });
 
-        let ty = UnionType::from_elements(db, env, elements);
-        (ty, preceding_truthiness)
+        let value_type = UnionType::from_elements(db, env, elements);
+        ChainedBooleanResult {
+            value_type,
+            preceding_truthiness,
+        }
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
@@ -11257,7 +11260,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // As some operators (==, !=, <, <=, >, >=) *can* return an arbitrary type, the logic below
         // is shared with the one in `infer_binary_type_comparison`.
-        let (ty, preceding_truthiness) = self.infer_chained_boolean_types(
+        let ChainedBooleanResult {
+            value_type: ty,
+            preceding_truthiness,
+        } = self.infer_chained_boolean_types(
             ast::BoolOp::And,
             false,
             std::iter::once(&**left)
@@ -11932,6 +11938,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_insert(constraints.clone());
         }
     }
+}
+
+/// The inferred result of a boolean or comparison chain.
+struct ChainedBooleanResult<'db> {
+    value_type: Type<'db>,
+    /// Combined truthiness of all operands except the last.
+    ///
+    /// For `a < b < c`, evaluating the chain as a value tests `a < b` to decide whether to
+    /// short-circuit, but returns `b < c` without testing it if evaluation continues.
+    /// Keeping the preceding checks separate lets comparison inference combine this result
+    /// with the final comparison's truthiness when analyzing the chain as a condition.
+    /// Using `value_type` instead would model testing the returned object again, which can
+    /// give a different answer when a comparison returns an object with mutable truthiness.
+    preceding_truthiness: Truthiness,
 }
 
 /// An expression cache shared across builders during multi-inference.
