@@ -278,6 +278,42 @@ class Incompatible(Parent[int]):
     def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
 ```
 
+## Constructor overloads with specialized receivers
+
+Only overloads whose `cls` annotation accepts the subclass constrain a constructor override. A
+subclass of `Parent[int]` does not need to accept arguments required only for `Parent[str]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import overload, override
+
+class Parent[T]:
+    @overload
+    def __new__(cls: type[Parent[int]], value: int) -> Parent[int]: ...
+    @overload
+    def __new__(cls: type[Parent[str]], value: str) -> Parent[str]: ...
+
+class IntChild(Parent[int]):
+    @override
+    def __new__(cls, value: int) -> IntChild: ...
+
+class StrChild(Parent[str]):
+    @override
+    def __new__(cls, value: str) -> StrChild: ...
+```
+
+The override must still accept the arguments of the applicable overload:
+
+```pyi
+class Incompatible(Parent[int]):
+    @override
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+```
+
 ## Decorated constructor overrides
 
 A decorator that preserves a constructor's signature also preserves the parameter types that an

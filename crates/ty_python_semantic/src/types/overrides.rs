@@ -39,6 +39,7 @@ use crate::{
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
+        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -883,14 +884,40 @@ fn check_class_declaration<'db>(
                         Type::Callable(callable) => callable,
                         _ => return ty,
                     };
-                    Type::Callable(CallableType::new(
-                        db,
-                        callable.signatures(db).bind_self_with_receiver(
+                    let signature = callable.signatures(db);
+                    let receiver = Type::from(class);
+                    let bound_signature = if signature.overloads.len() > 1
+                        && signature
+                            .overloads
+                            .iter()
+                            .any(Signature::has_explicit_positional_receiver_annotation)
+                    {
+                        // Overloads specialized for other subclasses do not constrain this override.
+                        CallableSignature::from_overloads(
+                            signature
+                                .overloads
+                                .iter()
+                                .filter_map(|signature| {
+                                    signature.bind_self_if_compatible(
+                                        db,
+                                        env,
+                                        receiver,
+                                        instance_of_class,
+                                    )
+                                })
+                                .flat_map(|signature| signature.overloads),
+                        )
+                    } else {
+                        signature.bind_self_with_receiver(
                             db,
                             env,
-                            Some(Type::from(class)),
+                            Some(receiver),
                             Some(instance_of_class),
-                        ),
+                        )
+                    };
+                    Type::Callable(CallableType::new(
+                        db,
+                        bound_signature,
                         // Compare call signatures independently of descriptor behavior.
                         CallableTypeKind::Regular,
                     ))
