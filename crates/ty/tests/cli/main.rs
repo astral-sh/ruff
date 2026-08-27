@@ -1001,6 +1001,7 @@ impl CliTest {
         command
     }
 
+    #[cfg(feature = "test-uv")]
     pub(crate) fn command_inheriting_environment(&self) -> Command {
         let mut command = Command::new(&self.ty_binary_path);
         command.current_dir(&self.project_dir).arg("check");
