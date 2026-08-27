@@ -847,8 +847,10 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            // Constructor methods are not checked for Liskov compliance
-            if is_constructor_like_method(&member.name) {
+            // Constructor signatures may differ unless `@override` requests compatibility.
+            if is_constructor_like_method(&member.name)
+                && !subclass_function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+            {
                 continue;
             }
 
@@ -859,9 +861,33 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some((subclass_override_type, superclass_override_type)) =
-                method_override_types(db, env, type_on_subclass_instance, superclass_type)
-            else {
+            // `__new__` is a static method, but its implicit `cls` parameter must be bound when
+            // comparing constructor signatures, just as `self` is bound for instance methods.
+            let bind_dunder_new = |ty| {
+                if member.name == "__new__"
+                    && let Type::FunctionLiteral(function) = ty
+                {
+                    Type::Callable(CallableType::new(
+                        db,
+                        function.signature(db).bind_self_with_receiver(
+                            db,
+                            env,
+                            Some(Type::from(class)),
+                            Some(instance_of_class),
+                        ),
+                        function.callable_type_kind(db),
+                    ))
+                } else {
+                    ty
+                }
+            };
+
+            let Some((subclass_override_type, superclass_override_type)) = method_override_types(
+                db,
+                env,
+                bind_dunder_new(type_on_subclass_instance),
+                bind_dunder_new(superclass_type),
+            ) else {
                 continue;
             };
 
@@ -882,8 +908,8 @@ fn check_class_declaration<'db>(
                     if !is_assignable_method_override(
                         db,
                         env,
-                        immediate_parent_type,
-                        superclass_type,
+                        bind_dunder_new(immediate_parent_type),
+                        bind_dunder_new(superclass_type),
                     ) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
