@@ -34,8 +34,8 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    Constraint, ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds,
-    SolutionPaths, Solutions,
+    ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
+    Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
@@ -231,6 +231,35 @@ fn inferable_typevars_from_tuple<'db>(
         .map(|ty| ty.as_typevar())
         .collect();
     typevars.map(|typevars| TypeVarSet::from_typevars(db, typevars))
+}
+
+/// Converts a bound from an internal `ConstraintSet` constructor to its solver representation.
+/// A bare `ParamSpec` requires parameter lists; ordinary typevars and `ParamSpec` components keep
+/// their type bounds. `None` indicates an invalid supplied bound, not an omitted endpoint.
+fn normalize_constraint_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    typevar: BoundTypeVarInstance<'db>,
+    bound: Type<'db>,
+) -> Option<Type<'db>> {
+    let bound = bound.project_type_form(db, env);
+    if !typevar.is_paramspec(db) || typevar.paramspec_attr(db).is_some() {
+        return Some(bound);
+    }
+    match bound.resolve_type_alias(db) {
+        Type::Callable(callable)
+            if let [signature] = callable.signatures(db).overloads.as_slice()
+                && signature.generic_context.is_none()
+                && let Some(paramspec) = signature.parameters().as_paramspec() =>
+        {
+            Some(Type::TypeVar(paramspec))
+        }
+        Type::Callable(callable) => Some(Type::Callable(callable.into_paramspec_value(db))),
+        Type::TypeVar(bound) if bound.is_paramspec(db) && bound.paramspec_attr(db).is_none() => {
+            Some(Type::TypeVar(bound))
+        }
+        _ => None,
+    }
 }
 
 /// Priority levels for call errors in intersection types.
@@ -2868,88 +2897,115 @@ impl<'db> Bindings<'db> {
                         }
                     },
 
-                    Type::KnownBoundMethod(
-                        method @ (KnownBoundMethodType::ConstraintSetLowerBound
-                        | KnownBoundMethodType::ConstraintSetUpperBound
-                        | KnownBoundMethodType::ConstraintSetEquality
-                        | KnownBoundMethodType::ConstraintSetRange),
-                    ) => {
-                        let typevar = match (method, overload.parameter_types()) {
-                            (
-                                KnownBoundMethodType::ConstraintSetLowerBound,
-                                [Some(_), Some(typevar)],
-                            )
-                            | (
-                                KnownBoundMethodType::ConstraintSetRange,
-                                [Some(_), Some(typevar), Some(_)],
-                            )
-                            | (
-                                KnownBoundMethodType::ConstraintSetUpperBound
-                                | KnownBoundMethodType::ConstraintSetEquality,
-                                [Some(typevar), Some(_)],
-                            ) => typevar.project_type_form(db, env),
-                            _ => return,
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetLowerBound) => {
+                        let [Some(lower), Some(typevar)] = overload.parameter_types() else {
+                            return;
                         };
+                        let typevar = typevar.project_type_form(db, env);
                         let Type::TypeVar(typevar) = typevar else {
                             return;
                         };
-                        let normalize_bound = |bound: Type<'db>| {
-                            let bound = bound.project_type_form(db, env);
-                            if !typevar.is_paramspec(db) || typevar.paramspec_attr(db).is_some() {
-                                return Some(bound);
-                            }
-                            match bound.resolve_type_alias(db) {
-                                Type::Callable(callable)
-                                    if let [signature] =
-                                        callable.signatures(db).overloads.as_slice()
-                                        && signature.generic_context.is_none()
-                                        && let Some(paramspec) =
-                                            signature.parameters().as_paramspec() =>
-                                {
-                                    Some(Type::TypeVar(paramspec))
-                                }
-                                Type::Callable(callable) => {
-                                    Some(Type::Callable(callable.into_paramspec_value(db)))
-                                }
-                                Type::TypeVar(bound)
-                                    if bound.is_paramspec(db)
-                                        && bound.paramspec_attr(db).is_none() =>
-                                {
-                                    Some(Type::TypeVar(bound))
-                                }
-                                _ => None,
-                            }
-                        };
-                        // A failed normalization rejects a supplied bound; it is not a missing
-                        // endpoint. Preserve absent sides separately inside each successful pair.
-                        let bounds = match (method, overload.parameter_types()) {
-                            (KnownBoundMethodType::ConstraintSetLowerBound, [Some(lower), _]) => {
-                                normalize_bound(*lower).map(|lower| (Some(lower), None))
-                            }
-                            (KnownBoundMethodType::ConstraintSetUpperBound, [_, Some(upper)]) => {
-                                normalize_bound(*upper).map(|upper| (None, Some(upper)))
-                            }
-                            (KnownBoundMethodType::ConstraintSetEquality, [_, Some(value)]) => {
-                                normalize_bound(*value).map(|value| (Some(value), Some(value)))
-                            }
-                            (
-                                KnownBoundMethodType::ConstraintSetRange,
-                                [Some(lower), _, Some(upper)],
-                            ) => normalize_bound(*lower)
-                                .zip(normalize_bound(*upper))
-                                .map(|(lower, upper)| (Some(lower), Some(upper))),
-                            _ => return,
-                        };
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
-                            let Some((lower, upper)) = bounds else {
+                            let Some(lower) = normalize_constraint_bound(db, env, typevar, *lower)
+                            else {
                                 return ConstraintSet::from_bool(constraints, false);
                             };
-                            ConstraintSet::from_constraint(
+                            ConstraintSet::constrain_typevar_lower_bound(
                                 db,
                                 env,
                                 constraints,
-                                Constraint::from_evidence(typevar, lower, upper),
+                                typevar,
+                                lower,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetUpperBound) => {
+                        let [Some(typevar), Some(upper)] = overload.parameter_types() else {
+                            return;
+                        };
+                        let typevar = typevar.project_type_form(db, env);
+                        let Type::TypeVar(typevar) = typevar else {
+                            return;
+                        };
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            let Some(upper) = normalize_constraint_bound(db, env, typevar, *upper)
+                            else {
+                                return ConstraintSet::from_bool(constraints, false);
+                            };
+                            ConstraintSet::constrain_typevar_upper_bound(
+                                db,
+                                env,
+                                constraints,
+                                typevar,
+                                upper,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetEquality) => {
+                        let [Some(typevar), Some(value)] = overload.parameter_types() else {
+                            return;
+                        };
+                        let typevar = typevar.project_type_form(db, env);
+                        let Type::TypeVar(typevar) = typevar else {
+                            return;
+                        };
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            let Some(value) = normalize_constraint_bound(db, env, typevar, *value)
+                            else {
+                                return ConstraintSet::from_bool(constraints, false);
+                            };
+                            ConstraintSet::constrain_typevar(
+                                db,
+                                env,
+                                constraints,
+                                typevar,
+                                value,
+                                value,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
+                        let [Some(lower), Some(typevar), Some(upper)] = overload.parameter_types()
+                        else {
+                            return;
+                        };
+                        let typevar = typevar.project_type_form(db, env);
+                        let Type::TypeVar(typevar) = typevar else {
+                            return;
+                        };
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            let (Some(lower), Some(upper)) = (
+                                normalize_constraint_bound(db, env, typevar, *lower),
+                                normalize_constraint_bound(db, env, typevar, *upper),
+                            ) else {
+                                return ConstraintSet::from_bool(constraints, false);
+                            };
+                            ConstraintSet::constrain_typevar(
+                                db,
+                                env,
+                                constraints,
+                                typevar,
+                                lower,
+                                upper,
                             )
                         });
                         let tracked = InternedConstraintSet::new(db, result);
