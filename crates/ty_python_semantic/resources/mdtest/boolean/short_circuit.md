@@ -192,3 +192,168 @@ def match_guard(flag: bool, subject: object):
 def comprehension_filter(flag: bool):
     [reveal_type(x) for _ in range(1) if flag and (x := 1)]  # revealed: Literal[1]
 ```
+
+## Reachability of compound conditions
+
+An `and` condition with an always-falsy operand cannot take the truthy branch. Similarly, an `or`
+condition with an always-truthy operand cannot take the falsy branch. This holds even when another
+operand has mutable truthiness, and when conditions contain nested boolean operations or `not`.
+
+```py
+def conditions(value: object):
+    if value and False:
+        "".missing
+
+    if value or True:
+        pass
+    else:
+        "".missing
+
+    if not (value and False):
+        pass
+    else:
+        "".missing
+
+    if (value and False) or not (value or True):
+        "".missing
+```
+
+A comparison can also return a value with unknown truthiness. That does not make a subsequent
+always-falsy operand optional when deciding whether to enter the branch.
+
+```py
+def comparison(value):
+    if value is not None and value != "" and False:
+        "".missing
+```
+
+Short-circuiting also skips later operands within a condition, including after nested boolean
+operations.
+
+```py
+def nested_operands(value):
+    if value is not None and (value != "" and False) and "".missing:
+        pass
+
+    if value is None or (value != "" or True) or "".missing:
+        pass
+
+    if value is not None and not (value != "" or True) and "".missing:
+        pass
+```
+
+The same short-circuit rules apply to loop conditions, assertions, conditional expressions,
+comprehension filters, and match guards.
+
+```py
+def other_conditions(value: object):
+    while value and False:
+        "".missing
+
+    assert value or True, value.missing
+
+    "".missing if value and False else None
+
+    [item.missing for item in range(1) if value and False]
+
+    match value:
+        case _ if value and False:
+            "".missing
+
+    assert value and False
+    "".missing
+```
+
+## Conditional expressions used as conditions
+
+When a conditional expression is itself a condition, its selected branch is evaluated as a condition
+too. The unselected branch does not affect whether the condition is truthy.
+
+```py
+def conditional_expressions(value: object, flag: bool):
+    if (value and False) if flag else False:
+        "".missing
+
+    if True if flag else (value or True):
+        pass
+    else:
+        "".missing
+
+    if True if value and False else False:
+        "".missing
+```
+
+## Chained comparison conditions
+
+A comparison chain used as a condition is falsy if any comparison is always falsy, even if an
+earlier comparison can return a value with mutable truthiness.
+
+```py
+def comparisons(value):
+    if value is not None and value == 1 < 0:
+        "".missing
+
+    if value is None:
+        return
+
+    if value == 1 < 0:
+        "".missing
+
+    if value == 1 < 0 < value:
+        "".missing
+
+    if (value == 1 < 0) and True:
+        "".missing
+
+    if (value == 1 < 0) and "".missing:
+        pass
+
+    if not (value == 1 < 0):
+        pass
+    else:
+        "".missing
+```
+
+## Re-testing boolean expression results
+
+Saving the result of `value and False` and then testing it can call `value.__bool__` twice. The
+second call may return a different result, so the truthy branch remains reachable. Assignment
+expressions and nested boolean operations in value contexts can also cause this extra test.
+
+```py
+class MutableTruthiness:
+    truthy: bool = False
+
+    def __bool__(self) -> bool:
+        self.truthy = not self.truthy
+        return self.truthy
+
+def expressions(value: MutableTruthiness, flag: bool):
+    saved = value and False
+    if saved:
+        "".missing  # error: [unresolved-attribute]
+
+    if saved := value and False:
+        "".missing  # error: [unresolved-attribute]
+
+    saved = (value and False) if flag else False
+    if saved:
+        "".missing  # error: [unresolved-attribute]
+
+    result = (value and False) and "".missing  # error: [unresolved-attribute]
+    result = (not (value or True)) or "".missing  # error: [unresolved-attribute]
+```
+
+Saving a comparison chain's result can likewise lead to re-testing a non-boolean comparison result.
+
+```py
+def saved_comparison(value):
+    if value is None:
+        return
+    result = value == 1 < 0
+    if result:
+        "".missing  # error: [unresolved-attribute]
+
+    if result := value == 1 < 0:
+        "".missing  # error: [unresolved-attribute]
+```
