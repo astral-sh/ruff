@@ -155,7 +155,7 @@ impl AlwaysFixableViolation for AssignmentDefaultInStub {
 /// Stub files exist to provide type hints, and are never executed. As such,
 /// all assignments in stub files should be annotated with a type.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269", category = Category::Style)]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Suspicious)]
 pub(crate) struct UnannotatedAssignmentInStub {
     name: String,
 }
@@ -187,7 +187,7 @@ impl Violation for UnannotatedAssignmentInStub {
 /// __all__: list[str] = ["foo", "bar"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271", category = Category::Suspicious)]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct UnassignedSpecialVariableInStub {
     name: String,
 }

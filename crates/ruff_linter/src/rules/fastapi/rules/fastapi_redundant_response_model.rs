@@ -65,7 +65,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// runtime behavior and API documentation generation. Additionally, comments inside
 /// the decorator might be removed when the argument is deleted.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Complexity)]
 pub(crate) struct FastApiRedundantResponseModel;
 
 impl AlwaysFixableViolation for FastApiRedundantResponseModel {

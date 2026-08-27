@@ -43,7 +43,7 @@ use crate::codes::Category;
 ///     X: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Suspicious)]
 pub(crate) struct ComplexAssignmentInStub;
 
 impl Violation for ComplexAssignmentInStub {

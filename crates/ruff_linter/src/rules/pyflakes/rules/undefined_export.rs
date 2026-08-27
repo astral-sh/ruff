@@ -41,7 +41,7 @@ use crate::codes::Category;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.25", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.25", category = Category::Suspicious)]
 pub(crate) struct UndefinedExport {
     pub name: String,
 }

@@ -41,7 +41,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// [documentation]: https://docs.python.org/3/library/stdtypes.html#dict.get
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.5", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.8.5", category = Category::Complexity)]
 pub(crate) struct FalsyDictGetFallback;
 
 impl Violation for FalsyDictGetFallback {

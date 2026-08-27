@@ -32,7 +32,7 @@ use crate::codes::Category;
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct UnmatchedSuppressionComment;
 
 impl Violation for UnmatchedSuppressionComment {

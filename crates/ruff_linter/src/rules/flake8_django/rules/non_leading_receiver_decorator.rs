@@ -42,7 +42,7 @@ use crate::codes::Category;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
 pub(crate) struct DjangoNonLeadingReceiverDecorator;
 
 impl Violation for DjangoNonLeadingReceiverDecorator {

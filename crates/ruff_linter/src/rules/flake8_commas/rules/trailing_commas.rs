@@ -200,7 +200,7 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 /// foo = (json.dumps({"bar": 1}),)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.223", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.223", category = Category::Suspicious)]
 pub(crate) struct TrailingCommaOnBareTuple;
 
 impl Violation for TrailingCommaOnBareTuple {

@@ -24,7 +24,7 @@ use crate::codes::Category;
 /// a["b"] = 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.250", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.250", category = Category::Suspicious)]
 pub(crate) struct UnintentionalTypeAnnotation;
 
 impl Violation for UnintentionalTypeAnnotation {

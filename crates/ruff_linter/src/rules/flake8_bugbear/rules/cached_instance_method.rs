@@ -72,7 +72,7 @@ use crate::codes::Category;
 /// - [Python documentation: `functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 /// - [don't lru_cache methods!](https://www.youtube.com/watch?v=sVjtp6tGo0g)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.114", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.114", category = Category::Suspicious)]
 pub(crate) struct CachedInstanceMethod;
 
 impl Violation for CachedInstanceMethod {

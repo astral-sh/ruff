@@ -32,7 +32,7 @@ use crate::codes::Category;
 /// - [Python documentation: Unary arithmetic and bitwise operations](https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations)
 /// - [Python documentation: Augmented assignment statements](https://docs.python.org/3/reference/simple_stmts.html#augmented-assignment-statements)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.83", category = Category::Suspicious)]
+#[violation_metadata(stable_since = "v0.0.83", category = Category::Correctness)]
 pub(crate) struct UnaryPrefixIncrementDecrement {
     operator: UnaryPrefixOperatorType,
 }

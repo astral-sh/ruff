@@ -88,7 +88,7 @@ impl UnusedNOQAKind {
 ///
 /// [RUF102]: https://docs.astral.sh/ruff/rules/invalid-rule-code/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155", category = Category::Correctness)]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Suspicious)]
 pub(crate) struct UnusedNOQA<'a> {
     pub codes: Option<UnusedCodes<'a>>,
     pub kind: UnusedNOQAKind,

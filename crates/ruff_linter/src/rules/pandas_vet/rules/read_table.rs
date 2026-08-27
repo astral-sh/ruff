@@ -37,7 +37,7 @@ use crate::codes::Category;
 /// - [Pandas documentation: `read_csv`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)
 /// - [Pandas documentation: `read_table`](https://pandas.pydata.org/docs/reference/api/pandas.read_table.html#pandas.read_table)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Complexity)]
 pub(crate) struct PandasUseOfDotReadTable;
 
 impl Violation for PandasUseOfDotReadTable {

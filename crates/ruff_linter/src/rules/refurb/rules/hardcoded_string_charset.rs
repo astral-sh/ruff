@@ -30,7 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: String constants](https://docs.python.org/3/library/string.html#string-constants)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.7.0", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.7.0", category = Category::Complexity)]
 pub(crate) struct HardcodedStringCharset {
     name: &'static str,
 }

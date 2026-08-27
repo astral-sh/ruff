@@ -52,7 +52,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - `lint.pep8-naming.classmethod-decorators`
 /// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0", category = Category::Correctness)]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct SingledispatchMethod;
 
 impl Violation for SingledispatchMethod {

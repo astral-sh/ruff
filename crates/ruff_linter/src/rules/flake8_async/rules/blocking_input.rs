@@ -34,7 +34,7 @@ use crate::codes::Category;
 ///     username = await loop.run_in_executor(None, input, "Username:")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0", category = Category::Pedantic)]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct BlockingInputInAsyncFunction;
 
 impl Violation for BlockingInputInAsyncFunction {
