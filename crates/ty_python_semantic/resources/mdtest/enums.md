@@ -823,14 +823,14 @@ python-version = "3.12"
 ```
 
 ```py
-from enum import Enum, StrEnum
-from typing import TYPE_CHECKING, Self
+from enum import Enum
+from typing import Self
 
 class GenericMixin[T]:
-    if TYPE_CHECKING:
-        def __new__(cls, value: T) -> Self: ...
+    def __new__(cls, value: T) -> Self:
+        return object.__new__(cls)
 
-class Specialized(GenericMixin[str], StrEnum):
+class Specialized(GenericMixin[str], Enum):
     A = "a"
     B = 1  # error: [invalid-assignment]
 ```
@@ -851,8 +851,8 @@ tuple payload is checked against the corresponding specialized parameter:
 
 ```py
 class Pair[T, U]:
-    if TYPE_CHECKING:
-        def __new__(cls, first: T, second: U) -> Self: ...
+    def __new__(cls, first: T, second: U) -> Self:
+        return object.__new__(cls)
 
 class Unpacked(Pair[str, int], Enum):
     A = ("a", 1)
@@ -865,10 +865,10 @@ even a fully permissive signature rejected every member:
 
 ```py
 class Ignored[T]:
-    if TYPE_CHECKING:
-        def __new__(cls, *args: object, **kwargs: object) -> Self: ...
+    def __new__(cls, *args: object, **kwargs: object) -> Self:
+        return object.__new__(cls)
 
-class Permissive(Ignored[str], StrEnum):
+class Permissive(Ignored[str], Enum):
     A = "a"
 ```
 
