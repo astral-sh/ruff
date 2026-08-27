@@ -564,18 +564,22 @@ impl Session {
         let capabilities = self.resolved_client_capabilities;
         let script_progress = self.script_progress.clone();
         let db = self.project_db_mut(path);
-        let result = db.apply_changes_with_progress(changes, &|db, project| {
-            Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
-                client,
-                WorkDoneProgressBegin {
-                    title: format!("Refreshing {} metadata", project.name(db)),
-                    cancellable: Some(false),
-                    message: None,
-                    percentage: None,
-                },
-                capabilities,
-            )))
-        });
+        let result = db.apply_changes(changes);
+        if let Some(project_path) = result.project_sync_path() {
+            db.uv_environments()
+                .request_project_sync(db, project_path, &|db, project| {
+                    Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                        client,
+                        WorkDoneProgressBegin {
+                            title: format!("Refreshing {} metadata", project.name(db)),
+                            cancellable: Some(false),
+                            message: None,
+                            percentage: None,
+                        },
+                        capabilities,
+                    )))
+                });
+        }
         let scripts = result.scripts_to_synchronize(db);
         Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
         result

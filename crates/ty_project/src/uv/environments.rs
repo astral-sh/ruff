@@ -119,7 +119,7 @@ impl UvEnvironments {
     }
 
     /// Requests fresh workspace metadata for project rediscovery.
-    pub(crate) fn request_project_sync(
+    pub fn request_project_sync(
         &self,
         db: &dyn Db,
         path: &SystemPath,

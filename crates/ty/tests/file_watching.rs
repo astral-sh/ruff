@@ -2924,7 +2924,13 @@ mod uv_metadata {
     fn update_and_synchronize_project(case: &mut TestCase, source: &str) -> anyhow::Result<()> {
         update_file(case.project_path("pyproject.toml"), source)?;
         let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
-        case.apply_changes(&changes);
+        let changes = case.apply_changes(&changes);
+
+        if let Some(project_path) = changes.project_sync_path() {
+            case.db()
+                .uv_environments()
+                .request_project_sync(case.db(), project_path, &|_, _| None);
+        }
 
         wait_for_synchronizations(case)?;
         Ok(())

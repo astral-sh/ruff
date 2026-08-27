@@ -1,7 +1,7 @@
 use crate::db::{Db, ProjectDatabase};
 use crate::script::script_tag;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
-use crate::{ProjectMetadata, ProjectReloadResult, ProjectSyncProgressFactory};
+use crate::{ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
 
 use crate::walk::{ProjectFilesWalker, create_walker_builder};
@@ -14,6 +14,7 @@ use ty_python_core::program::FallibleStrategy;
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
     project_changed: bool,
+    project_sync_path: Option<SystemPathBuf>,
     custom_stdlib_changed: bool,
     changed_files: ChangedFiles,
 }
@@ -22,6 +23,13 @@ impl ChangeResult {
     /// Returns `true` if the project structure has changed.
     pub fn project_changed(&self) -> bool {
         self.project_changed
+    }
+
+    /// The directory whose uv project metadata needs refreshing, if any.
+    ///
+    /// This may be an ancestor of the previous project root if that directory was deleted.
+    pub fn project_sync_path(&self) -> Option<&SystemPath> {
+        self.project_sync_path.as_deref()
     }
 
     /// Returns `true` if the custom stdlib's VERSIONS file has changed.
@@ -83,17 +91,11 @@ impl ChangedFiles {
 }
 
 impl ProjectDatabase {
-    pub fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
-        self.apply_changes_with_progress(changes, &|_, _| None)
-    }
-
-    /// Applies file changes, reporting progress if project metadata must be refreshed.
+    /// Applies file changes to the database.
+    ///
+    /// Any required uv synchronization is returned in [`ChangeResult`] for the caller to schedule.
     #[tracing::instrument(level = "debug", skip_all)]
-    pub fn apply_changes_with_progress(
-        &mut self,
-        changes: &[ChangeEvent],
-        make_progress: &ProjectSyncProgressFactory<'_>,
-    ) -> ChangeResult {
+    pub fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
         let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
@@ -104,6 +106,7 @@ impl ProjectDatabase {
 
         let mut result = ChangeResult {
             project_changed: false,
+            project_sync_path: None,
             custom_stdlib_changed: false,
             changed_files: if project.file_set(self).is_lazy() {
                 ChangedFiles::Unindexed
@@ -344,8 +347,7 @@ impl ProjectDatabase {
             if metadata.use_uv().workspace_discovery_enabled()
                 && metadata.config_file_override().is_none()
             {
-                self.uv_environments()
-                    .request_project_sync(self, path, make_progress);
+                result.project_sync_path = Some(path.to_path_buf());
             } else {
                 // We're not refreshing uv metadata, so use the existing environment.
                 let environment = metadata.environment().clone();

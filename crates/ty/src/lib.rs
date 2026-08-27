@@ -29,7 +29,8 @@ use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
-    CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress, watch,
+    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress,
+    watch,
 };
 use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
@@ -513,22 +514,10 @@ impl MainLoop {
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
-                    let progress = self
-                        .sync_progress
-                        .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
-
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    let result = db.apply_changes_with_progress(&changes, &|db, project| {
-                        progress.for_project(db, project)
-                    });
-
-                    // Another filesystem event can arrive while a script is still synchronizing.
-                    // Keep its progress visible after clearing the previous check's output.
-                    progress.bars.suspend(Printer::clear_screen)?;
-
-                    let scripts = result.scripts_to_synchronize(db);
-                    self.synchronize_scripts(db, &scripts);
+                    let result = db.apply_changes(&changes);
+                    self.synchronize_environments(db, &result)?;
 
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
@@ -547,6 +536,39 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+
+    fn synchronize_environments(
+        &mut self,
+        db: &mut ProjectDatabase,
+        changes: &ChangeResult,
+    ) -> Result<()> {
+        // Another filesystem event can arrive while a script is still synchronizing.
+        // Keep its progress visible after clearing the previous check's output.
+        if let Some(progress) = &self.sync_progress {
+            progress.bars.suspend(Printer::clear_screen)?;
+        } else {
+            Printer::clear_screen()?;
+        }
+
+        let project_path = changes.project_sync_path();
+        let scripts = changes.scripts_to_synchronize(db);
+        if project_path.is_none() && scripts.is_empty() {
+            return Ok(());
+        }
+
+        let progress = self
+            .sync_progress
+            .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
+
+        if let Some(project_path) = project_path {
+            db.uv_environments()
+                .request_project_sync(db, project_path, &|db, project| {
+                    progress.for_project(db, project)
+                });
+        }
+        self.synchronize_scripts(db, &scripts);
+        Ok(())
     }
 
     fn synchronize_scripts(&mut self, db: &mut ProjectDatabase, scripts: &[File]) {
