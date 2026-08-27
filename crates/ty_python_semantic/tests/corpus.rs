@@ -155,7 +155,7 @@ impl CorpusDb {
     pub fn new() -> Self {
         let vendored = ty_vendored::file_system().clone();
         let program_settings = ProgramSettings::empty(&vendored);
-        Self {
+        let db = Self {
             storage: salsa::Storage::new(None),
             system: TestSystem::default(),
             vendored,
@@ -163,7 +163,12 @@ impl CorpusDb {
             files: Files::default(),
             analysis_settings: Arc::new(AnalysisSettings::default()),
             program_settings,
-        }
+        };
+        ty_python_semantic::initialize_place_load_recording(
+            &db,
+            ty_python_semantic::PlaceLoadRecordingMode::default(),
+        );
+        db
     }
 }
 

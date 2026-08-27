@@ -184,6 +184,7 @@ Memory report:
 `FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `File`                                             metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `ModuleResolveModeIngredient`                      metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`PlaceLoadRecording`                               metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `ResolverEnvironment`                              metadata=[X.XXMB]   fields=[X.XXMB]   count=1

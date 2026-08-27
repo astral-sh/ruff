@@ -3,6 +3,8 @@ use crate::lint::{LintRegistry, RuleSelection};
 use crate::{AnalysisSettings, PythonVersionWithSource};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use rustc_hash::FxHashSet;
+use salsa::Setter;
 use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 
 /// Database giving access to semantic information about a Python program.
@@ -35,6 +37,77 @@ pub trait Db: PythonCoreDb {
     fn is_open_file(&self, file: File) -> bool;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
+}
+
+/// Initializes the database's permanent recording policy, with no files selected.
+///
+/// Call once when constructing a database, before running inference or creating snapshots.
+/// The input must exist even while recording is disabled: Salsa does not track the absence
+/// of a singleton, so creating it on first opt-in would not invalidate earlier inference.
+pub fn initialize_place_load_recording(db: &dyn Db, mode: PlaceLoadRecordingMode) {
+    let _ = PlaceLoadRecording::builder(mode, FxHashSet::default())
+        .mode_durability(salsa::Durability::NEVER_CHANGE)
+        .new(db);
+}
+
+/// Whether a database can retain place-load resolutions alongside inferred types.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+pub enum PlaceLoadRecordingMode {
+    /// Never record place loads, even if a caller requests them.
+    #[default]
+    Disabled,
+    /// Allow callers to enable recording for individual files.
+    OnDemand,
+}
+
+/// Enables cached place-load records for the selected files without running inference.
+///
+/// Recording persists across requests and source edits. Newly enabled files invalidate their
+/// unrecorded inference; enabling an already-enabled file does not change the database.
+/// Has no effect when the database was constructed with [`PlaceLoadRecordingMode::Disabled`].
+pub fn enable_place_load_recording(db: &mut dyn Db, files: impl IntoIterator<Item = File>) {
+    let recording = PlaceLoadRecording::get(db);
+    if recording.mode(db) == PlaceLoadRecordingMode::Disabled {
+        return;
+    }
+
+    let enabled = recording.files(db);
+
+    let additions: FxHashSet<_> = files
+        .into_iter()
+        .filter(|file| !enabled.contains(file))
+        .collect();
+    if additions.is_empty() {
+        return;
+    }
+
+    let mut enabled = enabled.clone();
+    enabled.extend(additions);
+    enabled.shrink_to_fit();
+
+    recording.set_files(db).to(enabled);
+}
+
+#[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
+struct PlaceLoadRecording {
+    #[returns(copy)]
+    mode: PlaceLoadRecordingMode,
+    #[returns(ref)]
+    files: FxHashSet<File>,
+}
+
+/// Returns whether inference retains place-load resolutions for `file`.
+///
+/// Permanently disabled databases neither cache per-file flags nor depend on the selected files.
+pub fn should_record_place_loads(db: &dyn Db, file: File) -> bool {
+    PlaceLoadRecording::get(db).mode(db) == PlaceLoadRecordingMode::OnDemand
+        && should_record_place_loads_impl(db, file)
+}
+
+/// Isolates recording changes so inference for other files can retain its cached result.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
+fn should_record_place_loads_impl(db: &dyn Db, file: File) -> bool {
+    PlaceLoadRecording::get(db).files(db).contains(&file)
 }
 
 #[cfg(test)]
@@ -80,7 +153,7 @@ pub(crate) mod tests {
             let events = Events::default();
             let vendored = ty_vendored::file_system().clone();
             let program_settings = ProgramSettings::empty(&vendored);
-            Self {
+            let db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
                     move |event| {
@@ -97,7 +170,9 @@ pub(crate) mod tests {
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
                 program_settings,
-            }
+            };
+            initialize_place_load_recording(&db, PlaceLoadRecordingMode::default());
+            db
         }
 
         pub(crate) fn python_version(&self) -> PythonVersion {
