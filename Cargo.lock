@@ -5001,6 +5001,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
+ "compact_str",
  "dunce",
  "mdtest",
  "ruff_db",

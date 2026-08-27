@@ -82,7 +82,7 @@ import direct
 
 # snapshot: missing-direct-dependency
 import indirect
-import indirect as alias  # error: [missing-direct-dependency]
+import indirect as alias  # error: [missing-direct-dependency] "Import of `indirect` requires a direct dependency on `indirect-distribution`"
 import indirect.child  # error: [missing-direct-dependency]
 from indirect.child import value  # error: [missing-direct-dependency]
 ```
@@ -112,7 +112,7 @@ second = 2
 `main.py`:
 
 ```py
-# error: [missing-direct-dependency]
+# error: [missing-direct-dependency] "Import of `indirect` requires a direct dependency on `indirect-distribution`"
 # error: [missing-direct-dependency]
 from indirect import first, second
 from indirect import *  # error: [missing-direct-dependency]

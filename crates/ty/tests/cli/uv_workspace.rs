@@ -52,13 +52,20 @@ requires-python = ">=3.8"
 }
 
 #[cfg(feature = "test-uv")]
-fn command_with_uv(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result<Command> {
-    let mut sync = Command::new("uv");
-    sync.current_dir(case.root())
-        .args(["workspace", "metadata", "--sync"])
+fn uv_command(case: &CliTest) -> Command {
+    let mut command = Command::new("uv");
+    command
+        .current_dir(case.root())
         .env("UV_CACHE_DIR", case.root().join("cache"))
         .env("UV_OFFLINE", "1")
         .env("UV_PYTHON_DOWNLOADS", "never");
+    command
+}
+
+#[cfg(feature = "test-uv")]
+fn command_with_uv(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result<Command> {
+    let mut sync = uv_command(case);
+    sync.args(["workspace", "metadata", "--sync"]);
     if let Some(virtual_env) = virtual_env {
         sync.arg("--active").env("VIRTUAL_ENV", virtual_env);
     }
@@ -130,11 +137,8 @@ fn write_dependency_wheel(
     Ok(())
 }
 
-/// Imports are checked against each member's direct dependencies, using uv's mapping from import
-/// names to distributions. A dependency declared by one member does not apply to its siblings.
 #[cfg(feature = "test-uv")]
-#[test]
-fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
+fn dependency_workspace_case() -> anyhow::Result<CliTest> {
     let case = workspace_case()?;
     case.write_files([
         (
@@ -176,6 +180,15 @@ dependencies = ["direct-dependency"]
         &["indirect-dependency"],
     )?;
 
+    Ok(case)
+}
+
+/// Imports are checked against each member's direct dependencies, using uv's mapping from import
+/// names to distributions. A dependency declared by one member does not apply to its siblings.
+#[cfg(feature = "test-uv")]
+#[test]
+fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
     let mut command = command_with_uv(&case, None)?;
     command.arg("packages");
     let lockfile = std::fs::read(case.root().join("uv.lock"))?;
@@ -225,20 +238,87 @@ dependencies = ["direct-dependency"]
     ----- stderr -----
     ");
 
-    command.env("TY_OUTPUT_FORMAT", "concise");
-    assert_cmd_snapshot!(command, @"
+    assert_eq!(std::fs::read(case.root().join("uv.lock"))?, lockfile);
+
+    Ok(())
+}
+
+/// An explicitly selected environment cannot use uv's module ownership, even when it is nested
+/// inside uv's environment. Dependency checks are skipped, but ordinary type checking continues.
+#[cfg(feature = "test-uv")]
+#[test]
+fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+    case.write_file(
+        "packages/member/member.py",
+        "from indirect_module import value\nnumber: str = value\n",
+    )?;
+
+    assert_cmd_snapshot!(
+        command_with_uv(&case, None)?
+            .args(["packages/member", "--error", "missing-direct-dependency"]),
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
-    packages/member/member.py:2:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
-    packages/member/member.py:3:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
-    packages/sibling/sibling.py:1:8: error[missing-direct-dependency] Import of `direct_module` requires a direct dependency on `direct-dependency`
-    Found 3 diagnostics
+    packages/member/member.py:1:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    packages/member/member.py:2:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
+    Found 2 diagnostics
 
     ----- stderr -----
-    ");
+    "
+    );
 
-    assert_eq!(std::fs::read(case.root().join("uv.lock"))?, lockfile);
+    for other_environment in ["other", ".venv/other"] {
+        let output = uv_command(&case)
+            .args(["venv", "--no-project", other_environment])
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "failed to create environment: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let output = uv_command(&case)
+            .args([
+                "pip",
+                "install",
+                "--python",
+                other_environment,
+                "--no-index",
+                "--find-links",
+                "wheels",
+                "indirect-dependency",
+            ])
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "failed to install dependency: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let mut command = command_with_uv(&case, None)?;
+        command.args([
+            "packages/member",
+            "--error",
+            "missing-direct-dependency",
+            "--python",
+            other_environment,
+        ]);
+        insta::allow_duplicates! {
+            assert_cmd_snapshot!(
+                command,
+                @"
+            success: false
+            exit_code: 1
+            ----- stdout -----
+            packages/member/member.py:2:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
+            Found 1 diagnostic
+
+            ----- stderr -----
+            "
+            );
+        }
+    }
 
     Ok(())
 }

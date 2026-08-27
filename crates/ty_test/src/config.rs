@@ -17,6 +17,7 @@
 
 use std::collections::BTreeMap;
 
+use compact_str::CompactString;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::script::ScriptTag;
@@ -224,7 +225,7 @@ impl TryFrom<DependencyMetadataOptions> for DependencyMetadataFixture {
             .map(|(module, owners)| {
                 let module_name = ModuleName::new(&module)
                     .ok_or_else(|| format!("Invalid dependency module name `{module}`"))?;
-                Ok((module_name, owners.into_iter().map(Into::into).collect()))
+                Ok((module_name, owners.into_boxed_slice()))
             })
             .collect::<Result<_, Self::Error>>()?;
 
@@ -235,13 +236,9 @@ impl TryFrom<DependencyMetadataOptions> for DependencyMetadataFixture {
                     .into_iter()
                     .map(|project| DependencyProject {
                         path: project.path,
-                        distribution: project.distribution.map(Into::into),
-                        dependencies: project.dependencies.into_iter().map(Into::into).collect(),
-                        group_dependencies: project
-                            .group_dependencies
-                            .into_iter()
-                            .map(Into::into)
-                            .collect(),
+                        distribution: project.distribution,
+                        dependencies: project.dependencies.into_iter().collect(),
+                        group_dependencies: project.group_dependencies.into_iter().collect(),
                     })
                     .collect(),
                 distributions: options
@@ -249,9 +246,9 @@ impl TryFrom<DependencyMetadataOptions> for DependencyMetadataFixture {
                     .into_iter()
                     .map(|(id, distribution)| {
                         (
-                            id.into(),
+                            id,
                             DependencyDistribution {
-                                name: distribution.name.into(),
+                                name: distribution.name,
                                 editable_path: distribution.editable_path,
                             },
                         )
@@ -269,25 +266,25 @@ struct DependencyMetadataOptions {
     #[serde(default)]
     projects: Vec<DependencyProjectOptions>,
     #[serde(default)]
-    distributions: BTreeMap<String, DependencyDistributionOptions>,
+    distributions: BTreeMap<CompactString, DependencyDistributionOptions>,
     #[serde(default)]
-    module_owners: BTreeMap<String, Vec<String>>,
+    module_owners: BTreeMap<CompactString, Vec<CompactString>>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct DependencyProjectOptions {
     path: SystemPathBuf,
-    distribution: Option<String>,
+    distribution: Option<CompactString>,
     #[serde(default)]
-    dependencies: Vec<String>,
+    dependencies: Vec<CompactString>,
     #[serde(default)]
-    group_dependencies: Vec<String>,
+    group_dependencies: Vec<CompactString>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct DependencyDistributionOptions {
-    name: String,
+    name: CompactString,
     editable_path: Option<SystemPathBuf>,
 }

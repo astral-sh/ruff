@@ -391,10 +391,11 @@ mod tests {
         metadata: &'a DependencyMetadata,
         path: &str,
     ) -> anyhow::Result<&'a DependencyProject> {
+        let path = absolute(path);
         metadata
             .projects
             .iter()
-            .find(|project| project.path == absolute(path))
+            .find(|project| project.path == path)
             .context("expected a project at this path")
     }
 
@@ -461,8 +462,8 @@ mod tests {
 
         assert_eq!(metadata.projects.len(), 3);
         let root = project(&metadata, "/app")?;
-        assert!(root.distribution.is_none());
-        assert!(root.dependencies.is_empty());
+        assert_eq!(root.distribution, None);
+        assert_eq!(root.dependencies, ids([]));
         assert_eq!(root.group_dependencies, ids(["workspace-tool"]));
 
         let member = project(&metadata, "/app/packages/member")?;
@@ -473,7 +474,7 @@ mod tests {
         );
 
         let sibling = project(&metadata, "/app/packages/sibling")?;
-        assert!(sibling.dependencies.is_empty());
+        assert_eq!(sibling.dependencies, ids([]));
         assert_eq!(sibling.group_dependencies, ids(["workspace-tool"]));
 
         Ok(())
@@ -496,7 +497,7 @@ mod tests {
         }))?;
 
         let root = project(&metadata, "/app")?;
-        assert!(root.distribution.is_none());
+        assert_eq!(root.distribution, None);
         assert_eq!(root.group_dependencies, ids(["tool"]));
 
         Ok(())
