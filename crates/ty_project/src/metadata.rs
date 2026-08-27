@@ -822,6 +822,9 @@ mod tests {
         assert!(
             find_will_execute_event_by_name(&db, "infer_scope_types_impl", None, &events).is_some()
         );
+        assert!(
+            find_will_execute_event_by_name(&db, "infer_definition_types", None, &events).is_some()
+        );
 
         // Changing the project's display name does not change its dependency declarations.
         let mut metadata = project.metadata(&db).clone();
@@ -830,6 +833,7 @@ mod tests {
         assert!(db.check_file(main).is_empty());
         let events = db.take_salsa_events();
         assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
+        assert_function_query_was_not_run_by_name(&db, "infer_definition_types", None, &events);
 
         // A new declaration changes the metadata, but not whether this import is allowed.
         set_dependency_metadata(&mut db, &["dependency", "unrelated"])?;
@@ -840,6 +844,7 @@ mod tests {
                 .is_some()
         );
         assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
+        assert_function_query_was_not_run_by_name(&db, "infer_definition_types", None, &events);
 
         // Removing the imported dependency must invalidate inference and report the import.
         set_dependency_metadata(&mut db, &[])?;
@@ -864,6 +869,7 @@ mod tests {
                 .is_some()
         );
         assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
+        assert_function_query_was_not_run_by_name(&db, "infer_definition_types", None, &events);
 
         set_dependency_metadata(&mut db, &["dependency"])?;
         assert!(db.check_file(main).is_empty());

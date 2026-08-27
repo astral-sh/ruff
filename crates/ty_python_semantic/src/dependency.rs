@@ -26,13 +26,15 @@ pub(crate) fn missing_direct_dependency<'db>(
 }
 
 /// The dependency information needed to check imports, without source ranges or lockfile details.
-///
-/// Distribution keys are opaque package-manager IDs. Keeping those IDs avoids conflating packages
-/// with the same name but different sources, and separates package identity from its display name.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct DependencyMetadata {
     pub projects: Box<[DependencyProject]>,
+    /// Installable packages, keyed by opaque package-manager IDs rather than names.
+    /// A distribution can provide several Python modules; its name need not match their import names.
+    /// IDs distinguish distributions with the same name but different sources.
     pub distributions: BTreeMap<CompactString, DependencyDistribution>,
+    /// Maps module names to the IDs in [`Self::distributions`] that provide those modules.
+    /// A module can have several owners, for example when distributions share a namespace package.
     pub module_owners: BTreeMap<ModuleName, Box<[CompactString]>>,
 }
 

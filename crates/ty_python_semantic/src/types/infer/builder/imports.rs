@@ -33,20 +33,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for alias in names {
             self.infer_definition(alias);
-
-            if self.context.is_lint_enabled(&MISSING_DIRECT_DEPENDENCY)
-                && let Some(name) = ModuleName::new(&alias.name)
-                && let Some(module) = resolve_module(
-                    self.db(),
-                    ImportingFile::File(
-                        self.file(),
-                        self.program_environment().resolver_environment(self.db()),
-                    ),
-                    &name,
-                )
-            {
-                self.check_direct_dependency(module, alias.range());
-            }
         }
     }
 
@@ -252,6 +238,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
+        if let Type::ModuleLiteral(module) = full_module_ty {
+            self.check_direct_dependency(module.module(self.db()), alias.range());
+        }
+
         let binding_ty = if asname.is_some() {
             // If we are renaming the imported module via an `as` clause, then we bind the resolved
             // module's type to that name, even if that module is nested.
@@ -293,7 +283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let module = self.check_import_from_module_is_resolvable(import);
-        let range = import.module.as_ref().map_or(import.range(), Ranged::range);
+        let import_range = import.module.as_ref().map_or(import.range(), Ranged::range);
 
         for alias in names {
             let mut checked_dependency = false;
@@ -313,15 +303,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let imported_module = if let Type::ModuleLiteral(literal) = ty.inner
                                 && let child = literal.module(db)
-                                && child.name(db).parent().as_ref() == Some(parent.name(db))
-                                && child.name(db).components().next_back()
-                                    == Some(alias.name.as_str())
+                                && let child_name = child.name(db)
+                                && child_name.parent().as_ref() == Some(parent.name(db))
+                                && child_name.components().next_back() == Some(alias.name.as_str())
                             {
                                 child
                             } else {
                                 parent
                             };
-                            self.check_direct_dependency(imported_module, range);
+                            self.check_direct_dependency(imported_module, import_range);
                             checked_dependency = true;
                         }
                     }
@@ -331,7 +321,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Star imports can have no definitions, and cycle recovery can omit declarations.
             if !checked_dependency && let Some(parent) = module {
-                self.check_direct_dependency(parent, range);
+                self.check_direct_dependency(parent, import_range);
             }
         }
     }

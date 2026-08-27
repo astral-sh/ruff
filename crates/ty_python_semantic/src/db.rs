@@ -23,13 +23,8 @@ pub trait Db: PythonCoreDb {
 
     fn analysis_settings(&self, file: File) -> &AnalysisSettings;
 
-    /// Returns the package manager's dependency information for this file's project.
-    ///
-    /// Hosts without package-manager integration, and standalone scripts whose environments have
-    /// not been discovered, have no dependency metadata.
-    fn dependency_metadata(&self, _file: File) -> Option<&DependencyMetadata> {
-        None
-    }
+    /// Returns the package manager's dependency information for this file.
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata>;
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
@@ -203,6 +198,10 @@ pub(crate) mod tests {
 
         fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
             &self.analysis_settings
+        }
+
+        fn dependency_metadata(&self, _file: File) -> Option<&DependencyMetadata> {
+            None
         }
 
         fn verbose(&self) -> bool {
