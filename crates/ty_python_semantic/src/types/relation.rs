@@ -1764,11 +1764,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Compare fixed `ParamSpec`s through their callable-shaped parameter values. This
             // preserves both ends of the materialization range of `...`: its bottom is below
             // every `ParamSpec`, and its top is above every `ParamSpec`.
+            // Gradual `Concatenate` values still require a fixed prefix, so they cannot stand in
+            // for an arbitrary fixed `ParamSpec`. Bare `...` assignability is handled above.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
             | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_paramspec(db)
-                    && other.kind(db) == CallableTypeKind::ParamSpecValue =>
+                    && other.kind(db) == CallableTypeKind::ParamSpecValue
+                    && other
+                        .signatures(db)
+                        .iter()
+                        .all(|signature| !signature.parameters().is_gradual()) =>
             {
                 let paramspec =
                     Type::paramspec_value_callable(db, Parameters::paramspec(db, bound_typevar));

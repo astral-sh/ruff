@@ -279,6 +279,37 @@ def takes_objects(*args: object, **kwargs: object) -> object:
 static_assert(not is_subtype_of(TopCallable, RegularCallableTypeOf[takes_objects]))
 ```
 
+## `ParamSpec` specializations
+
+For a class invariant in a `ParamSpec`, every fixed specialization lies between the bottom and top
+materializations of its `...` specialization. This holds for both subtyping and assignability. The
+reverse relations do not hold for an arbitrary fixed specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Box[**P]:
+    callback: Callable[P, None]
+
+def _[**P](value: Box[P]):
+    static_assert(is_subtype_of(Box[P], Top[Box[...]]))
+    static_assert(is_subtype_of(Bottom[Box[...]], Box[P]))
+    static_assert(not is_subtype_of(Top[Box[...]], Box[P]))
+    static_assert(not is_subtype_of(Box[P], Bottom[Box[...]]))
+
+    static_assert(is_assignable_to(Box[P], Top[Box[...]]))
+    static_assert(is_assignable_to(Bottom[Box[...]], Box[P]))
+    static_assert(not is_assignable_to(Top[Box[...]], Box[P]))
+    static_assert(not is_assignable_to(Box[P], Bottom[Box[...]]))
+```
+
 ## Tuple
 
 All positions in a tuple are covariant.
