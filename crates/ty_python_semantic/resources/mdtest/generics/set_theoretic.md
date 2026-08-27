@@ -301,10 +301,9 @@ static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
 ```
 
-In strict-mode `isinstance` narrowing, where we intersect with the top-materialization of generic
-classes, we can end up with intersections like `C[P] & Top[D[Any]]`, where `C` and `D` are generic
-classes in a subtyping relationship. If `C[T] = Sub[T]` is a subtype of `D[T] = Base[T]`, we can
-immediately simplify:
+In strict-mode `isinstance` narrowing, we intersect with the top-materialization of generic classes.
+Suppose `Sub[T]` is a subtype of `Base[T]`. There are two directions to consider, depending on which
+class is top-materialized. The first simplifies immediately:
 
 ```ignore
 Sub[P] & Top[Base[Any]] = Sub[P]
@@ -387,7 +386,7 @@ compatible with all of those types, which is impossible.
 We can encode these relations in ty assertions:
 
 ```pyi
-class InvariantSubOfCoBase[T](CoSub[T]):
+class InvariantSubOfCoBase[T](CoBase[T]):
     def push(self, x: T) -> None: ...
 
 static_assert(is_equivalent_to(CoBase[P] & Top[CoSub[Any]], CoSub[P]))
@@ -431,7 +430,7 @@ where both `Coroutine` and `CoroutineType` are contravariant in their "Send" typ
 Again, we can encode the results in ty assertions:
 
 ```pyi
-class InvariantSubOfContraBase[T](ContraSub[T]):
+class InvariantSubOfContraBase[T](ContraBase[T]):
     def get(self) -> T: ...
 
 static_assert(is_equivalent_to(ContraBase[P] & Top[ContraSub[Any]], ContraSub[P]))
