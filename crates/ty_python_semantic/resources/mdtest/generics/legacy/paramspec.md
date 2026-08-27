@@ -198,8 +198,7 @@ error[invalid-generic-class]: Variance of type variable `P_co` is incompatible w
 info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
 ```
 
-Forwarding `P.args` and `P.kwargs` also consumes `P`. An explicit receiver annotation does not
-affect this variance.
+Forwarding `P.args` and `P.kwargs` also consumes `P`.
 
 ```py
 class CovariantForwarder(Generic[P_co]):
@@ -207,8 +206,8 @@ class CovariantForwarder(Generic[P_co]):
     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
 
 class ContravariantForwarder(Generic[P_contra]):
-    def call(self: "ContravariantForwarder[P_contra]", *args: P_contra.args, **kwargs: P_contra.kwargs) -> None: ...
-    def returns(self: "ContravariantForwarder[P_contra]") -> Callable[P_contra, None]:
+    def call(self, *args: P_contra.args, **kwargs: P_contra.kwargs) -> None: ...
+    def returns(self) -> Callable[P_contra, None]:
         raise NotImplementedError
 ```
 
@@ -226,6 +225,94 @@ def returns() -> Callable[P_co, None]:
 
 class NotGeneric:
     def returns(self) -> Callable[P_co, None]:
+        raise NotImplementedError
+```
+
+Class methods are checked too. A static method has no receiver, so its first parameter contributes
+to its variance.
+
+```py
+class MethodKinds(Generic[P_contra]):
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls, callback: Callable[P_contra, None]) -> None: ...
+    @staticmethod
+    # error: [invalid-generic-class]
+    def static_method(callback: Callable[P_contra, None]) -> None: ...
+```
+
+### Variance in overloaded methods
+
+TODO: Variance validation is deferred for overloaded methods until it accounts for the complete
+overload set. Neither overloads nor their implementation are checked individually, even when they
+use a covariant `ParamSpec` contravariantly.
+
+```py
+from typing import Callable, Generic, ParamSpec, overload
+
+P_co = ParamSpec("P_co", covariant=True)
+
+class Overloaded(Generic[P_co]):
+    @overload
+    def method(self, value: int) -> Callable[P_co, None]: ...
+    @overload
+    def method(self, value: str) -> None: ...
+    def method(self, value: object) -> Callable[P_co, None] | None:
+        return None
+```
+
+### Variance in generic methods
+
+A method's independent type variable can accept any default. The `Callable[P_contra, None]` arm in
+the parameter annotation is redundant because `T` already accepts that default, and the result
+includes both types. This signature respects the class's contravariance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P_contra = ParamSpec("P_contra", contravariant=True)
+T = TypeVar("T")
+
+class Defaults(Generic[P_contra]):
+    def get(self, default: Callable[P_contra, None] | T) -> Callable[P_contra, None] | T:
+        return default
+```
+
+TODO: Until those relationships are checked, we defer validation for generic methods, including type
+parameters scoped to a returned callable. The incompatible return annotations below are not yet
+reported.
+
+```py
+P_co = ParamSpec("P_co", covariant=True)
+
+class GenericMethods(Generic[P_co]):
+    def legacy(self, value: T) -> Callable[P_co, T]:
+        raise NotImplementedError
+
+    def pep695[U](self, value: U) -> Callable[P_co, U]:
+        raise NotImplementedError
+
+    def returned_callable(self) -> Callable[P_co, T]:
+        raise NotImplementedError
+```
+
+### Variance with explicit receivers
+
+TODO: An explicit receiver can restrict which class specializations expose a method. We defer
+variance validation for these methods until receiver restrictions are taken into account.
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+P_co = ParamSpec("P_co", covariant=True)
+
+class Restricted(Generic[P_co]):
+    def method(self: "Restricted[[int]]") -> Callable[P_co, None]:
         raise NotImplementedError
 ```
 

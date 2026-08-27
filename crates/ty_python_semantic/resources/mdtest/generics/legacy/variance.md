@@ -308,7 +308,7 @@ T_co = TypeVar("T_co", covariant=True)
 T_contra = TypeVar("T_contra", contravariant=True)
 
 class Covariant(Generic[T_co]):
-    def returns(self: "Covariant[T_co]") -> T_co:
+    def returns(self) -> T_co:
         raise NotImplementedError
 
     # error: [invalid-generic-class]
@@ -336,33 +336,129 @@ class NestedFunction(Generic[T_co]):
         def accepts(value: T_co) -> None: ...
 ```
 
-An explicit `cls` annotation does not consume the type variable. A static method has no receiver, so
-its first parameter still contributes to its variance.
+Class methods also respect the declared variance. A static method has no receiver, so its first
+parameter still contributes to its variance.
 
 ```py
 class ClassMethods(Generic[T_co]):
     @classmethod
-    def returns(cls: type["ClassMethods[T_co]"]) -> T_co:
+    def returns(cls) -> T_co:
         raise NotImplementedError
 
+    @classmethod
+    # error: [invalid-generic-class]
+    def accepts(cls, value: T_co) -> None: ...
     @staticmethod
     # error: [invalid-generic-class]
-    def accepts(value: T_co) -> None: ...
+    def static_accepts(value: T_co) -> None: ...
 ```
 
-Each overload is checked, even when the implementation does not use the class's type variable.
+## Generic method defaults
+
+A method's independent type variable can accept defaults outside the class's covariant value type.
+The `V_co` arm in the parameter annotation is redundant: `T` already accepts any default, and the
+result includes both types. This signature does not require the class to be invariant.
 
 ```py
-from typing import overload
+from typing import Generic, TypeVar
+
+V_co = TypeVar("V_co", covariant=True)
+T = TypeVar("T")
+
+class Mapping(Generic[V_co]):
+    def get(self, default: V_co | T) -> V_co | T:
+        return default
+```
+
+Reusing `T` in another parameter can constrain which defaults the method accepts, so these generic
+methods do not always respect covariance. TODO: We defer variance checking for independently generic
+methods until we can account for these relationships, and miss this invalid use of `V_co`.
+
+```py
+class Correlated(Generic[V_co]):
+    def get(self, default: V_co | T, other: T) -> T:
+        raise NotImplementedError
+```
+
+## Overloads with generic fallbacks
+
+An overload that consumes a covariant type variable can be covered by a generic fallback. The second
+overload below accepts the first overload's arguments with the same result when `T` is `T_co`. The
+complete method therefore respects covariance.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Sequence(Generic[T_co]):
+    @overload
+    def __add__(self, value: tuple[T_co, ...]) -> tuple[T_co, ...]: ...
+    @overload
+    def __add__(self, value: tuple[T, ...]) -> tuple[T_co | T, ...]: ...
+    def __add__(self, value: tuple[object, ...]) -> tuple[object, ...]:
+        return value
+```
+
+## Overloaded mapping defaults
+
+A mapping can similarly accept its covariant value type as a default when another overload accepts
+arbitrary defaults. The generic overload covers the specialized default without losing its result
+type. The key parameter is invariant and does not affect this value-variance relationship.
+
+`mapping.pyi`:
+
+```pyi
+from typing import Generic, TypeVar, overload
+
+K = TypeVar("K")
+V_co = TypeVar("V_co", covariant=True)
+T = TypeVar("T")
+
+class Mapping(Generic[K, V_co]):
+    @overload
+    def get(self, key: K) -> V_co | None: ...
+    @overload
+    def get(self, key: K, default: V_co) -> V_co: ...
+    @overload
+    def get(self, key: K, default: T) -> V_co | T: ...
+```
+
+## Variance in overloaded methods
+
+TODO: We defer variance checking for overloaded methods until we can account for the complete
+overload set. This also means we miss invalid uses of covariant variables that no other overload
+covers.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
 
 class Overloaded(Generic[T_co]):
     @overload
-    # error: [invalid-generic-class]
     def method(self, value: T_co) -> int: ...
     @overload
     def method(self, value: int, other: int) -> int: ...
     def method(self, value: object, other: int = 0) -> int:
         return 0
+```
+
+## Variance with explicit receivers
+
+A specialized receiver restricts which specializations of the class can call a method. TODO: We
+defer variance checking for explicit receivers until we can account for these restrictions.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Restricted(Generic[T_co]):
+    def accepts(self: "Restricted[int]", value: T_co) -> None: ...
+    @classmethod
+    def class_accepts(cls: type["Restricted[int]"], value: T_co) -> None: ...
 ```
 
 ## Generic protocol variance

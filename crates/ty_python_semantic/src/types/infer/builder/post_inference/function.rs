@@ -49,7 +49,11 @@ pub(crate) fn check_function_definition<'db>(
     check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
-    check_method_typevar_variance(context, last_definition, &signature);
+    // Variance depends on the complete overload set: a broader overload can cover an otherwise
+    // incompatible signature. Defer checking overloads until we can account for that coverage.
+    if !function_type.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+        check_method_typevar_variance(context, last_definition, &signature);
+    }
 }
 
 /// Check that a method respects the declared variance of its class's type parameters.
@@ -87,9 +91,26 @@ fn check_method_typevar_variance<'db>(
     }) {
         return;
     }
+
+    // Independent method type parameters can make an occurrence of a class parameter redundant.
+    // Checking those relationships requires more than composing the variance of each occurrence.
+    // Use the lexical context so that type parameters moved into a returned callable also count.
+    let lexical_signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Lexical);
+    if lexical_signature.generic_context.is_some_and(|context| {
+        context
+            .variables(db)
+            .any(|typevar| !typevar.typevar(db).is_self(db))
+    }) {
+        return;
+    }
     let env = context.program_environment();
     let signature = if last_definition.has_implicit_receiver(db) {
-        // An explicit `self` or `cls` annotation does not consume the class's type parameters.
+        // A specialized receiver can restrict which class specializations expose this method.
+        // Defer these signatures until variance checking accounts for receiver restrictions.
+        if signature.has_explicit_positional_receiver_annotation() {
+            return;
+        }
+        // The implicit receiver does not consume the class's type parameters.
         signature.bind_self(db, env, None)
     } else {
         signature.clone()

@@ -289,7 +289,7 @@ A callable reverses the variance of its argument types. Returning a callable tha
 from typing import Callable
 
 class Callbacks(Generic[*Ts_contra]):
-    def returns(self: "Callbacks[*Ts_contra]") -> Callable[[*Ts_contra], None]:
+    def returns(self) -> Callable[[*Ts_contra], None]:
         raise NotImplementedError
 
     # error: [invalid-generic-class]
@@ -308,6 +308,86 @@ def accepts(*args: *Ts_co) -> None: ...
 
 class NotGeneric:
     def accepts(self, *args: *Ts_co) -> None: ...
+```
+
+### Variance in overloaded methods
+
+TODO: Variance validation is deferred for overloaded methods until it accounts for the complete
+overload set. Neither overloads nor their implementation are checked individually, even when they
+consume a covariant `TypeVarTuple`.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVarTuple, overload
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+
+class Overloaded(Generic[*Ts_co]):
+    @overload
+    def method(self, value: tuple[*Ts_co]) -> int: ...
+    @overload
+    def method(self, value: int) -> str: ...
+    def method(self, value: tuple[*Ts_co] | int) -> int | str:
+        return 0
+```
+
+### Variance in generic methods
+
+A method's independent type variable can accept any default. The `tuple[*Ts_co]` arm in the
+parameter annotation is redundant because `T` already accepts that default, and the result includes
+both types. This signature respects the class's covariance.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVar, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+T = TypeVar("T")
+
+class Defaults(Generic[*Ts_co]):
+    def get(self, default: tuple[*Ts_co] | T) -> tuple[*Ts_co] | T:
+        return default
+```
+
+TODO: Variance validation is deferred for methods with independent type parameters. The
+contravariant `TypeVarTuple` in the return annotations below would otherwise be rejected.
+
+```py
+Ts_contra = TypeVarTuple("Ts_contra", contravariant=True)
+
+class GenericMethods(Generic[*Ts_contra]):
+    def legacy(self, value: T) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+
+    def pep695[U](self, value: U) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+```
+
+### Variance with explicit receivers
+
+TODO: An explicit receiver can restrict which class specializations expose a method. We defer
+variance validation for these methods until receiver restrictions are taken into account.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+
+class Restricted(Generic[*Ts_co]):
+    def method(self: "Restricted[int]", value: tuple[*Ts_co]) -> None: ...
 ```
 
 ## Generic Classes
