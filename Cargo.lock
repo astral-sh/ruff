@@ -4816,6 +4816,7 @@ dependencies = [
  "ruff_ranged_value",
  "ruff_text_size",
  "rustc-hash",
+ "rustc-stable-hash",
  "salsa",
  "schemars",
  "serde",

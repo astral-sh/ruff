@@ -365,12 +365,17 @@ enum FixMode {
 
 impl FixMode {
     fn is_fixable(self, diagnostic: &Diagnostic) -> bool {
+        if diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint() {
+            return false;
+        }
+
         let Some(primary_span) = diagnostic.primary_span() else {
             return false;
         };
 
         match self {
             FixMode::Suppress => {
+                // Don't suppress unused ignore comments.
                 primary_span.range().is_some()
                     && diagnostic
                         .id()
@@ -387,17 +392,15 @@ impl FixMode {
         file: PythonFile<'_>,
         file_diagnostics: &[Diagnostic],
     ) -> Vec<ApplicableFix> {
+        let fixable_diagnostics = file_diagnostics
+            .iter()
+            .filter(|diagnostic| self.is_fixable(diagnostic));
+
         match self {
             FixMode::Suppress => {
-                let suppressable_diagnostics: Vec<_> = file_diagnostics
-                    .iter()
+                let suppressable_diagnostics: Vec<_> = fixable_diagnostics
                     .filter_map(|diagnostic| {
                         let lint_id = diagnostic.id().as_lint()?;
-
-                        // Don't suppress unused ignore comments.
-                        if is_unused_ignore_comment_lint(lint_id) {
-                            return None;
-                        }
 
                         // We can't suppress diagnostics without a corresponding file or range.
                         let span = diagnostic.primary_span()?;
@@ -420,9 +423,7 @@ impl FixMode {
                     )
                     .collect()
             }
-            FixMode::ApplyFixes(applicability) => file_diagnostics
-                .iter()
-                .filter(|diagnostic| diagnostic.has_applicable_fix(applicability))
+            FixMode::ApplyFixes(_) => fixable_diagnostics
                 .filter_map(|diagnostic| {
                     diagnostic.fix().cloned().map(|fix| ApplicableFix {
                         fix,

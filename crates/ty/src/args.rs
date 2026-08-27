@@ -77,6 +77,14 @@ pub(crate) struct CheckCommand {
     #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
 
+    /// Path to a JSON diagnostic baseline.
+    #[arg(long, value_name = "PATH")]
+    baseline: Option<SystemPathBuf>,
+
+    /// Regenerate the configured diagnostic baseline.
+    #[arg(long, conflicts_with_all = ["watch", "fix", "add_ignore"])]
+    pub(crate) update_baseline: bool,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
@@ -273,6 +281,7 @@ impl CheckCommand {
             .then_some(false)
             .or(self.error_on_warning);
         let options = Options {
+            baseline: self.baseline.map(RelativePathBuf::cli),
             environment: Some(EnvironmentOptions {
                 python_version: self.python_version.map(Into::into).map(RangedValue::cli),
                 python_platform: self

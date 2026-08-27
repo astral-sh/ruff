@@ -48,9 +48,10 @@ rayon = { workspace = true }
 regex = { workspace = true }
 regex-automata = { workspace = true }
 rustc-hash = { workspace = true }
+rustc-stable-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["rc"] }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
 strum = { workspace = true }

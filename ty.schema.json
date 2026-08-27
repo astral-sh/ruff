@@ -13,6 +13,17 @@
         }
       ]
     },
+    "baseline": {
+      "description": "Path to a JSON file containing diagnostics that should be treated as baselined.\n\nRelative paths are resolved relative to the project root.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RelativePathBuf"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [
