@@ -322,10 +322,11 @@ impl<'db> OwnedConstraintSet<'db> {
         f(&builder, set)
     }
 
-    /// Returns the types in constraints that are still reachable from the decision diagram.
+    /// Returns the typevars and stored bound types still reachable from the decision diagram.
     ///
     /// Source ordering can retain constraints that are no longer in the diagram, but their type
     /// variables must not participate in semantic walks or callable freshening.
+    /// Synthetic defaults are not stored types and must not affect these walks either.
     pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.inner.iter().flat_map(|inner| {
             inner
@@ -335,11 +336,8 @@ impl<'db> OwnedConstraintSet<'db> {
                 .unique()
                 .map(|constraint| inner.constraints[inner.retained_constraint_index(constraint)])
                 .flat_map(|constraint| {
-                    [
-                        Type::TypeVar(constraint.typevar),
-                        constraint.lower_bound().ty(),
-                        constraint.upper_bound().ty(),
-                    ]
+                    iter::once(Type::TypeVar(constraint.typevar))
+                        .chain(constraint.iter_stored_bounds().map(ConstraintBound::ty))
                 })
         })
     }
@@ -1917,12 +1915,14 @@ impl<'db> Constraint<'db> {
 
     /// Returns the effective lower endpoint, supplying a validity bound when none was provided.
     fn lower_bound(self) -> ConstraintBound<'db> {
-        self.bounds.lower_bound()
+        self.stored_lower_bound()
+            .unwrap_or_else(ConstraintBound::missing_lower)
     }
 
     /// Returns the effective upper endpoint, supplying a validity bound when none was provided.
     fn upper_bound(self) -> ConstraintBound<'db> {
-        self.bounds.upper_bound()
+        self.stored_upper_bound()
+            .unwrap_or_else(ConstraintBound::missing_upper)
     }
 
     fn stored_lower_bound(self) -> Option<ConstraintBound<'db>> {
@@ -1970,10 +1970,12 @@ enum ConstraintBound<'db> {
 }
 
 impl<'db> ConstraintBound<'db> {
+    /// The ordinary lower identity used by storage canonicalization and path aggregation.
     const fn missing_lower() -> Self {
         Self::Validity(Type::Never)
     }
 
+    /// The ordinary upper identity used by storage canonicalization and path aggregation.
     const fn missing_upper() -> Self {
         Self::Validity(Type::object())
     }
@@ -2053,9 +2055,9 @@ impl<'db> ConstraintBound<'db> {
 
 /// The lower and upper bounds for a typevar on one constraint path.
 ///
-/// Missing bounds are stored as `None`, even though this is technically redundant with
-/// `Validity(Never)` or `Validity(object)`. This is purely an optimization, which makes constraint
-/// equality and hashing more performant for the (common) missing-bounds cases.
+/// Missing bounds are stored as `None`, making equality and hashing cheaper for this common case.
+/// Ordinary validity identities (`Never`/`object`) are canonicalized to absence. The owning
+/// [`Constraint`] supplies effective defaults for missing endpoints.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct ConstraintBounds<'db> {
     lower: Option<ConstraintBound<'db>>,
@@ -2077,14 +2079,6 @@ impl<'db> ConstraintBounds<'db> {
             Some(ConstraintBound::Evidence(ty)),
             Some(ConstraintBound::Evidence(ty)),
         )
-    }
-
-    fn lower_bound(self) -> ConstraintBound<'db> {
-        self.lower.unwrap_or_else(ConstraintBound::missing_lower)
-    }
-
-    fn upper_bound(self) -> ConstraintBound<'db> {
-        self.upper.unwrap_or_else(ConstraintBound::missing_upper)
     }
 
     fn as_equality(self) -> Option<Type<'db>> {
@@ -2531,20 +2525,22 @@ impl<'db> Constraint<'db> {
             _ => {}
         }
 
-        storage.intern_constraint_typevars(db, env, Constraint::new(typevar, lower, upper));
+        let constraint = Constraint::new(typevar, lower, upper);
+        storage.intern_constraint_typevars(db, env, constraint);
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the constraint cannot
         // be satisfied, since there is no type that is both greater than `lower`, and less than
         // `upper`. We use an existential check here ("is there *some* assignment where
         // `lower ≤ upper`?") rather than a universal check, because the bounds may mention
         // typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable when `int ≤ T`.
-        let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
-        let effective_upper = upper.map_or(Type::object(), ConstraintBound::ty);
-        let when =
-            effective_lower.when_constraint_set_assignable_to_owned(db, env, effective_upper);
-        let is_never_satisfied = when.query(|_storage, when| when.is_never_satisfied(db, env));
-        if is_never_satisfied {
-            return (ALWAYS_FALSE, None);
+        let effective_lower = constraint.lower_bound().ty();
+        let effective_upper = constraint.upper_bound().ty();
+        if lower.is_some() && upper.is_some() {
+            let when =
+                effective_lower.when_constraint_set_assignable_to_owned(db, env, effective_upper);
+            if when.query(|_storage, when| when.is_never_satisfied(db, env)) {
+                return (ALWAYS_FALSE, None);
+            }
         }
 
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
@@ -2800,11 +2796,18 @@ impl ConstraintId {
             if effective_upper.is_nontrivial_intersection(db) {
                 return IntersectionResult::CannotSimplify;
             }
-            Some(ConstraintBound::from_combination(
-                effective_upper,
-                self_constraint.upper_bound(),
-                other_constraint.upper_bound(),
-            ))
+            match (
+                self_constraint.stored_upper_bound(),
+                other_constraint.stored_upper_bound(),
+            ) {
+                (Some(left), Some(right)) => Some(ConstraintBound::from_combination(
+                    effective_upper,
+                    left,
+                    right,
+                )),
+                (Some(upper), None) | (None, Some(upper)) => Some(upper.with_type(effective_upper)),
+                (None, None) => None,
+            }
         };
 
         IntersectionResult::Simplified(Constraint::new(self_constraint.typevar, lower, upper))
@@ -5169,8 +5172,14 @@ impl ConstraintAssignment {
 
         std::fmt::from_fn(move |f| {
             let constraint_data = storage.constraint_data(self.constraint());
-            let lower = constraint_data.lower_bound().ty();
-            let upper = constraint_data.upper_bound().ty();
+            // Render supplied bounds, using the ordinary identities below only for the
+            // shorthand for omitted endpoints.
+            let lower = constraint_data
+                .stored_lower_bound()
+                .map_or(Type::Never, ConstraintBound::ty);
+            let upper = constraint_data
+                .stored_upper_bound()
+                .map_or(Type::object(), ConstraintBound::ty);
             let typevar = constraint_data.typevar;
             if lower.is_equivalent_to(db, env, upper) {
                 // If this typevar is equivalent to another, output the constraint in a
