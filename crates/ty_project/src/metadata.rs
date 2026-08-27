@@ -1162,6 +1162,7 @@ unclosed table, expected `]`
         ])?;
 
         let metadata = serde_json::json!({
+            "schema": {"version": "preview"},
             "workspace_root": root,
             "environment": {
                 "root": environment,
@@ -1714,6 +1715,7 @@ unclosed table, expected `]`
         system: &TestSystem,
     ) -> anyhow::Result<ProjectEnvironment> {
         let metadata = serde_json::json!({
+            "schema": {"version": "preview"},
             "workspace_root": root,
         });
 

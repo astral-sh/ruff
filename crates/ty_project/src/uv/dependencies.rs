@@ -28,16 +28,6 @@ pub(super) struct WorkspaceDependencies {
 }
 
 impl WorkspaceDependencies {
-    pub(super) fn from_metadata(metadata: &[u8]) -> Option<Self> {
-        serde_json::from_slice(metadata)
-            .inspect_err(|error| {
-                tracing::debug!(
-                    "Skipping dependency checks: could not read uv dependency metadata: {error}"
-                );
-            })
-            .ok()
-    }
-
     pub(super) fn to_metadata(&self, root: &SystemPath) -> anyhow::Result<DependencyMetadata> {
         let mut distributions = BTreeMap::new();
         let mut extra_packages = BTreeMap::new();
@@ -382,9 +372,8 @@ mod tests {
     }
 
     fn extract(metadata: &Value) -> anyhow::Result<DependencyMetadata> {
-        WorkspaceDependencies::from_metadata(&serde_json::to_vec(metadata)?)
-            .context("expected valid dependency metadata")?
-            .to_metadata(&absolute("/app"))
+        let metadata: WorkspaceDependencies = serde_json::from_value(metadata.clone())?;
+        metadata.to_metadata(&absolute("/app"))
     }
 
     fn project<'a>(
@@ -549,21 +538,6 @@ mod tests {
             );
         }
         assert_eq!(metadata.module_owners.len(), 6);
-
-        Ok(())
-    }
-
-    #[test]
-    fn unsupported_metadata_is_not_deserialized() -> anyhow::Result<()> {
-        let mut unsupported_schema = metadata();
-        unsupported_schema["schema"]["version"] = json!("future-version");
-
-        for input in [json!({"workspace_root": "/app"}), unsupported_schema] {
-            assert!(
-                WorkspaceDependencies::from_metadata(&serde_json::to_vec(&input)?).is_none(),
-                "expected unsupported metadata to disable dependency checks: {input}"
-            );
-        }
 
         Ok(())
     }

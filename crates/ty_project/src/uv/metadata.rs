@@ -16,7 +16,7 @@ pub(crate) struct UvMetadata {
     members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
     python_version: Option<RangedValue<SupportedPythonVersion>>,
-    dependencies: Option<WorkspaceDependencies>,
+    dependencies: WorkspaceDependencies,
 }
 
 impl UvMetadata {
@@ -42,7 +42,6 @@ impl UvMetadata {
         metadata: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvMetadataError> {
-        let dependencies = WorkspaceDependencies::from_metadata(metadata);
         let metadata = serde_json::from_slice::<WorkspaceMetadata>(metadata)
             .map_err(UvMetadataError::InvalidMetadata)?;
 
@@ -65,13 +64,12 @@ impl UvMetadata {
             members: metadata.members,
             environment,
             python_version,
-            dependencies,
+            dependencies: metadata.dependencies,
         })
     }
 
     pub(crate) fn dependency_metadata(&self) -> Option<DependencyMetadata> {
         self.dependencies
-            .as_ref()?
             .to_metadata(&self.workspace_root)
             .inspect_err(|error| {
                 tracing::debug!(
@@ -155,6 +153,8 @@ struct WorkspaceMetadata {
     #[serde(default)]
     members: Box<[WorkspaceMember]>,
     environment: Option<WorkspaceEnvironment>,
+    #[serde(flatten)]
+    dependencies: WorkspaceDependencies,
 }
 
 #[derive(Deserialize)]
@@ -194,6 +194,7 @@ mod tests {
             .memory_file_system()
             .write_file_all("/app/pyproject.toml", "[tool.uv.workspace]")?;
         let metadata = br#"{
+            "schema": {"version": "preview"},
             "workspace_root": "/app"
         }"#;
 
@@ -215,6 +216,7 @@ mod tests {
             ("/env/marker", ""),
         ])?;
         let metadata = br#"{
+            "schema": {"version": "preview"},
             "workspace_root": "/app",
             "environment": {
                 "root": "/env",
@@ -241,6 +243,7 @@ mod tests {
             ("/env/marker", ""),
         ])?;
         let metadata = br#"{
+            "schema": {"version": "preview"},
             "workspace_root": "/app",
             "environment": {
                 "root": "/env",
@@ -257,15 +260,15 @@ mod tests {
     }
 
     #[test]
-    fn unusable_dependency_metadata_preserves_environment() -> anyhow::Result<()> {
+    fn rejects_incompatible_dependency_metadata() -> anyhow::Result<()> {
         let system = TestSystem::default();
         system.memory_file_system().write_files_all([
             ("/app/pyproject.toml", "[tool.uv.workspace]"),
             ("/env/marker", ""),
         ])?;
         for (schema, resolution) in [
-            (json!("future-version"), json!(["a different format"])),
-            (json!("preview"), json!({})),
+            ("future-version", json!({})),
+            ("preview", json!(["a different format"])),
         ] {
             let metadata = json!({
                 "workspace_root": "/app",
@@ -277,15 +280,10 @@ mod tests {
                 "resolution": resolution
             });
 
-            let workspace = UvMetadata::from_metadata(&serde_json::to_vec(&metadata)?, &system)?;
-
-            assert_eq!(workspace.workspace_root(), SystemPath::new("/app"));
-            assert_eq!(workspace.environment(), Some(SystemPath::new("/env")));
-            assert_eq!(
-                workspace.python_version().map(ToString::to_string),
-                Some("3.13".to_string())
+            assert_matches!(
+                UvMetadata::from_metadata(&serde_json::to_vec(&metadata)?, &system),
+                Err(UvMetadataError::InvalidMetadata(_))
             );
-            assert!(workspace.dependency_metadata().is_none());
         }
 
         Ok(())
