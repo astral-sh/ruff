@@ -1160,6 +1160,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::AssertTuple) {
                 pyflakes::rules::assert_tuple(checker, stmt, test);
             }
+            if checker.is_rule_enabled(Rule::AssertUnfilteredComprehension) {
+                ruff::rules::assert_unfiltered_comprehension(checker, test);
+            }
             if checker.is_rule_enabled(Rule::AssertFalse) {
                 flake8_bugbear::rules::assert_false(checker, stmt, test, msg.as_deref());
             }
