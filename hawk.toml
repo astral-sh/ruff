@@ -552,6 +552,22 @@ reason = "one-indexed arithmetic intentionally provides checked and saturating o
 
 [[override]]
 lint = "hawk::dead_public"
+crate = "ruff_text_size"
+item = "size::TextSize::saturating_add"
+kind = "inherent_method"
+level = "expect"
+reason = "TextSize intentionally provides both checked and saturating arithmetic"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_text_size"
+item = "size::TextSize::saturating_sub"
+kind = "inherent_method"
+level = "expect"
+reason = "TextSize intentionally provides both checked and saturating arithmetic"
+
+[[override]]
+lint = "hawk::dead_public"
 crate = "ty_project"
 item = "db::changes::ChangeResult::custom_stdlib_changed"
 kind = "inherent_method"
