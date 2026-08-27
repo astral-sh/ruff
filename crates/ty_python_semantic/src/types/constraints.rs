@@ -121,6 +121,7 @@ pub(crate) mod projection;
 mod sequents;
 mod solutions;
 mod support;
+mod variables;
 
 use paths::PathAssignments;
 use sequents::SequentMap;
@@ -1804,15 +1805,16 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 }
 
-/// Optionally applies a transformation to a builder-local typevar or constraint ID, which lets us
-/// exercise different BDD variable orderings.
+/// Optionally applies a transformation to the orderings that we use to compare builder-local
+/// typevar and constraint IDs, and to canonicalize [`TypeVarEquivalenceBound`]s. This lets us
+/// exercise different BDD variable orderings, among other things.
 ///
-/// Under normal operation, the IDs won't be modified, and we will construct BDDs based on the
-/// (builder-local) source order that we encounter typevars and constraints.
+/// Under normal operation, the orderings won't be modified, and we will construct BDDs based on
+/// the (builder-local) source order that we encounter typevars and constraints.
 ///
 /// Our results _shouldn't_ depend on the BDD variable ordering that we choose. You can use the
 /// `TY_CONSTRAINT_SET_ORDER` environment variable to artificially choose different permutations of
-/// the "natural" variable ordering, to ensure that results are consistent.
+/// the "natural" variable orderings, to ensure that results are consistent.
 fn wobble_index(index: u64) -> u64 {
     #[derive(Clone, Copy)]
     enum Order {
