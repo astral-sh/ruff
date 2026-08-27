@@ -162,7 +162,10 @@ python-version = "3.12"
 strict-generic-narrowing = true
 ```
 
-A `list()` pattern retains the original `Sequence` alongside the top-materialized list.
+A `list()` pattern leads to a type that retains the known element type (`int`), but prevents
+`.append` from accepting any type: `value` could be a list of `int`s, or a list of `bool`s, or a
+list of `Literal[1]`, etc. So whatever we would try to append might be incompatible with the actual
+element type of the list.
 
 ```py
 from typing import Sequence
@@ -170,7 +173,10 @@ from typing import Sequence
 def narrow_sequence_to_list(value: Sequence[int]) -> None:
     match value:
         case list():
-            reveal_type(value)  # revealed: Sequence[int] & Top[list[Unknown]]
+            reveal_type(value)  # revealed: Top[list[Unknown & int]]
+            reveal_type(value[0])  # revealed: int
+
+            value.append(1)  # error: [invalid-argument-type] "Expected `Never`, found `Literal[1]`"
         case _:
             reveal_type(value)  # revealed: Sequence[int] & ~Top[list[Unknown]]
 ```
@@ -1205,8 +1211,9 @@ def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
 
 ### Strict mode
 
-An invariant generic base determines its subclass's type arguments only when every argument has one
-exact solution. Unconstrained arguments and variant bases retain conservative member types.
+Captures retain the type information available in the narrowed subject. A known base argument
+constrains the corresponding subclass argument even if other parameters remain unconstrained.
+Covariant base arguments also constrain the types of captured values.
 
 ```toml
 [analysis]
@@ -1323,14 +1330,14 @@ def test_match_partially_specialized_generic_subclass(
 ) -> None:
     match value:
         case PartiallySpecializedGenericPatternChild(item=item):
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_covariant_generic_subclass(
     value: CovariantGenericPatternBase[int],
 ) -> None:
     match value:
         case CovariantGenericPatternChild(item=item):
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_inherited_generic_subclass_capture(
     value: GenericMemberBase[GenericPatternT],
@@ -1358,7 +1365,7 @@ def test_match_direct_generic_pattern_preserves_declared_member(value: object) -
 def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
     match value:
         case DefaultGenericPatternBox(value=int() as item):
-            reveal_type(item)  # revealed: Unknown & int
+            reveal_type(item)  # revealed: int
 ```
 
 ### Strict mode with a union type alias
@@ -1426,6 +1433,56 @@ def test_recursive_alias_capture(value: AliasPatternBase[RecursiveItem]) -> None
         case AliasPatternChild(item=item):
             # revealed: int | list[RecursiveItem]
             reveal_type(item)
+```
+
+## Class pattern captures from intersections
+
+In strict mode, a captured attribute retains the constraints from every part of the subject's
+intersection, just like direct attribute access:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```pyi
+from typing import reveal_type
+from ty_extensions import Intersection
+
+class A:
+    def a(self) -> None: ...
+
+class B:
+    def b(self) -> None: ...
+
+class Co[T]:
+    __match_args__ = ("item",)
+
+    @property
+    def item(self) -> T: ...
+
+def keyword(value: Intersection[Co[A], Co[B]]) -> None:
+    reveal_type(value.item)  # revealed: A & B
+    match value:
+        case Co(item=item):
+            reveal_type(item)  # revealed: A & B
+            item.a()
+            item.b()
+```
+
+Positional captures also retain both constraints when the intersection order is reversed:
+
+```pyi
+def positional(value: Intersection[Co[B], Co[A]]) -> None:
+    reveal_type(value.item)  # revealed: B & A
+    match value:
+        case Co(item):
+            reveal_type(item)  # revealed: B & A
+            item.a()
+            item.b()
 ```
 
 ## Positional class patterns
