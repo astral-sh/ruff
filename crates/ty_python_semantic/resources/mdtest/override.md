@@ -278,6 +278,54 @@ class Incompatible(Parent[int]):
     def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
 ```
 
+## Decorated constructor overrides
+
+A decorator that preserves a constructor's signature also preserves the parameter types that an
+override must accept:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing_extensions import Callable, Self, override
+
+def preserve_signature[**P, R](function: Callable[P, R]) -> Callable[P, R]: ...
+
+class Parent:
+    @preserve_signature
+    def __new__(cls, value: int) -> Self: ...
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
+## Overrides of generated `NamedTuple` constructors
+
+A subclass can explicitly override a generated `NamedTuple` constructor with a compatible signature.
+The override must still accept the field types declared on the named tuple:
+
+```pyi
+from typing_extensions import NamedTuple, Self, override
+
+class Parent(NamedTuple):
+    value: int
+
+class Compatible(Parent):
+    @override
+    def __new__(cls, value: int) -> Self: ...
+
+class Incompatible(Parent):
+    @override
+    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
 ## Missing `@override` decorator
 
 ```toml

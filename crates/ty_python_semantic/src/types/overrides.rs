@@ -18,9 +18,11 @@ use crate::{
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
-        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
+        MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
+        TypeContext, TypeQualifiers,
         call::CallArguments,
+        callable::CallableTypeKind,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -450,7 +452,16 @@ fn check_class_declaration<'db>(
 
     let instance_of_class = Type::instance(db, env, class);
 
-    let subclass_instance_member = instance_of_class.member(db, env, &member.name);
+    // Look up `__new__` on the class so generated and decorated callables retain `cls`
+    // until we bind them to the subclass below.
+    let lookup_member = |class: ClassType<'db>| {
+        if member.name == "__new__" {
+            class.class_member(db, env, &member.name, MemberLookupPolicy::default())
+        } else {
+            Type::instance(db, env, class).member(db, env, &member.name)
+        }
+    };
+    let subclass_instance_member = lookup_member(class);
     let Place::Defined(DefinedPlace {
         ty: type_on_subclass_instance,
         ..
@@ -677,8 +688,7 @@ fn check_class_declaration<'db>(
                     .unwrap_or_default();
             }
 
-            let superclass_instance_member =
-                Type::instance(db, env, superclass).member(db, env, &member.name);
+            let superclass_instance_member = lookup_member(superclass);
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
@@ -867,16 +877,22 @@ fn check_class_declaration<'db>(
                 Type::BoundMethod(method) if member.name == "__init__" => Type::BoundMethod(
                     method.with_signature_receiver(db, instance_of_class, instance_of_class),
                 ),
-                Type::FunctionLiteral(function) if member.name == "__new__" => {
+                ty if member.name == "__new__" => {
+                    let callable = match ty {
+                        Type::FunctionLiteral(function) => function.into_callable_type(db),
+                        Type::Callable(callable) => callable,
+                        _ => return ty,
+                    };
                     Type::Callable(CallableType::new(
                         db,
-                        function.signature(db).bind_self_with_receiver(
+                        callable.signatures(db).bind_self_with_receiver(
                             db,
                             env,
                             Some(Type::from(class)),
                             Some(instance_of_class),
                         ),
-                        function.callable_type_kind(db),
+                        // Compare call signatures independently of descriptor behavior.
+                        CallableTypeKind::Regular,
                     ))
                 }
                 _ => ty,
