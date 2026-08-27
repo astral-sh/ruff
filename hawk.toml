@@ -449,6 +449,14 @@ reason = "semantic model predicates intentionally expose each annotation context
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_python_semantic"
+item = "model::SemanticModel::<'a>::in_runtime_ambiguous_annotation"
+kind = "inherent_method"
+level = "expect"
+reason = "semantic model predicates intentionally expose each annotation context"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_semantic"
 item = "model::SemanticModel::<'a>::in_simple_string_type_definition"
 kind = "inherent_method"
 level = "expect"
