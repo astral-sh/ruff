@@ -73,7 +73,7 @@ mod tests {
     #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210_1.py"))]
     #[test_case(Rule::OsSymlink, Path::new("PTH211.py"))]
     fn rules_pypath(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
@@ -151,11 +151,7 @@ mod tests {
     #[test_case(Rule::OsPathGetmtime, Path::new("PTH204.py"))]
     #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]
     fn preview_flake8_use_pathlib(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
@@ -166,11 +162,7 @@ mod tests {
 
     #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210_2.py"))]
     fn pathlib_with_suffix_py314(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "py314__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("py314__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code)

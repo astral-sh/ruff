@@ -1098,7 +1098,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8UsePathlib, "124") => rules::flake8_use_pathlib::violations::PyPath,
         (Flake8UsePathlib, "201") => rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory,
         (Flake8UsePathlib, "202") => rules::flake8_use_pathlib::rules::OsPathGetsize,
-        (Flake8UsePathlib, "202") => rules::flake8_use_pathlib::rules::OsPathGetsize,
         (Flake8UsePathlib, "203") => rules::flake8_use_pathlib::rules::OsPathGetatime,
         (Flake8UsePathlib, "204") => rules::flake8_use_pathlib::rules::OsPathGetmtime,
         (Flake8UsePathlib, "205") => rules::flake8_use_pathlib::rules::OsPathGetctime,
@@ -1214,7 +1213,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
-        (Ruff, "076") => rules::ruff::rules::PytestFixtureAutouse,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1357,6 +1355,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Logging, "009") => rules::flake8_logging::rules::UndocumentedWarn,
         (Flake8Logging, "014") => rules::flake8_logging::rules::ExcInfoOutsideExceptHandler,
         (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
+
+        // Rules that belong only to categories, without linter groups or codes.
+        () => rules::ruff::rules::PytestFixtureAutouse,
 
         _ => return None,
     })

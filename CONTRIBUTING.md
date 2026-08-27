@@ -120,12 +120,13 @@ after running `cargo test` like so:
 cargo insta review
 ```
 
-If your pull request relates to a specific lint rule, include the category and rule code in the
-title, as in the following examples:
+If your pull request relates to a specific lint rule, include the category and rule code or name in
+the title, as in the following examples:
 
 - \[`flake8-bugbear`\] Avoid false positive for usage after `continue` (`B031`)
 - \[`flake8-simplify`\] Detect implicit `else` cases in `needless-bool` (`SIM103`)
 - \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
+- \[`pedantic`\] Implement `pytest-fixture-autouse`
 
 Your pull request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
@@ -225,7 +226,17 @@ adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
+1. Register the violation struct in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). If your lint
+    rule comes from an existing linter, you can map it to that linter and give it a code. Otherwise,
+    you can leave the linter and code blank, registering it only to a category. For example:
+
+    ```rust
+    // Rules with linter groups and codes
+    (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
+
+    // Rules with only a category
+    () => rules::ruff::rules::PytestFixtureAutouse,
+    ```
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -244,10 +255,14 @@ Once you're satisfied with your code, add tests for your rule
 (see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
 associated assets (like our JSON Schema) with `cargo dev generate-all`.
 
-Finally, submit a pull request, and include the category, rule name, and rule code in the title, as
-in:
+Finally, submit a pull request, and include the category, rule name, and rule code (if applicable)
+in the title, as in:
 
 > \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
+
+or
+
+> \[`pedantic`\] Implement `pytest-fixture-autouse`
 
 #### Rule testing: fixtures and snapshots
 
