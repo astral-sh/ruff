@@ -49,7 +49,7 @@ use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
 use std::borrow::Cow;
@@ -64,7 +64,8 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
-use builder::{DeferredExpressionState, TypeInferenceBuilder};
+pub use builder::DeferredExpressionState;
+use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
@@ -84,6 +85,74 @@ struct PlaceLoadMetadata<'db> {
     range: TextRange,
     deferred_state: DeferredExpressionState,
     resolution: DefinitionResolution<'db>,
+}
+
+/// Information captured while inference resolves a name load.
+pub struct InferredNameLoad<'db> {
+    deferred_state: DeferredExpressionState,
+    resolution: DefinitionResolution<'db>,
+}
+
+#[allow(dead_code, reason = "place-load metadata is exposed for IDE consumers")]
+impl<'db> InferredNameLoad<'db> {
+    pub(crate) const fn new(
+        deferred_state: DeferredExpressionState,
+        resolution: DefinitionResolution<'db>,
+    ) -> Self {
+        Self {
+            deferred_state,
+            resolution,
+        }
+    }
+
+    /// Returns the binding state selected by inference.
+    pub const fn deferred_state(&self) -> DeferredExpressionState {
+        self.deferred_state
+    }
+
+    /// Returns the definitions that can provide the loaded value.
+    pub const fn resolution(&self) -> &DefinitionResolution<'db> {
+        &self.resolution
+    }
+}
+
+pub(crate) fn place_load_metadata_from_inference<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    requested: &FxHashSet<TextRange>,
+) -> FxHashMap<TextRange, (DeferredExpressionState, DefinitionResolution<'db>)> {
+    if !crate::db::should_record_place_loads(db, scope.file(db)) {
+        return FxHashMap::default();
+    }
+    infer_complete_scope_types(db, scope)
+        .extra
+        .as_deref()
+        .and_then(|extra| extra.place_load_metadata.as_deref())
+        .into_iter()
+        .flat_map(FrozenMap::iter)
+        .filter(|(_, metadata)| requested.contains(&metadata.range))
+        .map(|(_, metadata)| {
+            (
+                metadata.range,
+                (metadata.deferred_state, metadata.resolution.clone()),
+            )
+        })
+        .collect()
+}
+
+pub(crate) fn complete_inference_scope<'db>(
+    db: &'db dyn Db,
+    mut scope: ScopeId<'db>,
+) -> ScopeId<'db> {
+    while scope.accepts_type_context(db) {
+        let program_file = scope.program_file(db);
+        let index = semantic_index(db, program_file);
+        let Some(parent_scope) = index.parent_scope_id(scope.file_scope_id(db)) else {
+            break;
+        };
+        scope = parent_scope.to_scope_id(db, program_file);
+    }
+    scope
 }
 
 bitflags::bitflags! {

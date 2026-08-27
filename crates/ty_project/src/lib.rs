@@ -632,6 +632,23 @@ impl Project {
         self.set_open_fileset(db).to(open_files);
     }
 
+    /// Enables cached name-load records for the selected files without running inference.
+    ///
+    /// The database must permit recording; construct a [`ProjectDatabase`] with
+    /// [`ProjectDatabase::with_place_load_recording`]. Otherwise this request has no effect.
+    ///
+    /// Call this before creating database snapshots or semantic models for the operation.
+    /// Recording remains enabled across requests and source edits. Already-enabled files do
+    /// not change the database; newly enabled files invalidate their unrecorded inference.
+    #[allow(dead_code, reason = "recording is exposed for IDE consumers")]
+    pub fn enable_place_load_recording(
+        self,
+        db: &mut dyn Db,
+        files: impl IntoIterator<Item = File>,
+    ) {
+        ty_python_semantic::enable_place_load_recording(db, files);
+    }
+
     /// Permanently marks the project as never having open files, so reads of the
     /// open-file state record no salsa dependency. Any later write panics.
     fn freeze_open_files(self, db: &mut dyn Db) {

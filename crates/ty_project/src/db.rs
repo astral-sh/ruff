@@ -18,7 +18,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::system_module_search_paths;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
+use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy};
 use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
@@ -120,18 +120,24 @@ impl ProjectDatabase {
         )
     }
 
-    /// Creates a new database, substituting default values for any misconfigured settings.
-    pub fn use_defaults<S>(project_metadata: ProjectMetadata, system: S) -> Self
+    /// Creates a database that permits name-load recording for selected files.
+    ///
+    /// The strategy determines how misconfigured settings are handled. Recording remains off
+    /// until files are selected with [`ty_python_semantic::enable_place_load_recording`].
+    pub fn with_place_load_recording<S, Strategy: MisconfigurationStrategy>(
+        project_metadata: ProjectMetadata,
+        system: S,
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<anyhow::Error>>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let Ok(db) = Self::new(
+        Self::new(
             project_metadata,
             system,
-            PlaceLoadRecordingMode::default(),
-            &UseDefaultStrategy,
-        );
-        db
+            PlaceLoadRecordingMode::OnDemand,
+            strategy,
+        )
     }
 
     /// Permanently freezes the most heavily read inputs that are immutable during a one-shot check.
@@ -953,11 +959,13 @@ pub(crate) mod testing {
 #[cfg(test)]
 mod tests {
     use ruff_db::Db as _;
-    use ruff_db::files::{FileRootKind, system_path_to_file};
+    use ruff_db::files::{File, FileRootKind, system_path_to_file};
+    use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_trivia::textwrap::dedent;
     use ty_module_resolver::list_modules;
+    use ty_python_core::program::FallibleStrategy;
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
@@ -983,6 +991,45 @@ result = value
         ty_python_semantic::enable_place_load_recording(&mut db, [file]);
         assert!(!ty_python_semantic::should_record_place_loads(&db, file));
         assert!(db.check_file(file).is_empty());
+    }
+
+    #[test]
+    fn place_load_recording_is_opt_in_and_additive() {
+        let system = TestSystem::default();
+        for path in ["/project/first.py", "/project/second.py"] {
+            system
+                .memory_file_system()
+                .write_file_all(
+                    path,
+                    r#"
+value = 1
+result = value
+"#,
+                )
+                .expect("write recording fixture");
+        }
+        let mut db = ProjectDatabase::with_place_load_recording(
+            ProjectMetadata::new("recording", SystemPathBuf::from("/project")),
+            system,
+            &FallibleStrategy,
+        )
+        .expect("valid test project");
+        let first = system_path_to_file(&db, "/project/first.py").expect("first fixture exists");
+        let second = system_path_to_file(&db, "/project/second.py").expect("second fixture exists");
+        let project = db.project();
+        assert!(!has_recorded_name_load(&db, first));
+        assert!(!has_recorded_name_load(&db, second));
+        assert!(db.check_file(first).is_empty());
+
+        project.enable_place_load_recording(&mut db, [first]);
+        assert!(has_recorded_name_load(&db, first));
+        assert!(!has_recorded_name_load(&db, second));
+        assert!(db.check_file(first).is_empty());
+
+        project.enable_place_load_recording(&mut db, [first, second]);
+        assert!(has_recorded_name_load(&db, first));
+        assert!(has_recorded_name_load(&db, second));
+        assert!(db.check_file(second).is_empty());
     }
 
     #[test]
@@ -1154,5 +1201,21 @@ result = value
         );
 
         Ok(())
+    }
+
+    fn has_recorded_name_load(db: &ProjectDatabase, file: File) -> bool {
+        let file = db.program_file(file);
+        let module = parsed_module(db, file.python_file(db)).load(db);
+        let name = module
+            .syntax()
+            .body
+            .last()
+            .and_then(|statement| statement.as_assign_stmt())
+            .and_then(|assignment| assignment.value.as_name_expr())
+            .expect("fixture ends with an assignment from a name");
+        ty_python_semantic::SemanticModel::new(db, file)
+            .infer_name_loads([name])
+            .get(name)
+            .is_some()
     }
 }
