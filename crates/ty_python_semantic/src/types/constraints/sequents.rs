@@ -14,7 +14,7 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
-use crate::types::{BoundTypeVarInstance, Type, TypeVarVariance};
+use crate::types::{BoundTypeVarInstance, Parameters, Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
 
 /// A collection of _sequents_ that describe how the constraints mentioned in a BDD relate to each
@@ -242,15 +242,25 @@ impl SequentMap {
     ) {
         // If this constraint binds its typevar to `Never ≤ T ≤ object`, then the typevar can take
         // on any type, and the constraint is always satisfied.
+        // For a ParamSpec, the bottom and top parameter lists likewise allow every specialization.
+        // Record this fact without discarding the supplied bounds as inference evidence.
         let constraint_data = storage.constraint_data(constraint);
         let lower = constraint_data.lower_bound().ty();
         let upper = constraint_data.upper_bound().ty();
-        if constraint_data
+        if (constraint_data
             .stored_lower_bound()
             .is_none_or(|bound| bound.ty().is_never())
             && constraint_data
                 .stored_upper_bound()
-                .is_none_or(|bound| bound.ty().is_object())
+                .is_none_or(|bound| bound.ty().is_object()))
+            || (constraint_data.typevar.is_paramspec(db)
+                && constraint_data.typevar.paramspec_attr(db).is_none()
+                && {
+                    let (lower, upper) = constraint_data.materialized_bounds(db);
+                    let bottom = Type::paramspec_value_callable(db, Parameters::bottom());
+                    let top = Type::paramspec_value_callable(db, Parameters::top());
+                    lower.is_equivalent_to(db, env, bottom) && upper.is_equivalent_to(db, env, top)
+                })
         {
             self.add_single_tautology(constraint);
             return;

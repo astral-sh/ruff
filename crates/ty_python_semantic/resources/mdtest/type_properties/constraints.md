@@ -1143,18 +1143,23 @@ def same_typevar[T]():
     static_assert(constraints == expected)
 ```
 
-For ParamSpecs too, a self-bound leaves that side of the range unconstrained.
+Constraining a ParamSpec with itself leaves every parameter list possible.
 
 ```pyi
 from typing import Callable
+from ty_extensions import Bottom, Top
 
 def same_paramspec[**P]() -> None:
-    constraints = ConstraintSet.range(Callable[[int], None], P, P)
-    expected = ConstraintSet.lower_bound(Callable[[int], None], P)
+    constraints = ConstraintSet.upper_bound(P, P)
+    expected = ConstraintSet.range(Bottom[Callable[..., Never]], P, Top[Callable[..., object]])
     static_assert(constraints == expected)
 
-    constraints = ConstraintSet.range(P, P, Callable[[int], None])
-    expected = ConstraintSet.upper_bound(P, Callable[[int], None])
+    constraints = ConstraintSet.lower_bound(P, P)
+    expected = ConstraintSet.range(Bottom[Callable[..., Never]], P, Top[Callable[..., object]])
+    static_assert(constraints == expected)
+
+    constraints = ConstraintSet.equality(P, P)
+    expected = ConstraintSet.range(Bottom[Callable[..., Never]], P, Top[Callable[..., object]])
     static_assert(constraints == expected)
 ```
 
