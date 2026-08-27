@@ -296,6 +296,75 @@ equivalent to) each other.
 
 It is not possible to construct a legacy typevar that is explicitly bivariant.
 
+## Variance in method signatures
+
+Methods must respect the declared variance of the class's type variables. Covariant variables can be
+returned but cannot be consumed, while contravariant variables can be consumed but not returned.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Covariant(Generic[T_co]):
+    def returns(self: "Covariant[T_co]") -> T_co:
+        raise NotImplementedError
+
+    # error: [invalid-generic-class]
+    def accepts(self, value: T_co) -> None: ...
+    def accepts_callback(self, callback: Callable[[T_co], None]) -> None: ...
+
+class Contravariant(Generic[T_contra]):
+    def accepts(self, value: T_contra) -> None: ...
+
+    # error: [invalid-generic-class]
+    def returns(self) -> T_contra:
+        raise NotImplementedError
+```
+
+The same variable can be bound independently to a generic method. Its declared variance does not
+apply to that method binding. A nested function is not part of the class's interface either.
+
+```py
+class GenericMethod(Generic[T_contra]):
+    def identity(self, value: T_co) -> T_co:
+        return value
+
+class NestedFunction(Generic[T_co]):
+    def method(self) -> None:
+        def accepts(value: T_co) -> None: ...
+```
+
+An explicit `cls` annotation does not consume the type variable. A static method has no receiver, so
+its first parameter still contributes to its variance.
+
+```py
+class ClassMethods(Generic[T_co]):
+    @classmethod
+    def returns(cls: type["ClassMethods[T_co]"]) -> T_co:
+        raise NotImplementedError
+
+    @staticmethod
+    # error: [invalid-generic-class]
+    def accepts(value: T_co) -> None: ...
+```
+
+Each overload is checked, even when the implementation does not use the class's type variable.
+
+```py
+from typing import overload
+
+class Overloaded(Generic[T_co]):
+    @overload
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> int: ...
+    @overload
+    def method(self, value: int, other: int) -> int: ...
+    def method(self, value: object, other: int = 0) -> int:
+        return 0
+```
+
 ## Generic protocol variance
 
 A protocol's declared variance must match whether its members consume or produce that type variable.

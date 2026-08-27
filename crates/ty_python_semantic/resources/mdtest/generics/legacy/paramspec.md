@@ -162,6 +162,73 @@ AmbiguousInferVariance = ParamSpec("AmbiguousInferVariance", infer_variance=cond
 CovariantAndInferred = ParamSpec("CovariantAndInferred", covariant=True, infer_variance=True)
 ```
 
+### Variance in method signatures
+
+Returning `Callable[P, None]` uses `P` contravariantly. Accepting that callable as a parameter
+reverses the direction, using `P` covariantly. An explicit variance declaration must permit these
+uses.
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+P_co = ParamSpec("P_co", covariant=True)
+P_contra = ParamSpec("P_contra", contravariant=True)
+
+class Covariant(Generic[P_co]):
+    def accepts(self, callback: Callable[P_co, None]) -> None: ...
+
+    # snapshot: invalid-generic-class
+    def returns(self) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+class Contravariant(Generic[P_contra]):
+    def returns(self) -> Callable[P_contra, None]:
+        raise NotImplementedError
+
+    # error: [invalid-generic-class] "Variance of type variable `P_contra` is incompatible with method `accepts`"
+    def accepts(self, callback: Callable[P_contra, None]) -> None: ...
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `returns`
+  --> src/mdtest_snippet.py:10:9
+   |
+10 |     def returns(self) -> Callable[P_co, None]:
+   |         ^^^^^^^
+info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Forwarding `P.args` and `P.kwargs` also consumes `P`. An explicit receiver annotation does not
+affect this variance.
+
+```py
+class CovariantForwarder(Generic[P_co]):
+    # error: [invalid-generic-class]
+    def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+
+class ContravariantForwarder(Generic[P_contra]):
+    def call(self: "ContravariantForwarder[P_contra]", *args: P_contra.args, **kwargs: P_contra.kwargs) -> None: ...
+    def returns(self: "ContravariantForwarder[P_contra]") -> Callable[P_contra, None]:
+        raise NotImplementedError
+```
+
+Constructors can establish a specialization without respecting its declared variance. A `ParamSpec`
+bound to a function or method instead of the class ignores its declared variance.
+
+```py
+class Constructed(Generic[P_co]):
+    def __init__(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+    def __new__(cls, *args: P_co.args, **kwargs: P_co.kwargs) -> "Constructed[P_co]":
+        raise NotImplementedError
+
+def returns() -> Callable[P_co, None]:
+    raise NotImplementedError
+
+class NotGeneric:
+    def returns(self) -> Callable[P_co, None]:
+        raise NotImplementedError
+```
+
 ### Defaults
 
 ```toml

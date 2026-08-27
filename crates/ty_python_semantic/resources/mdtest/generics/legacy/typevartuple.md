@@ -242,6 +242,74 @@ Ts_Contra = TypeVarTuple("Ts_Contra", contravariant=True)
 Ts_Inferred = TypeVarTuple("Ts_Inferred", infer_variance=True)
 ```
 
+### Variance in method signatures
+
+A tuple is covariant in its unpacked type variables. Returning `tuple[*Ts]` therefore uses `Ts`
+covariantly, while accepting `*args: *Ts` uses it contravariantly.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+Ts_contra = TypeVarTuple("Ts_contra", contravariant=True)
+
+class Covariant(Generic[*Ts_co]):
+    def returns(self) -> tuple[*Ts_co]:
+        raise NotImplementedError
+
+    # snapshot: invalid-generic-class
+    def accepts(self, *args: *Ts_co) -> None: ...
+
+class Contravariant(Generic[*Ts_contra]):
+    def accepts(self, *args: *Ts_contra) -> None: ...
+
+    # error: [invalid-generic-class] "Variance of type variable `Ts_contra` is incompatible with method `returns`"
+    def returns(self) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `Ts_co` is incompatible with method `accepts`
+  --> src/mdtest_snippet.py:11:9
+   |
+11 |     def accepts(self, *args: *Ts_co) -> None: ...
+   |         ^^^^^^^
+info: Type variable `Ts_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+A callable reverses the variance of its argument types. Returning a callable that consumes
+`Ts_contra` is valid, while accepting the same callable is not.
+
+```py
+from typing import Callable
+
+class Callbacks(Generic[*Ts_contra]):
+    def returns(self: "Callbacks[*Ts_contra]") -> Callable[[*Ts_contra], None]:
+        raise NotImplementedError
+
+    # error: [invalid-generic-class]
+    def accepts(self, callback: Callable[[*Ts_contra], None]) -> None: ...
+```
+
+Constructors and function-scoped type variables do not constrain the class's variance.
+
+```py
+class Constructed(Generic[*Ts_co]):
+    def __init__(self, *args: *Ts_co) -> None: ...
+    def __new__(cls, *args: *Ts_co) -> "Constructed[*Ts_co]":
+        raise NotImplementedError
+
+def accepts(*args: *Ts_co) -> None: ...
+
+class NotGeneric:
+    def accepts(self, *args: *Ts_co) -> None: ...
+```
+
 ## Generic Classes
 
 ### Multiple `TypeVarTuple`s

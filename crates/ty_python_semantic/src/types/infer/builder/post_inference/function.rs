@@ -1,17 +1,19 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownInstanceType, Signature, Type, TypeVarKind,
+        KnownInstanceType, Signature, Type, TypeVarKind, TypeVarVariance,
         context::InferContext,
         diagnostic::{
-            INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT,
-            UNBOUND_TYPE_VARIABLE,
+            INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
+            INVALID_TYPE_VARIABLE_DEFAULT, UNBOUND_TYPE_VARIABLE,
         },
         function::{FunctionDecorators, OverloadLiteral},
         generics::GenericContext,
+        infer::nearest_enclosing_class,
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
+        variance::VarianceInferable,
         visitor::find_over_type,
     },
 };
@@ -22,7 +24,7 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::definition::Definition;
+use ty_python_core::{definition::Definition, semantic_index};
 
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
@@ -47,6 +49,78 @@ pub(crate) fn check_function_definition<'db>(
     check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
+    check_method_typevar_variance(context, last_definition, &signature);
+}
+
+/// Check that a method respects the declared variance of its class's type parameters.
+/// Constructors are excluded because their parameters establish the class specialization.
+fn check_method_typevar_variance<'db>(
+    context: &InferContext<'db, '_>,
+    last_definition: OverloadLiteral<'db>,
+    signature: &Signature<'db>,
+) {
+    let db = context.db();
+    let body_scope = last_definition.body_scope(db);
+    if !context.is_lint_enabled(&INVALID_GENERIC_CLASS)
+        || !body_scope.is_method_scope(db)
+        || matches!(last_definition.name(db).as_str(), "__init__" | "__new__")
+    {
+        return;
+    }
+
+    let index = semantic_index(db, body_scope.program_file(db));
+    let Some(class) = nearest_enclosing_class(db, index, body_scope) else {
+        return;
+    };
+    // Protocols have separate checks for variance in their interfaces.
+    if class.is_protocol(db) {
+        return;
+    }
+    let Some(generic_context) = class.generic_context(db) else {
+        return;
+    };
+    if !generic_context.variables(db).any(|typevar| {
+        matches!(
+            typevar.typevar(db).explicit_variance(db),
+            Some(TypeVarVariance::Covariant | TypeVarVariance::Contravariant)
+        )
+    }) {
+        return;
+    }
+    let env = context.program_environment();
+    let signature = if last_definition.has_implicit_receiver(db) {
+        // An explicit `self` or `cls` annotation does not consume the class's type parameters.
+        signature.bind_self(db, env, None)
+    } else {
+        signature.clone()
+    };
+
+    for typevar in generic_context.variables(db) {
+        let Some(declared_variance) = typevar.typevar(db).explicit_variance(db) else {
+            continue;
+        };
+        if declared_variance == TypeVarVariance::Invariant {
+            continue;
+        }
+        let required_variance = (&signature).variance_of(db, env, typevar.identity(db));
+        if declared_variance.join(required_variance) == declared_variance {
+            continue;
+        }
+        let node = last_definition.node(db, context.file(), context.module());
+        if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, &node.name) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Variance of type variable `{}` is incompatible with method `{}`",
+                typevar.name(db),
+                node.name,
+            ));
+            diagnostic.info(format_args!(
+                "Type variable `{}` is declared as {}, but this method requires it to be {}",
+                typevar.name(db),
+                declared_variance.as_str(),
+                required_variance.as_str(),
+            ));
+        }
+    }
 }
 
 /// Check that a function using PEP 695 syntax does not also introduce legacy type variables.
