@@ -3,6 +3,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -34,7 +35,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.69")]
+#[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
 pub(crate) struct FirstWordUncapitalized {
     first_word: String,
     capitalized_word: String,

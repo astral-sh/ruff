@@ -446,7 +446,7 @@
       ]
     },
     "ignore": {
-      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.",
+      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
       "type": [
         "array",
         "null"
@@ -691,7 +691,7 @@
       ]
     },
     "select": {
-      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
+      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
       "type": [
         "array",
         "null"
@@ -2451,7 +2451,7 @@
           ]
         },
         "ignore": {
-          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.",
+          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
           "type": [
             "array",
             "null"
@@ -2609,7 +2609,7 @@
           ]
         },
         "select": {
-          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
+          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
           "type": [
             "array",
             "null"
@@ -4697,11 +4697,13 @@
         "complex-assignment-in-stub",
         "complex-if-statement-in-stub",
         "complex-structure",
+        "complexity",
         "constant-imported-as-non-constant",
         "continue-in-finally",
         "continue-outside-loop",
         "convert-named-tuple-functional-to-class",
         "convert-typed-dict-functional-to-class",
+        "correctness",
         "create-subprocess-in-async-function",
         "custom-type-var-for-self",
         "dataclass-enum",
@@ -4797,6 +4799,7 @@
         "for-loop-writes",
         "format-in-get-text-func-call",
         "format-literals",
+        "formatting",
         "forward-annotation-syntax-error",
         "fromisoformat-replace-z",
         "function-call-in-dataclass-default-argument",
@@ -5119,6 +5122,7 @@
         "pass-statement-stub-body",
         "patch-version-comparison",
         "path-constructor-current-directory",
+        "pedantic",
         "pep484-style-positional-only-parameter",
         "percent-format-expected-mapping",
         "percent-format-expected-sequence",
@@ -5129,6 +5133,7 @@
         "percent-format-positional-count-mismatch",
         "percent-format-star-requires-sequence",
         "percent-format-unsupported-format-character",
+        "performance",
         "post-init-default",
         "potential-index-error",
         "print",
@@ -5150,6 +5155,7 @@
         "pytest-erroneous-use-fixtures-on-fixture",
         "pytest-extraneous-scope-function",
         "pytest-fail-without-message",
+        "pytest-fixture-autouse",
         "pytest-fixture-finalizer-callback",
         "pytest-fixture-incorrect-parentheses-style",
         "pytest-fixture-param-without-value",
@@ -5216,6 +5222,7 @@
         "replace-universal-newlines",
         "request-with-no-cert-validation",
         "request-without-timeout",
+        "restriction",
         "return-in-generator",
         "return-in-init",
         "return-in-try-except-finally",
@@ -5228,6 +5235,7 @@
         "runtime-cast-value",
         "runtime-import-in-type-checking-block",
         "runtime-string-union",
+        "security",
         "self-assigning-variable",
         "self-or-cls-assignment",
         "set-attr-with-constant",
@@ -5273,6 +5281,7 @@
         "string-or-bytes-too-long",
         "strip-with-multi-characters",
         "stub-body-multiple-statements",
+        "style",
         "subclass-builtin",
         "subprocess-popen-preexec-fn",
         "subprocess-popen-with-shell-equals-true",
@@ -5286,6 +5295,7 @@
         "superfluous-else-return",
         "suppressible-exception",
         "surrounding-whitespace",
+        "suspicious",
         "suspicious-eval-usage",
         "suspicious-ftp-lib-usage",
         "suspicious-ftplib-import",

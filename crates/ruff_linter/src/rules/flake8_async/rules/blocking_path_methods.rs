@@ -1,5 +1,6 @@
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::typing::{TypeChecker, check_type, traverse_union_and_optional};
@@ -47,7 +48,7 @@ use ruff_text_size::Ranged;
 ///     new_path = os.path.join("/tmp/src/", path)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct BlockingPathMethodInAsyncFunction {
     path_library: String,
 }

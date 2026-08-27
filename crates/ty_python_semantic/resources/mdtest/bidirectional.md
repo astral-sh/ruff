@@ -1929,10 +1929,10 @@ _: list[int | str] = f12()  # error: [invalid-assignment]
 reveal_type(f12)  # revealed: () -> list[int]
 ```
 
-## Lambda contextual inference through union type aliases
+## Lambda contextual inference through type aliases
 
-A lambda parameter is inferred from a callable behind a union-valued type alias, including when that
-alias is itself an element of another union:
+A lambda parameter is inferred from a callable behind a type alias, including aliases that resolve
+to unions and aliases used as elements of another union:
 
 ```py
 from typing import Callable
@@ -1941,6 +1941,7 @@ from typing_extensions import TypeAliasType
 type IntCallback = Callable[[int], None]
 type IntCallbackOrInt = Callable[[int], None] | int
 IntCallbackOrIntAliasType = TypeAliasType("IntCallbackOrIntAliasType", Callable[[int], None] | int)
+IntCallbackAliasType = TypeAliasType("IntCallbackAliasType", Callable[[int], None])
 
 def consume(value: int) -> None:
     pass
@@ -1948,10 +1949,8 @@ def consume(value: int) -> None:
 x1: Callable[[int], None] | str = lambda value: consume(reveal_type(value))  # revealed: int
 x2: IntCallbackOrInt | str = lambda value: consume(reveal_type(value))  # revealed: int
 x3: IntCallbackOrIntAliasType | str = lambda value: consume(reveal_type(value))  # revealed: int
-
-# TODO: An alias that does not resolve to a union is not expanded here, so the parameter is not
-# inferred from the type context.
-x4: IntCallback = lambda value: consume(reveal_type(value))  # revealed: Unknown
+x4: IntCallback = lambda value: consume(reveal_type(value))  # revealed: int
+x5: IntCallbackAliasType = lambda value: consume(reveal_type(value))  # revealed: int
 ```
 
 ## Lambda contextual inference through `TypeAliasType` on Python 3.11

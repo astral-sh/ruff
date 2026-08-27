@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::{Replacement, is_airflow_builtin_or_provider};
 use crate::rules::airflow::helpers::{
     generate_import_edit, generate_remove_and_runtime_import_edit, is_guarded_by_try_except,
@@ -37,7 +38,7 @@ use ruff_text_size::TextRange;
 /// Asset(uri="test://test/")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Pedantic)]
 pub(crate) struct Airflow3SuggestedUpdate {
     deprecated: String,
     replacement: Replacement,

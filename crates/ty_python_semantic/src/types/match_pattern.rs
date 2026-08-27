@@ -9,7 +9,7 @@ use ty_python_core::predicate::{
 };
 
 use crate::place::{DefinedPlace, Place};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::equality::{
     ComparisonSoundnessPolicy, evaluate_type_equality, is_same_enum_domain,
 };
@@ -169,7 +169,6 @@ fn sequence_pattern_getitem_method<'db>(
         db,
         CallableSignature::from_overloads(overloads.chain(fallback_overload)),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     )
 }
 

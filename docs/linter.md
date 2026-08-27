@@ -61,7 +61,7 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 
 - Prefer [`lint.select`](settings.md#lint_select) over [`lint.extend-select`](settings.md#lint_extend-select) to make your rule set explicit.
 - Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
-- Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
+- Start with a small set of rules (`select = ["E", "F"]`) and add a group at-a-time. For example,
     you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
     extension.
 
@@ -143,6 +143,129 @@ with the exception of `F401`.
 
 When [preview mode](preview.md) is enabled, rule selectors also accept the human-readable name of a
 rule (e.g., `unused-import`).
+
+## Rule categories
+
+In [preview](preview.md), Ruff supports rule categories in addition to the Flake8-style linter
+groups described above. These categories organize rules by the types of issues they detect and
+determine whether rules are enabled by default. These categories and their descriptions, in
+order of decreasing severity, are:
+
+- **Correctness**: These rules flag code that is outright wrong as written. If you encounter a
+  correctness issue, you should try to fix it rather than suppressing the error with `noqa` or
+  `ruff: ignore`.
+- **Suspicious**: These rules are similar to `correctness` lints in that the code is likely wrong,
+  but `suspicious` lints acknowledge that there are valid reasons for the code to be written in this
+  way. You will still typically want to fix these issues, but using a suppression comment may
+  occasionally be necessary. Deprecations generally also fit into this category.
+- **Complexity**: These rules detect code that can be written in a simpler or more readable way
+  without changing its semantics.
+- **Performance**: These rules detect code that can be written in a more efficient way, without changing its semantics or significantly degrading readability.
+- **Style**: These rules flag code that could be written more idiomatically and where the relevant
+  idiom has broad community acceptance.
+- **Security**: These rules flag issues that could lead to security vulnerabilities, and as such,
+  bias heavily toward false positives to avoid false negatives.
+- **Formatting**: These rules flag formatting issues and are generally redundant with a code
+  formatter.
+- **Pedantic**: These rules are generally stylistic, like those in the `style` or similar
+  categories, but enforce styles that are too opinionated or are too prone to false positives to fit
+  into another category.
+- **Restriction**: These rules restrict the usage of basic language features in arbitrary ways.
+
+The first five categories compose the default rule set:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+	preview = true
+    select = [
+        "correctness",
+        "suspicious",
+        "complexity",
+        "performance",
+        "style",
+    ]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+	preview = true
+    select = [
+        "correctness",
+        "suspicious",
+        "complexity",
+        "performance",
+        "style",
+    ]
+    ```
+
+while the remaining four (`security`, `formatting`, `pedantic`, and `restriction`) are off by
+default. For certain projects, you may want to enable either `security` or `formatting` as entire
+categories, but `pedantic` and `restriction` contain a wider variety of opinionated lints, and you
+will typically only want to select individual rules from these categories directly.
+
+### Interaction with other selectors
+
+Categories can be freely mixed with linter groups, linter prefixes, rule codes, and rule names. In
+addition to the priority relationships described above for settings like `lint.select`,
+`lint.extend-select`, and `lint.ignore`, and those for various configuration sources like
+`pyproject.toml` files and the CLI, the various selectors also have precedence relationships with
+each other. In general, you can think of this precedence as increasing from the broadest selector
+(`ALL`) to the narrowest single-rule selectors (e.g. `F401` or `unused-import`):
+
+```text
+ALL < category < linter group < linter prefix < rule
+```
+
+As shown above, this means that configuration like:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    preview = true
+    select = ["E", "F"]
+    ignore = ["F401"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    preview = true
+    select = ["E", "F"]
+    ignore = ["F401"]
+    ```
+
+will select all `E` and `F` rules, with the exception of `F401`. Analogously, a selection with the
+`suspicious` category like:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    preview = true
+    select = ["suspicious"]
+    ignore = ["UP"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    preview = true
+    select = ["suspicious"]
+    ignore = ["UP"]
+    ```
+
+would select all `suspicious` rules, except for the `UP` rules in that category.
+
+Note that we plan to deprecate and eventually remove the linter groups in the future. If you give
+the new categories a try and run into situations where you need to fall back on linter groups,
+please let us know on the [tracking issue](https://github.com/astral-sh/ruff/issues/27959).
 
 ## Fixes
 

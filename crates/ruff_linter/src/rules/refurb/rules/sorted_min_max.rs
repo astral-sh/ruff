@@ -9,6 +9,7 @@ use crate::Fix;
 use crate::FixAvailability;
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `sorted()` to retrieve the minimum or maximum value in
@@ -53,7 +54,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Complexity)]
 pub(crate) struct SortedMinMax {
     min_max: MinMax,
 }

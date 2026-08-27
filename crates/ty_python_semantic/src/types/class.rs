@@ -26,7 +26,7 @@ use super::{
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -713,7 +713,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(class) => class.class_member(db, env, name, policy),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, env, name, policy),
             Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, env, name, policy),
-            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name),
+            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name, policy),
         }
     }
 
@@ -2067,7 +2067,6 @@ impl<'db> ClassType<'db> {
                             db,
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
-                            CallableFunctionProvenance::None,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -2383,12 +2382,8 @@ impl<'db> ClassType<'db> {
                 .iter()
                 .any(|signature| !signature.return_ty.is_assignable_to(db, env, instance_type));
 
-            let dunder_new_bound_method = CallableType::new(
-                db,
-                bound_signature,
-                CallableTypeKind::Regular,
-                CallableFunctionProvenance::None,
-            );
+            let dunder_new_bound_method =
+                CallableType::new(db, bound_signature, CallableTypeKind::Regular);
 
             if returns_non_subclass {
                 return CallableTypes::one(dunder_new_bound_method);
@@ -2462,7 +2457,6 @@ impl<'db> ClassType<'db> {
                     db,
                     synthesized_dunder_init_signature,
                     CallableTypeKind::Regular,
-                    CallableFunctionProvenance::None,
                 ))
             } else {
                 None

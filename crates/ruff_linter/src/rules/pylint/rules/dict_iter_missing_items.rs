@@ -6,6 +6,7 @@ use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -51,7 +52,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Fix safety
 /// Due to the known problem with tuple keys, this fix is unsafe.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.0")]
+#[violation_metadata(preview_since = "v0.3.0", category = Category::Suspicious)]
 pub(crate) struct DictIterMissingItems;
 
 impl AlwaysFixableViolation for DictIterMissingItems {

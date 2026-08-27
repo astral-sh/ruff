@@ -190,6 +190,28 @@ class Child(Base[T]): ...
 child: Child[int]
 ```
 
+## Unknown decorators on generic bases
+
+An unresolved decorator preserves the class binding and its generic context. A subclass can forward
+a type variable to the decorated base and be specialized without a cascading error.
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
+
+T = TypeVar("T")
+
+# error: [unresolved-reference] "Name `unknown_decorator` used when not defined"
+@unknown_decorator
+class Base(Generic[T]): ...
+
+reveal_type(generic_context(Base))  # revealed: ty_extensions._internal.GenericContext[T@Base]
+
+class Child(Base[T]): ...
+
+child: Child[int]
+```
+
 ## Specializing classes with unavailable generic context
 
 When an earlier error prevents ty from determining a class's generic context, specializing the class
@@ -215,30 +237,6 @@ class Parser(typing.Generic[T]): ...
 
 # TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
 parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` cannot be specialized in a type expression"
-```
-
-### Decorated generic bases
-
-An unresolved decorator obscures the generic context of a base class. Specializing a subclass that
-forwards a type variable to that base currently produces a cascading error.
-
-```py
-from typing import Generic, TypeVar
-from ty_extensions._internal import generic_context
-
-T = TypeVar("T")
-
-# error: [unresolved-reference] "Name `unknown_decorator` used when not defined"
-@unknown_decorator
-class Base(Generic[T]): ...
-
-reveal_type(generic_context(Base))  # revealed: None
-
-class Child(Base[T]): ...
-
-# TODO: Avoid this cascading error when the base's generic context is unavailable.
-# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
-child: Child[int]
 ```
 
 ### Unresolved generic bases

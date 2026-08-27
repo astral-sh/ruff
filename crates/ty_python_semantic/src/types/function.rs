@@ -67,7 +67,7 @@ use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, file_to_module,
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
@@ -1233,7 +1233,6 @@ impl<'db> FunctionType<'db> {
                             .signatures(db)
                             .with_inherited_generic_context(db, inherited_generic_context),
                         callable.kind(db),
-                        callable.provenance(db),
                     )
                 })
                 .collect()
@@ -1657,14 +1656,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signature(db),
-            self.callable_type_kind(db),
-            CallableFunctionProvenance::from_function_return_annotation(
-                self.has_explicit_return_annotation(db),
-            ),
-        )
+        CallableType::new(db, self.signature(db), self.callable_type_kind(db))
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].

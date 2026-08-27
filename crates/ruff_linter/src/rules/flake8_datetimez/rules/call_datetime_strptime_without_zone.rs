@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 
@@ -52,7 +53,7 @@ use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 /// - [Python documentation: `strftime()` and `strptime()` Behavior](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
 pub(crate) struct CallDatetimeStrptimeWithoutZone(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeStrptimeWithoutZone {

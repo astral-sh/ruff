@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -43,7 +44,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.227")]
+#[violation_metadata(stable_since = "v0.0.227", category = Category::Pedantic)]
 pub(crate) struct CollectionLiteralConcatenation {
     expression: SourceCodeSnippet,
 }

@@ -9,6 +9,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -59,7 +60,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///   so RUF072 must remove it first
 /// - [`useless-try-except`][TRY203]: Flags `try/except` that only re-raises
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.8")]
+#[violation_metadata(preview_since = "0.15.8", category = Category::Complexity)]
 pub(crate) struct UselessFinally;
 
 impl Violation for UselessFinally {
