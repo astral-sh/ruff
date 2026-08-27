@@ -253,7 +253,7 @@ impl ConditionFlowSnapshot {
 /// Condition context does not propagate through calls or assignment expressions: in
 /// `if f(x and False)`, the call's result controls the branch, but its argument is evaluated in
 /// value context.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 enum ExpressionContext {
     /// Produce the expression's result object for the enclosing code to use.
     #[default]
