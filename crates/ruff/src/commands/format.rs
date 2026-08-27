@@ -1096,7 +1096,6 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             // The formatter always removes blank lines before the docstring.
             Rule::IncorrectBlankLineBeforeClass,
         ] {
-            debug_assert!(rule.noqa_code().is_some());
             if setting.linter.rules.enabled(rule) {
                 incompatible_rules.insert(rule);
             }
@@ -1106,7 +1105,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     if !incompatible_rules.is_empty() {
         let mut rule_names: Vec<_> = incompatible_rules
             .into_iter()
-            .map(|rule| format!("`{}`", rule.noqa_code().unwrap()))
+            .map(|rule| format!("{:#}", rule.name_and_code()))
             .collect();
         rule_names.sort();
         if let [rule] = rule_names.as_slice() {

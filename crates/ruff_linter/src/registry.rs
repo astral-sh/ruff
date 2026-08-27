@@ -374,12 +374,19 @@ impl Rule {
     /// ```text
     /// unused-import (F401)
     /// ```
+    ///
+    /// When formatted with the `#` flag, both the name and code will be surrounded by backticks:
+    ///
+    /// ```text
+    /// `unused-import` (`F401`)
+    /// ```
     pub fn name_and_code(&self) -> impl std::fmt::Display + use<> {
         let rule = *self;
         std::fmt::from_fn(move |f| {
-            write!(f, "{}", rule.name())?;
+            let quote = if f.alternate() { "`" } else { "" };
+            write!(f, "{quote}{}{quote}", rule.name())?;
             if let Some(code) = rule.noqa_code() {
-                write!(f, " ({code})")?;
+                write!(f, " ({quote}{code}{quote})")?;
             }
             Ok(())
         })
