@@ -1,5 +1,6 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
@@ -49,7 +50,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// filtered.extend(x for x in original if x % 2)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Pedantic)]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
     comprehension_type: Option<ComprehensionType>,

@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for calls to `re.sub`, `re.subn`, and `re.split` that pass `count`,
@@ -40,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `re.subn`](https://docs.python.org/3/library/re.html#re.subn)
 /// - [Python documentation: `re.split`](https://docs.python.org/3/library/re.html#re.split)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.278")]
+#[violation_metadata(stable_since = "v0.0.278", category = Category::Pedantic)]
 pub(crate) struct ReSubPositionalArgs {
     method: Method,
 }

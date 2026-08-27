@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::add_argument;
 use crate::rules::flake8_bugbear::helpers::any_infinite_iterables;
 use crate::{AlwaysFixableViolation, Applicability, Fix};
@@ -39,7 +40,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ## References
 /// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.167")]
+#[violation_metadata(stable_since = "v0.0.167", category = Category::Pedantic)]
 pub(crate) struct ZipWithoutExplicitStrict;
 
 impl AlwaysFixableViolation for ZipWithoutExplicitStrict {

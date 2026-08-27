@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 
 /// ## Removed
@@ -65,7 +66,7 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 /// - [`pytest` documentation: Sharing fixtures across classes, modules, packages or session](https://docs.pytest.org/en/stable/how-to/fixtures.html#scope-sharing-fixtures-across-classes-modules-packages-or-session)
 /// - [`pytest` documentation: Fixtures can request other fixtures](https://docs.pytest.org/en/stable/how-to/fixtures.html#fixtures-can-request-other-fixtures)
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.15.20")]
+#[violation_metadata(removed_since = "0.15.20", category = Category::Pedantic)]
 pub(crate) struct PytestFixtureAutouse;
 
 impl Violation for PytestFixtureAutouse {

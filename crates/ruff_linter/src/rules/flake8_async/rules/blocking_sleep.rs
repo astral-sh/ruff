@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks that async functions do not call `time.sleep`.
@@ -35,7 +36,7 @@ use crate::checkers::ast::Checker;
 ///     await asyncio.sleep(1)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
 pub(crate) struct BlockingSleepInAsyncFunction;
 
 impl Violation for BlockingSleepInAsyncFunction {

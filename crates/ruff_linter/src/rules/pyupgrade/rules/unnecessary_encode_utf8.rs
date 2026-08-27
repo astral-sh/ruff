@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, pad, remove_argument};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -31,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Complexity)]
 pub(crate) struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }

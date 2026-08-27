@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -28,7 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct NotInTest;
 
 impl AlwaysFixableViolation for NotInTest {
@@ -65,7 +66,7 @@ impl AlwaysFixableViolation for NotInTest {
 ///
 /// [PEP8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct NotIsTest;
 
 impl AlwaysFixableViolation for NotIsTest {

@@ -1,3 +1,4 @@
+use crate::codes::Category;
 use crate::preview::is_enumerate_for_loop_int_index_enabled;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
@@ -43,7 +44,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Complexity)]
 pub(crate) struct EnumerateForLoop {
     index: String,
 }

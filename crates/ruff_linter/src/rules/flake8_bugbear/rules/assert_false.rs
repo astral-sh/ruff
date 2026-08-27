@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_false;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -35,7 +36,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.67")]
+#[violation_metadata(stable_since = "v0.0.67", category = Category::Pedantic)]
 pub(crate) struct AssertFalse;
 
 impl AlwaysFixableViolation for AssertFalse {

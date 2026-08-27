@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of undefined names.
@@ -27,7 +28,7 @@ use crate::Violation;
 /// ## References
 /// - [Python documentation: Naming and binding](https://docs.python.org/3/reference/executionmodel.html#naming-and-binding)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.20")]
+#[violation_metadata(stable_since = "v0.0.20", category = Category::Correctness)]
 pub(crate) struct UndefinedName {
     pub(crate) name: String,
     pub(crate) minor_version_builtin_added: Option<u8>,

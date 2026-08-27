@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_bad_version_info_in_non_stub_enabled;
 use crate::registry::Rule;
 
@@ -51,7 +52,7 @@ use crate::registry::Rule;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.254")]
+#[violation_metadata(stable_since = "v0.0.254", category = Category::Suspicious)]
 pub(crate) struct BadVersionInfoComparison;
 
 impl Violation for BadVersionInfoComparison {
@@ -101,7 +102,7 @@ impl Violation for BadVersionInfoComparison {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct BadVersionInfoOrder;
 
 impl Violation for BadVersionInfoOrder {

@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `continue` statements inside `finally`
@@ -37,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Correctness)]
 pub(crate) struct ContinueInFinally;
 
 impl Violation for ContinueInFinally {
