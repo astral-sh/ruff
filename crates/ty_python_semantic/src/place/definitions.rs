@@ -21,6 +21,7 @@ use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::ProgramEnvironment;
 
 /// A set of definitions found by name resolution along with facts about their availability.
+#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 #[expect(
     clippy::struct_excessive_bools,
     reason = "these flags describe independent facts about the resolved definitions"
@@ -311,6 +312,7 @@ impl<'db> DefinitionResolutionBuilder<'db> {
     ) -> DefinitionResolution<'db> {
         self.resolution.may_be_unbound = !is_definitely_bound;
         self.resolution.crosses_scope_declaration |= crosses_scope_declaration;
+        self.resolution.definitions.shrink_to_fit();
         self.resolution
     }
 }
