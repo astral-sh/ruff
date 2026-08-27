@@ -26,13 +26,13 @@ use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
 };
-use crate::types::typevar::TypeVarSet;
+use crate::types::typevar::{BindingContext, TypeVarSet};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
     DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    UnionTypeInstance, any_over_type, todo_type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -1020,9 +1020,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // against bounds/constraints, but recording the expression for deferred
                     // checking at end of scope. This would avoid a lot of cycles caused by eagerly
                     // doing assignment checks here.
-                    match typevar.typevar(db).bound_or_constraints(db, env) {
+                    let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, env);
+                    let type_to_check = if bound_or_constraints.is_some() {
+                        // Defaults such as `Box[T]` may be inferred before `T` has a binding context.
+                        // Bind only the copy used for validation, so the original default can later
+                        // be bound to each generic that uses it.
+                        provided_type.apply_type_mapping(
+                            db,
+                            env,
+                            &TypeMapping::BindLegacyTypevars(BindingContext::Synthetic(
+                                env.program(db),
+                            )),
+                            TypeContext::default(),
+                        )
+                    } else {
+                        provided_type
+                    };
+                    match bound_or_constraints {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            if provided_type
+                            if type_to_check
                                 .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
                                 .is_never_satisfied(db, env)
                             {
@@ -1033,12 +1049,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Type `{}` is not assignable to upper bound `{}` \
                                             of type variable `{}`",
-                                        provided_type.display(db, env),
+                                        type_to_check.display(db, env),
                                         bound.display(db, env),
                                         typevar.identity(db).display(db),
                                     ));
                                     add_typevar_definition(db, &mut diagnostic, typevar);
-                                    provided_type
+                                    type_to_check
                                         .assignability_error_context(db, env, bound)
                                         .attach_to(db, env, &mut diagnostic);
                                 }
@@ -1053,7 +1069,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // to _at least one_ of the individual constraints, not to the union of
                             // all of them. `int | str` is not a valid specialization of a typevar
                             // constrained to `(int, str)`.
-                            if provided_type
+                            if type_to_check
                                 .when_assignable_to(
                                     db,
                                     env,
@@ -1070,7 +1086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Type `{}` does not satisfy constraints `{}` \
                                             of type variable `{}`",
-                                        provided_type.display(db, env),
+                                        type_to_check.display(db, env),
                                         typevar_constraints
                                             .elements(db)
                                             .iter()

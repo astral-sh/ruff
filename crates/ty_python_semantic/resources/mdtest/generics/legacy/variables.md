@@ -379,6 +379,74 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid(Generic[U]): ...
 ```
 
+### Defaults containing bounded type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A default can specialize a bounded generic with another type variable whose upper bound is
+compatible. Applying the default substitutes the actual type argument, without replacing it with its
+upper bound.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class Box(Generic[T]): ...
+
+B = TypeVar("B", default=Box[T])
+
+class Holder(Generic[T, B]): ...
+
+reveal_type(Holder[bool]())  # revealed: Holder[bool, Box[bool]]
+```
+
+We reject a nested type argument whose upper bound is incompatible with the generic's bound:
+
+```py
+U = TypeVar("U", bound=str)
+
+# error: [invalid-type-arguments]
+Invalid = TypeVar("Invalid", default=Box[U])
+```
+
+### Defaults containing constrained type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A constrained type variable can appear inside a default when each of its constraints is allowed by
+the nested generic. The selected type argument is preserved in the default.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", int, str)
+
+class Box(Generic[T]): ...
+
+B = TypeVar("B", default=Box[T])
+
+class Holder(Generic[T, B]): ...
+
+reveal_type(Holder[str]())  # revealed: Holder[str, Box[str]]
+```
+
+We reject a nested type argument if one of its constraints is incompatible with the generic's
+constraints:
+
+```py
+U = TypeVar("U", int, bytes)
+
+# error: [invalid-type-arguments]
+Invalid = TypeVar("Invalid", default=Box[U])
+```
+
 ### Invalid defaults
 
 A TypeVar default must be compatible with its bound or constraints.
