@@ -1096,6 +1096,8 @@ pub struct LintCommonOptions {
             "path/to/file.py" = ["E402"]
             # Ignore `D` rules everywhere except for the `src/` directory.
             "!src/**.py" = ["D"]
+            # Ignore check for packages that are missing an `__init__.py` file.
+            "{benchmark,scripts,.github/action-name/}/*.py" = ["INP001"]
         "#
     )]
     pub per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
