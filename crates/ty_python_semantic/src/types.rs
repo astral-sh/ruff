@@ -6525,6 +6525,8 @@ impl<'db> Type<'db> {
         class: ClassType<'db>,
         recursion_guard: &ActiveRecursionDetector<Type<'db>>,
     ) -> Bindings<'db> {
+        const MAX_CONSTRUCTOR_DEPTH: usize = 64;
+
         fn resolve_dunder_new_callable<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -6650,9 +6652,17 @@ impl<'db> Type<'db> {
 
         let on_cycle = || {
             // Leave the return type unknown so the enclosing constructor supplies its own
-            // instance type, rather than the class where the cycle happened to be detected.
+            // instance type, rather than the class where expansion stopped.
             Binding::single(self_type, Signature::dynamic(Type::unknown())).into()
         };
+        // A chain such as `C[int] -> C[list[int]] -> C[list[list[int]]]` never repeats a
+        // receiver. Growth alone does not prove recursion: a finite chain can also add nesting
+        // before reaching a callable signature. Bound expansion separately from exact-cycle
+        // detection; sufficiently deep finite chains also use this fallback.
+        if recursion_guard.depth() >= MAX_CONSTRUCTOR_DEPTH {
+            return on_cycle();
+        }
+
         // Key recursion by the full receiver type. Descriptor overloads can distinguish `C` from
         // `type[C]`, and different specializations need separate expansion even if one contains
         // the other, because a constructor may ignore its nested type arguments.
