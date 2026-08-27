@@ -113,9 +113,15 @@ fn nominal_top_intersection<'db>(
     }
 
     if subclass_class.known(db) == Some(KnownClass::Tuple) {
-        subclass_specialization
-            .tuple(db)?
-            .variable_element_type(db)?;
+        let tuple = subclass_specialization.tuple(db)?;
+        // A homogeneous tuple would lose the shape of any fixed prefix or suffix.
+        if tuple.fixed_elements().next().is_some() {
+            return None;
+        }
+        let TupleSpec::Variable(variable) = tuple else {
+            return None;
+        };
+        variable.variable().homogeneous_type()?;
         return Some(Type::homogeneous_tuple(db, env, types[0]));
     }
 

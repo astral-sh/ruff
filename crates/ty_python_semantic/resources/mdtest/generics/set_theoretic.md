@@ -498,9 +498,9 @@ Tuple types are covariant in every type parameter, so the results derived for `C
 `tuple` at every position:
 
 ```pyi
-from typing import Any
+from typing import Any, Sequence, reveal_type
 from ty_extensions import static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 
 class P: ...
 class Q: ...
@@ -518,6 +518,28 @@ static_assert(is_equivalent_to(tuple[P, Any] & tuple[P, Q], tuple[P, Q & Any]))
 
 static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Any], tuple[P & Any, Q & Any]))
 static_assert(is_equivalent_to(tuple[Any, Any] & tuple[P, Q], tuple[P & Any, Q & Any]))
+```
+
+Intersecting a `Sequence` with a variable-length tuple retains its required prefix or suffix. These
+intersections currently remain unsimplified. The variable-length elements could be narrowed to
+`int`, but the required `bool` element must be preserved:
+
+```pyi
+type Prefix = tuple[bool, *tuple[object, ...]]
+type Suffix = tuple[*tuple[object, ...], bool]
+
+def _(prefix: Sequence[int] & Prefix, suffix: Sequence[int] & Suffix):
+    # TODO: Simplify to `tuple[bool, *tuple[int, ...]]`.
+    reveal_type(prefix)  # revealed: Sequence[int] & tuple[bool, *tuple[object, ...]]
+    # TODO: Simplify to `tuple[*tuple[int, ...], bool]`.
+    reveal_type(suffix)  # revealed: Sequence[int] & tuple[*tuple[object, ...], bool]
+```
+
+Required positions also preserve the minimum length, even when every element type is `object`:
+
+```pyi
+static_assert(not is_subtype_of(tuple[()], Sequence[int] & tuple[object, *tuple[object, ...]]))
+static_assert(not is_subtype_of(tuple[int], Sequence[int] & tuple[object, *tuple[object, ...], object]))
 ```
 
 ### `type[...]`
