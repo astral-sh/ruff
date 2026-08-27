@@ -38,7 +38,7 @@ use crate::types::attribute_write::{
 };
 use crate::types::class::ClassLiteral;
 use crate::types::function::FunctionLiteral;
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{GenericContext, Specialization, enclosing_generic_contexts};
 use crate::types::list_members::all_end_of_scope_members;
 use crate::types::protocol_class::property_set_type;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
@@ -387,6 +387,20 @@ impl<'db> RecursiveDefinition<'db> {
     }
 
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        if self.parameters(db).next().is_none() {
+            let scope = self.definition(db).scope(db);
+            let index = semantic_index(db, scope.program_file(db));
+            // Without a formal or enclosing parameter, recursive references cannot produce a new
+            // specialization. Keep this outside the tracked query so definitions with no source
+            // of specialization do not create entries.
+            if enclosing_generic_contexts(db, index, scope.file_scope_id(db))
+                .next()
+                .is_none()
+            {
+                return false;
+            }
+        }
+
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, _, _, ()| true,
