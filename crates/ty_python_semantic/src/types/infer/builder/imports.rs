@@ -70,6 +70,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if missing.group_dependency {
             diagnostic.info("Dependency groups are only available to non-package files");
         }
+        diagnostic.info("See https://docs.astral.sh/uv/concepts/projects/dependencies/");
     }
 
     fn report_unresolved_import(

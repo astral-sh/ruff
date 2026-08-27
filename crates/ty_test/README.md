@@ -451,8 +451,10 @@ can come from a [mock Python environment](#mocking-a-python-environment) or from
 
 The two sections are independent: `[project]` supplies installed modules, while
 `[dependency-metadata]` describes the declarations and ownership used by dependency checks.
-`[project]` does not automatically populate the fixture. Keeping metadata explicit also lets tests
-model nested projects and ambiguous module ownership using only mocked modules.
+Automatically deriving dependency metadata from `[project]` is deferred to future work.
+For now, tests with external dependencies must also supply `[dependency-metadata]` to exercise
+dependency checks. Explicit metadata also lets tests model nested projects and ambiguous module
+ownership using only mocked modules.
 
 ````markdown
 ```toml

@@ -202,6 +202,7 @@ dependencies = ["direct-dependency"]
     2 | from indirect_module import value
       |      ^^^^^^^^^^^^^^^
     help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
+    info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 
     error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
      --> packages/member/member.py:3:8
@@ -209,6 +210,7 @@ dependencies = ["direct-dependency"]
     3 | import indirect_module
       |        ^^^^^^^^^^^^^^^
     help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
+    info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 
     error[missing-direct-dependency]: Import of `direct_module` requires a direct dependency on `direct-dependency`
      --> packages/sibling/sibling.py:1:8
@@ -216,6 +218,7 @@ dependencies = ["direct-dependency"]
     1 | import direct_module
       |        ^^^^^^^^^^^^^
     help: Declare `direct-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
+    info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 
     Found 3 diagnostics
 

@@ -94,6 +94,7 @@ warning[missing-direct-dependency]: Import of `indirect` requires a direct depen
 4 | import indirect
   |        ^^^^^^^^
 help: Declare `indirect-distribution` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
+info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 ```
 
 ### From imports and star imports

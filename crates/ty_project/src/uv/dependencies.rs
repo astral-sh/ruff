@@ -10,6 +10,11 @@ use ty_python_semantic::dependency::{
 };
 
 /// The part of uv's metadata needed to connect imports to declared dependencies.
+///
+/// See uv's [schema documentation] and [serialization types] for the upstream format.
+///
+/// [schema documentation]: https://docs.astral.sh/uv/reference/internals/metadata/#schema
+/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-resolver/src/lock/export/metadata.rs
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 pub(super) struct WorkspaceDependencies {
     schema: Schema,
