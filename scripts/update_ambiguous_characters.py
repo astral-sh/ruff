@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.13"
 # dependencies = []
 #
 # [tool.ty.rules]
@@ -84,7 +84,7 @@ def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
     flattened_items: set[tuple[int, int]] = set()
     for items in raw_data.values():
         assert len(items) % 2 == 0, "Expected pairs of items"
-        flattened_items.update(itertools.batched(items, 2))
+        flattened_items.update(itertools.batched(items, 2, strict=True))
 
     tuples = [
         f"    {format_number(left)} => '{format_char(right)}',\n"
