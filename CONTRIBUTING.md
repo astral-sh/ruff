@@ -200,10 +200,9 @@ Commit the generated README and `.known-crates` update with the new crate.
 
 ### Example: Adding a new lint rule
 
-At a high level, the steps involved in adding a new lint rule are as follows:
-
-1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
-    (e.g., `AssertFalse`, as in, "allow `assert False`").
+Once a rule has been proposed and accepted in line with the
+[rule proposal guidelines](https://docs.astral.sh/ruff/rule-proposals/), the steps involved in
+adding a new lint rule are as follows:
 
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
@@ -249,28 +248,6 @@ Finally, submit a pull request, and include the category, rule name, and rule co
 in:
 
 > \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
-
-#### Rule naming convention
-
-Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "allow
-${rule}" or "allow ${rule} items", as in the context of suppression comments.
-
-For example, `AssertFalse` fits this convention: it flags `assert False` statements, and so a
-suppression comment would be framed as "allow `assert False`".
-
-As such, rule names should...
-
-- Highlight the pattern that is being linted against, rather than the preferred alternative.
-    For example, `AssertFalse` guards against `assert False` statements.
-
-- _Not_ contain instructions on how to fix the violation, which instead belong in the rule
-    documentation and the `fix_title`.
-
-- _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
-    convention.
-
-When re-implementing rules from other linters, we prioritize adhering to this convention over
-preserving the original rule name.
 
 #### Rule testing: fixtures and snapshots
 

@@ -113,7 +113,10 @@ impl serde::Serialize for NoqaCode {
 /// order of severity, with error categories first, followed by warning, and then by off-by-default
 /// categories.
 ///
+/// See our [rule categorization guidelines] for more information on assigning categories.
+///
 /// [Clippy]: https://doc.rust-lang.org/clippy/lints.html
+/// [rule categorization guidelines]: https://docs.astral.sh/ruff/rule-proposals/#rule-categorization-guidelines
 #[derive(
     Debug,
     Copy,
