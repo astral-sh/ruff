@@ -47,7 +47,8 @@ use crate::types::{
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
     TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
-    VarianceInferable, VarianceInferenceMode, infer_complete_scope_types, todo_type,
+    VarianceInferable, VarianceInferenceMode, VarianceResult, infer_complete_scope_types,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -584,12 +585,13 @@ impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
-        self.overloads
-            .iter()
-            .map(|signature| signature.variance_of_in_mode(db, env, typevar, mode))
-            .collect()
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
+        mode.join(
+            self.overloads
+                .iter()
+                .map(|signature| signature.variance_of_in_mode(db, env, typevar, mode)),
+        )
     }
 }
 
@@ -2004,8 +2006,8 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         tracing::trace!(
             "Checking variance of `{tvar}` in `{self:?}`",
             tvar = typevar.identity.name(db)
@@ -2035,11 +2037,10 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             Either::Right(self.parameters.iter().map(parameter_variance))
         };
 
-        itertools::chain(
+        mode.join(itertools::chain(
             parameter_variances,
             Some(self.return_ty.variance_of_in_mode(db, env, typevar, mode)),
-        )
-        .collect()
+        ))
     }
 }
 

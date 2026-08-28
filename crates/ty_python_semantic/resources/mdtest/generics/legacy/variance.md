@@ -870,6 +870,28 @@ class Sink(Protocol[T_contra]):
     def write(self, reader: NestedReader[T_contra]) -> None: ...
 ```
 
+## Declared variance of independent protocols
+
+An independent protocol retains its declared variance even if its type parameter is unused.
+Accepting a covariant `Marker[T]` makes `Sink` contravariant in `T`.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Marker(Protocol[T_co]):
+    def ready(self) -> bool: ...
+
+class Sink(Protocol[T_contra]):
+    def accept(self, value: Marker[T_contra]) -> None: ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantSink` should be contravariant, but is covariant"
+class CovariantSink(Protocol[T_co]):
+    def accept(self, value: Marker[T_co]) -> None: ...
+```
+
 ## Recursive protocol variance
 
 Recursive protocol references use the variance inferred from their interfaces, so an incorrect
@@ -936,6 +958,29 @@ class Right(Protocol[T_co]):
     def left(self) -> Left[T_co]: ...
 ```
 
+## Recursive protocols with independent dependencies
+
+Mutually recursive protocols infer their variance together, but still honor the declared variance of
+independent protocols. `Left` consumes the covariant `Marker[T]`, which also makes `Right`
+contravariant through its return type.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Marker(Protocol[T_co]):
+    def ready(self) -> bool: ...
+
+class Left(Protocol[T_contra]):
+    def accept(self, value: Marker[T_contra]) -> None: ...
+    def right(self) -> "Right[T_contra]": ...
+
+class Right(Protocol[T_contra]):
+    def left(self) -> Left[T_contra]: ...
+```
+
 ## Recursive protocols without observable type parameters
 
 A parameter used only in recursive references has no observable input or output position. We accept
@@ -971,11 +1016,21 @@ static_assert(is_subtype_of(Sink[object], Sink[int]))
 static_assert(not is_subtype_of(Sink[int], Sink[object]))
 ```
 
+An independent protocol consumer also uses `Recursive`'s declared covariance. The recursive
+references within `Recursive` do not make it mutually recursive with `ProtocolSink`.
+
+```py
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class ProtocolSink(Protocol[T_contra]):
+    def write(self, value: Recursive[T_contra]) -> None: ...
+```
+
 ## Recursive protocol variance through aliases and nominal classes
 
-Variance validation follows a recursive reference through a type alias and an inferred nominal
-class. The list in the alias makes `Recursive` invariant, even though it only directly produces its
-type parameter.
+Variance validation follows mutually recursive references through a type alias and an inferred
+nominal class. The list in the alias makes both protocols invariant, even though `Recursive` only
+directly produces its type parameter.
 
 ```toml
 [environment]
@@ -993,10 +1048,80 @@ class Wrapper[T]:
     def value(self) -> Next[T]:
         raise NotImplementedError
 
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Forward` should be invariant, but is covariant"
+class Forward(Protocol[T_co]):
+    def value(self) -> Wrapper[T_co]: ...
+
 # error: [invalid-protocol] "Type variable `T_co` in protocol `Recursive` should be invariant, but is covariant"
 class Recursive(Protocol[T_co]):
     def read(self) -> T_co: ...
-    def next(self) -> Wrapper[T_co]: ...
+    def next(self) -> Forward[T_co]: ...
+```
+
+## Recursive protocol references with fixed arguments
+
+The definitions refer to each other, but `Right`'s variance does not depend on `Left`: its reference
+to `Left[int]` does not use its type parameter. `Left` therefore uses `Right`'s declared covariance
+and is contravariant in the parameter it consumes.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Left(Protocol[T_contra]):
+    def accept(self, value: "Right[T_contra]") -> None: ...
+
+class Right(Protocol[T_co]):
+    def left(self) -> Left[int]: ...
+```
+
+## Recursive dependencies after invariant members
+
+A mutable list makes `Left` invariant. Its other method makes `Left` mutually recursive with
+`Right`, so `Right` is also invariant. Finding an invariant member does not stop dependency
+discovery in the remaining members.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Left` should be invariant, but is covariant"
+class Left(Protocol[T_co]):
+    def items(self) -> list[T_co]: ...
+    def next(self) -> "Right[T_co]": ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Right` should be invariant, but is covariant"
+class Right(Protocol[T_co]):
+    def left(self) -> Left[T_co]: ...
+```
+
+## Recursive protocol references in unused alias arguments
+
+An alias that ignores a type argument also removes its variance dependencies. `Ignore[Sink[T]]` is
+just `int`, so `Marker` is independent of `Sink`. Consuming the covariant `Marker[T]` makes `Sink`
+contravariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+type Ignore[T] = int
+
+class Marker(Protocol[T_co]):
+    def marker(self) -> Ignore["Sink[T_co]"]: ...
+
+class Sink(Protocol[T_contra]):
+    def accept(self, value: Marker[T_contra]) -> None: ...
 ```
 
 ## Recursive protocols with unsupported member types

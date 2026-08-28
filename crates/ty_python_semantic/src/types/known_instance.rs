@@ -8,7 +8,7 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
-        TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder, VarianceInferenceMode,
+        TypeMapping, TypeVarNonce, UnionBuilder, VarianceInferenceMode, VarianceResult,
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
@@ -237,13 +237,13 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => type_alias
                 .raw_value_type(db)
                 .variance_of_in_mode(db, env, typevar, mode),
-            _ => TypeVarVariance::Bivariant,
+            _ => VarianceResult::BIVARIANT,
         }
     }
 }

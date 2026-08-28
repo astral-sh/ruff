@@ -31,7 +31,7 @@ use crate::{
         KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
         PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral,
         Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
-        VarianceInferable, VarianceInferenceMode,
+        VarianceInferable, VarianceInferenceMode, VarianceResult,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -341,12 +341,15 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             };
 
-            let inferred_variance = match class.variance_of_in_mode(
-                db,
-                &env,
-                typevar.identity(db),
-                VarianceInferenceMode::Structural,
-            ) {
+            let inferred_variance = match class
+                .variance_of_in_mode(
+                    db,
+                    &env,
+                    typevar.identity(db),
+                    VarianceInferenceMode::Structural(typevar.identity(db)),
+                )
+                .variance
+            {
                 TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
                 variance => variance,
             };
@@ -1227,14 +1230,12 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
-        self.variance_types(db, env)
-            .map(|(ty, variance)| {
-                ty.with_polarity(variance)
-                    .variance_of_in_mode(db, env, typevar, mode)
-            })
-            .collect()
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
+        mode.join(self.variance_types(db, env).map(|(ty, variance)| {
+            ty.with_polarity(variance)
+                .variance_of_in_mode(db, env, typevar, mode)
+        }))
     }
 }
 

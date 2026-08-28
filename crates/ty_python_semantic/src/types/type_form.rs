@@ -1,8 +1,5 @@
-use super::variance::{VarianceInferable, VarianceInferenceMode};
-use super::{
-    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
-    visitor,
-};
+use super::variance::{VarianceInferable, VarianceInferenceMode, VarianceResult};
+use super::{BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, UnionType, visitor};
 use crate::Db;
 use crate::ProgramEnvironment;
 
@@ -103,8 +100,8 @@ impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         self.type_argument(db)
             .variance_of_in_mode(db, env, typevar, mode)
     }

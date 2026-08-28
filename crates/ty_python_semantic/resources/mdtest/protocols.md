@@ -7930,6 +7930,10 @@ visible. As of Python 3.13, it is necessary because structurally inferring throu
 `close() -> _ReturnT_co | None` can spuriously infer `None`. The latter workaround can be removed
 once [ty#3596](https://github.com/astral-sh/ty/issues/3596) is fixed.
 
+The custom protocol below is invariant because its mutable list contains a generator with a
+covariant return parameter. Variance validation respects that declaration even when the parameter is
+not structurally visible.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -7940,7 +7944,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, Protocol, TypeVar, Any, Protocol
 
-T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
 
 class A: ...
 class B: ...
@@ -7960,13 +7964,13 @@ static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
 static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
 static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
 
-class CustomCovariantProtocol(Protocol[T_co]):
-    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+class CustomInvariantProtocol(Protocol[T]):
+    def foo(self) -> tuple[list[Generator[None, None, T]]]: ...
 
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
-static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_assignable_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
 ```
 
 ## The `Generator` protocol's `_ReturnT_co` appears in `close` as of Python 3.13

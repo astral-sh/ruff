@@ -20,11 +20,11 @@ pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
 };
 use super::dedicated::pydantic;
+use super::display;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
@@ -47,7 +47,7 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
-    TypingModule, UnionBuilder, VarianceInferable, VarianceInferenceMode,
+    TypingModule, UnionBuilder, VarianceInferable, VarianceInferenceMode, VarianceResult,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -513,8 +513,8 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         self.variance_of_owner(db, typevar, mode)
     }
 }
@@ -523,15 +523,15 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 impl<'db> GenericAlias<'db> {
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _, _| VarianceResult::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of_owner(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         let origin = self.origin(db);
         let env = ProgramEnvironment::from_file(origin.program_file(db));
 
@@ -539,7 +539,7 @@ impl<'db> GenericAlias<'db> {
 
         // Note that we only care about the variance of the specialized generic alias with respect
         // to the given type variable, not the unspecialized class literal origin.
-        specialization
+        let variances = specialization
             .generic_context(db)
             .variables(db)
             .zip(specialization.types(db))
@@ -553,14 +553,25 @@ impl<'db> GenericAlias<'db> {
                     .compose_thunk(|| {
                         if let Some(explicit_variance) =
                             generic_typevar.typevar(db).explicit_variance(db)
-                            && (mode == VarianceInferenceMode::Effective
+                        {
+                            if mode == VarianceInferenceMode::Effective
                                 || generic_typevar.is_paramspec(db)
                                 || generic_typevar.is_typevartuple(db)
                                 || origin.into_protocol_class(db).is_none_or(|protocol| {
                                     !protocol.supports_variance_inference(db)
-                                }))
-                        {
-                            return explicit_variance;
+                                })
+                            {
+                                return explicit_variance.into();
+                            }
+                            if let Some(variance) = mode.protocol_parameter_variance(
+                                db,
+                                &env,
+                                origin,
+                                generic_typevar.identity(db),
+                                explicit_variance,
+                            ) {
+                                return variance;
+                            }
                         }
 
                         // A recursive protocol's declaration cannot determine its own validation
@@ -568,8 +579,8 @@ impl<'db> GenericAlias<'db> {
                         // bivariance as the bottom of the fixed point until inference completes.
                         origin.variance_of_in_mode(db, &env, generic_typevar.identity(db), mode)
                     })
-            })
-            .collect()
+            });
+        mode.join(variances)
     }
 }
 
@@ -2599,8 +2610,8 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => {
                 class.variance_of_in_mode(db, env, typevar, mode)
@@ -2610,7 +2621,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
-            ) => TypeVarVariance::Bivariant,
+            ) => VarianceResult::BIVARIANT,
             Self::Generic(generic) => generic.variance_of_in_mode(db, env, typevar, mode),
         }
     }
@@ -2827,14 +2838,14 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         match self {
             Self::Static(class) => class.variance_of_in_mode(db, env, typevar, mode),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => TypeVarVariance::Bivariant,
+            | Self::DynamicEnum(_) => VarianceResult::BIVARIANT,
         }
     }
 }

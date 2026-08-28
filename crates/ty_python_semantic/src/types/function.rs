@@ -89,7 +89,7 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
 use crate::types::tuple::TupleSpec;
-use crate::types::variance::{TypeVarVariance, VarianceInferable, VarianceInferenceMode};
+use crate::types::variance::{VarianceInferable, VarianceInferenceMode, VarianceResult};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1584,15 +1584,15 @@ impl<'db> FunctionType<'db> {
     /// function itself. Class and generic-alias variance use the same `Bivariant` cycle fallback.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _, _| VarianceResult::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
         self.signature(db)
             .variance_of_in_mode(db, &env, typevar, mode)

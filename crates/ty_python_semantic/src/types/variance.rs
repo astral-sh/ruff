@@ -1,5 +1,8 @@
 use crate::Db;
-use crate::{ProgramEnvironment, types::BoundTypeVarIdentity};
+use crate::{
+    ProgramEnvironment,
+    types::{BoundTypeVarIdentity, StaticClassLiteral},
+};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum TypeVarVariance {
@@ -131,11 +134,105 @@ impl std::iter::FromIterator<Self> for TypeVarVariance {
 /// the declaration itself instead has to follow recursive protocol references structurally;
 /// otherwise the declaration being checked would determine its own inferred result.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum VarianceInferenceMode {
+pub(crate) enum VarianceInferenceMode<'db> {
     /// Honor explicit variance declarations, inferring variance only when no declaration exists.
     Effective,
-    /// Infer supported protocols from their interfaces, even when variance is declared explicitly.
-    Structural,
+    /// Infer protocol parameters that depend on this parameter from their interfaces.
+    /// Independent parameters retain their declared variance.
+    Structural(BoundTypeVarIdentity<'db>),
+    /// Honor declarations while tracking variance dependencies on this parameter.
+    Dependencies(BoundTypeVarIdentity<'db>),
+}
+
+impl<'db> VarianceInferenceMode<'db> {
+    /// The variance of a supported protocol parameter at a use site. Returning `None` asks the
+    /// caller to infer its interface instead of using the declaration.
+    ///
+    /// A path back to the root puts both parameters in the same recursive component. The class
+    /// query uses formal parameters, not specializations, so expanding recursive references such
+    /// as `P[list[T]]` cannot produce an unbounded sequence of dependency queries.
+    pub(super) fn protocol_parameter_variance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: StaticClassLiteral<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+        declared: TypeVarVariance,
+    ) -> Option<VarianceResult> {
+        let depends_on_root = |root| {
+            typevar == root
+                || class
+                    .variance_of_in_mode(db, env, typevar, Self::Dependencies(root))
+                    .depends_on_root
+        };
+        match self {
+            Self::Structural(root) if depends_on_root(root) => None,
+            Self::Dependencies(root) => Some(VarianceResult {
+                variance: declared,
+                depends_on_root: depends_on_root(root),
+            }),
+            Self::Effective | Self::Structural(_) => Some(declared.into()),
+        }
+    }
+
+    /// Join occurrences, retaining dependencies even after variance has reached `Invariant`.
+    /// Ordinary inference can stop at `Invariant`; dependency analysis also needs to find any
+    /// reference to the root in subsequent members or specialization arguments.
+    pub(super) fn join(
+        self,
+        occurrences: impl IntoIterator<Item = VarianceResult>,
+    ) -> VarianceResult {
+        let mut result = VarianceResult::BIVARIANT;
+        for occurrence in occurrences {
+            result.variance = result.variance.join(occurrence.variance);
+            result.depends_on_root |= occurrence.depends_on_root;
+            if result.variance == TypeVarVariance::Invariant
+                && (!matches!(self, Self::Dependencies(_)) || result.depends_on_root)
+            {
+                break;
+            }
+        }
+        result
+    }
+}
+
+/// Variance and, during dependency analysis, whether it refers to the parameter being validated.
+///
+/// Both are computed by the same traversal. Composition removes dependencies along with unused
+/// type arguments: `type Ignore[T] = int` makes `Ignore[P[T]]` independent of both `T` and `P`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct VarianceResult {
+    pub(super) variance: TypeVarVariance,
+    pub(super) depends_on_root: bool,
+}
+
+impl VarianceResult {
+    pub(super) const BIVARIANT: Self = Self {
+        variance: TypeVarVariance::Bivariant,
+        depends_on_root: false,
+    };
+
+    pub(super) fn compose_thunk(self, other: impl FnOnce() -> Self) -> Self {
+        if self.variance == TypeVarVariance::Bivariant {
+            return Self::BIVARIANT;
+        }
+        let other = other();
+        let variance = self.variance.compose(other.variance);
+        Self {
+            variance,
+            depends_on_root: variance != TypeVarVariance::Bivariant
+                && (self.depends_on_root || other.depends_on_root),
+        }
+    }
+}
+
+impl From<TypeVarVariance> for VarianceResult {
+    fn from(variance: TypeVarVariance) -> Self {
+        Self {
+            variance,
+            depends_on_root: false,
+        }
+    }
 }
 
 pub(crate) trait VarianceInferable<'db>: Sized {
@@ -147,19 +244,21 @@ pub(crate) trait VarianceInferable<'db>: Sized {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         self.variance_of_in_mode(db, env, typevar, VarianceInferenceMode::Effective)
+            .variance
     }
 
     /// Computes variance while preserving the inference mode through nested types and Salsa keys.
     ///
     /// Implementations traverse types within `self` in which `typevar` could occur, calling this
-    /// method recursively with the same mode. Use `with_polarity` for non-covariant positions.
+    /// method recursively with the same mode. Use `with_polarity` for non-covariant positions,
+    /// and `mode.join` to combine occurrences without dropping dependency information.
     fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance;
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult;
 
     /// Creates a `VarianceInferable` that applies `polarity` (see
     /// `TypeVarVariance::compose`) to the result of variance inference on the
@@ -196,13 +295,41 @@ where
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
-    ) -> TypeVarVariance {
+        mode: VarianceInferenceMode<'db>,
+    ) -> VarianceResult {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of_in_mode(db, env, typevar, mode))
+        VarianceResult::from(polarity)
+            .compose_thunk(|| variance_inferable.variance_of_in_mode(db, env, typevar, mode))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TypeVarVariance, VarianceResult};
+
+    #[test]
+    fn composition_erases_dependencies_in_either_position() {
+        for variance in [
+            TypeVarVariance::Covariant,
+            TypeVarVariance::Contravariant,
+            TypeVarVariance::Invariant,
+        ] {
+            let dependent = VarianceResult {
+                variance,
+                depends_on_root: true,
+            };
+            assert_eq!(
+                dependent.compose_thunk(|| VarianceResult::BIVARIANT),
+                VarianceResult::BIVARIANT,
+            );
+            assert_eq!(
+                VarianceResult::BIVARIANT.compose_thunk(|| dependent),
+                VarianceResult::BIVARIANT,
+            );
+        }
     }
 }
