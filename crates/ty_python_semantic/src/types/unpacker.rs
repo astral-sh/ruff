@@ -111,7 +111,7 @@ impl<'db, 'ast, 'infer> Unpacker<'db, 'ast, 'infer> {
         &mut self,
         target: &ast::Expr,
         value: UnpackValue<'db>,
-        value_inference: Option<&ExpressionInference<'db>>,
+        value_inference: &ExpressionInference<'db>,
     ) {
         let db = self.db();
         debug_assert_matches!(
@@ -120,13 +120,6 @@ impl<'db, 'ast, 'infer> Unpacker<'db, 'ast, 'infer> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference = value_inference.unwrap_or_else(|| {
-            infer_expression_types(
-                self.context.db(),
-                value.expression(),
-                TypeContext::default(),
-            )
-        });
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         let value_type = value_inference.expression_type(value_expr);

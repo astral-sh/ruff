@@ -101,7 +101,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 infer_from_elements: &mut infer_capture,
             }),
         );
-        unpacker.unpack(target, value, Some(&value_inference));
+        unpacker.unpack(target, value, &value_inference);
         Some(unpacker.finish(Some(value_inference), contextual_expressions))
     }
 

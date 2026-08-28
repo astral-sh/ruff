@@ -787,7 +787,6 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     .entered();
 
     let env = ProgramEnvironment::from_file(program_file);
-    let target = unpack.target(db, &module);
     let value = unpack.value(db);
     if matches!(value.kind(), UnpackKind::Assign)
         && let Some(inference) = TypeInferenceBuilder::new(
@@ -811,7 +810,8 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
         &module,
         None,
     );
-    unpacker.unpack(target, value, None);
+    let value_inference = infer_expression_types(db, value.expression(), TypeContext::default());
+    unpacker.unpack(unpack.target(db, &module), value, value_inference);
     unpacker.finish(None, FxHashSet::default())
 }
 
