@@ -70,7 +70,7 @@ use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, semantic_index};
+use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
 mod comparisons;
@@ -1706,6 +1706,33 @@ struct ExpressionInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
+    /// A comparison chain's truthiness when evaluated directly as a condition.
+    ///
+    /// Expression types describe the objects produced by evaluation, which is not always enough
+    /// to determine a condition's outcome. If `x < 1` returns an object with mutable truthiness,
+    /// `saved = x < 1 < 0` can store that object after it tests falsy; `if saved:` can then test it
+    /// again and get `True`. In contrast, `if x < 1 < 0:` cannot enter its body: either the first
+    /// comparison tests falsy or the final comparison `1 < 0` does. Its condition truthiness is
+    /// `AlwaysFalse`, but its value type must still include objects returned by the first comparison.
+    ///
+    /// The same distinction matters for `and`/`or`, but their operands have separate expression
+    /// nodes with inferred types. [`crate::reachability::analyze_condition_expression`] can
+    /// reconstruct their condition truthiness by recursively visiting those operands, without
+    /// relying on the compound expression's value type.
+    ///
+    /// A comparison chain instead has one `ExprCompare` node with the operands and operators.
+    /// In `x < 1 < 0`, neither `x < 1` nor `1 < 0` has its own expression node, so their result
+    /// types are not recorded in [`ExpressionInference::expressions`]. We retain their combined
+    /// condition truthiness here while those types are available during comparison inference.
+    /// A single comparison needs no override: there is no intermediate truthiness check.
+    ///
+    /// When an `and`/`or` condition has a comparison chain as an operand, the recursive condition
+    /// analysis uses this map for that operand.
+    ///
+    /// Inference normally stores only differences from the truthiness of the chain's value type.
+    /// Cycle recovery also retains earlier overrides to keep widening monotonic.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
@@ -1760,6 +1787,10 @@ impl<'db> ExpressionInference<'db> {
             }
         }
 
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, env, previous);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
@@ -1779,6 +1810,42 @@ impl<'db> ExpressionInference<'db> {
         self
     }
 
+    /// Sparse overrides can appear or disappear as operand types change. Compare the effective
+    /// truthiness in both iterations, including previous-only overrides, so widening cannot make
+    /// a condition alternate between definite outcomes.
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness: FrozenMap<_, _> = self
+            .extra
+            .iter()
+            .chain(previous.extra.iter())
+            .flat_map(|extra| &extra.comparison_truthiness)
+            .map(|(expression, _)| {
+                let truthiness = self
+                    .comparison_truthiness(*expression)
+                    .unwrap_or_else(|| self.expression_type(*expression).bool(db, env));
+                let previous_truthiness = previous
+                    .comparison_truthiness(*expression)
+                    .unwrap_or_else(|| previous.expression_type(*expression).bool(db, env));
+                (
+                    *expression,
+                    if truthiness == previous_truthiness {
+                        truthiness
+                    } else {
+                        Truthiness::Ambiguous
+                    },
+                )
+            })
+            .collect();
+        if comparison_truthiness.iter().next().is_some() {
+            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
+        }
+    }
+
     fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
@@ -1789,6 +1856,17 @@ impl<'db> ExpressionInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn comparison_truthiness(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Truthiness> {
+        self.extra
+            .as_deref()?
+            .comparison_truthiness
+            .get(&expression.into())
+            .copied()
     }
 
     fn collection_use_constraints(
