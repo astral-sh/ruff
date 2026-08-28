@@ -2076,9 +2076,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.materialization_visitor,
         );
 
-        // Lazy comparisons record the bounds imposed by each materialization. Eager comparisons
-        // must also respect type variables: treating them as unconditional matches can discard
-        // valid alternatives from unions such as `list[T] | Top[list[Any & int]]`.
         let is_subtype_of = |source, target| self.check_type_pair(db, source, target);
         match (source_materialization, target_materialization) {
             // `source` is a subtype of `target` if the range of materializations covered by `source`

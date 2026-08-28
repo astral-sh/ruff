@@ -108,35 +108,6 @@ impl ProjectionTypeBudget {
 }
 
 impl<'db> ConstraintSet<'db, '_> {
-    /// Returns whether no specialization satisfying the type variables' declared bounds and
-    /// constraints can satisfy this constraint set.
-    ///
-    /// Unlike [`Self::is_never_satisfied`], this validates the solutions against their declarations.
-    /// Exhausting the solution budget does not prove that the set is unsatisfiable.
-    pub(crate) fn has_no_valid_solutions(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> bool {
-        if self.is_never_satisfied(db, env) {
-            return true;
-        }
-
-        let inferable = {
-            let storage = self.builder.storage.borrow();
-            let Some(support) = storage.node_support(self.node) else {
-                return false;
-            };
-            // For overlap, every mentioned type variable can choose a valid specialization.
-            TypeVarSet::from_typevars(db, support.iter().map(|id| storage.typevar_data(id)))
-        };
-
-        matches!(
-            self.solutions(db, env, inferable),
-            Ok(Solutions::Unsatisfiable)
-        )
-    }
-
     /// Computes default solutions for each BDD path within the default projection budget.
     pub(crate) fn solutions(
         self,
