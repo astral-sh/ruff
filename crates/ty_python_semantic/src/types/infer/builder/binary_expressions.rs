@@ -292,17 +292,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         op: ast::Operator,
         right_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        let (return_type, deprecated) = Type::try_call_bin_op_result(
+        let result = Type::try_call_bin_op_result(
             self.db(),
             self.program_environment(),
             left_ty,
             op,
             right_ty,
         )?;
-        for function in deprecated {
-            self.report_deprecated_function(&node, *function);
+        for &function in &result.deprecated_functions {
+            self.report_deprecated_function(&node, function);
         }
-        Some(return_type)
+        Some(result.return_type)
     }
 
     pub(super) fn infer_binary_expression_type(
