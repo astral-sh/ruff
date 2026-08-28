@@ -891,6 +891,17 @@ def check_marker(value: Old):
         value.value = 1  # error: [deprecated] "union setter"
 ```
 
+An invalid assignment to the first intersection in a union does not hide a deprecated setter in the
+second intersection. A member without the attribute still provides no alternative setter.
+
+```py
+def check_invalid_intersections(value: Wrong | Old):
+    if isinstance(value, Marker):
+        # error: [invalid-assignment]
+        # error: [deprecated] "union setter"
+        value.value = 1
+```
+
 ## Invalid property getter calls
 
 The getter below accepts an `int`, but Python passes a `C` instance. Reading the property reports
@@ -933,6 +944,25 @@ class Deprecated:
 def check(value: Ordinary):
     if isinstance(value, Deprecated):
         value.callback = lambda argument: reveal_type(argument)  # revealed: int
+```
+
+A protocol setter can also provide the inference context. When that setter accepts the assignment
+first, the ordinary attribute suppresses its deprecation without changing the inferred parameter
+type.
+
+```py
+from typing import Protocol
+
+class Callback(Protocol):
+    @property
+    def callback(self) -> Callable[[str], object]: ...
+    @callback.setter
+    @deprecated("callback setter")
+    def callback(self, value: Callable[[str], object]) -> None: ...
+
+def check_protocol(value: Callback):
+    if isinstance(value, Ordinary):
+        value.callback = lambda argument: reveal_type(argument)  # revealed: str
 ```
 
 ## Overloads
