@@ -2,6 +2,16 @@
 
 ## Behavior
 
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+# Disabled by default in production, but enabled by default in mdtests.
+# Tests for this rule are lower down in the file; for this section, we disable the rule.
+disjoint-cast = "ignore"
+```
+
 `cast()` takes two arguments, one type and one value, and returns a value of the given type.
 
 The (inferred) type of the value and the given type do not need to have any correlation.
@@ -83,11 +93,6 @@ def f(x: Any, y: Unknown, z: Any | str | int):
 
 Recursive aliases that fall back to `Divergent` should not trigger `redundant-cast`.
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
 from typing import cast
 
@@ -109,6 +114,137 @@ from ty_extensions._internal import Unknown
 
 def cast_gradual_tuple_class(value: type[tuple[object, Unknown]]) -> None:
     cast(type[tuple[object, Unknown]], value)
+```
+
+## Disjoint casts
+
+### Basics
+
+Casting between disjoint types often indicates a mistake in the user's code. When enabled,
+`disjoint-cast` reports casts whose source and destination types have no overlap.
+
+```py
+from typing import cast
+from typing_extensions import cast as extension_cast
+
+def incompatible_casts(integer: int, string: str) -> None:
+    # error: [disjoint-cast] "Cannot cast from `int` to `str`: the types are disjoint"
+    cast(str, integer)
+
+    # error: [disjoint-cast] "Cannot cast from `str` to `int`: the types are disjoint"
+    cast(int, string)
+
+    # error: [disjoint-cast] "Cannot cast from `int` to `str`: the types are disjoint"
+    cast(val=integer, typ=str)
+
+    # error: [disjoint-cast] "Cannot cast from `int` to `str`: the types are disjoint"
+    extension_cast(str, integer)
+```
+
+### Disjoint casts involving literals and unions
+
+Literal types and unions are rejected only when none of their possible values overlaps with the
+destination type.
+
+```py
+from typing import Literal, cast
+
+# error: [disjoint-cast] "Cannot cast from `Literal[1]` to `str`: the types are disjoint"
+cast(str, 1)
+
+# error: [disjoint-cast] "Cannot cast from `Literal["left"]` to `Literal["right"]`: the types are disjoint"
+cast(Literal["right"], "left")
+
+def cast_union(value: int | str) -> None:
+    # error: [disjoint-cast] "Cannot cast from `int | str` to `bytes`: the types are disjoint"
+    cast(bytes, value)
+
+    cast(str, value)
+    cast(int | bytes, value)
+```
+
+### Disjoint casts involving generic types
+
+Incompatible generic specializations are rejected, while gradual types remain valid because they may
+overlap with the destination type.
+
+```py
+from typing import Any, cast
+
+def cast_generic(integers: list[int], dynamic_values: list[Any], dynamic: Any) -> None:
+    # error: [disjoint-cast] "Cannot cast from `list[int]` to `list[str]`: the types are disjoint"
+    cast(list[str], integers)
+
+    cast(list[str], dynamic_values)
+    cast(str, dynamic)
+    cast(Any, integers)
+```
+
+### Disjoint casts between identically named types
+
+Disjoint types with the same display name are qualified so the diagnostic identifies which type
+comes from each module.
+
+```py
+from typing import cast
+
+import first
+import second
+
+def cast_identically_named(value: first.Value) -> None:
+    # error: [disjoint-cast] "Cannot cast from `first.Value` to `second.Value`: the types are disjoint"
+    cast(second.Value, value)
+```
+
+`first.py`:
+
+```py
+from typing import final
+
+@final
+class Value:
+    pass
+```
+
+`second.py`:
+
+```py
+from typing import final
+
+@final
+class Value:
+    pass
+```
+
+### Casts to `Never`
+
+`Never` is disjoint from every type, but excluded from `disjoint-cast`. It is assumed that the user
+knows what they're doing if they cast to `Never` explicitly:
+
+```py
+from typing_extensions import Never, cast
+
+x = cast(Never, 0)  # no diagnostic
+```
+
+Upcasts from a `Never`-inferred type to a supertype are also permitted without the rule being
+triggered:
+
+```py
+from typing_extensions import Never, cast
+
+def test(x: Never):
+    y = cast(str, x)  # no diagnostic
+```
+
+### Casts in stub files
+
+`disjoint-cast` is not applied to stub files:
+
+```pyi
+from typing import cast
+
+x = cast(int, ...)  # no diagnostic
 ```
 
 ## Diagnostic snapshots

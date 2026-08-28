@@ -165,6 +165,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
+    registry.register_lint(&DISJOINT_CAST);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&REDUNDANT_FINAL_CLASSVAR);
     registry.register_lint(&UNRESOLVED_GLOBAL);
@@ -1239,6 +1240,15 @@ declare_lint! {
         summary: "Invalid attribute access",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/disjoint-cast.md")]
+    pub(crate) static DISJOINT_CAST = {
+        summary: "detects `cast` calls between disjoint types",
+        status: LintStatus::stable("0.0.76"),
+        default_level: Level::Ignore,
     }
 }
 

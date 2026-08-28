@@ -73,8 +73,8 @@ use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
-    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-    TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
+    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST,
+    STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
     report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
     report_issubclass_check_against_protocol_with_non_method_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
@@ -2708,6 +2708,23 @@ impl KnownFunction {
                             )));
                         }
                     }
+                } else if context.is_lint_enabled(&DISJOINT_CAST)
+                    && !context.file().is_stub(db)
+                    && source_type.is_disjoint_from(db, env, casted_type)
+                    && !casted_type.is_equivalent_to(db, env, Type::Never)
+                    && !source_type.is_equivalent_to(db, env, Type::Never)
+                    && let Some(builder) = context.report_lint(&DISJOINT_CAST, call_expression)
+                {
+                    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+                        db,
+                        env,
+                        [*source_type, casted_type],
+                    );
+                    builder.into_diagnostic(format_args!(
+                        "Cannot cast from `{}` to `{}`: the types are disjoint",
+                        source_type.display_with(db, env, display_settings.clone()),
+                        casted_type.display_with(db, env, display_settings),
+                    ));
                 }
             }
 
