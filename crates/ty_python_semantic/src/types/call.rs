@@ -3,6 +3,7 @@ use super::{ClassType, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
+use crate::types::function::OverloadLiteral;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use crate::{Program, ProgramEnvironment};
 use ruff_python_ast as ast;
@@ -149,30 +150,40 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Memoize the pure return-type part of binary dunder resolution so repeated identical
-    /// expressions don't re-run overload selection at every call site.
-    pub(crate) fn try_call_bin_op_return_type(
+    /// Memoize the return type and deprecations from binary dunder resolution, without retaining
+    /// the full call bindings or repeating overload selection at each expression.
+    pub(crate) fn try_call_bin_op_result(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
-    ) -> Option<Type<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-        fn try_call_bin_op_return_type_impl<'db>(
+    ) -> Option<(Type<'db>, &'db [OverloadLiteral<'db>])> {
+        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn try_call_bin_op_result_impl<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
-        ) -> Option<Type<'db>> {
+        ) -> Option<(Type<'db>, Box<[OverloadLiteral<'db>]>)> {
             let env = &ProgramEnvironment::from_program(program);
             Type::try_call_bin_op(db, env, left_ty, op, right_ty)
                 .ok()
-                .map(|bindings| bindings.return_type(db, env))
+                .map(|bindings| {
+                    (
+                        bindings.return_type(db, env),
+                        bindings
+                            .deprecated_functions(db)
+                            .map(|(_, function)| function)
+                            .collect(),
+                    )
+                })
         }
 
-        try_call_bin_op_return_type_impl(db, env.program(db), left_ty, op, right_ty)
+        try_call_bin_op_result_impl(db, env.program(db), left_ty, op, right_ty)
+            .as_ref()
+            .map(|(return_type, deprecated)| (*return_type, deprecated.as_ref()))
     }
 
     pub(crate) fn try_call_bin_op(

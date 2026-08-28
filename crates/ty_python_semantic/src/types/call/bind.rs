@@ -900,6 +900,27 @@ impl<'db> Bindings<'db> {
         self.elements.iter().map(BindingsElement::callables)
     }
 
+    /// Returns the deprecated functions invoked by each union alternative. An intersection
+    /// only reports deprecations if every member that could implement the call is deprecated.
+    pub(crate) fn deprecated_functions(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = (&CallableBinding<'db>, OverloadLiteral<'db>)> {
+        self.iter_union_elements()
+            .filter(move |callables| {
+                callables
+                    .clone()
+                    .all(|callable| callable.deprecated_functions(db).next().is_some())
+            })
+            .flat_map(move |callables| {
+                callables.flat_map(move |callable| {
+                    callable
+                        .deprecated_functions(db)
+                        .map(move |function| (callable, function))
+                })
+            })
+    }
+
     /// Returns an iterator over all `CallableBinding`s, flattening the two-level structure.
     ///
     /// Note: This loses the union/intersection distinction. The returned iterator yields
@@ -4396,9 +4417,9 @@ impl<'db> CallableBinding<'db> {
             .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
-    /// Returns deprecated source overloads selected by this call, preserving their identities
-    /// when receiver binding has filtered or reordered the callable's signatures.
-    pub(crate) fn deprecated_overloads(
+    /// Returns a deprecated implementation, or the deprecated source overloads selected by this
+    /// call. Source indexes preserve overload identities after receiver compatibility filtering.
+    fn deprecated_functions(
         &self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + Clone {
@@ -4407,17 +4428,21 @@ impl<'db> CallableBinding<'db> {
             Type::BoundMethod(bound) => Some(bound.function(db)),
             _ => None,
         };
-        let overloads = function
-            .filter(|function| function.implementation_deprecated(db).is_none())
-            .map(|function| function.overloads_and_implementation(db).0)
+        let (overloads, implementation) = function
+            .map(|function| function.overloads_and_implementation(db))
             .unwrap_or_default();
+        let implementation = implementation.filter(|function| function.deprecated(db).is_some());
 
-        self.matching_overloads().filter_map(move |(_, binding)| {
-            overloads
-                .get(binding.source_overload_index())
-                .copied()
-                .filter(|overload| overload.deprecated(db).is_some())
-        })
+        implementation
+            .into_iter()
+            .chain(self.matching_overloads().filter_map(move |(_, binding)| {
+                overloads
+                    .get(binding.source_overload_index())
+                    .copied()
+                    .filter(|overload| {
+                        implementation.is_none() && overload.deprecated(db).is_some()
+                    })
+            }))
     }
 
     /// Returns the overload which call arguments should be inferred against, if every overload is

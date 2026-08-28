@@ -411,7 +411,111 @@ class MyInt:
 
 x = MyInt(1)
 y = MyInt(2)
-z = x + y  # TODO error: [deprecated] "MyInt `+` support is broken"
+z = x + y  # error: [deprecated] "MyInt `+` support is broken"
+x += y  # error: [deprecated] "MyInt `+` support is broken"
+```
+
+### Reflected operators
+
+Only the methods selected by operator resolution trigger deprecations. A deprecated reflected
+method is not used when the left operand accepts the operation.
+
+```py
+from typing_extensions import deprecated
+
+class Left:
+    def __add__(self, other: object) -> int:
+        return 0
+
+class Right:
+    @deprecated("reflected addition")
+    def __radd__(self, other: object) -> int:
+        return 0
+
+Left() + Right()
+1 + Right()  # error: [deprecated] "reflected addition"
+1 + Right()  # error: [deprecated] "reflected addition"
+```
+
+A deprecated method whose parameter does not accept the other operand does not trigger a warning
+when a compatible reflected method is available.
+
+```py
+class RestrictedLeft:
+    @deprecated("integer addition")
+    def __add__(self, other: int) -> int:
+        return 0
+
+class ActiveRight:
+    def __radd__(self, other: object) -> int:
+        return 0
+
+RestrictedLeft() + ActiveRight()
+```
+
+### In-place operators
+
+Augmented assignment calls the in-place method when available, without reporting deprecations on
+the unused binary method.
+
+```py
+from typing_extensions import deprecated
+
+class Number:
+    @deprecated("binary addition")
+    def __add__(self, other: int) -> "Number":
+        return self
+
+    def __iadd__(self, other: int) -> "Number":
+        return self
+
+class OldNumber:
+    @deprecated("in-place addition")
+    def __iadd__(self, other: int) -> "OldNumber":
+        return self
+
+number = Number()
+number += 1
+old = OldNumber()
+old += 1  # error: [deprecated] "in-place addition"
+```
+
+### Callable instances
+
+Calling an instance implicitly invokes its `__call__` method. Explicit references to that method
+already report its deprecation and do not produce a second diagnostic when called.
+
+```py
+from typing_extensions import deprecated
+
+class Invocable:
+    @deprecated("do not call")
+    def __call__(self) -> int:
+        return 0
+
+invocable = Invocable()
+invocable()  # error: [deprecated] "do not call"
+invocable.__call__()  # error: [deprecated] "do not call"
+invocable.__call__  # error: [deprecated] "do not call"
+```
+
+For overloaded `__call__` methods, only calls that select a deprecated overload trigger a warning.
+
+```py
+from typing import overload
+
+class Overloaded:
+    @overload
+    @deprecated("integer call")
+    def __call__(self, value: int) -> int: ...
+    @overload
+    def __call__(self, value: str) -> str: ...
+    def __call__(self, value: int | str) -> int | str:
+        return value
+
+overloaded = Overloaded()
+overloaded(1)  # error: [deprecated] "integer call"
+overloaded("one")
 ```
 
 ### Unary operators

@@ -284,6 +284,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
+    /// Report deprecations from the selected operator methods while reusing cached resolution.
+    fn infer_binary_dunder(
+        &self,
+        node: AnyNodeRef<'_>,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let (return_type, deprecated) = Type::try_call_bin_op_result(
+            self.db(),
+            self.program_environment(),
+            left_ty,
+            op,
+            right_ty,
+        )?;
+        for function in deprecated {
+            self.report_deprecated_function(&node, *function);
+        }
+        Some(return_type)
+    }
+
     pub(super) fn infer_binary_expression_type(
         &mut self,
         node: AnyNodeRef<'_>,
@@ -442,7 +463,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
+                    _ => self.infer_binary_dunder(node, left_ty, op, right_ty),
                 }
             }
 
@@ -474,7 +495,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
+                    _ => self.infer_binary_dunder(node, left_ty, op, right_ty),
                 }
             }
 
@@ -501,7 +522,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
+                    _ => self.infer_binary_dunder(node, left_ty, op, right_ty),
                 }
             }
 
@@ -511,8 +532,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // get the same `int | float` and `int | float | complex` special treatment that the
             // positional arguments get. In those cases we need to explicitly delegate to the base
             // type, so that it hits the `Type::Union` branches above.
-            (Type::NewTypeInstance(newtype), rhs, _) => {
-                Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty).or_else(|| {
+            (Type::NewTypeInstance(newtype), rhs, _) => self
+                .infer_binary_dunder(node, left_ty, op, right_ty)
+                .or_else(|| {
                     self.infer_binary_expression_type_impl(
                         node,
                         emitted_division_by_zero_diagnostic,
@@ -521,10 +543,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         op,
                         visitor,
                     )
-                })
-            }
-            (lhs, Type::NewTypeInstance(newtype), _) => {
-                Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty).or_else(|| {
+                }),
+            (lhs, Type::NewTypeInstance(newtype), _) => self
+                .infer_binary_dunder(node, left_ty, op, right_ty)
+                .or_else(|| {
                     self.infer_binary_expression_type_impl(
                         node,
                         emitted_division_by_zero_diagnostic,
@@ -533,8 +555,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         op,
                         visitor,
                     )
-                })
-            }
+                }),
 
             (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
@@ -829,7 +850,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Some(result)
                     }
 
-                    _ => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
+                    _ => self.infer_binary_dunder(node, left_ty, op, right_ty),
                 };
 
                 result.map(|result| match result {
@@ -968,7 +989,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .ok()
-            .map(|binding| binding.return_type(db, env)),
+            .map(|binding| {
+                self.check_deprecated_bindings(&node, &binding);
+                binding.return_type(db, env)
+            }),
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -1030,7 +1054,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::TypeForm(_)
                 | Type::TypedDict(_),
                 op,
-            ) => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
+            ) => self.infer_binary_dunder(node, left_ty, op, right_ty),
         }
     }
 

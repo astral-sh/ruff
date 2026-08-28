@@ -88,7 +88,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
-    FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
+    FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral, report_revealed_type,
     same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
@@ -4972,7 +4972,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     TypeContext::default(),
                 );
                 match call {
-                    Ok(outcome) => Ok(outcome.return_type(db, env)),
+                    Ok(outcome) => {
+                        self.check_deprecated_bindings(assignment, &outcome);
+                        Ok(outcome.return_type(db, env))
+                    }
                     Err(CallDunderError::MethodNotAvailable) => {
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty)
@@ -4980,6 +4983,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Err(CallDunderError::PossiblyUnbound {
                         bindings: outcome, ..
                     }) => {
+                        self.check_deprecated_bindings(assignment, &outcome);
                         let value_ty = outcome.type_for_argument(&call_arguments, 0);
                         match binary_return_ty(self, value_ty) {
                             Ok(binary_ty) => Ok(UnionType::from_two_elements(
@@ -9417,7 +9421,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.check_deprecated_overloads(func.as_ref(), &bindings);
+        for (binding, function) in bindings.deprecated_functions(db) {
+            // Explicit function references already report implementation deprecations.
+            // Calling an instance instead references the object, not its `__call__` method.
+            if function.is_overload(db) || binding.callable_type != binding.signature_type {
+                self.report_deprecated_function(func.as_ref(), function);
+            }
+        }
 
         if let Some(class) = class {
             pydantic::report_discarded_extra_arguments(&self.context, class, arguments, &bindings);
@@ -9966,53 +9976,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
-    /// Check selected overloads without reporting deprecations on unused overloads or on
-    /// implementations, which are already checked when the function is referenced.
-    fn check_deprecated_overloads<T: Ranged>(&self, ranged: &T, bindings: &Bindings<'db>) {
+    /// Report the deprecation of a function implementation or a selected overload.
+    fn report_deprecated_function<T: Ranged>(&self, ranged: &T, function: OverloadLiteral<'db>) {
         let db = self.db();
-        for callables in bindings.iter_union_elements() {
-            if callables
-                .clone()
-                .all(|callable| callable.deprecated_overloads(db).next().is_some())
-            {
-                for overload in callables.flat_map(|callable| callable.deprecated_overloads(db)) {
-                    let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged)
-                    else {
-                        continue;
-                    };
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "The overload of `{}` is deprecated",
-                        overload.name(db),
-                    ));
-                    if let Some(message) = overload
-                        .deprecated(db)
-                        .and_then(|deprecated| deprecated.message)
-                    {
-                        diagnostic.set_primary_annotation_message(message.value(db));
-                    }
-                    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-                }
-            }
+        let Some(deprecated) = function.deprecated(db) else {
+            return;
+        };
+        let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
+            return;
+        };
+        let kind = if function.is_overload(db) {
+            "overload of"
+        } else {
+            "function"
+        };
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "The {kind} `{}` is deprecated",
+            function.name(db),
+        ));
+        if let Some(message) = deprecated.message {
+            diagnostic.set_primary_annotation_message(message.value(db));
         }
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
     /// Report a deprecated callable only when its union alternative has no non-deprecated
     /// intersection member that could provide the implementation instead.
     fn check_deprecated_bindings<T: Ranged>(&self, ranged: &T, bindings: &Bindings<'db>) {
-        let db = self.db();
-
-        for callables in bindings.iter_union_elements() {
-            if callables.clone().all(|callable| {
-                let ty = match callable.callable_type {
-                    Type::BoundMethod(bound) => Type::FunctionLiteral(bound.function(db)),
-                    ty => ty,
-                };
-                ty.is_deprecated(db)
-            }) {
-                for callable in callables {
-                    self.check_deprecated(ranged, callable.callable_type);
-                }
-            }
+        for (_, function) in bindings.deprecated_functions(self.db()) {
+            self.report_deprecated_function(ranged, function);
         }
     }
 
