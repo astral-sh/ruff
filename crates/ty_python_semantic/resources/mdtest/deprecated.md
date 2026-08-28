@@ -590,8 +590,7 @@ def mixed_intersection(value: Deprecated) -> None:
 
 def deprecated_intersection(value: Deprecated) -> None:
     if isinstance(value, AlsoDeprecated):
-        # error: [deprecated] "old inversion"
-        # error: [deprecated] "old inversion"
+        # error: [deprecated] "old inversion; another old inversion"
         ~value
 ```
 
@@ -642,8 +641,7 @@ class Second:
 T = TypeVar("T", First, Second)
 
 def f(value: T) -> None:
-    # error: [deprecated] "first"
-    # error: [deprecated] "second"
+    # error: [deprecated] "first; second"
     ~value
 ```
 
@@ -675,8 +673,7 @@ W = TypeVar("W", First | Third, Second)
 
 def nested_union(value: W) -> None:
     # error: [unsupported-operator]
-    # error: [deprecated] "first"
-    # error: [deprecated] "second"
+    # error: [deprecated] "first; second"
     ~value
 ```
 
@@ -693,8 +690,7 @@ X = TypeVar("X", Invalid, Second)
 
 def invalid_operator(value: X) -> None:
     # error: [unsupported-operator]
-    # error: [deprecated] "invalid inversion"
-    # error: [deprecated] "second"
+    # error: [deprecated] "invalid inversion; second"
     ~value
 ```
 
@@ -961,4 +957,141 @@ def convert(value: int | str) -> str:
 
 convert(1)  # error: [deprecated] "entire function"
 convert("one")  # error: [deprecated] "entire function"
+```
+
+## Repeated inherited deprecations
+
+Both union alternatives can inherit the same deprecated method. Calling it reports that source
+method once at each call site, rather than once per possible receiver.
+
+```py
+from typing_extensions import deprecated
+
+class Base:
+    @deprecated("base call")
+    def __call__(self) -> None: ...
+
+class First(Base): ...
+class Second(Base): ...
+
+def check(value: First | Second):
+    value()  # error: [deprecated] "base call"
+    value()  # error: [deprecated] "base call"
+
+    # error: [deprecated] "base call"
+    # error: [deprecated] "base call"
+    (value(), value())
+
+    value()  # ty: ignore[deprecated]
+    if False:
+        value()
+```
+
+The same applies to an inherited overload selected through multiple possible receivers.
+
+```py
+from typing import overload
+
+class Overloaded:
+    @overload
+    @deprecated("integer call")
+    def __call__(self, value: int) -> None: ...
+    @overload
+    def __call__(self, value: str) -> None: ...
+    def __call__(self, value: int | str) -> None: ...
+
+class FirstOverload(Overloaded): ...
+class SecondOverload(Overloaded): ...
+
+def check_overload(value: FirstOverload | SecondOverload):
+    value(1)  # error: [deprecated] "integer call"
+    value("one")
+```
+
+Calls inside a `no_type_check` function remain silent.
+
+```py
+from typing import no_type_check
+
+@no_type_check
+def unchecked(value: First | Second):
+    value()
+```
+
+## Repeated binary deprecations
+
+Expanding union operands can select the same deprecated operator repeatedly. The expression reports
+the method once, even when both operands are unions.
+
+```py
+from typing_extensions import Self, deprecated
+
+class Number:
+    @deprecated("addition")
+    def __add__(self, other: int | str) -> Self:
+        return self
+
+class First(Number): ...
+class Second(Number): ...
+
+def check(number: First | Second, value: int | str):
+    number + value  # error: [deprecated] "addition"
+    number + value  # error: [deprecated] "addition"
+```
+
+Augmented assignment also collects the selected methods across union alternatives, including a
+fallback from `__iadd__` to `__add__`.
+
+```py
+class InPlace(Number):
+    @deprecated("in-place addition")
+    def __iadd__(self, other: int | str) -> Self:
+        return self
+
+def check_augmented(number: First | Second, value: int | str):
+    number += value  # error: [deprecated] "addition"
+
+def check_mixed(number: First | InPlace, value: int | str):
+    number += value  # error: [deprecated] "addition; in-place addition"
+```
+
+## Multiple deprecated targets
+
+Distinct deprecated implementations remain visible in a single diagnostic. Each source declaration
+is annotated once, even when several union alternatives inherit it.
+
+```py
+from typing_extensions import deprecated
+
+class First:
+    @deprecated("first message")
+    def __call__(self) -> None: ...
+
+class Second:
+    @deprecated("second message")
+    def __call__(self) -> None: ...
+
+class Inherited(First): ...
+
+def check(value: First | Second | Inherited):
+    # snapshot: deprecated
+    value()
+```
+
+```snapshot
+warning[deprecated]: Use of deprecated functions
+  --> src/mdtest_snippet.py:15:5
+   |
+15 |     value()
+   |     ^^^^^ first message; second message
+   |
+  ::: src/mdtest_snippet.py:5:9
+   |
+ 5 |     def __call__(self) -> None: ...
+   |         -------- first message
+ 6 |
+ 7 | class Second:
+ 8 |     @deprecated("second message")
+ 9 |     def __call__(self) -> None: ...
+   |         -------- second message
 ```

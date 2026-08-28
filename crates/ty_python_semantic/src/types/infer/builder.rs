@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use compact_str::CompactString;
 use itertools::Itertools;
-use ruff_db::diagnostic::Span;
+use ruff_db::diagnostic::{Annotation, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -94,6 +94,7 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
+use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
@@ -4894,6 +4895,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         target_type: Type<'db>,
         value_expr: &ast::Expr,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+        state: &mut BinaryInferenceState<'db>,
     ) -> Result<Type<'db>, Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
@@ -4902,19 +4904,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let op = assignment.op;
 
         // Fall back to non-augmented binary operator inference.
-        let binary_return_ty = |builder: &mut Self, value_ty| {
-            builder
-                .infer_binary_expression_type(assignment.into(), false, target_type, value_ty, op)
-                .ok_or_else(|| {
-                    report_unsupported_augmented_assignment(
-                        &builder.context,
-                        assignment,
+        let binary_return_ty =
+            |builder: &mut Self, value_ty, state: &mut BinaryInferenceState<'db>| {
+                builder
+                    .infer_binary_expression_type(
+                        assignment.into(),
                         target_type,
                         value_ty,
-                    );
-                    Type::unknown()
-                })
-        };
+                        op,
+                        state,
+                    )
+                    .ok_or_else(|| {
+                        report_unsupported_augmented_assignment(
+                            &builder.context,
+                            assignment,
+                            target_type,
+                            value_ty,
+                        );
+                        Type::unknown()
+                    })
+            };
 
         match target_type {
             Type::Union(union) => {
@@ -4931,6 +4940,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         elem_type,
                         value_expr,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
+                        state,
                     ) {
                         Ok(ty) => ty,
                         Err(recovery_ty) => {
@@ -4973,19 +4983,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 match call {
                     Ok(outcome) => {
-                        self.check_deprecated_bindings(assignment, &outcome);
+                        state.deprecated_functions.extend(
+                            outcome
+                                .deprecated_functions(db)
+                                .map(|(_, function)| function),
+                        );
                         Ok(outcome.return_type(db, env))
                     }
                     Err(CallDunderError::MethodNotAvailable) => {
                         let value_ty = infer_value_ty(self, TypeContext::default());
-                        binary_return_ty(self, value_ty)
+                        binary_return_ty(self, value_ty, state)
                     }
                     Err(CallDunderError::PossiblyUnbound {
                         bindings: outcome, ..
                     }) => {
-                        self.check_deprecated_bindings(assignment, &outcome);
+                        state.deprecated_functions.extend(
+                            outcome
+                                .deprecated_functions(db)
+                                .map(|(_, function)| function),
+                        );
                         let value_ty = outcome.type_for_argument(&call_arguments, 0);
-                        match binary_return_ty(self, value_ty) {
+                        match binary_return_ty(self, value_ty, state) {
                             Ok(binary_ty) => Ok(UnionType::from_two_elements(
                                 db,
                                 env,
@@ -5062,10 +5080,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let target_type = target_result.unwrap_or_else(|recovery_ty| recovery_ty);
-        let operation_result =
-            self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-                builder.infer_expression(value, tcx)
-            });
+        let mut state = BinaryInferenceState::default();
+        let operation_result = self.infer_augmented_op(
+            assignment,
+            target_type,
+            value,
+            &mut |builder, tcx| builder.infer_expression(value, tcx),
+            &mut state,
+        );
+        self.report_deprecated_functions(assignment, state.deprecated_functions);
 
         match (target_result, operation_result) {
             (Ok(_), Ok(result_ty)) => Ok(result_ty),
@@ -9421,13 +9444,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        for (binding, function) in bindings.deprecated_functions(db) {
-            // Explicit function references already report implementation deprecations.
-            // Calling an instance instead references the object, not its `__call__` method.
-            if function.is_overload(db) || binding.callable_type != binding.signature_type {
-                self.report_deprecated_function(func.as_ref(), function);
-            }
-        }
+        self.report_deprecated_functions(
+            func.as_ref(),
+            bindings
+                .deprecated_functions(db)
+                // Explicit function references already report implementation deprecations.
+                // Calling an instance instead references the object, not its `__call__` method.
+                .filter(|(binding, function)| {
+                    function.is_overload(db) || binding.callable_type != binding.signature_type
+                })
+                .map(|(_, function)| function),
+        );
 
         if let Some(class) = class {
             pydantic::report_discarded_extra_arguments(&self.context, class, arguments, &bindings);
@@ -9976,26 +10003,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
-    /// Report the deprecation of a function implementation or a selected overload.
-    fn report_deprecated_function<T: Ranged>(&self, ranged: &T, function: OverloadLiteral<'db>) {
+    /// Report the distinct deprecated targets of one operation in a single diagnostic.
+    /// Union alternatives can select the same source function or overload more than once.
+    fn report_deprecated_functions(
+        &self,
+        ranged: impl Ranged,
+        functions: impl IntoIterator<Item = OverloadLiteral<'db>>,
+    ) {
         let db = self.db();
-        let Some(deprecated) = function.deprecated(db) else {
+        let functions: SmallVec<[_; 1]> = functions.into_iter().unique().collect();
+        let Some(first) = functions.first() else {
             return;
         };
         let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
             return;
         };
-        let kind = if function.is_overload(db) {
-            "overload of"
+        let mut diagnostic = if functions.len() == 1 {
+            let kind = if first.is_overload(db) {
+                "overload of"
+            } else {
+                "function"
+            };
+            builder.into_diagnostic(format_args!(
+                "The {kind} `{}` is deprecated",
+                first.name(db)
+            ))
         } else {
-            "function"
+            let mut diagnostic = builder.into_diagnostic("Use of deprecated functions");
+            for function in &functions {
+                let mut annotation = Annotation::secondary(function.spans(db).name);
+                if let Some(message) = function
+                    .deprecated(db)
+                    .and_then(|deprecated| deprecated.message)
+                {
+                    annotation = annotation.message(message.value(db));
+                }
+                diagnostic.annotate(annotation);
+            }
+            diagnostic
         };
-        let mut diagnostic = builder.into_diagnostic(format_args!(
-            "The {kind} `{}` is deprecated",
-            function.name(db),
-        ));
-        if let Some(message) = deprecated.message {
-            diagnostic.set_primary_annotation_message(message.value(db));
+        let messages = functions
+            .iter()
+            .filter_map(|function| {
+                function
+                    .deprecated(db)
+                    .and_then(|deprecated| deprecated.message)
+            })
+            .map(|message| message.value(db))
+            .unique()
+            .join("; ");
+        if !messages.is_empty() {
+            diagnostic.set_primary_annotation_message(messages);
         }
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
@@ -10003,9 +10061,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Report a deprecated callable only when its union alternative has no non-deprecated
     /// intersection member that could provide the implementation instead.
     fn check_deprecated_bindings<T: Ranged>(&self, ranged: &T, bindings: &Bindings<'db>) {
-        for (_, function) in bindings.deprecated_functions(self.db()) {
-            self.report_deprecated_function(ranged, function);
-        }
+        self.report_deprecated_functions(
+            ranged,
+            bindings
+                .deprecated_functions(self.db())
+                .map(|(_, function)| function),
+        );
     }
 
     /// Check the property accessor invoked by an attribute operation. Looking on the receiver's
@@ -10072,12 +10133,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
         let bindings = accessors(db, env, member, access).bindings(db, env);
-        for (_, function) in bindings.deprecated_functions(db) {
-            // These are accessor references, not resolved overload calls.
-            if !function.is_overload(db) {
-                self.report_deprecated_function(&attribute.attr, function);
-            }
-        }
+        self.report_deprecated_functions(
+            &attribute.attr,
+            bindings
+                .deprecated_functions(db)
+                .map(|(_, function)| function)
+                // These are accessor references, not resolved overload calls.
+                .filter(|function| !function.is_overload(db)),
+        );
     }
 
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
@@ -11037,24 +11100,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 )
                             })
                             .collect();
-                        for outcome in &outcomes {
-                            let bindings = match outcome {
-                                Ok(bindings) => Some(bindings),
-                                // A method can be deprecated even if it is missing from some
-                                // union members or its signature rejects the implicit call.
-                                // Preserve those bindings so the deprecation is reported
-                                // alongside the unsupported-operator diagnostic.
-                                Err(
-                                    CallDunderError::PossiblyUnbound { bindings, .. }
-                                    | CallDunderError::CallError(_, bindings, _),
-                                ) => Some(bindings.as_ref()),
-                                // A completely missing method has no bindings to inspect.
-                                Err(CallDunderError::MethodNotAvailable) => None,
-                            };
-                            if let Some(bindings) = bindings {
-                                self.check_deprecated_bindings(unary, bindings);
-                            }
-                        }
+                        self.report_deprecated_functions(
+                            unary,
+                            outcomes
+                                .iter()
+                                .filter_map(|outcome| match outcome {
+                                    Ok(bindings) => Some(bindings),
+                                    // A method can be deprecated even if it is missing from some
+                                    // union members or its signature rejects the implicit call.
+                                    // Preserve those bindings so the deprecation is reported
+                                    // alongside the unsupported-operator diagnostic.
+                                    Err(
+                                        CallDunderError::PossiblyUnbound { bindings, .. }
+                                        | CallDunderError::CallError(_, bindings, _),
+                                    ) => Some(bindings.as_ref()),
+                                    // A completely missing method has no bindings to inspect.
+                                    Err(CallDunderError::MethodNotAvailable) => None,
+                                })
+                                .flat_map(|bindings| bindings.deprecated_functions(db))
+                                .map(|(_, function)| function),
+                        );
 
                         let mut outcomes = outcomes.into_iter();
                         let result = Self::map_constrained_typevar_constraints(

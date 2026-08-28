@@ -57,3 +57,12 @@ def f5(m: int, n: Literal[-1, 0, 1]):
     # error: [division-by-zero] "Cannot divide object of type `int` by zero"
     return m / n
 ```
+
+Several union alternatives can divide by zero at the same expression. We report it once per
+expression, not once per operand combination:
+
+```py
+def f6(m: Literal[1, 2], n: Literal[-1, 0, 1]):
+    m / n  # error: [division-by-zero]
+    m / n  # error: [division-by-zero]
+```
