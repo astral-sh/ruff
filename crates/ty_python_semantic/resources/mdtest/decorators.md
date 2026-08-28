@@ -1089,7 +1089,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
 help: Add a return type annotation to `dynamic`
 ```
 
-When multiple overloads match, the definition annotation spans every overload:
+Here, the remaining overloads return `Any` and `Unknown`, which are equivalent for overload
+resolution. The first is selected, so the diagnostic points to its definition.
 
 ```py
 from collections.abc import Callable
@@ -1114,21 +1115,15 @@ def decorated(value: Any) -> object:
 info[dynamic-function-decorator-return]: Decorator returns `Any`
   --> src/mdtest_snippet.py:27:1
    |
-27 |   @dynamic
-   |   ^^^^^^^^
-28 |   def decorated(value: Any) -> object:
-   |       --------- Signature of `decorated` will be obscured by the decorator
+27 | @dynamic
+   | ^^^^^^^^
+28 | def decorated(value: Any) -> object:
+   |     --------- Signature of `decorated` will be obscured by the decorator
    |
-  ::: src/mdtest_snippet.py:17:1
+  ::: src/mdtest_snippet.py:18:5
    |
-17 | / @overload
-18 | | def dynamic(function: Callable[[int], object]) -> Any: ...
-19 | | @overload
-20 | | def dynamic(function: None) -> None: ...
-21 | | @overload
-22 | | def dynamic(function: Callable[[str], object]): ...
-   | |______________________________________________- Overloads of `dynamic` defined here
-help: Ensure all `dynamic` overloads have a return annotation
+18 | def dynamic(function: Callable[[int], object]) -> Any: ...
+   |     ------------------------------------------------- Matching overload defined here
 ```
 
 ### Fully annotated decorators with multiple matching overloads

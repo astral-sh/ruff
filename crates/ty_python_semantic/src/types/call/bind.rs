@@ -4291,6 +4291,11 @@ impl<'db> CallableBinding<'db> {
         if !are_return_types_equivalent_for_all_matching_overloads {
             // Overload matching is ambiguous.
             self.overload_call_return_type = Some(OverloadCallReturnType::Ambiguous);
+        } else {
+            // Step 6: equivalent return types resolve the call to the first remaining overload.
+            for (_, overload) in self.matching_overloads_mut().skip(1) {
+                overload.mark_as_unmatched_overload();
+            }
         }
     }
 

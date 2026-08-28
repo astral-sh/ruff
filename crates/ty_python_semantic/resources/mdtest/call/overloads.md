@@ -2212,6 +2212,32 @@ def _(s: str):
 reveal_type(f((None, None, None)))  # revealed: Literal[b""]
 ```
 
+## Selecting the first overload with equivalent return types
+
+When the remaining overloads have equivalent return types, we select the first. Only that overload
+contributes constraints when inferring the contents of an initially empty collection.
+
+The `dict.update` overloads all return `None`. Updating from an unknown value does not introduce
+string keys from later overloads that accept keyword arguments when no keywords were supplied.
+
+```py
+def update_from_unknown(source):
+    result = {}
+    result.update(source)
+    reveal_type(result)  # revealed: dict[Unknown, Unknown]
+```
+
+A mapping with tuple keys also matches an overload accepting an iterable of key-value pairs. When
+the input can be unknown, selecting the mapping overload prevents tuple keys from being interpreted
+as separate keys and values.
+
+```py
+def update_from_mapping(other, source: dict[tuple[str, int], str]):
+    result = {}
+    result.update(other or source)
+    reveal_type(result)  # revealed: dict[tuple[str, int], str]
+```
+
 ## Bidirectional Type Inference
 
 ```toml
@@ -2363,4 +2389,70 @@ def takes_str_or_float(x: float): ...
 def takes_str_or_float(x: float | str): ...
 
 takes_str_or_float(round(1.0))
+```
+
+## Optional return context for a filter predicate
+
+The predicate receives an integer from `values`, even though the enclosing function can return
+`None`. Its parameter should not inherit `None` from that return annotation.
+
+```py
+def first(values: list[int]) -> int | None:
+    # TODO: The return context incorrectly makes the predicate parameter optional.
+    # error: [unresolved-attribute] "Attribute `real` is not defined on `None`"
+    return next(filter(lambda value: value.real, values), None)
+```
+
+## Nested calls with competing argument contexts
+
+The inner call passes an integer to its callback, so the callback can use `& 1`. The outer call's
+second overload accepts the result. Selecting its first overload should not make the callback's
+parameter a string.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Callable, TypeVar, overload
+
+T = TypeVar("T")
+
+@overload
+def invoke(): ...
+@overload
+def invoke(callback: Callable[[T], object], value: T) -> T: ...
+@overload
+def consume(key: str): ...
+@overload
+def consume(key: object): ...
+
+# TODO: Re-inferring the callback with the selected overload's context produces false positives.
+# error: [invalid-argument-type]
+# error: [unsupported-operator] "Operator `&` is not supported between objects of type `str` and `Literal[1]`"
+consume(invoke(lambda value: value & 1, 1))
+```
+
+## Nested calls forwarding a ParamSpec
+
+The `lazy` wrapper preserves its argument's parameters while wrapping the return type in a tuple.
+The result is accepted by `as_default`, including when the calls are nested.
+
+```py
+from typing import Callable, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+@overload
+def lazy(function: int) -> None: ...
+@overload
+def lazy(function: Callable[P, T]) -> Callable[P, tuple[T]]: ...
+def lazy(*args): ...
+@overload
+def as_default(function: Callable[P, tuple[T]]): ...
+@overload
+def as_default(function: Callable[P, T]): ...
+def as_default(*args): ...
+
+# TODO: The selected overload's unresolved ParamSpec incorrectly constrains the inner call.
+as_default(lazy(lambda: None))  # error: [no-matching-overload] "No overload of function `lazy` matches arguments"
 ```
