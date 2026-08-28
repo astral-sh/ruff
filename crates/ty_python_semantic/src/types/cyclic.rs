@@ -32,7 +32,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
-use crate::types::class::ClassLiteral;
+use crate::types::class::{ClassLiteral, implicit_attribute_names};
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization, enclosing_generic_contexts};
 use crate::types::list_members::{all_end_of_scope_bindings, all_end_of_scope_declarations};
@@ -43,7 +43,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, MemberLookupPolicy,
     PropertyInstanceType, StaticClassLiteral, SubclassOfInner, Type, TypeAliasType, TypedDictType,
 };
-use crate::{Db, ProgramEnvironment, attribute_scopes, semantic_index};
+use crate::{Db, ProgramEnvironment, semantic_index};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -692,16 +692,10 @@ impl<'db> SpecializationFlowVisitor<'db> {
 
         // Instance attributes implicitly defined by `self.x = ...` assignments in methods.
         let class = ClassType::NonGeneric(ClassLiteral::Static(origin));
-        let index = semantic_index(db, body_scope.program_file(db));
-        for function_scope_id in attribute_scopes(db, body_scope) {
-            for place_expr in index.place_table(function_scope_id).members() {
-                let Some(name) = place_expr.as_instance_attribute() else {
-                    continue;
-                };
-                let member = class.own_instance_member(db, &self.env, name);
-                if let Some(ty) = member.ignore_possibly_undefined() {
-                    self.visit_nominal_member(db, name, ty);
-                }
+        for name in implicit_attribute_names(db, body_scope) {
+            let member = class.own_instance_member(db, &self.env, name);
+            if let Some(ty) = member.ignore_possibly_undefined() {
+                self.visit_nominal_member(db, name, ty);
             }
         }
     }
