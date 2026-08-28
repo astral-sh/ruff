@@ -1312,6 +1312,30 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a set!"
 ```
 
+## Narrowing incompatible invariant specializations
+
+Subclasses of the same invariant generic class are disjoint when their type arguments cannot be
+equal. A nested type variable does not prevent this proof: `list[T]` cannot equal `int` for any `T`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never
+
+class Box[T]:
+    value: T
+
+class Nested[T](Box[list[T]]): ...
+class IntBox(Box[int]): ...
+
+def narrow[T](value: Nested[T]):
+    if isinstance(value, IntBox):
+        assert_never(value)
+```
+
 ## Narrowing recursively bounded generics (strict mode)
 
 An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.

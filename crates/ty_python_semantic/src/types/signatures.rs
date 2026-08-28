@@ -4692,6 +4692,19 @@ impl<'db> Parameters<'db> {
         matches!(self.data.kind, ParametersKind::Top)
     }
 
+    /// Returns whether the parameters are `(*object, **object)`, which accepts every call.
+    pub(crate) fn is_bottom(&self) -> bool {
+        self.is_standard()
+            && matches!(
+                self.as_slice(),
+                [variadic, keyword_variadic]
+                    if variadic.is_variadic()
+                        && variadic.annotated_type().is_object()
+                        && keyword_variadic.is_keyword_variadic()
+                        && keyword_variadic.annotated_type().is_object()
+            )
+    }
+
     /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
     /// `ParamSpec`, or `Concatenate`).
     pub(crate) fn is_standard(&self) -> bool {

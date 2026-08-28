@@ -1188,6 +1188,38 @@ class Both(Left, Right): ...
 static_assert(not is_disjoint_from(Left, Right))
 ```
 
+### Nested type variables in invariant arguments
+
+An invariant argument can contain a type variable and still be incompatible with another argument.
+For example, `list[T]` cannot equal `int`, regardless of the specialization of `T`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+def incompatible[T]():
+    static_assert(is_disjoint_from(list[list[T]], list[int]))
+    static_assert(is_disjoint_from(list[int], list[list[T]]))
+    static_assert(is_disjoint_from(list[tuple[T, int]], list[tuple[T, str]]))
+    static_assert(is_disjoint_from(list[tuple[T, str]], list[tuple[T, int]]))
+```
+
+When the surrounding structure matches, the arguments can instead be equal for some specialization.
+Aliases preserve that possibility, including aliases nested inside the argument.
+
+```py
+type Id[T] = T
+
+def compatible[T]():
+    static_assert(not is_disjoint_from(list[list[T]], list[list[int]]))
+    static_assert(not is_disjoint_from(list[list[Id[T]]], list[list[int]]))
+```
+
 ### NewTypes and overlapping types
 
 A `NewType` overlaps with any nominal or structural type that overlaps its concrete base. This

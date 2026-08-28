@@ -2171,26 +2171,25 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     let left_type = left_type.resolve_type_alias(db);
                     let right_type = right_type.resolve_type_alias(db);
 
-                    // Failing to prove equality does not establish disjointness when an argument
-                    // contains a type variable: `list[T]` and `list[int]` overlap if `T = int`.
-                    // Even `Never` is a possible specialization, so argument disjointness alone
-                    // cannot rule out overlap between the enclosing generic types.
-                    if left_type.has_typevar(db, self.env) || right_type.has_typevar(db, self.env) {
-                        return self.never();
-                    }
-
                     // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
                     // and `R` have any common materialization, so this is symmetric despite
                     // using a directional subtyping checker.
-                    self.as_relation_checker(TypeRelation::Subtyping)
-                        .check_subtyping_in_invariant_position(
-                            db,
-                            left_type,
-                            MaterializationKind::Bottom,
-                            right_type,
-                            MaterializationKind::Top,
-                        )
-                        .negate(db, self.constraints)
+                    // Keep type-variable comparisons as constraints: `list[T]` can equal
+                    // `list[int]` when `T = int`, but cannot equal `int` for any `T`. Disjointness
+                    // requires that no specialization satisfies the overlap constraints.
+                    let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
+                    checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+                    let overlap = checker.check_subtyping_in_invariant_position(
+                        db,
+                        left_type,
+                        MaterializationKind::Bottom,
+                        right_type,
+                        MaterializationKind::Top,
+                    );
+                    ConstraintSet::from_bool(
+                        self.constraints,
+                        overlap.is_never_satisfied(db, self.env),
+                    )
                 }
 
                 // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
