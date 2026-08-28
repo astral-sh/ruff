@@ -1775,10 +1775,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         signature.parameters().is_top() || signature.parameters().is_bottom()
                     }) =>
             {
-                let other_is_top = other
-                    .signatures(db)
-                    .iter()
-                    .all(|signature| signature.parameters().is_top());
+                let other_is_top = Self::is_top_paramspec_value(db, other);
                 ConstraintSet::from_bool(self.constraints, source.is_type_var() == other_is_top)
             }
 
@@ -2773,6 +2770,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .signatures(db)
                 .iter()
                 .all(|signature| signature.parameters().kind() == ParametersKind::Gradual)
+    }
+
+    /// Returns `true` if `callable` is the top materialization of a `ParamSpec` value.
+    fn is_top_paramspec_value(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
+        callable.kind(db) == CallableTypeKind::ParamSpecValue
+            && callable
+                .signatures(db)
+                .iter()
+                .all(|signature| signature.parameters().kind() == ParametersKind::Top)
     }
 }
 
