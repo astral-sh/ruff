@@ -118,7 +118,7 @@ use crate::types::typevar::{
 };
 use crate::types::unpacker::{
     UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
-    tuple_literal_needs_promotion,
+    tuple_literal_needs_promotion, unpacked_assignment_value,
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
@@ -2929,7 +2929,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     unpacked.value_inference(self.db(), shared_value),
                 );
                 self.context.extend(unpacked.diagnostics());
-                self.infer_unpacked_assignment_target(target, value, unpacked);
+                self.infer_unpacked_assignment_target(target, target, value, unpacked);
             } else {
                 self.infer_target(target, value, &|builder, tcx| {
                     let inference = infer_expression_types(builder.db(), shared_value, tcx);
@@ -2943,21 +2943,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_unpacked_assignment_target(
         &mut self,
         target: &ast::Expr,
+        unpack_target: &ast::Expr,
         value: &ast::Expr,
         unpacked: &UnpackResult<'db>,
     ) {
         match target {
             ast::Expr::Starred(ast::ExprStarred { value: target, .. }) => {
-                self.infer_unpacked_assignment_target(target, value, unpacked);
+                self.infer_unpacked_assignment_target(target, unpack_target, value, unpacked);
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for target in elts {
-                    self.infer_unpacked_assignment_target(target, value, unpacked);
+                    self.infer_unpacked_assignment_target(target, unpack_target, value, unpacked);
                 }
             }
             _ => {
                 let assigned_ty = unpacked.expression_type(target);
+
+                // Member validation can suppress a duplicate TypedDict-literal diagnostic
+                // only for a source expression that actually received the target's context.
+                let value = match target {
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                        unpacked_assignment_value(unpack_target, value, target)
+                            .filter(|value| unpacked.has_contextual_expression(value))
+                            .unwrap_or(value)
+                    }
+                    _ => value,
+                };
                 self.infer_target_impl(target, value, Some(&|_, _| assigned_ty));
             }
         }
@@ -7377,15 +7389,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    // Infer the type of a collection literal expression.
-    fn infer_collection_literal<'expr, const N: usize>(
+    /// Infer a collection from expressions or already-inferred elements. Only expression
+    /// elements call `infer_elt_expression`; inferred elements retain their types and provenance.
+    fn infer_collection_literal<'expr, const N: usize, E>(
         &mut self,
         collection_class: KnownClass,
         collection_expr: Option<ast::ExprRef<'_>>,
-        elts: &[[Option<&'expr ast::Expr>; N]],
+        elts: &[[Option<E>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Option<Type<'db>>
+    where
+        E: Copy + Into<CollectionElement<'db, 'expr>>,
+    {
         let db = self.db();
         let env = self.program_environment();
         let mut try_narrow = |narrowed_ty| {
@@ -7432,17 +7448,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    // Infer the type of a collection literal expression.
-    fn infer_collection_literal_impl<'expr, const N: usize>(
+    fn infer_collection_literal_impl<'expr, const N: usize, E>(
         &mut self,
         collection_class: KnownClass,
         collection_expr: Option<ast::ExprRef<'_>>,
-        elts: &[[Option<&'expr ast::Expr>; N]],
+        elts: &[[Option<E>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Option<Type<'db>>
+    where
+        E: Copy + Into<CollectionElement<'db, 'expr>>,
+    {
         let db = self.db();
         let env = self.program_environment();
+
+        let mut infer_elt_type =
+            |builder: &mut Self, i, elt: CollectionElement<'db, 'expr>, tcx| match elt {
+                CollectionElement::Expression(expression) => {
+                    infer_elt_expression(builder, (i, expression, tcx))
+                }
+                CollectionElement::Inferred { ty, .. } => ty,
+            };
 
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
@@ -7466,7 +7492,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Infer the element types without type context, and fallback to `Unknown` for
             // custom typesheds.
             for (i, elt) in elts.iter().flatten().flatten().enumerate() {
-                infer_elt_expression(self, (i, elt, TypeContext::default()));
+                infer_elt_type(self, i, (*elt).into(), TypeContext::default());
             }
 
             return None;
@@ -7652,13 +7678,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for (i, elt, elt_tcx) in itertools::izip!(0.., elts, specialization.iter().copied())
                 {
                     let Some(elt) = elt else { continue };
-                    let elt_tcx = if elt.is_starred_expr() && collection_class != KnownClass::Dict {
+                    let elt: CollectionElement = (*elt).into();
+                    let elt_tcx = if elt.is_starred() && collection_class != KnownClass::Dict {
                         Type::homogeneous_tuple(db, env, elt_tcx)
                     } else {
                         elt_tcx
                     };
                     let inferred_elt_ty =
-                        infer_elt_expression(self, (i, elt, TypeContext::new(Some(elt_tcx))));
+                        infer_elt_type(self, i, elt, TypeContext::new(Some(elt_tcx)));
                     inferred_elt_tys[i] = Some(inferred_elt_ty);
 
                     if !inferred_elt_ty.is_assignable_to(db, env, elt_tcx) {
@@ -7772,14 +7799,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
-            if let &[None, Some(value_expr)] = elts.as_slice() {
-                let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
+            if let &[None, Some(value_elt)] = elts.as_slice() {
+                let value_elt: CollectionElement = value_elt.into();
+                let unpack_ty = infer_elt_type(self, 1, value_elt, tcx);
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
                     unpack_ty.unpack_keys_and_items(db, env)
                 else {
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_expr)
+                    if let Some(value_expr) = value_elt.expression()
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_expr)
                     {
                         let mut diag = builder
                             .into_diagnostic("Argument expression after ** must be a mapping type");
@@ -7821,6 +7850,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // The inferred type of each element acts as an additional constraint on `T`.
             for (i, elt, elt_ty) in itertools::izip!(0.., elts, elt_tys.clone()) {
                 let Some(elt) = elt else { continue };
+                let elt: CollectionElement = (*elt).into();
 
                 // Note that unlike when preferring the declared type, we use covariant type
                 // assignments from the type context to potentially _narrow_ the inferred type,
@@ -7834,7 +7864,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .get(&elt_ty_identity)
                     .copied()
                     .map(|tcx| {
-                        if elt.is_starred_expr() && collection_class != KnownClass::Dict {
+                        if elt.is_starred() && collection_class != KnownClass::Dict {
                             Type::homogeneous_tuple(db, env, tcx)
                         } else {
                             tcx
@@ -7844,9 +7874,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let inferred_elt_ty = pre_inferred_elt_tys
                     .as_ref()
                     .and_then(|inferred_elts| inferred_elts[elts_index][i])
-                    .unwrap_or_else(|| {
-                        infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)))
-                    });
+                    .unwrap_or_else(|| infer_elt_type(self, i, elt, TypeContext::new(elt_tcx)));
 
                 // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
@@ -7871,7 +7899,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     promoted_elt_ty
                 };
 
-                let inferred_type_for_typevar = if elt.is_starred_expr() {
+                let inferred_type_for_typevar = if elt.is_starred() {
                     inferred_elt_ty
                         .iterate(db, env)
                         .homogeneous_element_type(db, env)
@@ -7883,7 +7911,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     env,
                     elt_ty_identity,
-                    elt,
+                    elt.expression(),
                     inferred_type_for_typevar,
                 );
 
@@ -12245,6 +12273,37 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
 /// An expression representing the function argument at the given index, along with its type
 /// context.
 type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
+
+/// An input to collection inference. A captured value has already been inferred, but its
+/// source expression, when available, still controls tuple-size promotion.
+#[derive(Clone, Copy)]
+enum CollectionElement<'db, 'ast> {
+    Expression(&'ast ast::Expr),
+    Inferred {
+        ty: Type<'db>,
+        expression: Option<&'ast ast::Expr>,
+    },
+}
+
+impl<'ast> CollectionElement<'_, 'ast> {
+    fn expression(self) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::Expression(expression) => Some(expression),
+            Self::Inferred { expression, .. } => expression,
+        }
+    }
+
+    fn is_starred(self) -> bool {
+        // An inferred element is already one of the values yielded by an expansion.
+        matches!(self, Self::Expression(expression) if expression.is_starred_expr())
+    }
+}
+
+impl<'ast> From<&'ast ast::Expr> for CollectionElement<'_, 'ast> {
+    fn from(expression: &'ast ast::Expr) -> Self {
+        Self::Expression(expression)
+    }
+}
 
 #[derive(Clone, Copy)]
 enum CallArgumentInferenceMode {

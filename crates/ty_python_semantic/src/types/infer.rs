@@ -789,37 +789,30 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     let env = ProgramEnvironment::from_file(program_file);
     let target = unpack.target(db, &module);
     let value = unpack.value(db);
-    let (value_inference, starred_types, contextual_expressions) =
-        if matches!(value.kind(), UnpackKind::Assign)
-            && let Some(inference) = TypeInferenceBuilder::new(
-                db,
-                &env,
-                InferenceRegion::Expression(value.expression(), TypeContext::default()),
-                python_file.file(db),
-                program_file,
-                semantic_index(db, program_file),
-                &module,
-            )
-            .finish_unpack_value(target, value.expression().node_ref(db).node(&module))
-        {
-            (
-                Some(inference.value),
-                inference.starred_types,
-                inference.contextual_expressions,
-            )
-        } else {
-            (None, FxHashMap::default(), FxHashSet::default())
-        };
+    if matches!(value.kind(), UnpackKind::Assign)
+        && let Some(inference) = TypeInferenceBuilder::new(
+            db,
+            &env,
+            InferenceRegion::Expression(value.expression(), TypeContext::default()),
+            python_file.file(db),
+            program_file,
+            semantic_index(db, program_file),
+            &module,
+        )
+        .finish_unpack(unpack)
+    {
+        return inference;
+    }
     let mut unpacker = Unpacker::new(
         db,
         &env,
         unpack.target_scope(db),
         program_file,
         &module,
-        starred_types,
+        None,
     );
-    unpacker.unpack(target, value, value_inference.as_ref());
-    unpacker.finish(value_inference, contextual_expressions)
+    unpacker.unpack(target, value, None);
+    unpacker.finish(None, FxHashSet::default())
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.

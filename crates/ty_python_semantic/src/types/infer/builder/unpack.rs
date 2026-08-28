@@ -9,16 +9,20 @@ use itertools::Either;
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::ExpressionNodeKey;
+use ty_python_core::unpack::Unpack;
 
-use super::{AddBinding, TypeInferenceBuilder};
+use super::{AddBinding, CollectionElement, TypeInferenceBuilder};
 use crate::place::{DefinedPlace, Place, TypeOrigin};
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
-use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
-use crate::types::unpacker::{UnpackValueInference, sequence_elts};
-use crate::types::{KnownClass, Type, TypeContext, UnionBuilder};
+use crate::types::tuple::{TupleElement, TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::unpacker::{
+    UnpackCaptureContext, UnpackElement, UnpackResult, Unpacker, sequence_elts,
+    unpack_literal_values,
+};
+use crate::types::{KnownClass, Type, TypeContext};
 
-impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    /// Infer an assignment's right-hand side with context from its unpacking targets.
+impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Infer and unpack an assignment's right-hand side with context from its targets.
     ///
     /// Return `None` when no target supplies context, so the caller can reuse the cached
     /// ordinary expression inference without storing another copy of its results.
@@ -32,16 +36,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// ```
     ///
     /// The list assigned to `rest` contains `1` and `2`, but there is no `[1, 2]` expression
-    /// whose type we can record. The returned [`UnpackValueInference`] stores contextual types
-    /// for these new lists in its `starred_types` map, keyed by the expressions inside the
-    /// starred targets. Here that map contains `list[object]` under the key for `rest`.
-    /// The returned struct's `value` field stores the tuple's type and its individual
-    /// expression types, so the unpacker can still determine the types assigned to other targets.
-    pub(in crate::types::infer) fn finish_unpack_value(
+    /// whose type we can record. For captures inferred from literal elements, this method passes
+    /// their contextual list types to [`Unpacker`] in the `starred_types` field of
+    /// [`UnpackCaptureContext`]. That field is a map keyed by the expressions inside starred
+    /// targets; here, it contains `list[object]` under the key for `rest`.
+    ///
+    /// For other captures, `Unpacker` matches the source elements before calling the context's
+    /// inference callback, preserving literal positions and union arms. The returned
+    /// [`UnpackResult`] contains the assigned target types and the source's expression types.
+    pub(in crate::types::infer) fn finish_unpack(
         mut self,
-        target: &ast::Expr,
-        value: &ast::Expr,
-    ) -> Option<UnpackValueInference<'db>> {
+        unpack: Unpack<'db>,
+    ) -> Option<UnpackResult<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let module = self.module();
+        let target = unpack.target(db, module);
+        let value = unpack.value(db);
+        let value_expr = value.expression().node_ref(db).node(module);
         if self.unpack_target_type_context(target).annotation.is_none() {
             self.context.defuse();
             return None;
@@ -69,15 +81,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut contextual_expressions = FxHashSet::default();
         self.infer_unpack_value(
             target,
-            value,
+            value_expr,
             &mut starred_types,
             &mut contextual_expressions,
         );
-        Some(UnpackValueInference {
-            value: self.into_expression_inference(),
-            starred_types,
-            contextual_expressions,
-        })
+        let mut capture_builder = self.speculate_without_diagnostics();
+        let value_inference = self.into_expression_inference();
+        let mut infer_capture = |target: &ast::Expr, elements: &[UnpackElement<'db, '_>]| {
+            capture_builder.infer_unpacked_captured_list(target, elements)
+        };
+        let mut unpacker = Unpacker::new(
+            db,
+            env,
+            unpack.target_scope(db),
+            unpack.program_file(db),
+            module,
+            Some(UnpackCaptureContext {
+                starred_types,
+                infer_from_elements: &mut infer_capture,
+            }),
+        );
+        unpacker.unpack(target, value, Some(&value_inference));
+        Some(unpacker.finish(Some(value_inference), contextual_expressions))
     }
 
     /// Infer each literal element with the declaration of the target that receives it.
@@ -114,133 +139,119 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::List(list) => Some((list.elts.as_slice(), Either::Right(list))),
             _ => None,
         };
-        let sequences = target_elts.zip(source_sequence);
 
         // A starred source expression prevents us from mapping syntax directly to targets.
         // For `first, *rest = (*items, 0)`, `first` receives either an element of `items` or
         // `0`, depending on whether `items` is empty. Infer the source's type first instead.
-        if let Some((targets, (values, sequence))) = sequences
+        // Length mismatches also fall back to ordinary inference: for `a, b = (1,)` or
+        // `first, *rest, last = (1,)`, let the unpacker report the missing values. Parser
+        // recovery can leave multiple starred targets, which have no unambiguous mapping.
+        if let Some(targets) = target_elts
+            && let Some((values, sequence)) = source_sequence
             && values.iter().all(|value| !value.is_starred_expr())
+            && targets
+                .iter()
+                .filter(|target| target.is_starred_expr())
+                .nth(1)
+                .is_none()
+            && let Some(matched) = unpack_literal_values(targets, value)
         {
-            let starred_index = targets.iter().position(ast::Expr::is_starred_expr);
-            let fixed_length = targets.len() - usize::from(starred_index.is_some());
+            for (target, source) in targets.iter().zip(matched.into_all_elements_with_kind()) {
+                if let ast::Expr::Starred(starred) = target
+                    && let TupleElement::Variable(captured) = source
+                {
+                    let tcx = self.unpack_target_type_context(&starred.value);
 
-            // Pairing lets each target's annotation guide inference of its source values.
-            // It requires a value for every ordinary target and at most one starred target
-            // to collect the remainder. For `a, b = (1,)` or `first, *rest, last = (1,)`,
-            // there are too few values; fall back to ordinary inference and let the unpacker
-            // report the length error. Parser recovery can also leave multiple starred
-            // targets, for which there is no unique way to distribute the values.
-            let can_pair_targets_with_values = if let Some(index) = starred_index {
-                values.len() >= fixed_length
-                    && targets[index + 1..]
-                        .iter()
-                        .all(|target| !target.is_starred_expr())
-            } else {
-                values.len() == fixed_length
-            };
-
-            if can_pair_targets_with_values {
-                let mut values_iter = values.iter();
-                for target in targets {
-                    if let ast::Expr::Starred(starred) = target {
-                        let captured = &values_iter.as_slice()[..values.len() - fixed_length];
-                        let tcx = self.unpack_target_type_context(&starred.value);
-
-                        if tcx.annotation.is_some() {
-                            // Infer the capture with the same context as a list literal:
-                            //
-                            //     rest: list[int]
-                            //     first, *rest, last = (0, 1, 2, 3)
-                            //
-                            // Here `rest` collects `[1, 2]`, which we infer with `list[int]`
-                            // context. An empty capture uses the annotation in the same way:
-                            //
-                            //     rest: list[int]
-                            //     first, *rest, last = (0, 3)
-                            //
-                            // Infer this capture as an empty list with `list[int]` context.
-                            // Captured literals can themselves use that context:
-                            //
-                            //     rest: list[list[object]]
-                            //     first, *rest = (0, [1], [2])
-                            //
-                            // Infer `[1]` and `[2]` with `list[object]` context, then construct
-                            // `list[list[object]]` as for a list literal containing them.
-                            let elts: Vec<[Option<&ast::Expr>; 1]> =
-                                captured.iter().map(|elt| [Some(elt)]).collect();
-                            if let Some(ty) = self.infer_collection_literal(
-                                KnownClass::List,
-                                None,
-                                &elts,
-                                &mut |builder, (_, elt, tcx)| builder.infer_expression(elt, tcx),
-                                tcx,
-                            ) {
-                                starred_types.insert(starred.value.as_ref().into(), ty);
-                            }
-                        } else {
-                            // Without a declaration for `rest`, `first, *rest = [1, "two"]`
-                            // needs no contextual capture type. Leave promotion to the
-                            // unpacker's existing rules for tuple and list sources.
-                            for value in captured {
-                                self.infer_expression(value, TypeContext::default());
-                            }
-                        }
-                        values_iter = values_iter.as_slice()[captured.len()..].iter();
-                    } else if let Some(value) = values_iter.next() {
-                        // A target may itself unpack a nested tuple or list:
+                    if tcx.annotation.is_some() {
+                        // Infer the capture with the same context as a list literal:
                         //
                         //     rest: list[int]
-                        //     (first, *rest), other = ((0, 1, 2), 3)
+                        //     first, *rest, last = (0, 1, 2, 3)
                         //
-                        // Recurse with `(first, *rest)` and `(0, 1, 2)` so that `rest`'s
-                        // annotation supplies context for the captured values `1` and `2`.
-                        // Inferring the inner tuple without inspecting its targets would
-                        // miss that annotation.
-                        self.infer_unpack_value(
-                            target,
-                            value,
-                            starred_types,
-                            contextual_expressions,
-                        );
-                    }
-                }
-
-                // We still need to record the type of the enclosing tuple or list:
-                //
-                //     items: list[object]
-                //     items, other = ([1], 0)
-                //
-                // We have inferred `[1]` as `list[object]` and recorded the types of `1`
-                // and `0`, but the tuple expression `([1], 0)` has no type yet. Construct
-                // its type, `tuple[list[object], Literal[0]]`, using those existing results.
-                // Calling ordinary expression inference on the tuple would infer `1`
-                // again and fail the assertion in `store_expression_type` that prohibits
-                // recording an expression's type twice. The callbacks below reuse the
-                // recorded child types instead of repeating their inference.
-                let ty = match sequence {
-                    Either::Left(tuple) => self.infer_tuple_expression_with(
-                        tuple,
-                        TypeContext::default(),
-                        &mut |builder, elt, tcx| builder.get_or_infer_expression(elt, tcx),
-                    ),
-                    Either::Right(list) => {
+                        // Here `rest` collects `[1, 2]`, which we infer with `list[int]`
+                        // context. An empty capture uses the annotation in the same way:
+                        //
+                        //     rest: list[int]
+                        //     first, *rest, last = (0, 3)
+                        //
+                        // Infer this capture as an empty list with `list[int]` context.
+                        // Captured literals can themselves use that context:
+                        //
+                        //     rest: list[list[object]]
+                        //     first, *rest = (0, [1], [2])
+                        //
+                        // Infer `[1]` and `[2]` with `list[object]` context, then construct
+                        // `list[list[object]]` as for a list literal containing them.
                         let elts: Vec<[Option<&ast::Expr>; 1]> =
-                            values.iter().map(|elt| [Some(elt)]).collect();
-                        self.infer_collection_literal(
+                            captured.into_iter().map(|elt| [elt]).collect();
+                        if let Some(ty) = self.infer_collection_literal(
                             KnownClass::List,
-                            Some(list.into()),
+                            None,
                             &elts,
-                            &mut |builder, (_, elt, tcx)| builder.get_or_infer_expression(elt, tcx),
-                            TypeContext::default(),
-                        )
-                        // Custom typesheds may omit `list` or define it without type parameters.
-                        .unwrap_or_else(Type::unknown)
+                            &mut |builder, (_, elt, tcx)| builder.infer_expression(elt, tcx),
+                            tcx,
+                        ) {
+                            starred_types.insert(starred.value.as_ref().into(), ty);
+                        }
+                    } else {
+                        // Without a declaration for `rest`, `first, *rest = [1, "two"]`
+                        // needs no contextual capture type. Leave promotion to the
+                        // unpacker's existing rules for tuple and list sources.
+                        for value in captured.into_iter().flatten() {
+                            self.infer_expression(value, TypeContext::default());
+                        }
                     }
-                };
-                self.store_expression_type(value, ty);
-                return;
+                } else if let TupleElement::Fixed(Some(value))
+                | TupleElement::Prefix(Some(value))
+                | TupleElement::Suffix(Some(value)) = source
+                {
+                    // A target may itself unpack a nested tuple or list:
+                    //
+                    //     rest: list[int]
+                    //     (first, *rest), other = ((0, 1, 2), 3)
+                    //
+                    // Recurse with `(first, *rest)` and `(0, 1, 2)` so that `rest`'s
+                    // annotation supplies context for the captured values `1` and `2`.
+                    // Inferring the inner tuple without inspecting its targets would
+                    // miss that annotation.
+                    self.infer_unpack_value(target, value, starred_types, contextual_expressions);
+                }
             }
+
+            // We still need to record the type of the enclosing tuple or list:
+            //
+            //     items: list[object]
+            //     items, other = ([1], 0)
+            //
+            // We have inferred `[1]` as `list[object]` and recorded the types of `1`
+            // and `0`, but the tuple expression `([1], 0)` has no type yet. Construct
+            // its type, `tuple[list[object], Literal[0]]`, using those existing results.
+            // Calling ordinary expression inference on the tuple would infer `1`
+            // again and fail the assertion in `store_expression_type` that prohibits
+            // recording an expression's type twice. The callbacks below reuse the
+            // recorded child types instead of repeating their inference.
+            let ty = match sequence {
+                Either::Left(tuple) => self.infer_tuple_expression_with(
+                    tuple,
+                    TypeContext::default(),
+                    &mut |builder, elt, tcx| builder.get_or_infer_expression(elt, tcx),
+                ),
+                Either::Right(list) => {
+                    let elts: Vec<[Option<&ast::Expr>; 1]> =
+                        values.iter().map(|elt| [Some(elt)]).collect();
+                    self.infer_collection_literal(
+                        KnownClass::List,
+                        Some(list.into()),
+                        &elts,
+                        &mut |builder, (_, elt, tcx)| builder.get_or_infer_expression(elt, tcx),
+                        TypeContext::default(),
+                    )
+                    // Custom typesheds may omit `list` or define it without type parameters.
+                    .unwrap_or_else(Type::unknown)
+                }
+            };
+            self.store_expression_type(value, ty);
+            return;
         }
 
         // A single name, attribute, or subscript target receives one expression. For example:
@@ -280,14 +291,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the dictionary expression that receives this context, not the enclosing tuple.
             contextual_expressions.insert(value.into());
         }
-        let ty = self.infer_expression_impl(value, tcx);
-        if tcx.annotation.is_some() {
-            self.contextualize_unpacked_captures(target, value, ty, starred_types);
-        }
+        self.infer_expression_impl(value, tcx);
     }
 
-    /// Even when the source has no literal elements, a starred target receives a fresh list.
-    /// Infer that list with context, without changing the types of the source's existing values.
+    /// Infer the fresh list made by a starred target from its matched elements.
     ///
     /// ```python
     /// def copy_values(source: list[int]):
@@ -298,106 +305,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Here `objects` can have type `list[object]` while `source` remains `list[int]`.
     /// Only the outer list is new: collecting values from `list[list[int]]` does not copy
     /// the inner lists, so those elements cannot be widened to `list[object]`.
-    fn contextualize_unpacked_captures(
+    fn infer_unpacked_captured_list(
         &mut self,
         target: &ast::Expr,
-        value: &ast::Expr,
-        ty: Type<'db>,
-        starred_types: &mut FxHashMap<ExpressionNodeKey, Type<'db>>,
-    ) {
-        let db = self.db();
-        let env = self.program_environment();
-        if let ast::Expr::Starred(starred) = target {
-            // `ty` describes the values collected by this target, but `value` is still the
-            // original right-hand side expression. An existing iterable has no individual
-            // element expressions to infer:
-            //
-            //     def copy_values(source: list[int]):
-            //         rest: list[object]
-            //         first, *rest = source
-            //
-            // Here `value` is `source`, which we pass as a placeholder. The callback ignores
-            // that expression and supplies the known element type `int`, allowing the new
-            // list to use `list[object]` context without changing `source`'s type. Inferring
-            // `source` as an element would instead describe a list containing the original
-            // list, which is not what unpacking does.
-            let tcx = self.unpack_target_type_context(&starred.value);
+        elements: &[UnpackElement<'db, '_>],
+    ) -> Option<Type<'db>> {
+        let tcx = self.unpack_target_type_context(target);
+        tcx.annotation?;
 
-            if tcx.annotation.is_some()
-                && let Ok(elements) = ty.try_iterate(db, env)
-                && let Some(ty) = self.infer_collection_literal(
-                    KnownClass::List,
-                    None,
-                    &[[Some(value)]],
-                    &mut |_, _| elements.homogeneous_element_type(db, env),
-                    tcx,
-                )
-            {
-                starred_types.insert(starred.value.as_ref().into(), ty);
-            }
-        } else if let Some(targets) = sequence_elts(target) {
-            // For `(first, *rest), other = source`, first unpack the outer tuple's type, then
-            // recurse into its first element to find the values collected by `rest`.
-            let length = targets
-                .iter()
-                .position(ast::Expr::is_starred_expr)
-                .map(|index| TupleLength::Variable(index, targets.len() - index - 1))
-                .unwrap_or_else(|| TupleLength::Fixed(targets.len()));
-            let mut inferred_targets: Vec<_> =
-                targets.iter().map(|_| UnionBuilder::new(db, env)).collect();
+        // The source is already inferred, but each element's syntax still determines whether
+        // collection inference may promote its tuple size. Keep literal tuple expressions;
+        // elements from existing iterables have no expression and retain their tuple shapes.
+        let elts: Vec<[Option<CollectionElement<'db, '_>>; 1]> = elements
+            .iter()
+            .map(|element| {
+                [Some(CollectionElement::Inferred {
+                    ty: element.ty,
+                    expression: element.expression,
+                })]
+            })
+            .collect();
 
-            // Each alternative in a union can contribute different captured element types:
-            //
-            //     def unpack(source: tuple[int, int] | tuple[int, str]):
-            //         rest: list[int | str]
-            //         first, *rest = source
-            //
-            // `rest` can collect an `int` or a `str`. Unpack both alternatives before
-            // inferring the captured list so its element type accounts for both possibilities.
-            let types = match ty {
-                Type::Union(union) => union.elements(db),
-                _ => std::slice::from_ref(&ty),
-            };
-
-            // Only record a contextual capture type if every union arm can be unpacked:
-            //
-            //     def unpack(source: tuple[int, int, int] | tuple[int] | int):
-            //         rest: list[object]
-            //         first, *rest, last = source
-            //
-            // The three-element tuple fits, but the one-element tuple cannot fill both
-            // `first` and `last`, and `int` is not iterable. Do not derive a capture override
-            // from just the valid arm. Leave the capture's type and the diagnostics for the
-            // invalid alternatives to the normal unpacker.
-            for ty in types {
-                let Ok(elements) = ty.try_iterate(db, env) else {
-                    return;
-                };
-                let Ok(elements) = elements.resize(db, env, length) else {
-                    return;
-                };
-                for ((target, inferred), ty) in targets
-                    .iter()
-                    .zip(&mut inferred_targets)
-                    .zip(elements.iter_element_types(db))
-                {
-                    let ty = if target.is_starred_expr() {
-                        KnownClass::List.to_specialized_instance(db, env, &[ty])
-                    } else {
-                        ty
-                    };
-                    inferred.add_in_place(ty);
-                }
-            }
-            for (target, inferred) in targets.iter().zip(inferred_targets) {
-                self.contextualize_unpacked_captures(
-                    target,
-                    value,
-                    inferred.build(),
-                    starred_types,
-                );
-            }
-        }
+        self.infer_collection_literal(
+            KnownClass::List,
+            None,
+            &elts,
+            &mut |_, _| Type::unknown(),
+            tcx,
+        )
     }
 
     /// Combine the declarations on an unpacking target into context for its source expression.

@@ -2018,13 +2018,12 @@ pub(super) fn report_invalid_assignment<'db>(
     let db = context.db();
     let definition_kind = definition.kind(context.db());
     let value_node = assignment_value_node(context, definition_kind);
-    let original_value_node = definition_kind.value(context.module()).or(value_node);
     let contextual_value_node = match definition_kind {
         DefinitionKind::Assignment(assignment) if let Some(unpack) = assignment.unpack() => {
             value_node
                 .filter(|value| infer_unpack_types(db, unpack).has_contextual_expression(value))
         }
-        _ => original_value_node,
+        _ => definition_kind.value(context.module()).or(value_node),
     };
 
     if let Some(value_node) = contextual_value_node

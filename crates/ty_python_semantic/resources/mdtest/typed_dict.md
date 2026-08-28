@@ -478,6 +478,33 @@ literal assigned to `payload`, so the incompatible key type still produces an as
 payload, other = {"value": 1, "other": 2}
 ```
 
+The same contextual check applies when the target is a `TypedDict` key. Tuple, list, and nested
+unpacking each report the invalid field value without an additional assignment diagnostic.
+
+```py
+class Container(TypedDict):
+    payload: Payload
+
+def assign_container(container: Container):
+    # error: [invalid-argument-type] "Invalid argument to key "value" with declared type `int` on TypedDict `Payload`"
+    container["payload"], other = ({"value": "wrong"}, 0)
+
+    # error: [invalid-argument-type]
+    [container["payload"], other] = [{"value": "wrong"}, 0]
+
+    # error: [invalid-argument-type]
+    (container["payload"],), other = (({"value": "wrong"},), 0)
+```
+
+An inner dictionary that did not receive context still needs the assignment diagnostic, even when
+its position can be recovered from the source syntax.
+
+```py
+def assign_without_context(container: Container):
+    # error: [invalid-assignment]
+    container["payload"], other = ({"value": "wrong"}, *(0,))
+```
+
 ## Nested `TypedDict`
 
 Nested `TypedDict` fields are also supported.
