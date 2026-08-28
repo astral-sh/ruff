@@ -35,7 +35,7 @@ use ty_python_core::definition::Definition;
 use crate::types::class::ClassLiteral;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization, enclosing_generic_contexts};
-use crate::types::list_members::{all_end_of_scope_bindings, all_end_of_scope_members};
+use crate::types::list_members::{all_end_of_scope_bindings, all_end_of_scope_declarations};
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
 };
@@ -677,18 +677,17 @@ impl<'db> SpecializationFlowVisitor<'db> {
 
         let instance = Type::instance(db, &self.env, origin.identity_specialization(db));
         let body_scope = origin.body_scope(db);
-        for memberdef in all_end_of_scope_members(db, body_scope) {
-            self.visit_nominal_member(db, memberdef.member.name.as_str(), memberdef.member.ty);
+        for memberdef in all_end_of_scope_declarations(db, body_scope) {
+            let name = memberdef.member.name.as_str();
+            let ty = memberdef.member.ty;
+            self.visit_nominal_member(db, name, ty);
+            self.visit_nominal_descriptor_member_types(db, instance, name, ty);
         }
-        // Only bindings can install a runtime descriptor. Declarations still contribute their raw
-        // instance types above, without requiring descriptor lookup for every class annotation.
         for memberdef in all_end_of_scope_bindings(db, body_scope) {
-            self.visit_nominal_descriptor_member_types(
-                db,
-                instance,
-                memberdef.member.name.as_str(),
-                memberdef.member.ty,
-            );
+            let name = memberdef.member.name.as_str();
+            let ty = memberdef.member.ty;
+            self.visit_nominal_member(db, name, ty);
+            self.visit_nominal_descriptor_member_types(db, instance, name, ty);
         }
 
         // Instance attributes implicitly defined by `self.x = ...` assignments in methods.

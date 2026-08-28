@@ -730,6 +730,28 @@ def assign_nominal(value: NominalImpl[int]) -> NominalProtocol[int]:
     return value  # error: [invalid-return-type]
 ```
 
+A descriptor annotation also contributes its effective read type, even when the class body has no
+runtime binding for that attribute.
+
+```py
+class DeclaredNominalDescriptor[T]:
+    def __get__(self, instance: object, owner: type | None = None) -> DeclaredNominalImpl[list[T]]:
+        raise NotImplementedError
+
+class DeclaredNominalImpl[T]:
+    child: DeclaredNominalDescriptor[T]
+
+class DeclaredNominalProtocol[T](Protocol):
+    child: DeclaredNominalProtocol[list[T]]
+
+def assign_declared_nominal(
+    value: DeclaredNominalImpl[int],
+) -> DeclaredNominalProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
 Writable descriptor members expose the recursive specialization contravariantly. The comparison
 therefore alternates direction before returning to the same pair of protocol definitions.
 

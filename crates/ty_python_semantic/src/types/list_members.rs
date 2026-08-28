@@ -36,7 +36,8 @@ pub(crate) fn all_end_of_scope_members<'db>(
     all_end_of_scope_declarations(db, scope_id).chain(all_end_of_scope_bindings(db, scope_id))
 }
 
-fn all_end_of_scope_declarations<'db>(
+/// Iterate over all declarations that exist at the end of the given scope.
+pub(crate) fn all_end_of_scope_declarations<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
