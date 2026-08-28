@@ -1104,31 +1104,131 @@ f(1)  # error: [deprecated] "entire function"
 f("hello")  # error: [deprecated] "entire function"
 ```
 
+### Equivalent return types
+
+An `Any` argument matches both overloads below. Their return types are equivalent, so overload
+resolution selects the first. The deprecated second overload does not produce a warning.
+
+```py
+from typing import Any, overload
+from typing_extensions import deprecated
+
+@overload
+def convert(value: int) -> str: ...
+@overload
+@deprecated("strings are no longer supported")
+def convert(value: str) -> str: ...
+def convert(value: int | str) -> str:
+    return str(value)
+
+def check(value: Any):
+    convert(value)
+```
+
+### Ambiguous overloads
+
+All three overloads remain possible for an `Any` argument. Their return types differ, so no single
+overload wins. The call reports the deprecated overload that remains a possible target.
+
+```py
+from typing import Any, overload
+from typing_extensions import deprecated
+
+@overload
+def convert(value: list[int]) -> int: ...
+@overload
+@deprecated("string lists are no longer supported")
+def convert(value: list[str]) -> str: ...
+@overload
+def convert(value: bytes) -> bytes: ...
+def convert(value): ...
+def check(value: Any):
+    convert(value)  # error: [deprecated] "string lists are no longer supported"
+```
+
+The same ambiguity can occur within one member of a union. The `list[Any]` member can select the
+deprecated overload, even though the `bytes` member selects a non-deprecated overload.
+
+```py
+def check_union(value: list[Any] | bytes):
+    convert(value)  # error: [deprecated] "string lists are no longer supported"
+```
+
 ### Union arguments
 
-A union argument can match several overloads. The call reports a deprecation if any matching
-overload is deprecated.
+A union argument can select different overloads for different members. The call reports a
+deprecation if any selected overload is deprecated.
 
 ```py
 from typing import overload
 from typing_extensions import deprecated
 
 @overload
-@deprecated("use a string")
 def convert(value: int) -> str: ...
 @overload
+@deprecated("use an integer")
 def convert(value: str) -> str: ...
 def convert(value: int | str) -> str:
     return str(value)
 
 def check(value: int | str):
-    convert(value)  # error: [deprecated] "use a string"
+    convert(value)  # error: [deprecated] "use an integer"
 ```
 
 If no overload accepts the argument, there is no selected overload to report as deprecated.
 
 ```py
 convert(None)  # error: [no-matching-overload]
+```
+
+### Equivalent return types within a union
+
+Each member of a union resolves its overloads separately. The `list[Any]` member matches the first
+two overloads, whose equivalent return types select the first. The `bytes` member selects the third
+overload. Neither selected overload is deprecated.
+
+```py
+from typing import Any, overload
+from typing_extensions import deprecated
+
+@overload
+def convert(value: list[int]) -> str: ...
+@overload
+@deprecated("string lists are no longer supported")
+def convert(value: list[str]) -> str: ...
+@overload
+def convert(value: bytes) -> str: ...
+def convert(value) -> str:
+    return ""
+
+def check(value: list[Any] | bytes):
+    convert(value)
+```
+
+### Ambiguity in one union member
+
+Ambiguity in one union member does not change how another member selects its overload. The
+`list[Any]` member can select the deprecated overload for lists of strings. The `set[Any]` member's
+two overloads have equivalent return types, so only its non-deprecated first overload is selected.
+
+```py
+from typing import Any, overload
+from typing_extensions import deprecated
+
+@overload
+def convert(value: list[int]) -> int: ...
+@overload
+@deprecated("string lists are no longer supported")
+def convert(value: list[str]) -> str: ...
+@overload
+def convert(value: set[int]) -> int: ...
+@overload
+@deprecated("string sets are no longer supported")
+def convert(value: set[str]) -> int: ...
+def convert(value): ...
+def check(value: list[Any] | set[Any]):
+    # error: [deprecated] "The overload of `convert` is deprecated: string lists are no longer supported"
+    convert(value)
 ```
 
 ### Overloads for different receivers

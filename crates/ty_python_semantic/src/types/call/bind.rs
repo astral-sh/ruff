@@ -3257,7 +3257,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
-            overload_call_return_type: None,
+            overload_call_result: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
         };
@@ -3292,21 +3292,24 @@ pub(crate) struct CallableBinding<'db> {
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
 
-    /// The return type of this overloaded callable.
+    /// The result of evaluating this overloaded callable when a single overload does not
+    /// determine its return type.
     ///
     /// This is [`Some`] only in the following cases:
     /// 1. Argument type expansion was performed and one of the expansions evaluated successfully
     ///    for all of the argument lists, or
     /// 2. Overload call evaluation was ambiguous, meaning that multiple overloads matched the
-    ///    argument lists, but they all had different return types
+    ///    argument lists, but their return types were not equivalent, or
+    /// 3. Argument type expansion reached its limit.
     ///
     /// For (1), the final return type is the union of all the return types of the matched
-    /// overloads for the expanded argument lists.
+    /// overloads for the expanded argument lists. We also retain the overloads selected for
+    /// deprecation reporting without discarding the other matches used for argument inference.
     ///
-    /// For (2), the final return type is [`Unknown`].
+    /// For (2) and (3), the final return type is [`Unknown`].
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
-    overload_call_return_type: Option<OverloadCallReturnType<'db>>,
+    overload_call_result: Option<OverloadCallResult<'db>>,
 
     /// The index of the overload that matched for this overloaded callable before type checking.
     ///
@@ -3381,7 +3384,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
-            overload_call_return_type: None,
+            overload_call_result: None,
             matching_overload_before_type_checking: None,
             overloads,
         }
@@ -3393,7 +3396,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
-            overload_call_return_type: None,
+            overload_call_result: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
         }
@@ -3904,9 +3907,8 @@ impl<'db> CallableBinding<'db> {
             let expanded_argument_lists = match expansion {
                 Expansion::LimitReached(index) => {
                     snapshotter.restore(self, post_evaluation_snapshot);
-                    self.overload_call_return_type = Some(
-                        OverloadCallReturnType::ArgumentTypeExpansionLimitReached(index),
-                    );
+                    self.overload_call_result =
+                        Some(OverloadCallResult::ArgumentTypeExpansionLimitReached(index));
                     return;
                 }
                 Expansion::Expanded(argument_lists) => argument_lists,
@@ -3919,6 +3921,7 @@ impl<'db> CallableBinding<'db> {
 
             // The return types of each of the expanded argument lists that evaluated successfully.
             let mut return_types = Vec::new();
+            let mut selected_overloads = SmallVec::<[usize; 2]>::new();
 
             for expanded_arguments in &expanded_argument_lists {
                 // The spec mentions that each expanded argument list should be re-evaluated from
@@ -3957,6 +3960,7 @@ impl<'db> CallableBinding<'db> {
                     "after step 2",
                 );
 
+                let mut is_ambiguous = false;
                 let return_type = match self.matching_overload_index() {
                     MatchingOverloadIndex::None => None,
                     MatchingOverloadIndex::Single(index) => {
@@ -3980,7 +3984,7 @@ impl<'db> CallableBinding<'db> {
                             }
                             MatchingOverloadIndex::Single(_) => Some(self.return_type()),
                             MatchingOverloadIndex::Multiple(indexes) => {
-                                self.filter_overloads_using_any_or_unknown(
+                                is_ambiguous = self.filter_overloads_using_any_or_unknown(
                                     db,
                                     env,
                                     constraints,
@@ -4015,6 +4019,19 @@ impl<'db> CallableBinding<'db> {
 
                 if let Some(return_type) = return_type {
                     return_types.push(return_type);
+                    // The shared call result can still contain ambiguity from an earlier
+                    // expansion. Select overloads using this expansion's result instead.
+                    let matching = self.matching_overloads();
+                    let selected = if is_ambiguous {
+                        Either::Left(matching)
+                    } else {
+                        Either::Right(matching.take(1))
+                    };
+                    for (index, _) in selected {
+                        if !selected_overloads.contains(&index) {
+                            selected_overloads.push(index);
+                        }
+                    }
                 } else {
                     // No need to check the remaining argument lists if the current argument list
                     // doesn't evaluate successfully. Move on to expanding the next argument type.
@@ -4035,10 +4052,12 @@ impl<'db> CallableBinding<'db> {
                 // If the number of return types is equal to the number of expanded argument lists,
                 // they all evaluated successfully. So, we need to combine their return types by
                 // union to determine the final return type.
-                self.overload_call_return_type =
-                    Some(OverloadCallReturnType::ArgumentTypeExpansion(
-                        UnionType::from_elements(db, env, return_types),
-                    ));
+                self.overload_call_result = Some(OverloadCallResult::ArgumentTypeExpansion(
+                    Box::new(ExpandedOverloadCall {
+                        return_type: UnionType::from_elements(db, env, return_types),
+                        selected_overloads,
+                    }),
+                ));
 
                 return;
             }
@@ -4119,6 +4138,9 @@ impl<'db> CallableBinding<'db> {
     /// `matching_overload_indexes` and are filtered out by marking them as unmatched overloads
     /// using the [`mark_as_unmatched_overload`] method.
     ///
+    /// Returns whether the remaining overloads have non-equivalent return types, leaving the
+    /// call ambiguous. Otherwise, step 6 selects the first remaining overload.
+    ///
     /// [`Any`]: crate::types::DynamicType::Any
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     /// [`mark_as_unmatched_overload`]: Binding::mark_as_unmatched_overload
@@ -4130,7 +4152,7 @@ impl<'db> CallableBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
-    ) {
+    ) -> bool {
         struct OverloadFilterSlot<'db> {
             parameter: Type<'db>,
             argument: Type<'db>,
@@ -4307,8 +4329,9 @@ impl<'db> CallableBinding<'db> {
 
         if !are_return_types_equivalent_for_all_matching_overloads {
             // Overload matching is ambiguous.
-            self.overload_call_return_type = Some(OverloadCallReturnType::Ambiguous);
+            self.overload_call_result = Some(OverloadCallResult::Ambiguous);
         }
+        !are_return_types_equivalent_for_all_matching_overloads
     }
 
     fn as_result(&self) -> Result<(), CallErrorKind> {
@@ -4413,6 +4436,23 @@ impl<'db> CallableBinding<'db> {
             .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
+    /// Returns the overloads selected for deprecation reporting without changing the matches
+    /// retained for argument inference. Equivalent return types select the first match;
+    /// ambiguous calls retain every match, and argument expansion combines its selected matches.
+    fn selected_overloads(&self) -> impl Iterator<Item = (usize, &Binding<'db>)> + Clone {
+        let matching = self.matching_overloads();
+        let Some(result) = &self.overload_call_result else {
+            return Either::Left(matching.take(1));
+        };
+        Either::Right(matching.filter(move |(index, _)| match result {
+            OverloadCallResult::ArgumentTypeExpansion(expanded) => {
+                expanded.selected_overloads.contains(index)
+            }
+            OverloadCallResult::Ambiguous => true,
+            OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => false,
+        }))
+    }
+
     /// Returns the deprecated implementation, taking precedence over any deprecated overloads.
     /// Otherwise, returns deprecated overloads selected by this call, using their original source
     /// indexes to preserve their identities after receiver compatibility filtering.
@@ -4434,7 +4474,7 @@ impl<'db> CallableBinding<'db> {
             return Either::Left(std::iter::once(implementation));
         }
 
-        Either::Right(self.matching_overloads().filter_map(move |(_, binding)| {
+        Either::Right(self.selected_overloads().filter_map(move |(_, binding)| {
             overloads
                 .get(binding.source_overload_index())
                 .copied()
@@ -4484,11 +4524,11 @@ impl<'db> CallableBinding<'db> {
     /// For an invalid call to an overloaded function, we return `Type::unknown`, since we cannot
     /// make any useful conclusions about which overload was intended to be called.
     fn return_type(&self) -> Type<'db> {
-        if let Some(overload_call_return_type) = self.overload_call_return_type {
-            return match overload_call_return_type {
-                OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
-                OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_) => Type::unknown(),
-                OverloadCallReturnType::Ambiguous => Type::Dynamic(DynamicType::AmbiguousOverload),
+        if let Some(overload_call_result) = &self.overload_call_result {
+            return match overload_call_result {
+                OverloadCallResult::ArgumentTypeExpansion(expanded) => expanded.return_type,
+                OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => Type::unknown(),
+                OverloadCallResult::Ambiguous => Type::Dynamic(DynamicType::AmbiguousOverload),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
@@ -4624,16 +4664,8 @@ impl<'db> CallableBinding<'db> {
                         .unwrap_or_default()
                 ));
 
-                if let Some(index) =
-                    self.overload_call_return_type
-                        .and_then(
-                            |overload_call_return_type| match overload_call_return_type {
-                                OverloadCallReturnType::ArgumentTypeExpansionLimitReached(
-                                    index,
-                                ) => Some(index),
-                                _ => None,
-                            },
-                        )
+                if let Some(OverloadCallResult::ArgumentTypeExpansionLimitReached(index)) =
+                    &self.overload_call_result
                 {
                     diag.info(format_args!(
                         "Limit of argument type expansion reached at argument {index}"
@@ -4743,11 +4775,22 @@ impl<'db> IntoIterator for CallableBinding<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-enum OverloadCallReturnType<'db> {
-    ArgumentTypeExpansion(Type<'db>),
+/// An overload call whose result requires more than the first matching signature.
+#[derive(Debug, Clone)]
+enum OverloadCallResult<'db> {
+    /// Successful argument expansion, boxed to keep other call bindings small.
+    ArgumentTypeExpansion(Box<ExpandedOverloadCall<'db>>),
+    /// Argument expansion stopped at this argument's expansion limit.
     ArgumentTypeExpansionLimitReached(usize),
+    /// Several overloads remain with non-equivalent return types.
     Ambiguous,
+}
+
+/// The combined return type and selected overloads from successful argument expansion.
+#[derive(Debug, Clone)]
+struct ExpandedOverloadCall<'db> {
+    return_type: Type<'db>,
+    selected_overloads: SmallVec<[usize; 2]>,
 }
 
 #[derive(Debug)]
@@ -6943,8 +6986,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
             (Some(_), Some(_)) => {
                 if !matches!(
-                    callable_binding.overload_call_return_type,
-                    Some(OverloadCallReturnType::ArgumentTypeExpansion(_))
+                    callable_binding.overload_call_result,
+                    Some(OverloadCallResult::ArgumentTypeExpansion(_))
                 ) {
                     extend_errors(&callable_binding.overloads()[0]);
                 }
@@ -8312,7 +8355,7 @@ struct BindingSnapshot<'db> {
 
 #[derive(Clone, Debug)]
 struct CallableBindingSnapshot<'db> {
-    overload_return_type: Option<OverloadCallReturnType<'db>>,
+    overload_result: Option<OverloadCallResult<'db>>,
 
     /// Represents the snapshot of the matched overload bindings.
     ///
@@ -8383,7 +8426,7 @@ impl CallableBindingSnapshotter {
     /// Panics if the indexes of the matched overloads are not valid for the given binding.
     fn take<'db>(&self, binding: &CallableBinding<'db>) -> CallableBindingSnapshot<'db> {
         CallableBindingSnapshot {
-            overload_return_type: binding.overload_call_return_type,
+            overload_result: binding.overload_call_result.clone(),
             matching_overloads: self
                 .0
                 .iter()
@@ -8399,7 +8442,7 @@ impl CallableBindingSnapshotter {
         snapshot: CallableBindingSnapshot<'db>,
     ) {
         debug_assert_eq!(self.0.len(), snapshot.matching_overloads.len());
-        binding.overload_call_return_type = snapshot.overload_return_type;
+        binding.overload_call_result = snapshot.overload_result;
         for (index, snapshot) in snapshot.matching_overloads {
             binding.overloads[index].restore(snapshot);
         }
