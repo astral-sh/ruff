@@ -156,62 +156,20 @@ extend-exclude = [
 preview = true
 select = [
     # E # pycodestyle (error)
-    "blank-lines-before-nested-definition",  # formatting
-    "whitespace-after-decorator",  # formatting
-    "indentation-with-invalid-multiple",  # formatting
     "ambiguous-variable-name",  # pedantic
     "module-import-not-at-top-of-file",  # pedantic
-    "tab-before-operator",  # formatting
-    "multiple-spaces-before-keyword",  # formatting
     "ambiguous-function-name",  # pedantic
-    "unexpected-indentation-comment",  # formatting
-    "multiple-spaces-after-operator",  # formatting
-    "indentation-with-invalid-multiple-comment",  # formatting
-    "missing-whitespace-around-operator",  # formatting
     "unexpected-indentation",  # pedantic
     "none-comparison",  # pedantic
     "ambiguous-class-name",  # pedantic
-    "missing-whitespace-around-parameter-equals",  # formatting
-    "missing-whitespace-after-keyword",  # formatting
-    "too-many-blank-lines",  # formatting
     "lambda-assignment",  # pedantic
-    "useless-semicolon",  # formatting
-    "mixed-spaces-and-tabs",  # formatting
-    "multiple-spaces-after-keyword",  # formatting
-    "missing-whitespace-around-modulo-operator",  # formatting
-    "multiple-statements-on-one-line-colon",  # formatting
-    "tab-after-keyword",  # formatting
-    "blank-lines-top-level",  # formatting
-    "whitespace-before-close-bracket",  # formatting
-    "over-indented",  # formatting
-    "tab-after-comma",  # formatting
     "multiple-leading-hashes-for-block-comment",  # pedantic
-    "blank-line-after-decorator",  # formatting
-    "no-space-after-inline-comment",  # formatting
-    "missing-whitespace-around-bitwise-or-shift-operator",  # formatting
     "not-in-test",  # pedantic
-    "unexpected-spaces-around-keyword-parameter-equals",  # formatting
     "type-comparison",  # pedantic
-    "missing-whitespace",  # formatting
-    "tab-before-keyword",  # formatting
-    "tab-after-operator",  # formatting
-    "redundant-backslash",  # formatting
-    "blank-line-between-methods",  # formatting
     "multiple-imports-on-one-line",  # pedantic
-    "multiple-spaces-after-comma",  # formatting
-    "multiple-statements-on-one-line-semicolon",  # formatting
-    "too-few-spaces-before-inline-comment",  # formatting
-    "blank-lines-after-function-or-class",  # formatting
-    "multiple-spaces-before-operator",  # formatting
-    "whitespace-before-parameters",  # formatting
     "true-false-comparison",  # pedantic
-    "no-indented-block-comment",  # formatting
     "no-indented-block",  # pedantic
-    "no-space-after-block-comment",  # formatting
-    "whitespace-before-punctuation",  # formatting
     "not-is-test",  # pedantic
-    "whitespace-after-open-bracket",  # formatting
-    "missing-whitespace-around-arithmetic-operator",  # formatting
     # F # pyflakes
     "undefined-local-with-import-star",  # restriction
     "forward-annotation-syntax-error",  # pedantic
