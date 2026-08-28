@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use compact_str::CompactString;
+use char_str::CharStr;
 use pep440_rs::Version;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_ranged_value::{RangedValue, ValueSource};
@@ -11,6 +11,7 @@ use thiserror::Error;
 use crate::metadata::python_version::SupportedPythonVersion;
 
 mod dependencies;
+mod string_interner;
 
 pub(crate) use dependencies::DependencyMetadataError;
 
@@ -23,8 +24,8 @@ pub(crate) struct UvMetadata {
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
-    resolution: BTreeMap<CompactString, ResolutionNode>,
-    module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
+    resolution: BTreeMap<CharStr, ResolutionNode>,
+    module_owners: BTreeMap<CharStr, Box<[ModuleOwner]>>,
 }
 
 impl UvMetadata {
@@ -50,7 +51,7 @@ impl UvMetadata {
         metadata: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvMetadataError> {
-        let metadata = serde_json::from_slice::<WorkspaceMetadata>(metadata)
+        let metadata = string_interner::from_slice::<WorkspaceMetadata>(metadata)
             .map_err(UvMetadataError::InvalidMetadata)?;
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
@@ -86,7 +87,8 @@ pub(crate) struct WorkspaceMember {
     pub(crate) name: Box<str>,
     /// Directory containing the member's `pyproject.toml`.
     pub(crate) path: SystemPathBuf,
-    id: CompactString,
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    id: CharStr,
 }
 
 #[derive(Debug, Error)]
@@ -163,10 +165,10 @@ struct WorkspaceMetadata {
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
+    #[serde(default, deserialize_with = "string_interner::deserialize_map")]
+    resolution: BTreeMap<CharStr, ResolutionNode>,
     #[serde(default)]
-    resolution: BTreeMap<CompactString, ResolutionNode>,
-    #[serde(default)]
-    module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
+    module_owners: BTreeMap<CharStr, Box<[ModuleOwner]>>,
 }
 
 #[derive(Deserialize)]
@@ -194,18 +196,21 @@ enum SchemaVersion {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 struct PathNodeReference {
     path: SystemPathBuf,
-    id: CompactString,
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    id: CharStr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 struct ModuleOwner {
-    package_id: CompactString,
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    package_id: CharStr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 struct ResolutionNode {
     kind: NodeKind,
-    name: Option<CompactString>,
+    #[serde(default, deserialize_with = "string_interner::deserialize_optional")]
+    name: Option<CharStr>,
     source: Option<Source>,
     // uv always emits this field, even for leaves. Missing edges are incomplete metadata, not
     // evidence that a project has no direct dependencies.
@@ -220,8 +225,8 @@ struct ResolutionNode {
 #[serde(rename_all = "snake_case")]
 enum NodeKind {
     Package,
-    Extra(CompactString),
-    Group(CompactString),
+    Extra(#[serde(deserialize_with = "string_interner::deserialize")] CharStr),
+    Group(#[serde(deserialize_with = "string_interner::deserialize")] CharStr),
     Workspace,
     Script,
     Build,
@@ -234,7 +239,8 @@ struct Source {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 struct NodeReference {
-    id: CompactString,
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    id: CharStr,
 }
 
 #[cfg(test)]
