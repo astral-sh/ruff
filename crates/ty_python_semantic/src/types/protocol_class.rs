@@ -38,7 +38,7 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
-        signatures::walk_signature,
+        signatures::{CallableSignature, walk_signature},
     },
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
@@ -1325,13 +1325,14 @@ impl<'db> ProtocolMemberType<'db> {
         resolved.with_ty(ty)
     }
 
-    /// Resolves this member type and binds member-local `Self` occurrences to `self_type`.
-    fn bind_self(
+    /// Resolves this member type, binds member-local `Self` occurrences to `self_type`, and
+    /// retains the binding context used for that substitution.
+    fn bind_self_with_context(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         self_type: Type<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Option<(Type<'db>, Option<BindingContext<'db>>)> {
         let Self::Value {
             ty,
             self_binding_context,
@@ -1340,15 +1341,63 @@ impl<'db> ProtocolMemberType<'db> {
             return None;
         };
         if !ty.contains_self(db, env) {
-            return Some(ty);
+            return Some((ty, self_binding_context));
         }
 
-        Some(ty.apply_type_mapping(
-            db,
-            env,
-            &TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, self_binding_context)),
-            TypeContext::default(),
+        Some((
+            ty.apply_type_mapping(
+                db,
+                env,
+                &TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, self_binding_context)),
+                TypeContext::default(),
+            ),
+            self_binding_context,
         ))
+    }
+
+    /// Resolves this member type and binds member-local `Self` occurrences to `self_type`.
+    fn bind_self(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> Option<Type<'db>> {
+        self.bind_self_with_context(db, env, self_type)
+            .map(|(ty, _)| ty)
+    }
+
+    /// Binds `Self` while preserving a callable member's declaration for signature recursion.
+    ///
+    /// A `Callable[...]` annotation produces synthetic signatures without definitions. During a
+    /// protocol relation, the containing member declaration is the stable identity needed to
+    /// recognize the same recursive signature obligation under a new specialization.
+    fn bind_self_for_relation(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let (ty, self_binding_context) = self.bind_self_with_context(db, env, self_type)?;
+        let Some(definition) = self_binding_context.and_then(BindingContext::definition) else {
+            return Some(ty);
+        };
+        let Type::Callable(callable) = ty else {
+            return Some(ty);
+        };
+
+        let mut signatures = Vec::with_capacity(callable.signatures(db).overloads.len());
+        for signature in callable.signatures(db) {
+            signatures.push(
+                signature
+                    .clone()
+                    .with_definition(signature.definition.or(Some(definition))),
+            );
+        }
+        Some(Type::Callable(CallableType::new(
+            db,
+            CallableSignature::from_overloads(signatures),
+            callable.kind(db),
+        )))
     }
 
     fn cycle_normalized(
@@ -3101,7 +3150,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             )
         } else {
             required_ty
-                .bind_self(db, env, protocol_self_binding_ty)
+                .bind_self_for_relation(db, env, protocol_self_binding_ty)
                 .when_some_and(db, self.constraints, |required_ty| {
                     let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()

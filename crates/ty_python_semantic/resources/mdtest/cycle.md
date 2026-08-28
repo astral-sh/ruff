@@ -752,6 +752,27 @@ def assign_declared_nominal(
     return value  # error: [invalid-return-type]
 ```
 
+A method can be checked against a callable protocol attribute. The callable attribute's declaration
+must participate in recursion detection even though its signature is synthesized from an annotation.
+
+```py
+from collections.abc import Callable
+
+class CallableNominalImpl[T]:
+    def child(self) -> CallableNominalImpl[list[T]]:
+        raise NotImplementedError
+
+class CallableNominalProtocol[T](Protocol):
+    child: Callable[[], CallableNominalProtocol[list[T]]]
+
+def assign_callable_nominal(
+    value: CallableNominalImpl[int],
+) -> CallableNominalProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
 Writable descriptor members expose the recursive specialization contravariantly. The comparison
 therefore alternates direction before returning to the same pair of protocol definitions.
 
