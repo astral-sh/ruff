@@ -32,19 +32,16 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
-use crate::types::attribute_write::{
-    AttributeWriteRequirement, ExplicitAttributeWriteRequirement, InstanceAttributeWriteMember,
-    attribute_write_requirement,
-};
 use crate::types::class::ClassLiteral;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization, enclosing_generic_contexts};
-use crate::types::list_members::all_end_of_scope_members;
-use crate::types::protocol_class::property_set_type;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::list_members::{all_end_of_scope_bindings, all_end_of_scope_members};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, StaticClassLiteral, SubclassOfInner,
-    Type, TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, MemberLookupPolicy,
+    PropertyInstanceType, StaticClassLiteral, SubclassOfInner, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment, attribute_scopes, semantic_index};
 
@@ -681,8 +678,17 @@ impl<'db> SpecializationFlowVisitor<'db> {
         let instance = Type::instance(db, &self.env, origin.identity_specialization(db));
         let body_scope = origin.body_scope(db);
         for memberdef in all_end_of_scope_members(db, body_scope) {
-            let name = memberdef.member.name.as_str();
-            self.visit_nominal_member_types(db, instance, name);
+            self.visit_nominal_member(db, memberdef.member.name.as_str(), memberdef.member.ty);
+        }
+        // Only bindings can install a runtime descriptor. Declarations still contribute their raw
+        // instance types above, without requiring descriptor lookup for every class annotation.
+        for memberdef in all_end_of_scope_bindings(db, body_scope) {
+            self.visit_nominal_descriptor_member_types(
+                db,
+                instance,
+                memberdef.member.name.as_str(),
+                memberdef.member.ty,
+            );
         }
 
         // Instance attributes implicitly defined by `self.x = ...` assignments in methods.
@@ -701,37 +707,97 @@ impl<'db> SpecializationFlowVisitor<'db> {
         }
     }
 
-    fn visit_nominal_member_types(&self, db: &'db dyn Db, instance: Type<'db>, name: &str) {
-        if let Some(ty) = instance
-            .member(db, &self.env, name)
-            .place
-            .ignore_possibly_undefined()
-        {
-            self.visit_nominal_member(db, name, ty);
+    fn visit_nominal_descriptor_member_types(
+        &self,
+        db: &'db dyn Db,
+        instance: Type<'db>,
+        name: &str,
+        member_ty: Type<'db>,
+    ) {
+        if let Some(property) = member_ty.as_property_instance() {
+            self.visit_nominal_property_types(db, property, instance);
+            return;
         }
 
-        let AttributeWriteRequirement::Instance {
-            member:
-                InstanceAttributeWriteMember::Explicit {
-                    member:
-                        ExplicitAttributeWriteRequirement::Descriptor {
-                            descriptor_ty,
-                            setter_ty,
-                            ..
-                        },
-                    ..
-                },
-            ..
-        } = attribute_write_requirement(db, &self.env, instance, name)
+        if matches!(
+            member_ty,
+            Type::FunctionLiteral(_)
+                | Type::BoundMethod(_)
+                | Type::KnownBoundMethod(_)
+                | Type::SlotDescriptor(_)
+        ) {
+            return;
+        }
+
+        let owner = instance.to_meta_type(db, &self.env);
+        if let Some(get_result) = member_ty
+            .try_call_dunder_get(db, &self.env, Some(instance), owner)
+            .unwrap_or_else(|error| Some(error.fallback()))
+        {
+            self.visit_nominal_member(db, name, get_result.return_type);
+        }
+
+        let Some(setter_ty) = member_ty
+            .class_member_with_policy(
+                db,
+                &self.env,
+                "__set__",
+                MemberLookupPolicy::REQUIRE_CONCRETE,
+            )
+            .place
+            .ignore_possibly_undefined()
         else {
             return;
         };
-        if let Some(property) = descriptor_ty.as_property_instance()
-            && let Some(set_type) = property_set_type(db, &self.env, property, instance)
+        self.visit_callable_parameter_types(db, setter_ty, 2, member_ty);
+    }
+
+    fn visit_nominal_property_types(
+        &self,
+        db: &'db dyn Db,
+        property: PropertyInstanceType<'db>,
+        instance: Type<'db>,
+    ) {
+        if let Some(getter) = property.getter(db)
+            && let Some(callables) = getter.try_upcast_to_callable(db, &self.env)
         {
-            self.visit_type(db, set_type);
-        } else {
-            self.visit_callable_parameter_types(db, setter_ty, 2, descriptor_ty);
+            for callable in &callables {
+                for signature in callable.signatures(db) {
+                    self.visit_nominal_property_accessor_type(db, signature.return_ty, instance);
+                }
+            }
+        }
+
+        if let Some(setter) = property.setter(db)
+            && let Some(callables) = setter.try_upcast_to_callable(db, &self.env)
+        {
+            for callable in &callables {
+                for signature in callable.signatures(db) {
+                    let Some(parameter) = signature.parameters().get_positional(1) else {
+                        continue;
+                    };
+                    self.visit_nominal_property_accessor_type(
+                        db,
+                        parameter.annotated_type(),
+                        instance,
+                    );
+                }
+            }
+        }
+    }
+
+    fn visit_nominal_property_accessor_type(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        instance: Type<'db>,
+    ) {
+        // An accessor type can only contribute specialization flow if it contains a type
+        // variable. The raw property traversal above already covers the descriptor itself.
+        if any_over_type(db, &self.env, ty, false, |ty| {
+            matches!(ty, Type::TypeVar(_))
+        }) {
+            self.visit_type(db, ty.bind_self_typevars(db, &self.env, instance));
         }
     }
 

@@ -790,6 +790,26 @@ def assign_nominal_write(
     return value  # error: [invalid-return-type]
 ```
 
+The getter of a `property` exposes its return type as the readable member type. Checking a recursive
+nominal property against a protocol member must terminate.
+
+```py
+class NominalReadPropertyImpl[T]:
+    @property
+    def child(self) -> NominalReadPropertyImpl[list[T]]:
+        raise NotImplementedError
+
+class NominalReadPropertyProtocol[T](Protocol):
+    child: NominalReadPropertyProtocol[list[T]]
+
+def assign_nominal_read_property(
+    value: NominalReadPropertyImpl[int],
+) -> NominalReadPropertyProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
 The setter of a `property` exposes its value parameter as the writable member type. Checking a
 recursive nominal property against a protocol property must terminate.
 
