@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::typing::{is_dict, is_list};
+use ruff_python_semantic::analyze::typing::is_list;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -10,8 +10,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::rules::refurb::helpers::generate_method_call;
 
 /// ## What it does
-/// Checks for `del` statements that delete the entire slice of a list or
-/// dictionary.
+/// Checks for `del` statements that delete the entire slice of a list.
 ///
 /// ## Why is this bad?
 /// It is faster and more succinct to remove all items via the `clear()`
@@ -19,30 +18,26 @@ use crate::rules::refurb::helpers::generate_method_call;
 ///
 /// ## Known problems
 /// This rule is prone to false negatives due to type inference limitations,
-/// as it will only detect lists and dictionaries that are instantiated as
-/// literals or annotated with a type annotation.
+/// as it will only detect lists that are instantiated as literals or annotated
+/// with a type annotation.
 ///
 /// ## Example
 /// ```python
-/// names = {"key": "value"}
 /// nums = [1, 2, 3]
 ///
-/// del names[:]
 /// del nums[:]
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// names = {"key": "value"}
 /// nums = [1, 2, 3]
 ///
-/// names.clear()
 /// nums.clear()
 /// ```
 ///
 /// ## References
-/// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html?highlight=list#mutable-sequence-types)
-/// - [Python documentation: `dict.clear()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#dict.clear)
+/// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#typesseq-mutable)
+/// - [Python documentation: `list.clear()`](https://docs.python.org/3/library/stdtypes.html#sequence.clear)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.0.287")]
 pub(crate) struct DeleteFullSlice;
@@ -81,7 +76,7 @@ pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
     }
 }
 
-/// Match `del expr[:]` where `expr` is a list or a dict.
+/// Match `del expr[:]` where `expr` is a list.
 fn match_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a ast::ExprName> {
     // Check that it is `del expr[...]`.
     let subscript = expr.as_subscript_expr()?;
@@ -100,10 +95,10 @@ fn match_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a 
         return None;
     }
 
-    // It should only apply to variables that are known to be lists or dicts.
+    // It should only apply to variables that are known to be lists.
     let name = subscript.value.as_name_expr()?;
     let binding = semantic.binding(semantic.only_binding(name)?);
-    if !(is_dict(binding, semantic) || is_list(binding, semantic)) {
+    if !is_list(binding, semantic) {
         return None;
     }
 

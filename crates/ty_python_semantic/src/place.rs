@@ -1,3 +1,5 @@
+pub(crate) mod definitions;
+
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_index::IndexSlice;
@@ -307,7 +309,7 @@ impl<'db> Place<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
+    fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
             Place::Defined(defined) => Place::Defined(DefinedPlace {
                 ty: f(defined.ty),
@@ -2532,6 +2534,8 @@ pub(crate) enum ConsideredDefinitions {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
     use crate::db::tests::{TestDb, setup_db};
 
@@ -2640,14 +2644,14 @@ mod tests {
 
     #[track_caller]
     fn assert_bound_string_symbol<'db>(db: &'db TestDb, symbol: Place<'db>) {
-        assert!(matches!(
+        assert_matches!(
             symbol,
             Place::Defined(DefinedPlace {
                 ty: Type::NominalInstance(_),
                 definedness: Definedness::AlwaysDefined,
                 ..
             })
-        ));
+        );
         assert_eq!(
             symbol.expect_type(),
             KnownClass::Str.to_instance(db, &db.program_environment())

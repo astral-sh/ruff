@@ -273,6 +273,128 @@ def _[T]() -> None:
     static_assert(negated_type != negated_constraint)
 ```
 
+## Constraints from materialized types
+
+### Invariant classes
+
+Assignability between fully static specializations of an invariant class determines the type
+variable exactly.
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+class Invariant[T]:
+    value: T
+
+def inspect_exact[T]() -> None:
+    exact = is_constraint_set_assignable_to(Top[Invariant[str]], Top[Invariant[T]])
+    reveal_type(exact.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=str]]
+```
+
+The top materialization of `Invariant[Any]` covers every static specialization represented by `Any`.
+No single fully static specialization of `T` can cover that range. The reverse
+bottom-materialization comparison is impossible for the same reason. Constraint inference preserves
+both ends of those ranges, so neither comparison has a solution.
+
+```py
+def inspect_gradual[T]() -> None:
+    top = is_constraint_set_assignable_to(Top[Invariant[Any]], Top[Invariant[T]])
+    reveal_type(top.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+    bottom = is_constraint_set_assignable_to(Bottom[Invariant[T]], Bottom[Invariant[Any]])
+    reveal_type(bottom.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
+### Recursive consuming methods
+
+A recursive consuming method imposes the opposite constraint from a covariant property. Seeing the
+type variable in the property's constraints is not enough to omit that method: both bounds are
+needed to establish the invariant specialization. The `Any` marker keeps the protocol gradual even
+when its type argument is fully static.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+class RecursiveInvariant[T](Protocol):
+    marker: Any
+
+    @property
+    def value(self) -> T: ...
+    def consume(self, other: RecursiveInvariant[T]) -> None: ...
+
+def inspect[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Top[RecursiveInvariant[str]], Top[RecursiveInvariant[T]])
+    static_assert(constraints == ConstraintSet.equality(T, str))
+```
+
+A top-materialized `Any` also contributes both bounds. Its recursive consuming requirement makes the
+relation impossible for every fully static specialization of `T`.
+
+```py
+def inspect_gradual[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Top[RecursiveInvariant[Any]], Top[RecursiveInvariant[T]])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
+### Constraints introduced by recursive properties
+
+A recursive property can introduce constraints that the outer properties do not impose. Here, the
+outer `value` properties both return `str | int`, but the children return `bytes | int` and
+`T | int`. The child therefore contributes the lower bound `bytes <: T`. Its specialization stays
+unchanged on subsequent recursive steps.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+class Recursive[A, B](Protocol):
+    @property
+    def value(self) -> A | int: ...
+    @property
+    def child(self) -> Recursive[B, B]: ...
+
+def materialized_source[T]() -> None:
+    top = is_constraint_set_assignable_to(Top[Recursive[str | int, bytes]], Recursive[str, T])
+    static_assert(top == ConstraintSet.lower_bound(bytes, T))
+    reveal_type(top.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=bytes]]
+
+    bottom = is_constraint_set_assignable_to(Bottom[Recursive[str | int, bytes]], Recursive[str, T])
+    static_assert(bottom == ConstraintSet.lower_bound(bytes, T))
+```
+
+Materializing the target instead preserves the same bound. These specializations contain no gradual
+types, so neither materialization changes their requirements.
+
+```py
+def materialized_target[T]() -> None:
+    top = is_constraint_set_assignable_to(Recursive[str | int, bytes], Top[Recursive[str, T]])
+    static_assert(top == ConstraintSet.lower_bound(bytes, T))
+
+    bottom = is_constraint_set_assignable_to(Recursive[str | int, bytes], Bottom[Recursive[str, T]])
+    static_assert(bottom == ConstraintSet.lower_bound(bytes, T))
+```
+
+The bound also survives opposite materializations. Combining it with an incompatible upper bound has
+no solution; the recursive comparison does not merely succeed without constraining `T`.
+
+```py
+def incompatible_bound[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Top[Recursive[str | int, bytes]], Bottom[Recursive[str, T]])
+    static_assert(constraints == ConstraintSet.lower_bound(bytes, T))
+
+    incompatible = constraints & ConstraintSet.upper_bound(T, str)
+    reveal_type(incompatible.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
 ## Intersection
 
 The intersection of two constraint sets requires that the constraints in both sets hold. In many
@@ -368,6 +490,56 @@ def lower_bounds[T]():
     # (Base ≤ T@upper_bounds) ∧ (Other ≤ T@upper_bounds)
     intersection_constraint = ConstraintSet.lower_bound(Base, T) & ConstraintSet.lower_bound(Other, T)
     static_assert(union_type == intersection_constraint)
+```
+
+### Intersection of two equality constraints
+
+A type variable cannot be exactly equal to two non-equivalent fully static types. This is stronger
+than checking whether the types are disjoint: two classes can have a common subclass, which makes
+their upper-bound constraints compatible, but that subclass is not exactly equal to either class.
+
+Gradual bounds cannot prove this incompatibility. Sequent maps derive facts via transitivity, but
+gradual assignability is not transitive. That means equality constraints containing dynamic types
+remain conservatively satisfiable. Type variables nested inside a bound are treated as opaque
+symbolic atoms; their declared bounds do not make an otherwise static proof gradual.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class Left: ...
+class Right: ...
+class Both(Left, Right): ...
+
+def _[T, U: Any, V]() -> None:
+    left = ConstraintSet.equality(T, Left)
+    right = ConstraintSet.equality(T, Right)
+    static_assert(~(left & right))
+
+    equivalent = left & left
+    static_assert(equivalent == left)
+
+    upper_bounds = ConstraintSet.upper_bound(T, Left) & ConstraintSet.upper_bound(T, Right)
+    static_assert(not ~upper_bounds)
+
+    both = ConstraintSet.equality(T, Both)
+    static_assert(both & upper_bounds == both)
+
+    symbolic_static_mismatch = ConstraintSet.equality(T, tuple[U, int]) & ConstraintSet.equality(T, tuple[U, str])
+    static_assert(~symbolic_static_mismatch)
+
+    gradual_mismatch = ConstraintSet.equality(T, list[Any]) & ConstraintSet.equality(T, list[int])
+    static_assert(not ~gradual_mismatch)
+
+    any_mismatch = ConstraintSet.equality(T, Any) & ConstraintSet.equality(T, int)
+    static_assert(not ~any_mismatch)
+
+    symbolic_gradual_mismatch = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
+    static_assert(not ~symbolic_gradual_mismatch)
+
+    symbolic_match = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(T, list[V])
+    static_assert(not ~symbolic_match)
 ```
 
 ### Intersection of a range and a negated range

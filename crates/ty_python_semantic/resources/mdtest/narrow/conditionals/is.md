@@ -526,21 +526,46 @@ def excluded_runtime_class(not_int: Not[int], other: UserId) -> None:
 
 ## `is` with string types
 
-Identity comparisons preserve existing `LiteralString` narrowing and do not make negated string
-literal comparisons unreachable.
+Identity transfers known literal-string origin when the other operand already proves it.
 
 ```py
 from typing import Literal
 from typing_extensions import LiteralString
-from ty_extensions import Not
+from ty_extensions import Intersection, Not
 
 def literal_string(value: object, text: LiteralString) -> None:
     if value is text:
         reveal_type(value)  # revealed: LiteralString
+```
 
+The same string object (same memory address) can be referenced by multiple different expressions
+(due to aliasing or interning). Some of those expressions may be validly typed as having literal
+origin and others may not. Checking string identity does not assume this is impossible:
+
+```py
 def negated_string_literal(value: Not[Literal["hello"]]) -> None:
     if value is "hello":
         reveal_type(value)  # revealed: ~Literal["hello"]
+
+def negated_literal_string(value: Intersection[str, Not[LiteralString]]) -> None:
+    reveal_type(value is "hello")  # revealed: bool
+
+    if value is "hello":
+        reveal_type(value)  # revealed: str & ~LiteralString
+
+    if "hello" is value:
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+When literal origin is already known, excluding a literal string also excludes that runtime value.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    reveal_type(value is "hello")  # revealed: Literal[False]
+    reveal_type("hello" is value)  # revealed: Literal[False]
+
+    if value is "hello":
+        reveal_type(value)  # revealed: Never
 ```
 
 ## `is` with `NewType`s

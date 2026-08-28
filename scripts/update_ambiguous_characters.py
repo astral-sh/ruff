@@ -1,3 +1,21 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# ///
+
 """Generate the confusables.rs file from the VS Code ambiguous.json file."""
 
 from __future__ import annotations
@@ -22,7 +40,7 @@ pub(crate) fn confusable(c: u32) -> Option<char> {
 postlude = """_ => return None, }; Some(result)}"""
 
 
-def get_mapping_data() -> dict:
+def get_mapping_data() -> dict[str, list[int]]:
     """
     Get the ambiguous character mapping data from the vscode-unicode-data repository.
 
@@ -34,7 +52,8 @@ def get_mapping_data() -> dict:
         encoding="utf-8",
     )
     # The content is a JSON object literal wrapped in a JSON string, so double decode:
-    return json.loads(json.loads(content))
+    mapping_data: dict[str, list[int]] = json.loads(json.loads(content))
+    return mapping_data
 
 
 def format_number(number: int) -> str:

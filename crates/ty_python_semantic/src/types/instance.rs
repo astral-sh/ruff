@@ -3,12 +3,10 @@
 use crate::ProgramEnvironment;
 use std::borrow::Cow;
 use std::cell::Cell;
+use std::debug_assert_matches;
 use std::marker::PhantomData;
 
-use ruff_python_ast::name::Name;
-use ty_module_resolver::{ModuleName, file_to_module};
-
-use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView};
+use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
     MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
@@ -17,6 +15,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
 };
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::walk_specialization;
 use crate::types::protocol_class::{
@@ -30,7 +29,10 @@ use crate::types::relation::{
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::TypeVarSet;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, materialization_is_noop,
+    walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -99,11 +101,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
-        let Some(tuple) = tuple else {
-            return Type::Never;
-        };
-        Type::tuple_instance(tuple)
+    pub(crate) fn tuple(tuple: TupleType<'db>) -> Self {
+        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
     pub fn homogeneous_tuple(
@@ -111,7 +110,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         element: Type<'db>,
     ) -> Self {
-        Type::tuple_instance(TupleType::homogeneous(db, env, element))
+        Type::tuple(TupleType::homogeneous(db, env, element))
     }
 
     pub(crate) fn heterogeneous_tuple<I, T>(
@@ -131,12 +130,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn empty_tuple(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
-        Type::tuple_instance(TupleType::empty(db, env))
-    }
-
-    /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
-    fn tuple_instance(tuple: TupleType<'db>) -> Self {
-        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
+        Type::tuple(TupleType::empty(db, env))
     }
 
     pub(crate) const fn sys_version_info() -> Self {
@@ -234,36 +228,6 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => class.inherits_from_explicit_any(),
             _ => false,
         }
-    }
-
-    /// Returns the name of the class this is an instance of.
-    ///
-    /// For example, for an instance of `builtins.str`, this returns `"str"`.
-    ///
-    /// As of 2026-02-16, this method is not used in any crates in the Ruff
-    /// repo, but is exposed as a public API for external users of
-    /// `ty_python_semantic`.
-    pub fn class_name(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> &'db Name {
-        self.class(db, env).name(db)
-    }
-
-    /// Returns the fully qualified module name of the module in which the class
-    /// is defined, if it can be resolved.
-    ///
-    /// For example, for an instance of `pathlib.Path`, this returns
-    /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
-    /// to a known module (e.g. for classes defined in scripts or notebooks).
-    ///
-    /// As of 2026-02-16, this method is not used in any crates in the Ruff
-    /// repo, but is exposed as a public API for external users of
-    /// `ty_python_semantic`.
-    pub fn class_module_name(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<&'db ModuleName> {
-        let class = self.class(db, env).class_literal(db);
-        file_to_module(db, class.program_file(db).resolver_file(db)).map(|module| module.name(db))
     }
 
     pub(super) fn class(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ClassType<'db> {
@@ -653,6 +617,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 source_protocol.interface(db),
                 protocol.interface(db),
             )
+        } else if let Some(structurally_satisfied) =
+            self.try_check_nominal_recursive_protocol_members(db, ty, protocol, result)
+        {
+            structurally_satisfied
         } else {
             protocol
                 .interface(db)
@@ -670,6 +638,131 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
         result.or(db, self.constraints, || structurally_satisfied)
+    }
+
+    /// Try a nominal proof when a materialized recursive protocol changes specialization.
+    ///
+    /// A recursive child can stabilize at a specialization that relates nominally even when its
+    /// parent only relates structurally. Keep the child's constraints without retrying the
+    /// structural comparison that reached the recursion guard.
+    pub(super) fn try_check_nominal_protocol_cycle(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let source = source.as_protocol_instance()?;
+        let target = target.as_protocol_instance()?;
+        if source.materialization_kind(db).is_none() && target.materialization_kind(db).is_none() {
+            return None;
+        }
+        let source_origin = source.class_origin(db)?;
+        let target_origin = target.class_origin(db)?;
+        if source_origin.class_literal(db) != target_origin.class_literal(db) {
+            return None;
+        }
+
+        // Nominal arguments alone do not describe materialized requirements such as a fixed
+        // `Any` member. Only use the nominal proof when the pending wrappers are harmless.
+        for protocol in [source, target] {
+            if let Some(origin) = protocol.materialized_origin(db)
+                && !materialization_is_noop(
+                    db,
+                    self.env,
+                    Type::ProtocolInstance(ProtocolInstanceType::from_class(origin)),
+                )
+            {
+                return None;
+            }
+        }
+
+        Some(self.check_type_pair(
+            db,
+            Type::NominalInstance(source.nominal_origin_instance(db)?),
+            Type::NominalInstance(target.nominal_origin_instance(db)?),
+        ))
+    }
+
+    /// Avoid recursive requirements that cannot add solutions beyond explicit inheritance.
+    fn try_check_nominal_recursive_protocol_members(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        protocol: ProtocolInstanceType<'db>,
+        nominally_satisfied: ConstraintSet<'db, 'c>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        if self.typevar_evaluation != TypeVarEvaluation::Lazy
+            || self.is_context_collection_enabled()
+            || nominally_satisfied.is_trivially_never_satisfied()
+        {
+            return None;
+        }
+
+        let env = self.env;
+        let source = ty.as_nominal_instance()?;
+        let source_class = source.class(db, env);
+        let source_alias = source_class.into_generic_alias()?;
+
+        let source_arguments = source_alias.specialization(db).types(db);
+        if !source_arguments.iter().all(|argument| match argument {
+            Type::TypeVar(typevar) => nominally_satisfied.mentions_typevar(*typevar),
+            argument => !any_over_type_expanding_aliases(db, env, *argument, Type::is_type_var),
+        }) {
+            return None;
+        }
+
+        let interface = protocol.interface(db);
+
+        // A concrete source normally contributes useful structural inference beyond its nominal
+        // specialization; for example, `()` infers `Iterable[Never]`. Recursive receiver
+        // binding is the exception: same-origin protocol sources and protocols with explicitly
+        // constrained receivers can otherwise repeatedly expand the same interface.
+        if !source_arguments
+            .iter()
+            .any(|argument| argument.is_type_var())
+            && !protocol.class_origin(db).is_some_and(|target_origin| {
+                source_class.class_literal(db) == target_origin.class_literal(db)
+            })
+            && !interface
+                .members(db)
+                .any(|member| member.has_explicit_receiver_annotation(db))
+        {
+            return None;
+        }
+
+        let mut members: Vec<_> = interface
+            .members(db)
+            .map(|member| (member.structural_member_priority(db, env), member))
+            .collect();
+        members.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+        let first_recursive = members.partition_point(|(priority, _)| {
+            !matches!(priority, StructuralMemberPriority::Recursive)
+        });
+        let (finite_members, recursive_members) = members.split_at(first_recursive);
+        if recursive_members.is_empty() {
+            return None;
+        }
+
+        let mut structurally_satisfied =
+            finite_members
+                .iter()
+                .when_all(db, self.constraints, |(_, member)| {
+                    self.type_satisfies_protocol_member(db, ty, member)
+                });
+        for (_, member) in recursive_members {
+            if structurally_satisfied
+                .implies(db, self.constraints, || nominally_satisfied)
+                .is_always_satisfied(db, env)
+            {
+                break;
+            }
+            structurally_satisfied = structurally_satisfied.and(db, self.constraints, || {
+                self.type_satisfies_protocol_member(db, ty, member)
+            });
+        }
+
+        Some(structurally_satisfied)
     }
 
     /// Tries to relate the finite members of two specializations of the same protocol.
@@ -704,6 +797,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source_alias.origin(db) != target_alias.origin(db) {
             return None;
         }
+
+        // A materialized recursive member can impose bounds that finite members do not
+        // capture, even when the nominal relation is impossible. Check the full interface.
+        if source_protocol.materialization_kind(db).is_some()
+            || protocol.materialization_kind(db).is_some()
+        {
+            return None;
+        }
+
         let identity_protocol = target_alias
             .origin(db)
             .identity_specialization(db)
@@ -711,8 +813,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_interface = source_protocol.interface(db);
         let target_interface = protocol.interface(db);
-        let source_non_recursive =
-            non_recursive_protocol_interface(db, source_interface.base(), identity_protocol, ty);
         let target_non_recursive = non_recursive_protocol_interface(
             db,
             target_interface.base(),
@@ -720,19 +820,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             Type::ProtocolInstance(protocol),
         );
 
-        if source_non_recursive == source_interface.base()
-            && target_non_recursive == target_interface.base()
-        {
+        if target_non_recursive == target_interface.base() {
             return None;
         }
 
+        // Filter requirements, not evidence: a target-finite member can contain the same protocol
+        // in the source specialization and must remain available for comparison.
         Some(self.check_protocol_interface_pair(
             db,
             ty,
-            ProtocolInterfaceView::new(
-                source_non_recursive,
-                source_interface.materialization_kind(),
-            ),
+            source_interface,
             ProtocolInterfaceView::new(
                 target_non_recursive,
                 target_interface.materialization_kind(),
@@ -756,10 +853,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        debug_assert!(matches!(
+        debug_assert_matches!(
             meta_ty,
             Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_)
-        ));
+        );
 
         let constructed_ty = meta_ty.bindings(db, env).return_type(db, env);
         self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
@@ -810,6 +907,7 @@ fn non_recursive_protocol_interface<'db>(
         origin: ClassLiteral<'db>,
         found: Cell<bool>,
         recursion_guard: TypeCollector<'db>,
+        active_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
     }
 
     impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'_, 'db> {
@@ -822,7 +920,11 @@ fn non_recursive_protocol_interface<'db>(
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-            self.visit_type(db, type_alias.value_type(db));
+            self.active_aliases.visit(
+                &Type::TypeAlias(type_alias).to_type_identity(db),
+                || self.found.set(true),
+                || self.visit_type(db, type_alias.value_type(db)),
+            );
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -852,6 +954,7 @@ fn non_recursive_protocol_interface<'db>(
             origin: protocol.class_literal(db),
             found: Cell::new(false),
             recursion_guard: TypeCollector::default(),
+            active_aliases: ActiveRecursionDetector::default(),
         };
         walk_protocol_instance_member(db, member, receiver_ty, &visitor);
         !visitor.found.get()
@@ -1074,6 +1177,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     } else {
         match protocol.inner {
             Protocol::FromClass(_) | Protocol::Materialized(_) => {
+                visitor.notify_skipped_lazy_type_attributes();
                 if let Some((_, Some(specialization))) = protocol
                     .class_origin(db)
                     .and_then(|class| class.static_class_literal(db))

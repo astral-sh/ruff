@@ -633,6 +633,9 @@ class Misc:
     master: Misc | None
     tk: _tkinter.TkappType
     children: dict[str, Widget]
+    if sys.version_info >= (3, 15):
+        __iter__: ClassVar[None]  # prevent using __getitem__ for iteration
+
     def destroy(self) -> None:
         """Internal function.
 
@@ -6383,6 +6386,9 @@ class Image(_Image):
 
     name: Incomplete
     tk: _tkinter.TkappType
+    if sys.version_info >= (3, 15):
+        __iter__: ClassVar[None]  # prevent using __getitem__ for iteration
+
     def __init__(self, imgtype, name=None, cnf={}, master: Misc | _tkinter.TkappType | None = None, **kw) -> None: ...
     def __del__(self) -> None: ...
     def __setitem__(self, key, value) -> None: ...

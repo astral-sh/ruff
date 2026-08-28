@@ -7,6 +7,7 @@
 use std::{path::Path, process::Command};
 
 use insta_cmd::assert_cmd_snapshot;
+use ty_static::EnvVars;
 
 use crate::CliTest;
 
@@ -73,6 +74,10 @@ fn command_with_uv(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result
         .env("UV_PYTHON_DOWNLOADS", "never")
         .env("TY_OUTPUT_FORMAT", "concise")
         .env("PATH", std::env::var_os("PATH").unwrap_or_default());
+    #[cfg(windows)]
+    if let Some(path_ext) = std::env::var_os("PATHEXT") {
+        command.env("PATHEXT", path_ext);
+    }
     if let Some(virtual_env) = virtual_env {
         command.env("VIRTUAL_ENV", virtual_env);
     }
@@ -333,12 +338,58 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Failures to invoke uv are visible by default instead of silently disabling integration.
+/// Script-only uv integration must not invoke uv to discover the enclosing workspace.
+#[test]
+fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value: int = 'unselected-workspace-root'")?;
+    case.write_file(
+        "packages/member/member.py",
+        "import shared\nvalue: int = 'selected-member'",
+    )?;
+
+    let mut command = case.command();
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env(EnvVars::TY_UV, "scripts")
+        .env(EnvVars::UV, "missing-uv-executable");
+
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `shared`
+     --> member.py:1:8
+      |
+    1 | import shared
+      |        ^^^^^^
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/packages/member (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+
+    error[invalid-assignment]: Object of type `Literal["selected-member"]` is not assignable to `int`
+     --> member.py:2:14
+      |
+    2 | value: int = 'selected-member'
+      |        ---   ^^^^^^^^^^^^^^^^^ Incompatible value of type `Literal["selected-member"]`
+      |        |
+      |        Declared type
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+/// Failures to locate uv are visible by default instead of silently disabling integration.
 #[test]
 fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     let case = workspace_case()?.with_filter(
-        "program not found",
-        "No such file or directory (os error 2)",
+        "no path to search and provided name is not an absolute path",
+        "cannot find binary path",
     );
     case.write_file("packages/member/member.py", "value: int = 1")?;
 
@@ -347,7 +398,8 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
         .current_dir(case.root().join("packages/member"))
         .arg(".")
         .env("TY_UV", "1")
-        .env("UV", "missing-uv-executable")
+        .env_remove("UV")
+        .env("PATH", "")
         .env("TY_OUTPUT_FORMAT", "concise");
 
     assert_cmd_snapshot!(command, @"
@@ -357,7 +409,7 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
-    WARN Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
+    WARN Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
     ");
 
     Ok(())
@@ -414,7 +466,7 @@ fn reports_uv_workspace_python_version_source() -> anyhow::Result<()> {
         assert!(!output.status.success());
         assert!(!stdout.contains("specified on the command line"));
         if output_format == "full" {
-            assert!(stdout.contains("provided by uv workspace metadata"));
+            assert!(stdout.contains("provided by uv metadata"));
         }
     }
 

@@ -1,0 +1,48 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: diagnostics
+---
+[
+  [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 13
+        },
+        "end": {
+          "line": 0,
+          "character": 14
+        }
+      },
+      "severity": 1,
+      "code": "invalid-assignment",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#invalid-assignment"
+      },
+      "source": "ty",
+      "message": "Object of type `Literal[1]` is not assignable to `str`"
+    }
+  ],
+  [
+    {
+      "range": {
+        "start": {
+          "line": 1,
+          "character": 4
+        },
+        "end": {
+          "line": 1,
+          "character": 10
+        }
+      },
+      "severity": 4,
+      "source": "ty",
+      "message": "`unused` is unused",
+      "tags": [
+        1
+      ]
+    }
+  ],
+  []
+]

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-assertion_line: 256
 ---
 PLC2701 Private name import `_a`
  --> __main__.py:2:6
@@ -84,3 +83,35 @@ PLC2701 Private name import `_bar` from external module `foo`
 51 |
 52 | from foo.    _bar import baz
    |              ^^^^
+53 |
+54 | # PLC2701 exceptions: `os._exit` is considered public despite leading underscore.
+   |
+
+PLC2701 Private name import `_exit` from external module `another_module`
+  --> __main__.py:57:28
+   |
+55 | from os import _exit
+56 | from os import _exit as process_exit
+57 | from another_module import _exit as another_exit
+   |                            ^^^^^
+58 | from os import _private_member
+59 | from os import _exit as os_exit, _other_private_member
+   |
+
+PLC2701 Private name import `_private_member` from external module `os`
+  --> __main__.py:58:16
+   |
+56 | from os import _exit as process_exit
+57 | from another_module import _exit as another_exit
+58 | from os import _private_member
+   |                ^^^^^^^^^^^^^^^
+59 | from os import _exit as os_exit, _other_private_member
+   |
+
+PLC2701 Private name import `_other_private_member` from external module `os`
+  --> __main__.py:59:34
+   |
+57 | from another_module import _exit as another_exit
+58 | from os import _private_member
+59 | from os import _exit as os_exit, _other_private_member
+   |                                  ^^^^^^^^^^^^^^^^^^^^^

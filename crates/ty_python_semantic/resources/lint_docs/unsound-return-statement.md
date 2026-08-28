@@ -60,8 +60,8 @@ def returns_list_of_any() -> list[Any]:
     return returns_any()
 ```
 
-This rule works especially well when combined with ty's
-`missing-type-argument` rule, and the Ruff rules [`ANN201`][ann201],
+This rule works especially well when combined with ty's `missing-type-argument` and
+`unsound-assignment` rules, as well as the Ruff rules [`ANN201`][ann201],
 [`ANN202`][ann202], [`ANN204`][ann204], [`ANN205`][ann205], and [`ANN206`][ann206]. Enabling all
 these rules at once effectively makes it much less likely that a `return` statement can lead to
 unsoundness "leaking" out of a function unless that function has been *explicitly* annotated with
@@ -109,6 +109,11 @@ def returns_int() -> int:
 This rule is disabled by default. It is intended for advanced users wanting additional soundness
 checks from their type checker, not for users who have just started to use type checkers on their
 Python code.
+
+## See also
+
+- `unsound-yield` is a similar rule that triggers on unsound `yield` expressions rather than unsound `return` statements
+- `unsound-assignment` is a similar rule that triggers on unsound assignments
 
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
 [ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/

@@ -1,3 +1,21 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# ///
+
 """Script to generate `crates/ruff_python_stdlib/src/sys/builtin_modules.rs`.
 
 This script requires `uvx` to be available on PATH.

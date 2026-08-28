@@ -5,6 +5,7 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::OptionDiagnostic;
 use crate::parallel::ParallelIteratorExt;
+use crate::script::Script;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
 pub use db::testing::TestDb;
@@ -22,6 +23,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
+pub use script::{ScriptEnvironmentAvailability, ScriptEnvironments};
 use std::backtrace::BacktraceStatus;
 use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
@@ -31,12 +33,15 @@ use ty_python_core::ProgramFile;
 use ty_python_core::program::{Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
+pub use uv::UseUv;
 
 mod db;
 mod files;
 pub mod glob;
 pub mod metadata;
 pub mod parallel;
+mod script;
+mod uv;
 mod walk;
 pub mod watch;
 
@@ -135,6 +140,13 @@ pub trait ProgressReporter: Send + Sync {
     /// Initialize the reporter with the number of files.
     fn set_files(&mut self, files: usize);
 
+    /// Creates an owned progress guard for synchronizing `file`'s standalone-script environment.
+    ///
+    /// Returns `None` when synchronization progress should not be displayed.
+    fn for_script(&self, _db: &dyn Db, _file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+        None
+    }
+
     /// Report the completion of checking a given file along with its diagnostics.
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]);
 
@@ -143,6 +155,14 @@ pub trait ProgressReporter: Send + Sync {
     /// But it's never a file for which [`Self::report_checked_file`] gets called.
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>);
 }
+
+/// An owned progress guard for synchronizing a standalone script's environment.
+///
+/// Creating the guard starts progress reporting and dropping it finishes progress reporting. A
+/// background synchronization may move the guard between threads and outlive the operation that
+/// scheduled it. Implementations must not retain a database because doing so could keep a cancelled
+/// database snapshot alive until synchronization finishes.
+pub trait ScriptSyncProgress: Send {}
 
 /// Reporter that collects all diagnostics into a `Vec`.
 #[derive(Default)]
@@ -241,7 +261,7 @@ impl Project {
 
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub fn program(self, db: &dyn Db) -> Program<'_> {
-        Program::from_settings(db, self.program_settings(db).clone())
+        Program::from_settings(db, self.program_settings(db))
     }
 
     pub fn update_program(self, db: &mut dyn Db, settings: ProgramSettings) {
@@ -370,6 +390,7 @@ impl Project {
 
         reporter.report_diagnostics(db, diagnostics);
 
+        let reporter: &dyn ProgressReporter = reporter;
         let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
 
@@ -383,6 +404,17 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
+                let initialization = db
+                    .script_environments()
+                    .initialize_blocking(db, file, reporter);
+                if initialization.is_pending() {
+                    // The CLI watch loop or language server already scheduled this script's first
+                    // synchronization in the background. Until it completes, there is no
+                    // environment that can produce correct diagnostics. Applying the result
+                    // causes the diagnostics to be recomputed.
+                    reporter.report_checked_file(db, file, &[]);
+                    return;
+                }
                 let program_file = db.program_file(file);
 
                 match check_file_impl(db, program_file) {
@@ -391,7 +423,12 @@ impl Project {
 
                         // This is outside `check_file_impl` to avoid that opening or closing
                         // a file invalidates the `check_file_impl` query of every file!
-                        if !open_files.contains(&file) {
+                        // Scripts with invalid settings are never parsed by `check_file_impl`, so
+                        // they have no AST to clear.
+                        if !open_files.contains(&file)
+                            && Script::for_file(db, file)
+                                .is_none_or(|script| script.has_valid_settings(db))
+                        {
                             let python_file = program_file.python_file(db);
                             // The module has already been parsed by `check_file_impl`.
                             // We only retrieve it here so that we can call `clear` on it.
@@ -655,6 +692,23 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
 }
 
+/// Returns whether semantic checking and semantic diagnostics should run for `file`.
+///
+/// Scripts with invalid configuration still produce configuration diagnostics and retain a program
+/// for editor operations, but their semantic diagnostics must not be reported. Semantic checks are
+/// also skipped until a script's first environment synchronization completes.
+pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
+    if !db.should_check_file(file) {
+        return false;
+    }
+
+    let Some(script) = Script::for_file(db, file) else {
+        return true;
+    };
+
+    script.has_valid_settings(db) && !db.script_environments().is_initialization_pending(db, file)
+}
+
 /// Returns `true` if the file should be checked.
 ///
 /// This depends on the project's check mode:
@@ -740,7 +794,26 @@ pub(crate) fn check_file_impl(
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, source_file, || {
-            ty_python_semantic::check_file(*db, file)
+            let script = Script::for_file(*db, source_file);
+            if let Some(script) = script
+                && !script.has_valid_settings(*db)
+            {
+                return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
+            }
+
+            let diagnostics = ty_python_semantic::check_file(*db, file)?;
+            let Some(script) = script else {
+                return Ok(diagnostics);
+            };
+
+            let settings_diagnostics = script.settings_diagnostics(*db);
+            if settings_diagnostics.is_empty() {
+                return Ok(diagnostics);
+            }
+
+            let mut diagnostics = diagnostics.into_vec();
+            diagnostics.extend(settings_diagnostics.iter().cloned());
+            Ok(diagnostics.into_boxed_slice())
         }) {
             Ok(result) => result,
             Err(diagnostic) => Ok(Box::new([diagnostic])),

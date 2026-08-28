@@ -167,32 +167,32 @@ fn analyze_escape_chars(
 
         // If the next character is a valid escape sequence, skip.
         // See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals.
+        //
+        // N.B. 'N', 'u' and 'U' are escape sequences only recognized in string literals
         if matches!(
             next_char,
-            '\n'
-            | '\\'
-            | '\''
-            | '"'
-            | 'a'
-            | 'b'
-            | 'f'
-            | 'n'
-            | 'r'
-            | 't'
-            | 'v'
-            | '0'
-            | '1'
-            | '2'
-            | '3'
-            | '4'
-            | '5'
-            | '6'
-            | '7'
-            | 'x'
-            // Escape sequences only recognized in string literals
-            | 'N'
-            | 'u'
-            | 'U'
+            '\n' | '\\'
+                | '\''
+                | '"'
+                | 'a'
+                | 'b'
+                | 'f'
+                | 'n'
+                | 'r'
+                | 't'
+                | 'v'
+                | '0'
+                | '1'
+                | '2'
+                | '3'
+                | '4'
+                | '5'
+                | '6'
+                | '7'
+                | 'x'
+                | 'N'
+                | 'u'
+                | 'U'
         ) {
             contains_valid_escape_sequence = true;
             continue;

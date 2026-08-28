@@ -5,9 +5,9 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::{
     CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
-    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
+    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -256,6 +256,17 @@ impl<'db> Type<'db> {
                 Truthiness::from(*is_non_empty)
             }
 
+            Type::PropertyInstance(property)
+                if let PropertyInstanceClass::Subclass(class) = property.instance_class(db) =>
+            {
+                Type::instance(db, env, class).try_bool_impl(
+                    db,
+                    env,
+                    allow_short_circuit,
+                    visitor,
+                )?
+            }
+
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -264,6 +275,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::BoundSuper(_)
             | Type::KnownInstance(_)
             | Type::SpecialForm(_)

@@ -162,7 +162,10 @@ python-version = "3.12"
 strict-generic-narrowing = true
 ```
 
-A `list()` pattern retains the original `Sequence` alongside the top-materialized list.
+A `list()` pattern leads to a type that retains the known element type (`int`), but prevents
+`.append` from accepting any type: `value` could be a list of `int`s, or a list of `bool`s, or a
+list of `Literal[1]`, etc. So whatever we would try to append might be incompatible with the actual
+element type of the list.
 
 ```py
 from typing import Sequence
@@ -170,7 +173,10 @@ from typing import Sequence
 def narrow_sequence_to_list(value: Sequence[int]) -> None:
     match value:
         case list():
-            reveal_type(value)  # revealed: Sequence[int] & Top[list[Unknown]]
+            reveal_type(value)  # revealed: Top[list[Unknown & int]]
+            reveal_type(value[0])  # revealed: int
+
+            value.append(1)  # error: [invalid-argument-type] "Expected `Never`, found `Literal[1]`"
         case _:
             reveal_type(value)  # revealed: Sequence[int] & ~Top[list[Unknown]]
 ```
@@ -1205,8 +1211,9 @@ def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
 
 ### Strict mode
 
-An invariant generic base determines its subclass's type arguments only when every argument has one
-exact solution. Unconstrained arguments and variant bases retain conservative member types.
+Captures retain the type information available in the narrowed subject. A known base argument
+constrains the corresponding subclass argument even if other parameters remain unconstrained.
+Covariant base arguments also constrain the types of captured values.
 
 ```toml
 [analysis]
@@ -1323,14 +1330,14 @@ def test_match_partially_specialized_generic_subclass(
 ) -> None:
     match value:
         case PartiallySpecializedGenericPatternChild(item=item):
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_covariant_generic_subclass(
     value: CovariantGenericPatternBase[int],
 ) -> None:
     match value:
         case CovariantGenericPatternChild(item=item):
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_inherited_generic_subclass_capture(
     value: GenericMemberBase[GenericPatternT],
@@ -1358,7 +1365,124 @@ def test_match_direct_generic_pattern_preserves_declared_member(value: object) -
 def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
     match value:
         case DefaultGenericPatternBox(value=int() as item):
-            reveal_type(item)  # revealed: Unknown & int
+            reveal_type(item)  # revealed: int
+```
+
+### Strict mode with a union type alias
+
+Strict generic narrowing preserves the specialization when an invariant generic subject is
+parameterized by a PEP 695 union type alias.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class AliasPatternBase(Generic[T]): ...
+
+class AliasPatternChild(AliasPatternBase[T]):
+    item: T
+
+type Item = int | str
+
+def test_union_alias_capture(value: AliasPatternBase[Item]) -> None:
+    match value:
+        case AliasPatternChild(item=item):
+            # revealed: int | str
+            reveal_type(item)
+
+            # error: [unresolved-attribute] "Object of type `int | str` has no attribute `nonexistent`"
+            item.nonexistent()
+```
+
+### Strict mode with a recursive type alias
+
+The inferred specialization also retains recursion instead of replacing a recursive alias with an
+unknown type.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class AliasPatternBase(Generic[T]): ...
+
+class AliasPatternChild(AliasPatternBase[T]):
+    item: T
+
+type RecursiveItem = int | list[RecursiveItem]
+
+def test_recursive_alias_capture(value: AliasPatternBase[RecursiveItem]) -> None:
+    match value:
+        case AliasPatternChild(item=item):
+            # revealed: int | list[RecursiveItem]
+            reveal_type(item)
+```
+
+## Class pattern captures from intersections
+
+In strict mode, a captured attribute retains the constraints from every part of the subject's
+intersection, just like direct attribute access:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```pyi
+from typing import reveal_type
+from ty_extensions import Intersection
+
+class A:
+    def a(self) -> None: ...
+
+class B:
+    def b(self) -> None: ...
+
+class Co[T]:
+    __match_args__ = ("item",)
+
+    @property
+    def item(self) -> T: ...
+
+def keyword(value: Intersection[Co[A], Co[B]]) -> None:
+    reveal_type(value.item)  # revealed: A & B
+    match value:
+        case Co(item=item):
+            reveal_type(item)  # revealed: A & B
+            item.a()
+            item.b()
+```
+
+Positional captures also retain both constraints when the intersection order is reversed:
+
+```pyi
+def positional(value: Intersection[Co[B], Co[A]]) -> None:
+    reveal_type(value.item)  # revealed: B & A
+    match value:
+        case Co(item):
+            reveal_type(item)  # revealed: B & A
+            item.a()
+            item.b()
 ```
 
 ## Positional class patterns
@@ -3123,7 +3247,12 @@ def string_pattern(value: str):
 def integer_pattern(value: int):
     match value:
         case 1:
-            reveal_type(value)  # revealed: Literal[1, True]
+            reveal_type(value)  # revealed: Literal[1]
+
+def zero_pattern(value: int):
+    match value:
+        case 0:
+            reveal_type(value)  # revealed: Literal[0]
 
 def bytes_pattern(value: bytes):
     match value:
@@ -3328,6 +3457,30 @@ def test_match_value_sequence(value: object) -> None:
     match value:
         case [1]:
             reveal_type(value[0])  # revealed: object
+```
+
+## String-literal origin in value patterns
+
+A string without literal origin can match a literal value pattern without gaining literal origin.
+
+```py
+from typing import Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
+
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    match value:
+        case "hello":
+            reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+For a known literal-origin string, excluding the same literal makes the value pattern impossible.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    match value:
+        case "hello":
+            reveal_type(value)  # revealed: Never
 ```
 
 ## Enum equality semantics
@@ -3823,7 +3976,7 @@ def _(x: Literal["foo", b"bar"] | int):
             pass
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
-        case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
+        case _ if reveal_type(x):  # revealed: int & ~Literal[42]
             pass
 ```
 
@@ -4037,6 +4190,20 @@ def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
             reveal_type(x)  # revealed: Never
 ```
 
+A tuple with several literal tags can match more than one case. Failing one of those tags leaves the
+tuple available to later cases:
+
+```py
+def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
+    match x[0]:
+        case "b":
+            reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
+        case "a":
+            reveal_type(x)  # revealed: tuple[Literal["a"], int]
+        case _:
+            reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
+```
+
 Narrowing is restricted to `Literal` tag elements:
 
 ```py
@@ -4092,6 +4259,20 @@ def _(x: A | B):
             reveal_type(x.field_b)  # revealed: str
         case _:
             reveal_type(x)  # revealed: Never
+```
+
+A class can also have several literal tags. A pattern outside that set of tags rules out the class:
+
+```py
+class MultipleTags:
+    tag: Literal["b", "c"]
+
+def multiple_tags(x: A | MultipleTags):
+    match x.tag:
+        case "a":
+            reveal_type(x)  # revealed: A
+        case _:
+            reveal_type(x)  # revealed: MultipleTags
 ```
 
 Non-literal tag arms are preserved during positive narrowing:
