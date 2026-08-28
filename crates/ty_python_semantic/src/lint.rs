@@ -203,7 +203,7 @@ pub enum LintStatus {
 }
 
 impl LintStatus {
-    pub const fn preview(since: &'static str) -> Self {
+    pub(crate) const fn preview(since: &'static str) -> Self {
         LintStatus::Preview { since }
     }
 
