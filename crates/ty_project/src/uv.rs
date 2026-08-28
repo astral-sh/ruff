@@ -13,7 +13,6 @@ pub(crate) use service::{
 };
 
 mod command;
-mod dependencies;
 mod environments;
 mod metadata;
 mod service;

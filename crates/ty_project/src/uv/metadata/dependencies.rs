@@ -2,33 +2,16 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, bail, ensure};
 use compact_str::CompactString;
-use ruff_db::system::{SystemPath, SystemPathBuf};
-use serde::Deserialize;
 use ty_module_resolver::ModuleName;
 use ty_python_semantic::dependency::{
     DependencyDistribution, DependencyMetadata, DependencyProject,
 };
 
-/// The part of uv's metadata needed to connect imports to declared dependencies.
-///
-/// See uv's [schema documentation] and [serialization types] for the upstream format.
-///
-/// [schema documentation]: https://docs.astral.sh/uv/reference/internals/metadata/#schema
-/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-resolver/src/lock/export/metadata.rs
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-pub(super) struct WorkspaceDependencies {
-    schema: Schema,
-    workspace: Option<NodeReference>,
-    #[serde(default)]
-    members: Box<[WorkspaceMember]>,
-    #[serde(default)]
-    resolution: BTreeMap<CompactString, ResolutionNode>,
-    #[serde(default)]
-    module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
-}
+use super::{NodeKind, ResolutionNode, UvMetadata};
 
-impl WorkspaceDependencies {
-    pub(super) fn to_metadata(&self, root: &SystemPath) -> anyhow::Result<DependencyMetadata> {
+impl UvMetadata {
+    pub(super) fn to_dependency_metadata(&self) -> anyhow::Result<DependencyMetadata> {
+        let root = self.workspace_root();
         let mut distributions = BTreeMap::new();
         let mut extra_packages = BTreeMap::new();
 
@@ -236,75 +219,18 @@ impl WorkspaceDependencies {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-struct Schema {
-    version: SchemaVersion,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-#[serde(rename_all = "snake_case")]
-enum SchemaVersion {
-    Preview,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-struct WorkspaceMember {
-    path: SystemPathBuf,
-    id: CompactString,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-struct ModuleOwner {
-    package_id: CompactString,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-struct ResolutionNode {
-    kind: NodeKind,
-    name: Option<CompactString>,
-    source: Option<Source>,
-    // uv always emits this field, even for leaves. Missing edges are incomplete metadata, not
-    // evidence that a project has no direct dependencies.
-    dependencies: Box<[NodeReference]>,
-    #[serde(default)]
-    optional_dependencies: Box<[NodeReference]>,
-    #[serde(default)]
-    dependency_groups: Box<[NodeReference]>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-#[serde(rename_all = "snake_case")]
-enum NodeKind {
-    Package,
-    Extra(CompactString),
-    Group(CompactString),
-    Workspace,
-    Script,
-    Build,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-struct Source {
-    editable: Option<SystemPathBuf>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
-struct NodeReference {
-    id: CompactString,
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
 
     use anyhow::Context;
     use compact_str::CompactString;
-    use ruff_db::system::SystemPathBuf;
+    use ruff_db::system::{SystemPathBuf, TestSystem};
     use serde_json::{Value, json};
     use ty_module_resolver::ModuleName;
     use ty_python_semantic::dependency::{DependencyMetadata, DependencyProject};
 
-    use super::WorkspaceDependencies;
+    use super::UvMetadata;
 
     fn absolute(path: &str) -> SystemPathBuf {
         if cfg!(windows) {
@@ -317,8 +243,9 @@ mod tests {
     fn metadata() -> Value {
         json!({
             "schema": {"version": "preview"},
+            "workspace_root": absolute("/app"),
             "workspace": {"id": "workspace"},
-            "members": [{"id": "member", "path": absolute("/app")}],
+            "members": [{"id": "member", "name": "app", "path": absolute("/app")}],
             "module_owners": {
                 "direct": [{"package_id": "direct"}],
                 "indirect": [{"package_id": "indirect"}],
@@ -372,8 +299,12 @@ mod tests {
     }
 
     fn extract(metadata: &Value) -> anyhow::Result<DependencyMetadata> {
-        let metadata: WorkspaceDependencies = serde_json::from_value(metadata.clone())?;
-        metadata.to_metadata(&absolute("/app"))
+        let system = TestSystem::default();
+        system
+            .memory_file_system()
+            .write_file_all(absolute("/app/pyproject.toml"), "[tool.uv.workspace]")?;
+        let metadata = UvMetadata::from_metadata(&serde_json::to_vec(metadata)?, &system)?;
+        metadata.to_dependency_metadata()
     }
 
     fn project<'a>(
@@ -441,8 +372,8 @@ mod tests {
     fn workspace_groups_apply_to_each_member_and_virtual_root() -> anyhow::Result<()> {
         let mut input = metadata();
         input["members"] = json!([
-            {"id": "member", "path": absolute("/app/packages/member")},
-            {"id": "sibling", "path": absolute("/app/packages/sibling")}
+            {"id": "member", "name": "app", "path": absolute("/app/packages/member")},
+            {"id": "sibling", "name": "sibling", "path": absolute("/app/packages/sibling")}
         ]);
         input["resolution"]["sibling"] = json!({
             "kind": "package", "name": "sibling", "dependencies": []
@@ -473,6 +404,7 @@ mod tests {
     fn workspace_without_members_can_supply_groups() -> anyhow::Result<()> {
         let metadata = extract(&json!({
             "schema": {"version": "preview"},
+            "workspace_root": absolute("/app"),
             "workspace": {"id": "workspace"},
             "module_owners": {"tool": [{"package_id": "tool"}]},
             "resolution": {
