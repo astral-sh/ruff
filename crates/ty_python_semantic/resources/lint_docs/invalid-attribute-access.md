@@ -1,15 +1,15 @@
 ## What it does
 
-Checks for assignments to class variables from instances
-and assignments to instance-only attributes from their class.
+Checks for assignments to class variables from instances and assignments to instance-only attributes
+from their class.
 
-An "instance-only" variable is one which is only ever assigned to or declared
-when accessed via `self` in an instance method.
+An "instance-only" variable is one which is only ever assigned to or declared when accessed via
+`self` in an instance method.
 
 ## Why is this bad?
 
-Incorrect assignments break the rules of the type system and
-weaken a type checker's ability to accurately reason about your code.
+Incorrect assignments break the rules of the type system and weaken a type checker's ability to
+accurately reason about your code.
 
 ## Examples
 
