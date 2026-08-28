@@ -312,6 +312,16 @@ def _(string: str, data: bytes, either: str | bytes) -> None:
     reveal_type(accepts_callable_and_value(overloaded_consumer, either))  # revealed: str | bytes
 ```
 
+A `str | int` value is rejected because neither overload of the consumer accepts its `int`
+alternative:
+
+```py
+def _(value: str | int) -> None:
+    # TODO: Do not include the consumer's `bytes` alternative in the error-recovery return type.
+    # error: [invalid-argument-type]
+    reveal_type(accepts_callable_and_value(overloaded_consumer, value))  # revealed: str | bytes | int
+```
+
 ## Rejected overloaded callbacks preserve valid specializations
 
 An overloaded callback may contain one alternative whose return type violates a type variable's
