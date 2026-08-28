@@ -2595,7 +2595,7 @@ impl<'db> TypeVisitor<'db> for SignatureTypevarVisitor<'_, 'db> {
 }
 
 /// Returns the effective value type accepted by a property's setter for `receiver_ty`.
-pub(super) fn property_set_type<'db>(
+fn property_set_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     property: PropertyInstanceType<'db>,
