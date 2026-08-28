@@ -709,6 +709,16 @@ def _(string: str, data: bytes, either: str | bytes) -> None:
     reveal_type(accepts_callable_and_value(overloaded_consumer, either))  # revealed: str | bytes
 ```
 
+A `str | int` value is rejected because neither overload of the consumer accepts its `int`
+alternative:
+
+```py
+def _(value: str | int) -> None:
+    # TODO: Do not include the consumer's `bytes` alternative in the error-recovery return type.
+    # error: [invalid-argument-type]
+    reveal_type(accepts_callable_and_value(overloaded_consumer, value))  # revealed: str | bytes | int
+```
+
 When overloads exchange their input and output types, each specialization validates the same call.
 Its return type satisfies both `tuple[int, str]` and `tuple[str, int]`, whose intersection is
 `Never`.
