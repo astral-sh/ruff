@@ -1,6 +1,6 @@
 ## What it does
 
-Checks for type alias definitions that are circular, either directly or through unions.
+Checks for circular type alias definitions.
 
 ## Why is it bad?
 

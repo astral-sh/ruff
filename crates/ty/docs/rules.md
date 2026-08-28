@@ -459,7 +459,7 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.29">0
 **What it does**
 
 
-Checks for type alias definitions that are circular, either directly or through unions.
+Checks for circular type alias definitions.
 
 **Why is it bad?**
 
