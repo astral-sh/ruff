@@ -16,6 +16,7 @@ on:
       - "crates/ruff_python_parser/**"
       - "scripts/memory_report.py"
       - ".github/workflows/memory_report.yaml"
+      - "scripts/install-mold.sh"
       - "Cargo.lock"
       - "!**.md"
       - "!**.snap"
@@ -70,7 +71,7 @@ jobs:
         run: rustup show
 
       - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+        run: bash ruff/scripts/install-mold.sh
 
       - name: Compute memory usage diff
         shell: bash
