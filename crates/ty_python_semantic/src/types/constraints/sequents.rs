@@ -82,6 +82,15 @@ pub(super) enum Sequent {
 }
 
 impl SequentMap {
+    pub(super) fn consequents(&self) -> impl Iterator<Item = ConstraintId> + '_ {
+        self.sequents.iter().filter_map(|sequent| match sequent {
+            Sequent::SingleImplication { post, .. } | Sequent::PairImplication { post, .. } => {
+                Some(*post)
+            }
+            Sequent::SingleTautology { .. } | Sequent::PairImpossibility { .. } => None,
+        })
+    }
+
     /// Returns a sequent map containing the sequents that we can infer from a single constraint in
     /// isolation. This method is salsa-tracked so that we only perform this work once per
     /// constraint.

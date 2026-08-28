@@ -425,9 +425,9 @@ assert_type(infer_return(callback), object)
 
 ## Generic inference after projection budget exhaustion
 
-The literal-specific overloads below produce more alternative bindings than generic inference can
-project within its limits. The precise type of `default=0` does not replace the missing callback
-evidence: we recover with `Unknown` in either argument order.
+Each tuple element independently matches one of the callback's overloads. The combined alternative
+bindings exceed generic inference's projection limits. The precise type of `default=0` does not
+replace the missing callback evidence: we recover with `Unknown` in either argument order.
 
 ```py
 from typing import Callable, Literal, TypeVar, overload
@@ -436,8 +436,10 @@ from ty_extensions._internal import Unknown
 
 R = TypeVar("R")
 T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
 
-def infer_return(callback: Callable[[T], R], default: R) -> R:
+def infer_return(callback: tuple[Callable[[T], R], Callable[[U], R], Callable[[V], R]], default: R) -> R:
     raise NotImplementedError
 
 @overload
@@ -461,18 +463,12 @@ def callback(value: Literal[16, 17]): ...
 @overload
 def callback(value: Literal[18, 19]): ...
 @overload
-def callback(value: Literal[20, 21]): ...
-@overload
-def callback(value: Literal[22, 23]): ...
-@overload
-def callback(value: Literal[24, 25]): ...
-@overload
 def callback(value: object) -> object: ...
 def callback(value):
     raise NotImplementedError
 
-assert_type(infer_return(callback, 0), Unknown)
-assert_type(infer_return(default=0, callback=callback), Unknown)
+assert_type(infer_return((callback, callback, callback), 0), Unknown)
+assert_type(infer_return(default=0, callback=(callback, callback, callback)), Unknown)
 ```
 
 ## Multiple occurrences of a higher-order generic callable

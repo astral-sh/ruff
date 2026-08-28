@@ -566,6 +566,66 @@ class C:
 reveal_type(C().method)  # revealed: Overload[[T](arg: T) -> None, (arg: int) -> None, (arg: str) -> None]
 ```
 
+## Recursive receiver protocols with tuple parameters
+
+The receiver's type variables can occur together in a tuple parameter and separately in the return
+type. Binding the receiver preserves both variables and the concrete overload alternatives.
+
+```py
+from typing import Protocol, overload
+
+class P[A, R](Protocol):
+    def method(self, arg: tuple[A, R]) -> R: ...
+
+@overload
+def method[A, R](obj: P[A, R], arg: tuple[A, R]) -> R: ...
+@overload
+def method(obj: object, arg: tuple[int, str]) -> str: ...
+@overload
+def method(obj: object, arg: tuple[str, int]) -> int: ...
+def method(obj, arg):
+    raise NotImplementedError
+
+class C:
+    method = method
+
+# revealed: Overload[[A, R](arg: tuple[A, R]) -> R, (arg: tuple[int, str]) -> str, (arg: tuple[str, int]) -> int]
+reveal_type(C().method)
+C().method((1, "x"))
+C().method(("x", 1))
+C().method((1,))  # error: [no-matching-overload]
+```
+
+## Recursive receiver protocols with invariant containers
+
+Type variables in invariant containers also survive receiver binding. Calls still enforce the
+parameter's container shape after the recursive receiver constraints have been resolved.
+
+```py
+from typing import Protocol, overload
+
+class P[A, R](Protocol):
+    def method(self, arg: list[A]) -> list[R]: ...
+
+@overload
+def method[A, R](obj: P[A, R], arg: list[A]) -> list[R]: ...
+@overload
+def method(obj: object, arg: list[int]) -> list[int]: ...
+@overload
+def method(obj: object, arg: list[str]) -> list[str]: ...
+def method(obj, arg):
+    raise NotImplementedError
+
+class C:
+    method = method
+
+# revealed: Overload[[A, R](arg: list[A]) -> list[R], (arg: list[int]) -> list[int], (arg: list[str]) -> list[str]]
+reveal_type(C().method)
+C().method([1])
+C().method(["x"])
+C().method(1)  # error: [no-matching-overload]
+```
+
 ## Builtin functions with recursive receiver protocols
 
 Assigning `pow` to a class's `__pow__` attribute is valid. Its overloads accept protocols describing
