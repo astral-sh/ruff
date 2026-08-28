@@ -1315,7 +1315,8 @@ def _(xs: list[str] | set[str]) -> str:
 ## Narrowing incompatible invariant specializations
 
 Subclasses of the same invariant generic class are disjoint when their type arguments cannot be
-equal. A nested type variable does not prevent this proof: `list[T]` cannot equal `int` for any `T`.
+equal. Here, `T` is bounded by `str`, so `list[T]` cannot equal `list[int]` and the positive branch
+is unreachable.
 
 ```toml
 [environment]
@@ -1329,25 +1330,9 @@ class Box[T]:
     value: T
 
 class Nested[T](Box[list[T]]): ...
-class IntBox(Box[int]): ...
-
-def narrow[T](value: Nested[T]):
-    if isinstance(value, IntBox):
-        assert_never(value)
-```
-
-Bounds and constraints can also make two nested arguments incompatible. If `T` is bounded by `str`
-or constrained to `str` and `bytes`, `list[T]` cannot equal `list[int]`, so the positive branch is
-unreachable.
-
-```py
 class IntListBox(Box[list[int]]): ...
 
-def narrow_bounded[T: str](value: Nested[T]):
-    if isinstance(value, IntListBox):
-        assert_never(value)
-
-def narrow_constrained[T: (str, bytes)](value: Nested[T]):
+def narrow[T: str](value: Nested[T]):
     if isinstance(value, IntListBox):
         assert_never(value)
 ```

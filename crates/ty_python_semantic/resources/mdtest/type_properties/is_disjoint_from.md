@@ -1169,8 +1169,6 @@ type Id[V] = V
 def _[U]():
     static_assert(not is_disjoint_from(Invariant[U], Invariant[int]))
     static_assert(not is_disjoint_from(Invariant[Id[U]], Invariant[int]))
-    static_assert(not is_disjoint_from(Invariant[list[U]], Invariant[list[int]]))
-    static_assert(not is_disjoint_from(Invariant[U], Invariant[Never]))
 
 static_assert(not is_disjoint_from(Invariant[Id[int]], Invariant[int]))
 static_assert(is_disjoint_from(Invariant[Id[int]], Invariant[str]))
@@ -1199,6 +1197,7 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
@@ -1218,14 +1217,13 @@ type Id[T] = T
 def compatible[T]():
     static_assert(not is_disjoint_from(list[list[T]], list[list[int]]))
     static_assert(not is_disjoint_from(list[list[Id[T]]], list[list[int]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[Never]]))
 ```
 
 An upper bound can rule out equality even when the surrounding structure matches. A type variable
 bounded by `str` cannot specialize to `int`, but it can specialize to `str` or `Never`.
 
 ```py
-from typing import Never
-
 def bounded[T: str]():
     static_assert(is_disjoint_from(list[list[T]], list[list[int]]))
     static_assert(is_disjoint_from(list[list[int]], list[list[T]]))
@@ -1233,13 +1231,14 @@ def bounded[T: str]():
     static_assert(not is_disjoint_from(list[list[T]], list[list[Never]]))
 ```
 
-A constrained type variable can only specialize to one of its constraints. Neither `str` nor `bytes`
-equals `int`; matching either constraint is enough to preserve a possible overlap.
+A constrained type variable can only specialize to one of its constraints. Neither `int` nor `Never`
+is a valid specialization, while matching either `str` or `bytes` preserves a possible overlap.
 
 ```py
 def constrained[T: (str, bytes)]():
     static_assert(is_disjoint_from(list[list[T]], list[list[int]]))
     static_assert(is_disjoint_from(list[list[int]], list[list[T]]))
+    static_assert(is_disjoint_from(list[list[T]], list[list[Never]]))
     static_assert(not is_disjoint_from(list[list[T]], list[list[str]]))
     static_assert(not is_disjoint_from(list[list[T]], list[list[bytes]]))
 ```

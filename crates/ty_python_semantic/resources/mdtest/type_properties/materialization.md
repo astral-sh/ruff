@@ -298,7 +298,7 @@ from ty_extensions._internal import is_assignable_to, is_subtype_of
 class Box[**P]:
     callback: Callable[P, None]
 
-def _[**P](value: Box[P]):
+def _[**P]():
     static_assert(is_subtype_of(Box[P], Top[Box[...]]))
     static_assert(is_subtype_of(Bottom[Box[...]], Box[P]))
     static_assert(not is_subtype_of(Top[Box[...]], Box[P]))
@@ -1499,39 +1499,26 @@ static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[bool | Any]
 static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[Any]]))
 ```
 
-An unresolved type variable does not necessarily satisfy a materialization's bounds. In particular,
-`list[T]` is not always a subtype of a list whose elements are integers, so both alternatives remain
-in their union.
-
-```pyi
-from typing import TypeVar
-
-T = TypeVar("T")
-
-def unresolved(values: list[T] | Top[list[int & Any]]):
-    static_assert(not is_subtype_of(list[T], Top[list[int & Any]]))
-    reveal_type(values)  # revealed: list[T@unresolved] | Top[list[int & Any]]
-```
-
-Likewise, `Top[list[Unknown]]` includes lists with any element type, so it is not a subtype of
-`list[T]` for an arbitrary `T`. This is a regression test for
-[ty#4201](https://github.com/astral-sh/ty/issues/4201).
+An unresolved type variable does not necessarily satisfy a materialization's bounds. Conversely,
+`Top[list[Unknown]]` includes specializations that do not match an arbitrary fixed `T`, as in
+[ty#4201](https://github.com/astral-sh/ty/issues/4201). Neither comparison below holds for every
+`T`, and the union retains both alternatives.
 
 ```pyi
 from ty_extensions._internal import Unknown
 
-def _[T](value: T):
+def unresolved[T](values: list[T] | Top[list[int & Any]]):
+    static_assert(not is_subtype_of(list[T], Top[list[int & Any]]))
     static_assert(not is_subtype_of(Top[list[Unknown]], list[T]))
+    reveal_type(values)  # revealed: list[T@unresolved] | Top[list[int & Any]]
 ```
 
 A declared upper bound can establish the required relation without fixing the type variable to one
 particular specialization.
 
 ```pyi
-IntT = TypeVar("IntT", bound=int)
-
-def bounded(values: list[IntT]):
-    static_assert(is_subtype_of(list[IntT], Top[list[int & Any]]))
+def bounded[T: int]():
+    static_assert(is_subtype_of(list[T], Top[list[int & Any]]))
 ```
 
 ## Assignability
