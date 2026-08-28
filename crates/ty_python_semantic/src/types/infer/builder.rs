@@ -11265,7 +11265,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // truthy. Skip the final comparison's truthiness computation when the prefix is
             // already always false.
             let truthiness = preceding_truthiness
-                .and_else(|| last_comparison_ty.bool(db, self.program_environment()));
+                .and_then(|| last_comparison_ty.bool(db, self.program_environment()));
             let expression = ast::ExprRef::Compare(compare).into();
             if truthiness != ty.bool(db, self.program_environment()) {
                 self.comparison_truthiness.insert(expression, truthiness);

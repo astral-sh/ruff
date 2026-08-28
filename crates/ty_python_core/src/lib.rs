@@ -986,7 +986,7 @@ impl Truthiness {
 
     /// Like [`Truthiness::and`], but evaluates `other` only when `self` may be true.
     #[must_use]
-    pub fn and_else(self, other: impl FnOnce() -> Self) -> Self {
+    pub fn and_then(self, other: impl FnOnce() -> Self) -> Self {
         match self {
             Truthiness::AlwaysFalse => self,
             Truthiness::AlwaysTrue | Truthiness::Ambiguous => self.and(other()),
@@ -1175,15 +1175,15 @@ mod tests {
             assert_eq!(left.and(right), expected, "{left:?}.and({right:?})");
 
             let mut calls = 0;
-            let lazy_result = left.and_else(|| {
+            let lazy_result = left.and_then(|| {
                 calls += 1;
                 right
             });
-            assert_eq!(lazy_result, expected, "{left:?}.and_else(|| {right:?})");
+            assert_eq!(lazy_result, expected, "{left:?}.and_then(|| {right:?})");
             assert_eq!(
                 calls,
                 usize::from(left != AlwaysFalse),
-                "{left:?}.and_else call count"
+                "{left:?}.and_then call count"
             );
         }
     }
