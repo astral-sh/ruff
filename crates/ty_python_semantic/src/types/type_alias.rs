@@ -6,9 +6,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
-        TypeMapping, TypeVarVariance, TypingModule,
-        cyclic::CycleDetector,
-        definition_expression_type,
+        TypeMapping, TypeVarVariance, TypingModule, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::VarianceInferable,
@@ -30,34 +28,22 @@ impl<'db> Type<'db> {
     /// another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
-        AliasCycleSummary::from_type(
-            db,
-            self,
-            &CycleDetector::new(AliasCycleSummary {
-                cyclic: true,
-                ..AliasCycleSummary::default()
-            }),
-        )
-        .cyclic
+        AliasCycleSummary::from_type(db, self).cyclic
     }
 }
 
 /// An alias's cycles and the type variables exposed outside containers and other enclosing types.
 /// Only arguments substituted for these variables can introduce an unguarded cycle.
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 struct AliasCycleSummary<'db> {
     cyclic: bool,
     typevars: Box<[BoundTypeVarInstance<'db>]>,
 }
 
 impl<'db> AliasCycleSummary<'db> {
-    fn from_type(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        visitor: &CycleDetector<'db, (), Type<'db>, Self, 8>,
-    ) -> Self {
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
         let mut typevars = FxOrderSet::default();
-        let cyclic = Self::collect(db, ty, visitor, &mut typevars);
+        let cyclic = Self::collect(db, ty, &mut typevars);
         Self {
             cyclic,
             typevars: typevars.into_iter().collect(),
@@ -67,7 +53,6 @@ impl<'db> AliasCycleSummary<'db> {
     fn collect(
         db: &'db dyn Db,
         ty: Type<'db>,
-        visitor: &CycleDetector<'db, (), Type<'db>, Self, 8>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) -> bool {
         match ty {
@@ -75,10 +60,7 @@ impl<'db> AliasCycleSummary<'db> {
                 // Inspect the definition independently of its arguments. Nested applications like
                 // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing
                 // recursive references beneath a container.
-                let definition = alias.unspecialized(db);
-                let summary = visitor.visit(db, Type::TypeAlias(definition), || {
-                    Self::from_type(db, definition.raw_value_type(db), visitor)
-                });
+                let summary = alias.cycle_summary(db);
                 if summary.cyclic {
                     return true;
                 }
@@ -88,7 +70,7 @@ impl<'db> AliasCycleSummary<'db> {
                         .map(|context| context.default_specialization(db, None))
                 });
 
-                // Process supplied arguments after leaving the definition's active visit. An
+                // Process supplied arguments after completing the definition's summary. An
                 // exposed argument can still close a cycle in the caller, as in
                 // `type Identity[T] = T; type Cycle = Identity[Cycle]`.
                 summary.typevars.iter().any(|&typevar| {
@@ -96,7 +78,7 @@ impl<'db> AliasCycleSummary<'db> {
                         specialization.and_then(|specialization| specialization.get(db, typevar))
                         && argument != Type::TypeVar(typevar)
                     {
-                        Self::collect(db, argument, visitor, typevars)
+                        Self::collect(db, argument, typevars)
                     } else {
                         typevars.insert(typevar);
                         false
@@ -110,7 +92,7 @@ impl<'db> AliasCycleSummary<'db> {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .any(|&element| Self::collect(db, element, visitor, typevars)),
+                .any(|&element| Self::collect(db, element, typevars)),
             _ => ty.is_divergent(),
         }
     }
@@ -423,6 +405,25 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
+    /// Summarize an alias's raw definition once, sharing the result across references.
+    /// Specializations reuse this summary and check their exposed arguments separately.
+    fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _, ()| AliasCycleSummary { cyclic: true, ..AliasCycleSummary::default() },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn cycle_summary<'db>(
+            db: &'db dyn Db,
+            alias: TypeAliasType<'db>,
+            (): (),
+        ) -> AliasCycleSummary<'db> {
+            AliasCycleSummary::from_type(db, alias.raw_value_type(db))
+        }
+
+        cycle_summary(db, self.unspecialized(db), ())
+    }
+
     pub(super) fn known_class(self, db: &'db dyn Db) -> KnownClass {
         match self {
             TypeAliasType::PEP695(_) => KnownClass::TypeAliasType,
@@ -683,5 +684,74 @@ impl std::fmt::Display for QualifiedTypeAliasName<'_> {
             f.write_char('.')?;
         }
         f.write_str(self.type_alias.name(self.db))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Context;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_db::testing::{
+        assert_function_query_was_not_run_by_name, find_will_execute_event_by_name,
+    };
+    use ty_python_core::ProgramFile;
+
+    use super::TypeAliasType;
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::global_symbol;
+    use crate::types::Type;
+
+    fn global_type_alias<'db>(db: &'db TestDb, name: &str) -> anyhow::Result<TypeAliasType<'db>> {
+        let file = system_path_to_file(db, "/src/main.py")?;
+        let file = ProgramFile::new(db, file, db.program_environment().program(db));
+        global_symbol(db, file, name)
+            .place
+            .ignore_possibly_undefined()
+            .and_then(Type::as_type_alias)
+            .with_context(|| format!("expected `{name}` to be a type alias"))
+    }
+
+    #[test]
+    fn cycle_summary_reuses_alias_chain() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/main.py",
+            r#"
+            type A = int
+            type B = A
+            type C = B
+            "#,
+        )?;
+
+        assert!(!global_type_alias(&db, "C")?.cycle_summary(&db).cyclic);
+        let events = db.take_salsa_events();
+        assert!(find_will_execute_event_by_name(&db, "cycle_summary", None, &events).is_some());
+
+        // Checking the outer alias also caches the summaries of each alias it expands.
+        for name in ["B", "A"] {
+            assert!(!global_type_alias(&db, name)?.cycle_summary(&db).cyclic);
+        }
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "cycle_summary", None, &events);
+        Ok(())
+    }
+
+    #[test]
+    fn cycle_summary_updates_when_an_alias_exposes_its_parameter() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let guarded = "type Inner[T] = list[T]\ntype Outer = Inner[Outer]\n";
+        let unguarded = "type Inner[T] = T\ntype Outer = Inner[Outer]\n";
+
+        db.write_file("/src/main.py", guarded)?;
+        assert!(!global_type_alias(&db, "Outer")?.cycle_summary(&db).cyclic);
+
+        // Exposing the argument closes the cycle in Outer, even though Inner remains acyclic.
+        db.write_file("/src/main.py", unguarded)?;
+        assert!(global_type_alias(&db, "Outer")?.cycle_summary(&db).cyclic);
+
+        db.write_file("/src/main.py", guarded)?;
+        assert!(!global_type_alias(&db, "Outer")?.cycle_summary(&db).cyclic);
+        Ok(())
     }
 }
