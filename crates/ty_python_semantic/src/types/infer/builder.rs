@@ -10008,6 +10008,78 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Check the property accessor invoked by an attribute operation. Looking on the receiver's
+    /// class also handles metaclass properties, without invoking getters for `Class.property`.
+    fn check_deprecated_property(
+        &self,
+        attribute: &ast::ExprAttribute,
+        receiver: Type<'db>,
+        access: ExprContext,
+    ) {
+        fn accessors<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            access: ExprContext,
+        ) -> Type<'db> {
+            match ty {
+                Type::PropertyInstance(property) => match access {
+                    ExprContext::Load => property.getter(db),
+                    ExprContext::Store => property.setter(db),
+                    ExprContext::Del => property.deleter(db),
+                    ExprContext::Invalid => None,
+                }
+                .unwrap_or_else(Type::unknown),
+                Type::Union(union) => union.map(db, env, |ty| accessors(db, env, *ty, access)),
+                Type::Intersection(intersection) => {
+                    intersection.map_positive(db, env, |ty| accessors(db, env, *ty, access))
+                }
+                _ => Type::unknown(),
+            }
+        }
+
+        if !self.context.is_lint_enabled(&diagnostic::DEPRECATED) {
+            return;
+        }
+        let db = self.db();
+        let env = self.program_environment();
+        let member = if let Type::BoundSuper(bound_super) = receiver {
+            // Class-bound super returns the property object, just like access through a class.
+            if access != ExprContext::Load
+                || !matches!(
+                    bound_super.owner(db).descriptor_binding(db, env),
+                    Some((Some(_), _))
+                )
+            {
+                return;
+            }
+            bound_super.find_name_in_mro_after_pivot(
+                db,
+                env,
+                &attribute.attr.id,
+                MemberLookupPolicy::default(),
+            )
+        } else {
+            receiver.class_member(db, env, &attribute.attr.id)
+        };
+        let Some(member) = member.place.ignore_possibly_undefined() else {
+            return;
+        };
+        if !matches!(
+            member,
+            Type::PropertyInstance(_) | Type::Union(_) | Type::Intersection(_)
+        ) {
+            return;
+        }
+        let bindings = accessors(db, env, member, access).bindings(db, env);
+        for (_, function) in bindings.deprecated_functions(db) {
+            // These are accessor references, not resolved overload calls.
+            if !function.is_overload(db) {
+                self.report_deprecated_function(&attribute.attr, function);
+            }
+        }
+    }
+
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         let db = self.db();
         let expr = PlaceExpr::from_expr_name(name_node);
@@ -10711,6 +10783,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let resolved_type = resolved_type.inner_type();
 
         self.check_deprecated(attr, resolved_type);
+
+        // Deleting an attribute does not invoke its getter. Augmented assignment, however,
+        // reads the property here even though its AST target has a store context.
+        self.check_deprecated_property(
+            attribute,
+            value_type,
+            if attribute.ctx == ExprContext::Del {
+                ExprContext::Del
+            } else {
+                ExprContext::Load
+            },
+        );
 
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).

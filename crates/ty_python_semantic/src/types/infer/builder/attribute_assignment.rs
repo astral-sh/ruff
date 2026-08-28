@@ -36,6 +36,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.db();
+        if emit_diagnostics {
+            self.check_deprecated_property(target, object_ty, ast::ExprContext::Store);
+        }
         let requirement =
             attribute_write_requirement(db, self.program_environment(), object_ty, attribute);
         let mut evaluator = AssignmentAttributeWriteEvaluator {

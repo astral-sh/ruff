@@ -360,7 +360,8 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    fn descriptor_binding(
+    /// Returns the instance and owner passed to a descriptor, when the super owner is known.
+    pub(super) fn descriptor_binding(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

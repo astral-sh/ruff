@@ -417,8 +417,8 @@ x += y  # error: [deprecated] "MyInt `+` support is broken"
 
 ### Reflected operators
 
-Only the methods selected by operator resolution trigger deprecations. A deprecated reflected
-method is not used when the left operand accepts the operation.
+Only the methods selected by operator resolution trigger deprecations. A deprecated reflected method
+is not used when the left operand accepts the operation.
 
 ```py
 from typing_extensions import deprecated
@@ -455,8 +455,8 @@ RestrictedLeft() + ActiveRight()
 
 ### In-place operators
 
-Augmented assignment calls the in-place method when available, without reporting deprecations on
-the unused binary method.
+Augmented assignment calls the in-place method when available, without reporting deprecations on the
+unused binary method.
 
 ```py
 from typing_extensions import deprecated
@@ -698,6 +698,160 @@ def invalid_operator(value: X) -> None:
     ~value
 ```
 
+## Property accessors
+
+Only the accessor invoked by an operation triggers its deprecation. Reading a property does not
+invoke its setter, writing does not invoke its getter, and deleting does not invoke either.
+Augmented assignment reads and then writes the property.
+
+```py
+from typing_extensions import deprecated
+
+class OldGetter:
+    @property
+    @deprecated("old getter")
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+    @value.deleter
+    def value(self) -> None: ...
+
+old_getter = OldGetter()
+old_getter.value  # error: [deprecated] "old getter"
+old_getter.value = 1
+old_getter.value += 1  # error: [deprecated] "old getter"
+del old_getter.value
+OldGetter.value
+
+class OldSetter:
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("old setter")
+    def value(self, value: int) -> None: ...
+    @value.deleter
+    @deprecated("old deleter")
+    def value(self) -> None: ...
+
+old_setter = OldSetter()
+old_setter.value
+old_setter.value = 1  # error: [deprecated] "old setter"
+old_setter.value += 1  # error: [deprecated] "old setter"
+del old_setter.value  # error: [deprecated] "old deleter"
+OldSetter.value
+```
+
+When both accessors are deprecated, augmented assignment reports both messages.
+
+```py
+class OldBoth:
+    @property
+    @deprecated("both getter")
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("both setter")
+    def value(self, value: int) -> None: ...
+
+old_both = OldBoth()
+# error: [deprecated] "both getter"
+# error: [deprecated] "both setter"
+old_both.value += 1
+```
+
+## Inherited properties
+
+Inherited accessors retain their deprecations. An override can replace a deprecated getter, while
+access through `super()` still invokes the inherited getter. Class-bound `super()` returns the
+property object without invoking its getter.
+
+```py
+from typing_extensions import deprecated
+
+class Parent:
+    @property
+    @deprecated("parent getter")
+    def value(self) -> int:
+        return 0
+
+class Child(Parent): ...
+
+class ActiveChild(Parent):
+    @property
+    def value(self) -> int:
+        return super().value  # error: [deprecated] "parent getter"
+
+Child().value  # error: [deprecated] "parent getter"
+ActiveChild().value
+super(Child, Child).value
+```
+
+## Metaclass properties
+
+A class is an instance of its metaclass, so reading or writing a metaclass property invokes its
+accessors. Access through the metaclass itself returns the property object.
+
+```py
+from typing_extensions import deprecated
+
+class Meta(type):
+    @property
+    @deprecated("metaclass getter")
+    def value(cls) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("metaclass setter")
+    def value(cls, value: int) -> None: ...
+
+class C(metaclass=Meta): ...
+
+C.value  # error: [deprecated] "metaclass getter"
+C.value = 1  # error: [deprecated] "metaclass setter"
+Meta.value
+```
+
+## Properties on unions
+
+An access through a union can invoke a deprecated accessor even when another member's accessor is
+not deprecated.
+
+```py
+from typing_extensions import deprecated
+
+class Old:
+    @property
+    @deprecated("union getter")
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("union setter")
+    def value(self, value: int) -> None: ...
+
+class Active:
+    value: int = 0
+
+def check(value: Old | Active):
+    value.value  # error: [deprecated] "union getter"
+    value.value = 1  # error: [deprecated] "union setter"
+```
+
+An intersection can obtain its implementation from a non-deprecated member. We do not warn when that
+member provides an alternative getter or setter.
+
+```py
+def check_intersection(value: Old):
+    if isinstance(value, Active):
+        value.value
+        value.value = 1
+```
+
 ## Overloads
 
 Overloads can be deprecated, but only trigger warnings when invoked.
@@ -764,8 +918,8 @@ convert(None)  # error: [no-matching-overload]
 
 ## Specialized receivers
 
-Binding a method can remove overloads whose receiver annotations are incompatible with the
-instance. Deprecation messages still refer to the selected source overload.
+Binding a method can remove overloads whose receiver annotations are incompatible with the instance.
+Deprecation messages still refer to the selected source overload.
 
 ```py
 from typing import Generic, TypeVar, overload
