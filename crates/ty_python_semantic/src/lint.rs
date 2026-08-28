@@ -168,6 +168,12 @@ pub const fn lint_metadata_defaults(status: LintStatus) -> LintMetadata {
     serde(tag = "type", rename_all = "lowercase")
 )]
 pub enum LintStatus {
+    /// The lint is available, but its behavior is not yet stable.
+    Preview {
+        /// The version in which the lint was added.
+        since: &'static str,
+    },
+
     /// The lint is stable.
     Stable {
         /// The version in which the lint was added.
@@ -197,6 +203,10 @@ pub enum LintStatus {
 }
 
 impl LintStatus {
+    pub(crate) const fn preview(since: &'static str) -> Self {
+        LintStatus::Preview { since }
+    }
+
     pub const fn stable(since: &'static str) -> Self {
         LintStatus::Stable { since }
     }
@@ -514,7 +524,7 @@ impl std::fmt::Display for GetLintError {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum LintEntry {
-    /// An existing lint rule. Can be stable or deprecated.
+    /// An existing lint rule. Can be in preview, stable or deprecated.
     Lint(LintId),
     /// A lint rule that has been removed.
     Removed(LintId),

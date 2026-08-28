@@ -54,6 +54,7 @@ pub use types::{
 };
 
 mod db;
+pub mod dependency;
 mod dunder_all;
 mod fixes;
 mod lexical_name_path;

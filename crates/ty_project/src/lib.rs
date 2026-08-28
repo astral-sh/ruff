@@ -32,6 +32,7 @@ use std::sync::Arc;
 use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::RuleSelection;
 pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges};
 
@@ -271,6 +272,67 @@ impl Project {
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub fn program(self, db: &dyn Db) -> Program<'_> {
         Program::from_settings(db, self.program_settings(db))
+    }
+
+    /// Extract dependency information once per metadata update. Unrelated project settings and
+    /// source ranges do not invalidate import inference when the extracted information is equal.
+    #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn dependency_metadata(self, db: &dyn Db) -> Option<Box<DependencyMetadata>> {
+        let metadata = self.metadata(db);
+        let Some(workspace) = metadata.uv_workspace() else {
+            tracing::debug!(
+                "Skipping dependency checks for '{}': no uv workspace metadata is available",
+                metadata.root(),
+            );
+            return None;
+        };
+        let Some(environment) = workspace.environment() else {
+            tracing::debug!(
+                "Skipping dependency checks for '{}': uv metadata does not specify a Python environment",
+                workspace.workspace_root(),
+            );
+            return None;
+        };
+        let environment = db
+            .system()
+            .canonicalize_path(environment)
+            .inspect_err(|error| {
+                tracing::debug!(
+                    "Skipping dependency checks for '{}': could not canonicalize uv's Python environment '{environment}': {error}",
+                    workspace.workspace_root(),
+                );
+            })
+            .ok()?;
+        let Some(selected_environment) = metadata
+            .to_merged_options()
+            .python_environment(db.system())
+            .inspect_err(|error| {
+                tracing::debug!(
+                    "Skipping dependency checks for '{}': could not resolve the selected Python environment: {error}",
+                    workspace.workspace_root(),
+                );
+            })
+            .ok()?
+        else {
+            tracing::debug!(
+                "Skipping dependency checks for '{}': no Python environment is configured",
+                workspace.workspace_root(),
+            );
+            return None;
+        };
+
+        // An explicit Python environment can override uv's selection. Its installed modules may
+        // belong to different distributions, so uv's ownership map cannot describe those imports.
+        if selected_environment.sys_prefix().as_std_path() != environment.as_std_path() {
+            tracing::info!(
+                "Skipping dependency checks for '{}': selected Python environment '{}' differs from uv's environment '{environment}'",
+                workspace.workspace_root(),
+                selected_environment.sys_prefix().as_std_path().display(),
+            );
+            return None;
+        }
+
+        workspace.dependency_metadata().map(Box::new)
     }
 
     pub fn update_program(self, db: &mut dyn Db, settings: ProgramSettings) {

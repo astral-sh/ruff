@@ -517,6 +517,10 @@ impl ProjectMetadata {
         Some(diagnostic)
     }
 
+    pub(crate) fn uv_workspace(&self) -> Option<&uv::UvMetadata> {
+        self.environment.metadata.as_ref()
+    }
+
     /// Applies lower-precedence options to this project.
     ///
     /// Options applied later take precedence over options applied earlier, but all fallback options
@@ -1158,6 +1162,7 @@ unclosed table, expected `]`
         ])?;
 
         let metadata = serde_json::json!({
+            "schema": {"version": "preview"},
             "workspace_root": root,
             "environment": {
                 "root": environment,
@@ -1710,6 +1715,7 @@ unclosed table, expected `]`
         system: &TestSystem,
     ) -> anyhow::Result<ProjectEnvironment> {
         let metadata = serde_json::json!({
+            "schema": {"version": "preview"},
             "workspace_root": root,
         });
 

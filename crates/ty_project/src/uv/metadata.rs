@@ -1,12 +1,17 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use compact_str::CompactString;
 use pep440_rs::Version;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
+use ty_python_semantic::dependency::DependencyMetadata;
 
 use crate::metadata::python_version::SupportedPythonVersion;
+
+mod dependencies;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct UvMetadata {
@@ -14,6 +19,10 @@ pub(crate) struct UvMetadata {
     members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
     python_version: Option<RangedValue<SupportedPythonVersion>>,
+    schema: Schema,
+    workspace: Option<NodeReference>,
+    resolution: BTreeMap<CompactString, ResolutionNode>,
+    module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
 }
 
 impl UvMetadata {
@@ -61,7 +70,22 @@ impl UvMetadata {
             members: metadata.members,
             environment,
             python_version,
+            schema: metadata.schema,
+            workspace: metadata.workspace,
+            resolution: metadata.resolution,
+            module_owners: metadata.module_owners,
         })
+    }
+
+    pub(crate) fn dependency_metadata(&self) -> Option<DependencyMetadata> {
+        self.to_dependency_metadata()
+            .inspect_err(|error| {
+                tracing::debug!(
+                    "Skipping dependency checks for '{}': {error:#}",
+                    self.workspace_root
+                );
+            })
+            .ok()
     }
 }
 
@@ -70,6 +94,7 @@ pub(crate) struct WorkspaceMember {
     pub(crate) name: Box<str>,
     /// Directory containing the member's `pyproject.toml`.
     pub(crate) path: SystemPathBuf,
+    id: CompactString,
 }
 
 #[derive(Debug, Error)]
@@ -131,12 +156,24 @@ fn resolve_python_version(
     Ok(RangedValue::new(version, ValueSource::UvMetadata))
 }
 
+/// The uv metadata used to discover the workspace and check imports against its dependencies.
+///
+/// See uv's [schema documentation] and [serialization types] for the upstream format.
+///
+/// [schema documentation]: https://docs.astral.sh/uv/reference/internals/metadata/#schema
+/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-resolver/src/lock/export/metadata.rs
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
     workspace_root: PathBuf,
     #[serde(default)]
     members: Box<[WorkspaceMember]>,
     environment: Option<WorkspaceEnvironment>,
+    schema: Schema,
+    workspace: Option<NodeReference>,
+    #[serde(default)]
+    resolution: BTreeMap<CompactString, ResolutionNode>,
+    #[serde(default)]
+    module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
 }
 
 #[derive(Deserialize)]
@@ -150,11 +187,63 @@ struct WorkspacePython {
     version: Version,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct Schema {
+    version: SchemaVersion,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+#[serde(rename_all = "snake_case")]
+enum SchemaVersion {
+    Preview,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct ModuleOwner {
+    package_id: CompactString,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct ResolutionNode {
+    kind: NodeKind,
+    name: Option<CompactString>,
+    source: Option<Source>,
+    // uv always emits this field, even for leaves. Missing edges are incomplete metadata, not
+    // evidence that a project has no direct dependencies.
+    dependencies: Box<[NodeReference]>,
+    #[serde(default)]
+    optional_dependencies: Box<[NodeReference]>,
+    #[serde(default)]
+    dependency_groups: Box<[NodeReference]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+#[serde(rename_all = "snake_case")]
+enum NodeKind {
+    Package,
+    Extra(CompactString),
+    Group(CompactString),
+    Workspace,
+    Script,
+    Build,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct Source {
+    editable: Option<SystemPathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct NodeReference {
+    id: CompactString,
+}
+
 #[cfg(test)]
 mod tests {
     use std::assert_matches;
 
     use ruff_db::system::{SystemPath, TestSystem};
+    use serde_json::json;
 
     use super::{UvMetadata, UvMetadataError};
 
@@ -175,6 +264,7 @@ mod tests {
             .memory_file_system()
             .write_file_all("/app/pyproject.toml", "[tool.uv.workspace]")?;
         let metadata = br#"{
+            "schema": {"version": "preview"},
             "workspace_root": "/app"
         }"#;
 
@@ -183,6 +273,7 @@ mod tests {
         assert!(workspace.environment().is_none());
         assert!(workspace.python_version().is_none());
         assert!(workspace.members().is_empty());
+        assert!(workspace.dependency_metadata().is_none());
 
         Ok(())
     }
@@ -195,6 +286,7 @@ mod tests {
             ("/env/marker", ""),
         ])?;
         let metadata = br#"{
+            "schema": {"version": "preview"},
             "workspace_root": "/app",
             "environment": {
                 "root": "/env",
@@ -221,6 +313,7 @@ mod tests {
             ("/env/marker", ""),
         ])?;
         let metadata = br#"{
+            "schema": {"version": "preview"},
             "workspace_root": "/app",
             "environment": {
                 "root": "/env",
@@ -232,6 +325,41 @@ mod tests {
             UvMetadata::from_metadata(metadata, &system),
             Err(UvMetadataError::InvalidPythonVersion(_))
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_incompatible_dependency_metadata() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        system.memory_file_system().write_files_all([
+            ("/app/pyproject.toml", "[tool.uv.workspace]"),
+            ("/env/marker", ""),
+        ])?;
+        for (schema, resolution) in [
+            ("future-version", json!({})),
+            ("preview", json!(["a different format"])),
+        ] {
+            let metadata = json!({
+                "workspace_root": "/app",
+                "environment": {
+                    "root": "/env",
+                    "python": { "version": "3.13.5" }
+                },
+                "schema": { "version": schema },
+                "resolution": resolution
+            });
+
+            let metadata = serde_json::to_string_pretty(&metadata)?;
+            let error = match UvMetadata::from_metadata(metadata.as_bytes(), &system) {
+                Err(UvMetadataError::InvalidMetadata(error)) => error,
+                result => anyhow::bail!("expected invalid metadata, got {result:?}"),
+            };
+            assert!(
+                error.line() > 0 && error.line() < metadata.lines().count(),
+                "expected the error to point to its field, not the end of the response: {error}"
+            );
+        }
 
         Ok(())
     }

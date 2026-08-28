@@ -19,6 +19,7 @@ use salsa::{Database, Event, Setter};
 use ty_module_resolver::system_module_search_paths;
 use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, PythonVersionWithSource};
 
@@ -605,6 +606,14 @@ impl SemanticDb for ProjectDatabase {
         settings.analysis(self)
     }
 
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+        if Script::for_file(self, file).is_some() {
+            return None;
+        }
+
+        self.project().dependency_metadata(self)
+    }
+
     fn verbose(&self) -> bool {
         self.project().verbose(self)
     }
@@ -699,6 +708,7 @@ pub(crate) mod testing {
     use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     #[cfg(feature = "testing")]
     use ty_python_semantic::ProgramEnvironment;
+    use ty_python_semantic::dependency::DependencyMetadata;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
 
@@ -867,6 +877,14 @@ pub(crate) mod testing {
             file_settings(self, file).analysis(self)
         }
 
+        fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+            if Script::for_file(self, file).is_some() {
+                return None;
+            }
+
+            self.project().dependency_metadata(self)
+        }
+
         fn verbose(&self) -> bool {
             false
         }
@@ -903,10 +921,13 @@ pub(crate) mod testing {
 mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::{FileRootKind, system_path_to_file};
-    use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
+    use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_trivia::textwrap::dedent;
     use ty_module_resolver::list_modules;
+    use ty_python_semantic::Db as _;
 
+    use crate::db::testing::TestDb;
     use crate::watch::ChangeEvent;
     use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
 
@@ -976,6 +997,27 @@ mod tests {
         fs.write_file_all(&script, ordinary)?;
         db.apply_changes(&[ChangeEvent::file_content_changed(script)]);
         assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
+
+    // The rule is disabled by default, so checking imports should not pay the cost of
+    // extracting dependency metadata.
+    #[test]
+    fn dependency_metadata_isnt_queried_unnecessarily() -> anyhow::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let mut db = TestDb::new(ProjectMetadata::new("app", root.clone()));
+        db.write_file(
+            root.join("main.py"),
+            "import typing\nfrom typing import Any\n",
+        )?;
+        let file = system_path_to_file(&db, root.join("main.py"))?;
+
+        assert!(db.check_file(file).is_empty());
+        let events = db.take_salsa_events();
+        for query in ["missing_direct_dependency", "Project::dependency_metadata_"] {
+            assert_function_query_was_not_run_by_name(&db, query, None, &events);
+        }
 
         Ok(())
     }

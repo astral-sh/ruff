@@ -4675,6 +4675,7 @@ dependencies = [
  "ty_site_packages",
  "ty_static",
  "wild",
+ "zip",
 ]
 
 [[package]]
@@ -5000,6 +5001,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
+ "compact_str",
  "dunce",
  "mdtest",
  "ruff_db",

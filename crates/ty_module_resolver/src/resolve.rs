@@ -954,65 +954,40 @@ impl SearchPaths {
     }
 }
 
-/// Collect all dynamic search paths. For each `site-packages` path:
-/// - Collect that `site-packages` path
-/// - Collect any search paths listed in `.pth` files in that `site-packages` directory
-///   due to editable installations of third-party packages.
+/// Returns the validated roots listed in the environment's `.pth` files.
 ///
-/// The editable-install search paths for the first `site-packages` directory
-/// should come between the two `site-packages` directories when it comes to
-/// module-resolution priority.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dynamic_resolution_paths<'db>(
+/// Unlike [`search_paths`], this includes editable roots that are also first-party search paths.
+/// Those `.pth` entries still identify installed source trees, even though adding their paths to
+/// module resolution a second time would be redundant.
+pub fn editable_search_paths<'db>(
     db: &'db dyn Db,
-    mode: ModuleResolveModeIngredient<'db>,
-) -> Vec<SearchPath> {
-    tracing::debug!("Resolving dynamic module resolution paths");
-
-    let SearchPaths {
-        static_paths,
-        stdlib_path,
-        site_packages,
-        typeshed_versions: _,
-        real_stdlib_path,
-    } = mode.resolver_environment(db).search_paths(db);
-
-    let mut dynamic_paths = Vec::new();
-
-    if site_packages.is_empty() {
-        return dynamic_paths;
-    }
-
-    let mut existing_paths: FxHashSet<_> = static_paths
+    environment: ResolverEnvironment<'db>,
+) -> impl Iterator<Item = &'db SystemPath> {
+    site_packages_editables(db, environment)
         .iter()
-        .filter_map(|path| path.as_system_path())
-        .map(Cow::Borrowed)
-        .collect();
+        .flat_map(|paths| paths.editables.iter())
+        .filter_map(SearchPath::as_system_path)
+}
 
-    // Use the `ModuleResolveMode` to determine which stdlib (if any) to mark as existing
-    let stdlib = match mode.mode(db) {
-        ModuleResolveMode::Typing => stdlib_path,
-        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
-            real_stdlib_path
-        }
-    };
-    if let Some(path) = stdlib.as_ref().and_then(SearchPath::as_system_path) {
-        existing_paths.insert(Cow::Borrowed(path));
-    }
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+struct SitePackagesEditables {
+    site_packages: SearchPath,
+    editables: Box<[SearchPath]>,
+}
 
-    let files = db.files();
+/// Discover editable roots without discarding entries that overlap static search paths.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn site_packages_editables<'db>(
+    db: &'db dyn Db,
+    environment: ResolverEnvironment<'db>,
+) -> Box<[SitePackagesEditables]> {
+    let mut paths = Vec::new();
     let system = db.system();
 
-    for site_packages_search_path in site_packages {
-        let site_packages_dir = site_packages_search_path
+    for site_packages in &environment.search_paths(db).site_packages {
+        let site_packages_dir = site_packages
             .as_system_path()
             .expect("Expected site package path to be a system path");
-
-        if !existing_paths.insert(Cow::Borrowed(site_packages_dir)) {
-            continue;
-        }
-
-        dynamic_paths.push(site_packages_search_path.clone());
 
         // As well as modules installed directly into `site-packages`,
         // the directory may also contain `.pth` files.
@@ -1026,9 +1001,15 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                 tracing::warn!(
                     "Failed to search for editable installation in {site_packages_dir}: {error}"
                 );
+                paths.push(SitePackagesEditables {
+                    site_packages: site_packages.clone(),
+                    editables: Box::default(),
+                });
                 continue;
             }
         };
+
+        let mut editables = Vec::new();
 
         // The Python documentation specifies that `.pth` files in `site-packages`
         // are processed in alphabetical order. `DirectoryListing` is already sorted.
@@ -1069,39 +1050,95 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                     .canonicalize_path(&installation)
                     .unwrap_or(installation);
 
-                if existing_paths.insert(Cow::Owned(installation.clone())) {
-                    match SearchPath::editable(system, installation.clone()) {
-                        Ok(search_path) => {
-                            tracing::debug!(
-                                "Adding editable installation to module resolution path {path}",
-                                path = installation
-                            );
-
-                            // Register a file root for editable installs that are outside any other root
-                            // (Most importantly, don't register a root for editable installations from the project
-                            // directory as that would change the durability of files within those folders).
-                            // Not having an exact file root for editable installs just means that
-                            // some queries (like `list_modules_in`) will run slightly more frequently
-                            // than they would otherwise.
-                            if let Some(dynamic_path) = search_path.as_system_path() {
-                                if files.root(db, dynamic_path).is_none() {
-                                    files.try_add_root(db, dynamic_path, FileRootKind::SearchPath);
-                                }
-                            }
-
-                            dynamic_paths.push(search_path);
-                        }
-
-                        Err(error) => {
-                            tracing::debug!("Skipping editable installation: {error}");
-                        }
+                match SearchPath::editable(system, installation) {
+                    Ok(search_path) => editables.push(search_path),
+                    Err(error) => {
+                        tracing::debug!("Skipping editable installation: {error}");
                     }
                 }
             }
         }
+
+        paths.push(SitePackagesEditables {
+            site_packages: site_packages.clone(),
+            editables: editables.into_boxed_slice(),
+        });
     }
 
-    dynamic_paths
+    paths.into_boxed_slice()
+}
+
+/// Collect all dynamic search paths. For each `site-packages` path:
+/// - Collect that `site-packages` path
+/// - Collect any search paths listed in `.pth` files in that `site-packages` directory
+///   due to editable installations of third-party packages.
+///
+/// The editable-install search paths for the first `site-packages` directory
+/// should come between the two `site-packages` directories when it comes to
+/// module-resolution priority.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn dynamic_resolution_paths<'db>(
+    db: &'db dyn Db,
+    mode: ModuleResolveModeIngredient<'db>,
+) -> Box<[SearchPath]> {
+    tracing::debug!("Resolving dynamic module resolution paths");
+
+    let environment = mode.resolver_environment(db);
+    let site_packages = site_packages_editables(db, environment);
+    if site_packages.is_empty() {
+        return Box::default();
+    }
+
+    let search_paths = environment.search_paths(db);
+    let mut existing_paths: FxHashSet<_> = search_paths
+        .static_paths
+        .iter()
+        .filter_map(SearchPath::as_system_path)
+        .collect();
+
+    if let Some(path) = search_paths
+        .stdlib(mode.mode(db))
+        .and_then(SearchPath::as_system_path)
+    {
+        existing_paths.insert(path);
+    }
+
+    let mut dynamic_paths = Vec::new();
+    let files = db.files();
+
+    for paths in site_packages {
+        let site_packages_dir = paths
+            .site_packages
+            .as_system_path()
+            .expect("Expected site package path to be a system path");
+        if !existing_paths.insert(site_packages_dir) {
+            continue;
+        }
+        dynamic_paths.push(paths.site_packages.clone());
+
+        for search_path in &paths.editables {
+            let Some(path) = search_path.as_system_path() else {
+                continue;
+            };
+            if !existing_paths.insert(path) {
+                continue;
+            }
+            tracing::debug!("Adding editable installation to module resolution path {path}");
+
+            // Register a file root for editable installs that are outside any other root
+            // (Most importantly, don't register a root for editable installations from the project
+            // directory as that would change the durability of files within those folders).
+            // Not having an exact file root for editable installs just means that
+            // some queries (like `list_modules_in`) will run slightly more frequently
+            // than they would otherwise.
+            if files.root(db, path).is_none() {
+                files.try_add_root(db, path, FileRootKind::SearchPath);
+            }
+            dynamic_paths.push(search_path.clone());
+        }
+    }
+
+    dynamic_paths.into_boxed_slice()
 }
 
 /// Iterate over the available module-resolution search paths,
@@ -3364,6 +3401,10 @@ not_a_directory
             .unwrap();
 
         assert!(resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).is_some());
+        assert_eq!(
+            editable_search_paths(&db, db.resolver_environment()).collect::<Vec<_>>(),
+            [SystemPath::new("/x/src")]
+        );
 
         let pth_path = site_packages.join("_editable.pth");
         db.memory_file_system()
@@ -3371,6 +3412,10 @@ not_a_directory
             .unwrap();
         File::sync_path_only(&mut db, &pth_path);
 
+        assert_eq!(
+            editable_search_paths(&db, db.resolver_environment()).collect::<Vec<_>>(),
+            [SystemPath::new("/y/src")]
+        );
         assert!(resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).is_none());
         assert!(resolve_module_confident(&db, &ModuleName::new_static("bar").unwrap()).is_some());
     }
@@ -3451,6 +3496,10 @@ not_a_directory
             !search_paths.contains(
                 &&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()
             )
+        );
+        assert_eq!(
+            editable_search_paths(&db, db.resolver_environment()).collect::<Vec<_>>(),
+            [SystemPath::new("/src")]
         );
     }
 

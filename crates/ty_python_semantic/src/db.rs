@@ -1,3 +1,4 @@
+use crate::dependency::DependencyMetadata;
 use crate::lint::{LintRegistry, RuleSelection};
 use crate::{AnalysisSettings, PythonVersionWithSource};
 use ruff_db::diagnostic::Diagnostic;
@@ -21,6 +22,9 @@ pub trait Db: PythonCoreDb {
     fn lint_registry(&self) -> &LintRegistry;
 
     fn analysis_settings(&self, file: File) -> &AnalysisSettings;
+
+    /// Returns the package manager's dependency information for this file.
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata>;
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
@@ -194,6 +198,10 @@ pub(crate) mod tests {
 
         fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
             &self.analysis_settings
+        }
+
+        fn dependency_metadata(&self, _file: File) -> Option<&DependencyMetadata> {
+            None
         }
 
         fn verbose(&self) -> bool {
