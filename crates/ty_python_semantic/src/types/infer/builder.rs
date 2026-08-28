@@ -9417,6 +9417,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        self.check_deprecated_overloads(func.as_ref(), &bindings);
+
         if let Some(class) = class {
             pydantic::report_discarded_extra_arguments(&self.context, class, arguments, &bindings);
         }
@@ -9942,10 +9944,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => return,
         };
 
-        // Currently we only check the final implementation for deprecation, as
-        // that check can be done on any reference to the function. Analysis of
-        // deprecated overloads needs to be done in places where we resolve the
-        // actual overloads being used.
+        // References to a function only check its implementation. Deprecated overloads are
+        // checked at call sites, after resolving which signatures accept the arguments.
         let Some(deprecated) = function.implementation_deprecated(self.db()) else {
             return;
         };
@@ -9964,6 +9964,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diag.set_primary_annotation_message(message.value(self.db()));
         }
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    }
+
+    /// Check selected overloads without reporting deprecations on unused overloads or on
+    /// implementations, which are already checked when the function is referenced.
+    fn check_deprecated_overloads<T: Ranged>(&self, ranged: &T, bindings: &Bindings<'db>) {
+        let db = self.db();
+        for callables in bindings.iter_union_elements() {
+            if callables
+                .clone()
+                .all(|callable| callable.deprecated_overloads(db).next().is_some())
+            {
+                for overload in callables.flat_map(|callable| callable.deprecated_overloads(db)) {
+                    let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged)
+                    else {
+                        continue;
+                    };
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "The overload of `{}` is deprecated",
+                        overload.name(db),
+                    ));
+                    if let Some(message) = overload
+                        .deprecated(db)
+                        .and_then(|deprecated| deprecated.message)
+                    {
+                        diagnostic.set_primary_annotation_message(message.value(db));
+                    }
+                    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+                }
+            }
+        }
     }
 
     /// Report a deprecated callable only when its union alternative has no non-deprecated

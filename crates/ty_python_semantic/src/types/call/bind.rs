@@ -4396,6 +4396,30 @@ impl<'db> CallableBinding<'db> {
             .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
+    /// Returns deprecated source overloads selected by this call, preserving their identities
+    /// when receiver binding has filtered or reordered the callable's signatures.
+    pub(crate) fn deprecated_overloads(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = OverloadLiteral<'db>> + Clone {
+        let function = match self.signature_type {
+            Type::FunctionLiteral(function) => Some(function),
+            Type::BoundMethod(bound) => Some(bound.function(db)),
+            _ => None,
+        };
+        let overloads = function
+            .filter(|function| function.implementation_deprecated(db).is_none())
+            .map(|function| function.overloads_and_implementation(db).0)
+            .unwrap_or_default();
+
+        self.matching_overloads().filter_map(move |(_, binding)| {
+            overloads
+                .get(binding.source_overload_index())
+                .copied()
+                .filter(|overload| overload.deprecated(db).is_some())
+        })
+    }
+
     /// Returns the overload which call arguments should be inferred against, if every overload is
     /// non-matching.
     pub(crate) fn best_failing_overload(&self) -> Option<&Binding<'db>> {

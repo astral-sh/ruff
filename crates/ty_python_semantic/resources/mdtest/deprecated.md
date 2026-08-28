@@ -611,7 +611,8 @@ def f(x):
     print(x)
 
 f(1)
-f("hello")  # TODO: error: [deprecated] "strings are no longer supported"
+f("hello")  # error: [deprecated] "strings are no longer supported"
+f  # Referring to the overloaded function does not select an overload.
 ```
 
 If the actual impl is deprecated, the deprecation always fires.
@@ -630,4 +631,76 @@ def f(x):
 
 f(1)  # error: [deprecated] "unusable"
 f("hello")  # error: [deprecated] "unusable"
+```
+
+## Overload selection
+
+Calls with union arguments can select multiple overloads. We report a deprecation if one of those
+overloads is deprecated, but do not report one when no overload accepts the arguments.
+
+```py
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("use a string")
+def convert(value: int) -> str: ...
+@overload
+def convert(value: str) -> str: ...
+def convert(value: int | str) -> str:
+    return str(value)
+
+def check(value: int | str):
+    convert(value)  # error: [deprecated] "use a string"
+
+convert(1)  # error: [deprecated] "use a string"
+convert("one")
+convert(None)  # error: [no-matching-overload]
+```
+
+## Specialized receivers
+
+Binding a method can remove overloads whose receiver annotations are incompatible with the
+instance. Deprecation messages still refer to the selected source overload.
+
+```py
+from typing import Generic, TypeVar, overload
+from typing_extensions import deprecated
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    @overload
+    def method(self: "C[int]", value: int) -> int: ...
+    @overload
+    @deprecated("string method")
+    def method(self: "C[str]", value: str) -> str: ...
+    def method(self, value: int | str) -> int | str:
+        return value
+
+def check(integer: C[int], string: C[str]):
+    integer.method(1)
+    string.method("one")  # error: [deprecated] "string method"
+```
+
+## Deprecated overload and implementation
+
+When both the implementation and a selected overload are deprecated, the reference to the function
+already reports the implementation's deprecation. We do not emit a second diagnostic for the call.
+
+```py
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("integer overload")
+def convert(value: int) -> str: ...
+@overload
+def convert(value: str) -> str: ...
+@deprecated("entire function")
+def convert(value: int | str) -> str:
+    return str(value)
+
+convert(1)  # error: [deprecated] "entire function"
+convert("one")  # error: [deprecated] "entire function"
 ```
