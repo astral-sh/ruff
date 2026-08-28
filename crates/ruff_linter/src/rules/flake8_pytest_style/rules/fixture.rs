@@ -386,8 +386,13 @@ impl Violation for PytestFixtureParamWithoutValue {
 /// Checks for `pytest.yield_fixture` usage.
 ///
 /// ## Why is this bad?
-/// `pytest.yield_fixture` has been deprecated since pytest 6.2, and is a plain
-/// alias for `pytest.fixture`. `pytest.fixture` should be used instead.
+/// `pytest.fixture` has supported `yield` since pytest 3.0, which left
+/// `pytest.yield_fixture` as a plain alias for it. The alias has been
+/// deprecated since pytest 6.2, now raises a `PytestRemovedIn10Warning`, and
+/// will be removed in pytest 10.
+///
+/// The two are the same function, so switching to `pytest.fixture` is a
+/// rename with no other consequence.
 ///
 /// ## Example
 /// ```python
