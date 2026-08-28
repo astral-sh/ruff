@@ -6,8 +6,8 @@ source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 +linter.preview = enabled
 
 --- Summary ---
-Removed: 5
-Added: 5
+Removed: 6
+Added: 6
 
 --- Removed ---
 PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
@@ -62,6 +62,21 @@ PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
    |     ^^^^^^^^^^^^^^^^^^^^^^^
 36 |     def error_in_class(self):
 37 |         return 0
+   |
+help: Replace with `pytest.fixture`
+
+
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+  --> PT020.py:40:1
+   |
+40 | / @(
+41 | |     pytest
+42 | |     # comment
+43 | |     .yield_fixture
+44 | | )
+   | |_^
+45 |   def error_with_comment_in_reference():
+46 |       return 0
    |
 help: Replace with `pytest.fixture`
 
@@ -152,3 +167,27 @@ help: Replace with `pytest.fixture`
 35 +     @pytest.fixture()
 36 |     def error_in_class(self):
    |
+
+
+PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+  --> PT020.py:40:1
+   |
+40 | / @(
+41 | |     pytest
+42 | |     # comment
+43 | |     .yield_fixture
+44 | | )
+   | |_^
+45 |   def error_with_comment_in_reference():
+46 |       return 0
+   |
+help: Replace with `pytest.fixture`
+   |
+40 | @(
+   -     pytest
+   -     # comment
+   -     .yield_fixture
+41 +     pytest.fixture
+42 | )
+   |
+note: This is an unsafe fix and may change runtime behavior

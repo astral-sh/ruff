@@ -414,10 +414,10 @@ impl Violation for PytestFixtureParamWithoutValue {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe. The pytest documentation describes
-/// `pytest.yield_fixture` as an alias that "has been so for a very long time,
-/// so it can be searched/replaced safely"; the only behavioral difference is
-/// the deprecation warning that `pytest.yield_fixture` emits.
+/// This rule's fix is marked as safe, unless the decorator contains comments
+/// that the fix would remove. `pytest.yield_fixture` and `pytest.fixture` are
+/// the same function; the only behavioral difference is the deprecation
+/// warning that `pytest.yield_fixture` emits.
 ///
 /// ## References
 /// - [`pytest` documentation: the `yield_fixture` function/decorator](https://docs.pytest.org/en/stable/deprecations.html#the-yield-fixture-function-decorator)
@@ -936,15 +936,25 @@ fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
         }
 
         let reference = map_callable(&decorator.expression);
+
+        // Mark the fix as unsafe when comments are in range, as replacing the
+        // reference would remove them.
+        let applicability = if checker.comment_ranges().intersects(reference.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("pytest", "fixture"),
                 reference.start(),
                 checker.semantic(),
             )?;
-            Ok(Fix::safe_edits(
+            Ok(Fix::applicable_edits(
                 import_edit,
                 [Edit::range_replacement(binding, reference.range())],
+                applicability,
             ))
         });
     }
