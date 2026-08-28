@@ -15,7 +15,7 @@ use crate::{Db, FxOrderSet};
 pub(crate) mod builder;
 mod generic_gradual_intersections;
 
-pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use builder::{DeferredUnionBuild, IntersectionBuilder, UnionBuilder};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -138,17 +138,16 @@ impl<'db> UnionType<'db> {
         Self::from_elements(db, env, self.elements(db).iter().copied())
     }
 
-    /// Expands aliases without starting a nested type-relation query for recursive aliases.
+    /// Expands aliases while deferring the remainder of a growing recursive alias.
     ///
-    /// Non-recursive aliases retain the normal relation-aware normalization. The caller supplies
-    /// the redundancy proof for a deferred growing alias because it already owns the surrounding
-    /// relation checker.
-    pub(crate) fn expand_aliases_with_recursive_alias_remainder_check(
+    /// Non-recursive aliases retain the normal relation-aware normalization. The caller can
+    /// inspect the deferred remainder and prove it redundant without starting a nested
+    /// type-relation query.
+    pub(crate) fn expand_aliases_with_deferred_recursive_alias_remainder(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        is_redundant: impl FnMut(Type<'db>, Type<'db>) -> bool,
-    ) -> Type<'db> {
+    ) -> DeferredUnionBuild<'db> {
         let mut recursive = Vec::new();
         let mut non_recursive = UnionBuilder::new(db, env);
 
@@ -165,7 +164,7 @@ impl<'db> UnionType<'db> {
 
         let non_recursive = non_recursive.build();
         if recursive.is_empty() {
-            return non_recursive;
+            return DeferredUnionBuild::from_resolved(db, env, non_recursive);
         }
 
         recursive
@@ -174,7 +173,7 @@ impl<'db> UnionType<'db> {
                 UnionBuilder::structural(db, env).add(non_recursive),
                 UnionBuilder::add,
             )
-            .build_with_recursive_alias_remainder_check(is_redundant)
+            .build_deferred()
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(

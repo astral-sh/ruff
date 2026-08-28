@@ -546,6 +546,79 @@ pub(crate) struct UnionBuilder<'db> {
     recursively_defined: RecursivelyDefined,
 }
 
+/// A normalized union whose growing alias remainder has not yet been resolved.
+pub(crate) struct DeferredUnionBuild<'db> {
+    current: Option<Type<'db>>,
+    recursive_alias_remainder: Option<Type<'db>>,
+    db: &'db dyn Db,
+    env: ProgramEnvironment<'db>,
+    cycle_recovery: bool,
+    normalization: NormalizationMode,
+}
+
+impl<'db> DeferredUnionBuild<'db> {
+    /// Creates a build whose union is already fully resolved.
+    pub(crate) fn from_resolved(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        current: Type<'db>,
+    ) -> Self {
+        Self {
+            current: Some(current),
+            recursive_alias_remainder: None,
+            db,
+            env: env.clone(),
+            cycle_recovery: false,
+            normalization: NormalizationMode::RelationAware,
+        }
+    }
+
+    /// Returns the deferred remainder and the union that has already been normalized.
+    ///
+    /// The pair is only available when proving the remainder redundant could affect the result.
+    pub(crate) fn recursive_alias_remainder(&self) -> Option<(Type<'db>, Type<'db>)> {
+        Some((self.recursive_alias_remainder?, self.current?))
+    }
+
+    /// Finishes the build after deciding whether the deferred remainder is redundant.
+    ///
+    /// `is_redundant` must only be `true` when the remainder returned by
+    /// [`Self::recursive_alias_remainder`] has been proved redundant.
+    pub(crate) fn finish(self, is_redundant: bool) -> Type<'db> {
+        self.try_finish(is_redundant).unwrap_or(Type::Never)
+    }
+
+    fn try_finish(self, is_redundant: bool) -> Option<Type<'db>> {
+        let Self {
+            current,
+            recursive_alias_remainder,
+            db,
+            env,
+            cycle_recovery,
+            normalization,
+        } = self;
+
+        if recursive_alias_remainder.is_none() {
+            return current;
+        }
+        if current.is_some() && is_redundant {
+            return current;
+        }
+
+        // The unexpanded remainder may contribute union members that are not represented by the
+        // current union. Dropping it would under-approximate the alias, so cover those members
+        // with `Unknown` when redundancy cannot be proven.
+        let mut fallback = UnionBuilder::with_normalization(db, &env, normalization)
+            .unpack_aliases(false)
+            .cycle_recovery(cycle_recovery);
+        if let Some(current) = current {
+            fallback.add_in_place(current);
+        }
+        fallback.add_in_place(Type::unknown());
+        fallback.try_build_resolved()
+    }
+}
+
 /// Accumulates types into a union.
 ///
 /// Most real-world type variables only accumulate one or two constraints. We keep those cases as
@@ -1261,59 +1334,38 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        if self.normalization.uses_relations() && !self.cycle_recovery {
-            let db = self.db;
-            let env = self.env.clone();
-            self.try_build_with_recursive_alias_remainder_check(|remainder, current| {
-                remainder.is_redundant_with(db, &env, current)
-            })
-        } else {
-            self.try_build_with_recursive_alias_remainder_check(|_, _| false)
-        }
+        let uses_relations = self.normalization.uses_relations() && !self.cycle_recovery;
+        let db = self.db;
+        let env = self.env.clone();
+        let build = self.build_deferred();
+        let is_redundant = uses_relations
+            && build
+                .recursive_alias_remainder()
+                .is_some_and(|(remainder, current)| remainder.is_redundant_with(db, &env, current));
+        build.try_finish(is_redundant)
     }
 
-    /// Builds the union using a caller-provided semantic check for deferred recursive aliases.
+    /// Builds the non-recursive part of the union while retaining any growing alias remainder.
     ///
-    /// This lets a caller that already owns a type-relation checker avoid starting a nested
-    /// relation query while preserving the same recursive-alias fallback semantics. The callback
-    /// must return `true` only when the remainder is proved redundant; `false` retains `Unknown`.
-    pub(crate) fn build_with_recursive_alias_remainder_check(
-        self,
-        is_redundant: impl FnMut(Type<'db>, Type<'db>) -> bool,
-    ) -> Type<'db> {
-        self.try_build_with_recursive_alias_remainder_check(is_redundant)
-            .unwrap_or(Type::Never)
-    }
-
-    fn try_build_with_recursive_alias_remainder_check(
-        mut self,
-        mut is_redundant: impl FnMut(Type<'db>, Type<'db>) -> bool,
-    ) -> Option<Type<'db>> {
-        let remainder = self.recursive_alias_remainder.take();
+    /// A caller that already owns a type-relation checker can inspect the remainder, perform its
+    /// semantic check without starting a nested query, and pass the resulting boolean to
+    /// [`DeferredUnionBuild::finish`].
+    pub(crate) fn build_deferred(mut self) -> DeferredUnionBuild<'db> {
+        let recursive_alias_remainder = self.recursive_alias_remainder.take();
         let db = self.db;
         let env = self.env.clone();
         let cycle_recovery = self.cycle_recovery;
         let normalization = self.normalization;
         let current = self.try_build_resolved();
 
-        let Some(remainder) = remainder else {
-            return current;
-        };
-        if current.is_some_and(|current| is_redundant(remainder, current)) {
-            return current;
+        DeferredUnionBuild {
+            current,
+            recursive_alias_remainder,
+            db,
+            env,
+            cycle_recovery,
+            normalization,
         }
-
-        // The unexpanded remainder may contribute union members that are not represented by the
-        // current union. Dropping it would under-approximate the alias, so cover those members
-        // with `Unknown` when redundancy cannot be proven.
-        let mut fallback = UnionBuilder::with_normalization(db, &env, normalization)
-            .unpack_aliases(false)
-            .cycle_recovery(cycle_recovery);
-        if let Some(current) = current {
-            fallback.add_in_place(current);
-        }
-        fallback.add_in_place(Type::unknown());
-        fallback.try_build_resolved()
     }
 
     fn try_build_resolved(self) -> Option<Type<'db>> {

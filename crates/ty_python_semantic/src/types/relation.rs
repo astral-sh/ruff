@@ -1477,7 +1477,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // absent, so force the sound `Unknown` fallback.
                     let expanded = UnionBuilder::structural(db, env)
                         .add(source)
-                        .build_with_recursive_alias_remainder_check(|_, _| false);
+                        .build_deferred()
+                        .finish(false);
                     self.check_type_pair(db, expanded, target)
                 })
             }
@@ -1499,11 +1500,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(db, source, target, || {
-                    let expanded = union.expand_aliases_with_recursive_alias_remainder_check(
-                        db,
-                        env,
-                        |remainder, current| self.is_redundant_with(db, remainder, current),
+                    let expansion =
+                        union.expand_aliases_with_deferred_recursive_alias_remainder(db, env);
+                    let is_redundant = expansion.recursive_alias_remainder().is_some_and(
+                        |(remainder, current)| self.is_redundant_with(db, remainder, current),
                     );
+                    let expanded = expansion.finish(is_redundant);
                     self.check_type_pair(db, source, expanded)
                 })
             }
