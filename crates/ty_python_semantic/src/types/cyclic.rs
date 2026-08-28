@@ -384,16 +384,23 @@ impl<'db> RecursiveDefinition<'db> {
     }
 
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
-        if self.parameters(db).next().is_none() {
-            let scope = self.definition(db).scope(db);
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn has_enclosing_generic_context<'db>(
+            db: &'db dyn Db,
+            definition: Definition<'db>,
+        ) -> bool {
+            let scope = definition.scope(db);
             let index = semantic_index(db, scope.program_file(db));
-            // Without a formal or enclosing parameter, recursive references cannot produce a new
-            // specialization. Keep this outside the tracked query so definitions with no source
-            // of specialization do not create entries.
-            if enclosing_generic_contexts(db, index, scope.file_scope_id(db))
+            enclosing_generic_contexts(db, index, scope.file_scope_id(db))
                 .next()
-                .is_none()
-            {
+                .is_some()
+        }
+
+        if self.parameters(db).next().is_none() {
+            // Without a formal or enclosing parameter, recursive references cannot produce a new
+            // specialization. Keep this outside the flow-graph query so definitions with no source
+            // of specialization do not create graph entries.
+            if !has_enclosing_generic_context(db, self.definition(db)) {
                 return false;
             }
         }
