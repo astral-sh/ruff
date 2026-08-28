@@ -209,9 +209,7 @@ impl ProjectMetadata {
             let metadata = uv::Uv::new(system)
                 .map_err(uv::uv_executable_error)
                 .map_err(uv::UvMetadataError::Invocation)
-                .and_then(|uv| {
-                    uv.metadata(system, &uv::MetadataTarget::Workspace(path.to_path_buf()))
-                });
+                .and_then(|uv| uv.metadata(system, &uv::MetadataTarget::Workspace(path)));
 
             match metadata {
                 Ok(metadata) => ProjectEnvironment {

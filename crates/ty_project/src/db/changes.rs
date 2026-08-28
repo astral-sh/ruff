@@ -1,6 +1,7 @@
 use crate::db::{Db, ProjectDatabase};
+use crate::script::script_tag;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
-use crate::{ProjectMetadata, ProjectReloadResult, ProjectSyncProgressFactory};
+use crate::{ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
 
 use crate::walk::{ProjectFilesWalker, create_walker_builder};
@@ -13,7 +14,9 @@ use ty_python_core::program::FallibleStrategy;
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
     project_changed: bool,
+    project_sync_path: Option<SystemPathBuf>,
     custom_stdlib_changed: bool,
+    changed_files: ChangedFiles,
 }
 
 impl ChangeResult {
@@ -22,24 +25,77 @@ impl ChangeResult {
         self.project_changed
     }
 
+    /// The directory whose uv project metadata needs refreshing, if any.
+    ///
+    /// This may be an ancestor of the previous project root if that directory was deleted.
+    pub fn project_sync_path(&self) -> Option<&SystemPath> {
+        self.project_sync_path.as_deref()
+    }
+
     /// Returns `true` if the custom stdlib's VERSIONS file has changed.
     pub fn custom_stdlib_changed(&self) -> bool {
         self.custom_stdlib_changed
     }
+
+    /// Returns the scripts whose environments may need synchronization after these file events.
+    ///
+    /// Returns no scripts if the project was unindexed when the changes were applied.
+    /// Otherwise, only includes scripts in [`crate::Project::files`], reindexing if needed.
+    ///
+    /// The result may include scripts with unsaved changes to their PEP 723 metadata.
+    /// Callers must defer environment synchronization until those changes are saved:
+    /// uv reads the file from disk, not the editor buffer.
+    pub fn scripts_to_synchronize(&self, db: &dyn Db) -> Vec<File> {
+        match &self.changed_files {
+            ChangedFiles::Unindexed => Vec::new(),
+            ChangedFiles::Known(changed_files) => {
+                if changed_files.is_empty() {
+                    return Vec::new();
+                }
+
+                let indexed = db.project().files(db);
+                changed_files
+                    .intersection(indexed.scripts())
+                    .copied()
+                    .collect()
+            }
+            ChangedFiles::Unknown => db.project().files(db).scripts().iter().copied().collect(),
+        }
+    }
+}
+
+enum ChangedFiles {
+    /// The project was unindexed when the changes were applied.
+    Unindexed,
+    /// The set of files that were created, opened, or modified. This set may be empty.
+    ///
+    /// For example, editing `main.py` includes that file. Files excluded by path or ignore rules
+    /// are not listed.
+    ///
+    /// The project's files are indexed and reflect these changes when
+    /// [`ProjectDatabase::apply_changes`] returns.
+    Known(FxHashSet<File>),
+    /// The project was indexed, but the set of changed files is unknown.
+    ///
+    /// For example, a directory event may represent many new files, or editing `.gitignore`
+    /// or `src.exclude` may change which files belong to the project.
+    Unknown,
+}
+
+impl ChangedFiles {
+    fn mark_unknown(&mut self) {
+        if matches!(self, Self::Known(_)) {
+            *self = Self::Unknown;
+        }
+    }
 }
 
 impl ProjectDatabase {
-    pub fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
-        self.apply_changes_with_progress(changes, &|_, _| None)
-    }
-
-    /// Applies file changes, reporting progress if project metadata must be refreshed.
+    /// Applies file changes to the database.
+    ///
+    /// Any required uv synchronization is returned in [`ChangeResult`] for the caller to schedule.
     #[tracing::instrument(level = "debug", skip_all)]
-    pub fn apply_changes_with_progress(
-        &mut self,
-        changes: &[ChangeEvent],
-        make_progress: &ProjectSyncProgressFactory<'_>,
-    ) -> ChangeResult {
+    pub fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
         let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
@@ -50,7 +106,13 @@ impl ProjectDatabase {
 
         let mut result = ChangeResult {
             project_changed: false,
+            project_sync_path: None,
             custom_stdlib_changed: false,
+            changed_files: if project.file_set(self).is_lazy() {
+                ChangedFiles::Unindexed
+            } else {
+                ChangedFiles::Known(FxHashSet::default())
+            },
         };
         // Paths whose project files should be discovered incrementally.
         let mut added_paths = BTreeSet::default();
@@ -110,6 +172,7 @@ impl ProjectDatabase {
                             );
 
                             removed_paths.insert(directory.to_path_buf());
+                            result.changed_files.mark_unknown();
 
                             if self.system().path_exists(directory) {
                                 added_paths.insert(directory.to_path_buf());
@@ -132,14 +195,15 @@ impl ProjectDatabase {
             }
 
             match change {
-                ChangeEvent::Changed { path, kind: _ } => {
-                    if synced_files.insert(path.to_path_buf()) {
-                        File::sync_path_only(self, path);
-                    }
-                }
-
-                ChangeEvent::Opened(path) | ChangeEvent::Created { path, .. } => {
+                ChangeEvent::Changed { path, .. }
+                | ChangeEvent::Opened(path)
+                | ChangeEvent::Created { path, .. } => {
                     match change {
+                        ChangeEvent::Changed { .. } => {
+                            if synced_files.insert(path.to_path_buf()) {
+                                File::sync_path_only(self, path);
+                            }
+                        }
                         ChangeEvent::Opened(_)
                         | ChangeEvent::Created {
                             kind: CreatedKind::File,
@@ -154,11 +218,18 @@ impl ProjectDatabase {
                         }
                     }
 
-                    // A created file can be indexed directly unless project indexing needs the
-                    // walker to apply ignore-file semantics. The ignore check below skips that
-                    // walk when the path is ignored.
                     if !project.file_set(self).is_lazy() {
-                        if self.system().is_file(path) {
+                        // A `Changed` event only updates known files. Opening or creating a file can
+                        // introduce a new one, but only after it passes the filters below.
+                        let is_file = if change.is_changed() {
+                            self.files()
+                                .try_system(self, path)
+                                .is_some_and(|file| file.exists(self))
+                        } else {
+                            self.system().is_file(path)
+                        };
+
+                        if is_file {
                             if !project
                                 .is_file_included(self, path)
                                 .should_index_file(self.system(), path)
@@ -171,7 +242,23 @@ impl ProjectDatabase {
                                 .is_none_or(|ignore_files| !ignore_files.is_ignored(path, false))
                                 && let Ok(file) = system_path_to_file(self, path)
                             {
-                                project.add_file(self, file);
+                                let is_script = script_tag(self, file).is_some();
+                                // Explicitly included files are checked even when scripts are otherwise excluded.
+                                let exclude_script = is_script
+                                    && project.settings(self).src().exclude_scripts
+                                    && !project.is_file_explicitly_included(self, file);
+
+                                if exclude_script {
+                                    project.remove_file(self, file);
+                                } else {
+                                    project.add_file(self, file, is_script);
+                                }
+
+                                if let ChangedFiles::Known(changed_files) =
+                                    &mut result.changed_files
+                                {
+                                    changed_files.insert(file);
+                                }
                             }
                         } else if change.is_created()
                             && project.is_directory_included(self, path)
@@ -182,6 +269,7 @@ impl ProjectDatabase {
                             // Unlike a new file, a new directory needs walking to discover
                             // project files that exist below it.
                             added_paths.insert(path.clone());
+                            result.changed_files.mark_unknown();
                         }
                     }
                 }
@@ -259,8 +347,7 @@ impl ProjectDatabase {
             if metadata.use_uv().workspace_discovery_enabled()
                 && metadata.config_file_override().is_none()
             {
-                self.uv_environments()
-                    .request_project_sync(self, path, make_progress);
+                result.project_sync_path = Some(path.to_path_buf());
             } else {
                 // We're not refreshing uv metadata, so use the existing environment.
                 let environment = metadata.environment().clone();
@@ -268,8 +355,9 @@ impl ProjectDatabase {
                     Ok(ProjectReloadResult::Unchanged) => {}
                     Ok(ProjectReloadResult::Changed { files_changed }) => {
                         result.project_changed = true;
+                        result.changed_files.mark_unknown();
                         if files_changed {
-                            // The project file set has already been rebuilt; continuing would
+                            // The project file set has been invalidated; continuing would
                             // run incremental discovery from paths collected before the reload.
                             return result;
                         }
@@ -281,6 +369,7 @@ impl ProjectDatabase {
                         );
                         if reload_project_files {
                             project.reload_files(self);
+                            result.changed_files.mark_unknown();
                             return result;
                         }
                     }
@@ -290,6 +379,7 @@ impl ProjectDatabase {
 
         if reload_project_files {
             project.reload_files(self);
+            result.changed_files.mark_unknown();
             // A full project-file reload supersedes incremental project-file updates.
             added_paths.clear();
             removed_paths.clear();
@@ -331,7 +421,7 @@ impl ProjectDatabase {
             let (files, diagnostics) = walker.collect_vec(self);
 
             for file in files {
-                project.add_file(self, file);
+                project.add_file(self, file.file, file.is_script);
             }
 
             diagnostics

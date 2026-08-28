@@ -42,6 +42,7 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod script_preparation;
 mod semantic_tokens;
 mod signature_help;
 mod type_hierarchy;
@@ -603,23 +604,34 @@ impl TestServer {
         self.send(Message::Response(Response::new_ok(id, ())));
     }
 
-    /// Checks server-created progress with a begin and end notification and no intermediate reports.
+    /// Checks server-created progress with matching begin, report, and end notifications.
     #[cfg(feature = "test-uv")]
     #[track_caller]
-    pub(crate) fn assert_work_done_progress(&mut self, expected_title: &str) -> Result<()> {
+    pub(crate) fn assert_work_done_progress(
+        &mut self,
+        expected_title: &str,
+    ) -> Result<lsp_types::WorkDoneProgressEnd> {
         let (request_id, progress) =
             self.await_request::<lsp_types::WorkDoneProgressCreateRequest>();
         self.send(Message::Response(Response::new_ok(request_id, ())));
 
         let begin = self.await_notification::<lsp_types::ProgressNotification>();
         assert_eq!(begin.token, progress.token);
+        assert_eq!(begin.value["kind"], "begin");
         let begin: lsp_types::WorkDoneProgressBegin = serde_json::from_value(begin.value)?;
         assert_eq!(begin.title, expected_title);
 
-        let end = self.await_notification::<lsp_types::ProgressNotification>();
-        assert_eq!(end.token, progress.token);
-        let _: lsp_types::WorkDoneProgressEnd = serde_json::from_value(end.value)?;
-        Ok(())
+        loop {
+            let notification = self.await_notification::<lsp_types::ProgressNotification>();
+            assert_eq!(notification.token, progress.token);
+            if notification.value["kind"] == "report" {
+                let _: lsp_types::WorkDoneProgressReport =
+                    serde_json::from_value(notification.value)?;
+            } else {
+                assert_eq!(notification.value["kind"], "end");
+                return Ok(serde_json::from_value(notification.value)?);
+            }
+        }
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and

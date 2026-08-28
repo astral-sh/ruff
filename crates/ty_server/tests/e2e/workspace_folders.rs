@@ -11,7 +11,7 @@ use crate::{
     TestServer, TestServerBuilder,
     pull_diagnostics::{
         assert_workspace_diagnostics_suspends_for_long_polling, send_workspace_diagnostic_request,
-        shutdown_and_await_workspace_diagnostic,
+        shutdown_and_await_workspace_diagnostic, sort_workspace_diagnostic_response,
     },
 };
 
@@ -723,7 +723,10 @@ fn global_settings_change() -> Result<()> {
 /// LSP is correctly recognizing and reporting diagnostics for each
 /// workspace folder. This isn't really meant to test the diagnostics
 /// themselves, hence the condensed output.
-fn condensed_workspace_diagnostic_snapshot(report: WorkspaceDiagnosticReport) -> String {
+pub(crate) fn condensed_workspace_diagnostic_snapshot(
+    mut report: WorkspaceDiagnosticReport,
+) -> String {
+    sort_workspace_diagnostic_response(&mut report);
     let items = report.items;
     items
         .into_iter()

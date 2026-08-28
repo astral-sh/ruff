@@ -56,7 +56,12 @@ impl LazyWorkDoneProgress {
         Self::new_inner(
             client,
             request_token,
-            title,
+            WorkDoneProgressBegin {
+                title: title.to_string(),
+                cancellable: Some(false),
+                message: None,
+                percentage: Some(0),
+            },
             capabilities,
             ProgressCreation::Queue,
         )
@@ -70,13 +75,13 @@ impl LazyWorkDoneProgress {
     /// deadlock because the main loop cannot drain its own queue until this call returns.
     pub(crate) fn new_on_main_loop(
         client: &Client,
-        title: &str,
+        begin: WorkDoneProgressBegin,
         capabilities: ResolvedClientCapabilities,
     ) -> Self {
         Self::new_inner(
             client,
             None,
-            title,
+            begin,
             capabilities,
             ProgressCreation::TryQueue,
         )
@@ -85,7 +90,7 @@ impl LazyWorkDoneProgress {
     fn new_inner(
         client: &Client,
         request_token: Option<ProgressToken>,
-        title: &str,
+        begin: WorkDoneProgressBegin,
         capabilities: ResolvedClientCapabilities,
         creation: ProgressCreation,
     ) -> Self {
@@ -98,7 +103,7 @@ impl LazyWorkDoneProgress {
         };
 
         if let Some(token) = request_token {
-            if Self::send_begin(client, token.clone(), title.to_string()) {
+            if Self::send_begin(client, token.clone(), begin) {
                 work_done
                     .inner
                     .token
@@ -112,13 +117,12 @@ impl LazyWorkDoneProgress {
                 SERVER_WORK_DONE_TOKENS.fetch_add(1, Ordering::Relaxed)
             ));
             let work_done = work_done.clone();
-            let title = title.to_string();
 
             let params = WorkDoneProgressCreateParams {
                 token: token.clone(),
             };
             let response_handler = move |client: &Client, ()| {
-                if Self::send_begin(client, token.clone(), title) {
+                if Self::send_begin(client, token.clone(), begin) {
                     work_done
                         .inner
                         .token
@@ -152,6 +156,8 @@ impl LazyWorkDoneProgress {
     }
 
     /// Sends a progress report with the given message and optional percentage.
+    ///
+    /// Reports sent before the client acknowledges progress creation are dropped.
     pub(super) fn report_progress(&self, message: impl Display, percentage: Option<u32>) {
         let Some(token) = self.inner.token.get() else {
             return;
@@ -170,16 +176,11 @@ impl LazyWorkDoneProgress {
             });
     }
 
-    fn send_begin(client: &Client, token: ProgressToken, title: String) -> bool {
+    fn send_begin(client: &Client, token: ProgressToken, begin: WorkDoneProgressBegin) -> bool {
         client.try_send_notification::<lsp_types::ProgressNotification>(ProgressParams {
             token,
-            value: serde_json::to_value(WorkDoneProgressBegin {
-                title,
-                cancellable: Some(false),
-                message: None,
-                percentage: Some(0),
-            })
-            .expect("Failed to serialize work done progress begin"),
+            value: serde_json::to_value(begin)
+                .expect("Failed to serialize work done progress begin"),
         })
     }
 }

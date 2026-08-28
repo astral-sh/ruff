@@ -1069,7 +1069,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     Ok(())
 }
 
-fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReport) {
+pub(crate) fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReport) {
     sort_workspace_report_items(&mut response.items);
 }
 

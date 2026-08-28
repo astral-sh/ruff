@@ -969,6 +969,138 @@ fn changed_file() -> anyhow::Result<()> {
 }
 
 #[test]
+fn scripts_to_synchronize_after_file_and_directory_changes() -> anyhow::Result<()> {
+    let script = dedent(
+        r"
+        # /// script
+        # dependencies = []
+        # ///
+        ",
+    );
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("existing.py", &script)?;
+        context.write_project_file("edited.py", "")?;
+        context.write_file("new/script.py", &script)
+    })?;
+    let edited = case.project_path("edited.py");
+    assert_eq!(
+        case.db().project().script_files(case.db()).iter().count(),
+        1
+    );
+
+    update_file(&edited, &script)?;
+
+    let changes = case.take_watch_changes(event_for_file("edited.py"));
+    let changes = case.apply_changes(&changes);
+    assert_eq!(
+        changes.scripts_to_synchronize(case.db()),
+        vec![case.system_file(&edited)?]
+    );
+
+    std::fs::rename(
+        case.root_path().join("new").as_std_path(),
+        case.project_path("new").as_std_path(),
+    )?;
+    let mut changes = case.take_watch_changes(event_for_file("new"));
+    update_file(&edited, "")?;
+    changes.extend(case.stop_watch(event_for_file("edited.py")));
+
+    // Directory discovery also includes unchanged scripts, but `edited.py` no longer
+    // contains a PEP 723 script metadata block.
+    let changes = case.apply_changes(&changes);
+    assert_eq!(
+        changes
+            .scripts_to_synchronize(case.db())
+            .into_iter()
+            .collect::<HashSet<_>>(),
+        HashSet::from([
+            case.system_file(case.project_path("existing.py"))?,
+            case.system_file(case.project_path("new/script.py"))?,
+        ])
+    );
+
+    Ok(())
+}
+
+#[test]
+fn script_exclusion_tracks_file_creation_and_metadata_edits() -> anyhow::Result<()> {
+    let mut case = setup([(
+        "ty.toml",
+        r"
+        [src]
+        exclude-scripts = true
+        ",
+    )])?;
+    let path = case.project_path("script.py");
+    let script = r"
+        # /// script
+        # dependencies = []
+        # ///
+        missing
+        ";
+    assert!(case.db().check().is_empty());
+
+    std::fs::write(path.as_std_path(), dedent(script).as_ref())?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    let changes = case.apply_changes(&changes);
+    assert!(changes.scripts_to_synchronize(case.db()).is_empty());
+    let file = case.system_file(&path)?;
+    assert!(case.db().check().is_empty());
+    assert!(case.db().check_file(file).is_empty());
+
+    update_file(&path, "missing\n")?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
+
+    update_file(&path, script)?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert!(case.db().check().is_empty());
+    assert!(case.db().check_file(file).is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn explicitly_included_file_remains_checked_when_becoming_a_script() -> anyhow::Result<()> {
+    let mut case = setup([
+        (
+            "ty.toml",
+            r"
+            [src]
+            exclude-scripts = true
+            ",
+        ),
+        ("script.py", "missing\n"),
+    ])?;
+    let path = case.project_path("script.py");
+    let file = case.system_file(&path)?;
+    case.db
+        .project()
+        .set_included_paths(&mut case.db, vec![path.clone()]);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
+
+    update_file(
+        &path,
+        r"
+        # /// script
+        # dependencies = []
+        # ///
+        missing
+        ",
+    )?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
+
+    Ok(())
+}
+
+#[test]
 fn deleted_file() -> anyhow::Result<()> {
     let foo_source = "print('Hello, world!')";
     let mut case = setup([("foo.py", foo_source)])?;
@@ -2500,7 +2632,7 @@ mod uv_metadata {
 
     use anyhow::Context;
     use ruff_db::diagnostic::DiagnosticId;
-    use ruff_db::files::system_path_to_file;
+    use ruff_db::files::File;
     use ruff_db::system::{OsSystem, System as _};
     use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges};
     use ty_static::EnvVars;
@@ -2692,7 +2824,7 @@ mod uv_metadata {
                 .any(|diagnostic| diagnostic.id().as_str() == "unresolved-import")
         );
 
-        let synchronized = update_and_synchronize_script(
+        update_and_synchronize_script(
             &mut case,
             r#"
             # /// script
@@ -2702,9 +2834,8 @@ mod uv_metadata {
             from attrs import define
             "#,
         )?;
-        assert!(!synchronized);
-
-        assert!(case.db().check().is_empty());
+        let diagnostics = case.db().check();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
 
         Ok(())
     }
@@ -2755,7 +2886,7 @@ mod uv_metadata {
 
     fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
         let uv = OsSystem::default().which("uv")?;
-        setup_with_system(
+        let mut case = setup_with_system(
             |context: &mut SetupContext| {
                 for (path, content) in files {
                     context.write_project_file(path, content)?;
@@ -2784,13 +2915,22 @@ mod uv_metadata {
                 );
                 system.set_env_var(EnvVars::UV, uv.as_str());
             },
-        )
+        )?;
+        let scripts: Vec<_> = case.db().project().script_files(case.db()).iter().collect();
+        synchronize_scripts(&mut case, &scripts)?;
+        Ok(case)
     }
 
     fn update_and_synchronize_project(case: &mut TestCase, source: &str) -> anyhow::Result<()> {
         update_file(case.project_path("pyproject.toml"), source)?;
         let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
-        case.apply_changes(&changes);
+        let changes = case.apply_changes(&changes);
+
+        if let Some(project_path) = changes.project_sync_path() {
+            case.db()
+                .uv_environments()
+                .request_project_sync(case.db(), project_path, &|_, _| None);
+        }
 
         wait_for_synchronizations(case)?;
         Ok(())
@@ -2799,21 +2939,24 @@ mod uv_metadata {
     fn update_and_synchronize_script(case: &mut TestCase, source: &str) -> anyhow::Result<bool> {
         update_file(case.project_path("script.py"), source)?;
         let changes = case.take_watch_changes(event_for_file("script.py"));
-        case.apply_changes(&changes);
+        let changes = case.apply_changes(&changes);
+        let scripts = changes.scripts_to_synchronize(case.db());
+        let changes = synchronize_scripts(case, &scripts)?;
+        Ok(!changes.scripts.is_empty())
+    }
 
-        let file = system_path_to_file(case.db(), case.project_path("script.py"))?;
+    fn synchronize_scripts(case: &mut TestCase, scripts: &[File]) -> anyhow::Result<UvSyncChanges> {
         let environments = case.db().uv_environments().clone();
-        if !environments.files().contains(&file) {
-            return Ok(false);
+        for &file in scripts {
+            environments.request_sync(
+                &mut case.db,
+                file,
+                ScriptEnvironmentAvailability::Pending,
+                &|_, _| None,
+            );
         }
-        environments.request_sync(
-            &mut case.db,
-            file,
-            ScriptEnvironmentAvailability::Pending,
-            &|_, _| None,
-        );
 
-        Ok(!wait_for_synchronizations(case)?.scripts.is_empty())
+        wait_for_synchronizations(case)
     }
 
     fn wait_for_synchronizations(case: &mut TestCase) -> anyhow::Result<UvSyncChanges> {

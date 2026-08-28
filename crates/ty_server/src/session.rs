@@ -11,6 +11,7 @@ use lsp_types::{
     ClientInfo, DiagnosticProvider, DiagnosticRegistrationOptions,
     DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Uri,
+    WorkDoneProgressBegin,
 };
 use lsp_types::{DidChangeWatchedFilesNotification, ExitNotification, Notification};
 use lsp_types::{
@@ -21,13 +22,12 @@ use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
-use salsa::Database as _;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{
-    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability,
-    SemanticDb as _, UseUv, UvSyncChanges,
+    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
+    ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
 };
 
 use index::DocumentError;
@@ -40,8 +40,8 @@ use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options}
 use crate::db::Db as _;
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
 use crate::server::{
-    Action, LazyWorkDoneProgress, publish_all_document_diagnostics, publish_diagnostics_if_needed,
-    publish_settings_diagnostics,
+    Action, LazyWorkDoneProgress, ScriptProgress, publish_all_document_diagnostics,
+    publish_diagnostics_if_needed, publish_settings_diagnostics,
 };
 use crate::session::client::Client;
 use crate::session::index::Document;
@@ -81,6 +81,9 @@ pub(crate) struct Session {
 
     /// The uv integrations enabled for the lifetime of this server.
     use_uv: UseUv,
+
+    /// Shares one progress indicator while script synchronization requests are outstanding.
+    script_progress: ScriptProgress,
 
     /// Resolved global settings that are shared across all workspaces.
     global_settings: Arc<GlobalSettings>,
@@ -176,6 +179,7 @@ impl Session {
             index: Some(index),
             initialization_options,
             use_uv,
+            script_progress: ScriptProgress::default(),
             global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
             resolved_client_capabilities,
@@ -264,29 +268,6 @@ impl Session {
             .collect()
     }
 
-    /// Resynchronizes closed scripts whose metadata changed after filesystem events.
-    pub(crate) fn synchronize_closed_scripts(&mut self, client: &Client) {
-        let capabilities = self.resolved_client_capabilities;
-        for state in self.projects.values_mut() {
-            let db = &mut state.db;
-            for file in db.uv_environments().files() {
-                // Open documents are synchronized when opened or saved. Ignore watcher events
-                // for them because the file on disk may differ from the open document.
-                if db.is_open_file(file) {
-                    continue;
-                }
-
-                Self::request_script_sync(
-                    db,
-                    file,
-                    client,
-                    capabilities,
-                    ScriptEnvironmentAvailability::Available,
-                );
-            }
-        }
-    }
-
     /// Gives one project's uv environments an opportunity to make progress.
     pub(crate) fn poll_uv_sync(&mut self, client: &Client, project_root: &SystemPath) {
         let Some(project) = self.projects.get_mut(project_root) else {
@@ -298,6 +279,21 @@ impl Session {
         let db = &mut project.db;
         let environments = db.uv_environments().clone();
         let changes = environments.poll_sync(db);
+        if matches!(
+            changes.project,
+            Some(ProjectReloadResult::Changed {
+                files_changed: true,
+            })
+        ) {
+            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+            Self::synchronize_closed_scripts(
+                db,
+                &scripts,
+                client,
+                self.resolved_client_capabilities,
+                &self.script_progress,
+            );
+        }
         self.uv_environments_changed(client, project_root, changes);
     }
 
@@ -342,12 +338,38 @@ impl Session {
         }
     }
 
+    /// Requests synchronization using the scripts' saved metadata.
+    fn synchronize_closed_scripts(
+        db: &mut ProjectDatabase,
+        scripts: &[File],
+        client: &Client,
+        capabilities: ResolvedClientCapabilities,
+        progress: &ScriptProgress,
+    ) {
+        for &file in scripts {
+            // Open and save handle editor documents separately. Their metadata may contain
+            // unsaved changes, including overlays that are not in the diagnostic open-file set.
+            if db.document(file).is_some() {
+                continue;
+            }
+            Self::request_script_sync(
+                db,
+                file,
+                client,
+                capabilities,
+                ScriptEnvironmentAvailability::Pending,
+                progress,
+            );
+        }
+    }
+
     fn request_script_sync(
         db: &mut ProjectDatabase,
         file: File,
         client: &Client,
         capabilities: ResolvedClientCapabilities,
         availability: ScriptEnvironmentAvailability,
+        progress: &ScriptProgress,
     ) {
         let environments = db.uv_environments().clone();
         environments.request_sync(db, file, availability, &|db, file| {
@@ -360,13 +382,7 @@ impl Session {
                         .to_string()
                 },
             );
-            let title = format!("Syncing {display_path}");
-
-            Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
-                client,
-                &title,
-                capabilities,
-            )))
+            progress.for_script(client, capabilities, display_path)
         });
     }
 
@@ -546,14 +562,27 @@ impl Session {
         self.bump_revision();
 
         let capabilities = self.resolved_client_capabilities;
-        self.project_db_mut(path)
-            .apply_changes_with_progress(changes, &|db, project| {
-                Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
-                    client,
-                    &format!("Refreshing {} metadata", project.name(db)),
-                    capabilities,
-                )))
-            })
+        let script_progress = self.script_progress.clone();
+        let db = self.project_db_mut(path);
+        let result = db.apply_changes(changes);
+        if let Some(project_path) = result.project_sync_path() {
+            db.uv_environments()
+                .request_project_sync(db, project_path, &|db, project| {
+                    Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                        client,
+                        WorkDoneProgressBegin {
+                            title: format!("Refreshing {} metadata", project.name(db)),
+                            cancellable: Some(false),
+                            message: None,
+                            percentage: None,
+                        },
+                        capabilities,
+                    )))
+                });
+        }
+        let scripts = result.scripts_to_synchronize(db);
+        Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        result
     }
 
     /// Returns a mutable iterator over all project databases.
@@ -766,7 +795,7 @@ impl Session {
                 ProjectDatabase::fallible(metadata, system.clone())
             });
 
-        let db = match project {
+        let mut db = match project {
             Ok(db) => db,
             Err(err) => {
                 tracing::error!(
@@ -795,6 +824,14 @@ impl Session {
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
+        let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
+        Self::synchronize_closed_scripts(
+            &mut db,
+            &scripts,
+            client,
+            self.resolved_client_capabilities,
+            &self.script_progress,
+        );
         self.projects.insert(
             root.clone(),
             ProjectState {
@@ -1375,6 +1412,7 @@ impl Session {
             && let DocumentKey::File(system_path) = DocumentKey::from_uri(document.uri())
         {
             let capabilities = self.resolved_client_capabilities;
+            let script_progress = self.script_progress.clone();
             let db = self.project_db_mut(&AnySystemPath::System(system_path.clone()));
 
             // Refresh any cached disk revision before reading the script tag. A filesystem
@@ -1382,15 +1420,13 @@ impl Session {
             // refresh the file from the editor contents instead.
             File::sync_path(db, &system_path);
             if let Ok(file) = system_path_to_file(db, &system_path) {
-                // Keep the synchronization alive when the editor buffer is installed. Cancel any
-                // blocking initialization now instead of reusing one that index_mut would cancel.
-                db.trigger_cancellation();
                 Self::request_script_sync(
                     db,
                     file,
                     client,
                     capabilities,
                     ScriptEnvironmentAvailability::Pending,
+                    &script_progress,
                 );
             }
         }
@@ -1996,11 +2032,19 @@ impl DocumentHandle {
             return;
         };
         let capabilities = session.resolved_client_capabilities;
+        let script_progress = session.script_progress.clone();
         let db = session.project_db_mut(path);
         let Some(file) = db.files().try_system(db, system_path) else {
             return;
         };
-        Session::request_script_sync(db, file, client, capabilities, availability);
+        Session::request_script_sync(
+            db,
+            file,
+            client,
+            capabilities,
+            availability,
+            &script_progress,
+        );
     }
 
     pub(crate) fn update_text_document(
@@ -2094,7 +2138,7 @@ impl DocumentHandle {
     ///
     /// This can return an error when the document does not exist in the
     /// session index.
-    pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
+    pub(crate) fn close(&self, session: &mut Session, client: &Client) -> crate::Result<bool> {
         let is_cell = self.is_cell();
         let path = self.notebook_or_file_path();
 
@@ -2125,8 +2169,11 @@ impl DocumentHandle {
                             db.project().remove_file(db, file);
                         }
 
-                        // Bump the file's revision back to using the file system's revision.
-                        file.sync(db);
+                        // Restore file and script membership from the saved contents. Discarding
+                        // unsaved script metadata can bring a file back into the project when
+                        // `exclude-scripts` is enabled. Also request synchronization for saved
+                        // metadata changes that were skipped while the editor overlay was present.
+                        self.update_in_db(session, client);
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every

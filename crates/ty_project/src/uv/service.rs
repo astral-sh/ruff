@@ -1,25 +1,30 @@
 use std::process::Output;
-use std::sync::{Arc, OnceLock, Weak};
-use std::time::Duration;
+use std::sync::{Arc, OnceLock};
 
-use crossbeam::channel::{Receiver, RecvTimeoutError, SendTimeoutError, Sender, TrySendError};
+use crossbeam::channel::{Receiver, Sender, TrySendError};
 use ruff_db::files::File;
 use ruff_db::system::{CommandExecutor, System, SystemPathBuf};
 
 use super::command::unsupported_command_execution;
 use super::{MetadataTarget, ScriptEnvironmentCacheKey, Uv, uv_executable_error};
-use crate::{Db, UvSyncProgress};
+use crate::UvSyncProgress;
 
 /// Runs workspace and standalone-script metadata requests with uv.
 ///
 /// A project stores one service in its shared `UvEnvironments`, so every database snapshot uses
-/// the same bounded request queue and workers. The queue applies backpressure to producers, while
-/// the number of workers limits concurrent uv processes.
+/// the same request queue and workers. The queue has no fixed capacity, so submitting work does
+/// not wait for uv. The number of workers still limits concurrent uv processes.
 ///
-/// The service deliberately owns neither a database nor its `System`. A uv command can outlive the
-/// check that scheduled it, while a database update must wait for all instances to be dropped.
-/// Retaining the scheduling database could therefore prevent that update from completing. Workers
-/// retain only the configured uv executable and a detached command executor.
+/// [`UvEnvironments`](crate::UvEnvironments) submits at most one job per project or script at a
+/// time, including jobs whose results have not yet been consumed. It retains only the latest
+/// follow-up and submits it after consuming the previous result. Both request and result queues
+/// are therefore bounded by the number of projects and scripts, not the number of changes.
+///
+/// The service deliberately owns neither a database nor its `System`. Workers stay alive between
+/// jobs, while the host must be able to apply file changes and completed uv results. Salsa waits
+/// for all database snapshots to be dropped before updating an input. If a worker retained a
+/// snapshot, even an idle worker would block those updates. Workers retain only the configured uv
+/// executable and a detached command executor.
 ///
 /// The service only owns scheduling of `uv metadata` calls.
 /// [`UvEnvironments`](crate::UvEnvironments) is the higher level abstraction that
@@ -47,64 +52,9 @@ impl UvMetadataService {
         }
     }
 
-    /// Requests workspace or script metadata and waits for its result.
-    ///
-    /// Blocks the calling thread, periodically checking for Salsa cancellation.
-    ///
-    /// This must not yield to Rayon. Another checking task could import this script and wait
-    /// for its initialization, preventing the current task from resuming to finish it.
-    /// The uv workers run on separate threads and can make progress while this thread waits.
-    pub(crate) fn run_blocking(
-        &self,
-        db: &dyn Db,
-        target: MetadataTarget,
-    ) -> std::io::Result<Output> {
-        let workers = self.worker_pool(db.system())?;
-
-        // Dropping the guard during Salsa unwinding cancels a job that hasn't started yet.
-        let (_cancellation_guard, cancellation) = UvJobCancellation::new();
-
-        // Each job produces one result. Buffering that result lets the worker publish it without
-        // waiting for this caller to be scheduled again.
-        let (result_sender, result_receiver) = crossbeam::channel::bounded(1);
-
-        let mut job = UvJob {
-            target,
-            mode: UvJobMode::Blocking {
-                result_sender,
-                cancellation,
-            },
-            span: tracing::Span::current(),
-        };
-
-        // Queue the job, checking for Salsa cancellation while waiting for capacity.
-        loop {
-            match workers.jobs.send_timeout(job, POLL_TIMEOUT) {
-                Ok(()) => break,
-                Err(SendTimeoutError::Timeout(pending)) => {
-                    db.unwind_if_revision_cancelled();
-                    job = pending;
-                }
-                Err(SendTimeoutError::Disconnected(_)) => return Err(worker_disconnected()),
-            }
-        }
-
-        // Wait for the result.
-        loop {
-            match result_receiver.recv_timeout(POLL_TIMEOUT) {
-                Ok(output) => return output,
-                Err(RecvTimeoutError::Timeout) => {
-                    db.unwind_if_revision_cancelled();
-                }
-                Err(RecvTimeoutError::Disconnected) => return Err(worker_disconnected()),
-            }
-        }
-    }
-
     /// Submits one background synchronization.
     ///
-    /// This blocks while the bounded worker queue is full, applying backpressure until a worker
-    /// accepts another job.
+    /// Submission does not wait for queue space.
     pub(crate) fn schedule_one(
         &self,
         system: &dyn System,
@@ -131,28 +81,19 @@ impl UvMetadataService {
         tracing::debug!("Queuing {description} for `{path}`");
 
         let job = UvJob {
-            target: task.to_metadata_target(),
-            mode: UvJobMode::Background {
-                task,
-                result_sender: self.results_sender.clone(),
-                wake_sender: self.wake_sender.clone(),
-                progress,
-            },
+            task,
+            result_sender: self.results_sender.clone(),
+            wake_sender: self.wake_sender.clone(),
+            progress,
             span,
         };
         if let Err(error) = workers.jobs.send(job) {
-            match error.into_inner().mode {
-                UvJobMode::Blocking { result_sender, .. } => {
-                    let _ = result_sender.send(Err(worker_disconnected()));
-                }
-                UvJobMode::Background { task, progress, .. } => {
-                    self.publish_result(UvMetadataResult {
-                        task,
-                        output: Err(worker_disconnected()),
-                        progress,
-                    });
-                }
-            }
+            let job = error.into_inner();
+            self.publish_result(UvMetadataResult {
+                task: job.task,
+                output: Err(worker_disconnected()),
+                progress: job.progress,
+            });
         }
     }
 
@@ -213,8 +154,8 @@ impl ScriptSyncTask {
 
 /// The immutable inputs to one uv synchronization.
 ///
-/// The entry state and worker retain cheap clones because a job can outlive the Salsa snapshot that
-/// scheduled it.
+/// The entry state and worker retain cheap clones of the request. These inputs are owned so jobs
+/// can outlive the host operation that scheduled them without retaining its database.
 #[derive(Clone, Debug)]
 pub(crate) struct ScriptSyncRequest(Arc<ScriptSyncRequestData>);
 
@@ -223,10 +164,10 @@ impl ScriptSyncRequest {
         &self.0.path
     }
 
-    pub(crate) fn to_metadata_target(&self) -> MetadataTarget {
+    fn metadata_target(&self) -> MetadataTarget<'_> {
         MetadataTarget::Script {
-            path: self.0.path.clone(),
-            python: self.0.python.clone(),
+            path: &self.0.path,
+            python: self.0.python.as_deref(),
         }
     }
 
@@ -250,29 +191,24 @@ pub(crate) enum UvSyncTask {
 }
 
 impl UvSyncTask {
-    fn to_metadata_target(&self) -> MetadataTarget {
+    fn metadata_target(&self) -> MetadataTarget<'_> {
         match self {
-            Self::Workspace(path) => MetadataTarget::Workspace(path.clone()),
-            Self::Script(task) => task.request.to_metadata_target(),
+            Self::Workspace(path) => MetadataTarget::Workspace(path),
+            Self::Script(task) => task.request.metadata_target(),
         }
     }
 }
 
 /// The result of a background uv metadata request.
 ///
-/// This owns the progress guard so progress remains active until the result is consumed.
+/// This keeps the progress reporter alive until the result is consumed or rescheduled.
 pub(crate) struct UvMetadataResult {
     pub(crate) task: UvSyncTask,
     pub(crate) output: std::io::Result<Output>,
     pub(crate) progress: Option<Box<dyn UvSyncProgress>>,
 }
 
-const MAX_UV_WORKERS: usize = 2;
-const MAX_QUEUED_UV_TASKS: usize = 8;
-/// Maximum time to block before checking for Salsa cancellation.
-const POLL_TIMEOUT: Duration = Duration::from_millis(1);
-
-/// A bounded worker pool for workspace and script metadata requests.
+/// Runs a limited number of workspace and script metadata commands concurrently.
 struct UvWorkerPool {
     /// Disconnects when the pool is dropped so workers abandon buffered jobs.
     ///
@@ -289,10 +225,10 @@ struct UvWorkerPool {
 impl UvWorkerPool {
     /// Creates worker threads using a detached command executor and resolved uv executable.
     fn new(command_executor: &dyn CommandExecutor, uv: &Uv) -> std::io::Result<Self> {
-        let (jobs, job_receiver) = crossbeam::channel::bounded(MAX_QUEUED_UV_TASKS);
+        let (jobs, job_receiver) = crossbeam::channel::unbounded();
         let (shutdown, shutdown_receiver) = crossbeam::channel::bounded(0);
 
-        let workers = ruff_db::max_parallelism().get().min(MAX_UV_WORKERS);
+        let workers = ruff_db::max_parallelism().get().div_ceil(4);
 
         tracing::debug!("Starting {workers} uv synchronization workers");
 
@@ -337,7 +273,7 @@ struct UvWorker {
 impl UvWorker {
     fn run(self) {
         loop {
-            let job = crossbeam::channel::select_biased! {
+            let mut job = crossbeam::channel::select_biased! {
                 // The worker pool disconnected, exit immetiatley
                 recv(self.shutdown) -> _ => return,
                 recv(self.jobs) -> job => {
@@ -348,119 +284,56 @@ impl UvWorker {
                 }
             };
 
-            // Don't schedule jobs that have been cancelled in the meantime (salsa cancellation).
-            if let UvJobMode::Blocking { cancellation, .. } = &job.mode
-                && cancellation.is_cancelled()
-            {
-                match &job.target {
-                    MetadataTarget::Workspace(path) => {
-                        tracing::debug!(
-                            "Discarded cancelled workspace metadata request for `{path}`"
-                        );
-                    }
-                    MetadataTarget::Script { path, .. } => {
-                        tracing::debug!("Discarded cancelled script synchronization for `{path}`");
-                    }
+            let _span = job.span.enter();
+            let target = job.task.metadata_target();
+            match &target {
+                MetadataTarget::Workspace(path) => {
+                    tracing::info!("Reading workspace metadata for `{path}`");
                 }
-                continue;
+                MetadataTarget::Script { path, .. } => {
+                    tracing::info!("Synchronizing script `{path}`");
+                }
+            }
+            if let Some(progress) = job.progress.as_mut() {
+                progress.started();
             }
 
-            // Run the job
-            let output = {
-                let _span = job.span.enter();
-                let target = &job.target;
-                match target {
-                    MetadataTarget::Workspace(path) => {
-                        tracing::info!("Reading workspace metadata for `{path}`");
-                    }
-                    MetadataTarget::Script { path, .. } => {
-                        tracing::info!("Synchronizing script `{path}`");
-                    }
-                }
-                self.uv.execute(&*self.executor, target)
-            };
+            let output = self.uv.execute(&*self.executor, &target);
+
+            if let Some(progress) = job.progress.as_mut() {
+                progress.finished();
+            }
 
             // Send the result
-            match job.mode {
-                UvJobMode::Blocking { result_sender, .. } => {
-                    // The receiver disappears when the blocking caller is cancelled.
-                    let _ = result_sender.send(output);
-                }
-                UvJobMode::Background {
-                    task,
-                    result_sender,
-                    wake_sender,
-                    progress,
-                } => {
-                    // The receiver disappears when the owning project is dropped.
-                    if result_sender
-                        .send(UvMetadataResult {
-                            task,
-                            output,
-                            progress,
-                        })
-                        .is_ok()
-                    {
-                        // Signal that there's a new result.
-                        let _ = wake_sender.try_send(());
-                    }
-                }
+            // The receiver disappears when the owning project is dropped.
+            if job
+                .result_sender
+                .send(UvMetadataResult {
+                    task: job.task,
+                    output,
+                    progress: job.progress,
+                })
+                .is_ok()
+            {
+                // Signal that there's a new result.
+                let _ = job.wake_sender.try_send(());
             }
         }
     }
 }
 
 struct UvJob {
-    target: MetadataTarget,
-    mode: UvJobMode,
+    /// The request to return with the synchronization result.
+    task: UvSyncTask,
+
+    /// The sender end of the channel communicating with the sync service.
+    result_sender: Sender<UvMetadataResult>,
+
+    /// The wake signal that notifies that there's a new result to process.
+    wake_sender: Sender<()>,
+    progress: Option<Box<dyn UvSyncProgress>>,
     span: tracing::Span,
 }
-
-enum UvJobMode {
-    Blocking {
-        /// Sender end of the channel that communicates with the thread waiting on this result (blocking).
-        result_sender: Sender<std::io::Result<Output>>,
-        /// Lets a worker discard a queued job after its blocking Salsa operation is cancelled.
-        cancellation: UvJobCancellation,
-    },
-
-    /// The job runs as a background task.
-    ///
-    Background {
-        /// The request to return with the synchronization result.
-        task: UvSyncTask,
-
-        /// The sender end of the channel communicating with the sync service.
-        result_sender: Sender<UvMetadataResult>,
-
-        /// The wake signal that notifies that there's a new result to process.
-        wake_sender: Sender<()>,
-        progress: Option<Box<dyn UvSyncProgress>>,
-    },
-}
-
-/// Cancellation token for a blocking uv operation.
-///
-/// The scheduling operation holds a [`UvJobCancellationGuard`] while the queued job holds this weak
-/// token. Salsa cancellation unwinds the scheduling operation and drops the guard, allowing the
-/// worker to discard the job without retaining the database or explicitly updating shared state.
-/// An already running uv process is not interrupted.
-struct UvJobCancellation(Weak<()>);
-
-impl UvJobCancellation {
-    fn new() -> (UvJobCancellationGuard, Self) {
-        let guard = UvJobCancellationGuard(Arc::new(()));
-        let cancellation = Self(Arc::downgrade(&guard.0));
-        (guard, cancellation)
-    }
-
-    fn is_cancelled(&self) -> bool {
-        self.0.upgrade().is_none()
-    }
-}
-
-/// Keeps a blocking uv job active while its scheduling operation is running.
-struct UvJobCancellationGuard(Arc<()>);
 
 fn worker_disconnected() -> std::io::Error {
     std::io::Error::new(
