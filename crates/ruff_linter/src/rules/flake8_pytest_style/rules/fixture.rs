@@ -16,6 +16,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits;
 use crate::importer::ImportRequest;
+use crate::preview::is_pt020_fix_enabled;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, FixAvailability, Violation};
 use crate::{Edit, Fix};
@@ -929,6 +930,10 @@ fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
         let mut diagnostic =
             checker.report_diagnostic(PytestDeprecatedYieldFixture, decorator.range());
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+
+        if !is_pt020_fix_enabled(checker.settings()) {
+            return;
+        }
 
         let reference = map_callable(&decorator.expression);
         diagnostic.try_set_fix(|| {

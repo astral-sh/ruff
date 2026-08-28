@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
   --> PT020.py:14:1
    |
 14 | @pytest.yield_fixture()
@@ -10,14 +10,8 @@ PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
 16 |     return 0
    |
 help: Replace with `pytest.fixture`
-   |
-13 |
-   - @pytest.yield_fixture()
-14 + @pytest.fixture()
-15 | def error_without_parens():
-   |
 
-PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
   --> PT020.py:19:1
    |
 19 | @pytest.yield_fixture
@@ -26,14 +20,8 @@ PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
 21 |     return 0
    |
 help: Replace with `pytest.fixture`
-   |
-18 |
-   - @pytest.yield_fixture
-19 + @pytest.fixture
-20 | def error_with_parens():
-   |
 
-PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
   --> PT020.py:24:1
    |
 24 | @pytest.yield_fixture(scope="module", name="my_fixture")
@@ -42,14 +30,8 @@ PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
 26 |     return 0
    |
 help: Replace with `pytest.fixture`
-   |
-23 |
-   - @pytest.yield_fixture(scope="module", name="my_fixture")
-24 + @pytest.fixture(scope="module", name="my_fixture")
-25 | def error_with_arguments():
-   |
 
-PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
   --> PT020.py:29:1
    |
 29 | @pytest.yield_fixture()  # comment
@@ -58,14 +40,8 @@ PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
 31 |     return 0
    |
 help: Replace with `pytest.fixture`
-   |
-28 |
-   - @pytest.yield_fixture()  # comment
-29 + @pytest.fixture()  # comment
-30 | def error_with_comment():
-   |
 
-PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
   --> PT020.py:35:5
    |
 34 | class TestClass:
@@ -75,9 +51,3 @@ PT020 [*] `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
 37 |         return 0
    |
 help: Replace with `pytest.fixture`
-   |
-34 | class TestClass:
-   -     @pytest.yield_fixture()
-35 +     @pytest.fixture()
-36 |     def error_in_class(self):
-   |
