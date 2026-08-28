@@ -810,6 +810,28 @@ def assign_nominal_read_property(
     return value  # error: [invalid-return-type]
 ```
 
+The property accessor can expose the recursive specialization through a type alias. The alias still
+contributes the same growing instance flow as the direct return type above.
+
+```py
+type NominalReadPropertyAlias[T] = NominalReadPropertyAliasImpl[list[T]]
+
+class NominalReadPropertyAliasImpl[T]:
+    @property
+    def child(self) -> NominalReadPropertyAlias[T]:
+        raise NotImplementedError
+
+class NominalReadPropertyAliasProtocol[T](Protocol):
+    child: NominalReadPropertyAliasProtocol[list[T]]
+
+def assign_nominal_read_property_alias(
+    value: NominalReadPropertyAliasImpl[int],
+) -> NominalReadPropertyAliasProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
 The setter of a `property` exposes its value parameter as the writable member type. Checking a
 recursive nominal property against a protocol property must terminate.
 

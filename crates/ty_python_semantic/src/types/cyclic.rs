@@ -37,7 +37,7 @@ use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization, enclosing_generic_contexts};
 use crate::types::list_members::{all_end_of_scope_bindings, all_end_of_scope_members};
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, MemberLookupPolicy,
@@ -794,9 +794,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
     ) {
         // An accessor type can only contribute specialization flow if it contains a type
         // variable. The raw property traversal above already covers the descriptor itself.
-        if any_over_type(db, &self.env, ty, false, |ty| {
-            matches!(ty, Type::TypeVar(_))
-        }) {
+        if any_over_type_expanding_aliases(db, &self.env, ty, |ty| matches!(ty, Type::TypeVar(_))) {
             self.visit_type(db, ty.bind_self_typevars(db, &self.env, instance));
         }
     }
