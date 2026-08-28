@@ -894,7 +894,7 @@ impl<'db> Bindings<'db> {
     }
 
     /// Returns the callable bindings for each union element without flattening intersections.
-    pub(crate) fn iter_union_elements(
+    fn iter_union_elements(
         &self,
     ) -> impl Iterator<Item = impl Iterator<Item = &CallableBinding<'db>> + Clone> + '_ {
         self.elements.iter().map(BindingsElement::callables)
