@@ -1,7 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use anyhow::{Context, bail, ensure};
 use compact_str::CompactString;
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
+};
+use ruff_db::system::SystemPathBuf;
+use thiserror::Error;
 use ty_module_resolver::ModuleName;
 use ty_python_semantic::dependency::{
     DependencyDistribution, DependencyMetadata, DependencyProject,
@@ -10,7 +14,9 @@ use ty_python_semantic::dependency::{
 use super::{NodeKind, ResolutionNode, UvMetadata};
 
 impl UvMetadata {
-    pub(super) fn to_dependency_metadata(&self) -> anyhow::Result<DependencyMetadata> {
+    pub(super) fn to_dependency_metadata(
+        &self,
+    ) -> Result<DependencyMetadata, DependencyMetadataError> {
         let root = self.workspace_root();
         let mut distributions = BTreeMap::new();
         let mut extra_packages = BTreeMap::new();
@@ -27,7 +33,11 @@ impl UvMetadata {
             if let Some(path) = &editable_path
                 && !path.is_absolute()
             {
-                bail!("editable path `{path}` for package `{id}` is not absolute");
+                return Err(DependencyMetadataError::RelativePath {
+                    kind: "editable package",
+                    id: id.clone(),
+                    path: path.clone(),
+                });
             }
 
             distributions.insert(
@@ -36,67 +46,61 @@ impl UvMetadata {
                     name: node
                         .name
                         .clone()
-                        .with_context(|| format!("package node `{id}` is missing its name"))?,
+                        .ok_or_else(|| DependencyMetadataError::MissingPackageName(id.clone()))?,
                     editable_path,
                 },
             );
 
             for extra in &node.optional_dependencies {
                 let extra_node = self.node(&extra.id)?;
-                ensure!(
-                    matches!(extra_node.kind, NodeKind::Extra(_)),
-                    "optional dependency `{}` of package `{id}` has kind {:?}, expected Extra",
-                    extra.id,
-                    extra_node.kind,
-                );
+                if !matches!(extra_node.kind, NodeKind::Extra(_)) {
+                    return Err(DependencyMetadataError::UnexpectedNodeKind {
+                        id: extra.id.clone(),
+                        expected: "extra",
+                    });
+                }
                 if let Some(previous) = extra_packages.insert(&extra.id, id)
                     && previous != id
                 {
-                    bail!(
-                        "extra node `{}` belongs to both package `{previous}` and package `{id}`",
-                        extra.id,
-                    );
+                    return Err(DependencyMetadataError::SharedExtra {
+                        id: extra.id.clone(),
+                        first: previous.clone(),
+                        second: id.clone(),
+                    });
                 }
             }
         }
 
-        ensure!(
-            !distributions.is_empty(),
-            "no package information is available in uv metadata"
-        );
-
-        let package_id =
-            |id: &CompactString| {
-                if distributions.contains_key(id) {
-                    Ok(id.clone())
-                } else {
-                    extra_packages.get(id).copied().cloned().with_context(|| {
-                        format!("dependency `{id}` is not a known package or extra")
-                    })
-                }
-            };
-
-        let dependencies = |id: &CompactString, node: &ResolutionNode| {
-            node.dependencies
-                .iter()
-                .map(|dependency| {
-                    package_id(&dependency.id)
-                        .with_context(|| format!("invalid dependency of node `{id}`"))
-                })
-                .collect::<anyhow::Result<BTreeSet<_>>>()
+        let package_id = |id: &CompactString| {
+            if distributions.contains_key(id) {
+                Ok(id.clone())
+            } else {
+                extra_packages
+                    .get(id)
+                    .copied()
+                    .cloned()
+                    .ok_or_else(|| DependencyMetadataError::UnknownDependency(id.clone()))
+            }
         };
 
-        let group_dependencies = |id: &CompactString, node: &ResolutionNode| {
+        let dependencies = |node: &ResolutionNode| {
+            node.dependencies
+                .iter()
+                .map(|dependency| package_id(&dependency.id))
+                .collect::<Result<BTreeSet<_>, _>>()
+        };
+
+        let group_dependencies = |node: &ResolutionNode| {
             let mut groups = BTreeSet::new();
             for group in &node.dependency_groups {
                 let group_node = self.node(&group.id)?;
-                ensure!(
-                    matches!(group_node.kind, NodeKind::Group(_)),
-                    "dependency group `{}` of node `{id}` has kind {:?}, expected Group",
-                    group.id,
-                    group_node.kind,
-                );
-                groups.extend(dependencies(&group.id, group_node)?);
+                if !matches!(group_node.kind, NodeKind::Group(_)) {
+                    return Err(DependencyMetadataError::UnexpectedNodeKind {
+                        id: group.id.clone(),
+                        expected: "dependency group",
+                    });
+                }
+                groups.extend(dependencies(group_node)?);
             }
             Ok(groups)
         };
@@ -104,13 +108,13 @@ impl UvMetadata {
         let workspace_groups = match &self.workspace {
             Some(workspace) => {
                 let node = self.node(&workspace.id)?;
-                ensure!(
-                    node.kind == NodeKind::Workspace,
-                    "workspace node `{}` has kind {:?}, expected Workspace",
-                    workspace.id,
-                    node.kind,
-                );
-                group_dependencies(&workspace.id, node)?
+                if node.kind != NodeKind::Workspace {
+                    return Err(DependencyMetadataError::UnexpectedNodeKind {
+                        id: workspace.id.clone(),
+                        expected: "workspace",
+                    });
+                }
+                group_dependencies(node)?
             }
             None => BTreeSet::new(),
         };
@@ -118,36 +122,37 @@ impl UvMetadata {
         let mut projects = Vec::new();
         let mut member_paths = BTreeSet::new();
         for member in &self.members {
-            ensure!(
-                member.path.is_absolute(),
-                "workspace member `{}` has a non-absolute path `{}`",
-                member.id,
-                member.path,
-            );
-            ensure!(
-                member_paths.insert(&member.path),
-                "multiple workspace members use path `{}`",
-                member.path,
-            );
+            if !member.path.is_absolute() {
+                return Err(DependencyMetadataError::RelativePath {
+                    kind: "workspace member",
+                    id: member.id.clone(),
+                    path: member.path.clone(),
+                });
+            }
+            if !member_paths.insert(&member.path) {
+                return Err(DependencyMetadataError::DuplicateMemberPath(
+                    member.path.clone(),
+                ));
+            }
             let node = self.node(&member.id)?;
-            ensure!(
-                node.kind == NodeKind::Package,
-                "workspace member `{}` has kind {:?}, expected Package",
-                member.id,
-                node.kind,
-            );
+            if node.kind != NodeKind::Package {
+                return Err(DependencyMetadataError::UnexpectedNodeKind {
+                    id: member.id.clone(),
+                    expected: "package",
+                });
+            }
 
-            let mut direct = dependencies(&member.id, node)?;
+            let mut direct = dependencies(node)?;
             for extra in &node.optional_dependencies {
                 // A member's own extras declare dependencies directly. By contrast, requesting an
                 // extra of another package only declares that package, not its extra's dependencies.
-                direct.extend(dependencies(&extra.id, self.node(&extra.id)?)?);
+                direct.extend(dependencies(self.node(&extra.id)?)?);
             }
             // Extra nodes also point back to their own package. A project's own imports are
             // accounted for by `distribution`, not by listing itself as a dependency.
             direct.remove(&member.id);
 
-            let mut groups = group_dependencies(&member.id, node)?;
+            let mut groups = group_dependencies(node)?;
             groups.extend(workspace_groups.iter().cloned());
 
             projects.push(DependencyProject {
@@ -171,10 +176,9 @@ impl UvMetadata {
             });
         }
 
-        ensure!(
-            !projects.is_empty(),
-            "no workspace project information is available in uv metadata"
-        );
+        if projects.is_empty() {
+            return Err(DependencyMetadataError::MissingProjects);
+        }
 
         let mut module_owners: BTreeMap<ModuleName, Box<[CompactString]>> = BTreeMap::new();
         for (module, owners) in &self.module_owners {
@@ -199,8 +203,13 @@ impl UvMetadata {
             && !distributions
                 .values()
                 .any(|distribution| distribution.editable_path.is_some())
+            // Check for a package outside the workspace. A dependency-free virtual workspace
+            // has no modules to attribute, so its empty ownership map is valid.
+            && distributions
+                .keys()
+                .any(|id| !self.members.iter().any(|member| member.id == id))
         {
-            bail!("no module ownership or editable source paths are available in uv metadata");
+            return Err(DependencyMetadataError::MissingModuleOwnership);
         }
 
         projects.sort_by(|left, right| left.path.cmp(&right.path));
@@ -212,10 +221,93 @@ impl UvMetadata {
         })
     }
 
-    fn node(&self, id: &CompactString) -> anyhow::Result<&ResolutionNode> {
+    fn node(&self, id: &CompactString) -> Result<&ResolutionNode, DependencyMetadataError> {
         self.resolution
             .get(id)
-            .with_context(|| format!("resolution node `{id}` is missing"))
+            .ok_or_else(|| DependencyMetadataError::MissingNode(id.clone()))
+    }
+}
+
+/// Why uv's dependency metadata cannot be used for the selected Python environment.
+#[derive(Debug, Clone, PartialEq, Eq, Error, get_size2::GetSize)]
+pub(crate) enum DependencyMetadataError {
+    #[error("resolution node `{0}` is missing")]
+    MissingNode(CompactString),
+    #[error("package node `{0}` is missing its name")]
+    MissingPackageName(CompactString),
+    #[error("resolution node `{id}` is not a {expected} node")]
+    UnexpectedNodeKind {
+        id: CompactString,
+        expected: &'static str,
+    },
+    #[error("dependency `{0}` is not a known package or extra")]
+    UnknownDependency(CompactString),
+    #[error("extra node `{id}` belongs to both package `{first}` and package `{second}`")]
+    SharedExtra {
+        id: CompactString,
+        first: CompactString,
+        second: CompactString,
+    },
+    #[error("{kind} `{id}` has a non-absolute path `{path}`")]
+    RelativePath {
+        kind: &'static str,
+        id: CompactString,
+        path: SystemPathBuf,
+    },
+    #[error("multiple workspace members use path `{0}`")]
+    DuplicateMemberPath(SystemPathBuf),
+    #[error("no workspace project information is available in uv metadata")]
+    MissingProjects,
+    #[error("uv metadata has no module ownership or editable source paths")]
+    MissingModuleOwnership,
+    #[error("uv did not provide a Python environment")]
+    MissingEnvironment,
+    #[error("could not read uv's Python environment `{path}`: {message}")]
+    InvalidEnvironment {
+        path: SystemPathBuf,
+        message: Box<str>,
+    },
+    #[error("could not resolve the selected Python environment: {0}")]
+    EnvironmentResolution(Box<str>),
+    #[error("no Python environment is configured")]
+    MissingSelectedEnvironment,
+    #[error("selected Python environment `{selected}` differs from uv's environment `{uv}`")]
+    EnvironmentMismatch {
+        selected: SystemPathBuf,
+        uv: SystemPathBuf,
+    },
+}
+
+impl DependencyMetadataError {
+    pub(crate) fn to_diagnostic(&self) -> Diagnostic {
+        let mut diagnostic = Diagnostic::new(
+            DiagnosticId::UvMetadata,
+            Severity::Warning,
+            "Cannot check dependencies using uv metadata",
+        );
+        diagnostic.set_concise_message(format_args!("Cannot check dependencies: {self}"));
+        diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            self.to_string(),
+        ));
+        match self {
+            Self::MissingModuleOwnership
+            | Self::MissingEnvironment
+            | Self::MissingSelectedEnvironment => {
+                diagnostic.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Help,
+                    "Synchronize the environment with `uv sync` or run ty through `uv check`",
+                ));
+            }
+            Self::EnvironmentMismatch { .. } => {
+                diagnostic.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Help,
+                    "Use the same Python environment for ty and uv",
+                ));
+            }
+            _ => {}
+        }
+        diagnostic
     }
 }
 
@@ -304,7 +396,7 @@ mod tests {
             .memory_file_system()
             .write_file_all(absolute("/app/pyproject.toml"), "[tool.uv.workspace]")?;
         let metadata = UvMetadata::from_metadata(&serde_json::to_vec(metadata)?, &system)?;
-        metadata.to_dependency_metadata()
+        Ok(metadata.to_dependency_metadata()?)
     }
 
     fn project<'a>(
@@ -475,6 +567,38 @@ mod tests {
     }
 
     #[test]
+    fn virtual_projects_without_dependencies_do_not_require_module_ownership() -> anyhow::Result<()>
+    {
+        for input in [
+            json!({
+                "schema": {"version": "preview"},
+                "workspace_root": absolute("/app"),
+                "workspace": {"id": "workspace"},
+                "resolution": {
+                    "workspace": {"kind": "workspace", "dependencies": []}
+                }
+            }),
+            json!({
+                "schema": {"version": "preview"},
+                "workspace_root": absolute("/app"),
+                "members": [{"id": "app", "name": "app", "path": absolute("/app")}],
+                "resolution": {
+                    "app": {
+                        "kind": "package", "name": "app", "source": {"virtual": absolute("/app")},
+                        "dependencies": []
+                    }
+                }
+            }),
+        ] {
+            let metadata = extract(&input)?;
+            assert!(project(&metadata, "/app")?.dependencies.is_empty());
+            assert!(metadata.module_owners.is_empty());
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn unavailable_dependency_information_has_a_reason() -> anyhow::Result<()> {
         let mut missing_graph = metadata();
         missing_graph["resolution"] = json!({});
@@ -485,17 +609,14 @@ mod tests {
         missing_owners["module_owners"] = json!({});
 
         for (input, expected) in [
-            (
-                missing_graph,
-                "no package information is available in uv metadata",
-            ),
+            (missing_graph, "resolution node `workspace` is missing"),
             (
                 missing_projects,
                 "no workspace project information is available in uv metadata",
             ),
             (
                 missing_owners,
-                "no module ownership or editable source paths are available in uv metadata",
+                "uv metadata has no module ownership or editable source paths",
             ),
         ] {
             let error = extract(&input)

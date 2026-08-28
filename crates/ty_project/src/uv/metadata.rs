@@ -13,6 +13,8 @@ use crate::metadata::python_version::SupportedPythonVersion;
 
 mod dependencies;
 
+pub(crate) use dependencies::DependencyMetadataError;
+
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct UvMetadata {
     workspace_root: SystemPathBuf,
@@ -77,15 +79,10 @@ impl UvMetadata {
         })
     }
 
-    pub(crate) fn dependency_metadata(&self) -> Option<DependencyMetadata> {
+    pub(crate) fn dependency_metadata(
+        &self,
+    ) -> Result<DependencyMetadata, DependencyMetadataError> {
         self.to_dependency_metadata()
-            .inspect_err(|error| {
-                tracing::debug!(
-                    "Skipping dependency checks for '{}': {error:#}",
-                    self.workspace_root
-                );
-            })
-            .ok()
     }
 }
 
@@ -273,7 +270,7 @@ mod tests {
         assert!(workspace.environment().is_none());
         assert!(workspace.python_version().is_none());
         assert!(workspace.members().is_empty());
-        assert!(workspace.dependency_metadata().is_none());
+        assert!(workspace.dependency_metadata().is_err());
 
         Ok(())
     }

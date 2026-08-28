@@ -16,9 +16,9 @@ use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use rayon::prelude::*;
 use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
+    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
-use ruff_db::files::File;
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
@@ -33,7 +33,9 @@ use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::dependency::DependencyMetadata;
-use ty_python_semantic::lint::RuleSelection;
+use ty_python_semantic::lint::{LintId, RuleSelection};
+use ty_python_semantic::types::MISSING_DIRECT_DEPENDENCY;
+use uv::DependencyMetadataError;
 pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges};
 
 mod db;
@@ -276,63 +278,49 @@ impl Project {
 
     /// Extract dependency information once per metadata update. Unrelated project settings and
     /// source ranges do not invalidate import inference when the extracted information is equal.
-    #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn dependency_metadata(self, db: &dyn Db) -> Option<Box<DependencyMetadata>> {
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn dependency_metadata(
+        self,
+        db: &dyn Db,
+    ) -> Result<Option<Box<DependencyMetadata>>, DependencyMetadataError> {
         let metadata = self.metadata(db);
         let Some(workspace) = metadata.uv_workspace() else {
             tracing::debug!(
                 "Skipping dependency checks for '{}': no uv workspace metadata is available",
                 metadata.root(),
             );
-            return None;
+            return Ok(None);
         };
-        let Some(environment) = workspace.environment() else {
-            tracing::debug!(
-                "Skipping dependency checks for '{}': uv metadata does not specify a Python environment",
-                workspace.workspace_root(),
-            );
-            return None;
-        };
+        let environment = workspace
+            .environment()
+            .ok_or(DependencyMetadataError::MissingEnvironment)?;
         let environment = db
             .system()
             .canonicalize_path(environment)
-            .inspect_err(|error| {
-                tracing::debug!(
-                    "Skipping dependency checks for '{}': could not canonicalize uv's Python environment '{environment}': {error}",
-                    workspace.workspace_root(),
-                );
-            })
-            .ok()?;
-        let Some(selected_environment) = metadata
+            .map_err(|error| DependencyMetadataError::InvalidEnvironment {
+                path: environment.to_path_buf(),
+                message: error.to_string().into(),
+            })?;
+        let selected_environment = metadata
             .to_merged_options()
             .python_environment(db.system())
-            .inspect_err(|error| {
-                tracing::debug!(
-                    "Skipping dependency checks for '{}': could not resolve the selected Python environment: {error}",
-                    workspace.workspace_root(),
-                );
-            })
-            .ok()?
-        else {
-            tracing::debug!(
-                "Skipping dependency checks for '{}': no Python environment is configured",
-                workspace.workspace_root(),
-            );
-            return None;
-        };
+            .map_err(|error| {
+                DependencyMetadataError::EnvironmentResolution(error.to_string().into())
+            })?
+            .ok_or(DependencyMetadataError::MissingSelectedEnvironment)?;
 
         // An explicit Python environment can override uv's selection. Its installed modules may
         // belong to different distributions, so uv's ownership map cannot describe those imports.
         if selected_environment.sys_prefix().as_std_path() != environment.as_std_path() {
-            tracing::info!(
-                "Skipping dependency checks for '{}': selected Python environment '{}' differs from uv's environment '{environment}'",
-                workspace.workspace_root(),
-                selected_environment.sys_prefix().as_std_path().display(),
-            );
-            return None;
+            return Err(DependencyMetadataError::EnvironmentMismatch {
+                selected: selected_environment.sys_prefix().to_path_buf(),
+                uv: environment,
+            });
         }
 
-        workspace.dependency_metadata().map(Box::new)
+        workspace
+            .dependency_metadata()
+            .map(|metadata| Some(Box::new(metadata)))
     }
 
     pub fn update_program(self, db: &mut dyn Db, settings: ProgramSettings) {
@@ -810,10 +798,32 @@ impl Project {
 
     /// Check if the project's settings have any issues
     pub fn check_settings(&self, db: &dyn Db) -> Vec<Diagnostic> {
+        let metadata = self.metadata(db);
+        let uv_diagnostic = metadata.uv_diagnostic(db).or_else(|| {
+            if !self
+                .settings(db)
+                .is_rule_enabled(LintId::of(&MISSING_DIRECT_DEPENDENCY))
+            {
+                return None;
+            }
+
+            let error = self.dependency_metadata(db).as_ref().err()?;
+            let mut diagnostic = error.to_diagnostic();
+            let root = metadata
+                .uv_workspace()
+                .map_or(metadata.root(), |workspace| workspace.workspace_root());
+            if let Ok(file) = system_path_to_file(db, root.join("pyproject.toml")) {
+                let mut annotation = Annotation::primary(Span::from(file));
+                annotation.hide_snippet(true);
+                diagnostic.annotate(annotation);
+            }
+            Some(diagnostic)
+        });
+
         self.settings_diagnostics(db)
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
-            .chain(self.metadata(db).uv_diagnostic(db))
+            .chain(uv_diagnostic)
             .collect()
     }
 }
