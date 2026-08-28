@@ -14,7 +14,7 @@ use ty_python_semantic::dependency::{
 use super::{NodeKind, ResolutionNode, UvMetadata};
 
 impl UvMetadata {
-    pub(super) fn to_dependency_metadata(
+    pub(crate) fn dependency_metadata(
         &self,
     ) -> Result<DependencyMetadata, DependencyMetadataError> {
         let root = self.workspace_root();
@@ -396,7 +396,7 @@ mod tests {
             .memory_file_system()
             .write_file_all(absolute("/app/pyproject.toml"), "[tool.uv.workspace]")?;
         let metadata = UvMetadata::from_metadata(&serde_json::to_vec(metadata)?, &system)?;
-        Ok(metadata.to_dependency_metadata()?)
+        Ok(metadata.dependency_metadata()?)
     }
 
     fn project<'a>(

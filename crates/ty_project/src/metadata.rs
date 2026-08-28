@@ -1143,6 +1143,36 @@ unclosed table, expected `]`
     }
 
     #[test]
+    fn dependency_metadata_warning_respects_rule_overrides() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from(if cfg!(windows) { "C:/app" } else { "/app" });
+        system.memory_file_system().create_directory_all(&root)?;
+        let environment = uv_workspace(&root, &system)?;
+        let mut metadata = ProjectMetadata::new("app", root).with_environment(environment);
+        metadata.apply_override_options(Options::from_toml_str(
+            r#"
+[[overrides]]
+include = ["*.py"]
+[overrides.rules]
+missing-direct-dependency = "warn"
+"#,
+            ValueSource::Cli,
+        )?);
+        let db = TestDb::new(metadata);
+
+        let diagnostics = db.project().check_settings(&db);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].severity(), Severity::Warning);
+        assert_eq!(
+            diagnostics[0].concise_message().to_string(),
+            "Cannot check dependencies: uv did not provide a Python environment"
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn uv_refresh_error_takes_precedence_over_dependency_error() -> anyhow::Result<()> {
         let system = TestSystem::default();
         let root = SystemPathBuf::from(if cfg!(windows) { "C:/app" } else { "/app" });

@@ -7,7 +7,6 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
-use ty_python_semantic::dependency::DependencyMetadata;
 
 use crate::metadata::python_version::SupportedPythonVersion;
 
@@ -77,12 +76,6 @@ impl UvMetadata {
             resolution: metadata.resolution,
             module_owners: metadata.module_owners,
         })
-    }
-
-    pub(crate) fn dependency_metadata(
-        &self,
-    ) -> Result<DependencyMetadata, DependencyMetadataError> {
-        self.to_dependency_metadata()
     }
 }
 
