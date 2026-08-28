@@ -1832,7 +1832,7 @@ impl<'db> UpperBound<'db> {
         upper
     }
 
-    fn iter_evidence(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
+    pub(super) fn iter_evidence(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
         self.evidence.iter().copied()
     }
 
@@ -1840,7 +1840,7 @@ impl<'db> UpperBound<'db> {
         self.validity.iter().copied()
     }
 
-    pub(super) fn iter_clauses(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
+    fn iter_clauses(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
         iter::chain(self.iter_evidence(), self.iter_validity())
     }
 
