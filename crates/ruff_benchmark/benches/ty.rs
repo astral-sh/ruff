@@ -14,11 +14,12 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_ranged_value::RangedValue;
-use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options, Rules};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::lint::Level;
 
 mod ty_shared;
 
@@ -863,6 +864,60 @@ fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmarks for ty#4269: recursive protocol inference and assignment diagnostics.
+///
+/// Explicit receiver annotations can repeatedly expand inherited recursive protocol members
+/// during constructor inference or diagnostic collection.
+fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
+    const NUM_METHODS: usize = 8;
+
+    setup_rayon();
+
+    let mut code = "\
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+"
+    .to_string();
+
+    for i in 0..NUM_METHODS {
+        writeln!(
+            &mut code,
+            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ..."
+        )
+        .ok();
+    }
+
+    code.push_str("\nclass Concrete[T](Chain[T]):\n");
+    code.push_str("    def __init__(self, values: Iterable[T]) -> None: ...\n");
+
+    for (name, scenario, expected_diagnostics) in [
+        (
+            "ty_micro[inherited_recursive_protocol_constructor]",
+            "\nvalue: Chain[int] = Concrete(())\n",
+            0,
+        ),
+        (
+            "ty_micro[inherited_recursive_protocol_diagnostic]",
+            "\ndef diagnose[T](value: Concrete[T]) -> None:\n    invalid: Chain[int] = value\n",
+            1,
+        ),
+    ] {
+        let code = format!("{code}{scenario}");
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| assert_eq!(case.db.check().len(), expected_diagnostics),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -1392,25 +1447,38 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
         });
     }
 
-    let mut code = String::from("def f(value: str) -> None:\n");
-    for index in 0..800 {
-        writeln!(&mut code, "    local_{index} = {index}").ok();
-    }
-    code.push_str("    try:\n");
-    code.push_str(&"        value.upper()\n".repeat(800));
-    code.push_str("    except Exception:\n        pass\n");
+    for (name, parameters, statement) in [
+        (
+            "ty_micro[repeated_statement_calls_in_try]",
+            "value: str",
+            "        value.upper()\n",
+        ),
+        (
+            "ty_micro[repeated_statement_calls_in_try_with_if_branches]",
+            "value: str, flag: bool",
+            "        if flag is True:\n            pass\n        value.upper()\n",
+        ),
+    ] {
+        let mut code = format!("def f({parameters}) -> None:\n");
+        for index in 0..800 {
+            writeln!(&mut code, "    local_{index} = {index}").ok();
+        }
+        code.push_str("    try:\n");
+        code.push_str(&statement.repeat(800));
+        code.push_str("    except Exception:\n        pass\n");
 
-    criterion.bench_function("ty_micro[repeated_statement_calls_in_try]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 struct ProjectBenchmark<'a> {
@@ -1418,6 +1486,7 @@ struct ProjectBenchmark<'a> {
     fs: MemoryFileSystem,
     max_diagnostics: usize,
     freeze_inputs: bool,
+    rules: Option<Rules>,
 }
 
 impl<'a> ProjectBenchmark<'a> {
@@ -1432,6 +1501,7 @@ impl<'a> ProjectBenchmark<'a> {
             fs,
             max_diagnostics,
             freeze_inputs: false,
+            rules: None,
         }
     }
 
@@ -1452,6 +1522,7 @@ impl<'a> ProjectBenchmark<'a> {
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
+            rules: self.rules.clone(),
             ..Options::default()
         });
 
@@ -1552,6 +1623,18 @@ fn attrs(criterion: &mut Criterion) {
     // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
     let frozen_benchmark = benchmark.freeze_inputs();
     bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
+
+    let all_rules_benchmark = ProjectBenchmark {
+        freeze_inputs: false,
+        rules: Some(Rules::from_iter([(
+            RangedValue::cli("all".to_owned()),
+            RangedValue::cli(Level::Error),
+        )])),
+        max_diagnostics: 100,
+        ..frozen_benchmark
+    };
+
+    bench_project_named(&all_rules_benchmark, criterion, "attrs (all rules)");
 }
 
 fn anyio(criterion: &mut Criterion) {
@@ -1608,6 +1691,7 @@ criterion_group!(
     benchmark_mixed_str_enum_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
+    benchmark_inherited_recursive_protocol,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,

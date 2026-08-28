@@ -3,6 +3,9 @@
 These tests describe which names are defined and what types they have in the branches of a
 `try`/`except`/`else`/`finally` statement.
 
+The analysis models exceptions from ordinary Python operations. It intentionally does not treat
+every possible interruption, such as an exception raised by a signal handler, as an exception point.
+
 For a full writeup on the semantics of exception handlers, see [this document][1].
 
 Functions whose names start with `could_raise_` make it clear that a call may raise an exception
@@ -10,8 +13,8 @@ before an assignment completes. Any other function call can raise as well.
 
 ## Operations that cannot raise
 
-An exception handler can run only if the `try` block contains an operation that can raise. Assigning
-a literal to a local name cannot raise:
+Under this model, an exception handler is reachable only if the `try` block contains an operation
+that can raise. Assigning a literal to a local name does not introduce an exception point:
 
 ```py
 x = 1
@@ -44,6 +47,106 @@ def known_safe_conditions(value: int | None) -> None:
         state = 2
 
     reveal_type(state)  # revealed: Literal[1]
+```
+
+## Annotated assignments that can raise
+
+An annotation applies to assignments in the exception handler even if evaluating the annotated
+assignment's right-hand side raises. In particular, it provides type context for a collection
+literal in the handler.
+
+```py
+from typing import Any
+
+def could_raise_dict() -> dict[str, Any]:
+    return {}
+
+def requires_str(value: str) -> None: ...
+def fallback() -> None:
+    try:
+        result: dict[str, Any] = could_raise_dict()
+    except Exception:
+        result = {"correct": False, "message": "fallback"}
+        reveal_type(result)  # revealed: dict[str, Any]
+
+    reveal_type(result)  # revealed: dict[str, Any]
+    requires_str(result["message"])
+```
+
+The declaration also rejects an incompatible assignment in the handler.
+
+```py
+def could_raise_int() -> int:
+    return 1
+
+def incompatible_fallback() -> None:
+    try:
+        value: int = could_raise_int()
+    except Exception:
+        value = "wrong"  # error: [invalid-assignment]
+```
+
+An earlier call in the `try` block does not hide a declaration reached before a later call raises.
+
+```py
+def declaration_after_call() -> None:
+    value = int()
+    try:
+        could_raise_int()
+        value: int = could_raise_int()
+    except Exception:
+        value = "wrong"  # error: [invalid-assignment]
+```
+
+The declaration does not make the new value available before the assignment completes. A handler
+still sees the previous value, or an unbound name if there was no previous binding.
+
+```py
+def previous_binding() -> None:
+    value = 0
+    try:
+        value: int = could_raise_int()
+    except Exception:
+        reveal_type(value)  # revealed: Literal[0]
+
+def no_previous_binding() -> None:
+    try:
+        value: int = could_raise_int()
+    except Exception:
+        # error: [unresolved-reference]
+        reveal_type(value)  # revealed: Unknown
+```
+
+A new annotation replaces an earlier declared type even if its right-hand side raises.
+
+```py
+def reannotated() -> None:
+    value: object = None
+    try:
+        value: int = could_raise_int()
+    except Exception:
+        value = 1
+
+    reveal_type(value)  # revealed: int
+```
+
+Assignments made while evaluating the right-hand side still reach the handler. When the call
+returns, its result replaces the value assigned by the walrus expression on the successful path.
+
+```py
+from collections.abc import Callable
+from typing import Literal
+
+def assignment_in_rhs(could_raise_after: Callable[[int], Literal[3]]) -> None:
+    value = 0
+    try:
+        value: int = could_raise_after(value := 2)
+    except Exception:
+        reveal_type(value)  # revealed: Literal[0, 2]
+    else:
+        reveal_type(value)  # revealed: Literal[3]
+
+    reveal_type(value)  # revealed: Literal[0, 2, 3]
 ```
 
 ## Looking up an undefined name
@@ -246,6 +349,20 @@ def repeated_calls() -> None:
         reveal_type(state)  # revealed: Literal[0, "changed"]
 ```
 
+A branch that does not change any bindings preserves the state visible to the handler:
+
+```py
+def unchanged_branch(flag: bool) -> None:
+    state = 0
+    try:
+        may_raise()
+        if flag is True:
+            pass
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
 Branch narrowing changes the state visible to the handler even when neither branch introduces a new
 binding:
 
@@ -268,6 +385,20 @@ def restored_branches(value: int | None) -> None:
             may_raise()
         else:
             may_raise()
+    except:
+        reveal_type(value)  # revealed: int | None
+```
+
+Match guards also distinguish successful and failed branches without introducing a new binding:
+
+```py
+def guarded_match_branches(value: int | None) -> None:
+    try:
+        match value:
+            case _ if value is not None:
+                may_raise()
+            case _:
+                may_raise()
     except:
         reveal_type(value)  # revealed: int | None
 ```
@@ -299,6 +430,54 @@ def call_never_returns() -> None:
     try:
         stop()
         state = "unreachable"
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
+## Nested handlers with merged bindings
+
+An inner handler can preserve the original binding while its `else` suite sees a later assignment.
+After those paths merge, an exception must expose both bindings to the outer handler:
+
+```py
+def may_raise() -> None: ...
+def nested_try() -> None:
+    state = 0
+    try:
+        try:
+            may_raise()
+            state = "changed"
+        except:
+            pass
+        else:
+            may_raise()
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0, "changed"]
+```
+
+## Caught calls that never return
+
+Catching an exception from a `NoReturn` call makes the following code reachable again, even if no
+bindings changed. The unreachable inner `else` suite must not hide the later exception:
+
+```py
+from typing import NoReturn
+
+def may_raise() -> None: ...
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def nested_terminal() -> None:
+    state = 0
+    try:
+        try:
+            stop()
+        except:
+            pass
+        else:
+            may_raise()
         may_raise()
     except:
         reveal_type(state)  # revealed: Literal[0]
@@ -752,7 +931,9 @@ def class_decorator_raises(decorator) -> None:
 A function decorator is applied after its parameter defaults have been evaluated:
 
 ```py
-def function_decorator_raises(decorator) -> None:
+from typing import Any, Callable
+
+def function_decorator_raises(decorator: Callable[[Any], None]) -> None:
     state = 0
     try:
         @decorator
@@ -766,7 +947,7 @@ def function_decorator_raises(decorator) -> None:
 Decorator application can also raise when the function has no parameter defaults:
 
 ```py
-def function_decorator_without_defaults(decorator) -> None:
+def function_decorator_without_defaults(decorator: Callable[[Any], None]) -> None:
     caught = False
     try:
         @decorator

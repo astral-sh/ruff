@@ -192,6 +192,19 @@ MyEnum = types.new_class("MyEnum", (Enum,))
 reveal_type(MyEnum)  # revealed: <class 'MyEnum'>
 ```
 
+### Protocol bases
+
+`types.new_class()` also preserves the `_ProtocolMeta` metaclass of source-defined protocols.
+
+```py
+import types
+from typing import Protocol
+
+class Interface(Protocol): ...
+
+reveal_type(type(types.new_class("Dynamic", (Interface,))))  # revealed: <class '_ProtocolMeta'>
+```
+
 ### Generic and TypedDict bases
 
 Even though `types.new_class()` handles `__mro_entries__` at runtime, ty does not yet model the full

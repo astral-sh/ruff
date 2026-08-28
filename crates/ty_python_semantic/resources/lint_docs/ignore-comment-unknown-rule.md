@@ -1,11 +1,12 @@
 ## What it does
 
-Checks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint rule.
+Checks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint
+rule.
 
 ## Why is this bad?
 
-A `ty: ignore[code]` or a `type: ignore[ty:code]` directive with a `code` that doesn't match
-any known rule will not suppress any type errors, and is probably a mistake.
+A `ty: ignore[code]` or a `type: ignore[ty:code]` directive with a `code` that doesn't match any
+known rule will not suppress any type errors, and is probably a mistake.
 
 ## Examples
 

@@ -1014,7 +1014,7 @@ fn method_override_types<'db>(
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method)) => {
             let superclass_signature = superclass_method.function(db).signature(db);
-            let receiver = match superclass_signature.overloads.as_slice() {
+            let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
                     .parameters()
                     .get(0)
@@ -1026,29 +1026,33 @@ fn method_override_types<'db>(
                 _ => None,
             };
 
-            receiver.map_or((subclass_type, superclass_type), |receiver| {
-                let typing_self_type = subclass_method.typing_self_type(db);
-                let receiver = receiver.bind_self_typevars(db, env, typing_self_type);
-                let receiver = IntersectionType::from_elements(
+            let typing_self_type = subclass_method.typing_self_type(db);
+            let receiver =
+                explicit_receiver.map_or(subclass_method.self_instance(db), |receiver| {
+                    let receiver = receiver.bind_self_typevars(db, env, typing_self_type);
+                    IntersectionType::from_elements(
+                        db,
+                        env,
+                        [subclass_method.self_instance(db), receiver],
+                    )
+                });
+
+            // Both signatures describe calls on the subclass. In particular, inherited `Self`
+            // annotations refer to the subclass even when the receiver is implicitly annotated.
+            (
+                Type::Callable(subclass_method.into_callable_type_with_receiver(
                     db,
                     env,
-                    [subclass_method.self_instance(db), receiver],
-                );
-                (
-                    Type::Callable(subclass_method.into_callable_type_with_receiver(
-                        db,
-                        env,
-                        receiver,
-                        typing_self_type,
-                    )),
-                    Type::Callable(superclass_method.into_callable_type_with_receiver(
-                        db,
-                        env,
-                        receiver,
-                        typing_self_type,
-                    )),
-                )
-            })
+                    receiver,
+                    typing_self_type,
+                )),
+                Type::Callable(superclass_method.into_callable_type_with_receiver(
+                    db,
+                    env,
+                    receiver,
+                    typing_self_type,
+                )),
+            )
         }
         _ => (subclass_type, superclass_type),
     };

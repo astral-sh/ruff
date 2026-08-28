@@ -710,7 +710,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: int
-reveal_type(c_instance.b)  # revealed: list[Literal[2, 3]]
+reveal_type(c_instance.b)  # revealed: list[int]
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -971,7 +971,11 @@ reveal_type(D().x)  # revealed: Unknown
 If `staticmethod` is something else, that should not influence the behavior:
 
 ```py
-def staticmethod(f):
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def staticmethod(f: T) -> T:
     return f
 
 class C:
@@ -2075,6 +2079,22 @@ A dynamic base likewise supplies the fallback for the non-descriptor members of 
 class UsesMaybeGeneratedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclass=MaybeDescriptorMeta): ...
 
 reveal_type(UsesMaybeGeneratedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
+```
+
+A union alias must not hide a non-descriptor member: the same dynamic fallback remains possible
+after expanding it:
+
+```py
+from typing_extensions import TypeAliasType
+
+GeneratedDescriptorOrInt = TypeAliasType("GeneratedDescriptorOrInt", GeneratedDescriptor | int)
+
+class AliasedDescriptorMeta(MaybeDescriptorMeta):
+    generated_descriptor: GeneratedDescriptorOrInt | GeneratedDescriptor
+
+class UsesAliasedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclass=AliasedDescriptorMeta): ...
+
+reveal_type(UsesAliasedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
 ```
 
 Dynamic bases are ignored when descriptor detection requires a concrete `__get__` method:
@@ -4761,6 +4781,7 @@ declarations.
 from unknown_library import unknown_decorator
 
 class C:
+    # error: [dynamic-function-decorator-return]
     @unknown_decorator
     def f(self):
         self.x: int = 1
@@ -4773,6 +4794,7 @@ class D:
     def __init__(self):
         self.x: int = 1
 
+    # error: [dynamic-function-decorator-return]
     @unknown_decorator
     def f(self):
         self.x = 2
@@ -4891,6 +4913,19 @@ class F:
         self.x = make_homogeneous_tuple(other.x)
 
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
+```
+
+A homogeneous tuple of `Divergent` has gradual length, so it is assignable to a fixed-length tuple.
+This allows a recursively inferred instance attribute to retain an empty tuple as its class default:
+
+```py
+class G:
+    x = ()
+
+    def f(self):
+        self.x = tuple(self.x)
+
+reveal_type(G().x)  # revealed: tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

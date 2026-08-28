@@ -1,4 +1,23 @@
 #!/usr/bin/env python3
+#
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["ruff"]
+#
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# ///
+
 """Check code snippets in docs are formatted by Ruff."""
 
 from __future__ import annotations
@@ -188,8 +207,8 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             code = format_str(code, extension)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
-        except NotImplementedError as e:
-            raise e
+        except NotImplementedError:
+            raise
 
         code = textwrap.indent(code, match["indent"])
         return f"{match['before']}{code}{match['after']}"
@@ -286,14 +305,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Check code snippets in docs are formatted by Ruff.",
     )
     parser.add_argument("--skip-errors", action="store_true")
-    parser.add_argument("--generate-docs", action="store_true")
     args = parser.parse_args(argv)
-
-    if args.generate_docs:
-        # Generate docs
-        from generate_mkdocs import main as generate_docs
-
-        generate_docs()
 
     # Get static docs
     static_docs = [Path("docs") / f for f in os.listdir("docs") if f.endswith(".md")]

@@ -9,6 +9,7 @@ use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
@@ -40,7 +41,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct DuplicateLiteralMember {
     duplicate_name: String,
 }

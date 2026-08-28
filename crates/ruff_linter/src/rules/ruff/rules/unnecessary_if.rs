@@ -12,6 +12,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix, fix};
 
 /// ## What it does
@@ -59,7 +60,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, fix};
 /// - [`empty-type-checking-block (TC005)`]: Detects empty `if TYPE_CHECKING`
 ///   blocks specifically.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.8")]
+#[violation_metadata(preview_since = "0.15.8", category = Category::Complexity)]
 pub(crate) struct UnnecessaryIf;
 
 impl AlwaysFixableViolation for UnnecessaryIf {

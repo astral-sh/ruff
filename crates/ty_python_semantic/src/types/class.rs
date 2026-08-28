@@ -5,12 +5,13 @@ pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
+use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
-use self::static_literal::{AugmentedBindings, ImplicitAttribute};
+pub use self::slots::SlotDescriptorType;
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
@@ -25,7 +26,7 @@ use super::{
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -45,7 +46,7 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypingModule,
     UnionBuilder, VarianceInferable,
 };
 use crate::{
@@ -68,15 +69,30 @@ use ty_python_core::{ProgramFile, place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
+mod implicit_attributes;
 mod known;
 mod named_tuple;
+mod slots;
 mod static_literal;
 mod typed_dict;
 
 #[derive(Clone, Copy)]
 enum DynamicClassHeaderAnchor<'db> {
     Definition(Definition<'db>),
-    ScopeOffset(u32),
+    ScopeOffset(DynamicClassScopeOffset),
+}
+
+/// Identifies a dangling dynamic-class call relative to its enclosing scope.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum DynamicClassScopeOffset {
+    /// A call in the module AST, identified by its scope-relative node index.
+    Node(u32),
+
+    /// A call in a parsed string annotation, whose nodes are not in the module AST.
+    ///
+    /// `offset` identifies the outermost string expression in the module AST, relative to the
+    /// scope's node index. `range` identifies the call within that string expression.
+    StringAnnotation { offset: u32, range: TextRange },
 }
 
 /// Returns the source range of a call that creates a dynamic class.
@@ -98,11 +114,24 @@ fn dynamic_class_header_range<'db>(
             .expect("dynamic class definitions should only be used for assignments")
             .range(),
         DynamicClassHeaderAnchor::ScopeOffset(offset) => {
+            let (offset, relative_range) = match offset {
+                DynamicClassScopeOffset::Node(offset) => (offset, None),
+                DynamicClassScopeOffset::StringAnnotation { offset, range } => {
+                    (offset, Some(range))
+                }
+            };
             let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
             let anchor_u32 = scope_anchor
                 .as_u32()
                 .expect("anchor should not be NodeIndex::NONE");
             let absolute_index = NodeIndex::from(anchor_u32 + offset);
+            if let Some(relative_range) = relative_range {
+                let string: &ast::ExprStringLiteral = module
+                    .get_by_index(absolute_index)
+                    .try_into()
+                    .expect("string annotation offset should point to ExprStringLiteral");
+                return relative_range + string.start();
+            }
             let node: &ast::ExprCall = module
                 .get_by_index(absolute_index)
                 .try_into()
@@ -661,6 +690,16 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
+        match self {
+            Self::Static(class) => class.inferred_metaclass(db),
+            Self::Dynamic(class) => class.inferred_metaclass(db),
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => {
+                ClassMetaclass::Selected(self.metaclass(db))
+            }
+        }
+    }
+
     /// Look up a class-level member by iterating through the MRO.
     pub(crate) fn class_member(
         self,
@@ -674,7 +713,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(class) => class.class_member(db, env, name, policy),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, env, name, policy),
             Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, env, name, policy),
-            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name),
+            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name, policy),
         }
     }
 
@@ -1506,12 +1545,17 @@ impl<'db> ClassType<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Self::NonGeneric(class) => class.metaclass(db),
-            Self::Generic(generic) => generic
-                .origin(db)
-                .metaclass(db)
-                .apply_optional_specialization(db, Some(generic.specialization(db))),
+        let env = ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
+        self.inferred_metaclass(db).to_type(db, &env)
+    }
+
+    pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
+        let (class, specialization) = self.class_literal_and_specialization(db);
+        match class.inferred_metaclass(db) {
+            ClassMetaclass::Selected(metaclass) => ClassMetaclass::Selected(
+                metaclass.apply_optional_specialization(db, specialization),
+            ),
+            ClassMetaclass::ProtocolFallback => ClassMetaclass::ProtocolFallback,
         }
     }
 
@@ -1713,11 +1757,11 @@ impl<'db> ClassType<'db> {
         // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
         // with any other arbitrary class, anyway).
         let type_class = KnownClass::Type.to_class_literal(db, env);
-        let self_metaclass = self.metaclass(db);
+        let self_metaclass = self.inferred_metaclass(db).for_inheritance(db, env);
         if self_metaclass == type_class {
             return true;
         }
-        let other_metaclass = other.metaclass(db);
+        let other_metaclass = other.inferred_metaclass(db).for_inheritance(db, env);
         if other_metaclass == type_class {
             return true;
         }
@@ -1825,7 +1869,7 @@ impl<'db> ClassType<'db> {
                 .map(|specialization| specialization.tuple_runtime_element_specialization(db));
             class_literal
                 .own_class_member(db, env, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                .map_type(|ty| ty.apply_optional_owner_specialization_to_member(db, specialization))
         };
 
         match name {
@@ -2023,7 +2067,6 @@ impl<'db> ClassType<'db> {
                             db,
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
-                            CallableFunctionProvenance::None,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -2141,7 +2184,9 @@ impl<'db> ClassType<'db> {
 
                 class_literal
                     .instance_member(db, env, specialization, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                    .map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, specialization)
+                    })
             }
         }
     }
@@ -2196,7 +2241,9 @@ impl<'db> ClassType<'db> {
                 generic
                     .origin(db)
                     .own_instance_member(db, env, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+                    .map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                    })
             }
         }
     }
@@ -2227,14 +2274,7 @@ impl<'db> ClassType<'db> {
     ) -> ImplicitAttribute<'db> {
         let augmented_bindings = self
             .static_class_literal(db)
-            .map(|(class, _)| {
-                StaticClassLiteral::implicit_attribute_bindings(
-                    db,
-                    class.body_scope(db),
-                    name,
-                    target_method_decorator,
-                )
-            })
+            .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator))
             .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
             .and_then(|implicit| implicit.augmented_bindings);
 
@@ -2342,12 +2382,8 @@ impl<'db> ClassType<'db> {
                 .iter()
                 .any(|signature| !signature.return_ty.is_assignable_to(db, env, instance_type));
 
-            let dunder_new_bound_method = CallableType::new(
-                db,
-                bound_signature,
-                CallableTypeKind::Regular,
-                CallableFunctionProvenance::None,
-            );
+            let dunder_new_bound_method =
+                CallableType::new(db, bound_signature, CallableTypeKind::Regular);
 
             if returns_non_subclass {
                 return CallableTypes::one(dunder_new_bound_method);
@@ -2421,7 +2457,6 @@ impl<'db> ClassType<'db> {
                     db,
                     synthesized_dunder_init_signature,
                     CallableTypeKind::Regular,
-                    CallableFunctionProvenance::None,
                 ))
             } else {
                 None
@@ -3136,7 +3171,7 @@ pub(super) enum ClassMemberResult<'db> {
     /// Found the member or exhausted the MRO.
     Done(CompletedMemberLookup<'db>),
     /// Encountered a `TypedDict` base.
-    TypedDict(TypedDictModule),
+    TypedDict(TypingModule),
 }
 
 pub(super) struct CompletedMemberLookup<'db> {
@@ -3316,6 +3351,59 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
+/// A selected metaclass, or the `ABCMeta` fallback inferred from a typeshed stdlib protocol base.
+///
+/// Typeshed lists `Protocol` as a base for some classes, such as collection ABCs, that do not
+/// inherit from it at runtime. Inferring a metaclass constraint from those bases would therefore
+/// produce false conflicts. The fallback exposes ABC methods such as `register`, but does not
+/// participate in metaclass selection.
+///
+/// Outside those stubs, a `Protocol` base selects its actual `_ProtocolMeta` metaclass, even in a
+/// stub file. It participates in metaclass selection and constrains subclasses in the usual way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum ClassMetaclass<'db> {
+    Selected(Type<'db>),
+    /// A lookup-only fallback originating in typeshed. Inheritance preserves this provenance.
+    ProtocolFallback,
+}
+
+impl<'db> ClassMetaclass<'db> {
+    fn with_protocol_fallback(
+        db: &'db dyn Db,
+        selected: Type<'db>,
+        has_protocol_fallback: bool,
+    ) -> Self {
+        if has_protocol_fallback
+            && selected
+                .to_class_type(db)
+                .is_some_and(|class| class.is_known(db, KnownClass::Type))
+        {
+            Self::ProtocolFallback
+        } else {
+            Self::Selected(selected)
+        }
+    }
+
+    fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self {
+            Self::Selected(metaclass) => metaclass,
+            Self::ProtocolFallback => KnownClass::ABCMeta.to_class_literal(db, env),
+        }
+    }
+
+    /// Return the metaclass guaranteed by class declarations, without the typeshed fallback.
+    pub(super) fn for_inheritance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        match self {
+            Self::Selected(metaclass) => metaclass,
+            Self::ProtocolFallback => KnownClass::Type.to_class_literal(db, env),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,
@@ -3335,16 +3423,11 @@ pub(super) enum MetaclassErrorKind<'db> {
     /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
     /// its bases.
     Conflict {
-        /// `candidate1` will either be the explicit `metaclass=` keyword in the class definition,
-        /// or the inferred metaclass of a base class
-        candidate1: MetaclassCandidate<'db>,
-
-        /// `candidate2` will always be the inferred metaclass of a base class
-        candidate2: MetaclassCandidate<'db>,
-
-        /// Flag to indicate whether `candidate1` is the explicit `metaclass=` keyword or the
-        /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
-        candidate1_is_base_class: bool,
+        /// The explicit `metaclass=` keyword or a previously visited base's metaclass.
+        candidate: MetaclassCandidate<'db>,
+        /// The incompatible metaclass of `base`.
+        base_metaclass: ClassType<'db>,
+        base: ClassBase<'db>,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,
@@ -3354,62 +3437,4 @@ pub(super) enum MetaclassErrorKind<'db> {
     PartlyNotCallable(Type<'db>),
     /// A cycle was encountered attempting to determine the metaclass
     Cycle,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum SlotsKind {
-    /// `__slots__` is not found in the class.
-    NotSpecified,
-    /// `__slots__` is defined but empty: `__slots__ = ()`.
-    Empty,
-    /// `__slots__` is defined and is not empty: `__slots__ = ("a", "b")`.
-    NotEmpty,
-    /// `__slots__` is defined but its value is dynamic:
-    /// * `__slots__ = tuple(a for a in b)`
-    /// * `__slots__ = ["a", "b"]`
-    Dynamic,
-}
-
-impl SlotsKind {
-    fn from(db: &dyn Db, base: StaticClassLiteral) -> Self {
-        let env = ProgramEnvironment::from_scope(base.body_scope(db));
-        let Place::Defined(DefinedPlace {
-            ty: slots_ty,
-            definedness: bound,
-            ..
-        }) = base
-            .own_class_member(
-                db,
-                &env,
-                base.inherited_generic_context(db),
-                None,
-                "__slots__",
-            )
-            .inner
-            .place
-        else {
-            return Self::NotSpecified;
-        };
-
-        if matches!(bound, Definedness::PossiblyUndefined) {
-            return Self::Dynamic;
-        }
-
-        match slots_ty {
-            // __slots__ = ("a", "b")
-            Type::NominalInstance(nominal) => match nominal
-                .tuple_spec(db, &env)
-                .and_then(|spec| spec.len().into_fixed_length())
-            {
-                Some(0) => Self::Empty,
-                Some(_) => Self::NotEmpty,
-                None => Self::Dynamic,
-            },
-
-            // __slots__ = "abc"  # Same as `("abc",)`
-            Type::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
-
-            _ => Self::Dynamic,
-        }
-    }
 }

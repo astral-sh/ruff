@@ -236,6 +236,80 @@ def foo() -> str:
 }
 
 #[test]
+fn on_did_open_invalid_script_reports_only_configuration_diagnostics() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let content = r#"# /// script
+# requires-python =
+# ///
+
+def function():
+    unused = 1
+    return missing
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(script, content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, content, 1);
+
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change_invalid_script_metadata_restores_semantic_diagnostics() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let invalid = r#"# /// script
+# requires-python =
+# ///
+
+missing
+"#;
+    let valid = r#"# /// script
+# requires-python = ">=3.12"
+# ///
+
+missing
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(script, invalid)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, invalid, 1);
+    let initial = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(initial);
+
+    server.change_text_document(
+        script,
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: valid.to_string(),
+                },
+            ),
+        ],
+        2,
+    );
+
+    let updated = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(updated);
+
+    Ok(())
+}
+
+#[test]
 fn on_did_change_script_python_requirement() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let script = SystemPath::new("src/script.py");
@@ -295,6 +369,31 @@ PythonFinalizationError
         diagnostics: [],
     }
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_open_virtual_script_reports_invalid_metadata() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemVirtualPath::new("untitled:script.py");
+    let content = r#"# /// script
+# requires-python =
+# ///
+
+missing
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_virtual_text_document(script, content, 1)?;
+
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    insta::assert_debug_snapshot!(diagnostics);
 
     Ok(())
 }
@@ -858,4 +957,137 @@ fn collect_publish_diagnostic_notifications_with_versions(
     }
 
     results
+}
+
+mod uv_metadata {
+    #[cfg(feature = "test-uv")]
+    use std::process::Command;
+
+    use anyhow::Result;
+    use lsp_types::{Code, PublishDiagnosticsNotification};
+    use ruff_db::system::SystemPath;
+    use serde_json::json;
+    use ty_project::UseUv;
+
+    use crate::TestServerBuilder;
+
+    #[cfg(feature = "test-uv")]
+    #[test]
+    fn project_refresh_reports_progress_and_clears_errors() -> Result<()> {
+        let manifest = r#"
+[project]
+name = "example"
+version = "0.1.0"
+requires-python = ">=3.8"
+"#;
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(SystemPath::new("src"), None)?
+            .with_file(
+                "src/pyproject.toml",
+                format!(
+                    r#"{manifest}
+[tool.uv]
+package = "invalid"
+"#
+                ),
+            )?
+            .with_real_uv(UseUv::On)?
+            .enable_work_done_progress(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+        let event = lsp_types::FileEvent {
+            uri: server.file_uri("src/pyproject.toml"),
+            kind: lsp_types::FileChangeType::Changed,
+        };
+        let diagnostics = server.collect_publish_diagnostic_notifications(1);
+        assert_eq!(diagnostics[&event.uri].len(), 1);
+        assert_eq!(
+            diagnostics[&event.uri][0].code,
+            Some(Code::String("uv-metadata".into()))
+        );
+
+        server.write_file("src/pyproject.toml", manifest)?;
+        let output = Command::new("uv")
+            .current_dir(server.file_path("src"))
+            .args(["sync", "--offline"])
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "uv sync failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        server.did_change_watched_files(vec![event.clone()]);
+
+        server.assert_work_done_progress("Refreshing example metadata")?;
+
+        // The existing warning is republished while the refresh is pending, then cleared.
+        assert_eq!(
+            server.collect_publish_diagnostic_notifications(1),
+            diagnostics
+        );
+        assert!(server.collect_publish_diagnostic_notifications(1)[&event.uri].is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn untrusted_workspace_keeps_semantic_diagnostics() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_raw_initialization_options(json!({"untrustedWorkspace": true}))
+            .with_use_uv(UseUv::On)
+            .with_env_var("TY_UV", "true")
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_pull_diagnostics(false)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+
+        // An attempted synchronization would replace this with a `uv-metadata` error.
+        let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+        assert_eq!(diagnostics.uri, server.file_uri(script));
+        assert_eq!(
+            diagnostics
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code.as_ref())
+                .collect::<Vec<_>>(),
+            [Some(&Code::String("unresolved-reference".to_string()))],
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn pushed_diagnostics_wait_for_the_initial_environment() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_pull_diagnostics(false)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+
+        let synchronized = server.await_notification::<PublishDiagnosticsNotification>();
+        assert!(synchronized.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some(Code::String("uv-metadata".to_string()))
+        }));
+        assert!(!synchronized.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some(Code::String("unresolved-reference".to_string()))
+        }));
+
+        Ok(())
+    }
 }

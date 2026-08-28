@@ -1,3 +1,6 @@
+use std::assert_matches;
+use std::fmt::Write;
+
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
@@ -300,14 +303,14 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 
     let owner_type = Type::unknown();
     let owner = DefinitionTypes::from_parts(first, vec![(first, owner_type)], vec![]);
-    assert!(matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type));
+    assert_matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type);
     assert_eq!(
         owner.bindings(first).collect::<Vec<_>>(),
         [(first, owner_type)]
     );
 
     let non_owner = DefinitionTypes::from_parts(first, vec![(second, owner_type)], vec![]);
-    assert!(matches!(non_owner, DefinitionTypes::Other(_)));
+    assert_matches!(non_owner, DefinitionTypes::Other(_));
     assert_eq!(
         non_owner.bindings(first).collect::<Vec<_>>(),
         [(second, owner_type)]
@@ -517,6 +520,72 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
     assert_eq!(cycles, Vec::<String>::new());
 }
 
+/// Checks widening when a comparison truthiness override is present in only one iteration.
+///
+/// A missing override falls back to the expression type's truthiness. Widening must compare the
+/// effective truthiness from both iterations, including this fallback. Discarding an override from
+/// the previous iteration could otherwise make a previously ambiguous condition definite again.
+///
+/// We construct inference results directly because mdtests cannot prescribe intermediate Salsa
+/// results. A Python cycle can converge before widening starts, or drop an override without
+/// changing any final types or diagnostics. No known Python example exposes the failures checked
+/// here, so this is defensive coverage of the widening invariant.
+#[test]
+fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("src/comparison.py", "0 < 1 < 2")?;
+    let file = program_file(&db, system_path_to_file(&db, "src/comparison.py")?);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let Some(ast::Stmt::Expr(statement)) = module.syntax().body.first() else {
+        anyhow::bail!("expected a comparison expression statement");
+    };
+    let expression = ExpressionNodeKey::from(statement.value.as_ref());
+    let scope = global_scope(&db, file);
+    let env = ProgramEnvironment::from_scope(scope);
+    let inference = |ty, truthiness: Option<Truthiness>| ExpressionInference {
+        expressions: [(expression, ty)].into_iter().collect(),
+        extra: truthiness.map(|truthiness| {
+            Box::new(ExpressionInferenceExtra {
+                comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
+                ..ExpressionInferenceExtra::default()
+            })
+        }),
+        #[cfg(debug_assertions)]
+        scope,
+    };
+
+    // A previously widened condition stays ambiguous even when the new result omits its
+    // override and has a definite value-type fallback.
+    let previous = inference(Type::bool_literal(false), Some(Truthiness::Ambiguous));
+    let mut current = inference(Type::bool_literal(false), None);
+    current.widen_comparison_truthiness(&db, &env, &previous);
+    assert_eq!(
+        current.comparison_truthiness(expression),
+        Some(Truthiness::Ambiguous)
+    );
+
+    // A new override is compared with the previous result's value-type fallback.
+    let previous = inference(Type::bool_literal(true), None);
+    let mut current = inference(Type::unknown(), Some(Truthiness::AlwaysFalse));
+    current.widen_comparison_truthiness(&db, &env, &previous);
+    assert_eq!(
+        current.comparison_truthiness(expression),
+        Some(Truthiness::Ambiguous)
+    );
+
+    // Matching effective truthiness stays precise. Keep the override even though it agrees with
+    // the current type: subsequent type widening can make that fallback ambiguous again.
+    let previous = inference(Type::unknown(), Some(Truthiness::AlwaysFalse));
+    let mut current = inference(Type::bool_literal(false), None);
+    current.widen_comparison_truthiness(&db, &env, &previous);
+    assert_eq!(
+        current.comparison_truthiness(expression),
+        Some(Truthiness::AlwaysFalse)
+    );
+
+    Ok(())
+}
+
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
 /// reachability-constraint checks in that scope.
 #[test]
@@ -582,7 +651,8 @@ class Ui:
             );
 
             for index in 0..MANY_WIDGETS {
-                ui.push_str(&format!(
+                write!(
+                    ui,
                     concat!(
                         "        self.widget_{index} = Widget()\n",
                         "        self.widget_{index}.configure()\n",
@@ -590,7 +660,7 @@ class Ui:
                         "        self.widget_{index}.configure()\n",
                     ),
                     index = index,
-                ));
+                )?;
             }
             ui.push_str("        self.target = Widget()\n");
 
@@ -639,7 +709,8 @@ class Inner:
 "#,
             );
             for index in 0..MANY_WIDGETS {
-                inner.push_str(&format!(
+                write!(
+                    inner,
                     concat!(
                         "        self.widget_{index} = Widget()\n",
                         "        self.widget_{index}.configure()\n",
@@ -647,7 +718,7 @@ class Inner:
                         "        self.widget_{index}.configure()\n",
                     ),
                     index = index,
-                ));
+                )?;
             }
             inner.push_str("        self.target = Widget()\n");
 
@@ -744,6 +815,43 @@ class Form(Ui):
     Ok(())
 }
 
+#[test]
+fn nested_binding_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);
+    let source = format!(
+        r#"def noop() -> None: ...
+{calls}value = 1
+values = [(value := 'abc') for _ in range(2)]
+value.bit_count()
+"#
+    );
+    db.write_file("/src/main.py", &source)?;
+
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Object of type `str` has no attribute `bit_count`"],
+    );
+
+    Ok(())
+}
+
+#[test]
+fn redundant_cast_without_closing_parenthesis() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    // A final newline changes the recovered argument range, so these files deliberately omit it.
+    for suffix in ["", " # comment"] {
+        let source =
+            format!("from typing import cast\n\ndef f(x: int):\n    return cast(int, x{suffix}");
+        db.write_file("/src/main.py", &source)?;
+        assert_file_diagnostics(&db, "/src/main.py", &["Value is already of type `int`"]);
+    }
+
+    Ok(())
+}
+
 // Incremental inference tests
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
@@ -783,6 +891,187 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         "bool"
     );
 
+    Ok(())
+}
+
+#[test]
+fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        def f(x: int = 1) -> int: return x
+        def annotated(x: int) -> int: return x
+        def defaulted(x=1): return x
+        "#,
+    )?;
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, file, "f"),
+        &events,
+    );
+    assert_function_query_was_not_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, file, "annotated"),
+        &events,
+    );
+    assert_function_query_was_not_run(
+        &db,
+        infer_deferred_types,
+        first_public_binding(&db, file, "defaulted"),
+        &events,
+    );
+
+    let definition = first_public_binding(&db, file, "f");
+    let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
+    let DefinitionKind::Function(function) = definition.kind(&db) else {
+        anyhow::bail!("expected a function definition");
+    };
+    let Some(parameter) = function.node(&module).parameters.find("x") else {
+        anyhow::bail!("expected parameter x");
+    };
+    let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default()) else {
+        anyhow::bail!("expected an annotated parameter with a default");
+    };
+
+    let annotations = infer_deferred_types(&db, definition);
+    assert!(annotations.try_expression_type(annotation).is_some());
+    assert!(annotations.try_expression_type(default).is_none());
+    let defaults = infer_function_default_types(&db, definition);
+    assert!(defaults.try_expression_type(default).is_some());
+    assert!(defaults.try_expression_type(annotation).is_none());
+    assert_eq!(
+        crate::types::definition_expression_type(&db, definition, default),
+        defaults.expression_type(default)
+    );
+    Ok(())
+}
+
+#[test]
+fn lazy_parameter_defaults() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        ("/src/defaults.py", "def f(x: int = 1) -> int: return x"),
+        ("/src/main.py", "from defaults import f\nresult = f()"),
+    ])?;
+    let source = system_path_to_file(&db, "/src/defaults.py")?;
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    db.clear_salsa_events();
+    let result = global_symbol(&db, main, "result").place.expect_type();
+    assert_eq!(
+        result.display(&db, &db.program_environment()).to_string(),
+        "int"
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, source, "f"),
+        &events,
+    );
+
+    // Display needs the actual default, unlike call checking.
+    let function = global_symbol(&db, source, "f").place.expect_type();
+    assert_eq!(
+        function.display(&db, &db.program_environment()).to_string(),
+        "def f(x: int = 1) -> int"
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_run(
+        &db,
+        infer_function_default_types,
+        first_public_binding(&db, source, "f"),
+        &events,
+    );
+
+    db.write_file("/src/defaults.py", "def f(x: int = 2) -> int: return x")?;
+    db.clear_salsa_events();
+    let result = global_symbol(&db, main, "result").place.expect_type();
+    assert_eq!(
+        result.display(&db, &db.program_environment()).to_string(),
+        "int"
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(
+        &db,
+        infer_definition_types,
+        first_public_binding(&db, main, "result"),
+        &events,
+    );
+    let function = global_symbol(&db, source, "f").place.expect_type();
+    assert_eq!(
+        function.display(&db, &db.program_environment()).to_string(),
+        "def f(x: int = 2) -> int"
+    );
+    Ok(())
+}
+
+#[test]
+fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let with_default = "def f(x: int = 1) -> int: return x";
+    db.write_files([
+        ("/src/defaults.py", with_default),
+        ("/src/main.py", "from defaults import f\nf()"),
+    ])?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    db.write_file("/src/defaults.py", "def f(x: int) -> int: return x")?;
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["No argument provided for required parameter `x` of function `f`"],
+    );
+
+    db.write_file("/src/defaults.py", with_default)?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
+fn field_specifier_default_value_invalidates_caller() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let field_source = r#"from typing import Any
+
+def field(*, init: bool = False) -> Any: ...
+"#;
+    db.write_files([
+        ("/src/fields.py", field_source),
+        (
+            "/src/model.py",
+            r#"from typing_extensions import dataclass_transform
+from fields import field
+
+@dataclass_transform(field_specifiers=(field,))
+class ModelBase: ...
+
+class Model(ModelBase):
+    value: int = field()
+"#,
+        ),
+        ("/src/main.py", "from model import Model\nModel()"),
+    ])?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    // This changes a default's value, not the field specifier's callable signature.
+    db.write_file(
+        "/src/fields.py",
+        field_source.replace("init: bool = False", "init: bool = True"),
+    )?;
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["No argument provided for required parameter `value`"],
+    );
+
+    db.write_file("/src/fields.py", field_source)?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
     Ok(())
 }
 

@@ -16,6 +16,7 @@ use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::PythonVersion;
 use ruff_source_file::OneIndexed;
+use std::assert_matches;
 use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
@@ -169,11 +170,9 @@ fn run_test(
                 return None;
             }
 
-            assert!(
-                matches!(
-                    embedded.lang,
-                    "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth"
-                ),
+            assert_matches!(
+                embedded.lang,
+                "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth",
                 "Supported file types are: py (or python), pyi, ipynb, text, cfg and ignore"
             );
 
@@ -307,6 +306,12 @@ fn run_test(
 
     db.update_program(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
+    db.update_dependency_metadata(
+        configuration
+            .dependency_metadata
+            .as_ref()
+            .map(|fixture| &fixture.metadata),
+    );
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
 
@@ -351,6 +356,7 @@ fn run_test(
                     test_file,
                     &inline_diagnostics,
                     &mut markdown_edits,
+                    |rendered| normalize_site_packages_paths(rendered, python_version),
                 )
             }) {
                 Ok(()) => None,
@@ -565,6 +571,28 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
     }
 }
 
+// Site-packages placeholders are specific to ty's fixtures. Keeping their normalization outside
+// the shared mdtest crate avoids rewriting Ruff snapshots or paths in displayed source and messages.
+fn normalize_site_packages_paths(rendered: &str, python_version: PythonVersion) -> String {
+    let unix_site_packages_path = format!("/lib/python{python_version}/site-packages/");
+    let mut normalized = String::with_capacity(rendered.len());
+
+    for line in rendered.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+
+        if trimmed.starts_with("--> ") || trimmed.starts_with("::: ") {
+            let line = line
+                .replace(&unix_site_packages_path, "/<path-to-site-packages>/")
+                .replace("/Lib/site-packages/", "/<path-to-site-packages>/");
+            normalized.push_str(&line);
+        } else {
+            normalized.push_str(line);
+        }
+    }
+
+    normalized
+}
+
 fn expand_site_packages_placeholder(
     path: &SystemPath,
     python_version: PythonVersion,
@@ -608,7 +636,31 @@ fn parse<'s>(
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
+
+    #[test]
+    fn normalizes_site_packages_paths_only_in_diagnostic_locations() {
+        let rendered = "warning[example]: Invalid value\n\
+             --> .venv/lib/python3.10/site-packages/dependency.py:1:5\n\
+              |\n\
+            1 | path = \".venv/lib/python3.10/site-packages/dependency.py\"\n\
+              |\n\
+             ::: .venv/Lib/site-packages/other.py:2:1\n\
+            help: Inspect .venv/lib/python3.10/site-packages/dependency.py";
+        let expected = "warning[example]: Invalid value\n\
+             --> .venv/<path-to-site-packages>/dependency.py:1:5\n\
+              |\n\
+            1 | path = \".venv/lib/python3.10/site-packages/dependency.py\"\n\
+              |\n\
+             ::: .venv/<path-to-site-packages>/other.py:2:1\n\
+            help: Inspect .venv/lib/python3.10/site-packages/dependency.py";
+
+        assert_eq!(
+            super::normalize_site_packages_paths(rendered, PythonVersion::PY310),
+            expected,
+        );
+    }
 
     #[test]
     fn multiple_sections_with_dependencies_not_allowed() {

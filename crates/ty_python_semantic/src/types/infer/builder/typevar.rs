@@ -96,7 +96,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let previous_deferred_state =
-            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
+            self.replace_deferred_state(DeferredExpressionState::Deferred);
         let bound_node = bound.as_deref();
         let bound_or_constraints = match bound_node {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
@@ -579,7 +579,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
         let previous_deferred_state =
-            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
+            self.replace_deferred_state(DeferredExpressionState::Deferred);
         self.infer_paramspec_default(default, Some(&name.id));
         self.deferred_state = previous_deferred_state;
     }
@@ -708,7 +708,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
         let previous_deferred_state =
-            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
+            self.replace_deferred_state(DeferredExpressionState::Deferred);
         self.infer_typevartuple_default(default, Some(&name.id));
         self.deferred_state = previous_deferred_state;
     }

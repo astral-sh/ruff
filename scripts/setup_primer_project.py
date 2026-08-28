@@ -4,17 +4,29 @@
 # requires-python = ">=3.11"
 # dependencies = ["mypy-primer"]
 #
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
 # [tool.uv]
+# no-build = true
+# no-binary-package = ["mypy-primer"]
+# build-constraint-dependencies = ["setuptools==84.0.0"]
 # # This is the default for ad hoc use. Historical ecosystem reproduction must
 # # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
 # # revision and project Python version, as shown in the module docstring.
 # # `exclude-newer` still constrains mypy-primer's registry dependencies.
-# exclude-newer = "7 days"
+# exclude-newer = "P7D"
 #
 # [tool.uv.sources]
-# # Keep this revision and the script's lockfile in sync with ecosystem-analyzer's
-# # mypy-primer pin so memory reports and ecosystem jobs use the same project definitions.
-# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer", rev = "6d6eebd8d37c9b8931381e79aa99808d9378c988" }
+# # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file
+# # so memory reports and ecosystem jobs use the same project definitions.
+# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
 # ///
 
 """Clone a mypy-primer project and set up a virtualenv with its dependencies installed.
@@ -149,7 +161,7 @@ def main() -> None:
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
         # Primer install commands are trusted project metadata and may use shell syntax.
-        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # noqa: S602
+        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
 
     # Install listed dependencies (matching primer's setup())
     if project.deps:

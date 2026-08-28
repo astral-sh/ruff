@@ -18,6 +18,7 @@ use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
+use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 
@@ -113,7 +114,33 @@ pub struct CallableAndCallExpr<'db> {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
+    /// The truthiness of an expression's resulting value.
     Expression(Expression<'db>),
+    /// A boolean operation, `not`, or conditional expression evaluated directly as a condition.
+    ///
+    /// In `if x and False`, the truthy branch is unreachable. But after `y = x and False`,
+    /// `if y` may be truthy: it can call `x.__bool__` a second time and get a different result.
+    Condition(Expression<'db>),
+    /// A chained comparison evaluated directly as a condition. Its inferred truthiness is
+    /// available without walking the expression again.
+    ChainedComparisonCondition(Expression<'db>),
+    /// Whether a context manager's exit return type allows an exception to be suppressed.
+    ///
+    /// Resolved during type inference because the context manager's type is unavailable during
+    /// semantic indexing.
+    ContextManagerSuppresses {
+        expression: Expression<'db>,
+        is_async: bool,
+    },
+    /// Whether semantic evaluation rules out every normal entry into a `finally` suite.
+    ///
+    /// The continuation is captured before constructing this predicate, so its constraint cannot
+    /// depend on the predicate itself. Deferring evaluation preserves terminal cleanup paths when
+    /// a context manager's suppression behavior is unavailable during semantic indexing.
+    FinallyNormalPathImpossible {
+        scope: ScopeId<'db>,
+        continuation: ScopedReachabilityConstraintId,
+    },
     /// These predicates are recorded for statements with call expressions. As part of
     /// reachability constraints, they are used to determine whether control flow can
     /// continue past this statement or not.

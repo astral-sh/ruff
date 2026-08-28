@@ -204,19 +204,22 @@ use crate::{
         CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
-        expand_type, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        expand_type, infer_expression_types, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
+        sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
+use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::{
-    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
+    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
+    FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
+    Truthiness, UseDefMap,
     definition::DefinitionState,
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
@@ -542,11 +545,15 @@ const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::Expression(expression) => expression.scope(db),
+        PredicateNode::Expression(expression)
+        | PredicateNode::Condition(expression)
+        | PredicateNode::ChainedComparisonCondition(expression)
+        | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
             callable.scope(db)
         }
         PredicateNode::Pattern(pattern) => pattern.scope(db),
+        PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
         PredicateNode::OrPatternAlternative(scope) => scope,
         PredicateNode::SubjectElementPattern(subject_element) => subject_element.pattern.scope(db),
         PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
@@ -703,6 +710,30 @@ fn evaluate_reachability_constraint<'db>(
     )
 }
 
+/// Evaluates the normal continuation captured by a deferred `finally` predicate.
+///
+/// Unlike other reachability predicates, a deferred `finally` predicate recursively evaluates
+/// another reachability constraint, which may contain earlier deferred `finally` predicates.
+/// Caching these continuations prevents a sequence of `finally` suites from repeatedly evaluating
+/// all preceding continuations, which would otherwise take exponential time.
+///
+/// Other expensive predicates already use tracked queries, while ordinary reachability
+/// constraints are cached within each inference region and at sparse checkpoints. Tracking
+/// [`evaluate_reachability_constraint`] itself would instead retain a Salsa query key and memo for
+/// every constraint.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn evaluate_finally_continuation<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    continuation: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    evaluate_reachability_constraint(db, scope, continuation)
+}
+
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
     match id {
         ScopedReachabilityConstraintId::ALWAYS_TRUE => Some(Truthiness::AlwaysTrue),
@@ -825,20 +856,41 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
 pub(crate) fn narrow_type_by_constraint<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    constraints: &NarrowingConstraints,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    id: ScopedNarrowingConstraint,
+    evaluator: &NarrowingEvaluator<'_, 'db>,
     base_ty: Type<'db>,
     place: ScopedPlaceId,
 ) -> Type<'db> {
+    let id = evaluator.constraint();
     match id {
         ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
         ScopedNarrowingConstraint::ALWAYS_FALSE => return Type::Never,
         _ => {}
     }
 
-    let mut projector = NarrowingProjector::new(db, env, constraints, predicates, place);
+    // Reachability gates can mention predicates that do not narrow this place. Evaluating those
+    // predicates cannot change its type and can introduce cycles through unrelated expressions.
+    // Terminal calls are also recorded as reachability constraints, so bindings eliminated by
+    // those calls are handled by reachability analysis even when no predicate narrows this place.
+    let predicate_narrowing_targets = evaluator.predicate_narrowing_targets();
+    if !predicate_narrowing_targets.contains_place(place) {
+        return base_ty;
+    }
+
+    let mut projector = NarrowingProjector::new(
+        db,
+        env,
+        evaluator.narrowing_constraints(),
+        evaluator.predicates(),
+        predicate_narrowing_targets,
+        place,
+    );
     let projected_root = projector.project(id);
+    match projected_root {
+        ProjectedNarrowingNodeId::ALWAYS_TRUE => return base_ty,
+        ProjectedNarrowingNodeId::ALWAYS_FALSE => return Type::Never,
+        _ => {}
+    }
+
     let mut context = ProjectedNarrowingContext {
         db,
         env,
@@ -1064,6 +1116,7 @@ struct NarrowingProjector<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     constraints: &'a NarrowingConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    predicate_narrowing_targets: &'a PredicateNarrowingTargets,
     place: ScopedPlaceId,
     project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
@@ -1076,6 +1129,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
         constraints: &'a NarrowingConstraints,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        predicate_narrowing_targets: &'a PredicateNarrowingTargets,
         place: ScopedPlaceId,
     ) -> Self {
         Self {
@@ -1083,6 +1137,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             env,
             constraints,
             predicates,
+            predicate_narrowing_targets,
             place,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
@@ -1097,6 +1152,13 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         Option<NarrowingConstraint<'db>>,
         Option<NarrowingConstraint<'db>>,
     ) {
+        if !self
+            .predicate_narrowing_targets
+            .contains(predicate_id, self.place)
+        {
+            return (None, None);
+        }
+
         let db = self.db;
         if let Some(cached) = self.graph.predicate_constraints_cache.get(&predicate_id) {
             return cached.clone();
@@ -1133,8 +1195,14 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
+                    let is_control_flow_gate = matches!(
+                        predicate.node,
+                        PredicateNode::IsNonTerminalCall(_)
+                            | PredicateNode::ContextManagerSuppresses { .. }
+                            | PredicateNode::FinallyNormalPathImpossible { .. }
+                    );
 
-                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    if is_control_flow_gate {
                         actions.push(Action::AnalyzeNonTerminal(id));
                         actions.push(Action::Visit(node.if_uncertain));
                     } else {
@@ -1151,7 +1219,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                            unreachable!(
+                                "statically decidable predicates should never be Ambiguous"
+                            )
                         }
                     };
 
@@ -1173,8 +1243,17 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
-                        let either = self.graph.or(if_true, if_false);
-                        self.graph.or(either, if_uncertain)
+                        // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
+                        // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
+                        // Including a statically unreachable branch could erase narrowing from the reachable branch.
+                        match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
+                            Truthiness::AlwaysTrue => self.graph.or(if_true, if_uncertain),
+                            Truthiness::AlwaysFalse => self.graph.or(if_false, if_uncertain),
+                            Truthiness::Ambiguous => {
+                                let either = self.graph.or(if_true, if_false);
+                                self.graph.or(either, if_uncertain)
+                            }
+                        }
                     } else {
                         self.graph.add_node(ProjectedNarrowingNode {
                             atom: node.atom,
@@ -1514,6 +1593,78 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
     }
 }
 
+/// Evaluate a condition without re-testing intermediate short-circuit results.
+///
+/// `None` means evaluation cannot produce a result, as for an operand narrowed to `Never`.
+/// This differs from ambiguous truthiness: in `flag and raises()`, where `raises()` returns
+/// `Never`, only the falsy short-circuit path can complete. For `flag or raises()`, only the
+/// truthy path can complete. Callers that cannot represent the absence of a result can
+/// conservatively map `None` to [`Truthiness::Ambiguous`].
+pub(crate) fn analyze_condition_expression(
+    node: &ast::Expr,
+    leaf_truthiness: &impl Fn(&ast::Expr) -> Option<Truthiness>,
+) -> Option<Truthiness> {
+    match node {
+        ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+            let short_circuit = Truthiness::from(op.is_or());
+            let mut result = short_circuit.negate();
+            for value in values {
+                let Some(truthiness) = analyze_condition_expression(value, leaf_truthiness) else {
+                    return result.is_ambiguous().then_some(short_circuit);
+                };
+                if truthiness == short_circuit {
+                    return Some(short_circuit);
+                }
+                if truthiness.is_ambiguous() {
+                    result = Truthiness::Ambiguous;
+                }
+            }
+            Some(result)
+        }
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            operand,
+            ..
+        }) => analyze_condition_expression(operand, leaf_truthiness).map(Truthiness::negate),
+        ast::Expr::If(ast::ExprIf {
+            test, body, orelse, ..
+        }) => match analyze_condition_expression(test, leaf_truthiness)? {
+            Truthiness::AlwaysTrue => analyze_condition_expression(body, leaf_truthiness),
+            Truthiness::AlwaysFalse => analyze_condition_expression(orelse, leaf_truthiness),
+            Truthiness::Ambiguous => {
+                let body_truthiness = analyze_condition_expression(body, leaf_truthiness);
+                let orelse_truthiness = analyze_condition_expression(orelse, leaf_truthiness);
+                match (body_truthiness, orelse_truthiness) {
+                    (None, truthiness) | (truthiness, None) => truthiness,
+                    (Some(body), Some(orelse)) => Some(if body == orelse {
+                        body
+                    } else {
+                        Truthiness::Ambiguous
+                    }),
+                }
+            }
+        },
+        _ => leaf_truthiness(node),
+    }
+}
+
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    let module = parsed_module(db, expression.python_file(db)).load(db);
+    let inference = infer_expression_types(db, expression, TypeContext::default());
+    analyze_condition_expression(expression.node_ref(db).node(&module), &|node| {
+        inference
+            .comparison_truthiness(node)
+            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
+    })
+    .unwrap_or(Truthiness::Ambiguous)
+}
+
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -1523,6 +1674,32 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
                 .bool(db, env)
                 .negate_if(!predicate.is_positive)
         }
+        PredicateNode::Condition(test_expr) => {
+            analyze_condition(db, test_expr).negate_if(!predicate.is_positive)
+        }
+        PredicateNode::ChainedComparisonCondition(test_expr) => {
+            let inference = infer_expression_types(db, test_expr, TypeContext::default());
+            let expression = test_expr.node_ref(db);
+            inference
+                .comparison_truthiness(expression)
+                .unwrap_or_else(|| inference.expression_type(expression).bool(db, env))
+                .negate_if(!predicate.is_positive)
+        }
+        PredicateNode::ContextManagerSuppresses {
+            expression,
+            is_async,
+        } => Truthiness::from(
+            infer_same_file_expression_type(db, expression, TypeContext::default())
+                .can_suppress_exceptions(db, env, EvaluationMode::from_is_async(is_async)),
+        )
+        .negate_if(!predicate.is_positive),
+        PredicateNode::FinallyNormalPathImpossible {
+            scope,
+            continuation,
+        } => Truthiness::from(
+            evaluate_finally_continuation(db, scope, continuation).is_always_false(),
+        )
+        .negate_if(!predicate.is_positive),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
             callable,
             call_expr,
@@ -1939,11 +2116,13 @@ class TargetB:
                 let constraints = NarrowingConstraints::from_test_nodes(nodes);
                 let x = index.place_table(function_scope).symbol_id("x").unwrap();
                 let env = db.program_environment();
+                let evaluator = use_def.narrowing_evaluator(ScopedNarrowingConstraint::ALWAYS_TRUE);
                 let mut projector = NarrowingProjector::new(
                     &db,
                     &env,
                     &constraints,
                     &predicates,
+                    evaluator.predicate_narrowing_targets(),
                     ScopedPlaceId::Symbol(x),
                 );
 

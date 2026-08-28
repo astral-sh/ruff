@@ -30,8 +30,8 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         expression: &ast::Expr,
         ty: Type<'db>,
     ) {
-        if !Self::is_promotable_tuple_literal(db, env, expression, ty) {
-            self.record_unpromotable_type(db, env, typevar_identity, ty);
+        if !Self::allows_expression(db, env, Some(expression), ty) {
+            self.blocked_typevars.insert(typevar_identity);
         }
     }
 
@@ -44,9 +44,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
-        if any_over_type(db, env, ty, true, |ty| {
-            ty.tuple_instance_spec(db, env).is_some()
-        }) {
+        if !Self::allows_expression(db, env, None, ty) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
@@ -55,6 +53,29 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     /// of the constraints recorded on this object.
     pub(crate) fn allow(&self, typevar_identity: BoundTypeVarIdentity<'db>) -> bool {
         !self.blocked_typevars.contains(&typevar_identity)
+    }
+
+    /// Reports whether an inferred collection element allows tuple size promotion. Tuple types
+    /// from annotations or nonliteral expressions keep their shape.
+    ///
+    /// For `items = [(1,), (2, 3)]`, both tuple literals are eligible, so their differing lengths
+    /// may be widened to `tuple[int, ...]`. With `pair = (2, 3)` followed by
+    /// `items = [(1,), pair]`, the nonliteral `pair` blocks promotion for the collection.
+    ///
+    /// The supplied `ty` should already have undergone literal promotion, so `(2, 3)` has the
+    /// homogeneous type `tuple[int, int]` when checking its eligibility.
+    /// If no source expression is available, any tuple type blocks tuple-size promotion.
+    pub(crate) fn allows_expression(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expression: Option<&ast::Expr>,
+        ty: Type<'db>,
+    ) -> bool {
+        expression
+            .is_some_and(|expression| Self::is_promotable_tuple_literal(db, env, expression, ty))
+            || !any_over_type(db, env, ty, true, |ty| {
+                ty.tuple_instance_spec(db, env).is_some()
+            })
     }
 
     /// Returns true if the given expression is either a non-starred homogeneous tuple literal or the

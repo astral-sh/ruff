@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, Reso
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
@@ -39,7 +40,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation:`int.bit_count`](https://docs.python.org/3/library/stdtypes.html#int.bit_count)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct BitCount {
     existing: SourceCodeSnippet,
     replacement: SourceCodeSnippet,

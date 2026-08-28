@@ -28,7 +28,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .iter()
                     .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))) =>
             {
-                Some(target.filter_union(db, |element| {
+                Some(target.filter_union(db, env, |element| {
                     !matches!(element.resolve_type_alias(db), Type::TypeForm(_))
                 }))
             }

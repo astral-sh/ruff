@@ -3,15 +3,24 @@ use std::sync::LazyLock;
 use proc_macro2::TokenStream;
 use quote::quote;
 use regex::Regex;
-use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, meta::ParseNestedMeta};
+use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, Path, meta::ParseNestedMeta};
 
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
 
-    let Some(group) = get_rule_status(&input.attrs)? else {
+    let metadata = get_metadata(&input.attrs)?;
+
+    let Some(status) = metadata.status else {
         return Err(Error::new_spanned(
-            input,
-            "Missing required rule group metadata",
+            &input,
+            "Missing required rule status metadata",
+        ));
+    };
+
+    let Some(category) = metadata.category else {
+        return Err(Error::new_spanned(
+            &input,
+            "Missing required rule category metadata",
         ));
     };
 
@@ -31,8 +40,12 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
                 Some(#docs)
             }
 
-            fn group() -> crate::codes::RuleGroup {
-                crate::codes::#group
+            fn status() -> crate::codes::RuleStatus {
+                crate::codes::#status
+            }
+
+            fn category() -> crate::codes::Category {
+                #category
             }
 
             fn file() -> &'static str {
@@ -65,37 +78,40 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
     Ok(explanation)
 }
 
-/// Extract the rule status attribute.
+/// Extract the rule metadata attributes.
 ///
 /// These attributes look like:
 ///
 /// ```ignore
-/// #[violation_metadata(stable_since = "1.2.3")]
+/// #[violation_metadata(stable_since = "1.2.3", category = Category::Correctness)]
 /// struct MyRule;
 /// ```
 ///
-/// The result is returned as a `TokenStream` so that the version string literal can be combined
-/// with the proper `RuleGroup` variant, e.g. `RuleGroup::Stable` for `stable_since` above.
-fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
-    let mut group = None;
+/// The rule status is stored as a `TokenStream` so that the version string literal can be combined
+/// with the proper `RuleStatus` variant, e.g. `RuleStatus::Stable` for `stable_since` above.
+fn get_metadata(attrs: &[Attribute]) -> syn::Result<Metadata> {
+    let mut metadata = Metadata::default();
     for attr in attrs {
         if attr.path().is_ident("violation_metadata") {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("stable_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Stable { since: #lit }));
+                    metadata.status = Some(quote!(RuleStatus::Stable { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("preview_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Preview { since: #lit }));
+                    metadata.status = Some(quote!(RuleStatus::Preview { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("deprecated_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Deprecated { since: #lit }));
+                    metadata.status = Some(quote!(RuleStatus::Deprecated { since: #lit }));
                     return Ok(());
                 } else if meta.path.is_ident("removed_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Removed { since: #lit }));
+                    metadata.status = Some(quote!(RuleStatus::Removed { since: #lit }));
+                    return Ok(());
+                } else if meta.path.is_ident("category") {
+                    metadata.category = Some(meta.value()?.parse()?);
                     return Ok(());
                 }
                 Err(Error::new_spanned(
@@ -105,7 +121,13 @@ fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
             })?;
         }
     }
-    Ok(group)
+    Ok(metadata)
+}
+
+#[derive(Default)]
+struct Metadata {
+    status: Option<TokenStream>,
+    category: Option<Path>,
 }
 
 fn parse_attr<'a, const LEN: usize>(

@@ -244,7 +244,7 @@ mod tests {
     #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
     #[test_case(Rule::MissingMaxsplitArg, Path::new("missing_maxsplit_arg.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
             &LinterSettings {
@@ -266,11 +266,7 @@ mod tests {
         Path::new("useless_exception_statement.py")
     )]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
 
         assert_diagnostics_diff!(
             snapshot,

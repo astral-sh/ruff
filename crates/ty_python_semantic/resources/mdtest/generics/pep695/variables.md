@@ -81,6 +81,74 @@ def multiple_legacy_defaults[T = K, U = K](value: K) -> K:
     return value
 ```
 
+### Defaults containing bounded type variables
+
+A default can specialize a bounded generic with an earlier type variable whose upper bound is
+compatible. Applying the default substitutes the actual type argument, without replacing it with its
+upper bound.
+
+```py
+class Box[T: int]: ...
+class Holder[T: int, B = Box[T]]: ...
+
+reveal_type(Holder[bool]())  # revealed: Holder[bool, Box[bool]]
+```
+
+The same substitution applies to defaults on generic type aliases:
+
+```py
+type Alias[T: int, B = Box[T]] = tuple[T, B]
+
+def alias(value: Alias[bool]):
+    reveal_type(value)  # revealed: tuple[bool, Box[bool]]
+```
+
+The referenced type variable can also appear inside the nested generic's type argument:
+
+```py
+class TupleBox[T: tuple[int, ...]]: ...
+class NestedHolder[T: int, B = TupleBox[tuple[T, ...]]]: ...
+
+reveal_type(NestedHolder[bool]())  # revealed: NestedHolder[bool, TupleBox[tuple[bool, ...]]]
+```
+
+We reject a nested type argument whose upper bound is incompatible with the generic's bound:
+
+```py
+# error: [invalid-type-arguments]
+class Invalid[T: str, B = Box[T]]: ...
+```
+
+An upper bound of `int` does not make `list[T]` assignable to `list[int]`: `list` is invariant, and
+`T` might be a proper subtype such as `bool`.
+
+```py
+class ListBox[T: list[int]]: ...
+
+# error: [invalid-type-arguments]
+class InvalidNested[T: int, B = ListBox[list[T]]]: ...
+```
+
+### Defaults containing constrained type variables
+
+A constrained type variable can appear inside a default when each of its constraints is allowed by
+the nested generic. The selected type argument is preserved in the default.
+
+```py
+class Box[T: (int, str)]: ...
+class Holder[T: (int, str), B = Box[T]]: ...
+
+reveal_type(Holder[str]())  # revealed: Holder[str, Box[str]]
+```
+
+We reject a nested type argument if one of its constraints is incompatible with the generic's
+constraints:
+
+```py
+# error: [invalid-type-arguments]
+class Invalid[T: (int, bytes), B = Box[T]]: ...
+```
+
 ### Invalid defaults
 
 A TypeVar default must be compatible with its bound or constraints.

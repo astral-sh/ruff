@@ -7,6 +7,7 @@ use ruff_source_file::find_newline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -141,7 +142,7 @@ impl fmt::Display for LiteralType {
 /// - [Python documentation: `bool`](https://docs.python.org/3/library/functions.html#bool)
 /// - [Python documentation: `complex`](https://docs.python.org/3/library/functions.html#complex)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.193")]
+#[violation_metadata(stable_since = "v0.0.193", category = Category::Style)]
 pub(crate) struct NativeLiterals {
     literal_type: LiteralType,
 }

@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for unnecessary direct calls to lambda expressions.
@@ -26,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Lambdas](https://docs.python.org/3/reference/expressions.html#lambda)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.153")]
+#[violation_metadata(stable_since = "v0.0.153", category = Category::Complexity)]
 pub(crate) struct UnnecessaryDirectLambdaCall;
 
 impl Violation for UnnecessaryDirectLambdaCall {

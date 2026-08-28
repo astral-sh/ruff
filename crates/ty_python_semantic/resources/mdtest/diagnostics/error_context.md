@@ -210,6 +210,59 @@ error[invalid-assignment]: Object of type `tuple[int, str]` is not assignable to
 info: a tuple of length 2 is not assignable to a tuple of length 3
 ```
 
+## Repeated successful comparisons before a mismatch
+
+Successful comparisons remain memoized while collecting context for a later mismatch. Fully
+expanding the first tuple element below would produce over a million leaves, but the diagnostic can
+identify the incompatible second element without visiting every repeated occurrence.
+
+```py
+type Pair[T] = tuple[T, T]
+type Quad[T] = Pair[Pair[T]]
+type Sixteen[T] = Quad[Quad[T]]
+type Nested[T] = Sixteen[Sixteen[Sixteen[Sixteen[Sixteen[T]]]]]
+
+def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
+    return source  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:7:12
+  |
+6 | def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
+  |                                               -------------------------- Expected `tuple[Nested[object], str]` because of return type
+7 |     return source  # snapshot: invalid-return-type
+  |            ^^^^^^ expected `tuple[Nested[object], str]`, found `tuple[Nested[int], int]`
+info: the second tuple element is not compatible: `int` is not assignable to `str`
+```
+
+An explicit receiver can leave successful comparisons conditional on a type variable. Comparing the
+first parameters below produces a satisfiable constraint on `S`. We reuse that result while
+reporting the incompatible `y` parameter.
+
+```py
+from typing import Callable
+
+class Receiver:
+    def method[S](self: S, x: Nested[S], y: int) -> int:
+        return 0
+
+def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
+    return receiver.method  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:15:12
+   |
+14 | def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
+   |                                           --------------------------------- Expected `(Nested[int], str, /) -> int` because of return type
+15 |     return receiver.method  # snapshot: invalid-return-type
+   |            ^^^^^^^^^^^^^^^ expected `(Nested[int], str, /) -> int`, found `bound method Receiver.method[S](x: Nested[S], y: int) -> int`
+info: the second parameter has an incompatible type: `str` is not assignable to `int`
+```
+
 ## `Callable`
 
 Assigning a function to a `Callable`
@@ -1270,6 +1323,96 @@ error[invalid-assignment]: Object of type `SupportsCheckWithOtherSignature` is n
 info: protocol `SupportsCheckWithOtherSignature` is not assignable to protocol `SupportsCheck`
 info: └── protocol member `check` is incompatible
 info:     └── parameter `y` has an incompatible type: `str` is not assignable to `bytes`
+```
+
+## Recursive protocol diagnostic context
+
+A value-constrained type parameter makes the recursive `child` override valid for each permitted
+specialization. The explicit receiver on `Outer.expose` preserves unresolved type variables while
+diagnostic context is collected, including the incompatible recursive member and its return type.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def child(self) -> Chain[T]: ...
+    def value(self) -> T: ...
+
+class Outer[T](Protocol):
+    def expose(self: Outer[T]) -> Chain[T]: ...
+
+class Concrete[T: (str, object)](Chain[T], Outer[T]):
+    def child(self) -> Concrete[str]:
+        raise NotImplementedError
+
+    def expose(self: Outer[T]) -> Concrete[T]:
+        raise NotImplementedError
+
+def diagnose[T: (str, object)](value: Concrete[T]) -> None:
+    invalid: Outer[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@diagnose]` is not assignable to `Outer[int]`
+  --> src/mdtest_snippet.py:20:27
+   |
+20 |     invalid: Outer[int] = value  # snapshot: invalid-assignment
+   |              ----------   ^^^^^ Incompatible value of type `Concrete[T@diagnose]`
+   |              |
+   |              Declared type
+info: type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `child` is incompatible
+info:     └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
+info:         └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
+info:             └── protocol member `value` is incompatible
+info:                 └── incompatible return types: `str` is not assignable to `int`
+```
+
+## Recursive protocols in a union after overload comparison
+
+A recursive callable protocol can be incompatible with more than one member of a target union. The
+diagnostic includes the nested `payload` mismatch for `HasPacket[str]`, even if the same member
+types were already compared when checking the callable overloads.
+
+```py
+from __future__ import annotations
+
+from typing import Callable, Protocol, overload
+
+class Packet[T](Protocol):
+    payload: T
+
+class HasPacket[T](Protocol):
+    def packet(self) -> Packet[T]: ...
+
+class Source[T](HasPacket[T], Protocol):
+    @overload
+    def __call__(self, x: int) -> Source[T]: ...
+    @overload
+    def __call__(self, x: str) -> Source[tuple[T]]: ...
+
+def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
+    return source  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:18:12
+   |
+17 | def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
+   |                                     --------------------------------------------- Expected `((int, /) -> Source[str]) | HasPacket[str]` because of return type
+18 |     return source  # snapshot: invalid-return-type
+   |            ^^^^^^ expected `((int, /) -> Source[str]) | HasPacket[str]`, found `Source[bytes]`
+info: type `Source[bytes]` is not assignable to any element of the union `((int, /) -> Source[str]) | HasPacket[str]`
+info: ├── type `Source[bytes]` has inferred callable type `Overload[(x: int) -> Source[bytes], (x: str) -> Source[tuple[bytes]]]`
+info: └── protocol `Source[bytes]` is not assignable to protocol `HasPacket[str]`
+info:     └── protocol member `packet` is incompatible
+info:         └── incompatible return types: `Packet[bytes]` is not assignable to `Packet[str]`
+info:             └── protocol `Packet[bytes]` is not assignable to protocol `Packet[str]`
+info:                 └── protocol member `payload` is incompatible
+info:                     └── read type `bytes` is not assignable to `str`
 ```
 
 ## Protocol method parameter names

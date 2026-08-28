@@ -82,6 +82,44 @@ reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
+An inferred specialization preserves a PEP 695 type alias when it is the only inferred lower bound.
+This keeps diagnostics expressed in terms of the alias instead of expanding it to the underlying
+type.
+
+```py
+type Scalar = int
+
+def takes_str(value: str) -> None:
+    pass
+
+def check_alias(value: Scalar) -> None:
+    # error: [invalid-argument-type] "Argument to function `takes_str` is incorrect: Expected `str`, found `Scalar`"
+    takes_str(f(value))
+```
+
+A PEP 695 type alias is also preserved when relating one generic function to a generic callback.
+This lets us infer the callback's return type from the members of the alias.
+
+```py
+from collections.abc import Callable
+
+type Items = tuple[int] | tuple[str]
+
+def identity[T](value: T) -> T:
+    return value
+
+def extract[T](callback: Callable[[Items], tuple[T]]) -> T:
+    raise NotImplementedError
+
+result = extract(identity)
+
+# revealed: str | int
+reveal_type(result)
+
+# error: [unresolved-attribute] "Object of type `str | int` has no attribute `nonexistent`"
+result.nonexistent()
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
@@ -93,7 +131,7 @@ argument _explicitly_ implements the protocol by listing it as a base class.
 ```py
 from typing import Protocol, TypeVar
 
-S = TypeVar("S")
+S = TypeVar("S", covariant=True)
 
 class CanIndex(Protocol[S]):
     def __getitem__(self, index: int, /) -> S: ...
@@ -684,6 +722,47 @@ reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
 reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 ```
 
+## Inferring tuple parameter types from unions
+
+Every member of a union argument contributes to the inferred element type of a homogeneous tuple
+parameter. Different tuple lengths do not prevent inference, and an empty tuple contributes no
+element types.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+def elements[T](values: tuple[T, ...]) -> tuple[T, ...]:
+    return values
+
+def _(
+    same: tuple[A, A] | tuple[A, A, A],
+    mixed: tuple[A] | tuple[B, B],
+    possibly_empty: tuple[()] | tuple[A, A],
+):
+    reveal_type(elements(same))  # revealed: tuple[A, ...]
+    reveal_type(elements(mixed))  # revealed: tuple[A | B, ...]
+    reveal_type(elements(possibly_empty))  # revealed: tuple[A, ...]
+```
+
+Fixed-length and mixed tuples infer type parameters from their corresponding element positions.
+
+```py
+def swap[T, U](values: tuple[U, T]) -> tuple[T, U]:
+    return values[1], values[0]
+
+def _(pairs: tuple[A, B] | tuple[C, D]):
+    reveal_type(swap(pairs))  # revealed: tuple[B | D, A | C]
+
+def tail[T](values: tuple[A, *tuple[T, ...]]) -> tuple[T, ...]:
+    return values[1:]
+
+def _(tails: tuple[A, B] | tuple[A, C, C]):
+    reveal_type(tail(tails))  # revealed: tuple[B | C, ...]
+```
+
 ## Inferring a bound typevar
 
 ```py
@@ -1175,8 +1254,8 @@ reveal_type(invoke(lift_invariant, 1))
 
 ## Passing unbound generic methods to generic functions
 
-An unbound method of a generic class can be passed to a generic higher-order function. The class
-type parameter must still be inferred from the concrete receiver expected by that function.
+An unbound method accessed through a bare generic class uses the class's default specialization. The
+higher-order function can still infer its own type parameter from its other arguments.
 
 ```py
 from __future__ import annotations
@@ -1187,6 +1266,9 @@ class Box[T]:
     def merge(self, other: Box[T]) -> Box[T]:
         return self
 
+reveal_type(Box.merge)  # revealed: def merge(self, other: Box[Unknown]) -> Box[Unknown]
+reveal_type(Box[str].merge)  # revealed: def merge(self, other: Box[str]) -> Box[str]
+
 def fold[T](function: Callable[[T, T], T], values: list[T]) -> T:
     return values[0]
 
@@ -1194,7 +1276,8 @@ def merge_boxes(values: list[Box[str]]) -> Box[str]:
     return fold(Box.merge, values)
 ```
 
-The same applies to the standard-library `set.union` method passed to `functools.reduce`.
+The same applies to the standard-library `set.union` method passed to `functools.reduce`: `reduce`
+infers its result from the iterable rather than reopening `set`'s default specialization.
 
 ```py
 from functools import reduce
@@ -1274,6 +1357,7 @@ def opaque_decorator(f: Any) -> Any:
 def transparent_decorator[F: Callable[..., Any]](f: F) -> F:
     return f
 
+# error: [dynamic-function-decorator-return]
 @opaque_decorator
 def decorated[T](t: T) -> None:
     # error: [redundant-cast]
@@ -1346,6 +1430,268 @@ def g[T: A](b: B[T]):
     return f(b.x)  # Fine
 ```
 
+## Inferred upper bounds restrict the range of gradual solutions
+
+Gradual lower bounds are intersected with their inferred upper bounds.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Callable, TypeAlias
+from ty_extensions._internal import Unknown
+
+def infer[T](lower: T, upper: Callable[[T], None]) -> T:
+    return lower
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int], None]):
+    reveal_type(infer(any_value, upper))  # revealed: int & Any
+    reveal_type(infer(unknown_value, upper))  # revealed: int & Unknown
+```
+
+All inferred upper bounds contribute to the intersection, whether they are static or gradual:
+
+```py
+def infer_multiple[T](
+    value: T,
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+) -> T:
+    return value
+
+def _(
+    any_value: Any,
+    unknown_value: Unknown,
+    static: Callable[[int], None],
+    first: Callable[[int | list[Any]], None],
+    second: Callable[[int | dict[str, Any]], None],
+):
+    reveal_type(infer_multiple(any_value, static, first))  # revealed: int & Any
+    reveal_type(infer_multiple(any_value, first, second))  # revealed: int & Any
+    reveal_type(infer_multiple(unknown_value, first, second))  # revealed: int & Unknown
+```
+
+An unsatisfiable gradual range falls back to unioning the inferred bounds for diagnostic recovery:
+
+```py
+def _(
+    unknown_value: Unknown,
+    static: Callable[[int], None],
+    incompatible: Callable[[list[Any]], None],
+):
+    result = infer_multiple(
+        unknown_value,
+        static,  # error: [invalid-argument-type]
+        incompatible,  # error: [invalid-argument-type]
+    )
+    reveal_type(result)  # revealed: Unknown | int | list[Any]
+```
+
+A gradual upper bound contributes its top materialization without replacing the gradual lower bound:
+
+```py
+def _(
+    any_value: Any,
+    unknown_value: Unknown,
+    list_upper: Callable[[list[Any]], None],
+    tuple_upper: Callable[[tuple[Any, ...]], None],
+    callable_upper: Callable[[Callable[[Any], int]], None],
+):
+    reveal_type(infer(any_value, list_upper))  # revealed: Top[list[Any]] & Any
+    reveal_type(infer(unknown_value, list_upper))  # revealed: Top[list[Any]] & Unknown
+    reveal_type(infer(any_value, tuple_upper))  # revealed: tuple[object, ...] & Any
+    reveal_type(infer(any_value, callable_upper))  # revealed: ((Never, /) -> int) & Any
+```
+
+The inferred upper bound is also retained when an invariant return type triggers promotion:
+
+```py
+def infer_list[T](lower: T, upper: Callable[[T], None]) -> list[T]:
+    return [lower]
+
+def _(any_value: Any, upper: Callable[[int], None]):
+    reveal_type(infer_list(any_value, upper))  # revealed: list[int & Any]
+```
+
+Promotion must also preserve the upper bound when a gradual solution contains promotable literals:
+
+```py
+def infer_promoted[T](static: T, gradual: T, upper: Callable[[T], None]) -> list[T]:
+    return [static, gradual]
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int | str], None]):
+    reveal_type(infer_promoted(1, any_value, upper))  # revealed: list[int | (str & Any)]
+    reveal_type(infer_promoted(1, unknown_value, upper))  # revealed: list[int | (str & Unknown)]
+```
+
+The same restriction applies when a type variable occurs in a callable's parameter and return types:
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+def predicate(value: Derived) -> bool:
+    return True
+
+def gradual_rule(value: Derived) -> Unknown:
+    raise NotImplementedError
+
+def condition[T](predicate: Callable[[T], bool], rule: Callable[[T], T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+reveal_type(condition(predicate, gradual_rule))  # revealed: (Derived & Unknown, /) -> Derived & Unknown
+```
+
+If the upper bound is a union, it is distributed across the gradual lower bound:
+
+```py
+class A: ...
+class B: ...
+class Result(A): ...
+
+def reduce[T](function: Callable[[T, T], T], values: Iterable[T]) -> T:
+    raise NotImplementedError
+
+def combine(left: A | B, right: A | B) -> Result:
+    raise NotImplementedError
+
+def _(values: Iterable[Any]):
+    # revealed: Result | (A & Any) | (B & Any)
+    reveal_type(reduce(combine, values))
+```
+
+Declared upper bounds validate a gradual solution but do not restrict its range on their own:
+
+```py
+def bounded[T: A | B](value: T) -> T:
+    return value
+
+def bounded_with_upper[T: A | B](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, upper: Callable[[object], None]):
+    reveal_type(bounded(any_value))  # revealed: Any
+    reveal_type(bounded_with_upper(any_value, upper))  # revealed: Any
+```
+
+An inferred upper bound cannot introduce materializations outside the declared upper bound:
+
+```py
+def bounded_range[T: int | str](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[int | bytes], None]):
+    reveal_type(bounded_range(any_value, upper))  # revealed: int & Any
+    reveal_type(bounded_range(unknown_value, upper))  # revealed: int & Unknown
+
+def _(any_value: Any, upper: Callable[[bytes], None]):
+    reveal_type(bounded_range(any_value, upper))  # revealed: Any
+```
+
+Declared gradual bounds preserve the gradual type inferred from the lower bound:
+
+```py
+def bounded_any[T: Any](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def bounded_gradual[T: list[Any]](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(
+    unknown_value: Unknown,
+    int_upper: Callable[[int], None],
+    list_upper: Callable[[list[int]], None],
+):
+    reveal_type(bounded_any(unknown_value, int_upper))  # revealed: int & Unknown
+    reveal_type(bounded_gradual(unknown_value, list_upper))  # revealed: list[int] & Unknown
+```
+
+Recursive declared bounds do not introduce `Divergent` into a concrete solution:
+
+```py
+Recursive: TypeAlias = int | list["Recursive"]
+
+def bounded_recursive[T: Recursive](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]):
+    any_result = bounded_recursive(any_value, upper)
+    unknown_result = bounded_recursive(unknown_value, upper)
+
+    reveal_type(any_result)  # revealed: list[int] & Any
+    reveal_type(any_result[0])  # revealed: int & Any
+    reveal_type(unknown_result)  # revealed: list[int] & Unknown
+    reveal_type(unknown_result[0])  # revealed: int & Unknown
+```
+
+## Redundant upper bounds preserve large gradual unions
+
+The invariant list fixes `T` to the entire union, while the callback adds the redundant upper bound
+`object`. Restricting the inferred gradual type by these bounds must preserve all five union
+members.
+
+```py
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
+
+Bound = None | int | set[int] | Sequence[Any] | Mapping[str, Any]
+
+def first[T: Bound](values: list[T], sink: Callable[[T], None]) -> T:
+    return values[0]
+
+def _(values: list[Bound], sink: Callable[[object], None]) -> None:
+    # revealed: None | int | set[int] | Sequence[Any] | Mapping[str, Any]
+    reveal_type(first(values, sink))
+```
+
+The same holds for recursive aliases, whose recursive positions currently fall back to `Divergent`.
+This is a reduced regression test for [ty#4335](https://github.com/astral-sh/ty/issues/4335).
+
+```py
+Recursive = None | int | set[int] | Sequence["Recursive"] | Mapping[str, "Recursive"]
+
+def first_recursive[T: Recursive](values: list[T], sink: Callable[[T], None]) -> T:
+    return values[0]
+
+def _(values: list[Recursive], sink: Callable[[object], None]) -> None:
+    # revealed: None | int | set[int] | Sequence[Divergent] | Mapping[str, Divergent]
+    reveal_type(first_recursive(values, sink))
+```
+
+## Inferring from multiple intersection arguments
+
+Each argument below satisfies `Source[T]` in two ways. Combining independent alternatives must
+remain bounded, and the merged inference result retains evidence from all four arguments. Reordering
+the arguments does not change that result.
+
+```py
+from typing import assert_type
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+class G: ...
+class H: ...
+
+def first[T](a: Source[T], b: Source[T], c: Source[T], d: Source[T]) -> T:
+    return a.get()
+
+def _(
+    a: Intersection[Source[A], Source[B]],
+    b: Intersection[Source[C], Source[D]],
+    c: Intersection[Source[E], Source[F]],
+    d: Intersection[Source[G], Source[H]],
+) -> None:
+    assert_type(first(a, b, c, d), A | B | C | D | E | F | G | H)
+    assert_type(first(d, c, b, a), A | B | C | D | E | F | G | H)
+```
+
 ## Typevars in a union
 
 ```py
@@ -1384,6 +1730,38 @@ def h[T](x: list[T] | dict[T, T]) -> T | None: ...
 def _(x: list[int], y: dict[int, int]):
     reveal_type(h(x))  # revealed: int | None
     reveal_type(h(y))  # revealed: int | None
+```
+
+A bounded type variable should still be enforced when it appears in multiple union members and the
+argument is itself a union. This currently exposes <https://github.com/astral-sh/ty/issues/4277>:
+
+```py
+class Box[T]: ...
+
+def unbox[T: bytes](value: Box[T] | T) -> T:
+    raise NotImplementedError
+
+def invalid_union(value: int | str) -> None:
+    # TODO: This should report [invalid-argument-type]: neither `int` nor `str` satisfies `T: bytes`.
+    reveal_type(unbox(value))  # revealed: Unknown
+```
+
+The same missing constraint lets an incompatible generic overload win over a matching overload:
+
+```py
+from typing import assert_type, overload
+
+@overload
+def select[T: bytes](value: Box[T] | T) -> T: ...
+@overload
+def select(value: int | str) -> bool: ...
+def select(value: object) -> object:
+    raise NotImplementedError
+
+def selects_invalid_overload(value: int | str) -> None:
+    # TODO: This should select the second overload and infer `bool`.
+    # error: [type-assertion-failure] "Type `Unknown` does not match asserted type `bool`"
+    assert_type(select(value), bool)
 ```
 
 ## Bounded typevar call context through a union
@@ -1578,6 +1956,27 @@ def needs_str(value: str, *args: object, **kwargs: object) -> int:
 reveal_type(invoke(accepts_int))  # revealed: int
 # error: [invalid-argument-type]
 reveal_type(invoke(needs_str))  # revealed: int
+```
+
+### Inferring uninhabited keyword types
+
+Inferring a keyword type as `Never` can eliminate a collision with an occupied positional parameter.
+
+The callback's return type must still contribute its own inference constraint.
+
+```py
+from typing import Protocol
+
+class Callback[T, R](Protocol):
+    def __call__(self, x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: T) -> R: ...
+
+def infer[T, R](callback: Callback[T, R]) -> tuple[list[T], R]:
+    raise NotImplementedError
+
+def source(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> str:
+    return ""
+
+reveal_type(infer(source))  # revealed: tuple[list[Never], str]
 ```
 
 ### Class constructors

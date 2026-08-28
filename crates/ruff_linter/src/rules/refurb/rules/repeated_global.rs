@@ -5,6 +5,7 @@ use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -40,7 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: the `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 /// - [Python documentation: the `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#the-nonlocal-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.9")]
+#[violation_metadata(preview_since = "v0.4.9", category = Category::Formatting)]
 pub(crate) struct RepeatedGlobal {
     global_kind: GlobalKind,
 }

@@ -7,6 +7,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
 
@@ -46,7 +47,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryEmptyIterableWithinDequeCall {
     has_maxlen: bool,
 }

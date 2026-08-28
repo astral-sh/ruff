@@ -9,6 +9,7 @@ use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use ruff_python_ast::PythonVersion;
@@ -89,7 +90,7 @@ use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 ///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.273")]
+#[violation_metadata(stable_since = "v0.0.273", category = Category::Suspicious)]
 pub(crate) struct ImplicitOptional {
     conversion_type: ConversionType,
 }

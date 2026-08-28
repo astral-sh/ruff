@@ -1,14 +1,16 @@
 use std::fmt::Display;
 
+use ty_module_resolver::{SearchPath, file_to_module};
+
 use crate::ProgramEnvironment;
-use crate::types::class::CodeGeneratorKind;
+use crate::types::class::{ClassMetaclass, CodeGeneratorKind};
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
     KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, TypedDictModule, todo_type,
+    TypeMapping, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -37,7 +39,7 @@ pub enum ClassBase<'db> {
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
     Generic,
-    TypedDict(TypedDictModule),
+    TypedDict(TypingModule),
 }
 
 impl<'db> ClassBase<'db> {
@@ -91,7 +93,7 @@ impl<'db> ClassBase<'db> {
         self.typed_dict_module().is_some()
     }
 
-    pub(super) const fn typed_dict_module(self) -> Option<TypedDictModule> {
+    pub(super) const fn typed_dict_module(self) -> Option<TypingModule> {
         match self {
             ClassBase::TypedDict(module) => Some(module),
             _ => None,
@@ -104,7 +106,7 @@ impl<'db> ClassBase<'db> {
     /// pseudo-base when detecting duplicate or conflicting bases.
     pub(super) const fn mro_identity(self) -> Self {
         match self {
-            Self::TypedDict(_) => Self::TypedDict(TypedDictModule::Typing),
+            Self::TypedDict(_) => Self::TypedDict(TypingModule::Typing),
             _ => self,
         }
     }
@@ -164,7 +166,7 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::Union(union) => {
-                if let Some(module) = TypedDictModule::from_type(db, ty) {
+                if let Some(module) = TypingModule::from_typed_dict_type(db, ty) {
                     return Some(ClassBase::TypedDict(module));
                 }
 
@@ -206,6 +208,7 @@ impl<'db> ClassBase<'db> {
             }
 
             Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::EnumComplement(_)
             | Type::LiteralValue(_)
             | Type::FunctionLiteral(_)
@@ -361,18 +364,35 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    /// Return the metaclass of this class base.
-    pub(crate) fn metaclass(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        match self {
-            Self::Class(class) => class.metaclass(db),
+    /// Return this base's selected metaclass or inferred protocol fallback.
+    ///
+    /// `subclass` is the class whose declaration names this base. Only a direct `Protocol` base
+    /// depends on whether its declaration is in the bundled or configured typeshed stdlib;
+    /// named bases retain their own metaclass constraints or fallback wherever they are inherited.
+    pub(super) fn inferred_metaclass(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        subclass: ClassLiteral<'db>,
+    ) -> ClassMetaclass<'db> {
+        let metaclass = match self {
+            Self::Class(class) => return class.inferred_metaclass(db),
+            Self::Protocol => {
+                if subclass.file(db).is_stub(db)
+                    && file_to_module(db, subclass.program_file(db).resolver_file(db))
+                        .and_then(|module| module.search_path(db))
+                        .is_some_and(SearchPath::is_standard_library)
+                {
+                    return ClassMetaclass::ProtocolFallback;
+                }
+                KnownClass::ProtocolMeta.to_class_literal(db, env)
+            }
             Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),
-            // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
-            Self::Protocol | Self::Generic | Self::TypedDict(_) => {
-                KnownClass::Type.to_instance(db, env)
-            }
-        }
+            Self::Generic | Self::TypedDict(_) => KnownClass::Type.to_instance(db, env),
+        };
+        ClassMetaclass::Selected(metaclass)
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -405,7 +425,7 @@ impl<'db> ClassBase<'db> {
                 &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
             let new_self = self.apply_type_mapping_impl(
                 db,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
                     specialization,
                 )),
                 TypeContext::default(),

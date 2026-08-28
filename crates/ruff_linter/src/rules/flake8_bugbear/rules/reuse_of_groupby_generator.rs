@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for multiple usage of the generator returned from
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///         do_something_with_the_group(values)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
+#[violation_metadata(stable_since = "v0.0.260", category = Category::Suspicious)]
 pub(crate) struct ReuseOfGroupbyGenerator;
 
 impl Violation for ReuseOfGroupbyGenerator {

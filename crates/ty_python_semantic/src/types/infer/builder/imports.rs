@@ -1,17 +1,18 @@
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{
-    ImportingFile, ModuleName, ModuleNameResolutionError, ModuleResolveMode, resolve_module,
-    search_paths,
+    ImportingFile, Module, ModuleName, ModuleNameResolutionError, ModuleResolveMode,
+    resolve_module, search_paths,
 };
 
 use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
+    dependency::missing_direct_dependency,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
         diagnostic::{
-            POSSIBLY_MISSING_IMPORT, UNRESOLVED_IMPORT,
+            MISSING_DIRECT_DEPENDENCY, POSSIBLY_MISSING_IMPORT, UNRESOLVED_IMPORT,
             hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
@@ -33,6 +34,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for alias in names {
             self.infer_definition(alias);
         }
+    }
+
+    fn check_direct_dependency(&self, module: Module<'db>, range: TextRange) {
+        if !self.context.is_lint_enabled(&MISSING_DIRECT_DEPENDENCY)
+            || self.in_stub()
+            || self.is_in_type_checking_block(self.scope(), range)
+            || self
+                .settings()
+                .replace_imports_with_any
+                .matches(module.name(self.db()))
+                .is_include()
+        {
+            return;
+        }
+
+        let db = self.db();
+        let Some(missing) = missing_direct_dependency(db, self.program_file(), module) else {
+            return;
+        };
+
+        let Some(builder) = self.context.report_lint(&MISSING_DIRECT_DEPENDENCY, range) else {
+            return;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Import of `{}` requires a direct dependency on `{}`",
+            module.name(db),
+            missing.distribution_name,
+        ));
+        diagnostic.help(format_args!(
+            "Declare `{}` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`",
+            missing.distribution_name,
+        ));
+        if missing.group_dependency {
+            diagnostic.info("Dependency groups are only available to non-package files");
+        }
+        diagnostic.info("See https://docs.astral.sh/uv/concepts/projects/dependencies/");
     }
 
     fn report_unresolved_import(
@@ -201,6 +239,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
+        if let Type::ModuleLiteral(module) = full_module_ty {
+            self.check_direct_dependency(module.module(self.db()), alias.range());
+        }
+
         let binding_ty = if asname.is_some() {
             // If we are renaming the imported module via an `as` clause, then we bind the resolved
             // module's type to that name, even if that module is nested.
@@ -241,9 +283,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        self.check_import_from_module_is_resolvable(import);
+        let module = self.check_import_from_module_is_resolvable(import);
+        let import_range = import.module.as_ref().map_or(import.range(), Ranged::range);
 
         for alias in names {
+            let mut checked_dependency = false;
             for definition in self.index.definitions(alias) {
                 let inferred = infer_definition_types(self.db(), *definition);
                 // Check non-star imports for deprecations
@@ -251,16 +295,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.
                     for ty in inferred.declaration_types() {
                         self.check_deprecated(alias, ty.inner);
+
+                        // `from namespace import child` can import a distribution other than the
+                        // namespace's other children. Use inference's attribute-versus-submodule
+                        // decision, and do not follow values re-exported from unrelated modules.
+                        if self.context.is_lint_enabled(&MISSING_DIRECT_DEPENDENCY)
+                            && let Some(parent) = module
+                        {
+                            let imported_module = if let Type::ModuleLiteral(literal) = ty.inner
+                                && let child = literal.module(db)
+                                && let child_name = child.name(db)
+                                && child_name.parent().as_ref() == Some(parent.name(db))
+                                && child_name.components().next_back() == Some(alias.name.as_str())
+                            {
+                                child
+                            } else {
+                                parent
+                            };
+                            self.check_direct_dependency(imported_module, import_range);
+                            checked_dependency = true;
+                        }
                     }
                 }
                 self.extend_definition(*definition, inferred);
             }
+
+            // Star imports can have no definitions, and cycle recovery can omit declarations.
+            if !checked_dependency && let Some(parent) = module {
+                self.check_direct_dependency(parent, import_range);
+            }
         }
     }
 
-    /// Resolve the [`ModuleName`], and the type of the module, being referred to by an
-    /// [`ast::StmtImportFrom`] node. Emit a diagnostic if the module cannot be resolved.
-    fn check_import_from_module_is_resolvable(&mut self, import_from: &ast::StmtImportFrom) {
+    /// Resolve and return the module referred to by the `from` clause of an
+    /// [`ast::StmtImportFrom`] node. For `from package import child`, this returns
+    /// `package`, not `child`. Relative imports are resolved to an absolute module name.
+    ///
+    /// Return `None` if the module name is invalid or the module cannot be resolved.
+    /// Emit an unresolved-import diagnostic for resolution failures; syntax errors are
+    /// reported elsewhere.
+    fn check_import_from_module_is_resolvable(
+        &mut self,
+        import_from: &ast::StmtImportFrom,
+    ) -> Option<Module<'db>> {
         let ast::StmtImportFrom { module, level, .. } = import_from;
 
         let db = self.db();
@@ -289,7 +366,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Err(ModuleNameResolutionError::InvalidSyntax) => {
                 tracing::debug!("Failed to resolve import due to invalid syntax");
                 // Invalid syntax diagnostics are emitted elsewhere.
-                return;
+                return None;
             }
             Err(ModuleNameResolutionError::TooManyDots) => {
                 tracing::debug!(
@@ -297,7 +374,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     format_import_from_module(*level, module),
                 );
                 self.report_unresolved_import(module_ref.range(), *level, module, None);
-                return;
+                return None;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
@@ -307,13 +384,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.file().path(db)
                 );
                 self.report_unresolved_import(module_ref.range(), *level, module, None);
-                return;
+                return None;
             }
         };
 
-        if resolve_module(db, importing_file, &module_name).is_none() {
+        let resolved = resolve_module(db, importing_file, &module_name);
+        if resolved.is_none() {
             self.report_unresolved_import(module_ref.range(), *level, module, Some(&module_name));
         }
+
+        resolved
     }
 
     pub(super) fn infer_import_from_definition(

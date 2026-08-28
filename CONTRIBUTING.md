@@ -68,7 +68,7 @@ Ruff is written in Rust. You'll need to install the
 You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 
 ```shell
-cargo install cargo-insta
+cargo install --locked cargo-insta
 ```
 
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
@@ -120,12 +120,13 @@ after running `cargo test` like so:
 cargo insta review
 ```
 
-If your pull request relates to a specific lint rule, include the category and rule code in the
-title, as in the following examples:
+If your pull request relates to a specific lint rule, include the category and rule code or name in
+the title, as in the following examples:
 
 - \[`flake8-bugbear`\] Avoid false positive for usage after `continue` (`B031`)
 - \[`flake8-simplify`\] Detect implicit `else` cases in `needless-bool` (`SIM103`)
 - \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
+- \[`pedantic`\] Implement `pytest-fixture-autouse`
 
 Your pull request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
@@ -184,14 +185,14 @@ crates.io as part of Ruff's releases:
 For a publishable crate, generate its README and verify that the workspace can still be packaged:
 
 ```shell
-uv run --script scripts/generate-crate-readmes.py
+uv run scripts/generate-crate-readmes.py
 cargo publish --workspace --dry-run
 ```
 
 Before merging a publishable crate, ask a crates.io owner to bootstrap it by running:
 
 ```shell
-CARGO_REGISTRY_TOKEN=<token> uv run --no-config --script scripts/setup-crates-io-publish.py
+CARGO_REGISTRY_TOKEN=<token> uv run --no-config scripts/setup-crates-io-publish.py
 ```
 
 The bootstrap script reserves the crate name, configures the release workflow as its trusted
@@ -200,18 +201,18 @@ Commit the generated README and `.known-crates` update with the new crate.
 
 ### Example: Adding a new lint rule
 
-At a high level, the steps involved in adding a new lint rule are as follows:
-
-1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention)
-    (e.g., `AssertFalse`, as in, "allow `assert False`").
+Once a rule has been proposed and accepted in line with the
+[rule proposal guidelines](https://docs.astral.sh/ruff/rule-proposals/), the steps involved in
+adding a new lint rule are as follows:
 
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
     `#[derive(ViolationMetadata)]` to see examples. You also need to add a
-    `#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]` attribute on your
-    `ViolationMetadata` struct. This adds the rule in preview, and the version will be filled in
-    automatically in the next release.
+    `#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::<variant>)]`
+    attribute on your `ViolationMetadata` struct, importing `crate::codes::Category` and choosing
+    the appropriate category for the rule. This adds the rule in preview, and the version will be
+    filled in automatically in the next release.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
@@ -225,7 +226,17 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
+1. Register the violation struct in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). If your lint
+    rule comes from an existing linter, you can map it to that linter and give it a code. Otherwise,
+    you can leave the linter and code blank, registering it only to a category. For example:
+
+    ```rust
+    // Rules with linter groups and codes
+    (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
+
+    // Rules with only a category
+    () => rules::ruff::rules::PytestFixtureAutouse,
+    ```
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -244,32 +255,14 @@ Once you're satisfied with your code, add tests for your rule
 (see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
 associated assets (like our JSON Schema) with `cargo dev generate-all`.
 
-Finally, submit a pull request, and include the category, rule name, and rule code in the title, as
-in:
+Finally, submit a pull request, and include the category, rule name, and rule code (if applicable)
+in the title, as in:
 
 > \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
 
-#### Rule naming convention
+or
 
-Like Clippy, Ruff's rule names should make grammatical and logical sense when read as "allow
-${rule}" or "allow ${rule} items", as in the context of suppression comments.
-
-For example, `AssertFalse` fits this convention: it flags `assert False` statements, and so a
-suppression comment would be framed as "allow `assert False`".
-
-As such, rule names should...
-
-- Highlight the pattern that is being linted against, rather than the preferred alternative.
-    For example, `AssertFalse` guards against `assert False` statements.
-
-- _Not_ contain instructions on how to fix the violation, which instead belong in the rule
-    documentation and the `fix_title`.
-
-- _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
-    convention.
-
-When re-implementing rules from other linters, we prioritize adhering to this convention over
-preserving the original rule name.
+> \[`pedantic`\] Implement `pytest-fixture-autouse`
 
 #### Rule testing: fixtures and snapshots
 
@@ -468,13 +461,13 @@ To preview any changes to the documentation locally:
 1. Generate the MkDocs site with:
 
     ```shell
-    uv run --no-project --isolated --with-requirements docs/requirements.txt scripts/generate_mkdocs.py
+    uv run scripts/generate_mkdocs.py
     ```
 
 1. Run the development server with:
 
     ```shell
-    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.yml
+    uv run --only-group=docs mkdocs serve -f mkdocs.yml
     ```
 
 The documentation should then be available locally at
@@ -560,7 +553,7 @@ Commit each step of this process separately for easier review.
 
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
-    1. Run `uv run --only-dev --no-sync scripts/update_schemastore.py --proto <https|ssh>`
+    1. Run `uv run scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
 1. Update the [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repository by following
@@ -612,7 +605,7 @@ git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter
 Install `hyperfine`:
 
 ```shell
-cargo install hyperfine
+cargo install --locked hyperfine
 ```
 
 To benchmark the release build:
@@ -777,7 +770,7 @@ critcmp main pr
 You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comparison.
 
 ```bash
-cargo install critcmp
+cargo install --locked critcmp
 ```
 
 #### Tips
@@ -831,7 +824,7 @@ flamegraph --perfdata perf.data --no-inline
 Install [`cargo-instruments`](https://crates.io/crates/cargo-instruments):
 
 ```shell
-cargo install cargo-instruments
+cargo install --locked cargo-instruments
 ```
 
 Then run the profiler with

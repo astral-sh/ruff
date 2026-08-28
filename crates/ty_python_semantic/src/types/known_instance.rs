@@ -319,7 +319,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeAliasType(alias) if alias.specialization(db).is_some() => {
                 KnownClass::GenericAlias
             }
-            Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::TypeAliasType(alias) => alias.known_class(db),
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,

@@ -1,0 +1,7 @@
+t'first' b'second'
+b'first' t'second'
+t'first' br'second'
+'first' b'second' t'third'
+b'first' 'second' t'third'
+'first' t'second' 'third' b'fourth'
+b'first' t'second' f'third'

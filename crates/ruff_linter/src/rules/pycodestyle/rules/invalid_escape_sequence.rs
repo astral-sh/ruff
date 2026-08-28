@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad_start;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -41,7 +42,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.85")]
+#[violation_metadata(stable_since = "v0.0.85", category = Category::Correctness)]
 pub(crate) struct InvalidEscapeSequence {
     ch: char,
     fix_title: FixTitle,

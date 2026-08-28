@@ -36,6 +36,8 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CONFORMANCE_SUITE_COMMIT: bee91c2646261629c9835dc0adad16e0d554b4a5
   PYTHON_VERSION: 3.12
 
