@@ -609,6 +609,14 @@ x3: tuple[list[Literal[1]], ...] = 3 * ((singleton(1),) + (singleton(1),))
 reveal_type(x3)  # revealed: tuple[list[Literal[1]], ...]
 ```
 
+Type context also reaches mutable elements inside a starred list literal. Preserving their positions
+in the resulting tuple does not discard the element annotations.
+
+```py
+x4: tuple[list[Literal[1]], ...] = (*[[1], []],)
+reveal_type(x4)  # revealed: tuple[list[Literal[1]], list[Literal[1]]]
+```
+
 ## Generator expressions
 
 ```py

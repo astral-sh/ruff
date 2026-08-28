@@ -2925,6 +2925,36 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Finalizes the element type of a mutable collection after combining its element evidence.
+    /// Literal types supplied by explicit annotations remain unpromotable. Without contextual
+    /// constraints, singleton types also widen: `[None]` permits later mutation, as does the list
+    /// created by `*rest, = (None,)`.
+    /// Evidence from later collection uses also passes through this helper, since those types
+    /// have not necessarily undergone the promotion applied to literal elements during inference.
+    fn promote_collection_element_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        allow_tuple_size_promotion: bool,
+        unconstrained: bool,
+    ) -> Type<'db> {
+        let ty = if unconstrained {
+            self.promote(db, env)
+        } else {
+            self
+        };
+        let ty = if allow_tuple_size_promotion {
+            ty.promote_tuple_size_in_union(db, env)
+        } else {
+            ty
+        };
+        if unconstrained {
+            ty.promote_singletons_recursively(db, env)
+        } else {
+            ty
+        }
+    }
+
     /// Promote a top-level singleton type (like `None`, `EllipsisType`) to `T | Unknown`.
     pub(crate) fn promote_singletons(
         self,
