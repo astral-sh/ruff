@@ -155,19 +155,122 @@ extend-exclude = [
 [tool.ruff.lint]
 preview = true
 select = [
-    "E", # pycodestyle (error)
-    "F", # pyflakes
-    "B", # bugbear
-    "B9",
-    "C4", # flake8-comprehensions
-    "SIM", # flake8-simplify
-    "I", # isort
-    "UP", # pyupgrade
-    "PIE", # flake8-pie
-    "PGH", # pygrep-hooks
-    "PYI", # flake8-pyi
-    "RUF",
-    "S602", # flake8-bandit: subprocess-popen-with-shell-equals-true
+    # E # pycodestyle (error)
+    "blank-lines-before-nested-definition",  # formatting
+    "whitespace-after-decorator",  # formatting
+    "indentation-with-invalid-multiple",  # formatting
+    "ambiguous-variable-name",  # pedantic
+    "module-import-not-at-top-of-file",  # pedantic
+    "tab-before-operator",  # formatting
+    "multiple-spaces-before-keyword",  # formatting
+    "ambiguous-function-name",  # pedantic
+    "unexpected-indentation-comment",  # formatting
+    "multiple-spaces-after-operator",  # formatting
+    "indentation-with-invalid-multiple-comment",  # formatting
+    "missing-whitespace-around-operator",  # formatting
+    "unexpected-indentation",  # pedantic
+    "none-comparison",  # pedantic
+    "ambiguous-class-name",  # pedantic
+    "missing-whitespace-around-parameter-equals",  # formatting
+    "missing-whitespace-after-keyword",  # formatting
+    "too-many-blank-lines",  # formatting
+    "lambda-assignment",  # pedantic
+    "useless-semicolon",  # formatting
+    "mixed-spaces-and-tabs",  # formatting
+    "multiple-spaces-after-keyword",  # formatting
+    "missing-whitespace-around-modulo-operator",  # formatting
+    "multiple-statements-on-one-line-colon",  # formatting
+    "tab-after-keyword",  # formatting
+    "blank-lines-top-level",  # formatting
+    "whitespace-before-close-bracket",  # formatting
+    "over-indented",  # formatting
+    "tab-after-comma",  # formatting
+    "multiple-leading-hashes-for-block-comment",  # pedantic
+    "blank-line-after-decorator",  # formatting
+    "no-space-after-inline-comment",  # formatting
+    "missing-whitespace-around-bitwise-or-shift-operator",  # formatting
+    "not-in-test",  # pedantic
+    "unexpected-spaces-around-keyword-parameter-equals",  # formatting
+    "type-comparison",  # pedantic
+    "missing-whitespace",  # formatting
+    "tab-before-keyword",  # formatting
+    "tab-after-operator",  # formatting
+    "redundant-backslash",  # formatting
+    "blank-line-between-methods",  # formatting
+    "multiple-imports-on-one-line",  # pedantic
+    "multiple-spaces-after-comma",  # formatting
+    "multiple-statements-on-one-line-semicolon",  # formatting
+    "too-few-spaces-before-inline-comment",  # formatting
+    "blank-lines-after-function-or-class",  # formatting
+    "multiple-spaces-before-operator",  # formatting
+    "whitespace-before-parameters",  # formatting
+    "true-false-comparison",  # pedantic
+    "no-indented-block-comment",  # formatting
+    "no-indented-block",  # pedantic
+    "no-space-after-block-comment",  # formatting
+    "whitespace-before-punctuation",  # formatting
+    "not-is-test",  # pedantic
+    "whitespace-after-open-bracket",  # formatting
+    "missing-whitespace-around-arithmetic-operator",  # formatting
+    # F # pyflakes
+    "undefined-local-with-import-star",  # restriction
+    "forward-annotation-syntax-error",  # pedantic
+    "undefined-local-with-import-star-usage",  # restriction
+    # B # bugbear
+    "batched-without-explicit-strict",  # pedantic
+    "map-without-explicit-strict",  # pedantic
+    "class-as-data-structure",  # pedantic
+    "no-explicit-stacklevel",  # pedantic
+    "unused-loop-control-variable",  # pedantic
+    "raise-without-from-inside-except",  # pedantic
+    "re-sub-positional-args",  # pedantic
+    "zip-without-explicit-strict",  # pedantic
+    # C4 # flake8-comprehensions
+    "unnecessary-comprehension",  # pedantic
+    # SIM # flake8-simplify
+    "uncapitalized-environment-variables",  # pedantic
+    "compare-with-tuple",  # pedantic
+    "if-else-block-instead-of-if-exp",  # pedantic
+    "yoda-conditions",  # pedantic
+    "suppressible-exception",  # pedantic
+    "dict-get-with-none-default",  # pedantic
+    "if-else-block-instead-of-dict-lookup",  # pedantic
+    "if-expr-with-twisted-arms",  # pedantic
+    # I # isort
+    "missing-required-import",  # pedantic
+    # UP # pyupgrade
+    "redundant-open-modes",  # pedantic
+    "convert-typed-dict-functional-to-class",  # pedantic
+    # PGH # pygrep-hooks
+    "blanket-noqa",  # pedantic
+    "blanket-type-ignore",  # restriction
+    # PYI # flake8-pyi
+    "redundant-literal-union",  # pedantic
+    "docstring-in-stub",  # pedantic
+    "collections-named-tuple",  # pedantic
+    "unsupported-method-call-on-all",  # pedantic
+    "argument-default-in-stub",  # pedantic
+    "typed-argument-default-in-stub",  # pedantic
+    "numeric-literal-too-long",  # pedantic
+    "string-or-bytes-too-long",  # pedantic
+    # RUF
+    "noqa-comments",  # pedantic
+    "ambiguous-unicode-character-docstring",  # security
+    "incorrectly-parenthesized-tuple-in-subscript",  # pedantic
+    "asyncio-dangling-task",  # pedantic
+    "used-dummy-variable",  # pedantic
+    "rule-codes-in-selectors",  # pedantic
+    "unused-async",  # pedantic
+    "ambiguous-unicode-character-comment",  # security
+    "non-empty-init-module",  # pedantic
+    "unraw-re-pattern",  # pedantic
+    "ambiguous-unicode-character-string",  # security
+    "parenthesize-chained-operators",  # pedantic
+    "unnecessary-assign-before-yield",  # pedantic
+    "collection-literal-concatenation",  # pedantic
+    # S
+    "subprocess-popen-with-shell-equals-true",  # security
+    # Categories
     "correctness",
     "suspicious",
     "complexity",
