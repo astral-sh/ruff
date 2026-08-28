@@ -1813,6 +1813,28 @@ items, first = pair()
 reveal_type(items)  # revealed: list[int]
 ```
 
+### Non-iterable annotations on starred targets
+
+A non-iterable annotation on a starred target supplies no element-type context. An annotation of
+`object` still accepts the inferred capture list.
+
+```py
+rest: object
+first, *rest = (0, 1, 2)
+reveal_type(rest)  # revealed: list[int]
+```
+
+An annotation of `int` cannot accept a list. We report the incompatible assignment without trying to
+use `int` as the source's element type. After the invalid assignment, `invalid` retains its declared
+type.
+
+```py
+invalid: int
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `int` (declared type of variable `invalid`)"
+first, *invalid = (0, 1, 2)
+reveal_type(invalid)  # revealed: int
+```
+
 ### Cyclic assignments
 
 An annotated target can also appear on the right-hand side. The annotation remains available while
