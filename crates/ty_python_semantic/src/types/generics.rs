@@ -3635,18 +3635,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let argument = if let Some(lower) = lower {
                     lower
                 } else {
-                    let upper_evidence = || {
-                        path_bound.upper.iter_clauses().filter_map(|bound| {
-                            if let ConstraintBound::Evidence(ty) = bound {
-                                Some(ty)
-                            } else {
-                                None
-                            }
-                        })
-                    };
+                    let upper_evidence = path_bound.upper.iter_evidence().map(ConstraintBound::ty);
                     if !path_bound.has_upper_evidence()
                         || declared_constraints.iter().any(|constraint| {
-                            !upper_evidence()
+                            !upper_evidence
+                                .clone()
                                 .when_all(db, self.constraints, |upper| {
                                     constraint
                                         .bottom_materialization(db, self.env)
@@ -3662,7 +3655,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     {
                         return None;
                     }
-                    IntersectionType::bounded_from_elements(db, self.env, upper_evidence())?
+                    IntersectionType::bounded_from_elements(db, self.env, upper_evidence)?
                 };
                 Some(SpecializationError::MismatchedConstraint {
                     bound_typevar,

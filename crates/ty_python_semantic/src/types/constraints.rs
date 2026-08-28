@@ -2010,7 +2010,7 @@ impl<'db> ConstraintBound<'db> {
         Self::Validity(Type::object())
     }
 
-    fn ty(self) -> Type<'db> {
+    pub(super) fn ty(self) -> Type<'db> {
         match self {
             Self::Validity(ty) | Self::Evidence(ty) => ty,
         }
@@ -2165,7 +2165,7 @@ impl<'db> UpperBound<'db> {
         self.evidence.is_empty() && self.validity.is_empty()
     }
 
-    fn iter_evidence(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+    pub(super) fn iter_evidence(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
         self.evidence.iter().copied().map(ConstraintBound::Evidence)
     }
 
@@ -2173,7 +2173,7 @@ impl<'db> UpperBound<'db> {
         self.validity.iter().copied().map(ConstraintBound::Validity)
     }
 
-    pub(super) fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+    fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
         iter::chain(self.iter_evidence(), self.iter_validity())
     }
 

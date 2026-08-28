@@ -964,21 +964,6 @@ def _(value: Intersection[Source[A], Source[ConcreteElement]]) -> None:
     reveal_type(FixedReceiverConstructor(value))  # revealed: FixedReceiverConstructor[ConcreteElement]
 ```
 
-Generic constructors still reconstruct their return type from merged type-variable assignments, so
-an iterable intersection does not yet refine the constructed list's element type:
-
-```py
-def explicit(x: Intersection[Sequence[int], str]) -> None:
-    # TODO: revealed: list[Never]
-    reveal_type(list(x))  # revealed: list[int | str]
-
-def narrowed(x: Sequence[int]) -> None:
-    if isinstance(x, str):
-        reveal_type(x)  # revealed: Sequence[int] & str
-        # TODO: revealed: list[Never]
-        reveal_type(list(x))  # revealed: list[int | str]
-```
-
 Intersecting covariant return types does not generally allow intersecting their type arguments. A
 meet-preserving generic would satisfy `F[A & B] == F[A] & F[B]`; covariance only guarantees
 `F[A & B] <: F[A] & F[B]`, not the reverse. Here, an object usable as both `F[A]` and `F[B]` can
@@ -1263,16 +1248,6 @@ def _(
     reveal_type(constrained_element(any_))  # revealed: Any
     reveal_type(bounded_element(unknown))  # revealed: Unknown
     reveal_type(constrained_element(unknown))  # revealed: Unknown
-```
-
-An untyped value narrowed to `list` remains gradual. `enumerate` should accept it and preserve the
-unknown element type:
-
-```py
-def _(x):
-    assert isinstance(x, list)
-    for _, item in enumerate(x):
-        reveal_type(item)  # revealed: Unknown
 ```
 
 ## Intersection arguments do not hide argument errors

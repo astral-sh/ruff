@@ -683,7 +683,8 @@ reveal_type(bound({}))  # revealed: Any
 ### Truthiness-narrowed gradual ParamSpec callable bound with `partial`
 
 A truthiness-narrowed gradual callable remains valid input to a `ParamSpec` wrapper. Binding the
-wrapper must produce a gradual callable that can be assigned to the original callback:
+wrapper produces a gradual callable that remains assignable to a callback with a fixed parameter
+list:
 
 ```toml
 [environment]
