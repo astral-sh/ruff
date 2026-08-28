@@ -4860,6 +4860,8 @@ impl<'db> Type<'db> {
     /// Whether class access exposes an instance attribute whose type depends on the class's
     /// type parameters. Specializing a class does not give it separate attribute storage:
     /// `Box[int].value` and `Box[str].value` both refer to `Box.value` at runtime.
+    /// A `type[Box[int]]` receiver can refer to a concrete subclass with its own attributes,
+    /// so this restriction only applies to class literals and generic aliases.
     fn has_generic_instance_attribute(
         self,
         db: &'db dyn Db,
@@ -4875,12 +4877,6 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class) => class,
             Type::GenericAlias(alias) => alias.origin(db).into(),
-            Type::SubclassOf(subclass) => {
-                let Some(class) = subclass.subclass_of().into_class(db, env) else {
-                    return false;
-                };
-                class.class_literal(db)
-            }
             _ => return false,
         };
         let Some(generic_context) = class

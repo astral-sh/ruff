@@ -937,6 +937,34 @@ box.value = 1
 reveal_type(box.value)  # revealed: Literal[1]
 ```
 
+## Generic attributes accessed through subclass methods
+
+The `cls` receiver in a classmethod, `__new__`, or `__init_subclass__` can refer to a concrete
+subclass. We allow these methods to access generic attributes through their receiver.
+
+```py
+from typing import Self
+
+class Box[T]:
+    value: T
+
+    @classmethod
+    def get(cls) -> T:
+        return cls.value
+
+    def __new__(cls) -> Self:
+        cls.value
+        return super().__new__(cls)
+
+    def __init_subclass__(cls, *, value: T) -> None:
+        cls.value = value
+        reveal_type(cls.value)  # revealed: T@Box
+
+class Concrete(Box[int], value=1): ...
+
+reveal_type(Concrete.get())  # revealed: int
+```
+
 ## Generic attributes using type aliases
 
 An alias can hide a dependency on a class type parameter, including inside a recursive alias. An

@@ -1349,8 +1349,8 @@ reveal_type(Box[int].get)  # revealed: def get(self) -> int | None
 
 ## Inherited generic instance attributes
 
-The restriction also applies to inherited attributes and to `type[...]` parameters. A subclass that
-fixes the type argument can expose the inherited attribute without ambiguity.
+The restriction also applies to inherited attributes. A subclass that fixes the type argument can
+expose the inherited attribute without ambiguity.
 
 ```py
 from typing import Generic, TypeVar
@@ -1368,25 +1368,55 @@ Child.value
 # error: [invalid-attribute-access]
 Child[int].value = [1]
 reveal_type(Concrete.value)  # revealed: list[int]
-
-def access(cls: type[Parent[int]], instance: Parent[int]) -> None:
-    # error: [invalid-attribute-access]
-    cls.value
-    # error: [invalid-attribute-access]
-    cls.value = [1]
-    # error: [invalid-attribute-access]
-    type(instance).value
 ```
 
 Augmented assignments report the invalid access once. Deleting a generic instance attribute through
-a class is also invalid.
+the generic class or alias is also invalid.
 
 ```py
-def mutate(cls: type[Parent[int]]) -> None:
-    # error: [invalid-attribute-access]
+# error: [invalid-attribute-access]
+Child[int].value += [1]
+# error: [invalid-attribute-access]
+del Child[int].value
+```
+
+## Generic attributes accessed through subclass receivers
+
+A `type[Parent[int]]` receiver can refer to a concrete subclass with its own class attributes. We
+allow reads, writes, and deletion through these receivers, while still checking assignment types.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Parent(Generic[T]):
+    value: list[T]
+
+class Concrete(Parent[int]):
+    value = [1]
+
+def access(cls: type[Parent[int]], instance: Parent[int]) -> None:
+    reveal_type(cls.value)  # revealed: list[int]
+    reveal_type(type(instance).value)  # revealed: list[int]
+    cls.value = [1]
     cls.value += [1]
-    # error: [invalid-attribute-access]
     del cls.value
+
+    # error: [invalid-assignment]
+    cls.value = ["wrong"]
+
+access(Concrete, Concrete())
+```
+
+The receiver can also retain an enclosing type variable, so the attribute has the specialization
+supplied by the caller.
+
+```py
+def generic_access(cls: type[Parent[T]]) -> list[T]:
+    return cls.value
+
+reveal_type(generic_access(Concrete))  # revealed: list[int]
 ```
 
 ## Descriptors on generic classes
