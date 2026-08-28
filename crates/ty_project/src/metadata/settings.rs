@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ruff_db::files::File;
 use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
-use ty_python_semantic::lint::{LintId, RuleSelection};
+use ty_python_semantic::lint::RuleSelection;
 
 use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
 use crate::script::Script;
@@ -38,15 +38,6 @@ pub struct Settings {
 }
 
 impl Settings {
-    /// Returns whether a rule is enabled globally or by a file override.
-    pub(crate) fn is_rule_enabled(&self, lint: LintId) -> bool {
-        self.rules.is_enabled(lint)
-            || self
-                .overrides
-                .iter()
-                .any(|over| over.settings.rules.is_enabled(lint))
-    }
-
     fn rules(&self) -> &RuleSelection {
         &self.rules
     }

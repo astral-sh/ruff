@@ -3767,9 +3767,6 @@ or later is required.
 **Known limitations**
 
 
-When this rule is enabled but uv's dependency metadata cannot be used, ty reports
-a `uv-metadata` warning and continues with ordinary type checking.
-
 The current workspace integration applies to directory checks. Explicit file
 arguments and `--config-file` bypass uv workspace discovery.
 

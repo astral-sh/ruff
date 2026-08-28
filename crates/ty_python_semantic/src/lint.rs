@@ -612,7 +612,7 @@ impl RuleSelection {
     }
 
     /// Returns `true` if the `lint` is enabled.
-    pub fn is_enabled(&self, lint: LintId) -> bool {
+    pub(crate) fn is_enabled(&self, lint: LintId) -> bool {
         self.severity(lint).is_some()
     }
 

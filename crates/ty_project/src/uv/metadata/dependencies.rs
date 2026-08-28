@@ -271,9 +271,12 @@ pub(crate) enum DependencyMetadataError {
     EnvironmentResolution(Box<str>),
     #[error("no Python environment is configured")]
     MissingSelectedEnvironment,
-    #[error("selected Python environment `{selected}` differs from uv's environment `{uv}`")]
+    #[error(
+        "selected Python environment `{selected}` (from {selected_origin}) differs from uv's environment `{uv}`"
+    )]
     EnvironmentMismatch {
         selected: SystemPathBuf,
+        selected_origin: Box<str>,
         uv: SystemPathBuf,
     },
 }
@@ -283,9 +286,11 @@ impl DependencyMetadataError {
         let mut diagnostic = Diagnostic::new(
             DiagnosticId::UvMetadata,
             Severity::Warning,
-            "Cannot check dependencies using uv metadata",
+            "Failed to load uv dependency metadata",
         );
-        diagnostic.set_concise_message(format_args!("Cannot check dependencies: {self}"));
+        diagnostic.set_concise_message(format_args!(
+            "Failed to load uv dependency metadata: {self}"
+        ));
         diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             self.to_string(),
@@ -299,10 +304,10 @@ impl DependencyMetadataError {
                     "Synchronize the environment with `uv sync` or run ty through `uv check`",
                 ));
             }
-            Self::EnvironmentMismatch { .. } => {
+            Self::EnvironmentMismatch { uv, .. } => {
                 diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Help,
-                    "Use the same Python environment for ty and uv",
+                    format_args!("Use `--python` to select uv's Python environment at `{uv}`"),
                 ));
             }
             _ => {}

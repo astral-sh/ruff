@@ -1009,8 +1009,8 @@ mod tests {
         Ok(())
     }
 
-    // The rule is disabled by default, so checking imports should not pay the cost of
-    // extracting dependency metadata.
+    // Without uv metadata or an enabled dependency rule, checking settings and imports
+    // should not query dependency metadata.
     #[test]
     fn dependency_metadata_isnt_queried_unnecessarily() -> anyhow::Result<()> {
         let root = SystemPathBuf::from("/project");

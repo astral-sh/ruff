@@ -33,8 +33,7 @@ use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::dependency::DependencyMetadata;
-use ty_python_semantic::lint::{LintId, RuleSelection};
-use ty_python_semantic::types::MISSING_DIRECT_DEPENDENCY;
+use ty_python_semantic::lint::RuleSelection;
 use uv::DependencyMetadataError;
 pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges};
 
@@ -314,6 +313,7 @@ impl Project {
         if selected_environment.sys_prefix().as_std_path() != environment.as_std_path() {
             return Err(DependencyMetadataError::EnvironmentMismatch {
                 selected: selected_environment.sys_prefix().to_path_buf(),
+                selected_origin: selected_environment.origin().to_string().into(),
                 uv: environment,
             });
         }
@@ -800,19 +800,12 @@ impl Project {
     pub fn check_settings(&self, db: &dyn Db) -> Vec<Diagnostic> {
         let metadata = self.metadata(db);
         let uv_diagnostic = metadata.uv_diagnostic(db).or_else(|| {
-            if !self
-                .settings(db)
-                .is_rule_enabled(LintId::of(&MISSING_DIRECT_DEPENDENCY))
-            {
-                return None;
-            }
-
+            let workspace = metadata.uv_workspace()?;
             let error = self.dependency_metadata(db).as_ref().err()?;
             let mut diagnostic = error.to_diagnostic();
-            let root = metadata
-                .uv_workspace()
-                .map_or(metadata.root(), |workspace| workspace.workspace_root());
-            if let Ok(file) = system_path_to_file(db, root.join("pyproject.toml")) {
+            if let Ok(file) =
+                system_path_to_file(db, workspace.workspace_root().join("pyproject.toml"))
+            {
                 let mut annotation = Annotation::primary(Span::from(file));
                 annotation.hide_snippet(true);
                 diagnostic.annotate(annotation);

@@ -318,7 +318,7 @@ fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<
             exit_code: 1
             ----- stdout -----
             packages/member/member.py:3:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
-            pyproject.toml: warning[uv-metadata] Cannot check dependencies: selected Python environment `<environment>` differs from uv's environment `<temp_dir>/.venv`
+            pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: selected Python environment `<environment>` (from `--python` argument) differs from uv's environment `<temp_dir>/.venv`
             Found 2 diagnostics
 
             ----- stderr -----
