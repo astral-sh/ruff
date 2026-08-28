@@ -17,7 +17,7 @@
 
 use std::collections::BTreeMap;
 
-use compact_str::CompactString;
+use char_str::CharStr;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::script::ScriptTag;
@@ -266,25 +266,25 @@ struct DependencyMetadataOptions {
     #[serde(default)]
     projects: Vec<DependencyProjectOptions>,
     #[serde(default)]
-    distributions: BTreeMap<CompactString, DependencyDistributionOptions>,
+    distributions: BTreeMap<CharStr, DependencyDistributionOptions>,
     #[serde(default)]
-    module_owners: BTreeMap<CompactString, Vec<CompactString>>,
+    module_owners: BTreeMap<CharStr, Vec<CharStr>>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct DependencyProjectOptions {
     path: SystemPathBuf,
-    distribution: Option<CompactString>,
+    distribution: Option<CharStr>,
     #[serde(default)]
-    dependencies: Vec<CompactString>,
+    dependencies: Vec<CharStr>,
     #[serde(default)]
-    group_dependencies: Vec<CompactString>,
+    group_dependencies: Vec<CharStr>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct DependencyDistributionOptions {
-    name: CompactString,
+    name: CharStr,
     editable_path: Option<SystemPathBuf>,
 }

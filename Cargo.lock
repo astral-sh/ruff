@@ -4794,6 +4794,7 @@ dependencies = [
  "anyhow",
  "bitvec",
  "camino",
+ "char_str",
  "colored",
  "compact_str",
  "crossbeam",
@@ -5001,7 +5002,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
- "compact_str",
+ "char_str",
  "dunce",
  "mdtest",
  "ruff_db",
