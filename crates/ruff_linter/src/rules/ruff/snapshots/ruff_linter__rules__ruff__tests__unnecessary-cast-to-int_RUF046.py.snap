@@ -890,7 +890,7 @@ RUF046 [*] Value being cast to `int` is already an integer
 169 | | (1))
     | |____^
 170 |
-171 |   int(round # a comment
+171 |   # Attribute access within the callee can also rely on the outer parentheses.
     |
 help: Remove unnecessary `int` call
     |
@@ -901,113 +901,110 @@ help: Remove unnecessary `int` call
     |
 
 RUF046 [*] Value being cast to `int` is already an integer
-   --> RUF046.py:171:1
+   --> RUF046.py:172:1
     |
-169 |   (1))
-170 |
-171 | / int(round # a comment
-172 | | # and another comment
-173 | | (10)
-174 | | )
-    | |_^
-175 |
-176 |   int(round (17)) # this is safe without parens
+171 |   # Attribute access within the callee can also rely on the outer parentheses.
+172 | / int(math
+173 | | .floor(1.5))
+    | |____________^
+174 |
+175 |   int(round # a comment
     |
 help: Remove unnecessary `int` call
     |
-170 |
+171 | # Attribute access within the callee can also rely on the outer parentheses.
+    - int(math
+172 + (math
+173 | .floor(1.5))
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF046 [*] Value being cast to `int` is already an integer
+   --> RUF046.py:175:1
+    |
+173 |   .floor(1.5))
+174 |
+175 | / int(round # a comment
+176 | | # and another comment
+177 | | (10)
+178 | | )
+    | |_^
+179 |
+180 |   int(round (17)) # this is safe without parens
+    |
+help: Remove unnecessary `int` call
+    |
+174 |
     - int(round # a comment
-171 + (round # a comment
-172 | # and another comment
+175 + (round # a comment
+176 | # and another comment
     - (10)
     - )
-173 + (10))
-174 |
+177 + (10))
+178 |
     |
 
 RUF046 [*] Value being cast to `int` is already an integer
-   --> RUF046.py:176:1
+   --> RUF046.py:180:1
     |
-174 | )
-175 |
-176 | int(round (17)) # this is safe without parens
+178 | )
+179 |
+180 | int(round (17)) # this is safe without parens
     | ^^^^^^^^^^^^^^^
-177 |
-178 | int( round (
-    |
-help: Remove unnecessary `int` call
-    |
-175 |
-    - int(round (17)) # this is safe without parens
-176 + round (17) # this is safe without parens
-177 |
-    |
-
-RUF046 [*] Value being cast to `int` is already an integer
-   --> RUF046.py:178:1
-    |
-176 |   int(round (17)) # this is safe without parens
-177 |
-178 | / int( round (
-179 | |                 17
-180 | |             )) # this is also safe without parens
-    | |______________^
 181 |
-182 |   int((round)  # Comment
+182 | int( round (
     |
 help: Remove unnecessary `int` call
     |
-177 |
-    - int( round (
-178 + round (
-179 |                 17
-    -             )) # this is also safe without parens
-180 +             ) # this is also safe without parens
+179 |
+    - int(round (17)) # this is safe without parens
+180 + round (17) # this is safe without parens
 181 |
     |
 
 RUF046 [*] Value being cast to `int` is already an integer
    --> RUF046.py:182:1
     |
-180 |               )) # this is also safe without parens
+180 |   int(round (17)) # this is safe without parens
 181 |
-182 | / int((round)  # Comment
-183 | | (42)
-184 | | )
-    | |_^
+182 | / int( round (
+183 | |                 17
+184 | |             )) # this is also safe without parens
+    | |______________^
 185 |
-186 |   int((round  # Comment
+186 |   int((round)  # Comment
     |
 help: Remove unnecessary `int` call
     |
 181 |
-    - int((round)  # Comment
-    - (42)
-    - )
-182 + ((round)  # Comment
-183 + (42))
-184 |
+    - int( round (
+182 + round (
+183 |                 17
+    -             )) # this is also safe without parens
+184 +             ) # this is also safe without parens
+185 |
     |
 
 RUF046 [*] Value being cast to `int` is already an integer
    --> RUF046.py:186:1
     |
-184 |   )
+184 |               )) # this is also safe without parens
 185 |
-186 | / int((round  # Comment
-187 | | )(42)
+186 | / int((round)  # Comment
+187 | | (42)
 188 | | )
     | |_^
 189 |
-190 |   int(  # Unsafe fix because of this comment
+190 |   int((round  # Comment
     |
 help: Remove unnecessary `int` call
     |
 185 |
-    - int((round  # Comment
-186 + (round  # Comment
-187 | )(42)
+    - int((round)  # Comment
+    - (42)
     - )
+186 + ((round)  # Comment
+187 + (42))
 188 |
     |
 
@@ -1016,79 +1013,151 @@ RUF046 [*] Value being cast to `int` is already an integer
     |
 188 |   )
 189 |
-190 | / int(  # Unsafe fix because of this comment
-191 | | (  # Comment
-192 | |     (round
-193 | | )  # Comment
-194 | | )(42)
-195 | | )
+190 | / int((round  # Comment
+191 | | )(42)
+192 | | )
     | |_^
-196 |
-197 |   int(
+193 |
+194 |   int(  # Unsafe fix because of this comment
     |
 help: Remove unnecessary `int` call
     |
 189 |
-    - int(  # Unsafe fix because of this comment
-190 | (  # Comment
-191 |     (round
-192 | )  # Comment
-193 | )(42)
+    - int((round  # Comment
+190 + (round  # Comment
+191 | )(42)
     - )
-194 |
+192 |
+    |
+
+RUF046 [*] Value being cast to `int` is already an integer
+   --> RUF046.py:194:1
+    |
+192 |   )
+193 |
+194 | / int(  # Unsafe fix because of this comment
+195 | | (  # Comment
+196 | |     (round
+197 | | )  # Comment
+198 | | )(42)
+199 | | )
+    | |_^
+200 |
+201 |   int(
+    |
+help: Remove unnecessary `int` call
+    |
+193 |
+    - int(  # Unsafe fix because of this comment
+194 | (  # Comment
+195 |     (round
+196 | )  # Comment
+197 | )(42)
+    - )
+198 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
-   --> RUF046.py:197:1
+   --> RUF046.py:201:1
     |
-195 |   )
-196 |
-197 | / int(
-198 | |     round(
-199 | |         42
-200 | |     ) # unsafe fix because of this comment
-201 | | )
+199 |   )
+200 |
+201 | / int(
+202 | |     round(
+203 | |         42
+204 | |     ) # unsafe fix because of this comment
+205 | | )
     | |_^
-202 |
-203 |   int(
+206 |
+207 |   int(
     |
 help: Remove unnecessary `int` call
     |
-196 |
+200 |
     - int(
     -     round(
-197 + round(
-198 |         42
+201 + round(
+202 |         42
     -     ) # unsafe fix because of this comment
     - )
-199 +     )
-200 |
+203 +     )
+204 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
-   --> RUF046.py:203:1
+   --> RUF046.py:207:1
     |
-201 |   )
-202 |
-203 | / int(
-204 | |     round(
-205 | |         42
-206 | |     ) 
-207 | | # unsafe fix because of this comment
-208 | | )
+205 |   )
+206 |
+207 | / int(
+208 | |     round(
+209 | |         42
+210 | |     )
+211 | | # unsafe fix because of this comment
+212 | | )
     | |_^
+213 |
+214 |   # Integer attribute access still requires parentheses.
+    |
 help: Remove unnecessary `int` call
     |
-202 |
+206 |
     - int(
     -     round(
-203 + round(
-204 |         42
-    -     ) 
+207 + round(
+208 |         42
+209 |     )
     - # unsafe fix because of this comment
     - )
-205 +     )
+210 |
     |
 note: This is an unsafe fix and may change runtime behavior
+
+RUF046 [*] Value being cast to `int` is already an integer
+   --> RUF046.py:215:1
+    |
+214 | # Integer attribute access still requires parentheses.
+215 | int(1).real
+    | ^^^^^^
+216 |
+217 | # Parentheses separate the replacement from adjacent keywords.
+    |
+help: Remove unnecessary `int` call
+    |
+214 | # Integer attribute access still requires parentheses.
+    - int(1).real
+215 + (1).real
+216 |
+    |
+
+RUF046 [*] Value being cast to `int` is already an integer
+   --> RUF046.py:218:1
+    |
+217 | # Parentheses separate the replacement from adjacent keywords.
+218 | int(1)and True
+    | ^^^^^^
+219 |
+220 | def parenthesized_callee():
+    |
+help: Remove unnecessary `int` call
+    |
+217 | # Parentheses separate the replacement from adjacent keywords.
+    - int(1)and True
+218 + (1)and True
+219 |
+    |
+
+RUF046 [*] Value being cast to `int` is already an integer
+   --> RUF046.py:221:11
+    |
+220 | def parenthesized_callee():
+221 |     return(int)(1)
+    |           ^^^^^^^^
+help: Remove unnecessary `int` call
+    |
+220 | def parenthesized_callee():
+    -     return(int)(1)
+221 +     return(1)
+    |

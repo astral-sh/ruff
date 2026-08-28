@@ -358,7 +358,7 @@ pub struct TokenIterWithContext<'a> {
 }
 
 impl<'a> TokenIterWithContext<'a> {
-    fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
+    pub(crate) fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
         TokenIterWithContext {
             inner: tokens.iter(),
             nesting: 0,
