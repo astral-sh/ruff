@@ -1520,6 +1520,7 @@ fn loop_header_reachability_impl<'db>(
     let place = loop_header_definition.place();
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
+    let mut deleted_narrowing_constraints = FxIndexSet::default();
     let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
     let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
@@ -1542,7 +1543,11 @@ fn loop_header_reachability_impl<'db>(
         }
 
         match use_def.definition(live_binding.binding()) {
-            DefinitionState::Defined(def) => {
+            // Assignment validity can depend on this header, so avoid inferring it while
+            // initializing a cycle.
+            DefinitionState::Defined(def)
+                if is_cycle_initial || !is_discarded_dict_key_assignment(db, def) =>
+            {
                 debug_assert_ne!(
                     def, definition,
                     "loop headers only include bindings from within the loop"
@@ -1555,8 +1560,11 @@ fn loop_header_reachability_impl<'db>(
             // `del` in the loop body is always visible to code after the loop via the
             // normal control flow merge. Updating `deleted_reachability` here is
             // necessary for prior uses in the loop to see it.
-            DefinitionState::Deleted => {
+            // Discarded dictionary-key bindings also require a fallback to the receiver's
+            // value type instead of contributing their assigned value.
+            DefinitionState::Defined(_) | DefinitionState::Deleted => {
                 deleted_reachability = deleted_reachability.or(reachability);
+                deleted_narrowing_constraints.insert(live_binding.narrowing_constraint());
             }
             DefinitionState::Undefined => {
                 unreachable!("loop headers only include bindings from within the loop")
@@ -1566,6 +1574,7 @@ fn loop_header_reachability_impl<'db>(
 
     LoopHeaderReachability {
         deleted_reachability,
+        deleted_narrowing_constraints: deleted_narrowing_constraints.into_iter().collect(),
         reachable_bindings,
     }
 }
@@ -1574,7 +1583,10 @@ fn loop_header_reachability_impl<'db>(
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct LoopHeaderReachability<'db> {
     pub(crate) deleted_reachability: Truthiness,
-    /// Reachable loop-back bindings that are not `del`s.
+    /// Constraints established after a deletion, member invalidation, or discarded key assignment.
+    /// These still narrow the fallback type of the member on the next iteration.
+    pub(crate) deleted_narrowing_constraints: Box<[ScopedNarrowingConstraint]>,
+    /// Reachable loop-back bindings whose values contribute to inferred types.
     pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
 }
 
@@ -1586,15 +1598,27 @@ impl<'db> LoopHeaderReachability<'db> {
     ) -> LoopHeaderReachability<'db> {
         // Avoid losing precision for cycles that are soon to converge.
         // See [`Type::cycle_normalized`] for more details.
-        let reachable_bindings = if cycle.iteration() <= crate::TAINTED_CYCLES {
-            self.reachable_bindings
-        } else {
-            let previous_bindings = previous.reachable_bindings.iter().copied();
-            previous_bindings.chain(self.reachable_bindings).collect()
-        };
+        if cycle.iteration() <= crate::TAINTED_CYCLES {
+            return self;
+        }
+
+        let mut reachable_bindings: FxIndexSet<_> = previous
+            .reachable_bindings
+            .iter()
+            .copied()
+            .chain(self.reachable_bindings)
+            .collect();
+        reachable_bindings.shrink_to_fit();
+        let deleted_narrowing_constraints: FxIndexSet<_> = previous
+            .deleted_narrowing_constraints
+            .iter()
+            .copied()
+            .chain(self.deleted_narrowing_constraints)
+            .collect();
 
         LoopHeaderReachability {
             deleted_reachability: self.deleted_reachability,
+            deleted_narrowing_constraints: deleted_narrowing_constraints.into_iter().collect(),
             reachable_bindings,
         }
     }
