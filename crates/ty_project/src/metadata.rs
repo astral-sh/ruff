@@ -722,14 +722,17 @@ mod tests {
 
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
+    use ruff_db::diagnostic::{DiagnosticId, Severity};
     use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_ast::PythonVersion;
     use ruff_ranged_value::ValueSource;
     use ty_static::EnvVars;
 
+    use crate::db::testing::TestDb;
     use crate::metadata::{Options, uv::UvMetadata, value::RelativePathBuf};
-    use crate::uv::ProjectEnvironment;
-    use crate::{ProjectMetadata, ProjectMetadataError};
+    use crate::uv::{DependencyMetadataError, ProjectEnvironment};
+    use crate::{Db as _, ProjectMetadata, ProjectMetadataError};
 
     #[test]
     fn project_without_pyproject() -> anyhow::Result<()> {
@@ -1135,6 +1138,66 @@ unclosed table, expected `]`
         let project = ProjectMetadata::discover_with_uv_workspace(&member, &system, environment)?;
 
         assert_eq!(project.root(), &*root);
+
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_metadata_warning_is_reported_by_default() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from(if cfg!(windows) { "C:/app" } else { "/app" });
+        system.memory_file_system().create_directory_all(&root)?;
+        let environment = uv_workspace(&root, &system)?;
+        let metadata = ProjectMetadata::new("app", root).with_environment(environment);
+        let db = TestDb::new(metadata);
+
+        let diagnostics = db.project().check_settings(&db);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].severity(), Severity::Warning);
+        assert_eq!(
+            diagnostics[0].concise_message().to_string(),
+            "Failed to load uv dependency metadata: uv did not provide a Python environment"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn uv_refresh_error_takes_precedence_over_dependency_error() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from(if cfg!(windows) { "C:/app" } else { "/app" });
+        system.memory_file_system().create_directory_all(&root)?;
+        let mut environment = uv_workspace(&root, &system)?;
+        environment.error = Some("uv metadata refresh failed".into());
+        let mut metadata = ProjectMetadata::new("app", root).with_environment(environment);
+        metadata.apply_override_options(Options::from_toml_str(
+            "[rules]\nmissing-direct-dependency = 'warn'",
+            ValueSource::Cli,
+        )?);
+        let mut db = TestDb::new(metadata);
+        let project = db.project();
+
+        assert!(project.metadata(&db).uv_workspace().is_some());
+        let diagnostics = project.check_settings(&db);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].severity(), Severity::Warning);
+        assert_eq!(
+            diagnostics[0].concise_message().to_string(),
+            "uv metadata refresh failed"
+        );
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "Project::dependency_metadata_",
+            None,
+            &events,
+        );
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::MissingEnvironment)
+        );
 
         Ok(())
     }

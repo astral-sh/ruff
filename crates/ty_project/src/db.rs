@@ -611,7 +611,11 @@ impl SemanticDb for ProjectDatabase {
             return None;
         }
 
-        self.project().dependency_metadata(self)
+        self.project()
+            .dependency_metadata(self)
+            .as_ref()
+            .ok()?
+            .as_deref()
     }
 
     fn verbose(&self) -> bool {
@@ -882,7 +886,11 @@ pub(crate) mod testing {
                 return None;
             }
 
-            self.project().dependency_metadata(self)
+            self.project()
+                .dependency_metadata(self)
+                .as_ref()
+                .ok()?
+                .as_deref()
         }
 
         fn verbose(&self) -> bool {
@@ -1001,8 +1009,8 @@ mod tests {
         Ok(())
     }
 
-    // The rule is disabled by default, so checking imports should not pay the cost of
-    // extracting dependency metadata.
+    // Without uv metadata or an enabled dependency rule, checking settings and imports
+    // should not query dependency metadata.
     #[test]
     fn dependency_metadata_isnt_queried_unnecessarily() -> anyhow::Result<()> {
         let root = SystemPathBuf::from("/project");
@@ -1013,6 +1021,7 @@ mod tests {
         )?;
         let file = system_path_to_file(&db, root.join("main.py"))?;
 
+        assert!(db.project().check_settings(&db).is_empty());
         assert!(db.check_file(file).is_empty());
         let events = db.take_salsa_events();
         for query in ["missing_direct_dependency", "Project::dependency_metadata_"] {

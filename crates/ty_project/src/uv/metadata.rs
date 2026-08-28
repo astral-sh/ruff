@@ -7,11 +7,12 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
-use ty_python_semantic::dependency::DependencyMetadata;
 
 use crate::metadata::python_version::SupportedPythonVersion;
 
 mod dependencies;
+
+pub(crate) use dependencies::DependencyMetadataError;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct UvMetadata {
@@ -75,17 +76,6 @@ impl UvMetadata {
             resolution: metadata.resolution,
             module_owners: metadata.module_owners,
         })
-    }
-
-    pub(crate) fn dependency_metadata(&self) -> Option<DependencyMetadata> {
-        self.to_dependency_metadata()
-            .inspect_err(|error| {
-                tracing::debug!(
-                    "Skipping dependency checks for '{}': {error:#}",
-                    self.workspace_root
-                );
-            })
-            .ok()
     }
 }
 
@@ -273,7 +263,7 @@ mod tests {
         assert!(workspace.environment().is_none());
         assert!(workspace.python_version().is_none());
         assert!(workspace.members().is_empty());
-        assert!(workspace.dependency_metadata().is_none());
+        assert!(workspace.dependency_metadata().is_err());
 
         Ok(())
     }

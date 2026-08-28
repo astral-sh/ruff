@@ -248,7 +248,10 @@ fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
 #[cfg(feature = "test-uv")]
 #[test]
 fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<()> {
-    let case = dependency_workspace_case()?;
+    let case = dependency_workspace_case()?.with_filter(
+        r"selected Python environment `<temp_dir>/(?:\.venv/)?other`",
+        "selected Python environment `<environment>`",
+    );
     case.write_file(
         "packages/member/member.py",
         r#"
@@ -315,7 +318,8 @@ fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<
             exit_code: 1
             ----- stdout -----
             packages/member/member.py:3:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
-            Found 1 diagnostic
+            pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: selected Python environment `<environment>` (from `--python` argument) differs from uv's environment `<temp_dir>/.venv`
+            Found 2 diagnostics
 
             ----- stderr -----
             "
@@ -628,10 +632,7 @@ fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
 /// Failures to locate uv are visible by default instead of silently disabling integration.
 #[test]
 fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
-    let case = workspace_case()?.with_filter(
-        "no path to search and provided name is not an absolute path",
-        "cannot find binary path",
-    );
+    let case = workspace_case()?;
     case.write_file("packages/member/member.py", "value: int = 1")?;
 
     let mut command = case.command();
