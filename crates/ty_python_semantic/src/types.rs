@@ -26,9 +26,9 @@ use ty_module_resolver::{
 
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
-use self::cyclic::ActiveRecursionDetector;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
+use self::cyclic::{ActiveRecursionDetector, TypeIdentity};
 pub use self::dedicated::pytest::{FixtureBinding, fixture_bindings_for_parameter};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
@@ -394,6 +394,37 @@ fn definition_expression_annotation<'db>(
             inference.expression_type(expression),
             TypeOrigin::Declared,
             inference.qualifiers(expression),
+        )
+    }
+}
+
+#[derive(Default)]
+struct MetaTypeVisitor<'db> {
+    active_aliases: ActiveRecursionDetector<TypeAliasType<'db>>,
+    active_identities: ActiveRecursionDetector<TypeIdentity<'db>>,
+}
+
+impl<'db> MetaTypeVisitor<'db> {
+    fn visit_alias(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        alias: TypeAliasType<'db>,
+    ) -> Type<'db> {
+        // A repeated specialization adds no new classes to a recursive union. Changing
+        // type arguments can introduce other classes, so use an unconstrained metatype.
+        // Do not cache results: a projection made while another alias is active can omit
+        // classes that are only encountered later in that alias's union.
+        self.active_aliases.visit(
+            &alias,
+            || Type::Never,
+            || {
+                self.active_identities.visit(
+                    &Type::TypeAlias(alias).to_type_identity(db),
+                    || KnownClass::Type.to_instance(db, env),
+                    || alias.value_type(db).to_meta_type_impl(db, env, self),
+                )
+            },
         )
     }
 }
@@ -7803,6 +7834,15 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.to_meta_type_impl(db, env, &MetaTypeVisitor::default())
+    }
+
+    fn to_meta_type_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        visitor: &MetaTypeVisitor<'db>,
+    ) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
             Type::NominalInstance(instance) => instance.to_meta_type(db, env),
@@ -7812,9 +7852,9 @@ impl<'db> Type<'db> {
                 property.instance_class(db).to_class_literal(db, env)
             }
             Type::SlotDescriptor(_) => KnownClass::MemberDescriptorType.to_class_literal(db, env),
-            Type::Union(union) => union.map(db, env, |ty| ty.to_meta_type(db, env)),
+            Type::Union(union) => union.map(db, env, |ty| ty.to_meta_type_impl(db, env, visitor)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db, env),
-            Type::TypeForm(_) => Type::object().to_meta_type(db, env),
+            Type::TypeForm(_) => Type::object().to_meta_type_impl(db, env, visitor),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db, env),
                 LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db, env),
@@ -7852,13 +7892,13 @@ impl<'db> Type<'db> {
             Type::Divergent(_) => self,
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
-                    alternatives.to_meta_type(db, env)
+                    alternatives.to_meta_type_impl(db, env, visitor)
                 } else {
                     // Negative constraints do not generally constrain classes: `int & ~Literal[0]`
                     // still has meta-type `type[int]`. Pure negations are bounded by `object`.
                     let mut builder = IntersectionBuilder::new(db, env);
                     for positive in intersection.positive_elements_or_object(db) {
-                        builder.add_positive_in_place(positive.to_meta_type(db, env));
+                        builder.add_positive_in_place(positive.to_meta_type_impl(db, env, visitor));
                     }
 
                     // An exclusion can narrow a type variable's union bound to a definite class:
@@ -7883,7 +7923,9 @@ impl<'db> Type<'db> {
                             _ => None,
                         }
                     {
-                        builder.add_positive_in_place(narrowed_bound.to_meta_type(db, env));
+                        builder.add_positive_in_place(
+                            narrowed_bound.to_meta_type_impl(db, env, visitor),
+                        );
                     }
 
                     builder.build()
@@ -7891,7 +7933,7 @@ impl<'db> Type<'db> {
             }
             Type::EnumComplement(complement) => complement
                 .remaining_literal_union(db, env)
-                .to_meta_type(db, env),
+                .to_meta_type_impl(db, env, visitor),
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db, env),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db, env),
             // Class-member lookup on a protocol instance must use the protocol's nominal class.
@@ -7908,8 +7950,10 @@ impl<'db> Type<'db> {
                     todo_type!("TypedDict synthesized meta-type").expect_dynamic(),
                 ),
             },
-            Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db, env),
-            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).to_meta_type(db, env),
+            Type::TypeAlias(alias) => visitor.visit_alias(db, env, alias),
+            Type::NewTypeInstance(newtype) => newtype
+                .concrete_base_type(db)
+                .to_meta_type_impl(db, env, visitor),
         }
     }
 

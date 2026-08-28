@@ -4128,6 +4128,61 @@ class Foo: ...
 reveal_type(Foo.__class__)  # revealed: <class 'type'>
 ```
 
+## Classes of recursive intersections
+
+Mutually recursive aliases can describe the same union of classes. Computing the class of their
+intersection preserves every possible class, regardless of the order in which the aliases are
+expanded.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import Intersection
+
+type First = Second | int
+type Second = First | str
+
+def recursive(value: Intersection[First, Second]):
+    reveal_type(type(value))  # revealed: type[int | str]
+```
+
+## Classes of recursive aliases with repeating specializations
+
+Rotating the arguments of a recursive alias produces a finite set of specializations. Class
+inference retains the union of those arguments instead of widening to `type`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Rotate[T, U] = T | Rotate[U, T]
+
+def rotating(value: Rotate[int, str]):
+    reveal_type(type(value))  # revealed: type[int | str]
+```
+
+## Classes of recursive aliases with growing specializations
+
+Recursive specialization can introduce classes beyond the initial type argument. Class inference
+terminates even when the type arguments keep growing, conservatively returning `type`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Growing[T] = T | Growing[list[T]]
+
+def growing(value: Growing[int]):
+    reveal_type(type(value))  # revealed: type
+```
+
 ## Module attributes
 
 ### Basic
