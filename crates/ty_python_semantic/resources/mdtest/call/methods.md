@@ -1081,6 +1081,10 @@ def narrowed_bound_method_attribute():
 Assigning to `self` does not assign to its method attributes. An empty loop targeting `self`
 therefore leaves method calls bound, both before the loop and outside the method containing it.
 
+This guards against a regression in implicit attribute type inference: synthetic loop-header
+definitions for attribute places such as `self.method` are not attribute assignments and must not be
+considered when inferring instance attribute types.
+
 ```py
 class C:
     def method(self) -> None:

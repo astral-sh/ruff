@@ -634,7 +634,7 @@ while True:
     x = 1
 ```
 
-### Loop header definitions don't shadow member bindings
+### Rebinding an object before an unconditional `break`
 
 Rebinding an object followed by an unconditional `break` does not affect its members at the start of
 the loop, because the new object never reaches another iteration.
@@ -661,120 +661,148 @@ while True:
 ```
 
 The same applies to narrowing from a guard before the loop. The condition is always true on the only
-iteration, but the replacement frame's attribute is not narrowed after the `break`.
+iteration, but the replacement object's attribute is not narrowed after the `break`.
 
 ```py
-class Frame:
-    fin: bool
+class Box:
+    value: bool
 
-def f(frame: Frame):
-    if frame.fin:
+def f(box: Box):
+    if box.value:
         return
 
-    while reveal_type(not frame.fin):  # revealed: Literal[True]
-        frame = Frame()
+    while reveal_type(not box.value):  # revealed: Literal[True]
+        box = Box()
         break
 
-    reveal_type(frame.fin)  # revealed: bool
+    reveal_type(box.value)  # revealed: bool
 ```
 
 ### Rebinding an object resets attribute narrowing across iterations
 
-A guard before the loop only constrains the initial object. Rebinding `frame` can make `fin` true on
-a later iteration, so the loop condition is not always true.
+The first iteration sees the initial object's `int` value; later iterations see the replacement's
+`str` value. The type at the start of the body is therefore `int | str`. Rebinding restores the full
+declared attribute type, including `None`, until the replacement is narrowed again.
 
 ```py
-class Frame:
-    fin: bool
+class Box:
+    value: int | str | None
 
-def condition(frame: Frame, replacement: Frame):
-    if frame.fin:
-        return
+def example(box: Box):
+    assert isinstance(box.value, int)
+    reveal_type(box.value)  # revealed: int
 
-    while reveal_type(not frame.fin):  # revealed: bool
-        frame = replacement
+    while True:
+        reveal_type(box.value)  # revealed: int | str
+
+        box = Box()
+        reveal_type(box.value)  # revealed: int | str | None
+
+        assert isinstance(box.value, str)
 ```
 
-When the loop exits normally, the current frame has `fin` set to `True`.
+### Rebinding an object affects the loop condition
+
+A guard before the loop only constrains the initial object. Rebinding `box` can make `box.value`
+true on a later iteration, so the loop condition is not always true.
 
 ```py
-def normal_exit(frame: Frame, replacement: Frame):
-    if frame.fin:
+class Box:
+    value: bool
+
+def condition(box: Box, replacement: Box):
+    if box.value:
         return
 
-    while not frame.fin:
-        reveal_type(frame.fin)  # revealed: Literal[False]
-        frame = replacement
+    reveal_type(box.value)  # revealed: Literal[False]
 
-    reveal_type(frame.fin)  # revealed: Literal[True]
+    while reveal_type(not box.value):  # revealed: bool
+        box = replacement
+```
+
+When the loop exits normally, `box.value` is `True`.
+
+```py
+def normal_exit(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    reveal_type(box.value)  # revealed: Literal[False]
+
+    while not box.value:
+        reveal_type(box.value)  # revealed: Literal[False]
+        box = replacement
+        reveal_type(box.value)  # revealed: bool
+
+    reveal_type(box.value)  # revealed: Literal[True]
 ```
 
 ### Rebinding an object before `continue`
 
 Rebinding also invalidates attribute narrowing when the next iteration is reached through
-`continue`. The replacement frame can end the loop.
+`continue`. A replacement whose `value` is `True` can end the loop.
 
 ```py
-class Frame:
-    fin: bool
+class Box:
+    value: bool
 
-def f(frame: Frame, replacement: Frame):
-    if frame.fin:
+def f(box: Box, replacement: Box):
+    if box.value:
         return
 
-    while not frame.fin:
-        frame = replacement
+    while not box.value:
+        box = replacement
         continue
 
-    reveal_type(frame.fin)  # revealed: Literal[True]
+    reveal_type(box.value)  # revealed: Literal[True]
 ```
 
 ### Rebinding in an inner loop reaches the next outer iteration
 
-An inner loop can rebind `frame` on one iteration, then exit through a `break` before reaching the
+An inner loop can rebind `box` on one iteration, then exit through a `break` before reaching the
 assignment again. The replacement is visible both after the inner loop and on later outer
-iterations, so the initial guard no longer narrows `frame.fin`.
+iterations, so the initial guard no longer narrows `box.value`.
 
 ```py
-class Frame:
-    fin: bool
+class Box:
+    value: bool
 
 def stop() -> bool:
     raise NotImplementedError
 
-def f(frame: Frame, replacement: Frame, repeat: bool):
-    if frame.fin:
+def f(box: Box, replacement: Box, repeat: bool):
+    if box.value:
         return
 
     while repeat:
-        reveal_type(frame.fin)  # revealed: bool
+        reveal_type(box.value)  # revealed: bool
         while True:
             if stop():
                 break
-            frame = replacement
-        reveal_type(frame.fin)  # revealed: bool
+            box = replacement
+        reveal_type(box.value)  # revealed: bool
 ```
 
 ### Rebinding a member resets nested attribute narrowing
 
-Replacing `box.frame` invalidates narrowing of `box.frame.fin` on subsequent iterations, even though
-the outer `box` object is unchanged.
+Replacing `wrapper.box` invalidates narrowing of `wrapper.box.value` on subsequent iterations, even
+though the outer `wrapper` object is unchanged.
 
 ```py
-class Frame:
-    fin: bool
-
 class Box:
-    frame: Frame
+    value: bool
 
-def f(box: Box, replacement: Frame):
-    if box.frame.fin:
+class Wrapper:
+    box: Box
+
+def f(wrapper: Wrapper, replacement: Box):
+    if wrapper.box.value:
         return
 
-    while not box.frame.fin:
-        box.frame = replacement
+    while not wrapper.box.value:
+        wrapper.box = replacement
 
-    reveal_type(box.frame.fin)  # revealed: Literal[True]
+    reveal_type(wrapper.box.value)  # revealed: Literal[True]
 ```
 
 ### Rebinding a collection resets subscript narrowing

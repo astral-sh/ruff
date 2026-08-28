@@ -1090,8 +1090,7 @@ class D:
 
 ### Assignment in a loop in `__init__`
 
-An assignment in a loop body can initialize a `Final` attribute. The `break` ensures the attribute
-is assigned only once.
+An assignment in a loop body provides a value for a `Final` attribute declared in the class body.
 
 ```py
 from typing import Final
@@ -1100,9 +1099,8 @@ class C:
     value: Final[int]
 
     def __init__(self) -> None:
-        while True:
+        for _ in range(2):
             self.value = 1
-            break
 ```
 
 ### Rebinding `self` does not initialize `Final` attributes

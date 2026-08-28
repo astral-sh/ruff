@@ -2035,7 +2035,7 @@ def _():
             nonlocal y  # error: [invalid-syntax] "name `y` is used prior to nonlocal declaration"
 ```
 
-### Loop header definitions don't shadow member bindings
+### Rebinding an object before an unconditional `break`
 
 Rebinding an object followed by an unconditional `break` does not affect its members at the start of
 the loop, because the new object never reaches another iteration.
@@ -2063,32 +2063,58 @@ for _ in range(1):
 
 ### Rebinding an object resets attribute narrowing across iterations
 
-The loop body can observe either the initial frame or a replacement from a previous iteration. A
-guard on the initial frame therefore does not narrow `fin` throughout the loop.
+The first iteration sees the initial object; later iterations see a replacement narrowed at the end
+of the previous iteration. A replacement's attribute initially has the full declared union.
 
 ```py
-class Frame:
-    fin: bool
+class Box:
+    value: int | str | None
 
-def f(frame: Frame, replacement: Frame):
-    if frame.fin:
-        return
+def example(box: Box):
+    assert isinstance(box.value, int)
+    reveal_type(box.value)  # revealed: int
 
     for _ in range(2):
-        reveal_type(frame.fin)  # revealed: bool
-        frame = replacement
+        # The first iteration sees int; subsequent iterations see str.
+        reveal_type(box.value)  # revealed: int | str
+
+        box = Box()
+        reveal_type(box.value)  # revealed: int | str | None
+
+        assert isinstance(box.value, str)
+
+    # The loop is non-empty, so the current value has been narrowed to str.
+    reveal_type(box.value)  # revealed: str
 ```
 
-Narrowing established on a replacement frame also reaches the next iteration. If each replacement
-has `fin` set to `False`, the loop body keeps that narrowing.
+### Boolean attribute narrowing after rebinding
+
+The loop body can observe either the initial object or a replacement from a previous iteration. A
+guard on the initial object therefore does not narrow `box.value` throughout the loop.
 
 ```py
-def narrowed_replacement(frame: Frame, replacement: Frame):
-    if frame.fin:
+class Box:
+    value: bool
+
+def f(box: Box, replacement: Box):
+    if box.value:
         return
 
     for _ in range(2):
-        reveal_type(frame.fin)  # revealed: Literal[False]
-        frame = replacement
-        assert not frame.fin
+        reveal_type(box.value)  # revealed: bool
+        box = replacement
+```
+
+Narrowing established on a replacement object also reaches the next iteration. If each replacement
+has `value` narrowed to `False`, the loop body keeps that narrowing.
+
+```py
+def narrowed_replacement(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    for _ in range(2):
+        reveal_type(box.value)  # revealed: Literal[False]
+        box = replacement
+        assert not box.value
 ```
