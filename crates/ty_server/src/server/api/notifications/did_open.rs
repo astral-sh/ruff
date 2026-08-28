@@ -1,5 +1,4 @@
 use lsp_types::{DidOpenTextDocumentNotification, DidOpenTextDocumentParams, TextDocumentItem};
-use ty_project::ScriptEnvironmentAvailability;
 
 use crate::TextDocument;
 use crate::server::Result;
@@ -31,13 +30,7 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
         } = params;
 
         let text_doc = TextDocument::new(uri, text, version, language_id);
-        let document = session.open_text_document(text_doc);
-        // Defer diagnostics until synchronization provides the script's declared dependencies.
-        session.synchronize_script(
-            client,
-            document.notebook_or_file_path(),
-            ScriptEnvironmentAvailability::Pending,
-        );
+        let document = session.open_text_document(client, text_doc);
         publish_diagnostics_if_needed(&document, session, client);
 
         Ok(())

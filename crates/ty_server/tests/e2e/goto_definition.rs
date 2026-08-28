@@ -61,11 +61,13 @@ from dependency import script_only
 mod uv_metadata {
     use anyhow::{Context, Result, anyhow};
     use lsp_types::{
-        Definition, DefinitionResponse, FileChangeType, FileEvent, Position,
+        Code, Definition, DefinitionResponse, FileChangeType, FileEvent, Position,
         TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
+        WorkspaceDocumentDiagnosticReport,
     };
     use ruff_db::system::{OsSystem, System as _, SystemPath, SystemPathBuf};
     use ty_project::UseUv;
+    use ty_server::{ClientOptions, DiagnosticMode};
 
     use crate::TestServerBuilder;
 
@@ -285,6 +287,109 @@ from idna import encode
                 .goto_definition_request(script, Position::new(4, 19))
                 .is_some(),
             "saving must synchronize newly declared script dependencies"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn saving_unsaved_open_metadata_repeats_synchronization() -> Result<()> {
+        let script = SystemPath::new("src/script.py");
+        let initial = r#"# /// script
+# requires-python = '>=3.12'
+# dependencies = []
+# ///
+"#;
+        let updated = r#"# /// script
+# requires-python = '>=3.12'
+# dependencies = ['attrs==25.4.0']
+# ///
+from attrs import define
+"#;
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(SystemPath::new("src"), None)?
+            .with_file(script, initial)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", uv_executable()?)
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        // Opening synchronizes the backing file, not the unsaved metadata.
+        server.open_text_document(script, updated, 1);
+        server.await_diagnostic_refresh();
+        assert!(
+            server
+                .goto_definition_request(script, Position::new(4, 18))
+                .is_none(),
+            "unsaved dependencies must not be installed"
+        );
+
+        server.write_file(script, updated)?;
+        server.save_text_document(script);
+        server.await_diagnostic_refresh();
+        assert!(
+            server
+                .goto_definition_request(script, Position::new(4, 18))
+                .is_some(),
+            "saving must install attrs even though the editor's metadata is unchanged"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_check_does_not_synchronize_unsaved_script_metadata() -> Result<()> {
+        let script = SystemPath::new("src/script.py");
+        let ordinary = "from attrs import define\nprint(define)\n";
+        let source = r#"# /// script
+# requires-python = '>=3.12'
+# dependencies = ['attrs==25.4.0']
+# ///
+from attrs import define
+print(define)
+"#;
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(
+                SystemPath::new("src"),
+                Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+            )?
+            .with_file(script, ordinary)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", uv_executable()?)
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+
+        // A workspace check must not initialize uv from metadata that exists only in the editor.
+        let diagnostics = server.workspace_diagnostic_request(None, None);
+        let [WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)] =
+            diagnostics.items.as_slice()
+        else {
+            return Err(anyhow!("expected diagnostics for the unsaved script"));
+        };
+        let [diagnostic] = report.full_document_diagnostic_report.items.as_slice() else {
+            return Err(anyhow!(
+                "expected only the unresolved attrs import: {report:?}"
+            ));
+        };
+        assert_eq!(
+            diagnostic.code,
+            Some(Code::String("unresolved-import".to_string()))
+        );
+
+        server.write_file(script, source)?;
+        server.save_text_document(script);
+        server.await_diagnostic_refresh();
+        assert!(
+            server
+                .goto_definition_request(script, Position::new(4, 18))
+                .is_some(),
+            "the first save must synchronize the script's dependencies"
         );
 
         Ok(())

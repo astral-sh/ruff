@@ -24,7 +24,7 @@ use ty_ide::{
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
-use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::watch::{ChangeEvent, ChangedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase, SemanticDb as _};
 use ty_python_core::program::FallibleStrategy;
@@ -199,10 +199,7 @@ impl Workspace {
             .write_file_all(&path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(&[ChangeEvent::Created {
-            path: path.clone(),
-            kind: CreatedKind::File,
-        }]);
+        self.db.apply_changes(&[ChangeEvent::Opened(path.clone())]);
 
         let file = system_path_to_file(&self.db, &path).expect("File to exist");
 

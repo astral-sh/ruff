@@ -123,8 +123,9 @@ impl ScriptEnvironments {
     /// the change, increasing CLI and language-server latency.
     ///
     /// Instead, project checks initialize virtual environments lazily as they encounter scripts.
-    /// If no [`ScriptEnvironment`] exists, this method synchronizes the virtual environment and
-    /// waits for uv before creating the input. An existing [`ScriptEnvironment`] is reused.
+    /// For a closed file without a [`ScriptEnvironment`], this method synchronizes the virtual
+    /// environment and waits for uv before creating the input. An existing environment is reused.
+    /// Open files without an environment use the default environment until they are saved.
     ///
     /// Background synchronization works differently: it creates the [`ScriptEnvironment`] input
     /// before invoking uv so other operations can use it while synchronization runs. Applying the
@@ -171,6 +172,13 @@ impl ScriptEnvironments {
                     // If the other caller is cancelled, it restores the entry to `Vacant`. Check the
                     // state again after waiting so this caller can initialize the environment instead.
                     state = entry.wait_until_initialized(db, state);
+                }
+
+                ScriptEnvironmentState::Vacant if db.is_open_file(file) => {
+                    // An unsaved edit added a script metadata block to an ordinary file.
+                    // Keep diagnostics available with the default environment, as for other
+                    // unsaved edits. Synchronize on save, when uv can read the metadata from disk.
+                    return ScriptEnvironmentAvailability::Available;
                 }
 
                 ScriptEnvironmentState::Vacant => {

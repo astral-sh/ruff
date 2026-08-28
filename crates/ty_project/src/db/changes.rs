@@ -123,20 +123,24 @@ impl ProjectDatabase {
             }
 
             match change {
-                ChangeEvent::Changed { path, kind: _ } | ChangeEvent::Opened(path) => {
+                ChangeEvent::Changed { path, kind: _ } => {
                     if synced_files.insert(path.to_path_buf()) {
                         File::sync_path_only(self, path);
                     }
                 }
 
-                ChangeEvent::Created { kind, path } => {
-                    match kind {
-                        CreatedKind::File => {
+                ChangeEvent::Opened(path) | ChangeEvent::Created { path, .. } => {
+                    match change {
+                        ChangeEvent::Opened(_)
+                        | ChangeEvent::Created {
+                            kind: CreatedKind::File,
+                            ..
+                        } => {
                             if synced_files.insert(path.to_path_buf()) {
                                 File::sync_path(self, path);
                             }
                         }
-                        CreatedKind::Directory | CreatedKind::Any => {
+                        _ => {
                             sync_recursively.insert(path.clone());
                         }
                     }
@@ -160,7 +164,8 @@ impl ProjectDatabase {
                             {
                                 project.add_file(self, file);
                             }
-                        } else if project.is_directory_included(self, path)
+                        } else if change.is_created()
+                            && project.is_directory_included(self, path)
                             && ignore_files
                                 .as_mut()
                                 .is_none_or(|ignore_files| !ignore_files.is_ignored(path, true))
