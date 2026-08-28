@@ -178,10 +178,10 @@ select = [
 ignore = [
     # only relevant if you run a script with `python -0`,
     # which seems unlikely for any of the scripts in this repo
-    "B011",
+    "assert-false",
     # Leave it to the formatter to split long lines and
     # the judgement of all of us.
-    "E501",
+    "line-too-long",
     # This is often more readable in our scripts.
     "repeated-append",
 ]
