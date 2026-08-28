@@ -560,6 +560,20 @@ def _(c: MyClass):
     c.field = c
 ```
 
+A generic type alias preserves `Self` when it is used in an attribute annotation:
+
+```py
+type Identity[T] = T
+
+class AliasedNode:
+    parent: Identity[Self]
+
+    def __init__(self) -> None:
+        self.parent = self
+
+reveal_type(AliasedNode().parent)  # revealed: AliasedNode
+```
+
 Self from class body annotations and method signatures represent the same logical type variable.
 When a method returns an attribute annotated with `Self` in the class body, the class-body `Self`
 and the method's `Self` should be considered the same type, even though they have different binding
@@ -1422,6 +1436,21 @@ class D(C): ...
 reveal_type(D().instance_method)
 # revealed: bound method <class 'D'>.class_method() -> D
 reveal_type(D.class_method)
+```
+
+A generic type alias does not prevent binding `Self` in the method signature:
+
+```py
+from typing import Self
+
+type Identity[T] = T
+
+class Aliased:
+    def copy(self, other: Identity[Self]) -> Identity[Self]:
+        return other
+
+# revealed: bound method Aliased.copy(other: Aliased) -> Aliased
+reveal_type(Aliased().copy)
 ```
 
 In nested functions `self` binds to the method. So in the following example the `self` in `C.b` is
