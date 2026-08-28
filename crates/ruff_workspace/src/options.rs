@@ -1086,6 +1086,8 @@ pub struct LintCommonOptions {
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files. An initial '!' negates
     /// the file pattern.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
