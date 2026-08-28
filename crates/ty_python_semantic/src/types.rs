@@ -707,7 +707,7 @@ enum MemberLookupErrorKind<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct MemberLookupError<'db> {
     #[returns(copy)]
-    fallback_member: PlaceAndQualifiers<'db>,
+    fallback_member: ResolvedMember<'db>,
     #[returns(copy)]
     kind: MemberLookupErrorKind<'db>,
 }
@@ -833,13 +833,84 @@ impl<'db> MemberLookupError<'db> {
 ///
 /// Unlike [`crate::place::LookupResult`], errors here describe failed attribute-access operations,
 /// not undefined or possibly undefined places.
-type MemberLookupResult<'db> = Result<PlaceAndQualifiers<'db>, MemberLookupError<'db>>;
+type MemberLookupResult<'db> = Result<ResolvedMember<'db>, MemberLookupError<'db>>;
+
+/// A member and the property accessors needed to report deprecations at its use site.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum ResolvedMember<'db> {
+    /// A member with no deprecated property accessors.
+    Plain(PlaceAndQualifiers<'db>),
+    /// A member with deprecated property accessors, stored separately to keep ordinary lookups compact.
+    WithDeprecations(DeprecatedMember<'db>),
+}
+
+/// Only members with deprecated property accessors need this additional storage.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct DeprecatedMember<'db> {
+    #[returns(copy)]
+    member: PlaceAndQualifiers<'db>,
+    #[returns(copy)]
+    properties: Type<'db>,
+}
+
+impl get_size2::GetSize for DeprecatedMember<'_> {}
+
+impl<'db> ResolvedMember<'db> {
+    fn member(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::Plain(member) => member,
+            Self::WithDeprecations(member) => member.member(db),
+        }
+    }
+
+    fn deprecated_properties(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::WithDeprecations(member) => Some(member.properties(db)),
+            Self::Plain(_) => None,
+        }
+    }
+
+    fn new(
+        db: &'db dyn Db,
+        member: PlaceAndQualifiers<'db>,
+        properties: Option<Type<'db>>,
+    ) -> Self {
+        match properties {
+            Some(properties) => {
+                Self::WithDeprecations(DeprecatedMember::new(db, member, properties))
+            }
+            None => Self::Plain(member),
+        }
+    }
+
+    fn map_type(self, db: &'db dyn Db, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        Self::new(
+            db,
+            self.member(db).map_type(f),
+            self.deprecated_properties(db),
+        )
+    }
+}
+
+fn union_deprecated_properties<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    left: Option<Type<'db>>,
+    right: Option<Type<'db>>,
+) -> Option<Type<'db>> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(UnionType::from_two_elements(db, env, left, right)),
+        _ => left.or(right),
+    }
+}
 
 fn member_lookup_result<'db>(
     db: &'db dyn Db,
     member: PlaceAndQualifiers<'db>,
     error: Option<MemberLookupErrorKind<'db>>,
+    properties: Option<Type<'db>>,
 ) -> MemberLookupResult<'db> {
+    let member = ResolvedMember::new(db, member, properties);
     match error {
         Some(kind) => Err(MemberLookupError::new(db, member, kind)),
         None => Ok(member),
@@ -852,10 +923,10 @@ fn map_member_lookup_type<'db>(
     f: impl FnOnce(Type<'db>) -> Type<'db>,
 ) -> MemberLookupResult<'db> {
     match result {
-        Ok(member) => Ok(member.map_type(f)),
+        Ok(member) => Ok(member.map_type(db, f)),
         Err(error) => Err(MemberLookupError::new(
             db,
-            error.fallback_member(db).map_type(f),
+            error.fallback_member(db).map_type(db, f),
             error.kind(db),
         )),
     }
@@ -874,6 +945,7 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
             .member_lookup_with_policy_and_receiver(db, env, name, policy, Some(symbolic_receiver)),
         TypeVarBoundOrConstraints::Constraints(constraints) => {
             let mut error = None;
+            let mut properties = None;
             let member = constraints.map_with_boundness_and_qualifiers(db, env, |constraint| {
                 let result = constraint.member_lookup_with_policy_and_receiver(
                     db,
@@ -890,9 +962,16 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
                         _ => ty,
                     });
                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
-                result.unwrap_or_else(|error| error.fallback_member(db))
+                let member = result.unwrap_or_else(|error| error.fallback_member(db));
+                properties = union_deprecated_properties(
+                    db,
+                    env,
+                    properties,
+                    member.deprecated_properties(db),
+                );
+                member.member(db)
             });
-            member_lookup_result(db, member, error)
+            member_lookup_result(db, member, error, properties)
         }
     }
 }
@@ -903,7 +982,8 @@ fn member_lookup_or_fall_back_to<'db>(
     result: MemberLookupResult<'db>,
     fallback_fn: impl FnOnce() -> MemberLookupResult<'db>,
 ) -> MemberLookupResult<'db> {
-    let member = result.unwrap_or_else(|error| error.fallback_member(db));
+    let resolved = result.unwrap_or_else(|error| error.fallback_member(db));
+    let member = resolved.member(db);
     match member.place {
         Place::Undefined => fallback_fn(),
         Place::Defined(DefinedPlace {
@@ -918,11 +998,17 @@ fn member_lookup_or_fall_back_to<'db>(
             let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
             member_lookup_result(
                 db,
-                member.or_fall_back_to(db, env, || fallback_member),
+                member.or_fall_back_to(db, env, || fallback_member.member(db)),
                 result
                     .err()
                     .map(|error| error.kind(db))
                     .or_else(|| fallback.err().map(|error| error.kind(db))),
+                union_deprecated_properties(
+                    db,
+                    env,
+                    resolved.deprecated_properties(db),
+                    fallback_member.deprecated_properties(db),
+                ),
             )
         }
     }
@@ -941,18 +1027,25 @@ fn cycle_normalized_member_lookup<'db>(
         .filter(|_| cycle.iteration() <= crate::TAINTED_CYCLES || previous.is_err());
     let member = result.unwrap_or_else(|error| error.fallback_member(db));
     let previous = previous.unwrap_or_else(|error| error.fallback_member(db));
-    member_lookup_result(db, member.cycle_normalized(db, env, previous, cycle), error)
+    member_lookup_result(
+        db,
+        member
+            .member(db)
+            .cycle_normalized(db, env, previous.member(db), cycle),
+        error,
+        member.deprecated_properties(db),
+    )
 }
 
 impl<'db> From<PlaceAndQualifiers<'db>> for MemberLookupResult<'db> {
     fn from(member: PlaceAndQualifiers<'db>) -> Self {
-        Ok(member)
+        Ok(ResolvedMember::Plain(member))
     }
 }
 
 impl<'db> From<Place<'db>> for MemberLookupResult<'db> {
     fn from(place: Place<'db>) -> Self {
-        Ok(place.into())
+        Ok(ResolvedMember::Plain(place.into()))
     }
 }
 
@@ -4082,7 +4175,7 @@ impl<'db> Type<'db> {
         if let Type::ModuleLiteral(module) = self {
             module
                 .static_member(db, env, name)
-                .map_or(Place::Undefined, |member| member.place)
+                .map_or(Place::Undefined, |member| member.member(db).place)
         } else if let place @ Place::Defined(_) = self.class_member(db, env, name).place {
             place
         } else if let Some(place @ Place::Defined(_)) = self
@@ -4092,6 +4185,44 @@ impl<'db> Type<'db> {
             place
         } else {
             self.instance_member(db, env, name).place
+        }
+    }
+
+    /// Whether this descriptor contains a property with a deprecated accessor implementation.
+    /// Overload deprecations require a resolved call and do not apply to accessor references.
+    fn has_deprecated_property(self, db: &'db dyn Db) -> bool {
+        fn deprecated(db: &dyn Db, ty: Type<'_>) -> bool {
+            match ty {
+                Type::FunctionLiteral(function) => function.implementation_deprecated(db).is_some(),
+                Type::BoundMethod(method) => {
+                    method.function(db).implementation_deprecated(db).is_some()
+                }
+                Type::Union(union) => union.elements(db).iter().any(|ty| deprecated(db, *ty)),
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| deprecated(db, *ty)),
+                _ => false,
+            }
+        }
+        match self {
+            Type::PropertyInstance(property) => [
+                property.getter(db),
+                property.setter(db),
+                property.deleter(db),
+            ]
+            .into_iter()
+            .flatten()
+            .any(|ty| deprecated(db, ty)),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.has_deprecated_property(db)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|ty| ty.has_deprecated_property(db)),
+            _ => false,
         }
     }
 
@@ -4682,8 +4813,11 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
+        let meta_properties = meta_attr_ty.filter(|ty| ty.has_deprecated_property(db));
         let fallback_error = fallback.err().map(|error| error.kind(db));
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
+        let fallback_properties = fallback_member.deprecated_properties(db);
+        let fallback_member = fallback_member.member(db);
 
         // A slot stores the same instance attribute described by the receiver's declarations.
         // Unlike an arbitrary data descriptor, its inherited getter must not hide a more precise
@@ -4692,7 +4826,7 @@ impl<'db> Type<'db> {
             && matches!(meta_attr_ty, Some(Type::SlotDescriptor(_)))
             && !fallback_member.place.is_undefined()
         {
-            return member_lookup_result(db, fallback_member, fallback_error);
+            return fallback;
         }
 
         let PlaceAndQualifiers {
@@ -4707,6 +4841,7 @@ impl<'db> Type<'db> {
                 db,
                 meta_attr.with_qualifiers(meta_attr_qualifiers),
                 meta_attr_error,
+                meta_properties,
             ),
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
@@ -4722,6 +4857,7 @@ impl<'db> Type<'db> {
                 db,
                 meta_attr.with_qualifiers(meta_attr_qualifiers),
                 meta_attr_error,
+                meta_properties,
             ),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
@@ -4754,6 +4890,7 @@ impl<'db> Type<'db> {
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
                 meta_attr_error.or(fallback_error),
+                union_deprecated_properties(db, env, meta_properties, fallback_properties),
             ),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -4775,6 +4912,7 @@ impl<'db> Type<'db> {
                 db,
                 fallback.with_qualifiers(fallback_qualifiers),
                 fallback_error,
+                fallback_properties,
             ),
 
             // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
@@ -4807,6 +4945,7 @@ impl<'db> Type<'db> {
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
                 meta_attr_error.or(fallback_error),
+                union_deprecated_properties(db, env, meta_properties, fallback_properties),
             ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
@@ -4814,6 +4953,7 @@ impl<'db> Type<'db> {
                 db,
                 fallback.with_qualifiers(fallback_qualifiers),
                 fallback_error,
+                fallback_properties,
             ),
         }
     }
@@ -4832,6 +4972,7 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         self.try_member_lookup(db, env, name)
             .unwrap_or_else(|error| error.fallback_member(db))
+            .member(db)
     }
 
     /// Performs member lookup while retaining errors from implicit attribute-access methods.
@@ -4861,6 +5002,7 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy_and_receiver(db, env, name, policy, None)
             .unwrap_or_else(|error| error.fallback_member(db))
+            .member(db)
     }
 
     /// Perform member lookup while optionally binding descriptors and `Self` to a more precise
@@ -4878,7 +5020,7 @@ impl<'db> Type<'db> {
     ) -> MemberLookupResult<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Ok(Place::bound(Type::divergent(id)).into()),
+            cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -4893,7 +5035,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _, _| Ok(Place::bound(Type::divergent(id)).into()),
+            cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -4917,7 +5059,9 @@ impl<'db> Type<'db> {
                 env: &ProgramEnvironment<'db>,
                 result: MemberLookupResult<'db>,
             ) -> MemberLookupResult<'db> {
-                let member = result.unwrap_or_else(|error| error.fallback_member(db));
+                let member = result
+                    .unwrap_or_else(|error| error.fallback_member(db))
+                    .member(db);
                 let should_promote = matches!(
                     member.place,
                     Place::Defined(DefinedPlace {
@@ -4976,6 +5120,7 @@ impl<'db> Type<'db> {
 
                 if result
                     .unwrap_or_else(|error| error.fallback_member(db))
+                    .member(db)
                     .is_class_var()
                     && this.is_typed_dict()
                 {
@@ -5013,14 +5158,22 @@ impl<'db> Type<'db> {
             match this {
                 Type::Union(union) => {
                     let mut error = None;
+                    let mut properties = None;
                     let member = union.map_with_boundness_and_qualifiers(db, env, |elem| {
                         let result = elem.member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
                         );
                         error = error.or_else(|| result.err().map(|error| error.kind(db)));
-                        result.unwrap_or_else(|error| error.fallback_member(db))
+                        let member = result.unwrap_or_else(|error| error.fallback_member(db));
+                        properties = union_deprecated_properties(
+                            db,
+                            env,
+                            properties,
+                            member.deprecated_properties(db),
+                        );
+                        member.member(db)
                     });
-                    member_lookup_result(db, member, error)
+                    member_lookup_result(db, member, error, properties)
                 }
 
                 Type::Intersection(intersection) => {
@@ -5032,15 +5185,30 @@ impl<'db> Type<'db> {
                     } else {
                         let receiver = Some(receiver.unwrap_or(this));
                         let mut error = None;
+                        let mut properties = IntersectionBuilder::new(db, env);
+                        let mut all_deprecated = true;
                         let member =
                             intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
                                 let result = elem.member_lookup_with_policy_and_receiver(
                                     db, env, name_str, policy, receiver,
                                 );
                                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
-                                result.unwrap_or_else(|error| error.fallback_member(db))
+                                let member =
+                                    result.unwrap_or_else(|error| error.fallback_member(db));
+                                if let Some(deprecated) = member.deprecated_properties(db) {
+                                    properties.add_positive_in_place(deprecated);
+                                } else if !member.member(db).place.is_undefined() {
+                                    all_deprecated = false;
+                                }
+                                member.member(db)
                             });
-                        member_lookup_result(db, member, error)
+                        member_lookup_result(
+                            db,
+                            member,
+                            error,
+                            (all_deprecated && !member.place.is_undefined())
+                                .then(|| properties.build()),
+                        )
                     }
                 }
 
@@ -5437,6 +5605,7 @@ impl<'db> Type<'db> {
                     if name_str == "func" {
                         match nominal_lookup
                             .unwrap_or_else(|error| error.fallback_member(db))
+                            .member(db)
                             .place
                         {
                             Place::Defined(DefinedPlace {
@@ -5531,6 +5700,7 @@ impl<'db> Type<'db> {
                             db,
                             class_attr_fallback,
                             class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
+                            None,
                         ),
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
                     );
@@ -7046,13 +7216,12 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        !matches!(
-            result,
-            Ok(PlaceAndQualifiers {
-                place: Place::Defined(place),
-                ..
-            }) if place.is_definitely_defined()
-        )
+        !result.is_ok_and(|member| {
+            matches!(
+                member.member(db).place,
+                Place::Defined(place) if place.is_definitely_defined()
+            )
+        })
     }
 
     /// Apply `__getattr__` / `__getattribute__` fallback to an attribute-lookup result.
@@ -7089,6 +7258,7 @@ impl<'db> Type<'db> {
                         receiver: self,
                         name: name_type,
                     }),
+                    None,
                 ),
                 Err(
                     CallDunderError::PossiblyUnbound { .. } | CallDunderError::MethodNotAvailable,
@@ -7124,6 +7294,7 @@ impl<'db> Type<'db> {
                     receiver: self,
                     name: name_type,
                 }),
+                None,
             ),
             Err(CallDunderError::PossiblyUnbound { .. }) => Place::Undefined.into(),
             Err(CallDunderError::MethodNotAvailable) => {
@@ -7133,11 +7304,14 @@ impl<'db> Type<'db> {
 
         if let Err(error) = custom_getattribute {
             let member = result.unwrap_or_else(|error| error.fallback_member(db));
-            return Err(MemberLookupError::new(
+            return member_lookup_result(
                 db,
-                member.or_fall_back_to(db, env, || error.fallback_member(db)),
-                error.kind(db),
-            ));
+                member
+                    .member(db)
+                    .or_fall_back_to(db, env, || error.fallback_member(db).member(db)),
+                Some(error.kind(db)),
+                member.deprecated_properties(db),
+            );
         }
 
         // A custom override runs before the descriptor and might return without invoking it.
@@ -10593,6 +10767,7 @@ impl<'db> ModuleLiteralType<'db> {
                     qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
                 },
                 error,
+                None,
             );
         }
 

@@ -950,6 +950,25 @@ impl<'db> BoundSuperType<'db> {
         env: &ProgramEnvironment<'db>,
         attribute: PlaceAndQualifiers<'db>,
     ) -> Option<MemberLookupResult<'db>> {
+        // `super` delegates reads to the owner's descriptors, but not writes or deletions.
+        // Retain only the getters when carrying property accessors out of this lookup.
+        fn getters_only<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+        ) -> Type<'db> {
+            match ty {
+                Type::PropertyInstance(property) => Type::PropertyInstance(
+                    property.with_accessors(db, property.getter(db), None, None),
+                ),
+                Type::Union(union) => union.map(db, env, |ty| getters_only(db, env, *ty)),
+                Type::Intersection(intersection) => {
+                    intersection.map_positive(db, env, |ty| getters_only(db, env, *ty))
+                }
+                _ => ty,
+            }
+        }
+
         let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
         let (member, _, descriptor_error) =
             Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
@@ -957,6 +976,10 @@ impl<'db> BoundSuperType<'db> {
             db,
             member,
             descriptor_error.map(MemberLookupErrorKind::DescriptorGet),
+            instance
+                .and_then(|_| attribute.place.ignore_possibly_undefined())
+                .filter(|ty| ty.has_deprecated_property(db))
+                .map(|ty| getters_only(db, env, ty)),
         ))
     }
 

@@ -11,6 +11,15 @@ use ty_python_core::program::Program;
 use ty_python_core::{ProgramFile, TestProgramDb as _};
 
 #[test]
+fn member_lookup_result_size() {
+    // Property diagnostics must not enlarge every cached member lookup.
+    assert_eq!(
+        size_of::<MemberLookupResult<'_>>(),
+        size_of::<Result<PlaceAndQualifiers<'_>, MemberLookupError<'_>>>(),
+    );
+}
+
+#[test]
 fn bounded_intersection_preserves_late_union_elements() {
     let db = setup_db();
     let db = &db;

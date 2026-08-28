@@ -12,12 +12,13 @@ use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallEr
 use crate::types::class::FrozenDataclassDispatch;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, MISSING_SLOT, UNRESOLVED_ATTRIBUTE,
+    DEPRECATED, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, MISSING_SLOT, UNRESOLVED_ATTRIBUTE,
     report_bad_dunder_set_call, report_invalid_attribute_assignment,
     report_possibly_missing_attribute,
 };
 use crate::types::{
-    CallDunderError, DisplaySettings, MemberLookupPolicy, Type, TypeContext, TypeQualifiers,
+    CallDunderError, DisplaySettings, IntersectionType, MemberLookupPolicy, Type, TypeContext,
+    TypeQualifiers, union_deprecated_properties,
 };
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -36,12 +37,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.db();
-        if emit_diagnostics {
-            self.check_deprecated_property(target, object_ty, ast::ExprContext::Store);
-        }
         let requirement =
             attribute_write_requirement(db, self.program_environment(), object_ty, attribute);
         let mut evaluator = AssignmentAttributeWriteEvaluator {
+            collect_deprecations: emit_diagnostics && self.context.is_lint_enabled(&DEPRECATED),
             builder: self,
             target,
             value,
@@ -49,7 +48,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             attribute,
             infer_value_ty: MultiInferenceGuard::new(infer_value_ty),
         };
-        evaluator.evaluate(&requirement, emit_diagnostics)
+        let mode = if emit_diagnostics {
+            AttributeWriteEvaluation::Validate
+        } else {
+            AttributeWriteEvaluation::ValidateSilently
+        };
+        let outcome = evaluator.evaluate(&requirement, mode);
+        if let Some(properties) = outcome.deprecated_properties {
+            self.check_deprecated_property(target, properties, ast::ExprContext::Store);
+        }
+        outcome.valid
     }
 }
 
@@ -87,6 +95,23 @@ enum ContextualInference {
     Speculate,
 }
 
+/// Validation can stop at a decisive alternative while deprecation collection continues.
+#[derive(Clone, Copy)]
+enum AttributeWriteEvaluation {
+    /// Validate the assignment and report its errors.
+    Validate,
+    /// Validate an alternative without reporting its individual errors.
+    ValidateSilently,
+    /// Inspect accessor metadata without inferring the value or validating the assignment.
+    DeprecationsOnly,
+}
+
+/// The validity and deprecated accessors collected from one assignment requirement.
+struct AttributeWriteOutcome<'db> {
+    valid: bool,
+    deprecated_properties: Option<Type<'db>>,
+}
+
 struct AssignmentAttributeWriteEvaluator<'a, 'db, 'ast, 'infer> {
     builder: &'a mut TypeInferenceBuilder<'db, 'ast>,
     target: &'a ast::ExprAttribute,
@@ -94,6 +119,7 @@ struct AssignmentAttributeWriteEvaluator<'a, 'db, 'ast, 'infer> {
     object_ty: Type<'db>,
     attribute: &'a str,
     infer_value_ty: MultiInferenceGuard<'db, 'ast, 'infer>,
+    collect_deprecations: bool,
 }
 
 impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
@@ -161,61 +187,150 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         (setattr_result, value_ty)
     }
 
+    /// Resolve each alternative once, keeping accessor metadata even after validation stops.
     fn evaluate(
         &mut self,
         requirement: &AttributeWriteRequirement<'db>,
-        emit_diagnostics: bool,
-    ) -> bool {
+        mode: AttributeWriteEvaluation,
+    ) -> AttributeWriteOutcome<'db> {
         let db = self.builder.db();
         let env = self.builder.program_environment();
-        match requirement {
+        let validate = !matches!(mode, AttributeWriteEvaluation::DeprecationsOnly);
+        let emit_diagnostics = matches!(mode, AttributeWriteEvaluation::Validate);
+        let mut deprecated_properties = if self.collect_deprecations {
+            match requirement {
+                AttributeWriteRequirement::ProtocolMember {
+                    write: Some(ProtocolMemberWriteRequirement::Descriptor { descriptor_ty, .. }),
+                    ..
+                }
+                | AttributeWriteRequirement::Instance {
+                    member:
+                        InstanceAttributeWriteMember::Explicit {
+                            member:
+                                ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. },
+                            ..
+                        },
+                    ..
+                }
+                | AttributeWriteRequirement::Class {
+                    member:
+                        ClassAttributeWriteMember::Explicit {
+                            member:
+                                ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. },
+                            ..
+                        },
+                    ..
+                } => descriptor_ty
+                    .has_deprecated_property(db)
+                    .then_some(*descriptor_ty),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        if !validate
+            && !matches!(
+                requirement,
+                AttributeWriteRequirement::All { .. } | AttributeWriteRequirement::Any { .. }
+            )
+        {
+            // An enclosing alternative already decided validity. Only the accessor metadata
+            // from this result is used, so do not infer the value or validate the write again.
+            return AttributeWriteOutcome {
+                valid: true,
+                deprecated_properties,
+            };
+        }
+
+        let valid = match requirement {
             AttributeWriteRequirement::All {
                 object_ty,
                 element_tys,
             } => {
-                let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                let value_ty =
+                    validate.then(|| self.infer_value(TypeContext::default(), emit_diagnostics));
                 let mut valid = true;
                 for element_ty in *element_tys {
                     let requirement =
                         attribute_write_requirement(db, env, *element_ty, self.attribute);
-                    if !self.evaluate(&requirement, false) {
-                        valid = false;
+                    let mode = if validate && valid {
+                        AttributeWriteEvaluation::ValidateSilently
+                    } else {
+                        AttributeWriteEvaluation::DeprecationsOnly
+                    };
+                    let outcome = self.evaluate(&requirement, mode);
+                    valid &= outcome.valid;
+                    deprecated_properties = union_deprecated_properties(
+                        db,
+                        env,
+                        deprecated_properties,
+                        outcome.deprecated_properties,
+                    );
+                    if !valid && !self.collect_deprecations {
                         break;
                     }
                 }
                 if valid {
                     self.validate_composite_final_assignment(*object_ty, emit_diagnostics);
-                    true
-                } else {
-                    if emit_diagnostics {
-                        self.report(
-                            AssignmentAttributeWriteDiagnostic::InvalidCompositeAssignment {
-                                object_ty: *object_ty,
-                                value_ty,
-                            },
-                        );
-                    }
-                    false
+                } else if emit_diagnostics && let Some(value_ty) = value_ty {
+                    self.report(
+                        AssignmentAttributeWriteDiagnostic::InvalidCompositeAssignment {
+                            object_ty: *object_ty,
+                            value_ty,
+                        },
+                    );
                 }
+                valid
             }
             AttributeWriteRequirement::Any {
                 object_ty,
                 intersection,
             } => {
                 let mut valid = false;
-                for element_ty in intersection.positive(self.builder.db()) {
+                let mut all_deprecated = true;
+                for element_ty in intersection.positive(db) {
                     let requirement =
                         attribute_write_requirement(db, env, *element_ty, self.attribute);
-                    if self.evaluate(&requirement, false) {
-                        valid = true;
+                    let mode = if validate && !valid {
+                        AttributeWriteEvaluation::ValidateSilently
+                    } else {
+                        AttributeWriteEvaluation::DeprecationsOnly
+                    };
+                    let outcome = self.evaluate(&requirement, mode);
+                    valid |= outcome.valid;
+                    // An absent member does not provide a non-deprecated alternative setter.
+                    if !matches!(
+                        requirement,
+                        AttributeWriteRequirement::Instance {
+                            member: InstanceAttributeWriteMember::SetAttr,
+                            ..
+                        } | AttributeWriteRequirement::Class {
+                            member: ClassAttributeWriteMember::Unresolved { .. },
+                            ..
+                        } | AttributeWriteRequirement::Module(None)
+                    ) {
+                        if let Some(properties) = outcome.deprecated_properties {
+                            deprecated_properties = Some(match deprecated_properties {
+                                Some(previous) => IntersectionType::from_two_elements(
+                                    db, env, previous, properties,
+                                ),
+                                None => properties,
+                            });
+                        } else {
+                            all_deprecated = false;
+                        }
+                    }
+                    if valid && (!self.collect_deprecations || !all_deprecated) {
                         break;
                     }
                 }
-                if valid {
+                if !all_deprecated {
+                    deprecated_properties = None;
+                }
+                if validate && valid {
                     self.infer_with_last_context(emit_diagnostics);
                     self.validate_composite_final_assignment(*object_ty, emit_diagnostics);
-                    true
-                } else {
+                } else if validate {
                     let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
                     if emit_diagnostics {
                         self.report(
@@ -225,8 +340,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                             },
                         );
                     }
-                    false
                 }
+                valid
             }
             AttributeWriteRequirement::Unconstrained => {
                 self.infer_value(TypeContext::default(), emit_diagnostics);
@@ -272,7 +387,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     if let Some(domain) = domain
                         && !self.check_type_pair(value_ty, *domain, emit_diagnostics)
                     {
-                        return false;
+                        return AttributeWriteOutcome {
+                            valid: false,
+                            deprecated_properties,
+                        };
                     }
                     self.evaluate_protocol_descriptor_write(
                         *descriptor_ty,
@@ -306,6 +424,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AttributeWriteRequirement::Class { object_ty, member } => {
                 self.evaluate_class(*object_ty, member, emit_diagnostics)
             }
+        };
+        AttributeWriteOutcome {
+            valid,
+            deprecated_properties,
         }
     }
 

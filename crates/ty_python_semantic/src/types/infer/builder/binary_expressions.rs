@@ -30,7 +30,7 @@ type BinaryExpressionVisitor<'db> =
 /// Diagnostic state shared across the alternatives of one binary or augmented operation.
 #[derive(Default)]
 pub(super) struct BinaryInferenceState<'db> {
-    emitted_division_by_zero_diagnostic: bool,
+    pub(super) emitted_division_by_zero_diagnostic: bool,
     pub(super) deprecated_functions: Vec<OverloadLiteral<'db>>,
 }
 

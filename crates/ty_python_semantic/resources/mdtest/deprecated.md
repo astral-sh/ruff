@@ -775,6 +775,10 @@ class Parent:
     def value(self) -> int:
         return 0
 
+    @value.deleter
+    @deprecated("parent deleter")
+    def value(self) -> None: ...
+
 class Child(Parent): ...
 
 class ActiveChild(Parent):
@@ -785,6 +789,21 @@ class ActiveChild(Parent):
 Child().value  # error: [deprecated] "parent getter"
 ActiveChild().value
 super(Child, Child).value
+```
+
+Deleting through an instance invokes the inherited deleter. `super()` delegates reads to the owner's
+descriptors, but it does not delegate deletion.
+
+```py
+del Child().value  # error: [deprecated] "parent deleter"
+del super(Child, Child()).value
+
+class Ordinary:
+    value: int
+
+def delete_union(flag: bool):
+    target = super(Child, Child()) if flag else Ordinary()
+    del target.value
 ```
 
 ## Metaclass properties
@@ -838,6 +857,18 @@ def check(value: Old | Active):
     value.value = 1  # error: [deprecated] "union setter"
 ```
 
+An invalid assignment on one union member does not hide a deprecated setter on another member.
+
+```py
+class Wrong:
+    value: str
+
+def check_invalid(value: Wrong | Old):
+    # error: [invalid-assignment]
+    # error: [deprecated] "union setter"
+    value.value = 1
+```
+
 An intersection can obtain its implementation from a non-deprecated member. We do not warn when that
 member provides an alternative getter or setter.
 
@@ -846,6 +877,62 @@ def check_intersection(value: Old):
     if isinstance(value, Active):
         value.value
         value.value = 1
+```
+
+An intersection member without the attribute does not provide an alternative accessor, so the
+deprecated property still applies.
+
+```py
+class Marker: ...
+
+def check_marker(value: Old):
+    if isinstance(value, Marker):
+        value.value  # error: [deprecated] "union getter"
+        value.value = 1  # error: [deprecated] "union setter"
+```
+
+## Invalid property getter calls
+
+The getter below accepts an `int`, but Python passes a `C` instance. Reading the property reports
+both the invalid call and the deprecation.
+
+```py
+from typing_extensions import deprecated
+
+class C:
+    @property
+    @deprecated("invalid getter")
+    def value(self: int) -> int:
+        return self
+
+# error: [invalid-attribute-access]
+# error: [deprecated] "invalid getter"
+C().value
+```
+
+## Setter deprecations and contextual inference
+
+An intersection can use an ordinary attribute annotation to infer a lambda's parameter type.
+Checking the other member's deprecated setter does not replace that inference context, and the
+ordinary attribute provides a non-deprecated alternative.
+
+```py
+from collections.abc import Callable
+from typing_extensions import deprecated
+
+class Ordinary:
+    callback: Callable[[int], object]
+
+class Deprecated:
+    @property
+    def callback(self) -> object: ...
+    @callback.setter
+    @deprecated("old setter")
+    def callback(self, value: Callable[[str], object]) -> None: ...
+
+def check(value: Ordinary):
+    if isinstance(value, Deprecated):
+        value.callback = lambda argument: reveal_type(argument)  # revealed: int
 ```
 
 ## Overloads
