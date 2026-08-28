@@ -190,7 +190,14 @@ impl TestCase {
     }
 
     fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
-        self.db.apply_changes(changes)
+        let result = self.db.apply_changes(changes);
+
+        if let Some(watcher) = &mut self.watcher {
+            watcher.update(&self.db);
+            assert!(!watcher.has_errored_paths());
+        }
+
+        result
     }
 
     fn update_options(&mut self, options: Options) -> anyhow::Result<()> {
@@ -206,11 +213,6 @@ impl TestCase {
 
         let changes = self.take_watch_changes(event_for_file("pyproject.toml"));
         self.apply_changes(&changes);
-
-        if let Some(watcher) = &mut self.watcher {
-            watcher.update(&self.db);
-            assert!(!watcher.has_errored_paths());
-        }
 
         Ok(())
     }
@@ -1518,6 +1520,119 @@ fn remove_search_path() -> anyhow::Result<()> {
 }
 
 #[test]
+fn script_dependency_changes() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        context.write_project_file(
+            "script.py",
+            r#"
+            # /// script
+            # [tool.ty.environment]
+            # extra-paths = ["../dependencies"]
+            # ///
+            from dependency import value
+            result: int = value
+            "#,
+        )
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+    assert!(case.db().check().is_empty());
+
+    update_file(&dependency, "value = 'wrong'")?;
+    let changes = case.take_watch_changes(event_for_file("dependency.py"));
+    case.apply_changes(&changes);
+
+    let diagnostics = case.db().check();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+
+    std::fs::remove_file(dependency.as_std_path())?;
+    let changes = case.take_watch_changes(event_for_file("dependency.py"));
+    case.apply_changes(&changes);
+
+    let diagnostics = case.db().check();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+
+    std::fs::write(dependency.as_std_path(), "value = 1")?;
+    let changes = case.stop_watch(event_for_file("dependency.py"));
+    case.apply_changes(&changes);
+
+    assert!(case.db().check().is_empty());
+    Ok(())
+}
+
+#[test]
+fn shared_script_search_paths_are_unwatched_when_unused() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        let script = r#"
+        # /// script
+        # [tool.ty.environment]
+        # extra-paths = ["../dependencies"]
+        # ///
+        "#;
+        context.write_project_file("first.py", script)?;
+        context.write_project_file("second.py", script)
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+
+    update_file(case.project_path("first.py"), "")?;
+    let changes = case.take_watch_changes(event_for_file("first.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 'wrong'")?;
+    let changes = case.take_watch_changes(event_for_file("dependency.py"));
+    case.apply_changes(&changes);
+
+    std::fs::remove_file(case.project_path("second.py").as_std_path())?;
+    let changes = case.take_watch_changes(event_for_file("second.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 1")?;
+    let changes = case.try_stop_watch(event_for_file("dependency.py"), Duration::from_millis(100));
+
+    assert_eq!(changes, Err(vec![]));
+    Ok(())
+}
+
+#[test]
+fn removed_script_search_paths_keep_cached_files_up_to_date() -> anyhow::Result<()> {
+    let script = r#"
+    # /// script
+    # [tool.ty.environment]
+    # extra-paths = ["../dependencies"]
+    # ///
+    from dependency import value
+    result: int = value
+    "#;
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        context.write_project_file("script.py", script)
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+    assert!(case.db().check().is_empty());
+
+    // Removing the script metadata removes its extra search path from the project.
+    update_file(case.project_path("script.py"), "")?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 'wrong'")?;
+    let changes = case.take_watch_changes(event_for_file("dependency.py"));
+    case.apply_changes(&changes);
+
+    update_file(case.project_path("script.py"), script)?;
+    let changes = case.stop_watch(event_for_file("script.py"));
+    case.apply_changes(&changes);
+
+    let diagnostics = case.db().check();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+    Ok(())
+}
+
+#[test]
 fn change_python_version_and_platform() -> anyhow::Result<()> {
     let mut case = setup(|context: &mut SetupContext| {
         // `sys.last_exc` is a Python 3.12 only feature
@@ -2634,7 +2749,9 @@ mod uv_metadata {
     use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::File;
     use ruff_db::system::{OsSystem, System as _};
+    use ty_module_resolver::system_module_search_paths;
     use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges};
+    use ty_python_semantic::Db as _;
     use ty_static::EnvVars;
 
     use super::{SetupContext, TestCase, event_for_file, setup_with_system, update_file};
@@ -2884,6 +3001,74 @@ mod uv_metadata {
         Ok(())
     }
 
+    #[test]
+    fn script_editable_install_paths_are_watched() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[
+                (
+                    "script.py",
+                    r#"
+                    # /// script
+                    # dependencies = []
+                    # requires-python = ">=3.12"
+                    # ///
+                    from dependency import value
+                    result: int = value
+                    "#,
+                ),
+                ("../first/dependency.py", "value = 1"),
+                ("../second/dependency.py", "value = 1"),
+            ],
+        )?;
+        let db = case.db();
+        let script = case.system_file(case.project_path("script.py"))?;
+        let environment = db.program_file(script).program(db).resolver_environment(db);
+        let site_packages = system_module_search_paths(db, environment)
+            .find(|path| path.file_name() == Some("site-packages"))
+            .context("script environment has no site-packages")?
+            .to_path_buf();
+        let pth = site_packages.join("dependency.pth");
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+
+        std::fs::write(pth.as_std_path(), case.root_path().join("first").as_str())?;
+        let changes = case.take_watch_changes(event_for_file("dependency.pth"));
+        case.apply_changes(&changes);
+
+        assert!(case.db().check().is_empty());
+
+        update_file(
+            case.root_path().join("first/dependency.py"),
+            "value = 'wrong'",
+        )?;
+        let changes = case.take_watch_changes(event_for_file("dependency.py"));
+        case.apply_changes(&changes);
+
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+
+        update_file(&pth, case.root_path().join("second").as_str())?;
+        let changes = case.take_watch_changes(event_for_file("dependency.pth"));
+        case.apply_changes(&changes);
+
+        assert!(case.db().check().is_empty());
+
+        update_file(
+            case.root_path().join("second/dependency.py"),
+            "value = 'wrong'",
+        )?;
+        let changes = case.stop_watch(event_for_file("dependency.py"));
+        case.apply_changes(&changes);
+
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+        Ok(())
+    }
+
     fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
         let uv = OsSystem::default().which("uv")?;
         let mut case = setup_with_system(
@@ -2972,7 +3157,7 @@ mod uv_metadata {
             changes.project = completed.project.or(changes.project);
         }
 
-        if changes.project.is_some()
+        if !changes.is_empty()
             && let Some(watcher) = &mut case.watcher
         {
             watcher.update(&case.db);
