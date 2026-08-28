@@ -10,6 +10,7 @@ on:
       - "crates/ty*/**"
       - "crates/ruff_db/**"
       - "crates/ruff_python_ast/**"
+      - "crates/ruff_python_edits/**"
       - "crates/ruff_python_parser/**"
       - "playground/**"
       - ".github/workflows/publish-ty-playground.yml"

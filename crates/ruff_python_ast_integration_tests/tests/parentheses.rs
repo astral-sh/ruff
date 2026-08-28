@@ -1,17 +1,11 @@
-//! Tests for [`ruff_python_ast::token::parentheses_iterator`],
-//! [`ruff_python_ast::token::parenthesized_range`], and
-//! [`ruff_python_ast::helpers::unwrapped_call_argument`].
-
-use std::error::Error;
+//! Tests for [`ruff_python_ast::token::parentheses_iterator`] and
+//! [`ruff_python_ast::token::parenthesized_range`].
 
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, Expr,
-    find_node::covering_node,
-    helpers::unwrapped_call_argument,
+    self as ast, Expr,
     token::{parentheses_iterator, parenthesized_range},
 };
 use ruff_python_parser::parse_module;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 #[test]
 fn test_no_parentheses() {
@@ -202,40 +196,4 @@ fn test_multiline_with_parentheses() {
     let result = parenthesized_range(assign.value.as_ref().into(), stmt.into(), tokens);
     let range = result.expect("should find parentheses");
     assert_eq!(&source[range], "(\n    2 + 2 + 2\n)");
-}
-
-#[test]
-fn call_unwrapping_preserves_context() -> Result<(), Box<dyn Error>> {
-    for (source, expected) in [
-        ("wrap(f if flag else g)()", "(f if flag else g)()"),
-        (
-            "[x for x in wrap(a if flag else b)]",
-            "[x for x in (a if flag else b)]",
-        ),
-        ("f\"{wrap({})}\"", "f\"{({})}\""),
-    ] {
-        let parsed = parse_module(source)?;
-        let start = TextSize::try_from(source.find("wrap").ok_or("missing wrap call")?)?;
-        let covering = covering_node(
-            parsed.syntax().into(),
-            TextRange::at(start, "wrap".text_len()),
-        )
-        .find_first(|node| matches!(node, AnyNodeRef::ExprCall(_)))
-        .map_err(|_| "missing enclosing call")?;
-        let AnyNodeRef::ExprCall(call) = covering.node() else {
-            return Err("expected a call expression".into());
-        };
-        let argument = call.arguments.args.first().ok_or("missing argument")?;
-        let replacement =
-            unwrapped_call_argument(call, argument, covering.parent(), parsed.tokens(), source);
-
-        let mut fixed = source.to_string();
-        fixed.replace_range(
-            usize::from(call.start())..usize::from(call.end()),
-            &replacement,
-        );
-        assert_eq!(fixed, expected, "{source}");
-        parse_module(&fixed)?;
-    }
-    Ok(())
 }
