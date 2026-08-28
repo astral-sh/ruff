@@ -1763,9 +1763,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // Compare fixed `ParamSpec`s with the endpoints of the materialization range of `...`:
             // its bottom is below every `ParamSpec`, and its top is above every `ParamSpec`.
-            // Do not expand a fixed `ParamSpec` for ordinary parameter lists. The eager signature
-            // comparison treats `P.args` and `P.kwargs` as optional variadics, but `P` can contain
-            // required parameters, so `P` is not necessarily compatible with an empty list.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
             | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
