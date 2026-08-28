@@ -12,6 +12,7 @@ use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
 use ty_python_semantic::PythonVersionWithSource;
+use ty_python_semantic::dependency::DependencyMetadata;
 
 use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
@@ -54,6 +55,7 @@ pub(crate) struct Script<'db> {
     pub(crate) settings_diagnostics: Box<[Diagnostic]>,
 }
 
+#[salsa::tracked]
 impl<'db> Script<'db> {
     /// Returns the script for `file` without creating a second Salsa memo for ordinary files.
     pub(crate) fn for_file(db: &'db dyn Db, file: File) -> Option<Self> {
@@ -61,6 +63,21 @@ impl<'db> Script<'db> {
         // do not also allocate a tracked `script` memo just to cache another `None`.
         script_tag(db, file)?;
         script(db, file)
+    }
+
+    /// Cache dependency declarations separately from settings, which can remain unchanged after
+    /// uv synchronizes an edit to the script's dependencies.
+    #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn dependency_metadata(self, db: &'db dyn Db) -> Option<Box<DependencyMetadata>> {
+        if !self.has_valid_settings(db) {
+            return None;
+        }
+
+        let file = self.file(db);
+        let environment = script_environment(db, file)?;
+        let metadata = environment.uv_metadata(db)?;
+        metadata.environment()?;
+        metadata.dependency_metadata().ok().map(Box::new)
     }
 }
 

@@ -63,7 +63,10 @@ fn uv_command(case: &CliTest) -> Command {
 }
 
 #[cfg(feature = "test-uv")]
-fn uv_sync_command(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result<Command> {
+pub(super) fn uv_sync_command(
+    case: &CliTest,
+    virtual_env: Option<&Path>,
+) -> anyhow::Result<Command> {
     let mut sync = uv_command(case);
     sync.args(["workspace", "metadata", "--sync"]);
     if let Some(virtual_env) = virtual_env {
@@ -95,7 +98,7 @@ fn uv_sync_command(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result
 }
 
 #[cfg(feature = "test-uv")]
-fn write_dependency_wheel(
+pub(super) fn write_dependency_wheel(
     case: &CliTest,
     distribution: &str,
     module: &str,

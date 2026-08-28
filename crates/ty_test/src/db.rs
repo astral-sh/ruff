@@ -182,7 +182,10 @@ impl SemanticDb for Db {
     fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
         match file_settings(self, file) {
             FileSettings::Global => self.settings().dependency_metadata(self).as_ref(),
-            FileSettings::File { .. } => None,
+            FileSettings::File {
+                dependency_metadata,
+                ..
+            } => dependency_metadata.as_ref(),
         }
     }
 
@@ -221,6 +224,7 @@ fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
     FileSettings::File {
         rules: MdtestRuleSelection(mdtest_rule_selection(options.rules.as_ref(), None)),
         analysis: mdtest_analysis_settings(options.analysis.as_ref()),
+        dependency_metadata: options.dependency_metadata.map(|fixture| fixture.metadata),
     }
 }
 
@@ -230,6 +234,7 @@ enum FileSettings {
     File {
         rules: MdtestRuleSelection,
         analysis: AnalysisSettings,
+        dependency_metadata: Option<DependencyMetadata>,
     },
 }
 

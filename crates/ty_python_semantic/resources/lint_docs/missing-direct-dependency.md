@@ -1,7 +1,7 @@
 ## What it does
 
-Checks for imports from installable packages that the current project does not declare as direct
-dependencies.
+Checks for imports from installable packages that the current project or PEP 723 script does not
+declare as direct dependencies.
 
 The name used in dependency declarations can differ from the import name: for example, the `pillow`
 package is imported as `PIL`.
@@ -9,8 +9,8 @@ package is imported as `PIL`.
 ## Why is this bad?
 
 A dependency can be installed because another package requires it. Importing that dependency without
-declaring it makes your project rely on another package's dependency list. If that package removes
-the dependency, your imports can fail.
+declaring it makes your code rely on another package's dependency list. If that package removes the
+dependency, your imports can fail.
 
 Declare the packages that provide your imports in `project.dependencies` or
 `project.optional-dependencies` in `pyproject.toml`. Non-package files, such as tests and
@@ -21,11 +21,17 @@ for how to add these declarations.
 
 ## Rule status
 
-This rule is disabled by default. It requires uv workspace integration (`TY_UV=1`) and an existing,
-synchronized environment. Running [`uv check`](https://docs.astral.sh/uv/reference/cli/#uv-check)
-synchronizes the environment automatically before invoking ty, unless `--no-sync` is passed. The
-rule itself reads the dependency graph and module ownership returned by `uv workspace metadata`; it
-does not install or update dependencies. uv 0.12.3 or later is required.
+This rule is disabled by default and requires uv integration.
+
+For projects, enable uv workspace integration (`TY_UV=1`) and use an existing, synchronized
+environment. Running [`uv check`](https://docs.astral.sh/uv/reference/cli/#uv-check) synchronizes
+the environment automatically before invoking ty, unless `--no-sync` is passed. For these checks, ty
+reads the dependency graph and module ownership returned by `uv workspace metadata` without
+installing or updating dependencies. uv 0.12.3 or later is required.
+
+For PEP 723 scripts, enable uv script integration with `TY_UV=scripts` or `TY_UV=1`. ty synchronizes
+each script's environment and checks imports against its inline `dependencies` list. Declarations
+and environments from the enclosing workspace or other scripts do not apply.
 
 ## Known limitations
 
@@ -37,7 +43,7 @@ can use development-only dependencies, such as type stub packages, without requi
 as runtime dependencies.
 
 Standard-library imports and imports whose owning package cannot be identified unambiguously are
-also not reported. This rule does not support PEP 723 scripts.
+also not reported.
 
 Imports of [namespace packages](https://docs.python.org/3/reference/import.html#namespace-packages)
 themselves, such as `import ns`, are not reported: the namespace can contain modules from several
