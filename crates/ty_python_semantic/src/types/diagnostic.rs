@@ -445,7 +445,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes)]
+    #[expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/unsound-return-statement.md")]
     pub(crate) static UNSOUND_RETURN_STATEMENT = {
         summary: "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
@@ -464,7 +464,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes)]
+    #[expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/unsound-yield.md")]
     pub(crate) static UNSOUND_YIELD = {
         summary: "detects yield expressions that unsoundly yield a type that is not a subtype of the generator's annotated yield type",
@@ -492,7 +492,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes)]
+    #[expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/unsound-assignment.md")]
     pub(crate) static UNSOUND_ASSIGNMENT = {
         summary: "detects assignments that unsoundly assign a type that is not a subtype of the declared type",
