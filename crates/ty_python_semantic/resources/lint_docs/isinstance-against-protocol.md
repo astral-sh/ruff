@@ -1,9 +1,8 @@
 ## What it does
 
-Reports invalid runtime checks against `Protocol` classes.
-This includes explicit calls `isinstance()`/`issubclass()` against
-non-runtime-checkable protocols, `issubclass()` calls against protocols
-that have non-method members, and implicit `isinstance()` checks against
+Reports invalid runtime checks against `Protocol` classes. This includes explicit calls
+`isinstance()`/`issubclass()` against non-runtime-checkable protocols, `issubclass()` calls against
+protocols that have non-method members, and implicit `isinstance()` checks against
 non-runtime-checkable protocols via pattern matching.
 
 ## Why is this bad?
