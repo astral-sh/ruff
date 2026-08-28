@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 use crate::{checkers::ast::Checker, fix::edits::add_argument};
 
@@ -46,7 +47,7 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 ///
 ///[Python documentation]: https://docs.python.org/3/library/warnings.html#warnings.warn
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Pedantic)]
 pub(crate) struct NoExplicitStacklevel;
 
 impl AlwaysFixableViolation for NoExplicitStacklevel {

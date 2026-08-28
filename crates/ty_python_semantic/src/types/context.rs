@@ -47,7 +47,7 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment that lazily obtains its program from `definition`.
-    pub fn from_definition(definition: Definition<'db>) -> Self {
+    pub(crate) fn from_definition(definition: Definition<'db>) -> Self {
         Self {
             environment: Cell::new(ProgramSource::Definition(definition.as_id())),
             lifetime: PhantomData,
@@ -55,7 +55,7 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment that lazily obtains its program from `scope`.
-    pub fn from_scope(scope: ScopeId<'db>) -> Self {
+    pub(crate) fn from_scope(scope: ScopeId<'db>) -> Self {
         Self {
             environment: Cell::new(ProgramSource::Scope(scope.as_id())),
             lifetime: PhantomData,
@@ -102,13 +102,13 @@ impl<'db> ProgramEnvironment<'db> {
 
     /// Returns the Python version used by this operation.
     #[inline]
-    pub fn python_version(&self, db: &'db dyn Db) -> PythonVersion {
+    pub(crate) fn python_version(&self, db: &'db dyn Db) -> PythonVersion {
         self.program(db).python_version(db)
     }
 
     /// Returns the resolver environment used by this operation.
     #[inline]
-    pub fn resolver_environment(&self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
+    pub(crate) fn resolver_environment(&self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
         self.program(db).resolver_environment(db)
     }
 }
@@ -185,7 +185,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.file
     }
 
-    pub(crate) fn python_file(&self) -> PythonFile<'db> {
+    fn python_file(&self) -> PythonFile<'db> {
         self.program_file.python_file(self.db())
     }
 
@@ -533,8 +533,8 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                 LintSource::Editor => {
                     format!("rule `{rule}` was selected in the editor settings")
                 }
-                LintSource::UvWorkspace => {
-                    format!("rule `{rule}` was selected by uv workspace metadata")
+                LintSource::UvMetadata => {
+                    format!("rule `{rule}` was selected by uv metadata")
                 }
             });
         }

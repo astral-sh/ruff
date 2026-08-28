@@ -246,9 +246,25 @@ def mutually_constrained[U, T]():
     static_assert(not given_int.implies_subtype_of(T, str))
 ```
 
+## Type variable tuples
+
+A concrete tuple is not a subtype of an arbitrary type variable tuple. A constraint relating the two
+can establish that relationship without admitting incompatible tuple elements.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def tuple_assumptions[*Ts]() -> None:
+    given = is_constraint_set_assignable_to(tuple[int], tuple[*Ts])
+    static_assert(given.implies_subtype_of(tuple[int], tuple[*Ts]))
+    static_assert(not given.implies_subtype_of(tuple[str], tuple[*Ts]))
+    static_assert(not ConstraintSet.always().implies_subtype_of(tuple[int], tuple[*Ts]))
+```
+
 ## Compound types
 
-All of the relationships in the above section also apply when a typevar appears in a compound type.
+The relationships for [type variables](#type-variables) also apply within compound types.
 
 ```py
 from ty_extensions import static_assert

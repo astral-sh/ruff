@@ -204,12 +204,14 @@ use crate::{
         CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
-        expand_type, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        expand_type, infer_expression_types, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
+        sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
+use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -544,6 +546,8 @@ const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression)
+        | PredicateNode::Condition(expression)
+        | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
             callable.scope(db)
@@ -1589,6 +1593,78 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
     }
 }
 
+/// Evaluate a condition without re-testing intermediate short-circuit results.
+///
+/// `None` means evaluation cannot produce a result, as for an operand narrowed to `Never`.
+/// This differs from ambiguous truthiness: in `flag and raises()`, where `raises()` returns
+/// `Never`, only the falsy short-circuit path can complete. For `flag or raises()`, only the
+/// truthy path can complete. Callers that cannot represent the absence of a result can
+/// conservatively map `None` to [`Truthiness::Ambiguous`].
+pub(crate) fn analyze_condition_expression(
+    node: &ast::Expr,
+    leaf_truthiness: &impl Fn(&ast::Expr) -> Option<Truthiness>,
+) -> Option<Truthiness> {
+    match node {
+        ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+            let short_circuit = Truthiness::from(op.is_or());
+            let mut result = short_circuit.negate();
+            for value in values {
+                let Some(truthiness) = analyze_condition_expression(value, leaf_truthiness) else {
+                    return result.is_ambiguous().then_some(short_circuit);
+                };
+                if truthiness == short_circuit {
+                    return Some(short_circuit);
+                }
+                if truthiness.is_ambiguous() {
+                    result = Truthiness::Ambiguous;
+                }
+            }
+            Some(result)
+        }
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            operand,
+            ..
+        }) => analyze_condition_expression(operand, leaf_truthiness).map(Truthiness::negate),
+        ast::Expr::If(ast::ExprIf {
+            test, body, orelse, ..
+        }) => match analyze_condition_expression(test, leaf_truthiness)? {
+            Truthiness::AlwaysTrue => analyze_condition_expression(body, leaf_truthiness),
+            Truthiness::AlwaysFalse => analyze_condition_expression(orelse, leaf_truthiness),
+            Truthiness::Ambiguous => {
+                let body_truthiness = analyze_condition_expression(body, leaf_truthiness);
+                let orelse_truthiness = analyze_condition_expression(orelse, leaf_truthiness);
+                match (body_truthiness, orelse_truthiness) {
+                    (None, truthiness) | (truthiness, None) => truthiness,
+                    (Some(body), Some(orelse)) => Some(if body == orelse {
+                        body
+                    } else {
+                        Truthiness::Ambiguous
+                    }),
+                }
+            }
+        },
+        _ => leaf_truthiness(node),
+    }
+}
+
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    let module = parsed_module(db, expression.python_file(db)).load(db);
+    let inference = infer_expression_types(db, expression, TypeContext::default());
+    analyze_condition_expression(expression.node_ref(db).node(&module), &|node| {
+        inference
+            .comparison_truthiness(node)
+            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
+    })
+    .unwrap_or(Truthiness::Ambiguous)
+}
+
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -1596,6 +1672,17 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::Expression(test_expr) => {
             infer_same_file_expression_type(db, test_expr, TypeContext::default())
                 .bool(db, env)
+                .negate_if(!predicate.is_positive)
+        }
+        PredicateNode::Condition(test_expr) => {
+            analyze_condition(db, test_expr).negate_if(!predicate.is_positive)
+        }
+        PredicateNode::ChainedComparisonCondition(test_expr) => {
+            let inference = infer_expression_types(db, test_expr, TypeContext::default());
+            let expression = test_expr.node_ref(db);
+            inference
+                .comparison_truthiness(expression)
+                .unwrap_or_else(|| inference.expression_type(expression).bool(db, env))
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {

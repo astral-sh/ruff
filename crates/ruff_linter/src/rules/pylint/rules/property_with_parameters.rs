@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::visibility::is_property;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for property definitions that accept function parameters.
@@ -39,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `property`](https://docs.python.org/3/library/functions.html#property)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.153")]
+#[violation_metadata(stable_since = "v0.0.153", category = Category::Correctness)]
 pub(crate) struct PropertyWithParameters;
 
 impl Violation for PropertyWithParameters {

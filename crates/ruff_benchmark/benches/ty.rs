@@ -14,11 +14,12 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_ranged_value::RangedValue;
-use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options, Rules};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::lint::Level;
 
 mod ty_shared;
 
@@ -1485,6 +1486,7 @@ struct ProjectBenchmark<'a> {
     fs: MemoryFileSystem,
     max_diagnostics: usize,
     freeze_inputs: bool,
+    rules: Option<Rules>,
 }
 
 impl<'a> ProjectBenchmark<'a> {
@@ -1499,6 +1501,7 @@ impl<'a> ProjectBenchmark<'a> {
             fs,
             max_diagnostics,
             freeze_inputs: false,
+            rules: None,
         }
     }
 
@@ -1519,6 +1522,7 @@ impl<'a> ProjectBenchmark<'a> {
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
+            rules: self.rules.clone(),
             ..Options::default()
         });
 
@@ -1619,6 +1623,18 @@ fn attrs(criterion: &mut Criterion) {
     // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
     let frozen_benchmark = benchmark.freeze_inputs();
     bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
+
+    let all_rules_benchmark = ProjectBenchmark {
+        freeze_inputs: false,
+        rules: Some(Rules::from_iter([(
+            RangedValue::cli("all".to_owned()),
+            RangedValue::cli(Level::Error),
+        )])),
+        max_diagnostics: 100,
+        ..frozen_benchmark
+    };
+
+    bench_project_named(&all_rules_benchmark, criterion, "attrs (all rules)");
 }
 
 fn anyio(criterion: &mut Criterion) {

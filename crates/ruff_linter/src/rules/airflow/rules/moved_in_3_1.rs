@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::{
     INTERNAL_MODULE_WARNING, Replacement, generate_import_edit,
     generate_remove_and_runtime_import_edit, is_guarded_by_try_except,
@@ -31,7 +32,7 @@ use ruff_text_size::TextRange;
 /// convert_to_utc(datetime.now())
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.1")]
+#[violation_metadata(preview_since = "0.15.1", category = Category::Pedantic)]
 pub(crate) struct Airflow31Moved {
     deprecated: String,
     replacement: Replacement,

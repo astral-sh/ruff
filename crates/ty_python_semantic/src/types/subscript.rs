@@ -867,7 +867,9 @@ impl<'db> Type<'db> {
                 Some(Ok(Type::any()))
             }
 
-            (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {
+            (Type::SpecialForm(special_form), _)
+                if special_form.class(db, env).is_special_form() =>
+            {
                 Some(Ok(todo_type!("Inference of subscript on special form")))
             }
 

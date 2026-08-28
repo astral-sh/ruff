@@ -19,6 +19,7 @@ use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
@@ -137,6 +138,10 @@ impl SemanticDb for TestDb {
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
+    }
+
+    fn dependency_metadata(&self, _file: File) -> Option<&DependencyMetadata> {
+        None
     }
 
     fn lint_registry(&self) -> &LintRegistry {

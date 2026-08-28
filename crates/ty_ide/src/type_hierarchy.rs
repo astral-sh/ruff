@@ -503,7 +503,7 @@ mod tests {
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:104711:104716 tuple :: builtins",
+            @"vendored://stdlib/builtins.pyi:104699:104704 tuple :: builtins",
         );
     }
 

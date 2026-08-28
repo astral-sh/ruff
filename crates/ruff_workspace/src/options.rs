@@ -819,13 +819,16 @@ pub struct LintCommonOptions {
     pub fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// rules (like `F841`), entire groups (like `F`), or anything in
     /// between.
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes. `ignore` takes precedence over `select` if the same
     /// prefix appears in both.
+    ///
+    /// In preview, categories like `correctness` and `suspicious` can be used
+    /// in addition to rule codes and linter group prefixes.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -909,13 +912,16 @@ pub struct LintCommonOptions {
     pub logger_objects: Option<Vec<String>>,
 
     /// A list of rule codes or prefixes to enable. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// rules (like `F841`), entire groups (like `F`), or anything in
     /// between.
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes. `ignore` takes precedence over `select` if the
     /// same prefix appears in both.
+    ///
+    /// In preview, categories like `correctness` and `suspicious` can be used
+    /// in addition to rule codes and linter group prefixes.
     #[option(
         default = r#"See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`"#,
         value_type = "list[RuleSelector]",
@@ -1086,6 +1092,8 @@ pub struct LintCommonOptions {
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files. An initial '!' negates
     /// the file pattern.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
@@ -1096,6 +1104,8 @@ pub struct LintCommonOptions {
             "path/to/file.py" = ["E402"]
             # Ignore `D` rules everywhere except for the `src/` directory.
             "!src/**.py" = ["D"]
+            # Ignore check for packages that are missing an `__init__.py` file.
+            "{benchmark,scripts,.github/action-name/}/*.py" = ["INP001"]
         "#
     )]
     pub per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,

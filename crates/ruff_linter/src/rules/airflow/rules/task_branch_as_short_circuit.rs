@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::is_airflow_task_variant;
 
 /// ## What it does
@@ -70,7 +71,7 @@ use crate::rules::airflow::helpers::is_airflow_task_variant;
 /// task = ShortCircuitOperator(task_id="my_task", python_callable=my_callable)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.12")]
+#[violation_metadata(preview_since = "0.15.12", category = Category::Complexity)]
 pub(crate) struct AirflowTaskBranchAsShortCircuit {
     kind: BranchKind,
 }

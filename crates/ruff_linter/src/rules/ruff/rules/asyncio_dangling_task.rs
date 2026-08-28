@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls
@@ -67,7 +68,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `asyncio.create_task`](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
 /// - [Python documentation: `asyncio.TaskGroup`](https://docs.python.org/3/library/asyncio-task.html#asyncio.TaskGroup)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.247")]
+#[violation_metadata(stable_since = "v0.0.247", category = Category::Pedantic)]
 pub(crate) struct AsyncioDanglingTask {
     expr: String,
     method: Method,

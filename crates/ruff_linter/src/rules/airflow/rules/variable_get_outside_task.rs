@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::is_airflow_task;
 
 /// ## What it does
@@ -54,7 +55,7 @@ use crate::rules::airflow::helpers::is_airflow_task;
 /// )
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.6")]
+#[violation_metadata(preview_since = "0.15.6", category = Category::Suspicious)]
 pub(crate) struct AirflowVariableGetOutsideTask {
     in_function: bool,
 }

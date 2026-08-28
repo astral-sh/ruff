@@ -664,6 +664,25 @@ reveal_type(int_container)  # revealed: Container[int]
 reveal_type(int_container.set_value(1))  # revealed: Container[int]
 ```
 
+## Unbound inherited methods on generic classes
+
+When an inherited method returns `Self`, its return type is the type of the instance passed to it.
+This includes the subclass and its type arguments, even when the call uses `Child` rather than
+`Child[int]`.
+
+```py
+from typing import Self
+
+class Parent[T]:
+    def get_self(self) -> Self:
+        return self
+
+class Child[U](Parent[U]): ...
+
+def _(child: Child[int]):
+    reveal_type(Child.get_self(child))  # revealed: Child[int]
+```
+
 ## Generic class with bounded type variable
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/2467>.

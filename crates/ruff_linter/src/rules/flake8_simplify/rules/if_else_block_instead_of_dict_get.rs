@@ -10,6 +10,7 @@ use ruff_python_semantic::analyze::typing::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::fits;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -61,7 +62,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.219")]
+#[violation_metadata(stable_since = "v0.0.219", category = Category::Complexity)]
 pub(crate) struct IfElseBlockInsteadOfDictGet {
     contents: String,
 }

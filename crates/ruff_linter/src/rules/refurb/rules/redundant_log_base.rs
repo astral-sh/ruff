@@ -6,6 +6,7 @@ use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -51,7 +52,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `math.log10`](https://docs.python.org/3/library/math.html#math.log10)
 /// - [Python documentation: `math.e`](https://docs.python.org/3/library/math.html#math.e)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct RedundantLogBase {
     base: Base,
     arg: String,

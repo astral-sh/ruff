@@ -10,6 +10,7 @@ use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -59,7 +60,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// re.compile(r"foo\bar")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.0")]
+#[violation_metadata(preview_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct UnrawRePattern {
     module: RegexModule,
     func: String,

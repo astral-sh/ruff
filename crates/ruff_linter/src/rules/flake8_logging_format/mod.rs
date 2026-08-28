@@ -55,11 +55,7 @@ mod tests {
     #[test_case(Rule::LoggingFString, Path::new("G004_arg_order.py"))]
     #[test_case(Rule::LoggingFString, Path::new("G004_implicit_concat.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_logging_format").join(path).as_path(),
             &settings::LinterSettings {

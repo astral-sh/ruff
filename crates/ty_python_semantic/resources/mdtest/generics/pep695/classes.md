@@ -809,6 +809,43 @@ reveal_type(PartiallyFixed.fixed)  # revealed: int
 reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
 ```
 
+## Unbound inherited methods
+
+An inherited method can be called through the subclass, passing the instance explicitly. Without
+type arguments, `Child.get` uses `Unknown` for `U`; it does not infer `U` from the instance.
+
+```py
+class Parent[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Child[U](Parent[U]): ...
+
+def _(child: Child[int]):
+    reveal_type(Child.get(child))  # revealed: Unknown
+```
+
+An explicit default also determines which instances the method accepts. `DefaultChild.get` uses
+`int` for `U`, so it accepts a `DefaultChild[int]` but rejects a `DefaultChild[str]`.
+
+```py
+class DefaultChild[U = int](Parent[U]): ...
+
+def _(int_child: DefaultChild[int], str_child: DefaultChild[str]):
+    reveal_type(DefaultChild.get(int_child))  # revealed: int
+    DefaultChild.get(str_child)  # error: [invalid-argument-type]
+```
+
+Defaults also apply when a type parameter appears inside a base class's type argument. Only `U`
+becomes `Unknown` below; the `int` in `tuple[int, U]` is unchanged.
+
+```py
+class NestedChild[U](Parent[tuple[int, U]]): ...
+
+def _(child: NestedChild[str]):
+    reveal_type(NestedChild.get(child))  # revealed: tuple[int, Unknown]
+```
+
 ## Generic methods
 
 Generic classes can contain methods that are themselves generic. The generic methods can refer to

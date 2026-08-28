@@ -12,8 +12,9 @@ use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallEr
 use crate::types::class::FrozenDataclassDispatch;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, UNRESOLVED_ATTRIBUTE, report_bad_dunder_set_call,
-    report_invalid_attribute_assignment, report_possibly_missing_attribute,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, MISSING_SLOT, UNRESOLVED_ATTRIBUTE,
+    report_bad_dunder_set_call, report_invalid_attribute_assignment,
+    report_possibly_missing_attribute,
 };
 use crate::types::{
     CallDunderError, DisplaySettings, MemberLookupPolicy, Type, TypeContext, TypeQualifiers,
@@ -932,6 +933,31 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         argument_ranges: &[self.target.range(), self.value.range()],
                     },
                 );
+            }
+            AssignmentAttributeWriteDiagnostic::Unresolved { with_period: false }
+                if self
+                    .object_ty
+                    .nominal_class(db, env)
+                    .and_then(|class| class.static_class_literal(db))
+                    .is_some_and(|(class, _)| class.lacks_instance_storage(db, self.attribute))
+                    && !self
+                        .object_ty
+                        .class_member(db, env, self.attribute)
+                        .place
+                        .is_undefined() =>
+            {
+                if let Some(builder) = self.builder.context.report_lint(&MISSING_SLOT, self.target)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Cannot assign to attribute `{}`: `{}` has no slot or instance dictionary",
+                        self.attribute,
+                        self.object_ty.display(db, env),
+                    ));
+                    diagnostic.info(format_args!(
+                        "Attribute `{}` is declared but is not included in `__slots__`",
+                        self.attribute,
+                    ));
+                }
             }
             AssignmentAttributeWriteDiagnostic::Unresolved { with_period } => {
                 if let Some(builder) = self

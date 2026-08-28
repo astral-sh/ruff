@@ -117,7 +117,7 @@ pub struct ParsedModule {
 }
 
 impl ParsedModule {
-    pub fn new(file: File, python_version: PythonVersion, parsed: Parsed<ModModule>) -> Self {
+    fn new(file: File, python_version: PythonVersion, parsed: Parsed<ModModule>) -> Self {
         Self {
             file,
             python_version,

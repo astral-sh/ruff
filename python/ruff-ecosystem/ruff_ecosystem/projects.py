@@ -30,9 +30,12 @@ class Project(Serializable):
     """
 
     repo: Repository
+    # ruff: disable[unnecessary-lambda] False positive on types defined later in the file
+    # See https://github.com/astral-sh/ruff/issues/24704
     check_options: CheckOptions = field(default_factory=lambda: CheckOptions())
     format_options: FormatOptions = field(default_factory=lambda: FormatOptions())
     config_overrides: ConfigOverrides = field(default_factory=lambda: ConfigOverrides())
+    # ruff: enable[unnecessary-lambda]
 
     def with_preview_enabled(self: Self) -> Self:
         return type(self)(
@@ -72,7 +75,7 @@ RULE_SELECTOR_OPTIONS = (
 
 
 @cache
-def rule_name_to_code(executable: Path) -> dict[str, str]:
+def rule_name_to_code(executable: Path) -> dict[str, str | None]:
     rules = json.loads(
         check_output(
             [executable, "rule", "--all", "--output-format", "json"],
@@ -83,7 +86,7 @@ def rule_name_to_code(executable: Path) -> dict[str, str]:
 
 
 def normalize_rule_selectors(
-    config: dict[str, Any], rule_names: dict[str, str]
+    config: dict[str, Any], rule_names: dict[str, str | None]
 ) -> None:
     selector_lists: list[list[Any]] = []
 
@@ -104,12 +107,14 @@ def normalize_rule_selectors(
                 )
 
     for selectors in selector_lists:
-        selectors[:] = [
-            rule_names.get(selector, selector)
-            if isinstance(selector, str)
-            else selector
-            for selector in selectors
-        ]
+        normalized = []
+        for selector in selectors:
+            if not isinstance(selector, str):
+                normalized.append(selector)
+            # Rules without codes have no selector that works outside preview mode.
+            elif (code := rule_names.get(selector, selector)) is not None:
+                normalized.append(code)
+        selectors[:] = normalized
 
 
 @dataclass(frozen=True)
@@ -147,7 +152,7 @@ class ConfigOverrides(Serializable):
         self,
         dirpath: Path,
         preview: bool,
-        rule_names: dict[str, str],
+        rule_names: dict[str, str | None],
     ) -> None:
         """
         Temporarily patch the Ruff configuration file in the given directory.

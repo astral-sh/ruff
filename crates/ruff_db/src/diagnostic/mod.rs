@@ -1012,6 +1012,9 @@ pub enum DiagnosticId {
     /// A PEP 723 script contains invalid metadata or configuration.
     InvalidScriptMetadata,
 
+    /// Metadata could not be loaded from uv.
+    UvMetadata,
+
     /// An `include` glob without any patterns.
     ///
     /// ## Why is this bad?
@@ -1141,6 +1144,7 @@ impl DiagnosticId {
             DiagnosticId::UnknownRule => "unknown-rule",
             DiagnosticId::InvalidGlob => "invalid-glob",
             DiagnosticId::InvalidScriptMetadata => "invalid-script-metadata",
+            DiagnosticId::UvMetadata => "uv-metadata",
             DiagnosticId::EmptyInclude => "empty-include",
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",

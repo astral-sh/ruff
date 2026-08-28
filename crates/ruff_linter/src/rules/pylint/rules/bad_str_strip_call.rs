@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -48,7 +49,7 @@ use ruff_python_ast::PythonVersion;
 /// ## References
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.242")]
+#[violation_metadata(stable_since = "v0.0.242", category = Category::Correctness)]
 pub(crate) struct BadStrStripCall {
     strip: StripKind,
     removal: Option<RemovalKind>,
