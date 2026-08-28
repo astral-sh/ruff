@@ -582,6 +582,10 @@ class Bar: ...
 
 ## Nominal instances in recursively-specialized relations
 
+A nominal class can expose a member whose specialization grows on every recursive step. Relating
+that class to the corresponding structural protocol must terminate even though no exact instance
+type repeats.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -606,6 +610,9 @@ def assign(value: Impl[int]) -> Proto[int]:
 
 ## Generic aliases in recursively-specialized relations
 
+The same growing nominal specialization can be reached through a generic alias for a class object.
+The alias must not hide the recursive nominal identity from relation checking.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -629,6 +636,10 @@ def assign(value: TypeOf[Impl[int]]) -> Proto[int]:
 
 ## Subclass-of types in recursively-specialized relations
 
+A class object can expose a recursively specialized nominal member while it is checked against an
+instance protocol. This relation must terminate after projecting the class object into the member
+lookup domain.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -646,10 +657,15 @@ class Proto[T](Protocol):
     child: Proto[list[T]]
 
 def assign(value: type[Impl[int]]) -> Proto[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
     return value  # error: [invalid-return-type]
 ```
 
 ## Subclass-of types in recursively-specialized meta-type relations
+
+When the target is also a class object, the recursive comparison stays in the meta-type domain. The
+same growing specialization must still terminate there.
 
 ```toml
 [environment]
@@ -668,6 +684,8 @@ class Proto[T](Protocol):
     child: type[Proto[list[T]]]
 
 def assign(value: type[Impl[int]]) -> type[Proto[int]]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
     return value  # error: [invalid-return-type]
 ```
 
