@@ -155,85 +155,96 @@ extend-exclude = [
 [tool.ruff.lint]
 preview = true
 select = [
-    # E # pycodestyle (error)
-    "ambiguous-variable-name",
-    "module-import-not-at-top-of-file",
-    "ambiguous-function-name",
-    "unexpected-indentation",
-    "none-comparison",
-    "ambiguous-class-name",
-    "lambda-assignment",
-    "multiple-leading-hashes-for-block-comment",
-    "not-in-test",
-    "type-comparison",
-    "multiple-imports-on-one-line",
-    "true-false-comparison",
-    "no-indented-block",
-    "not-is-test",
-    # F # pyflakes
-    "undefined-local-with-import-star",
-    "forward-annotation-syntax-error",
-    "undefined-local-with-import-star-usage",
-    # B # bugbear
-    "batched-without-explicit-strict",
-    "map-without-explicit-strict",
-    "class-as-data-structure",
-    "no-explicit-stacklevel",
-    "unused-loop-control-variable",
-    "raise-without-from-inside-except",
-    "re-sub-positional-args",
-    "zip-without-explicit-strict",
-    # C4 # flake8-comprehensions
-    "unnecessary-comprehension",
-    # SIM # flake8-simplify
-    "uncapitalized-environment-variables",
-    "compare-with-tuple",
-    "if-else-block-instead-of-if-exp",
-    "yoda-conditions",
-    "suppressible-exception",
-    "dict-get-with-none-default",
-    "if-else-block-instead-of-dict-lookup",
-    "if-expr-with-twisted-arms",
-    # I # isort
-    "missing-required-import",
-    # UP # pyupgrade
-    "redundant-open-modes",
-    "convert-typed-dict-functional-to-class",
-    # PGH # pygrep-hooks
-    "blanket-noqa",
-    "blanket-type-ignore",
-    # PYI # flake8-pyi
-    "redundant-literal-union",
-    "docstring-in-stub",
-    "collections-named-tuple",
-    "unsupported-method-call-on-all",
-    "argument-default-in-stub",
-    "typed-argument-default-in-stub",
-    "numeric-literal-too-long",
-    "string-or-bytes-too-long",
-    # RUF
-    "noqa-comments",
-    "ambiguous-unicode-character-docstring",
-    "incorrectly-parenthesized-tuple-in-subscript",
-    "asyncio-dangling-task",
-    "used-dummy-variable",
-    "rule-codes-in-selectors",
-    "unused-async",
-    "ambiguous-unicode-character-comment",
-    "non-empty-init-module",
-    "unraw-re-pattern",
-    "ambiguous-unicode-character-string",
-    "parenthesize-chained-operators",
-    "unnecessary-assign-before-yield",
-    "collection-literal-concatenation",
-    # S
-    "subprocess-popen-with-shell-equals-true",
     # Categories
     "correctness",
     "suspicious",
     "complexity",
     "performance",
     "style",
+
+    # E # pycodestyle (error)
+    "ambiguous-class-name",
+    "ambiguous-function-name",
+    "ambiguous-variable-name",
+    "lambda-assignment",
+    "module-import-not-at-top-of-file",
+    "multiple-imports-on-one-line",
+    "multiple-leading-hashes-for-block-comment",
+    "no-indented-block",
+    "none-comparison",
+    "not-in-test",
+    "not-is-test",
+    "true-false-comparison",
+    "type-comparison",
+    "unexpected-indentation",
+
+    # F # pyflakes
+    "forward-annotation-syntax-error",
+    "undefined-local-with-import-star",
+    "undefined-local-with-import-star-usage",
+
+    # B # bugbear
+    "batched-without-explicit-strict",
+    "class-as-data-structure",
+    "map-without-explicit-strict",
+    "no-explicit-stacklevel",
+    "raise-without-from-inside-except",
+    "re-sub-positional-args",
+    "unused-loop-control-variable",
+    "zip-without-explicit-strict",
+
+    # C4 # flake8-comprehensions
+    "unnecessary-comprehension",
+
+    # SIM # flake8-simplify
+    "compare-with-tuple",
+    "dict-get-with-none-default",
+    "if-else-block-instead-of-dict-lookup",
+    "if-else-block-instead-of-if-exp",
+    "if-expr-with-twisted-arms",
+    "suppressible-exception",
+    "uncapitalized-environment-variables",
+    "yoda-conditions",
+
+    # I # isort
+    "missing-required-import",
+
+    # UP # pyupgrade
+    "convert-typed-dict-functional-to-class",
+    "redundant-open-modes",
+
+    # PGH # pygrep-hooks
+    "blanket-noqa",
+    "blanket-type-ignore",
+
+    # PYI # flake8-pyi
+    "argument-default-in-stub",
+    "collections-named-tuple",
+    "docstring-in-stub",
+    "numeric-literal-too-long",
+    "redundant-literal-union",
+    "string-or-bytes-too-long",
+    "typed-argument-default-in-stub",
+    "unsupported-method-call-on-all",
+
+    # RUF
+    "ambiguous-unicode-character-comment",
+    "ambiguous-unicode-character-docstring",
+    "ambiguous-unicode-character-string",
+    "asyncio-dangling-task",
+    "collection-literal-concatenation",
+    "incorrectly-parenthesized-tuple-in-subscript",
+    "non-empty-init-module",
+    "noqa-comments",
+    "parenthesize-chained-operators",
+    "rule-codes-in-selectors",
+    "unnecessary-assign-before-yield",
+    "unraw-re-pattern",
+    "unused-async",
+    "used-dummy-variable",
+
+    # S
+    "subprocess-popen-with-shell-equals-true",
 ]
 
 ignore = [
