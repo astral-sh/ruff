@@ -386,7 +386,7 @@ impl<'db> SubclassOfType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -394,12 +394,10 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
         mode: VarianceInferenceMode<'db>,
     ) -> VarianceResult {
         match self.subclass_of {
-            SubclassOfInner::Class(class) => class.variance_of_in_mode(db, env, typevar, mode),
-            SubclassOfInner::Protocol(protocol) => {
-                protocol.variance_of_in_mode(db, env, typevar, mode)
-            }
+            SubclassOfInner::Class(class) => class.variance_of(db, env, typevar, mode),
+            SubclassOfInner::Protocol(protocol) => protocol.variance_of(db, env, typevar, mode),
             SubclassOfInner::TypeVar(inner) => {
-                Type::TypeVar(inner).variance_of_in_mode(db, env, typevar, mode)
+                Type::TypeVar(inner).variance_of(db, env, typevar, mode)
             }
             SubclassOfInner::Dynamic(_) => VarianceResult::BIVARIANT,
         }

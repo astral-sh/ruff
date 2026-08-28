@@ -575,7 +575,7 @@ impl<'db> TypedDictType<'db> {
                     TypeVarVariance::Invariant
                 };
                 ty.with_polarity(polarity)
-                    .variance_of_in_mode(db, env, typevar, mode)
+                    .variance_of(db, env, typevar, mode)
             });
         mode.join(variances)
     }
@@ -1372,7 +1372,7 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1384,7 +1384,7 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
                 // Compose each type parameter's variance with its type argument. Inferred variance
                 // is computed on the unspecialized class: expanding specialized fields here would
                 // not terminate for a recursive item such as `child: Node[list[T]]`.
-                class.variance_of_in_mode(db, env, typevar, mode)
+                class.variance_of(db, env, typevar, mode)
             }
             Self::Class(class) => {
                 #[salsa::tracked(

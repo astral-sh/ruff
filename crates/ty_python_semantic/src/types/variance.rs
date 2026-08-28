@@ -162,7 +162,7 @@ impl<'db> VarianceInferenceMode<'db> {
         let depends_on_root = |root| {
             typevar == root
                 || class
-                    .variance_of_in_mode(db, env, typevar, Self::Dependencies(root))
+                    .variance_of(db, env, typevar, Self::Dependencies(root))
                     .depends_on_root
         };
         match self {
@@ -236,23 +236,12 @@ impl From<TypeVarVariance> for VarianceResult {
 }
 
 pub(crate) trait VarianceInferable<'db>: Sized {
-    /// The variance of `typevar` in `self`, honoring explicit variance declarations.
-    fn variance_of(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.variance_of_in_mode(db, env, typevar, VarianceInferenceMode::Effective)
-            .variance
-    }
-
     /// Computes variance while preserving the inference mode through nested types and Salsa keys.
     ///
     /// Implementations traverse types within `self` in which `typevar` could occur, calling this
     /// method recursively with the same mode. Use `with_polarity` for non-covariant positions,
     /// and `mode.join` to combine occurrences without dropping dependency information.
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -265,7 +254,7 @@ pub(crate) trait VarianceInferable<'db>: Sized {
     /// underlying value.
     ///
     /// In some cases, we need to apply a polarity to the recursive call.
-    /// You can do this with `ty.with_polarity(polarity).variance_of(typevar)`.
+    /// You can do this with `ty.with_polarity(polarity).variance_of(db, env, typevar, mode)`.
     /// Generally, this will be whenever the type occurs in argument-position,
     /// in which case you will want `TypeVarVariance::Contravariant`, or
     /// `TypeVarVariance::Invariant` if the value(s) being annotated is known to
@@ -290,7 +279,7 @@ impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
 where
     T: VarianceInferable<'db>,
 {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -303,33 +292,6 @@ where
         } = self;
 
         VarianceResult::from(polarity)
-            .compose_thunk(|| variance_inferable.variance_of_in_mode(db, env, typevar, mode))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{TypeVarVariance, VarianceResult};
-
-    #[test]
-    fn composition_erases_dependencies_in_either_position() {
-        for variance in [
-            TypeVarVariance::Covariant,
-            TypeVarVariance::Contravariant,
-            TypeVarVariance::Invariant,
-        ] {
-            let dependent = VarianceResult {
-                variance,
-                depends_on_root: true,
-            };
-            assert_eq!(
-                dependent.compose_thunk(|| VarianceResult::BIVARIANT),
-                VarianceResult::BIVARIANT,
-            );
-            assert_eq!(
-                VarianceResult::BIVARIANT.compose_thunk(|| dependent),
-                VarianceResult::BIVARIANT,
-            );
-        }
+            .compose_thunk(|| variance_inferable.variance_of(db, env, typevar, mode))
     }
 }

@@ -1587,15 +1587,14 @@ impl<'db> FunctionType<'db> {
         cycle_initial=|_, _, _, _, _| VarianceResult::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    pub(crate) fn variance_of_in_mode(
+    pub(crate) fn variance_of(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
         mode: VarianceInferenceMode<'db>,
     ) -> VarianceResult {
         let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
-        self.signature(db)
-            .variance_of_in_mode(db, &env, typevar, mode)
+        self.signature(db).variance_of(db, &env, typevar, mode)
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.

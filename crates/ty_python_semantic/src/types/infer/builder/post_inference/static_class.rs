@@ -53,7 +53,7 @@ use crate::{
         special_form::TypeQualifier,
         tuple::Tuple,
         typevar::TypeVarInstance,
-        variance::VarianceInferable,
+        variance::{VarianceInferable, VarianceInferenceMode},
         visitor::find_over_type,
     },
 };
@@ -415,8 +415,14 @@ pub(crate) fn check_static_class_definitions<'db>(
                             if declared_variance == TypeVarVariance::Invariant {
                                 return None;
                             }
-                            let required_variance =
-                                base_alias.variance_of(db, env, typevar.identity(db));
+                            let required_variance = base_alias
+                                .variance_of(
+                                    db,
+                                    env,
+                                    typevar.identity(db),
+                                    VarianceInferenceMode::Effective,
+                                )
+                                .variance;
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {

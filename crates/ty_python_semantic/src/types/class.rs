@@ -508,7 +508,7 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
@@ -549,36 +549,35 @@ impl<'db> GenericAlias<'db> {
                 //
                 // If salsa let us look at the cache, we could check first
                 // to see if the class literal query was already run.
-                ty.variance_of_in_mode(db, &env, typevar, mode)
-                    .compose_thunk(|| {
-                        if let Some(explicit_variance) =
-                            generic_typevar.typevar(db).explicit_variance(db)
+                ty.variance_of(db, &env, typevar, mode).compose_thunk(|| {
+                    if let Some(explicit_variance) =
+                        generic_typevar.typevar(db).explicit_variance(db)
+                    {
+                        if mode == VarianceInferenceMode::Effective
+                            || generic_typevar.is_paramspec(db)
+                            || generic_typevar.is_typevartuple(db)
+                            || origin
+                                .into_protocol_class(db)
+                                .is_none_or(|protocol| !protocol.supports_variance_inference(db))
                         {
-                            if mode == VarianceInferenceMode::Effective
-                                || generic_typevar.is_paramspec(db)
-                                || generic_typevar.is_typevartuple(db)
-                                || origin.into_protocol_class(db).is_none_or(|protocol| {
-                                    !protocol.supports_variance_inference(db)
-                                })
-                            {
-                                return explicit_variance.into();
-                            }
-                            if let Some(variance) = mode.protocol_parameter_variance(
-                                db,
-                                &env,
-                                origin,
-                                generic_typevar.identity(db),
-                                explicit_variance,
-                            ) {
-                                return variance;
-                            }
+                            return explicit_variance.into();
                         }
+                        if let Some(variance) = mode.protocol_parameter_variance(
+                            db,
+                            &env,
+                            origin,
+                            generic_typevar.identity(db),
+                            explicit_variance,
+                        ) {
+                            return variance;
+                        }
+                    }
 
-                        // A recursive protocol's declaration cannot determine its own validation
-                        // result. Structural inference follows the interface instead, retaining
-                        // bivariance as the bottom of the fixed point until inference completes.
-                        origin.variance_of_in_mode(db, &env, generic_typevar.identity(db), mode)
-                    })
+                    // A recursive protocol's declaration cannot determine its own validation
+                    // result. Structural inference follows the interface instead, retaining
+                    // bivariance as the bottom of the fixed point until inference completes.
+                    origin.variance_of(db, &env, generic_typevar.identity(db), mode)
+                })
             });
         mode.join(variances)
     }
@@ -2605,7 +2604,7 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2614,7 +2613,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
     ) -> VarianceResult {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => {
-                class.variance_of_in_mode(db, env, typevar, mode)
+                class.variance_of(db, env, typevar, mode)
             }
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
@@ -2622,7 +2621,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
             ) => VarianceResult::BIVARIANT,
-            Self::Generic(generic) => generic.variance_of_in_mode(db, env, typevar, mode),
+            Self::Generic(generic) => generic.variance_of(db, env, typevar, mode),
         }
     }
 }
@@ -2833,7 +2832,7 @@ impl<'db> Field<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2841,7 +2840,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         mode: VarianceInferenceMode<'db>,
     ) -> VarianceResult {
         match self {
-            Self::Static(class) => class.variance_of_in_mode(db, env, typevar, mode),
+            Self::Static(class) => class.variance_of(db, env, typevar, mode),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)

@@ -664,88 +664,118 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
     let env = db.program_environment();
     let covariant = get_type_alias(db, "CovariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, covariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, covariant),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Covariant
     );
 
     let contravariant = get_type_alias(db, "ContravariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, contravariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, contravariant),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Contravariant
     );
 
     let invariant = get_type_alias(db, "InvariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, invariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, invariant),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Invariant
     );
 
     let bivariant = get_type_alias(db, "BivariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, bivariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, bivariant),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Bivariant
     );
 
     let covariant_alias = get_type_alias(db, "CovariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, covariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant_alias))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, covariant_alias),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Covariant
     );
 
     let contravariant_alias = get_type_alias(db, "ContravariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, contravariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant_alias))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, contravariant_alias),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Contravariant
     );
 
     let invariant_alias = get_type_alias(db, "InvariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, invariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant_alias))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, invariant_alias),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Invariant
     );
 
     let bivariant_alias = get_type_alias(db, "BivariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, bivariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant_alias))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, bivariant_alias),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Bivariant
     );
 
     let paramspec_contravariant = get_type_alias(db, "ParamSpecContravariantAlias");
     assert_eq!(
         KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_contravariant))
-            .variance_of(db, &env, get_bound_typevar(db, paramspec_contravariant)),
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, paramspec_contravariant),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Contravariant
     );
 
@@ -755,48 +785,62 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
             .variance_of(
                 db,
                 &env,
-                get_bound_typevar(db, paramspec_default_contravariant)
-            ),
+                get_bound_typevar(db, paramspec_default_contravariant),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Contravariant
     );
 
     let paramspec_concatenate = get_type_alias(db, "ParamSpecConcatenateAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, paramspec_concatenate)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, paramspec_concatenate),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Contravariant
     );
 
     let paramspec_bivariant = get_type_alias(db, "ParamSpecBivariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_bivariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, paramspec_bivariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_bivariant))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, paramspec_bivariant),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Bivariant
     );
 
     let recursive = get_type_alias(db, "RecursiveAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, recursive)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, recursive),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Bivariant
     );
 
     let recursive2 = get_type_alias(db, "RecursiveAlias2");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, recursive2)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2))
+            .variance_of(
+                db,
+                &env,
+                get_bound_typevar(db, recursive2),
+                VarianceInferenceMode::Effective
+            )
+            .variance,
         TypeVarVariance::Invariant
     );
 

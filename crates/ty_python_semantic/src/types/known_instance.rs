@@ -232,7 +232,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -242,7 +242,7 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => type_alias
                 .raw_value_type(db)
-                .variance_of_in_mode(db, env, typevar, mode),
+                .variance_of(db, env, typevar, mode),
             _ => VarianceResult::BIVARIANT,
         }
     }

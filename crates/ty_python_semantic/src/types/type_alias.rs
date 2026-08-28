@@ -636,7 +636,7 @@ impl<'db> TypeAliasType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
@@ -662,9 +662,7 @@ impl<'db> TypeAliasType<'db> {
     ) -> VarianceResult {
         let env = ProgramEnvironment::from_definition(self.definition(db));
         let Some(generic_context) = self.generic_context(db) else {
-            return self
-                .value_type(db)
-                .variance_of_in_mode(db, &env, typevar, mode);
+            return self.value_type(db).variance_of(db, &env, typevar, mode);
         };
 
         // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
@@ -673,9 +671,7 @@ impl<'db> TypeAliasType<'db> {
             .variables(db)
             .any(|alias_typevar| alias_typevar.identity(db) == typevar)
         {
-            return self
-                .raw_value_type(db)
-                .variance_of_in_mode(db, &env, typevar, mode);
+            return self.raw_value_type(db).variance_of(db, &env, typevar, mode);
         }
 
         let raw_value_type = self.raw_value_type(db);
@@ -690,8 +686,8 @@ impl<'db> TypeAliasType<'db> {
             .zip(specialization.types(db))
             .map(|(alias_typevar, argument_ty)| {
                 raw_value_type
-                    .variance_of_in_mode(db, &env, alias_typevar.identity(db), mode)
-                    .compose_thunk(|| argument_ty.variance_of_in_mode(db, &env, typevar, mode))
+                    .variance_of(db, &env, alias_typevar.identity(db), mode)
+                    .compose_thunk(|| argument_ty.variance_of(db, &env, typevar, mode))
             });
         mode.join(variances)
     }

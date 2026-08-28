@@ -95,14 +95,13 @@ impl<'db> Type<'db> {
 
 impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
     // `TypeForm` is covariant in its type argument.
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
         mode: VarianceInferenceMode<'db>,
     ) -> VarianceResult {
-        self.type_argument(db)
-            .variance_of_in_mode(db, env, typevar, mode)
+        self.type_argument(db).variance_of(db, env, typevar, mode)
     }
 }

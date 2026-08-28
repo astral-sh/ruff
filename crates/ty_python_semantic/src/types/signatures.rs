@@ -580,7 +580,7 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 
 impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
     // TODO: possibly need to replace self
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -590,7 +590,7 @@ impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
         mode.join(
             self.overloads
                 .iter()
-                .map(|signature| signature.variance_of_in_mode(db, env, typevar, mode)),
+                .map(|signature| signature.variance_of(db, env, typevar, mode)),
         )
     }
 }
@@ -1338,7 +1338,13 @@ impl<'db> Signature<'db> {
             if let Some(bounds) = bounds
                 && concrete_class_receiver
                 && bound_signature
-                    .variance_of(db, env, typevar.identity(db))
+                    .variance_of(
+                        db,
+                        env,
+                        typevar.identity(db),
+                        VarianceInferenceMode::Effective,
+                    )
+                    .variance
                     .is_covariant()
                 && bounds.evidence_lower.is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
@@ -2001,7 +2007,7 @@ impl<'db> Signature<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2017,7 +2023,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             parameter
                 .annotated_type()
                 .with_polarity(TypeVarVariance::Contravariant)
-                .variance_of_in_mode(db, env, typevar, mode)
+                .variance_of(db, env, typevar, mode)
         };
 
         let parameter_variances = if let Some((prefix_parameters, paramspec)) =
@@ -2030,7 +2036,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
                     .chain(std::iter::once(
                         Type::TypeVar(paramspec)
                             .with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of_in_mode(db, env, typevar, mode),
+                            .variance_of(db, env, typevar, mode),
                     )),
             )
         } else {
@@ -2039,7 +2045,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
 
         mode.join(itertools::chain(
             parameter_variances,
-            Some(self.return_ty.variance_of_in_mode(db, env, typevar, mode)),
+            Some(self.return_ty.variance_of(db, env, typevar, mode)),
         ))
     }
 }

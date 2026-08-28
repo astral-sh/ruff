@@ -3353,7 +3353,7 @@ fn expanded_fixed_length_starred_class_base_tuple<'db>(
 }
 
 impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
@@ -3392,9 +3392,7 @@ impl<'db> StaticClassLiteral<'db> {
             && let Some(protocol) = self.identity_specialization(db).into_protocol_class(db)
             && protocol.supports_variance_inference(db)
         {
-            return protocol
-                .interface(db)
-                .variance_of_in_mode(db, &env, typevar, mode);
+            return protocol.interface(db).variance_of(db, &env, typevar, mode);
         }
 
         let class_body_scope = self.body_scope(db);
@@ -3406,7 +3404,7 @@ impl<'db> StaticClassLiteral<'db> {
         let explicit_bases_variances = self
             .explicit_bases(db)
             .iter()
-            .map(|class| class.variance_of_in_mode(db, &env, typevar, mode));
+            .map(|class| class.variance_of(db, &env, typevar, mode));
 
         let default_attribute_variance = {
             let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self.into());
@@ -3501,7 +3499,7 @@ impl<'db> StaticClassLiteral<'db> {
                         default_attribute_variance
                     };
                     ty.with_polarity(variance)
-                        .variance_of_in_mode(db, &env, typevar, mode)
+                        .variance_of(db, &env, typevar, mode)
                 })
             });
 

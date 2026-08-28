@@ -342,7 +342,7 @@ impl<'db> ProtocolClass<'db> {
             };
 
             let inferred_variance = match class
-                .variance_of_in_mode(
+                .variance_of(
                     db,
                     &env,
                     typevar.identity(db),
@@ -1225,7 +1225,7 @@ impl<'db> ProtocolMemberWrite<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1234,7 +1234,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     ) -> VarianceResult {
         mode.join(self.variance_types(db, env).map(|(ty, variance)| {
             ty.with_polarity(variance)
-                .variance_of_in_mode(db, env, typevar, mode)
+                .variance_of(db, env, typevar, mode)
         }))
     }
 }
