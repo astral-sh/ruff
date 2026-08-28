@@ -228,6 +228,39 @@ impl ConditionFlowSnapshot {
     }
 }
 
+/// Whether evaluation produces a result object or chooses a control-flow path.
+///
+/// In `Value` context, the enclosing code receives the expression's result object. For example,
+/// `result = x and y` produces `x` if `x` is falsy, or `y` otherwise. This also applies to expressions
+/// that return `bool`: the comparison in `result = x > 0` has value context.
+///
+/// In `Condition` context, the enclosing code only needs to know which branch to take. For example,
+/// CPython evaluates `if x and y` by testing `x` and, only if `x` is truthy, testing `y`. If `x` tests
+/// falsy, that one truthiness check is enough to skip the body: `x` is not tested again as the
+/// result of `x and y`.
+///
+/// This distinction matters when an operand's `__bool__` can change between calls:
+///
+/// ```python
+/// if x and False:      # A falsy x skips the body; a truthy x reaches False.
+///     ...              # Unreachable in either case.
+/// saved = x and False  # Can produce x after checking that it is falsy.
+/// if saved:            # Can call x.__bool__ again, which may now return True.
+///     ...              # Reachable.
+/// ```
+///
+/// The context propagates through `and`, `or`, `not`, and the branches of conditional expressions.
+/// Condition context does not propagate through calls or assignment expressions: in
+/// `if f(x and False)`, the call's result controls the branch, but its argument is evaluated in
+/// value context.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ExpressionContext {
+    /// Produce the expression's result object for the enclosing code to use.
+    Value,
+    /// Choose the truthy or falsy control-flow path without preserving the result object.
+    Condition,
+}
+
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -2153,12 +2186,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         predicate_node: &'ast ast::Expr,
     ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
-        let predicate = self.build_predicate(predicate_node);
+        let predicate = self.build_predicate(predicate_node, ExpressionContext::Condition);
         let predicate_id = self.record_narrowing_constraint(predicate);
         (predicate, predicate_id)
     }
 
-    fn build_predicate(&mut self, predicate_node: &'ast ast::Expr) -> PredicateOrLiteral<'db> {
+    fn build_predicate(
+        &mut self,
+        predicate_node: &'ast ast::Expr,
+        context: ExpressionContext,
+    ) -> PredicateOrLiteral<'db> {
         // Some commonly used test expressions are eagerly evaluated as `true`
         // or `false` here for performance reasons. This list does not need to
         // be exhaustive. More complex expressions will still evaluate to the
@@ -2190,7 +2227,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         match resolve_to_literal(predicate_node) {
             Some(literal) => PredicateOrLiteral::Literal(literal),
             None => PredicateOrLiteral::Predicate(Predicate {
-                node: PredicateNode::Expression(expression),
+                node: match (context, predicate_node) {
+                    (
+                        ExpressionContext::Condition,
+                        ast::Expr::BoolOp(_)
+                        | ast::Expr::If(_)
+                        | ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                            op: ast::UnaryOp::Not,
+                            ..
+                        }),
+                    ) => PredicateNode::Condition(expression),
+                    (ExpressionContext::Condition, ast::Expr::Compare(compare))
+                        if compare.ops.len() > 1 =>
+                    {
+                        PredicateNode::ChainedComparisonCondition(expression)
+                    }
+                    _ => PredicateNode::Expression(expression),
+                },
                 is_positive: true,
             }),
         }
@@ -2249,7 +2302,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let place_table = self.current_place_table();
 
                 match pred.node {
-                    PredicateNode::Expression(expression) => {
+                    PredicateNode::Expression(expression)
+                    | PredicateNode::Condition(expression)
+                    | PredicateNode::ChainedComparisonCondition(expression) => {
                         let expression_node = expression.node_ref(self.db).node(self.module);
                         let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);
@@ -3008,7 +3063,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// print(last)
     /// ```
     fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) -> FlowSnapshot {
-        self.visit_expr(if_expr);
+        self.visit_expr_with_context(if_expr, ExpressionContext::Condition);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
         let filtered_out = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
             self.flow_restore(snapshots.truthy);
@@ -3273,13 +3328,265 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .get_or_init(|| source_text(self.db, self.file.file(self.db)))
     }
 
+    fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
+        self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
+
+        self.scopes_by_expression
+            .record_expression(expr, self.current_scope());
+
+        match expr {
+            ast::Expr::Name(ast::ExprName { ctx, .. })
+            | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
+            | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
+                // Record place effects after walking the expression. For names, this is
+                // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
+                // child evaluation can introduce bindings (for example via walrus operators),
+                // and those bindings need to exist before we register parent/member associations.
+                let mut deferred_effects = None;
+                if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
+                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
+                        && let PlaceExpr::Member(member) = &mut place_expr
+                        && member.is_instance_attribute_candidate()
+                        && let Some(attribute) = expr.as_attribute_expr()
+                    {
+                        // We specifically mark direct attribute assignments to the first
+                        // parameter of a method, i.e. typically `self` or `cls`.
+                        // However, we must check that the symbol hasn't been shadowed by an
+                        // intermediate scope (e.g., a comprehension variable: `for self in [...]`)
+                        // and that the AST base is still the original name rather than a
+                        // rebinding expression such as `(self := other).x`.
+                        let accessed_object_refers_to_first_parameter =
+                            self.current_first_parameter_name.is_some_and(|first| {
+                                attribute
+                                    .value
+                                    .as_name_expr()
+                                    .is_some_and(|name| name.id == first)
+                                    && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                        first,
+                                        method_scope_id,
+                                    )
+                            });
+
+                        if accessed_object_refers_to_first_parameter {
+                            member.mark_instance_attribute();
+                        }
+                    }
+
+                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
+                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                            // Record the target load now; the definition is recorded separately
+                            // after visiting the right-hand side.
+                            (true, false)
+                        }
+                        (ast::ExprContext::Load, _) => (true, false),
+                        (ast::ExprContext::Store, _) => (false, true),
+                        (ast::ExprContext::Del, _) => (true, true),
+                        (ast::ExprContext::Invalid, _) => (false, false),
+                    };
+                    deferred_effects = Some((place_expr, is_use, is_definition));
+                }
+
+                walk_expr(self, expr);
+
+                let is_use = deferred_effects
+                    .as_ref()
+                    .is_some_and(|(_, is_use, _)| *is_use);
+                let can_raise = self.place_access_can_raise(expr, is_use);
+                self.record_exception_checkpoint_if(can_raise);
+
+                if let Some((place_expr, is_use, is_definition)) = deferred_effects {
+                    let place_id = self.add_place(place_expr);
+
+                    if is_use {
+                        self.record_place_use(place_id, expr);
+
+                        // Keep track of any uses of unannotated collection initializers.
+                        if let Some(collection_def) =
+                            self.unannotated_collection_initializer_binding(expr)
+                            && let Some(current_statement) = self.current_statements.last_mut()
+                        {
+                            current_statement
+                                .collection_uses
+                                .push((collection_def, expr.into()));
+                        }
+                    }
+
+                    if is_definition {
+                        self.record_place_definition(place_id, expr);
+                    }
+
+                    if let Some(unpack_position) = self
+                        .current_assignment_mut()
+                        .and_then(CurrentAssignment::unpack_position_mut)
+                    {
+                        *unpack_position = UnpackPosition::Other;
+                    }
+                }
+            }
+            ast::Expr::Named(node) => {
+                self.visit_expr(&node.value);
+
+                // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
+                if node.target.is_name_expr() {
+                    self.push_assignment(CurrentAssignment::Named(node));
+                    self.visit_expr(&node.target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(&node.target);
+                }
+            }
+            ast::Expr::Lambda(lambda) => {
+                self.current_statement_mut()
+                    .expect("every lambda expression is part of a statement")
+                    .lambda_expressions
+                    .push(lambda);
+
+                if let Some(parameters) = &lambda.parameters {
+                    // The default value of the parameters needs to be evaluated in the
+                    // enclosing scope.
+                    for default in parameters
+                        .iter_non_variadic_params()
+                        .filter_map(|param| param.default.as_deref())
+                    {
+                        self.visit_expr(default);
+                    }
+                    self.visit_parameters(parameters);
+                }
+                self.push_scope(NodeWithScopeRef::Lambda(lambda));
+
+                // Add symbols and definitions for the parameters to the lambda scope.
+                if let Some(parameters) = lambda.parameters.as_ref() {
+                    self.declare_lambda_parameters(parameters, lambda);
+                }
+
+                self.visit_expr(lambda.body.as_ref());
+                self.pop_scope();
+            }
+            ast::Expr::If(node) => self.visit_if_expression(node, context),
+            ast::Expr::ListComp(
+                list_comprehension @ ast::ExprListComp {
+                    elt, generators, ..
+                },
+            ) => {
+                let scope = self.with_generators_scope(
+                    NodeWithScopeRef::ListComprehension(list_comprehension),
+                    generators,
+                    |builder| builder.visit_expr(elt),
+                );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
+            }
+            ast::Expr::SetComp(
+                set_comprehension @ ast::ExprSetComp {
+                    elt, generators, ..
+                },
+            ) => {
+                let scope = self.with_generators_scope(
+                    NodeWithScopeRef::SetComprehension(set_comprehension),
+                    generators,
+                    |builder| builder.visit_expr(elt),
+                );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
+            }
+            ast::Expr::Generator(
+                generator @ ast::ExprGenerator {
+                    elt, generators, ..
+                },
+            ) => {
+                self.with_generators_scope(
+                    NodeWithScopeRef::GeneratorExpression(generator),
+                    generators,
+                    |builder| builder.visit_expr(elt),
+                );
+            }
+            ast::Expr::DictComp(
+                dict_comprehension @ ast::ExprDictComp {
+                    key,
+                    value,
+                    generators,
+                    ..
+                },
+            ) => {
+                let scope = self.with_generators_scope(
+                    NodeWithScopeRef::DictComprehension(dict_comprehension),
+                    generators,
+                    |builder| {
+                        if let Some(key) = key {
+                            builder.visit_expr(key);
+                        }
+                        builder.visit_expr(value);
+                    },
+                );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
+            }
+            ast::Expr::Call(_) | ast::Expr::BinOp(_) => {
+                walk_expr(self, expr);
+                self.record_exception_checkpoint();
+            }
+            ast::Expr::UnaryOp(unary) => {
+                self.visit_expr_with_context(
+                    &unary.operand,
+                    if unary.op == ast::UnaryOp::Not {
+                        context
+                    } else {
+                        ExpressionContext::Value
+                    },
+                );
+                self.record_exception_checkpoint_if(
+                    unary.op != ast::UnaryOp::Not
+                        || !Self::condition_evaluation_is_known_safe(&unary.operand),
+                );
+            }
+            ast::Expr::Compare(ast::ExprCompare {
+                left,
+                ops,
+                comparators,
+                ..
+            }) => {
+                self.visit_expr(left);
+                for (op, comparator) in ops.iter().zip(comparators) {
+                    self.visit_expr(comparator);
+                    self.record_exception_checkpoint_if(!matches!(
+                        op,
+                        ast::CmpOp::Is | ast::CmpOp::IsNot
+                    ));
+                }
+            }
+            ast::Expr::BoolOp(node) => self.visit_bool_expression(node, context),
+            ast::Expr::StringLiteral(_) => {
+                walk_expr(self, expr);
+            }
+            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
+                let scope = self.current_scope();
+                if self.scopes[scope].kind() == ScopeKind::Function {
+                    self.generator_functions.insert(scope);
+                }
+                walk_expr(self, expr);
+                self.record_exception_checkpoint();
+            }
+            ast::Expr::Await(_) => {
+                self.mark_current_comprehension_async();
+                walk_expr(self, expr);
+                self.record_exception_checkpoint();
+            }
+            _ => {
+                walk_expr(self, expr);
+            }
+        }
+    }
+
     /// Visits a conditional expression without reserving its flow snapshots in every recursive
     /// expression-visitor frame. This matters for deeply nested expressions in unoptimized builds.
-    fn visit_if_expression(&mut self, node: &'ast ast::ExprIf) {
+    fn visit_if_expression(&mut self, node: &'ast ast::ExprIf, context: ExpressionContext) {
         let ast::ExprIf {
             body, test, orelse, ..
         } = node;
-        self.visit_expr(test);
+        self.visit_expr_with_context(test, ExpressionContext::Condition);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
             self.flow_restore(snapshots.truthy);
@@ -3292,7 +3599,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let in_type_checking_block = self.in_type_checking_block;
         self.current_use_def_map_mut()
             .record_range_reachability(body.range(), in_type_checking_block);
-        self.visit_expr(body);
+        self.visit_expr_with_context(body, context);
         let post_body = self.flow_snapshot();
         self.flow_restore(falsy);
 
@@ -3301,12 +3608,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let in_type_checking_block = self.in_type_checking_block;
         self.current_use_def_map_mut()
             .record_range_reachability(orelse.range(), in_type_checking_block);
-        self.visit_expr(orelse);
+        self.visit_expr_with_context(orelse, context);
         self.flow_merge(post_body);
     }
 
     /// Keeps short-circuit flow snapshots out of the common recursive expression-visitor frame.
-    fn visit_bool_expression(&mut self, node: &'ast ast::ExprBoolOp) {
+    fn visit_bool_expression(&mut self, node: &'ast ast::ExprBoolOp, context: ExpressionContext) {
         let ast::ExprBoolOp { values, op, .. } = node;
         let mut snapshots = vec![];
         let mut reachability_constraints = vec![];
@@ -3321,7 +3628,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let in_type_checking_block = self.in_type_checking_block;
             self.current_use_def_map_mut()
                 .record_range_reachability(value.range(), in_type_checking_block);
-            self.visit_expr(value);
+            self.visit_expr_with_context(value, context);
 
             // Only non-final values can short-circuit this boolean operation. The final
             // value can still have its own outcome-specific flow if it is nested.
@@ -3330,7 +3637,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     value,
                 ));
                 let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
-                let predicate = self.build_predicate(value);
+                let predicate = self.build_predicate(value, context);
                 let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                 let predicate_id = match op {
                     ast::BoolOp::And => self.add_predicate(predicate),
@@ -3870,9 +4177,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // `msg` branch back into the following flow, since there is no way of getting out
                 // of that branch. Code after the assertion starts from the condition's truthy flow.
 
-                self.visit_expr(test);
+                self.visit_expr_with_context(test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
-                let predicate = self.build_predicate(test);
+                let predicate = self.build_predicate(test, ExpressionContext::Condition);
 
                 if msg.is_some()
                     || self
@@ -4043,7 +4350,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
-                self.visit_expr(&node.test);
+                self.visit_expr_with_context(&node.test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                     self.flow_restore(snapshots.truthy);
@@ -4097,7 +4404,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     let next_falsy = if let Some(elif_test) = clause_test {
-                        self.visit_expr(elif_test);
+                        self.visit_expr_with_context(elif_test, ExpressionContext::Condition);
                         // A test expression is evaluated whether the branch is taken or not
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
                         let next_falsy =
@@ -4180,7 +4487,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
-                self.visit_expr(test);
+                self.visit_expr_with_context(test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 
                 // Take the pre_loop snapshot from the post-test fallback flow before restoring the
@@ -4558,7 +4865,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // while the next case is reached through `!P || (P && !G)`. Save `P && !G`
                     // separately so it can be merged with the pattern-failure state after the body.
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
-                        self.visit_expr(guard);
+                        self.visit_expr_with_context(guard, ExpressionContext::Condition);
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(guard);
                         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches()
                         {
@@ -5270,248 +5577,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
-
-        self.scopes_by_expression
-            .record_expression(expr, self.current_scope());
-
-        match expr {
-            ast::Expr::Name(ast::ExprName { ctx, .. })
-            | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
-            | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                // Record place effects after walking the expression. For names, this is
-                // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
-                // child evaluation can introduce bindings (for example via walrus operators),
-                // and those bindings need to exist before we register parent/member associations.
-                let mut deferred_effects = None;
-                if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
-                        && let PlaceExpr::Member(member) = &mut place_expr
-                        && member.is_instance_attribute_candidate()
-                        && let Some(attribute) = expr.as_attribute_expr()
-                    {
-                        // We specifically mark direct attribute assignments to the first
-                        // parameter of a method, i.e. typically `self` or `cls`.
-                        // However, we must check that the symbol hasn't been shadowed by an
-                        // intermediate scope (e.g., a comprehension variable: `for self in [...]`)
-                        // and that the AST base is still the original name rather than a
-                        // rebinding expression such as `(self := other).x`.
-                        let accessed_object_refers_to_first_parameter =
-                            self.current_first_parameter_name.is_some_and(|first| {
-                                attribute
-                                    .value
-                                    .as_name_expr()
-                                    .is_some_and(|name| name.id == first)
-                                    && !self.is_symbol_bound_in_intermediate_eager_scopes(
-                                        first,
-                                        method_scope_id,
-                                    )
-                            });
-
-                        if accessed_object_refers_to_first_parameter {
-                            member.mark_instance_attribute();
-                        }
-                    }
-
-                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                            // Record the target load now; the definition is recorded separately
-                            // after visiting the right-hand side.
-                            (true, false)
-                        }
-                        (ast::ExprContext::Load, _) => (true, false),
-                        (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (true, true),
-                        (ast::ExprContext::Invalid, _) => (false, false),
-                    };
-                    deferred_effects = Some((place_expr, is_use, is_definition));
-                }
-
-                walk_expr(self, expr);
-
-                let is_use = deferred_effects
-                    .as_ref()
-                    .is_some_and(|(_, is_use, _)| *is_use);
-                let can_raise = self.place_access_can_raise(expr, is_use);
-                self.record_exception_checkpoint_if(can_raise);
-
-                if let Some((place_expr, is_use, is_definition)) = deferred_effects {
-                    let place_id = self.add_place(place_expr);
-
-                    if is_use {
-                        self.record_place_use(place_id, expr);
-
-                        // Keep track of any uses of unannotated collection initializers.
-                        if let Some(collection_def) =
-                            self.unannotated_collection_initializer_binding(expr)
-                            && let Some(current_statement) = self.current_statements.last_mut()
-                        {
-                            current_statement
-                                .collection_uses
-                                .push((collection_def, expr.into()));
-                        }
-                    }
-
-                    if is_definition {
-                        self.record_place_definition(place_id, expr);
-                    }
-
-                    if let Some(unpack_position) = self
-                        .current_assignment_mut()
-                        .and_then(CurrentAssignment::unpack_position_mut)
-                    {
-                        *unpack_position = UnpackPosition::Other;
-                    }
-                }
-            }
-            ast::Expr::Named(node) => {
-                self.visit_expr(&node.value);
-
-                // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
-                if node.target.is_name_expr() {
-                    self.push_assignment(CurrentAssignment::Named(node));
-                    self.visit_expr(&node.target);
-                    self.pop_assignment();
-                } else {
-                    self.visit_expr(&node.target);
-                }
-            }
-            ast::Expr::Lambda(lambda) => {
-                self.current_statement_mut()
-                    .expect("every lambda expression is part of a statement")
-                    .lambda_expressions
-                    .push(lambda);
-
-                if let Some(parameters) = &lambda.parameters {
-                    // The default value of the parameters needs to be evaluated in the
-                    // enclosing scope.
-                    for default in parameters
-                        .iter_non_variadic_params()
-                        .filter_map(|param| param.default.as_deref())
-                    {
-                        self.visit_expr(default);
-                    }
-                    self.visit_parameters(parameters);
-                }
-                self.push_scope(NodeWithScopeRef::Lambda(lambda));
-
-                // Add symbols and definitions for the parameters to the lambda scope.
-                if let Some(parameters) = lambda.parameters.as_ref() {
-                    self.declare_lambda_parameters(parameters, lambda);
-                }
-
-                self.visit_expr(lambda.body.as_ref());
-                self.pop_scope();
-            }
-            ast::Expr::If(node) => self.visit_if_expression(node),
-            ast::Expr::ListComp(
-                list_comprehension @ ast::ExprListComp {
-                    elt, generators, ..
-                },
-            ) => {
-                let scope = self.with_generators_scope(
-                    NodeWithScopeRef::ListComprehension(list_comprehension),
-                    generators,
-                    |builder| builder.visit_expr(elt),
-                );
-                if self.async_comprehensions.contains(&scope) {
-                    self.mark_current_comprehension_async();
-                }
-            }
-            ast::Expr::SetComp(
-                set_comprehension @ ast::ExprSetComp {
-                    elt, generators, ..
-                },
-            ) => {
-                let scope = self.with_generators_scope(
-                    NodeWithScopeRef::SetComprehension(set_comprehension),
-                    generators,
-                    |builder| builder.visit_expr(elt),
-                );
-                if self.async_comprehensions.contains(&scope) {
-                    self.mark_current_comprehension_async();
-                }
-            }
-            ast::Expr::Generator(
-                generator @ ast::ExprGenerator {
-                    elt, generators, ..
-                },
-            ) => {
-                self.with_generators_scope(
-                    NodeWithScopeRef::GeneratorExpression(generator),
-                    generators,
-                    |builder| builder.visit_expr(elt),
-                );
-            }
-            ast::Expr::DictComp(
-                dict_comprehension @ ast::ExprDictComp {
-                    key,
-                    value,
-                    generators,
-                    ..
-                },
-            ) => {
-                let scope = self.with_generators_scope(
-                    NodeWithScopeRef::DictComprehension(dict_comprehension),
-                    generators,
-                    |builder| {
-                        if let Some(key) = key {
-                            builder.visit_expr(key);
-                        }
-                        builder.visit_expr(value);
-                    },
-                );
-                if self.async_comprehensions.contains(&scope) {
-                    self.mark_current_comprehension_async();
-                }
-            }
-            ast::Expr::Call(_) | ast::Expr::BinOp(_) => {
-                walk_expr(self, expr);
-                self.record_exception_checkpoint();
-            }
-            ast::Expr::UnaryOp(unary) => {
-                walk_expr(self, expr);
-                self.record_exception_checkpoint_if(
-                    unary.op != ast::UnaryOp::Not
-                        || !Self::condition_evaluation_is_known_safe(&unary.operand),
-                );
-            }
-            ast::Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                ..
-            }) => {
-                self.visit_expr(left);
-                for (op, comparator) in ops.iter().zip(comparators) {
-                    self.visit_expr(comparator);
-                    self.record_exception_checkpoint_if(!matches!(
-                        op,
-                        ast::CmpOp::Is | ast::CmpOp::IsNot
-                    ));
-                }
-            }
-            ast::Expr::BoolOp(node) => self.visit_bool_expression(node),
-            ast::Expr::StringLiteral(_) => {
-                walk_expr(self, expr);
-            }
-            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
-                let scope = self.current_scope();
-                if self.scopes[scope].kind() == ScopeKind::Function {
-                    self.generator_functions.insert(scope);
-                }
-                walk_expr(self, expr);
-                self.record_exception_checkpoint();
-            }
-            ast::Expr::Await(_) => {
-                self.mark_current_comprehension_async();
-                walk_expr(self, expr);
-                self.record_exception_checkpoint();
-            }
-            _ => {
-                walk_expr(self, expr);
-            }
-        }
+        // Generic AST walking evaluates child expressions as values. Short-circuit syntax
+        // propagates condition context explicitly through `visit_expr_with_context`.
+        self.visit_expr_with_context(expr, ExpressionContext::Value);
     }
 
     fn visit_parameters(&mut self, parameters: &'ast ast::Parameters) {

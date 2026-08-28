@@ -973,6 +973,27 @@ impl Truthiness {
     }
 
     #[must_use]
+    pub fn and(self, other: Self) -> Self {
+        match self {
+            Truthiness::AlwaysTrue => other,
+            Truthiness::AlwaysFalse => self,
+            Truthiness::Ambiguous => match other {
+                Truthiness::AlwaysFalse => Truthiness::AlwaysFalse,
+                Truthiness::AlwaysTrue | Truthiness::Ambiguous => Truthiness::Ambiguous,
+            },
+        }
+    }
+
+    /// Like [`Truthiness::and`], but evaluates `other` only when `self` may be true.
+    #[must_use]
+    pub fn and_else(self, other: impl FnOnce() -> Self) -> Self {
+        match self {
+            Truthiness::AlwaysFalse => self,
+            Truthiness::AlwaysTrue | Truthiness::Ambiguous => self.and(other()),
+        }
+    }
+
+    #[must_use]
     pub fn or(self, other: Self) -> Self {
         match self {
             Truthiness::AlwaysTrue => self,
@@ -1078,6 +1099,7 @@ mod tests {
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
 
+    use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous};
     use super::*;
 
     use crate::{
@@ -1135,6 +1157,35 @@ mod tests {
             .symbols()
             .map(|expr| expr.name().to_string())
             .collect()
+    }
+
+    #[test]
+    fn truthiness_and() {
+        for (left, right, expected) in [
+            (AlwaysTrue, AlwaysTrue, AlwaysTrue),
+            (AlwaysTrue, AlwaysFalse, AlwaysFalse),
+            (AlwaysTrue, Ambiguous, Ambiguous),
+            (AlwaysFalse, AlwaysTrue, AlwaysFalse),
+            (AlwaysFalse, AlwaysFalse, AlwaysFalse),
+            (AlwaysFalse, Ambiguous, AlwaysFalse),
+            (Ambiguous, AlwaysTrue, Ambiguous),
+            (Ambiguous, AlwaysFalse, AlwaysFalse),
+            (Ambiguous, Ambiguous, Ambiguous),
+        ] {
+            assert_eq!(left.and(right), expected, "{left:?}.and({right:?})");
+
+            let mut calls = 0;
+            let lazy_result = left.and_else(|| {
+                calls += 1;
+                right
+            });
+            assert_eq!(lazy_result, expected, "{left:?}.and_else(|| {right:?})");
+            assert_eq!(
+                calls,
+                usize::from(left != AlwaysFalse),
+                "{left:?}.and_else call count"
+            );
+        }
     }
 
     #[test]
