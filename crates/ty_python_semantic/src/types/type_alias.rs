@@ -4,9 +4,9 @@ use std::fmt::Write;
 use crate::{
     Db, FxOrderSet,
     types::{
-        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext, KnownClass,
-        KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypingModule,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
+        TypeMapping, TypeVarVariance, TypingModule,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
@@ -30,27 +30,88 @@ impl<'db> Type<'db> {
     /// another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
-        self.has_unguarded_alias_cycle_impl(db, &CycleDetector::new(true))
+        AliasCycleSummary::from_type(
+            db,
+            self,
+            &CycleDetector::new(AliasCycleSummary {
+                cyclic: true,
+                ..AliasCycleSummary::default()
+            }),
+        )
+        .cyclic
+    }
+}
+
+/// An alias's cycles and the type variables exposed outside containers and other enclosing types.
+/// Only arguments substituted for these variables can introduce an unguarded cycle.
+#[derive(Clone, Default)]
+struct AliasCycleSummary<'db> {
+    cyclic: bool,
+    typevars: Box<[BoundTypeVarInstance<'db>]>,
+}
+
+impl<'db> AliasCycleSummary<'db> {
+    fn from_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visitor: &CycleDetector<'db, (), Type<'db>, Self, 8>,
+    ) -> Self {
+        let mut typevars = FxOrderSet::default();
+        let cyclic = Self::collect(db, ty, visitor, &mut typevars);
+        Self {
+            cyclic,
+            typevars: typevars.into_iter().collect(),
+        }
     }
 
-    fn has_unguarded_alias_cycle_impl(
-        self,
+    fn collect(
         db: &'db dyn Db,
-        visitor: &CycleDetector<'db, (), Type<'db>, bool, 8>,
+        ty: Type<'db>,
+        visitor: &CycleDetector<'db, (), Type<'db>, Self, 8>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) -> bool {
-        match self {
-            Type::TypeAlias(alias) => visitor.visit(db, self, || {
-                // Substitution can expose a cycle through an otherwise non-recursive alias,
-                // as in `type Identity[T] = T; type Cycle = Identity[Cycle]`.
-                alias
-                    .value_type(db)
-                    .has_unguarded_alias_cycle_impl(db, visitor)
-            }),
+        match ty {
+            Type::TypeAlias(alias) => {
+                // Inspect the definition independently of its arguments. Nested applications like
+                // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing
+                // recursive references beneath a container.
+                let definition = alias.unspecialized(db);
+                let summary = visitor.visit(db, Type::TypeAlias(definition), || {
+                    Self::from_type(db, definition.raw_value_type(db), visitor)
+                });
+                if summary.cyclic {
+                    return true;
+                }
+                let specialization = alias.specialization(db).or_else(|| {
+                    alias
+                        .generic_context(db)
+                        .map(|context| context.default_specialization(db, None))
+                });
+
+                // Process supplied arguments after leaving the definition's active visit. An
+                // exposed argument can still close a cycle in the caller, as in
+                // `type Identity[T] = T; type Cycle = Identity[Cycle]`.
+                summary.typevars.iter().any(|&typevar| {
+                    if let Some(argument) =
+                        specialization.and_then(|specialization| specialization.get(db, typevar))
+                        && argument != Type::TypeVar(typevar)
+                    {
+                        Self::collect(db, argument, visitor, typevars)
+                    } else {
+                        typevars.insert(typevar);
+                        false
+                    }
+                })
+            }
+            Type::TypeVar(typevar) => {
+                typevars.insert(typevar);
+                false
+            }
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .any(|element| element.has_unguarded_alias_cycle_impl(db, visitor)),
-            _ => self.is_divergent(),
+                .any(|&element| Self::collect(db, element, visitor, typevars)),
+            _ => ty.is_divergent(),
         }
     }
 }

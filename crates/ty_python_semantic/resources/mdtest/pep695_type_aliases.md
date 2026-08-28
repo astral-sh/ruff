@@ -1034,6 +1034,38 @@ cycle.
 type ThroughIdentity = Identity[ThroughIdentity]
 ```
 
+### Finite nested applications of recursive aliases
+
+A recursive alias can appear in its own type arguments without creating a cycle in its expansion.
+Here, expanding the two applications exposes `int`; the remaining recursion is inside `list`.
+
+```py
+type Recursive[T] = T | list[Recursive[list[T]]]
+type Repeated = Recursive[Recursive[int]]
+
+value: Repeated = 1
+```
+
+An exposed type argument can still close a cycle. Unlike the finite nested applications above, this
+argument leads back to the alias being defined.
+
+```py
+type Cycle = Recursive[Cycle]  # error: [cyclic-type-alias-definition]
+```
+
+The same rule applies to aliases created with `TypeAliasType`.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+Functional = TypeAliasType("Functional", T | "list[Functional[list[T]]]", type_params=(T,))
+RepeatedFunctional = TypeAliasType("RepeatedFunctional", Functional[Functional[int]])
+
+functional_value: RepeatedFunctional = 1
+FunctionalCycle = TypeAliasType("FunctionalCycle", Functional["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
+```
+
 ### With legacy generic
 
 ```py
