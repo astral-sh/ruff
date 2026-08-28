@@ -61,6 +61,37 @@ fn rule_json_output() {
 }
 
 #[test]
+fn preview_rule_status() -> anyhow::Result<()> {
+    let output = ty_cmd()
+        .args(["explain", "rule", "missing-direct-dependency"])
+        .output()?;
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("Default level: ignore | Preview (since 0.0.76)"),
+        "{stdout}"
+    );
+
+    let output = ty_cmd()
+        .args([
+            "explain",
+            "rule",
+            "missing-direct-dependency",
+            "--output-format",
+            "json",
+        ])
+        .output()?;
+    assert!(output.status.success());
+    let rule: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(
+        rule["status"],
+        serde_json::json!({"type": "preview", "since": "0.0.76"})
+    );
+
+    Ok(())
+}
+
+#[test]
 fn rule_unknown() {
     assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "does-not-exist"]), @"
     success: false

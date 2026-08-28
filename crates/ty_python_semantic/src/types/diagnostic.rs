@@ -1183,7 +1183,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/missing-direct-dependency.md")]
     pub(crate) static MISSING_DIRECT_DEPENDENCY = {
         summary: "detects imports of dependencies that are not declared directly",
-        status: LintStatus::stable("0.0.75"),
+        status: LintStatus::preview("0.0.76"),
         default_level: Level::Ignore,
     }
 }
