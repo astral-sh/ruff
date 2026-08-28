@@ -279,7 +279,7 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "hints")]
     pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
-        Ok(hints(&self.db, self.db.program_file(file_id.file))
+        Ok(hints(&self.db, file_id.file)
             .into_iter()
             .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
             .collect())
