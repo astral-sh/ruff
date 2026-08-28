@@ -71,6 +71,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CYCLIC_TYPE_ALIAS_DEFINITION);
     registry.register_lint(&DEPRECATED);
     registry.register_lint(&DIVISION_BY_ZERO);
+    registry.register_lint(&DYNAMIC_CLASS_DECORATOR_RETURN);
     registry.register_lint(&DYNAMIC_FUNCTION_DECORATOR_RETURN);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
@@ -436,6 +437,17 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[expect(clippy::doc_overindented_list_items)]
+    #[doc = include_str!("../../resources/lint_docs/dynamic-class-decorator-return.md")]
+    pub(crate) static DYNAMIC_CLASS_DECORATOR_RETURN = {
+        summary: "detects decorators that replace a class with a dynamic type such as `Any`",
+        status: LintStatus::stable("0.0.76"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/dynamic-function-decorator-return.md")]
     pub(crate) static DYNAMIC_FUNCTION_DECORATOR_RETURN = {
         summary: "detects decorators that replace a function with a dynamic type such as `Any`",
@@ -2528,6 +2540,50 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
     };
 
     diagnostic.annotate(secondary_annotation);
+
+    add_dynamic_decorator_definition(context, &mut diagnostic, decorator_bindings);
+}
+
+pub(super) fn report_dynamic_class_decorator_return<'db>(
+    context: &InferContext<'db, '_>,
+    decorator: &ast::Decorator,
+    decorated_ty: Type<'db>,
+    decorator_bindings: &Bindings<'db>,
+    decorated_class: &ast::StmtClassDef,
+    return_ty: Type<'db>,
+) {
+    let Some(builder) = context.report_lint(&DYNAMIC_CLASS_DECORATOR_RETURN, decorator) else {
+        return;
+    };
+
+    let db = context.db();
+    let env = context.program_environment();
+    let returned = return_ty.display(db, env);
+
+    let mut diagnostic = builder.into_diagnostic(format_args!("Decorator returns `{returned}`"));
+    let description = if decorated_ty.is_class_literal() {
+        "Class"
+    } else {
+        "Previous type of"
+    };
+    diagnostic.annotate(
+        context
+            .secondary(&decorated_class.name)
+            .message(format_args!(
+                "{description} `{}` will be obscured by the decorator",
+                decorated_class.name.id
+            )),
+    );
+
+    add_dynamic_decorator_definition(context, &mut diagnostic, decorator_bindings);
+}
+
+fn add_dynamic_decorator_definition<'db>(
+    context: &InferContext<'db, '_>,
+    diagnostic: &mut LintDiagnosticGuard,
+    decorator_bindings: &Bindings<'db>,
+) {
+    let db = context.db();
 
     // Union and intersection bindings can refer to different callables, so there is no single
     // decorator definition or set of overloads that can be safely highlighted.

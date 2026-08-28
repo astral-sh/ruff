@@ -1,9 +1,10 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
-    CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
+    CallArguments, DataclassParams, DynamicType, KnownClass, KnownInstanceType, SpecialFormType,
     StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule,
-    call::CallError,
+    call::{Bindings, CallError},
+    diagnostic::{DYNAMIC_CLASS_DECORATOR_RETURN, report_dynamic_class_decorator_return},
     function::KnownFunction,
     infer::{
         TypeInferenceBuilder,
@@ -273,7 +274,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
             let decorator_result = apply_class_decorator(db, env, decorator_ty, original_class_ty);
             let decorated_ty = match &decorator_result {
-                Ok(return_ty) => *return_ty,
+                Ok(bindings) => bindings.return_type(db, env),
                 Err(error) => error.return_type(db, env),
             };
             if !is_unknown_decorator_result(db, decorated_ty)
@@ -314,11 +315,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => apply_class_decorator(db, env, decorator_ty, inferred_ty),
             };
-            let decorated_ty = match decorator_result {
-                Ok(return_ty) => return_ty,
+            let (decorated_ty, decorator_bindings) = match decorator_result {
+                Ok(bindings) => (bindings.return_type(db, env), Some(bindings)),
                 Err(CallError(_, bindings)) => {
                     bindings.report_diagnostics(&self.context, decorator_node.into());
-                    bindings.return_type(db, env)
+                    (bindings.return_type(db, env), None)
                 }
             };
             let decorated_ty = match decorated_ty {
@@ -341,6 +342,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     decorated_ty,
                 )
             } else {
+                if let Some(decorator_bindings) = decorator_bindings.as_ref()
+                    && self
+                        .context
+                        .is_lint_enabled(&DYNAMIC_CLASS_DECORATOR_RETURN)
+                    && is_dynamic_class_decorator_result(db, env, decorated_ty)
+                    && !is_dynamic_class_decorator_result(db, env, inferred_ty)
+                {
+                    report_dynamic_class_decorator_return(
+                        &self.context,
+                        decorator_node,
+                        inferred_ty,
+                        decorator_bindings,
+                        class_node,
+                        decorated_ty,
+                    );
+                }
+
                 // Only record an undecorated type once a decorator actually replaces the public
                 // binding. If all decorators preserve the class, there is no alternate class type
                 // to expose.
@@ -438,11 +456,18 @@ fn apply_class_decorator<'db>(
     env: &ProgramEnvironment<'db>,
     decorator_ty: Type<'db>,
     decorated_ty: Type<'db>,
-) -> Result<Type<'db>, CallError<'db>> {
+) -> Result<Bindings<'db>, CallError<'db>> {
     let call_arguments = CallArguments::positional([decorated_ty]);
-    decorator_ty
-        .try_call(db, env, &call_arguments)
-        .map(|bindings| bindings.return_type(db, env))
+    decorator_ty.try_call(db, env, &call_arguments)
+}
+
+fn is_dynamic_class_decorator_result<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    ty.is_equivalent_to(db, env, Type::any())
+        || ty.is_equivalent_to(db, env, SubclassOfType::from(db, env, DynamicType::Any))
 }
 
 /// Return true if a decorator result still binds the name to the original class.

@@ -682,6 +682,7 @@ from typing import Any
 def decorator(cls: type) -> Any:
     return cls
 
+# error: [dynamic-class-decorator-return]
 @decorator
 class C: ...
 
@@ -694,6 +695,7 @@ An explicit `type[Any]` return type also replaces the binding:
 def class_decorator(cls: type) -> type[Any]:
     return cls
 
+# error: [dynamic-class-decorator-return]
 @class_decorator
 class D: ...
 
@@ -1413,4 +1415,319 @@ def returns_callable(function: Callable[..., object]) -> Callable[..., Any]:
 @returns_callable
 def decorated_function(value: int) -> str:
     return str(value)
+```
+
+## Dynamic class decorator returns
+
+### Basics
+
+A decorator that returns `Any` erases the original class's type. Our opt-in diagnostic
+`dynamic-class-decorator-return` identifies and flags these cases, which will be undesirable for
+users who want strict typing enforced on their codebases:
+
+```py
+from typing import Any
+
+def returns_any(cls: type) -> Any:
+    return cls
+
+# snapshot: dynamic-class-decorator-return
+@returns_any
+class FullyTyped:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+reveal_type(FullyTyped)  # revealed: Any
+```
+
+```snapshot
+info[dynamic-class-decorator-return]: Decorator returns `Any`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | @returns_any
+  | ^^^^^^^^^^^^
+8 | class FullyTyped:
+  |       ---------- Class `FullyTyped` will be obscured by the decorator
+  |
+ ::: src/mdtest_snippet.py:3:5
+  |
+3 | def returns_any(cls: type) -> Any:
+  |     ----------------------------- `returns_any` defined here
+```
+
+A decorator that returns `type[Any]` still describes a class, but obscures its constructor and
+attributes:
+
+```py
+def returns_dynamic_class(cls: type) -> type[Any]:
+    return cls
+
+# snapshot: dynamic-class-decorator-return
+@returns_dynamic_class
+class DynamicClass:
+    value: int
+
+reveal_type(DynamicClass)  # revealed: type[Any]
+```
+
+```snapshot
+info[dynamic-class-decorator-return]: Decorator returns `type[Any]`
+  --> src/mdtest_snippet.py:17:1
+   |
+17 | @returns_dynamic_class
+   | ^^^^^^^^^^^^^^^^^^^^^^
+18 | class DynamicClass:
+   |       ------------ Class `DynamicClass` will be obscured by the decorator
+   |
+  ::: src/mdtest_snippet.py:13:5
+   |
+13 | def returns_dynamic_class(cls: type) -> type[Any]:
+   |     --------------------------------------------- `returns_dynamic_class` defined here
+```
+
+### Unknown decorator returns preserve the class
+
+Unlike function decorators, class decorators that return `Unknown` or `type[Unknown]` receive
+special casing. Most class decorators return the original class largely unchanged, so ty assumes
+that these decorators preserve the type of the class passed to them. Rather than replacing that type
+with the decorator's return type, we retain the class's constructor signature and attributes. The
+decorator application therefore does not erase any type information, and
+`dynamic-class-decorator-return` does not fire.
+
+This special case applies to the result of the decorator call, regardless of why the result is
+unknown: a missing return annotation, an invalid annotation, or an unresolved import can all lead to
+an `Unknown` return type. We test both an unannotated decorator and explicitly annotated decorators
+whose return types are `Unknown` or `type[Unknown]`:
+
+```py
+from ty_extensions._internal import Unknown
+
+def unannotated(cls):
+    return cls
+
+def returns_unknown(cls: type) -> Unknown:
+    return cls
+
+def returns_unknown_class(cls: type) -> type[Unknown]:
+    return cls
+
+@unannotated
+@returns_unknown
+@returns_unknown_class
+class Preserved:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+reveal_type(Preserved)  # revealed: <class 'Preserved'>
+reveal_type(Preserved(1).value)  # revealed: int
+Preserved("a")  # error: [invalid-argument-type]
+```
+
+### Dynamic decorators implemented by callable instances
+
+A callable-instance decorator points to its `__call__` method:
+
+```py
+from typing import Any
+
+class CallableDecorator:
+    def __call__(self, cls: type) -> type[Any]:
+        return cls
+
+# snapshot: dynamic-class-decorator-return
+@CallableDecorator()
+class Decorated: ...
+
+reveal_type(Decorated)  # revealed: type[Any]
+```
+
+```snapshot
+info[dynamic-class-decorator-return]: Decorator returns `type[Any]`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | @CallableDecorator()
+  | ^^^^^^^^^^^^^^^^^^^^
+9 | class Decorated: ...
+  |       --------- Class `Decorated` will be obscured by the decorator
+  |
+ ::: src/mdtest_snippet.py:4:9
+  |
+4 |     def __call__(self, cls: type) -> type[Any]:
+  |         -------------------------------------- `CallableDecorator.__call__` defined here
+```
+
+### Dynamic decorators use the matched overload definition
+
+The definition annotation points to the overload selected by the implicit decorator call, even when
+that overload is not the first declaration. An unannotated implementation does not cause a
+suggestion to add a return annotation, since its annotation is irrelevant to the diagnostic:
+
+`decorator.py`:
+
+```py
+from typing import Any, overload
+
+@overload
+def dynamic(value: None) -> None: ...
+@overload
+def dynamic(value: type) -> Any: ...
+def dynamic(value):
+    return value
+```
+
+`main.py`:
+
+```py
+from decorator import dynamic
+
+# snapshot: dynamic-class-decorator-return
+@dynamic
+class Decorated: ...
+```
+
+```snapshot
+info[dynamic-class-decorator-return]: Decorator returns `Any`
+ --> src/main.py:4:1
+  |
+4 | @dynamic
+  | ^^^^^^^^
+5 | class Decorated: ...
+  |       --------- Class `Decorated` will be obscured by the decorator
+  |
+ ::: src/decorator.py:6:5
+  |
+6 | def dynamic(value: type) -> Any: ...
+  |     --------------------------- Matching overload defined here
+```
+
+### Multiple dynamic decorators
+
+Only the first decorator that replaces a precise type with a dynamic type is reported. Outer
+decorators receive an already-dynamic type, so they do not lose any additional information:
+
+```py
+from typing import Any
+
+def dynamic(value: Any) -> Any:
+    return value
+
+def dynamic_class(value: Any) -> type[Any]:
+    return value
+
+@dynamic
+# error: [dynamic-class-decorator-return]
+@dynamic
+class Decorated: ...
+
+@dynamic_class
+@dynamic
+# error: [dynamic-class-decorator-return]
+@dynamic_class
+class DecoratedClass: ...
+
+reveal_type(Decorated)  # revealed: Any
+reveal_type(DecoratedClass)  # revealed: type[Any]
+```
+
+### Dynamic decorators applied to replacement values
+
+When an inner decorator replaces a class with a non-class value, an outer dynamic decorator obscures
+that replacement value's type rather than the original class type:
+
+```py
+from typing import Any
+
+def replace_with_int(cls: type) -> int:
+    return 1
+
+def dynamic(value: int) -> Any:
+    return value
+
+# snapshot: dynamic-class-decorator-return
+@dynamic
+@replace_with_int
+class Decorated: ...
+```
+
+```snapshot
+info[dynamic-class-decorator-return]: Decorator returns `Any`
+  --> src/mdtest_snippet.py:10:1
+   |
+10 | @dynamic
+   | ^^^^^^^^
+11 | @replace_with_int
+12 | class Decorated: ...
+   |       --------- Previous type of `Decorated` will be obscured by the decorator
+   |
+  ::: src/mdtest_snippet.py:6:5
+   |
+ 6 | def dynamic(value: int) -> Any:
+   |     -------------------------- `dynamic` defined here
+```
+
+### Decorator return types equivalent to dynamic types
+
+Aliases of `Any` and `type[Any]` erase the decorated type in the same way as direct annotations:
+
+```py
+from typing import Any, TypeAlias
+
+DynamicAlias: TypeAlias = Any
+DynamicClassAlias: TypeAlias = type[Any]
+
+def returns_alias(value: type) -> DynamicAlias:
+    return value
+
+# error: [dynamic-class-decorator-return]
+@returns_alias
+class Decorated: ...
+
+def returns_class_alias(value: type) -> DynamicClassAlias:
+    return value
+
+# error: [dynamic-class-decorator-return]
+@returns_class_alias
+class DecoratedClass: ...
+```
+
+### Partially dynamic decorator returns
+
+A decorator does not erase all information when its return type merely contains `Any`. These
+decorators retain a callable signature or a specific class, so they are not reported:
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def returns_callable(cls: type) -> Callable[..., Any]:
+    return cls
+
+@returns_callable
+class DecoratedCallable: ...
+
+def returns_list_class(cls: type) -> type[list[Any]]:
+    return list
+
+@returns_list_class
+class DecoratedList: ...
+
+reveal_type(DecoratedCallable)  # revealed: (...) -> Any
+reveal_type(DecoratedList)  # revealed: type[list[Any]]
+```
+
+### Invalid decorator calls
+
+An invalid decorator call reports the call error without an additional dynamic-return diagnostic:
+
+```py
+from typing import Any
+
+def dynamic(value: int) -> Any:
+    return value
+
+# error: [invalid-argument-type]
+@dynamic
+class Decorated: ...
+
+reveal_type(Decorated)  # revealed: Any
 ```
