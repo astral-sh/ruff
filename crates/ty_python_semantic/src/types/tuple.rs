@@ -800,25 +800,42 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = left.len().size_hint();
         let (other_min, other_max) = right.len().size_hint();
-        if self_max.is_some_and(|max| max < other_min) {
-            return self.always();
-        }
-        if other_max.is_some_and(|max| max < self_min) {
+        if self_max.is_some_and(|max| max < other_min)
+            || other_max.is_some_and(|max| max < self_min)
+        {
+            if let Some(context) = self.report_context() {
+                context.push(ErrorContext::DisjointTupleLengths {
+                    left: left.len(),
+                    right: right.len(),
+                });
+            }
             return self.always();
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
         let any_disjoint = |a: &[Type<'db>], b: &[Type<'db>], rev: bool| {
+            let check_element = |(index, (&left, &right))| {
+                let result = self.check_type_pair(db, left, right);
+                if let Some(context) = self.report_context()
+                    && result.is_always_satisfied(db, self.env)
+                {
+                    context.push(ErrorContext::DisjointTupleElement {
+                        left,
+                        right,
+                        index,
+                        from_end: rev,
+                    });
+                }
+                result
+            };
             if rev {
-                std::iter::zip(a.iter().rev(), b.iter().rev()).when_any(
-                    db,
-                    self.constraints,
-                    |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
-                )
+                std::iter::zip(a.iter().rev(), b.iter().rev())
+                    .enumerate()
+                    .when_any(db, self.constraints, check_element)
             } else {
-                std::iter::zip(a, b).when_any(db, self.constraints, |(&left_elem, &right_elem)| {
-                    self.check_type_pair(db, left_elem, right_elem)
-                })
+                std::iter::zip(a, b)
+                    .enumerate()
+                    .when_any(db, self.constraints, check_element)
             }
         };
 

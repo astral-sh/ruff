@@ -98,9 +98,9 @@ use crate::types::{
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
 
@@ -2715,16 +2715,61 @@ impl KnownFunction {
                     && !source_type.is_equivalent_to(db, env, Type::Never)
                     && let Some(builder) = context.report_lint(&DISJOINT_CAST, call_expression)
                 {
-                    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
-                        db,
-                        env,
-                        [*source_type, casted_type],
-                    );
-                    builder.into_diagnostic(format_args!(
-                        "Cannot cast from `{}` to `{}`: the types are disjoint",
-                        source_type.display_with(db, env, display_settings.clone()),
-                        casted_type.display_with(db, env, display_settings),
+                    let types = [*source_type, casted_type];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                    let source_display = source_type.display_with(db, env, settings.clone());
+                    let casted_display = casted_type.display_with(db, env, settings.clone());
+                    let mut diagnostic = builder.into_diagnostic("Disjoint cast");
+                    diagnostic.set_concise_message(format_args!(
+                        "Disjoint cast from `{source_display}` to `{casted_display}`",
                     ));
+                    if let Some(arg) = call_expression.arguments.find_argument_value("typ", 0) {
+                        diagnostic.annotate(
+                            context
+                                .secondary(arg)
+                                .message("Disjoint from the inferred type"),
+                        );
+                    }
+                    if let Some(arg) = call_expression.arguments.find_argument_value("val", 1) {
+                        diagnostic.annotate(
+                            context
+                                .secondary(arg)
+                                .message(format_args!("Inferred as `{source_display}`")),
+                        );
+                    }
+                    let definitions: FxIndexMap<Definition<'db>, String> =
+                        [*source_type, casted_type]
+                            .into_iter()
+                            .filter_map(|ty| ty.definition(db, env))
+                            .filter_map(|definition| definition.definition())
+                            .filter_map(|definition| Some((definition, definition.name(db)?)))
+                            .collect();
+
+                    for (definition, name) in definitions {
+                        let file = definition.python_file(db);
+                        let module = parsed_module(db, file).load(db);
+                        let mut range = definition.focus_range(db, &module);
+                        if let DefinitionKind::Class(class) = definition.kind(db) {
+                            let definition_types = infer_definition_types(db, definition);
+                            if let Some(decorator) =
+                                class.node(&module).decorator_list.iter().find(|decorator| {
+                                    definition_types
+                                        .expression_type(&decorator.expression)
+                                        .as_function_literal()
+                                        .is_some_and(|func| func.is_known(db, KnownFunction::Final))
+                                })
+                            {
+                                range = range.cover_range(decorator.range());
+                            }
+                        }
+                        diagnostic.annotate(
+                            Annotation::secondary(Span::from(range))
+                                .message(format_args!("`{name}` defined here")),
+                        );
+                    }
+                    source_type
+                        .disjointness_error_context(db, env, casted_type)
+                        .attach_to(db, env, &mut diagnostic);
                 }
             }
 

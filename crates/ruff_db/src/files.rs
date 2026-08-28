@@ -681,6 +681,12 @@ impl FileRange {
     pub const fn file(&self) -> File {
         self.file
     }
+
+    #[must_use]
+    pub fn cover_range(mut self, range: TextRange) -> Self {
+        self.range = self.range.cover(range);
+        self
+    }
 }
 
 impl Ranged for FileRange {

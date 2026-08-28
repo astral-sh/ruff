@@ -45,9 +45,9 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypingModule,
-    UnionBuilder, VarianceInferable,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
+    ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
+    TypingModule, UnionBuilder, VarianceInferable,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -1670,6 +1670,7 @@ impl<'db> ClassType<'db> {
             db,
             env,
             other,
+            None,
             |this, other| this.could_exist_in_mro_of(db, env, other, constraints),
             |this, other| {
                 this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
@@ -1695,6 +1696,7 @@ impl<'db> ClassType<'db> {
             db,
             env,
             other,
+            checker.report_context(),
             |this, other| {
                 this.could_exist_in_mro_of_with_disjointness_checker(db, env, other, checker)
             },
@@ -1711,11 +1713,13 @@ impl<'db> ClassType<'db> {
         )
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn could_coexist_in_mro_with_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other: Self,
+        context: Option<&ErrorContextTree<'db>>,
         could_exist_in_mro_of: impl Fn(Self, Self) -> bool,
         specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
         types_are_disjoint: impl Fn(Type<'db>, Type<'db>) -> bool,
@@ -1725,11 +1729,25 @@ impl<'db> ClassType<'db> {
         }
 
         if self.is_final(db) {
-            return could_exist_in_mro_of(other, self);
+            let compatible = could_exist_in_mro_of(other, self);
+            if !compatible && let Some(context) = context {
+                context.push(ErrorContext::FinalClassDisjoint {
+                    final_type: Type::instance(db, env, self),
+                    other: Type::instance(db, env, other),
+                });
+            }
+            return compatible;
         }
 
         if other.is_final(db) {
-            return could_exist_in_mro_of(self, other);
+            let compatible = could_exist_in_mro_of(self, other);
+            if !compatible && let Some(context) = context {
+                context.push(ErrorContext::FinalClassDisjoint {
+                    final_type: Type::instance(db, env, other),
+                    other: Type::instance(db, env, self),
+                });
+            }
+            return compatible;
         }
 
         // A class cannot implement two incompatible specializations of an invariant base.
@@ -1748,6 +1766,12 @@ impl<'db> ClassType<'db> {
                     })
             })
         {
+            if let Some(context) = context {
+                context.push(ErrorContext::IncompatibleClassLayouts {
+                    left: Type::instance(db, env, self),
+                    right: Type::instance(db, env, other),
+                });
+            }
             return false;
         }
 
