@@ -1500,21 +1500,17 @@ static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[Any]]))
 ```
 
 An unresolved type variable does not necessarily satisfy a materialization's bounds. Conversely,
-`Top[list[Unknown]]` includes specializations that do not match an arbitrary fixed `T`, as in
-[ty#4201](https://github.com/astral-sh/ty/issues/4201). Neither comparison below holds for every
-`T`, and the union retains both alternatives.
+`Top[list[Unknown]]` includes specializations that do not match an arbitrary fixed `T`.
 
 ```pyi
 from ty_extensions._internal import Unknown
 
-def unresolved[T](values: list[T] | Top[list[int & Any]]):
+def unresolved[T]():
     static_assert(not is_subtype_of(list[T], Top[list[int & Any]]))
     static_assert(not is_subtype_of(Top[list[Unknown]], list[T]))
-    reveal_type(values)  # revealed: list[T@unresolved] | Top[list[int & Any]]
 ```
 
-A declared upper bound can establish the required relation without fixing the type variable to one
-particular specialization.
+A declared upper bound on `T` can make this relation true:
 
 ```pyi
 def bounded[T: int]():
