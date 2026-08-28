@@ -9,7 +9,7 @@ use crate::{
         TypeMapping, TypeRecursionContext, TypingModule, VarianceTerm, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
-        variance::{VarianceInferable, VarianceOrigin, VarianceVariable},
+        variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
 };
@@ -641,16 +641,15 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        VarianceTerm::Variable(VarianceVariable::new(
-            db,
-            VarianceOrigin::TypeAlias(self),
-            typevar,
-        ))
+        VarianceTerm::variable(db, VarianceOrigin::TypeAlias(self), typevar)
     }
 }
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
+    /// Measure the alias's own parameters in its raw RHS, and external parameters through its
+    /// specialization arguments. For `type Items[T] = list[T]`, querying `Items[int]` for its
+    /// formal `T` still describes `list[T]`, not the specialized `list[int]`.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
@@ -666,8 +665,7 @@ impl<'db> TypeAliasType<'db> {
             return self.value_type(db).variance_of(db, &env, typevar);
         };
 
-        // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
-        // here would recursively request the same `variance_of` query.
+        // Applying specialization here can re-enter variance inference for the same alias.
         if generic_context
             .variables(db)
             .any(|alias_typevar| alias_typevar.identity(db) == typevar)

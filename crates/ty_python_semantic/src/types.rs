@@ -5268,7 +5268,8 @@ impl<'db> Type<'db> {
                 // Variance accounts for aliases without expanding recursive specializations,
                 // and ignores alias arguments that do not affect the resulting type.
                 && generic_context.variables(db).any(|typevar| {
-                    ty.variance_of(db, env, typevar.identity(db)) != TypeVarVariance::Bivariant
+                    ty.variance_of(db, env, typevar.identity(db)).evaluate(db)
+                        != TypeVarVariance::Bivariant
                 })
         })
     }

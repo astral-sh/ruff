@@ -44,7 +44,7 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
-use crate::types::variance::{VarianceOrigin, VarianceVariable};
+use crate::types::variance::VarianceOrigin;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
@@ -515,16 +515,15 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        VarianceTerm::Variable(VarianceVariable::new(
-            db,
-            VarianceOrigin::GenericAlias(self),
-            typevar,
-        ))
+        VarianceTerm::variable(db, VarianceOrigin::GenericAlias(self), typevar)
     }
 }
 
 #[salsa::tracked]
 impl<'db> GenericAlias<'db> {
+    /// Compose each type argument's variance with its formal parameter's variance. Inferred
+    /// parameters refer to the unspecialized class equation, keeping references such as
+    /// `P[list[T]]` finite without expanding specialized class bodies.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
@@ -550,27 +549,23 @@ impl<'db> GenericAlias<'db> {
                 // Composition is commutative. Keep the argument on the left so evaluation can
                 // skip the class's potentially expensive equation when the argument is bivariant.
                 ty.variance_of(db, &env, typevar).compose_thunk(db, || {
-                    if let Some(explicit_variance) =
-                        generic_typevar.typevar(db).explicit_variance(db)
-                    {
-                        if generic_typevar.is_paramspec(db)
-                            || generic_typevar.is_typevartuple(db)
-                            || origin
-                                .into_protocol_class(db)
-                                .is_none_or(|protocol| !protocol.supports_variance_inference(db))
+                    match generic_typevar.typevar(db).explicit_variance(db) {
+                        Some(explicit_variance)
+                            if generic_typevar.is_paramspec(db)
+                                || generic_typevar.is_typevartuple(db)
+                                || origin.into_protocol_class(db).is_none_or(|protocol| {
+                                    !protocol.supports_variance_inference(db)
+                                }) =>
                         {
-                            return explicit_variance.into();
+                            explicit_variance.into()
                         }
-                        return VarianceTerm::Variable(VarianceVariable::new(
+                        Some(explicit_variance) => VarianceTerm::variable(
                             db,
                             VarianceOrigin::ProtocolParameter(origin, explicit_variance),
                             generic_typevar.identity(db),
-                        ));
+                        ),
+                        None => origin.variance_of(db, &env, generic_typevar.identity(db)),
                     }
-
-                    // References name the formal parameter's equation rather than expanding a
-                    // specialized body, so recursive applications remain a finite graph.
-                    origin.variance_of(db, &env, generic_typevar.identity(db))
                 })
             });
         VarianceTerm::join(db, variances)

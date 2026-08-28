@@ -33,6 +33,14 @@ pub(crate) enum VarianceTerm<'db> {
 impl<'db> VarianceTerm<'db> {
     pub(crate) const BIVARIANT: Self = Self::Constant(TypeVarVariance::Bivariant);
 
+    pub(crate) fn variable(
+        db: &'db dyn Db,
+        origin: VarianceOrigin<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Self {
+        Self::Variable(VarianceVariable::new(db, origin, typevar))
+    }
+
     /// Combine occurrences without discarding symbolic dependencies at `Invariant`.
     /// Only evaluation can short-circuit there: later terms can still connect a recursive group.
     pub(crate) fn join(db: &'db dyn Db, terms: impl IntoIterator<Item = Self>) -> Self {
@@ -74,6 +82,8 @@ impl<'db> VarianceTerm<'db> {
         self.evaluate_with(db, &|variable| variable.effective_variance(db))
     }
 
+    /// Substitute the supplied variable values; the component solver supplies its current
+    /// approximations for members and effective variance for references outside the component.
     fn evaluate_with(
         self,
         db: &'db dyn Db,
@@ -163,6 +173,8 @@ impl get_size2::GetSize for VarianceVariable<'_> {}
 
 #[salsa::tracked]
 impl<'db> VarianceVariable<'db> {
+    /// Honor the protocol declaration attached to this reference even when its equation infers
+    /// a different variance. References without a declaration are evaluated from their equations.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
     fn effective_variance(self, db: &'db dyn Db) -> TypeVarVariance {
         if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
@@ -172,6 +184,9 @@ impl<'db> VarianceVariable<'db> {
         }
     }
 
+    /// Return the defining expression without substituting this parameter's declared variance.
+    /// Recursive references remain symbolic, allowing the same equation to serve
+    /// ordinary evaluation and declaration validation.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
     fn equation(self, db: &'db dyn Db) -> VarianceTerm<'db> {
         let typevar = self.typevar(db);
@@ -189,7 +204,8 @@ impl<'db> VarianceVariable<'db> {
         }
     }
 
-    /// Cache the live edges independently of the parameter that initiates component discovery.
+    /// Return unique references that survive composition under ordinary, declaration-honoring
+    /// evaluation. Component discovery and the solver's work queue share these cached edges.
     #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn dependencies(self, db: &'db dyn Db) -> Box<[Self]> {
         let mut dependencies = Vec::new();
@@ -211,6 +227,9 @@ impl get_size2::GetSize for VarianceComponent<'_> {}
 #[salsa::tracked]
 impl<'db> VarianceComponent<'db> {
     /// Solve all equations together, revisiting only the dependents of a changed value.
+    ///
+    /// Results follow the component's canonical variable order. The empty Salsa cycle seed
+    /// represents bivariance for every member until the solution is available.
     #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn solution(self, db: &'db dyn Db) -> Box<[TypeVarVariance]> {
         let variables = self.variables(db);
@@ -262,6 +281,20 @@ impl<'db> VarianceComponent<'db> {
 /// Infer the root protocol parameter together with its mutually dependent parameters.
 /// Declarations outside that component remain authoritative. Equations and effective values are
 /// cached separately, so dependency discovery does not repeat the semantic type traversal.
+///
+/// For example, this infers contravariance for `T_co` despite its declaration:
+///
+/// ```python
+/// from typing import Protocol, TypeVar
+///
+/// T_co = TypeVar("T_co", covariant=True)
+/// class Sink(Protocol[T_co]):
+///     def write(self, value: T_co) -> None: ...
+///     def next(self) -> "Sink[T_co]": ...
+/// ```
+///
+/// Callers select supported protocol parameters and normalize bivariance to covariance only
+/// after inference, so unused parameters do not introduce constraints into a recursive component.
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_protocol_variance<'db>(
     db: &'db dyn Db,

@@ -52,7 +52,7 @@ use crate::{
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
-        variance::{VarianceInferable, VarianceOrigin, VarianceTerm, VarianceVariable},
+        variance::{VarianceInferable, VarianceOrigin, VarianceTerm},
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
@@ -3359,16 +3359,15 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        VarianceTerm::Variable(VarianceVariable::new(
-            db,
-            VarianceOrigin::Class(self),
-            typevar,
-        ))
+        VarianceTerm::variable(db, VarianceOrigin::Class(self), typevar)
     }
 }
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
+    /// Build a definition-site equation before substituting type arguments. Supported protocols
+    /// use their structural interface; `TypedDict` classes use their fields. Other classes retain the
+    /// ordinary attribute and base-class variance rules.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
     pub(in crate::types) fn variance_equation(
         self,

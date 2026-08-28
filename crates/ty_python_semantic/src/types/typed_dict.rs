@@ -27,7 +27,7 @@ use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
-use crate::types::variance::{VarianceOrigin, VarianceVariable};
+use crate::types::variance::VarianceOrigin;
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
@@ -1383,11 +1383,9 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
                 // not terminate for a recursive item such as `child: Node[list[T]]`.
                 class.variance_of(db, env, typevar)
             }
-            Self::Class(class) => VarianceTerm::Variable(VarianceVariable::new(
-                db,
-                VarianceOrigin::TypedDict(class),
-                typevar,
-            )),
+            Self::Class(class) => {
+                VarianceTerm::variable(db, VarianceOrigin::TypedDict(class), typevar)
+            }
             Self::Synthesized(_) => self.variance_of_items(db, env, typevar),
         }
     }

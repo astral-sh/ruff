@@ -89,7 +89,7 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
 use crate::types::tuple::TupleSpec;
-use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm, VarianceVariable};
+use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1584,14 +1584,11 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        VarianceTerm::Variable(VarianceVariable::new(
-            db,
-            VarianceOrigin::Function(self),
-            typevar,
-        ))
+        VarianceTerm::variable(db, VarianceOrigin::Function(self), typevar)
     }
 
-    /// Build the variance equation for this function's signature.
+    /// Build the signature's equation in the function's defining environment, independent of
+    /// the caller's environment. Recursive `TypeOf` annotations remain named references.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
