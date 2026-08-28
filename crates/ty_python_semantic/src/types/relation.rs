@@ -1217,10 +1217,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        let collect_context = self.is_context_collection_enabled();
         self.relation_visitor
             .try_visit(
                 db,
                 (source, target, self.relation, self.typevar_evaluation),
+                // Cached constraints do not retain explanations. When collecting context,
+                // recompute unsatisfiable comparisons while preserving the active recursion
+                // guards. Satisfiable constraints remain reusable, including those that
+                // constrain type variables.
+                |result| !collect_context || !result.is_never_satisfied(db, self.env),
                 work,
             )
             .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
