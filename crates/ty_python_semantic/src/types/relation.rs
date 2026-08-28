@@ -13,7 +13,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
-use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::set_theoretic::{RecursivelyDefined, UnionBuilder};
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::{
@@ -1153,6 +1153,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
+    fn is_redundant_with(&self, db: &'db dyn Db, candidate: Type<'db>, current: Type<'db>) -> bool {
+        Self {
+            inferable: TypeVarSet::None,
+            relation: TypeRelation::Redundancy { pure: false },
+            typevar_evaluation: TypeVarEvaluation::Eager,
+            context_tree: None,
+            given: ConstraintSet::from_bool(self.constraints, false),
+            ..self.clone()
+        }
+        .check_type_pair(db, candidate, current)
+        .is_always_satisfied(db, self.env)
+    }
+
     /// Overwrite the error context tree with a new root context and child nodes.
     fn set_context(
         &self,
@@ -1456,6 +1469,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
+            (Type::TypeAlias(source_alias), _) if source_alias.contains_growing_alias(db) => {
+                self.with_recursion_guard(db, source, target, || {
+                    // A recursion-guarded `false` is not proof that the deferred remainder is
+                    // absent, so force the sound `Unknown` fallback.
+                    let expanded = UnionBuilder::structural(db, env)
+                        .add(source)
+                        .build_with_recursive_alias_remainder_check(|_, _| false);
+                    self.check_type_pair(db, expanded, target)
+                })
+            }
+
             (Type::TypeAlias(source_alias), _) => {
                 self.with_recursion_guard(db, source, target, || {
                     self.check_type_pair(db, source_alias.value_type(db), target)
@@ -1473,7 +1497,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, union.expand_aliases(db, env))
+                    let expanded = if union.has_recursive_aliases(db) {
+                        union.expand_recursive_aliases_structurally(
+                            db,
+                            env,
+                            |remainder, current| self.is_redundant_with(db, remainder, current),
+                        )
+                    } else {
+                        union.expand_aliases(db, env)
+                    };
+                    self.check_type_pair(db, source, expanded)
                 })
             }
 

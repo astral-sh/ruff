@@ -126,6 +126,13 @@ impl<'db> UnionType<'db> {
             .any(|element| matches!(element, Type::TypeAlias(_)))
     }
 
+    /// Returns `true` if a direct alias element reaches a recursive alias.
+    pub(crate) fn has_recursive_aliases(self, db: &'db dyn Db) -> bool {
+        self.elements(db).iter().any(|element| {
+            matches!(element, Type::TypeAlias(alias) if alias.contains_recursive_alias(db))
+        })
+    }
+
     /// Recursively expands aliases that expose top-level union elements.
     ///
     /// Aliases nested inside non-union elements remain part of those elements.
@@ -136,6 +143,36 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
         Self::from_elements(db, env, self.elements(db).iter().copied())
+    }
+
+    /// Expands recursive aliases without starting a nested type-relation query.
+    ///
+    /// Aliases that do not reach recursion retain the normal relation-aware normalization. The
+    /// caller supplies the redundancy proof for a deferred growing alias because it already owns
+    /// the surrounding relation checker.
+    pub(crate) fn expand_recursive_aliases_structurally(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        is_redundant: impl FnMut(Type<'db>, Type<'db>) -> bool,
+    ) -> Type<'db> {
+        let (recursive, non_recursive): (Vec<_>, Vec<_>) =
+            self.elements(db).iter().copied().partition(|element| {
+                matches!(element, Type::TypeAlias(alias) if alias.contains_recursive_alias(db))
+            });
+
+        let non_recursive = non_recursive
+            .into_iter()
+            .fold(UnionBuilder::new(db, env), UnionBuilder::add)
+            .build();
+
+        recursive
+            .into_iter()
+            .fold(
+                UnionBuilder::structural(db, env).add(non_recursive),
+                UnionBuilder::add,
+            )
+            .build_with_recursive_alias_remainder_check(is_redundant)
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(

@@ -1,12 +1,14 @@
 use crate::ProgramEnvironment;
-use std::fmt::Write;
+use std::{cell::RefCell, fmt::Write};
 
 use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext, KnownClass,
         KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypingModule, definition_expression_type,
+        TypingModule,
+        cyclic::TypeIdentity,
+        definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::VarianceInferable,
@@ -22,6 +24,7 @@ use ty_python_core::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
+use rustc_hash::FxHashSet;
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
@@ -393,6 +396,52 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.raw_value_type(db),
         }
+    }
+
+    /// Returns whether expanding this alias reaches a recursive type alias.
+    pub(crate) fn contains_recursive_alias(self, db: &'db dyn Db) -> bool {
+        let env = ProgramEnvironment::from_definition(self.definition(db));
+        visitor::any_over_type_expanding_aliases(db, &env, Type::TypeAlias(self), |nested| {
+            matches!(
+                nested.to_type_identity(db),
+                TypeIdentity::GrowingTypeAlias(_)
+            )
+        })
+    }
+
+    /// Returns whether expanding this alias reaches a recursive alias whose specialization can
+    /// grow without bound.
+    pub(crate) fn contains_growing_alias(self, db: &'db dyn Db) -> bool {
+        let mut pending = vec![self];
+        let mut seen = FxHashSet::default();
+
+        while let Some(alias) = pending.pop() {
+            // A growing recursive path is recognized before expansion. Every other path either
+            // terminates or eventually repeats an exact alias, so visiting each alias once keeps
+            // shared alias graphs linear.
+            if !seen.insert(alias) {
+                continue;
+            }
+
+            if matches!(
+                Type::TypeAlias(alias).to_type_identity(db),
+                TypeIdentity::GrowingTypeAlias(_)
+            ) {
+                return true;
+            }
+
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
+            let nested_aliases = RefCell::new(Vec::new());
+            visitor::any_over_type(db, &env, alias.value_type(db), false, |nested| {
+                if let Type::TypeAlias(nested_alias) = nested {
+                    nested_aliases.borrow_mut().push(nested_alias);
+                }
+                false
+            });
+            pending.extend(nested_aliases.into_inner());
+        }
+
+        false
     }
 
     /// Returns the alias without an applied specialization or pending materialization.
