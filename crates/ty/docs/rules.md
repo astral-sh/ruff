@@ -3761,8 +3761,8 @@ This rule is disabled by default. It requires uv workspace integration
 [`uv check`](https://docs.astral.sh/uv/reference/cli/#uv-check) synchronizes the
 environment automatically before invoking ty, unless `--no-sync` is passed.
 The rule itself reads the dependency graph and module ownership returned by
-`uv workspace metadata`; it does not install or update dependencies. uv 0.11.32
-or later is required to report module ownership without synchronizing the environment.
+`uv workspace metadata`; it does not install or update dependencies. uv 0.12.3
+or later is required.
 
 **Known limitations**
 

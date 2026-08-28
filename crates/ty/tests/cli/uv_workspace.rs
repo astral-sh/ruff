@@ -63,7 +63,7 @@ fn uv_command(case: &CliTest) -> Command {
 }
 
 #[cfg(feature = "test-uv")]
-fn command_with_uv(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result<Command> {
+fn uv_sync_command(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result<Command> {
     let mut sync = uv_command(case);
     sync.args(["workspace", "metadata", "--sync"]);
     if let Some(virtual_env) = virtual_env {
@@ -144,31 +144,31 @@ fn dependency_workspace_case() -> anyhow::Result<CliTest> {
         (
             "pyproject.toml",
             r#"
-[tool.uv.workspace]
-members = ["packages/*"]
+                [tool.uv.workspace]
+                members = ["packages/*"]
 
-[tool.uv]
-no-index = true
-find-links = ["wheels"]
-"#,
+                [tool.uv]
+                no-index = true
+                find-links = ["wheels"]
+            "#,
         ),
         (
             "packages/member/pyproject.toml",
             r#"
-[project]
-name = "member"
-version = "0.1.0"
-requires-python = ">=3.8"
-dependencies = ["direct-dependency"]
-"#,
+                [project]
+                name = "member"
+                version = "0.1.0"
+                requires-python = ">=3.8"
+                dependencies = ["direct-dependency"]
+            "#,
         ),
         (
             "packages/member/member.py",
-            concat!(
-                "import direct_module\n",
-                "from indirect_module import value\n",
-                "import indirect_module\n",
-            ),
+            r#"
+                import direct_module
+                from indirect_module import value
+                import indirect_module
+            "#,
         ),
         ("packages/sibling/sibling.py", "import direct_module\n"),
     ])?;
@@ -189,7 +189,7 @@ dependencies = ["direct-dependency"]
 #[test]
 fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
     let case = dependency_workspace_case()?;
-    let mut command = command_with_uv(&case, None)?;
+    let mut command = uv_sync_command(&case, None)?;
     command.arg("packages");
     let lockfile = std::fs::read(case.root().join("uv.lock"))?;
 
@@ -210,17 +210,17 @@ fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
-     --> packages/member/member.py:2:6
+     --> packages/member/member.py:3:6
       |
-    2 | from indirect_module import value
+    3 | from indirect_module import value
       |      ^^^^^^^^^^^^^^^
     help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
     info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 
     error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
-     --> packages/member/member.py:3:8
+     --> packages/member/member.py:4:8
       |
-    3 | import indirect_module
+    4 | import indirect_module
       |        ^^^^^^^^^^^^^^^
     help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
     info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
@@ -251,18 +251,21 @@ fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<
     let case = dependency_workspace_case()?;
     case.write_file(
         "packages/member/member.py",
-        "from indirect_module import value\nnumber: str = value\n",
+        r#"
+            from indirect_module import value
+            number: str = value
+        "#,
     )?;
 
     assert_cmd_snapshot!(
-        command_with_uv(&case, None)?
+        uv_sync_command(&case, None)?
             .args(["packages/member", "--error", "missing-direct-dependency"]),
         @"
     success: false
     exit_code: 1
     ----- stdout -----
-    packages/member/member.py:1:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
-    packages/member/member.py:2:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
+    packages/member/member.py:2:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+    packages/member/member.py:3:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
     Found 2 diagnostics
 
     ----- stderr -----
@@ -296,7 +299,7 @@ fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<
             String::from_utf8_lossy(&output.stderr)
         );
 
-        let mut command = command_with_uv(&case, None)?;
+        let mut command = uv_sync_command(&case, None)?;
         command.args([
             "packages/member",
             "--error",
@@ -311,7 +314,7 @@ fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<
             success: false
             exit_code: 1
             ----- stdout -----
-            packages/member/member.py:2:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
+            packages/member/member.py:3:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
             Found 1 diagnostic
 
             ----- stderr -----
@@ -335,7 +338,7 @@ fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
         "import shared\nvalue: int = 'selected-member'",
     )?;
 
-    let mut command = command_with_uv(&case, None)?;
+    let mut command = uv_sync_command(&case, None)?;
     command
         .current_dir(case.root().join("packages/member"))
         .arg(".");
@@ -366,7 +369,7 @@ fn explicit_file_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
         "import shared\nvalue: int = 'selected-script'",
     )?;
 
-    let mut command = command_with_uv(&case, None)?;
+    let mut command = uv_sync_command(&case, None)?;
     command
         .current_dir(case.root().join("packages/member"))
         .arg("member.py");
@@ -400,7 +403,7 @@ members = ["packages/*"]
 invalid-assignment = "ignore"
 "#,
     )?;
-    let mut command = command_with_uv(&case, None)?;
+    let mut command = uv_sync_command(&case, None)?;
     command.arg("packages/member");
 
     assert_cmd_snapshot!(command, @"
@@ -446,7 +449,7 @@ requires-python = ">=3.8"
         ),
     ])?;
 
-    let mut command = command_with_uv(&case, None)?;
+    let mut command = uv_sync_command(&case, None)?;
     command
         .args(["--project", "../external-package", "../external-package"])
         .env("UV_PROJECT", case.root());
@@ -489,7 +492,7 @@ requires-python = ">=3.8"
         "value: int = 'unselected-nested-member'",
     )?;
 
-    let mut command = command_with_uv(&case, None)?;
+    let mut command = uv_sync_command(&case, None)?;
     command.args(["--exclude", "packages/member/nested", "packages/member"]);
 
     assert_cmd_snapshot!(command, @r#"
@@ -522,7 +525,7 @@ python = "missing-configured-environment"
 "#,
     )?;
     let environment = case.root().join("isolated");
-    let mut command = command_with_uv(&case, Some(&environment))?;
+    let mut command = uv_sync_command(&case, Some(&environment))?;
     command
         .current_dir(case.root().join("packages/member"))
         .arg(".")
@@ -678,7 +681,7 @@ fn finds_uv_on_path_without_uv_environment_variable() -> anyhow::Result<()> {
         "import shared\nvalue: int = 'selected-member'",
     )?;
 
-    let mut command = command_with_uv(&case, None)?;
+    let mut command = uv_sync_command(&case, None)?;
     command
         .current_dir(case.root().join("packages/member"))
         .arg(".")
@@ -706,7 +709,7 @@ fn reports_uv_workspace_python_version_source() -> anyhow::Result<()> {
     case.write_file("packages/member/member.py", "frozendict")?;
 
     for output_format in ["full", "concise"] {
-        let mut command = command_with_uv(&case, None)?;
+        let mut command = uv_sync_command(&case, None)?;
         command
             .current_dir(case.root().join("packages/member"))
             .arg(".")
