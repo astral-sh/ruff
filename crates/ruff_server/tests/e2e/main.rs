@@ -1006,6 +1006,7 @@ impl TestServerBuilder {
     }
 
     /// Set the initial client options for the test server
+    #[expect(dead_code)]
     pub(crate) fn with_initialization_options(mut self, options: serde_json::Value) -> Self {
         self.initialization_options = Some(options);
         self
