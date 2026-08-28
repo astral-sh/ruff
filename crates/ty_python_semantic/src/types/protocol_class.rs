@@ -6,6 +6,7 @@ use itertools::Itertools;
 
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
@@ -1517,6 +1518,144 @@ struct ProtocolMemberCapabilities<'db> {
     class: ProtocolMemberAccess<'db>,
 }
 
+/// The effective readable and writable types exposed by an instance member.
+///
+/// Properties and descriptors both hide their accessor callables behind member access. Recursive
+/// specialization flow follows the value produced by reads and the value accepted by writes, not
+/// the accessor signatures themselves.
+#[derive(Debug, Clone)]
+pub(super) struct EffectiveMemberTypes<'db> {
+    read: SmallVec<[Type<'db>; 1]>,
+    write: EffectiveMemberWriteTypes<'db>,
+}
+
+#[derive(Debug, Clone)]
+enum EffectiveMemberWriteTypes<'db> {
+    Missing,
+    Known(SmallVec<[Type<'db>; 1]>),
+    Deferred,
+}
+
+impl<'db> EffectiveMemberTypes<'db> {
+    pub(super) fn from_property(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        property: PropertyInstanceType<'db>,
+        receiver: Type<'db>,
+    ) -> Self {
+        let mut read = SmallVec::new();
+        if let Some(getter) = property.getter(db)
+            && let Some(callables) = getter.try_upcast_to_callable(db, env)
+        {
+            for callable in &callables {
+                for signature in callable.signatures(db) {
+                    read.push(signature.return_ty.bind_self_typevars(db, env, receiver));
+                }
+            }
+        }
+
+        let mut write_types = SmallVec::new();
+        if let Some(setter) = property.setter(db)
+            && let Some(callables) = setter.try_upcast_to_callable(db, env)
+        {
+            for callable in &callables {
+                for signature in callable.signatures(db) {
+                    let Some(parameter) = signature.parameters().get_positional(1) else {
+                        continue;
+                    };
+                    write_types.push(
+                        parameter
+                            .annotated_type()
+                            .bind_self_typevars(db, env, receiver),
+                    );
+                }
+            }
+        }
+
+        let write = if write_types.is_empty() {
+            EffectiveMemberWriteTypes::Missing
+        } else {
+            EffectiveMemberWriteTypes::Known(write_types)
+        };
+
+        Self { read, write }
+    }
+
+    pub(super) fn from_descriptor(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        descriptor: Type<'db>,
+        receiver: Type<'db>,
+    ) -> Self {
+        let owner = receiver.to_meta_type(db, env);
+        let mut read = SmallVec::new();
+        if let Some(result) = descriptor
+            .try_call_dunder_get(db, env, Some(receiver), owner)
+            .unwrap_or_else(|error| Some(error.fallback()))
+        {
+            read.push(result.return_type);
+        }
+        let write = match descriptor_setter_domain(db, env, descriptor, receiver) {
+            DescriptorSetterDomain::Missing => EffectiveMemberWriteTypes::Missing,
+            DescriptorSetterDomain::Known(write) => {
+                let mut write_types = SmallVec::new();
+                write_types.push(write);
+                EffectiveMemberWriteTypes::Known(write_types)
+            }
+            DescriptorSetterDomain::Deferred => EffectiveMemberWriteTypes::Deferred,
+        };
+
+        Self { read, write }
+    }
+
+    fn read_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
+        if self.read.is_empty() {
+            None
+        } else {
+            Some(UnionType::from_elements(db, env, self.read.iter().copied()))
+        }
+    }
+
+    fn descriptor_setter_domain(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> DescriptorSetterDomain<'db> {
+        match &self.write {
+            EffectiveMemberWriteTypes::Missing => DescriptorSetterDomain::Missing,
+            EffectiveMemberWriteTypes::Known(types) => DescriptorSetterDomain::Known(
+                UnionType::from_elements(db, env, types.iter().copied()),
+            ),
+            EffectiveMemberWriteTypes::Deferred => DescriptorSetterDomain::Deferred,
+        }
+    }
+
+    pub(super) fn read_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.read.iter().copied()
+    }
+
+    pub(super) fn write_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        let types = match &self.write {
+            EffectiveMemberWriteTypes::Known(types) => types.as_slice(),
+            EffectiveMemberWriteTypes::Missing | EffectiveMemberWriteTypes::Deferred => &[],
+        };
+        types.iter().copied()
+    }
+
+    fn walk_recursive_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &V,
+    ) {
+        for read in self.read_types() {
+            visitor.visit_type(db, read);
+        }
+        for write in self.write_types() {
+            visitor.visit_type(db, write);
+        }
+    }
+}
+
 impl<'db> ProtocolMemberCapabilities<'db> {
     fn materialize(
         self,
@@ -2380,18 +2519,12 @@ fn descriptor_decorated_protocol_member<'db>(
     };
 
     let receiver_ty = Type::instance(db, env, protocol);
-    let read_ty = descriptor_ty
-        .try_call_dunder_get(
-            db,
-            env,
-            Some(receiver_ty),
-            receiver_ty.to_meta_type(db, env),
-        )
-        .unwrap_or_else(|error| Some(error.fallback()))?
-        .return_type;
+    let effective_types =
+        EffectiveMemberTypes::from_descriptor(db, env, descriptor_ty, receiver_ty);
+    let read_ty = effective_types.read_type(db, env)?;
     let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
 
-    let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
+    let write = match effective_types.descriptor_setter_domain(db, env) {
         DescriptorSetterDomain::Missing => None,
         DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
             descriptor_ty,
@@ -3748,20 +3881,14 @@ impl<'db> ProtocolMemberCandidate<'db> {
     ) {
         match self.ty {
             Type::PropertyInstance(property) => {
-                // A property exposes its getter return and setter value types. Walking the
-                // accessor callables themselves would also visit their receiver and make every
-                // generic protocol property appear recursive.
-                for member in [
-                    property.getter(db).map(ProtocolMemberType::property_getter),
-                    property.setter(db).map(ProtocolMemberType::property_setter),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    if let Some(member) = member.resolve(db, visitor.program_environment()) {
-                        visitor.visit_type(db, member.ty());
-                    }
-                }
+                let receiver = Type::instance(db, visitor.program_environment(), protocol);
+                EffectiveMemberTypes::from_property(
+                    db,
+                    visitor.program_environment(),
+                    property,
+                    receiver,
+                )
+                .walk_recursive_types(db, visitor);
             }
             _ if self.is_bound_method_like(db) => {}
             _ if self.bound_on_class.is_yes()
