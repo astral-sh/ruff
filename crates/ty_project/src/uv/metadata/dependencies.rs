@@ -308,7 +308,7 @@ pub(crate) enum DependencyMetadataError {
 }
 
 impl DependencyMetadataError {
-    pub(crate) fn to_diagnostic(&self) -> Diagnostic {
+    pub(crate) fn to_diagnostic(&self, kind: DependencyProjectKind) -> Diagnostic {
         let mut diagnostic = Diagnostic::new(
             DiagnosticId::UvMetadata,
             Severity::Warning,
@@ -324,7 +324,9 @@ impl DependencyMetadataError {
         match self {
             Self::MissingModuleOwnership
             | Self::MissingEnvironment
-            | Self::MissingSelectedEnvironment => {
+            | Self::MissingSelectedEnvironment
+                if kind == DependencyProjectKind::Project =>
+            {
                 diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Help,
                     "Synchronize the environment with `uv sync` or run ty through `uv check`",

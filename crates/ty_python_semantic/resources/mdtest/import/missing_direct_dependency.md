@@ -961,6 +961,63 @@ import project_dep
 import script_dep  # error: [missing-direct-dependency] "direct dependency on `script-dependency`"
 ```
 
+## Dependencies imported by local modules
+
+Script dependency checks currently cover imports in the script itself. They do not check imports in
+local modules against the script's declarations, a limitation tracked in
+[ty#4417](https://github.com/astral-sh/ty/issues/4417). Here, the project declares `attrs`, but the
+script declares no dependencies.
+
+```toml
+[environment]
+python = "/.venv"
+
+[rules]
+missing-direct-dependency = "warn"
+
+[dependency-metadata]
+projects = [{ path = "/src", dependencies = ["attrs"] }]
+
+[dependency-metadata.distributions]
+attrs = { name = "attrs" }
+
+[dependency-metadata.module-owners]
+attrs = ["attrs"]
+```
+
+`/.venv/<path-to-site-packages>/attrs/__init__.py`:
+
+```py
+```
+
+`b.py`:
+
+```py
+import attrs
+```
+
+Importing `b` does not report its dependency on `attrs` as missing from the script. Importing
+`attrs` directly does report the missing declaration.
+
+`script.py`:
+
+```py
+# /// script
+# dependencies = []
+# [tool.ty.rules]
+# missing-direct-dependency = "warn"
+# [tool.ty.dependency-metadata]
+# projects = [{ path = "/src/script.py" }]
+# [tool.ty.dependency-metadata.distributions]
+# attrs = { name = "attrs" }
+# [tool.ty.dependency-metadata.module-owners]
+# attrs = ["attrs"]
+# ///
+
+import b
+import attrs  # error: [missing-direct-dependency] "Import of `attrs` requires a direct dependency on `attrs`"
+```
+
 ## Unavailable script metadata
 
 Without metadata for a script's environment, the rule cannot establish module ownership. It skips

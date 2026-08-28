@@ -791,16 +791,16 @@ fn script_python(db: &dyn Db) -> Option<SystemPathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use std::process::{ExitStatus, Output};
-
     use anyhow::Context;
+    use ruff_db::Db as _;
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath};
+    use salsa::Setter;
     use salsa::plumbing::AsId;
     use serde_json::{Value, json};
     use ty_python_semantic::Db as _;
 
-    use super::{apply_sync_result, script_environment, script_sync_task};
+    use super::{UvMetadata, script_environment};
     use crate::db::testing::TestDb;
     use crate::{Db as _, ProjectMetadata, UseUv};
 
@@ -868,10 +868,7 @@ mod tests {
                 "#,
             ),
         )?;
-        db.write_files([
-            (site_packages.join("parent.py"), "value = 1\n"),
-            (site_packages.join("leaf.py"), "value = 1\n"),
-        ])?;
+        db.write_file(site_packages.join("leaf.py"), "")?;
         db.write_dedented(path.as_str(), indirect)?;
         let file = system_path_to_file(&db, &path)?;
 
@@ -929,7 +926,6 @@ mod tests {
                 "leaf": {"kind": "package", "name": "leaf", "dependencies": []}
             },
             "module_owners": {
-                "parent": [{"package_id": "parent"}],
                 "leaf": [{"package_id": "leaf"}]
             }
         })
@@ -940,14 +936,9 @@ mod tests {
         file: File,
         metadata: &Value,
     ) -> anyhow::Result<()> {
-        let output = Output {
-            status: ExitStatus::default(),
-            stdout: serde_json::to_vec(metadata)?,
-            stderr: Vec::new(),
-        };
+        let metadata = UvMetadata::from_metadata(&serde_json::to_vec(metadata)?, db.system())?;
         let environment = script_environment(db, file).context("expected a script environment")?;
-        let task = script_sync_task(db, file).context("expected a script synchronization")?;
-        apply_sync_result(db, environment, &task.request, Ok(output));
+        environment.set_uv_metadata(db).to(Some(metadata));
         Ok(())
     }
 

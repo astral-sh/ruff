@@ -32,7 +32,7 @@ use std::sync::Arc;
 use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
-use ty_python_semantic::dependency::DependencyMetadata;
+use ty_python_semantic::dependency::{DependencyMetadata, DependencyProjectKind};
 use ty_python_semantic::lint::RuleSelection;
 use uv::DependencyMetadataError;
 pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges};
@@ -802,7 +802,7 @@ impl Project {
         let uv_diagnostic = metadata.uv_diagnostic(db).or_else(|| {
             let workspace = metadata.uv_workspace()?;
             let error = self.dependency_metadata(db).as_ref().err()?;
-            let mut diagnostic = error.to_diagnostic();
+            let mut diagnostic = error.to_diagnostic(DependencyProjectKind::Project);
             if let Ok(file) =
                 system_path_to_file(db, workspace.workspace_root().join("pyproject.toml"))
             {
@@ -976,12 +976,21 @@ pub(crate) fn check_file_impl(
             };
 
             let settings_diagnostics = script.settings_diagnostics(*db);
-            if settings_diagnostics.is_empty() {
+            let dependency_diagnostic =
+                script.dependency_metadata(*db).as_ref().err().map(|error| {
+                    let mut diagnostic = error.to_diagnostic(DependencyProjectKind::Script);
+                    let mut annotation = Annotation::primary(Span::from(source_file));
+                    annotation.hide_snippet(true);
+                    diagnostic.annotate(annotation);
+                    diagnostic
+                });
+            if settings_diagnostics.is_empty() && dependency_diagnostic.is_none() {
                 return Ok(diagnostics);
             }
 
             let mut diagnostics = diagnostics.into_vec();
             diagnostics.extend(settings_diagnostics.iter().cloned());
+            diagnostics.extend(dependency_diagnostic);
             Ok(diagnostics.into_boxed_slice())
         }) {
             Ok(result) => result,
