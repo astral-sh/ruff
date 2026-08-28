@@ -58,11 +58,11 @@ def f5(m: int, n: Literal[-1, 0, 1]):
     return m / n
 ```
 
-Several union alternatives can divide by zero at the same expression. We report it once per
-expression, not once per operand combination:
+Several combinations of union members divide by zero. Each expression gets one warning, including
+when the same operation appears again:
 
 ```py
-def f6(m: Literal[1, 2], n: Literal[-1, 0, 1]):
+def f6(m: Literal[1, 2], n: Literal[0, 1]):
     m / n  # error: [division-by-zero]
     m / n  # error: [division-by-zero]
 ```

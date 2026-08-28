@@ -395,30 +395,30 @@ AliasClass()  # error: [deprecated] "Use OtherType instead"
 
 ### Binary operators
 
-If a dunder like `__add__` is deprecated, then the equivalent syntactic sugar like `+` should fire a
-diagnostic.
+Using `+` invokes `__add__`, so it reports that method's deprecation.
 
 ```py
 from typing_extensions import deprecated
 
-class MyInt:
-    def __init__(self, val):
-        self.val = val
+class Number:
+    @deprecated("old addition")
+    def __add__(self, other: object) -> "Number":
+        return self
 
-    @deprecated("MyInt `+` support is broken")
-    def __add__(self, other):
-        return MyInt(self.val + other.val)
+number = Number()
+number + 1  # error: [deprecated] "old addition"
+```
 
-x = MyInt(1)
-y = MyInt(2)
-z = x + y  # error: [deprecated] "MyInt `+` support is broken"
-x += y  # error: [deprecated] "MyInt `+` support is broken"
+Without an `__iadd__` method, `+=` falls back to `__add__` and reports the same deprecation.
+
+```py
+number += 1  # error: [deprecated] "old addition"
 ```
 
 ### Reflected operators
 
-Only the methods selected by operator resolution trigger deprecations. A deprecated reflected method
-is not used when the left operand accepts the operation.
+When the left operand accepts the operation, a deprecated `__radd__` on the right operand is not
+called and does not produce a warning.
 
 ```py
 from typing_extensions import deprecated
@@ -433,7 +433,12 @@ class Right:
         return 0
 
 Left() + Right()
-1 + Right()  # error: [deprecated] "reflected addition"
+```
+
+Here, `int.__add__` does not accept a `Right` instance, so `+` calls the deprecated
+`Right.__radd__`.
+
+```py
 1 + Right()  # error: [deprecated] "reflected addition"
 ```
 
@@ -455,8 +460,7 @@ RestrictedLeft() + ActiveRight()
 
 ### In-place operators
 
-Augmented assignment calls the in-place method when available, without reporting deprecations on the
-unused binary method.
+When `__iadd__` accepts the operand, `+=` uses it without calling a deprecated `__add__`.
 
 ```py
 from typing_extensions import deprecated
@@ -469,21 +473,25 @@ class Number:
     def __iadd__(self, other: int) -> "Number":
         return self
 
+number = Number()
+number += 1
+```
+
+A deprecated `__iadd__` produces a warning at the augmented assignment.
+
+```py
 class OldNumber:
     @deprecated("in-place addition")
     def __iadd__(self, other: int) -> "OldNumber":
         return self
 
-number = Number()
-number += 1
 old = OldNumber()
 old += 1  # error: [deprecated] "in-place addition"
 ```
 
 ### Callable instances
 
-Calling an instance implicitly invokes its `__call__` method. Explicit references to that method
-already report its deprecation and do not produce a second diagnostic when called.
+Calling an instance invokes its `__call__` method and reports that method's deprecation.
 
 ```py
 from typing_extensions import deprecated
@@ -495,14 +503,23 @@ class Invocable:
 
 invocable = Invocable()
 invocable()  # error: [deprecated] "do not call"
-invocable.__call__()  # error: [deprecated] "do not call"
-invocable.__call__  # error: [deprecated] "do not call"
 ```
+
+An explicit reference to `__call__` is also deprecated. Calling that reference still produces only
+one warning.
+
+```py
+invocable.__call__  # error: [deprecated] "do not call"
+invocable.__call__()  # error: [deprecated] "do not call"
+```
+
+### Overloaded callable instances
 
 For overloaded `__call__` methods, only calls that select a deprecated overload trigger a warning.
 
 ```py
 from typing import overload
+from typing_extensions import deprecated
 
 class Overloaded:
     @overload
@@ -561,8 +578,7 @@ def f(x: MyBits | NoBits):
 
 #### Unions and intersections
 
-A union reports a deprecated operator when any alternative is deprecated. An intersection reports
-deprecated operators only when every applicable implementation is deprecated.
+A unary operation on a union reports a deprecation if any member's operator is deprecated.
 
 ```py
 from typing_extensions import deprecated
@@ -572,21 +588,30 @@ class Deprecated:
     def __invert__(self) -> int:
         return 1
 
-class AlsoDeprecated:
-    @deprecated("another old inversion")
-    def __invert__(self) -> int:
-        return 2
-
 class Ordinary:
     def __invert__(self) -> int:
         return 3
 
 def mixed_union(value: Deprecated | Ordinary) -> None:
     ~value  # error: [deprecated] "old inversion"
+```
 
+An intersection can use a non-deprecated implementation instead, so it does not warn when one is
+available.
+
+```py
 def mixed_intersection(value: Deprecated) -> None:
     if isinstance(value, Ordinary):
         ~value
+```
+
+When every applicable implementation is deprecated, one warning includes both messages.
+
+```py
+class AlsoDeprecated:
+    @deprecated("another old inversion")
+    def __invert__(self) -> int:
+        return 2
 
 def deprecated_intersection(value: Deprecated) -> None:
     if isinstance(value, AlsoDeprecated):
@@ -595,7 +620,7 @@ def deprecated_intersection(value: Deprecated) -> None:
 ```
 
 A gradually typed comparison can produce an intersection of `bool` and `Any`. The unknown
-alternative might provide a nondeprecated operator, so inverting it should not warn.
+alternative might provide a non-deprecated operator, so inverting it should not warn.
 
 ```py
 from typing import Any
@@ -622,7 +647,8 @@ def f(x: bool):
 
 #### Constrained TypeVars
 
-Type variable constraints also should be checked.
+A unary operation on a constrained type variable can invoke the method from any of its constraints.
+If several methods are deprecated, their messages appear in one diagnostic.
 
 ```py
 from typing import TypeVar
@@ -696,9 +722,8 @@ def invalid_operator(value: X) -> None:
 
 ## Property accessors
 
-Only the accessor invoked by an operation triggers its deprecation. Reading a property does not
-invoke its setter, writing does not invoke its getter, and deleting does not invoke either.
-Augmented assignment reads and then writes the property.
+Reading a property invokes its getter. A deprecated getter produces a warning on a read, but not on
+an assignment or deletion.
 
 ```py
 from typing_extensions import deprecated
@@ -717,10 +742,13 @@ class OldGetter:
 old_getter = OldGetter()
 old_getter.value  # error: [deprecated] "old getter"
 old_getter.value = 1
-old_getter.value += 1  # error: [deprecated] "old getter"
 del old_getter.value
-OldGetter.value
+```
 
+Assignments and deletions invoke the setter and deleter, respectively. Neither accessor is called
+when reading the property.
+
+```py
 class OldSetter:
     @property
     def value(self) -> int:
@@ -736,14 +764,23 @@ class OldSetter:
 old_setter = OldSetter()
 old_setter.value
 old_setter.value = 1  # error: [deprecated] "old setter"
-old_setter.value += 1  # error: [deprecated] "old setter"
 del old_setter.value  # error: [deprecated] "old deleter"
-OldSetter.value
 ```
 
-When both accessors are deprecated, augmented assignment reports both messages.
+Access through the class returns the property object without invoking its deprecated getter.
 
 ```py
+OldGetter.value
+```
+
+## Augmented property assignments
+
+Augmented assignment reads and then writes the property. When both the getter and setter are
+deprecated, it reports each accessor's deprecation.
+
+```py
+from typing_extensions import deprecated
+
 class OldBoth:
     @property
     @deprecated("both getter")
@@ -762,9 +799,8 @@ old_both.value += 1
 
 ## Inherited properties
 
-Inherited accessors retain their deprecations. An override can replace a deprecated getter, while
-access through `super()` still invokes the inherited getter. Class-bound `super()` returns the
-property object without invoking its getter.
+Reading or deleting the property on a subclass instance reports the inherited accessor's
+deprecation.
 
 ```py
 from typing_extensions import deprecated
@@ -781,23 +817,58 @@ class Parent:
 
 class Child(Parent): ...
 
+Child().value  # error: [deprecated] "parent getter"
+del Child().value  # error: [deprecated] "parent deleter"
+```
+
+Overriding the getter with a non-deprecated method removes the deprecation on reads.
+
+```py
 class ActiveChild(Parent):
     @property
     def value(self) -> int:
-        return super().value  # error: [deprecated] "parent getter"
+        return 0
 
-Child().value  # error: [deprecated] "parent getter"
 ActiveChild().value
+```
+
+## Properties accessed through `super()`
+
+Reading a property through `super()` invokes the parent getter with the instance as its receiver.
+
+```py
+from typing_extensions import deprecated
+
+class Parent:
+    @property
+    @deprecated("parent getter")
+    def value(self) -> int:
+        return 0
+
+    @value.deleter
+    @deprecated("parent deleter")
+    def value(self) -> None: ...
+
+class Child(Parent):
+    def read(self) -> int:
+        return super().value  # error: [deprecated] "parent getter"
+```
+
+Binding `super()` to a class instead returns the property object without invoking its getter.
+
+```py
 super(Child, Child).value
 ```
 
-Deleting through an instance invokes the inherited deleter. `super()` delegates reads to the owner's
-descriptors, but it does not delegate deletion.
+Deleting an attribute on a `super()` object does not invoke the parent's property deleter.
 
 ```py
-del Child().value  # error: [deprecated] "parent deleter"
 del super(Child, Child()).value
+```
 
+The same holds when the receiver may be either a `super()` object or an ordinary instance.
+
+```py
 class Ordinary:
     value: int
 
@@ -809,7 +880,7 @@ def delete_union(flag: bool):
 ## Metaclass properties
 
 A class is an instance of its metaclass, so reading or writing a metaclass property invokes its
-accessors. Access through the metaclass itself returns the property object.
+accessors.
 
 ```py
 from typing_extensions import deprecated
@@ -828,13 +899,17 @@ class C(metaclass=Meta): ...
 
 C.value  # error: [deprecated] "metaclass getter"
 C.value = 1  # error: [deprecated] "metaclass setter"
+```
+
+Access through the metaclass itself returns the property object without invoking its getter.
+
+```py
 Meta.value
 ```
 
 ## Properties on unions
 
-An access through a union can invoke a deprecated accessor even when another member's accessor is
-not deprecated.
+An attribute access through a union warns if any member uses a deprecated property.
 
 ```py
 from typing_extensions import deprecated
@@ -850,7 +925,7 @@ class Old:
     def value(self, value: int) -> None: ...
 
 class Active:
-    value: int = 0
+    value: int
 
 def check(value: Old | Active):
     value.value  # error: [deprecated] "union getter"
@@ -869,37 +944,56 @@ def check_invalid(value: Wrong | Old):
     value.value = 1
 ```
 
-An intersection can obtain its implementation from a non-deprecated member. We do not warn when that
-member provides an alternative getter or setter.
+An invalid assignment still reports deprecations after an `isinstance` check narrows the union's
+members to intersections.
 
 ```py
-def check_intersection(value: Old):
+class Marker: ...
+
+def check_invalid_intersections(value: Wrong | Old):
+    if isinstance(value, Marker):
+        # error: [invalid-assignment]
+        # error: [deprecated] "union setter"
+        value.value = 1
+```
+
+## Properties on intersections
+
+An intersection can use a non-deprecated member's attribute instead of a deprecated property. We do
+not warn when that alternative is available.
+
+```py
+from typing_extensions import deprecated
+
+class Old:
+    @property
+    @deprecated("old getter")
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("old setter")
+    def value(self, value: int) -> None: ...
+
+class Active:
+    value: int
+
+def check(value: Old):
     if isinstance(value, Active):
         value.value
         value.value = 1
 ```
 
-An intersection member without the attribute does not provide an alternative accessor, so the
-deprecated property still applies.
+A member without the attribute does not provide an alternative accessor, so the deprecated property
+still applies.
 
 ```py
 class Marker: ...
 
 def check_marker(value: Old):
     if isinstance(value, Marker):
-        value.value  # error: [deprecated] "union getter"
-        value.value = 1  # error: [deprecated] "union setter"
-```
-
-An invalid assignment to the first intersection in a union does not hide a deprecated setter in the
-second intersection. A member without the attribute still provides no alternative setter.
-
-```py
-def check_invalid_intersections(value: Wrong | Old):
-    if isinstance(value, Marker):
-        # error: [invalid-assignment]
-        # error: [deprecated] "union setter"
-        value.value = 1
+        value.value  # error: [deprecated] "old getter"
+        value.value = 1  # error: [deprecated] "old setter"
 ```
 
 ## Invalid property getter calls
@@ -923,9 +1017,8 @@ C().value
 
 ## Setter deprecations and contextual inference
 
-An intersection can use an ordinary attribute annotation to infer a lambda's parameter type.
-Checking the other member's deprecated setter does not replace that inference context, and the
-ordinary attribute provides a non-deprecated alternative.
+The ordinary attribute supplies `int` as the lambda's parameter type. Checking the other member's
+deprecated setter does not change that inferred type or warn about the non-deprecated assignment.
 
 ```py
 from collections.abc import Callable
@@ -946,9 +1039,7 @@ def check(value: Ordinary):
         value.callback = lambda argument: reveal_type(argument)  # revealed: int
 ```
 
-A protocol setter can also provide the inference context. When that setter accepts the assignment
-first, the ordinary attribute suppresses its deprecation without changing the inferred parameter
-type.
+Deprecation checks also preserve the `str` parameter type inferred from a protocol setter.
 
 ```py
 from typing import Protocol
@@ -967,11 +1058,12 @@ def check_protocol(value: Callback):
 
 ## Overloads
 
-Overloads can be deprecated, but only trigger warnings when invoked.
+### Deprecated overloads
+
+A call reports the deprecation of the overload selected by its arguments.
 
 ```py
-from typing_extensions import deprecated
-from typing_extensions import overload
+from typing_extensions import deprecated, overload
 
 @overload
 @deprecated("strings are no longer supported")
@@ -983,31 +1075,39 @@ def f(x):
 
 f(1)
 f("hello")  # error: [deprecated] "strings are no longer supported"
-f  # Referring to the overloaded function does not select an overload.
 ```
 
-If the actual impl is deprecated, the deprecation always fires.
+Referring to the function without calling it does not select an overload and does not warn.
 
 ```py
-from typing_extensions import deprecated
-from typing_extensions import overload
+f
+```
+
+### Deprecated implementations
+
+A deprecated implementation makes every call deprecated. Its message takes precedence over an
+individual overload's deprecation, and a call produces only one warning.
+
+```py
+from typing_extensions import deprecated, overload
 
 @overload
+@deprecated("string overload")
 def f(x: str): ...
 @overload
 def f(x: int): ...
-@deprecated("unusable")
+@deprecated("entire function")
 def f(x):
     print(x)
 
-f(1)  # error: [deprecated] "unusable"
-f("hello")  # error: [deprecated] "unusable"
+f(1)  # error: [deprecated] "entire function"
+f("hello")  # error: [deprecated] "entire function"
 ```
 
-## Overload selection
+### Union arguments
 
-Calls with union arguments can select multiple overloads. We report a deprecation if one of those
-overloads is deprecated, but do not report one when no overload accepts the arguments.
+A union argument can match several overloads. The call reports a deprecation if any matching
+overload is deprecated.
 
 ```py
 from typing import overload
@@ -1023,16 +1123,18 @@ def convert(value: int | str) -> str:
 
 def check(value: int | str):
     convert(value)  # error: [deprecated] "use a string"
+```
 
-convert(1)  # error: [deprecated] "use a string"
-convert("one")
+If no overload accepts the argument, there is no selected overload to report as deprecated.
+
+```py
 convert(None)  # error: [no-matching-overload]
 ```
 
-## Specialized receivers
+### Overloads for different receivers
 
-Binding a method can remove overloads whose receiver annotations are incompatible with the instance.
-Deprecation messages still refer to the selected source overload.
+The `self` annotations restrict which overloads each instance can call. A call on `C[str]` reports
+the deprecated string overload, even though binding the method discards the integer overload.
 
 ```py
 from typing import Generic, TypeVar, overload
@@ -1054,32 +1156,9 @@ def check(integer: C[int], string: C[str]):
     string.method("one")  # error: [deprecated] "string method"
 ```
 
-## Deprecated overload and implementation
+## Calls to an inherited deprecated method
 
-When both the implementation and a selected overload are deprecated, the reference to the function
-already reports the implementation's deprecation. We do not emit a second diagnostic for the call.
-
-```py
-from typing import overload
-from typing_extensions import deprecated
-
-@overload
-@deprecated("integer overload")
-def convert(value: int) -> str: ...
-@overload
-def convert(value: str) -> str: ...
-@deprecated("entire function")
-def convert(value: int | str) -> str:
-    return str(value)
-
-convert(1)  # error: [deprecated] "entire function"
-convert("one")  # error: [deprecated] "entire function"
-```
-
-## Repeated inherited deprecations
-
-Both union alternatives can inherit the same deprecated method. Calling it reports that source
-method once at each call site, rather than once per possible receiver.
+When both union members inherit the same deprecated method, a call reports that method once.
 
 ```py
 from typing_extensions import deprecated
@@ -1093,21 +1172,24 @@ class Second(Base): ...
 
 def check(value: First | Second):
     value()  # error: [deprecated] "base call"
-    value()  # error: [deprecated] "base call"
-
-    # error: [deprecated] "base call"
-    # error: [deprecated] "base call"
-    (value(), value())
-
-    value()  # ty: ignore[deprecated]
-    if False:
-        value()
 ```
 
-The same applies to an inherited overload selected through multiple possible receivers.
+Separate calls each produce a warning, even when they are on the same line.
+
+```py
+def two_calls(value: First | Second):
+    # error: 6 [deprecated] "base call"
+    # error: 15 [deprecated] "base call"
+    (value(), value())
+```
+
+## Calls to an inherited deprecated overload
+
+A deprecated overload inherited by both members of a union also produces only one warning per call.
 
 ```py
 from typing import overload
+from typing_extensions import deprecated
 
 class Overloaded:
     @overload
@@ -1125,20 +1207,41 @@ def check_overload(value: FirstOverload | SecondOverload):
     value("one")
 ```
 
-Calls inside a `no_type_check` function remain silent.
+## Suppressing call deprecations
+
+An inline ignore suppresses the deprecation on an instance's implicit `__call__` invocation.
+
+```py
+from typing_extensions import deprecated
+
+class Callable:
+    @deprecated("do not call")
+    def __call__(self) -> None: ...
+
+Callable()()  # ty: ignore[deprecated]
+```
+
+An unreachable call does not produce a warning.
+
+```py
+if False:
+    Callable()()
+```
+
+The same applies to calls inside a `no_type_check` function.
 
 ```py
 from typing import no_type_check
 
 @no_type_check
-def unchecked(value: First | Second):
+def unchecked(value: Callable):
     value()
 ```
 
-## Repeated binary deprecations
+## Repeated binary operations
 
-Expanding union operands can select the same deprecated operator repeatedly. The expression reports
-the method once, even when both operands are unions.
+Several combinations of union members can invoke the same deprecated operator. Each expression
+reports that method once. Repeating the operation still produces a warning at the second expression.
 
 ```py
 from typing_extensions import Self, deprecated
@@ -1156,8 +1259,15 @@ def check(number: First | Second, value: int | str):
     number + value  # error: [deprecated] "addition"
 ```
 
-Augmented assignment also collects the selected methods across union alternatives, including a
-fallback from `__iadd__` to `__add__`.
+The same rule applies when augmented assignment falls back to `__add__`.
+
+```py
+def check_augmented(number: First | Second, value: int | str):
+    number += value  # error: [deprecated] "addition"
+```
+
+When some members provide `__iadd__` and others fall back to `__add__`, the warning includes the
+deprecations of both methods.
 
 ```py
 class InPlace(Number):
@@ -1165,17 +1275,14 @@ class InPlace(Number):
     def __iadd__(self, other: int | str) -> Self:
         return self
 
-def check_augmented(number: First | Second, value: int | str):
-    number += value  # error: [deprecated] "addition"
-
 def check_mixed(number: First | InPlace, value: int | str):
     number += value  # error: [deprecated] "addition; in-place addition"
 ```
 
-## Multiple deprecated targets
+## Calls to different deprecated methods
 
-Distinct deprecated implementations remain visible in a single diagnostic. Each source declaration
-is annotated once, even when several union alternatives inherit it.
+When a call can invoke different deprecated methods, one warning includes both messages and points
+to both method definitions. Inherited copies of the same method are listed only once.
 
 ```py
 from typing_extensions import deprecated
