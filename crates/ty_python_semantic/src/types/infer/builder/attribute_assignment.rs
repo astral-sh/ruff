@@ -48,12 +48,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             attribute,
             infer_value_ty: MultiInferenceGuard::new(infer_value_ty),
         };
-        let mode = if emit_diagnostics {
-            AttributeWriteEvaluation::Validate
-        } else {
-            AttributeWriteEvaluation::ValidateSilently
-        };
-        let outcome = evaluator.evaluate(&requirement, mode);
+        let outcome = evaluator.evaluate(
+            &requirement,
+            AttributeWriteEvaluation::Validate { emit_diagnostics },
+        );
         if let Some(properties) = outcome.deprecated_properties {
             self.check_deprecated_property(target, properties, ast::ExprContext::Store);
         }
@@ -98,12 +96,10 @@ enum ContextualInference {
 /// Validation can stop at a decisive alternative while deprecation collection continues.
 #[derive(Clone, Copy)]
 enum AttributeWriteEvaluation {
-    /// Validate the assignment and report its errors.
-    Validate,
-    /// Validate an alternative without reporting its individual errors.
-    ValidateSilently,
-    /// Inspect accessor metadata without inferring the value or validating the assignment.
-    DeprecationsOnly,
+    /// Validate the assignment, optionally reporting its errors.
+    Validate { emit_diagnostics: bool },
+    /// Collect deprecated accessors without inferring the value or validating the assignment.
+    Deprecation,
 }
 
 /// The validity and deprecated accessors collected from one assignment requirement.
@@ -199,8 +195,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
     ) -> AttributeWriteOutcome<'db> {
         let db = self.builder.db();
         let env = self.builder.program_environment();
-        let validate = !matches!(mode, AttributeWriteEvaluation::DeprecationsOnly);
-        let emit_diagnostics = matches!(mode, AttributeWriteEvaluation::Validate);
+        let (validate, emit_diagnostics) = match mode {
+            AttributeWriteEvaluation::Validate { emit_diagnostics } => (true, emit_diagnostics),
+            AttributeWriteEvaluation::Deprecation => (false, false),
+        };
         let mut deprecated_properties = if self.collect_deprecations {
             match requirement {
                 AttributeWriteRequirement::ProtocolMember {
@@ -258,9 +256,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     let requirement =
                         attribute_write_requirement(db, env, *element_ty, self.attribute);
                     let mode = if validate && valid {
-                        AttributeWriteEvaluation::ValidateSilently
+                        AttributeWriteEvaluation::Validate {
+                            emit_diagnostics: false,
+                        }
                     } else {
-                        AttributeWriteEvaluation::DeprecationsOnly
+                        AttributeWriteEvaluation::Deprecation
                     };
                     let outcome = self.evaluate(&requirement, mode);
                     valid &= outcome.valid;
@@ -296,9 +296,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     let requirement =
                         attribute_write_requirement(db, env, *element_ty, self.attribute);
                     let mode = if validate && !valid {
-                        AttributeWriteEvaluation::ValidateSilently
+                        AttributeWriteEvaluation::Validate {
+                            emit_diagnostics: false,
+                        }
                     } else {
-                        AttributeWriteEvaluation::DeprecationsOnly
+                        AttributeWriteEvaluation::Deprecation
                     };
                     let outcome = self.evaluate(&requirement, mode);
                     valid |= outcome.valid;
