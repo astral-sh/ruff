@@ -21,32 +21,40 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     let range = call.func.range();
     match qualified_name.segments() {
         // PTH118
-        ["os", "path", "join"] => checker.report_diagnostic_if_enabled(
-            OsPathJoin {
-                module: "path".to_string(),
-                joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
-                    Joiner::Joinpath
-                } else {
-                    Joiner::Slash
+        ["os", "path", "join"] => {
+            checker.report_diagnostic_if_enabled(
+                OsPathJoin {
+                    module: "path".to_string(),
+                    joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                        Joiner::Joinpath
+                    } else {
+                        Joiner::Slash
+                    },
                 },
-            },
-            range,
-        ),
-        ["os", "sep", "join"] => checker.report_diagnostic_if_enabled(
-            OsPathJoin {
-                module: "sep".to_string(),
-                joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
-                    Joiner::Joinpath
-                } else {
-                    Joiner::Slash
+                range,
+            );
+        }
+        ["os", "sep", "join"] => {
+            checker.report_diagnostic_if_enabled(
+                OsPathJoin {
+                    module: "sep".to_string(),
+                    joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                        Joiner::Joinpath
+                    } else {
+                        Joiner::Slash
+                    },
                 },
-            },
-            range,
-        ),
+                range,
+            );
+        }
         // PTH122
-        ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
+        ["os", "path", "splitext"] => {
+            checker.report_diagnostic_if_enabled(OsPathSplitext, range);
+        }
         // PTH124
-        ["py", "path", "local"] => checker.report_diagnostic_if_enabled(PyPath, range),
+        ["py", "path", "local"] => {
+            checker.report_diagnostic_if_enabled(PyPath, range);
+        }
         // PTH207
         ["glob", "glob"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
@@ -64,7 +72,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                     function: "glob".to_string(),
                 },
                 range,
-            )
+            );
         }
 
         ["glob", "iglob"] => {
@@ -83,7 +91,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                     function: "iglob".to_string(),
                 },
                 range,
-            )
+            );
         }
         // PTH208
         ["os", "listdir"] => {
@@ -112,9 +120,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                     });
                 }
             }
-            None
         }
 
-        _ => return,
-    };
+        _ => {}
+    }
 }
