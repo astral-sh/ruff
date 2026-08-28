@@ -52,7 +52,7 @@ use crate::{
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
-        variance::{VarianceInferable, VarianceInferenceMode, VarianceResult},
+        variance::{VarianceInferable, VarianceOrigin, VarianceTerm, VarianceVariable},
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
@@ -3358,26 +3358,28 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
-        self.variance_of_owner(db, typevar, mode)
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::Variable(VarianceVariable::new(
+            db,
+            VarianceOrigin::Class(self),
+            typevar,
+        ))
     }
 }
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| VarianceResult::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
-    fn variance_of_owner(
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
+    pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
+    ) -> VarianceTerm<'db> {
         let env = ProgramEnvironment::from_scope(self.body_scope(db));
 
         if self.is_typed_dict(db) {
             return TypedDictType::new(self.identity_specialization(db))
-                .variance_of_items(db, &env, typevar, mode);
+                .variance_of_items(db, &env, typevar);
         }
 
         let typevar_in_generic_context = self
@@ -3385,14 +3387,14 @@ impl<'db> StaticClassLiteral<'db> {
             .is_some_and(|generic_context| generic_context.contains(db, typevar));
 
         if !typevar_in_generic_context {
-            return VarianceResult::BIVARIANT;
+            return VarianceTerm::BIVARIANT;
         }
 
         if self.is_protocol(db)
             && let Some(protocol) = self.identity_specialization(db).into_protocol_class(db)
             && protocol.supports_variance_inference(db)
         {
-            return protocol.interface(db).variance_of(db, &env, typevar, mode);
+            return protocol.interface(db).variance_of(db, &env, typevar);
         }
 
         let class_body_scope = self.body_scope(db);
@@ -3404,7 +3406,7 @@ impl<'db> StaticClassLiteral<'db> {
         let explicit_bases_variances = self
             .explicit_bases(db)
             .iter()
-            .map(|class| class.variance_of(db, &env, typevar, mode));
+            .map(|class| class.variance_of(db, &env, typevar));
 
         let default_attribute_variance = {
             let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self.into());
@@ -3498,12 +3500,11 @@ impl<'db> StaticClassLiteral<'db> {
                     } else {
                         default_attribute_variance
                     };
-                    ty.with_polarity(variance)
-                        .variance_of(db, &env, typevar, mode)
+                    ty.with_polarity(variance).variance_of(db, &env, typevar)
                 })
             });
 
-        mode.join(attribute_variances.chain(explicit_bases_variances))
+        VarianceTerm::join(db, attribute_variances.chain(explicit_bases_variances))
     }
 }
 

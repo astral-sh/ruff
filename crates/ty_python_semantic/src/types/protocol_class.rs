@@ -31,12 +31,13 @@ use crate::{
         KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
         PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral,
         Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
-        VarianceInferable, VarianceInferenceMode, VarianceResult,
+        VarianceInferable, VarianceTerm,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
         signatures::walk_signature,
+        variance::infer_protocol_variance,
     },
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
@@ -341,18 +342,11 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             };
 
-            let inferred_variance = match class
-                .variance_of(
-                    db,
-                    &env,
-                    typevar.identity(db),
-                    VarianceInferenceMode::Structural(typevar.identity(db)),
-                )
-                .variance
-            {
-                TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
-                variance => variance,
-            };
+            let inferred_variance =
+                match infer_protocol_variance(db, class, typevar.identity(db), declared_variance) {
+                    TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
+                    variance => variance,
+                };
 
             if inferred_variance == declared_variance {
                 continue;
@@ -1230,12 +1224,12 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
-        mode.join(self.variance_types(db, env).map(|(ty, variance)| {
-            ty.with_polarity(variance)
-                .variance_of(db, env, typevar, mode)
-        }))
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::join(
+            db,
+            self.variance_types(db, env)
+                .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar)),
+        )
     }
 }
 

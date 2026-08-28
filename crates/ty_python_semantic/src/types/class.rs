@@ -44,10 +44,11 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
+use crate::types::variance::{VarianceOrigin, VarianceVariable};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
-    TypingModule, UnionBuilder, VarianceInferable, VarianceInferenceMode, VarianceResult,
+    TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -513,9 +514,12 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
-        self.variance_of_owner(db, typevar, mode)
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::Variable(VarianceVariable::new(
+            db,
+            VarianceOrigin::GenericAlias(self),
+            typevar,
+        ))
     }
 }
 
@@ -523,15 +527,14 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 impl<'db> GenericAlias<'db> {
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _, _| VarianceResult::BIVARIANT,
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of_owner(
+    pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
+    ) -> VarianceTerm<'db> {
         let origin = self.origin(db);
         let env = ProgramEnvironment::from_file(origin.program_file(db));
 
@@ -544,17 +547,13 @@ impl<'db> GenericAlias<'db> {
             .variables(db)
             .zip(specialization.types(db))
             .map(|(generic_typevar, ty)| {
-                // Composition is commutative, so infer the argument's variance first. If it is
-                // bivariant, we can avoid traversing the class's potentially expensive interface.
-                //
-                // If salsa let us look at the cache, we could check first
-                // to see if the class literal query was already run.
-                ty.variance_of(db, &env, typevar, mode).compose_thunk(|| {
+                // Composition is commutative. Keep the argument on the left so evaluation can
+                // skip the class's potentially expensive equation when the argument is bivariant.
+                ty.variance_of(db, &env, typevar).compose_thunk(db, || {
                     if let Some(explicit_variance) =
                         generic_typevar.typevar(db).explicit_variance(db)
                     {
-                        if mode == VarianceInferenceMode::Effective
-                            || generic_typevar.is_paramspec(db)
+                        if generic_typevar.is_paramspec(db)
                             || generic_typevar.is_typevartuple(db)
                             || origin
                                 .into_protocol_class(db)
@@ -562,24 +561,19 @@ impl<'db> GenericAlias<'db> {
                         {
                             return explicit_variance.into();
                         }
-                        if let Some(variance) = mode.protocol_parameter_variance(
+                        return VarianceTerm::Variable(VarianceVariable::new(
                             db,
-                            &env,
-                            origin,
+                            VarianceOrigin::ProtocolParameter(origin, explicit_variance),
                             generic_typevar.identity(db),
-                            explicit_variance,
-                        ) {
-                            return variance;
-                        }
+                        ));
                     }
 
-                    // A recursive protocol's declaration cannot determine its own validation
-                    // result. Structural inference follows the interface instead, retaining
-                    // bivariance as the bottom of the fixed point until inference completes.
-                    origin.variance_of(db, &env, generic_typevar.identity(db), mode)
+                    // References name the formal parameter's equation rather than expanding a
+                    // specialized body, so recursive applications remain a finite graph.
+                    origin.variance_of(db, &env, generic_typevar.identity(db))
                 })
             });
-        mode.join(variances)
+        VarianceTerm::join(db, variances)
     }
 }
 
@@ -2609,19 +2603,16 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
+    ) -> VarianceTerm<'db> {
         match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => {
-                class.variance_of(db, env, typevar, mode)
-            }
+            Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, env, typevar),
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
-            ) => VarianceResult::BIVARIANT,
-            Self::Generic(generic) => generic.variance_of(db, env, typevar, mode),
+            ) => VarianceTerm::BIVARIANT,
+            Self::Generic(generic) => generic.variance_of(db, env, typevar),
         }
     }
 }
@@ -2837,14 +2828,13 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
+    ) -> VarianceTerm<'db> {
         match self {
-            Self::Static(class) => class.variance_of(db, env, typevar, mode),
+            Self::Static(class) => class.variance_of(db, env, typevar),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => VarianceResult::BIVARIANT,
+            | Self::DynamicEnum(_) => VarianceTerm::BIVARIANT,
         }
     }
 }

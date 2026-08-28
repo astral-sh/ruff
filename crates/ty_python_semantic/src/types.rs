@@ -110,7 +110,7 @@ pub(crate) use crate::types::typevar::{
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
-use crate::types::variance::{VarianceInferable, VarianceInferenceMode, VarianceResult};
+use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
     any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
@@ -10026,8 +10026,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
+    ) -> VarianceTerm<'db> {
         tracing::trace!(
             "Checking variance of '{tvar}' in `{ty:?}`",
             tvar = typevar.identity.name(db),
@@ -10035,40 +10034,41 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         );
 
         let v = match self {
-            Type::ClassLiteral(class_literal) => class_literal.variance_of(db, env, typevar, mode),
+            Type::ClassLiteral(class_literal) => class_literal.variance_of(db, env, typevar),
 
             Type::FunctionLiteral(function_type) => {
                 // TODO: do we need to replace self?
-                function_type.variance_of(db, typevar, mode)
+                function_type.variance_of(db, typevar)
             }
 
             Type::BoundMethod(method_type) => {
                 // TODO: do we need to replace self?
-                method_type.function(db).variance_of(db, typevar, mode)
+                method_type.function(db).variance_of(db, typevar)
             }
 
             Type::NominalInstance(nominal_instance_type) => {
-                nominal_instance_type.variance_of(db, env, typevar, mode)
+                nominal_instance_type.variance_of(db, env, typevar)
             }
-            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, env, typevar, mode),
-            Type::Callable(callable_type) => callable_type
-                .signatures(db)
-                .variance_of(db, env, typevar, mode),
+            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, env, typevar),
+            Type::Callable(callable_type) => {
+                callable_type.signatures(db).variance_of(db, env, typevar)
+            }
             // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) if other_typevar.identity(db) == typevar => {
                 // type variables are covariant in themselves
                 TypeVarVariance::Covariant.into()
             }
             Type::ProtocolInstance(protocol_instance_type) => {
-                protocol_instance_type.variance_of(db, env, typevar, mode)
+                protocol_instance_type.variance_of(db, env, typevar)
             }
-            Type::TypedDict(typed_dict) => typed_dict.variance_of(db, env, typevar, mode),
+            Type::TypedDict(typed_dict) => typed_dict.variance_of(db, env, typevar),
             // unions are covariant in their disjuncts
-            Type::Union(union_type) => mode.join(
+            Type::Union(union_type) => VarianceTerm::join(
+                db,
                 union_type
                     .elements(db)
                     .iter()
-                    .map(|ty| ty.variance_of(db, env, typevar, mode)),
+                    .map(|ty| ty.variance_of(db, env, typevar)),
             ),
 
             // Products are covariant in their conjuncts. For negative
@@ -10077,20 +10077,22 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             // `A`, and so is not assignable to `~A`. On the other hand, a value
             // of type `~A` excludes all `A`s, and thus all `B`s, and so _is_
             // assignable to `~B`.
-            Type::Intersection(intersection_type) => mode.join(
+            Type::Intersection(intersection_type) => VarianceTerm::join(
+                db,
                 intersection_type
                     .positive(db)
                     .iter()
-                    .map(|ty| ty.variance_of(db, env, typevar, mode))
+                    .map(|ty| ty.variance_of(db, env, typevar))
                     .chain(intersection_type.negative(db).iter().map(|ty| {
                         ty.with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of(db, env, typevar, mode)
+                            .variance_of(db, env, typevar)
                     })),
             ),
             Type::EnumComplement(complement) => complement
                 .to_intersection(db, env)
-                .variance_of(db, env, typevar, mode),
-            Type::PropertyInstance(property_instance_type) => mode.join(
+                .variance_of(db, env, typevar),
+            Type::PropertyInstance(property_instance_type) => VarianceTerm::join(
+                db,
                 [
                     Some(property_instance_type.instance_fallback(db, env)),
                     property_instance_type.getter(db),
@@ -10099,7 +10101,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 ]
                 .into_iter()
                 .flatten()
-                .map(|ty| ty.variance_of(db, env, typevar, mode)),
+                .map(|ty| ty.variance_of(db, env, typevar)),
             ),
             // A generic class can store another class's slot descriptor directly:
             //
@@ -10110,17 +10112,13 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::SlotDescriptor(descriptor) => descriptor
                 .value_type(db)
                 .with_polarity(TypeVarVariance::Invariant)
-                .variance_of(db, env, typevar, mode),
-            Type::SubclassOf(subclass_of_type) => {
-                subclass_of_type.variance_of(db, env, typevar, mode)
-            }
-            Type::TypeIs(type_is_type) => type_is_type.variance_of(db, env, typevar, mode),
-            Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, env, typevar, mode),
-            Type::TypeForm(typeform_type) => typeform_type.variance_of(db, env, typevar, mode),
-            Type::KnownInstance(known_instance) => {
-                known_instance.variance_of(db, env, typevar, mode)
-            }
-            Type::TypeAlias(alias) => alias.variance_of(db, env, typevar, mode),
+                .variance_of(db, env, typevar),
+            Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, env, typevar),
+            Type::TypeIs(type_is_type) => type_is_type.variance_of(db, env, typevar),
+            Type::TypeGuard(type_guard_type) => type_guard_type.variance_of(db, env, typevar),
+            Type::TypeForm(typeform_type) => typeform_type.variance_of(db, env, typevar),
+            Type::KnownInstance(known_instance) => known_instance.variance_of(db, env, typevar),
+            Type::TypeAlias(alias) => alias.variance_of(db, env, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -10135,7 +10133,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::AlwaysTruthy
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
-            | Type::NewTypeInstance(_) => VarianceResult::BIVARIANT,
+            | Type::NewTypeInstance(_) => VarianceTerm::BIVARIANT,
         };
 
         tracing::trace!(
@@ -11414,11 +11412,10 @@ impl<'db> VarianceInferable<'db> for TypeIsType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
+    ) -> VarianceTerm<'db> {
         self.type_argument(db)
             .with_polarity(TypeVarVariance::Invariant)
-            .variance_of(db, env, typevar, mode)
+            .variance_of(db, env, typevar)
     }
 }
 
@@ -11487,9 +11484,8 @@ impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
-        self.return_type(db).variance_of(db, env, typevar, mode)
+    ) -> VarianceTerm<'db> {
+        self.return_type(db).variance_of(db, env, typevar)
     }
 }
 

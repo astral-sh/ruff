@@ -62,7 +62,7 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
-use crate::types::variance::{VarianceInferable, VarianceInferenceMode};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
     walk_type_with_recursion_guard,
@@ -6394,13 +6394,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         matched.index != parameter_index
                             && !self.signature.parameters()[matched.index]
                                 .annotated_type()
-                                .variance_of(
-                                    db,
-                                    self.env,
-                                    typevartuple.identity(db),
-                                    VarianceInferenceMode::Effective,
-                                )
-                                .variance
+                                .variance_of(db, self.env, typevartuple.identity(db))
+                                .evaluate(db)
                                 .is_covariant()
                     })
             })

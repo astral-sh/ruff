@@ -89,7 +89,7 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
 use crate::types::tuple::TupleSpec;
-use crate::types::variance::{VarianceInferable, VarianceInferenceMode, VarianceResult};
+use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm, VarianceVariable};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1578,23 +1578,32 @@ impl<'db> FunctionType<'db> {
             .unwrap_or_else(|| self.literal(db).signature(db))
     }
 
-    /// Infer the variance of a type variable within this function's signature.
-    ///
-    /// This is tracked because signatures can contain recursive `TypeOf` references back to the
-    /// function itself. Class and generic-alias variance use the same `Bivariant` cycle fallback.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, _, _, _, _| VarianceResult::BIVARIANT,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
+    /// Refer to this signature's equation, including recursive `TypeOf` references to itself.
     pub(crate) fn variance_of(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode<'db>,
-    ) -> VarianceResult {
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::Variable(VarianceVariable::new(
+            db,
+            VarianceOrigin::Function(self),
+            typevar,
+        ))
+    }
+
+    /// Build the variance equation for this function's signature.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(in crate::types) fn variance_equation(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
         let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
-        self.signature(db).variance_of(db, &env, typevar, mode)
+        self.signature(db).variance_of(db, &env, typevar)
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.

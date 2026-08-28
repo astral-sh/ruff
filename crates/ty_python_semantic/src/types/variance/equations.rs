@@ -1,0 +1,265 @@
+//! Variance inference separates constructing equations from evaluating them. Recursive types
+//! contribute named variables, so references such as `P[list[T]]` do not expand indefinitely.
+//!
+//! Ordinary evaluation honors explicit protocol declarations. To validate a declaration, we
+//! instead solve the equations in that parameter's strongly connected component, starting at
+//! bivariance. Declarations outside the component still apply: referencing an independent
+//! protocol does not make its declared variance part of the validation problem.
+//!
+//! Dependencies follow variance composition, not just syntax. An argument erased by a bivariant
+//! parameter cannot connect two components. Conversely, reaching invariance does not erase
+//! later dependencies, even though ordinary evaluation can stop there.
+
+use rustc_hash::{FxHashMap, FxHashSet};
+
+use crate::types::{
+    BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, StaticClassLiteral, TypeAliasType,
+    TypeVarVariance, TypedDictType,
+};
+use crate::{Db, ProgramEnvironment};
+
+/// A variance expression whose recursive references name equations rather than expand types.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum VarianceTerm<'db> {
+    Constant(TypeVarVariance),
+    Variable(VarianceVariable<'db>),
+    Join(VarianceSum<'db>),
+    Compose(VarianceProduct<'db>),
+}
+
+impl<'db> VarianceTerm<'db> {
+    pub(crate) const BIVARIANT: Self = Self::Constant(TypeVarVariance::Bivariant);
+
+    /// Combine occurrences without discarding symbolic dependencies at `Invariant`.
+    /// Only evaluation can short-circuit there: later terms can still connect a recursive group.
+    pub(crate) fn join(db: &'db dyn Db, terms: impl IntoIterator<Item = Self>) -> Self {
+        let mut constant = TypeVarVariance::Bivariant;
+        let mut symbolic = Vec::new();
+        for term in terms {
+            match term {
+                Self::Constant(variance) => constant = constant.join(variance),
+                _ => symbolic.push(term),
+            }
+        }
+        if constant != TypeVarVariance::Bivariant {
+            symbolic.push(Self::Constant(constant));
+        }
+        match symbolic.as_slice() {
+            [] => Self::BIVARIANT,
+            [term] => *term,
+            _ => Self::Join(VarianceSum::new(db, symbolic.into_boxed_slice())),
+        }
+    }
+
+    /// Compose definition-site and use-site variance, preserving erasure in either position.
+    pub(crate) fn compose_thunk(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        if self == Self::BIVARIANT {
+            return self;
+        }
+        let other = other();
+        match (self, other) {
+            (Self::Constant(left), Self::Constant(right)) => left.compose(right).into(),
+            (_, Self::Constant(TypeVarVariance::Bivariant)) => Self::BIVARIANT,
+            (Self::Constant(TypeVarVariance::Covariant), _) => other,
+            (_, Self::Constant(TypeVarVariance::Covariant)) => self,
+            _ => Self::Compose(VarianceProduct::new(db, self, other)),
+        }
+    }
+
+    /// Evaluate an expression using declared variance at protocol-parameter references.
+    pub(crate) fn evaluate(self, db: &'db dyn Db) -> TypeVarVariance {
+        self.evaluate_with(db, &|variable| variable.effective_variance(db))
+    }
+
+    fn evaluate_with(
+        self,
+        db: &'db dyn Db,
+        lookup: &impl Fn(VarianceVariable<'db>) -> TypeVarVariance,
+    ) -> TypeVarVariance {
+        match self {
+            Self::Constant(variance) => variance,
+            Self::Variable(variable) => lookup(variable),
+            Self::Join(sum) => sum
+                .terms(db)
+                .iter()
+                .map(|term| term.evaluate_with(db, lookup))
+                .collect(),
+            Self::Compose(product) => product
+                .left(db)
+                .evaluate_with(db, lookup)
+                .compose_thunk(|| product.right(db).evaluate_with(db, lookup)),
+        }
+    }
+
+    /// Visit only references that survive composition. For example, the equation for the
+    /// parameter in `type Ignore[T] = int` is bivariant, so `Ignore[P[T]]` adds no edge to `P`.
+    fn visit_live_variables(self, db: &'db dyn Db, mut visit: impl FnMut(VarianceVariable<'db>)) {
+        let mut pending = vec![self];
+        let mut visited = FxHashSet::default();
+        while let Some(term) = pending.pop() {
+            if !visited.insert(term) || term.evaluate(db) == TypeVarVariance::Bivariant {
+                continue;
+            }
+            match term {
+                Self::Constant(_) => {}
+                Self::Variable(variable) => visit(variable),
+                Self::Join(sum) => pending.extend(sum.terms(db).iter().copied()),
+                Self::Compose(product) => pending.extend([product.left(db), product.right(db)]),
+            }
+        }
+    }
+}
+
+impl From<TypeVarVariance> for VarianceTerm<'_> {
+    fn from(variance: TypeVarVariance) -> Self {
+        Self::Constant(variance)
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct VarianceSum<'db> {
+    #[returns(ref)]
+    terms: Box<[VarianceTerm<'db>]>,
+}
+
+impl get_size2::GetSize for VarianceSum<'_> {}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct VarianceProduct<'db> {
+    #[returns(copy)]
+    left: VarianceTerm<'db>,
+    #[returns(copy)]
+    right: VarianceTerm<'db>,
+}
+
+impl get_size2::GetSize for VarianceProduct<'_> {}
+
+/// Definition bodies that can occur recursively in variance expressions.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum VarianceOrigin<'db> {
+    Class(StaticClassLiteral<'db>),
+    /// A use of an explicitly declared protocol parameter, distinct from inferring its body.
+    ProtocolParameter(StaticClassLiteral<'db>, TypeVarVariance),
+    GenericAlias(GenericAlias<'db>),
+    TypeAlias(TypeAliasType<'db>),
+    Function(FunctionType<'db>),
+    TypedDict(ClassType<'db>),
+}
+
+/// One unknown in the equation graph. Generic references use the origin's formal parameters;
+/// specialization arguments contribute separate terms instead of expanding definition bodies.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct VarianceVariable<'db> {
+    #[returns(copy)]
+    origin: VarianceOrigin<'db>,
+    #[returns(copy)]
+    typevar: BoundTypeVarIdentity<'db>,
+}
+
+impl get_size2::GetSize for VarianceVariable<'_> {}
+
+#[salsa::tracked]
+impl<'db> VarianceVariable<'db> {
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+    fn effective_variance(self, db: &'db dyn Db) -> TypeVarVariance {
+        if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
+            declared
+        } else {
+            self.equation(db).evaluate(db)
+        }
+    }
+
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
+    fn equation(self, db: &'db dyn Db) -> VarianceTerm<'db> {
+        let typevar = self.typevar(db);
+        match self.origin(db) {
+            VarianceOrigin::Class(class) | VarianceOrigin::ProtocolParameter(class, _) => {
+                class.variance_equation(db, typevar)
+            }
+            VarianceOrigin::GenericAlias(alias) => alias.variance_equation(db, typevar),
+            VarianceOrigin::TypeAlias(alias) => alias.variance_equation(db, typevar),
+            VarianceOrigin::Function(function) => function.variance_equation(db, typevar),
+            VarianceOrigin::TypedDict(class) => {
+                let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+                TypedDictType::new(class).variance_of_items(db, &env, typevar)
+            }
+        }
+    }
+}
+
+/// Infer the root protocol parameter together with its mutually dependent parameters.
+/// Declarations outside that component remain authoritative. Equations and effective values are
+/// cached separately, so dependency discovery does not repeat the semantic type traversal.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn infer_protocol_variance<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    typevar: BoundTypeVarIdentity<'db>,
+    declared: TypeVarVariance,
+) -> TypeVarVariance {
+    let root = VarianceVariable::new(
+        db,
+        VarianceOrigin::ProtocolParameter(class, declared),
+        typevar,
+    );
+    let mut pending = vec![root];
+    let mut visited = FxHashSet::default();
+    let mut incoming: FxHashMap<_, Vec<_>> = FxHashMap::default();
+    let mut equations = Vec::new();
+
+    while let Some(variable) = pending.pop() {
+        if !visited.insert(variable) {
+            continue;
+        }
+        let equation = variable.equation(db);
+        equation.visit_live_variables(db, |dependency| {
+            incoming.entry(dependency).or_default().push(variable);
+            pending.push(dependency);
+        });
+        equations.push((variable, equation));
+    }
+
+    // Every visited variable is reachable from the root. Those with a path back to the root
+    // therefore form exactly its strongly connected component.
+    let mut component = FxHashSet::default();
+    pending.push(root);
+    while let Some(variable) = pending.pop() {
+        if component.insert(variable)
+            && let Some(predecessors) = incoming.get(&variable)
+        {
+            pending.extend(predecessors.iter().copied());
+        }
+    }
+    equations.retain(|(variable, _)| component.contains(variable));
+
+    let mut values: FxHashMap<_, _> = equations
+        .iter()
+        .map(|(variable, _)| (*variable, TypeVarVariance::Bivariant))
+        .collect();
+    // Join and composition are monotone. Starting every unknown at the bottom of the finite
+    // variance lattice therefore converges to the least fixed point, including for negative cycles.
+    loop {
+        let mut changed = false;
+        for (variable, equation) in &equations {
+            let variance = equation.evaluate_with(db, &|dependency| {
+                values
+                    .get(&dependency)
+                    .copied()
+                    .unwrap_or_else(|| dependency.effective_variance(db))
+            });
+            let previous = values
+                .entry(*variable)
+                .or_insert(TypeVarVariance::Bivariant);
+            if *previous != variance {
+                *previous = variance;
+                changed = true;
+            }
+        }
+        if !changed {
+            return values
+                .get(&root)
+                .copied()
+                .unwrap_or(TypeVarVariance::Bivariant);
+        }
+    }
+}
