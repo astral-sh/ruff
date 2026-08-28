@@ -132,6 +132,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
                 },
                 python_platform: python_platform.clone(),
                 search_paths: search_paths.clone(),
+                python_executable: default_program.python_executable(&db).clone(),
             },
         ),
     );
@@ -147,6 +148,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
                 },
                 python_platform,
                 search_paths,
+                python_executable: default_program.python_executable(&db).clone(),
             },
         ),
     );
@@ -208,6 +210,7 @@ fn program_file_changes_with_python_version() -> anyhow::Result<()> {
             python_version: db.program_settings().python_version.clone(),
             python_platform: program.python_platform(&db).clone(),
             search_paths: program.search_paths(&db).clone(),
+            python_executable: program.python_executable(&db).clone(),
         },
     );
     assert_eq!(program, equivalent_program);
@@ -225,6 +228,7 @@ fn program_file_changes_with_python_version() -> anyhow::Result<()> {
             },
             python_platform: program.python_platform(&db).clone(),
             search_paths: program.search_paths(&db).clone(),
+            python_executable: program.python_executable(&db).clone(),
         },
     );
 

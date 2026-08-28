@@ -300,7 +300,14 @@ impl Project {
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
-    fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+    /// Returns whether `path` is a directory that is part of the project and included
+    /// (see [`Self::is_file_included`]).
+    ///
+    /// A directory is included when the project's settings could match something inside it.
+    /// That is an over-approximation: an include pattern such as `**/tests` makes every
+    /// directory a candidate, because whether a directory contains a `tests` directory can
+    /// only be decided by looking inside it.
+    pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         matches!(
             ProjectFilesFilter::from_project(db, self)
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),

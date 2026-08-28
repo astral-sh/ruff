@@ -296,6 +296,10 @@ impl Options {
             ToProgramSettingsError::SearchPaths,
         )?;
 
+        let python_executable = python_environment
+            .as_ref()
+            .and_then(|environment| environment.python_executable(system));
+
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
             python_version = python_version.version
@@ -306,6 +310,7 @@ impl Options {
                 python_version,
                 python_platform,
                 search_paths,
+                python_executable,
             },
             diagnostics,
         ))
