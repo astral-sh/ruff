@@ -1734,8 +1734,12 @@ class RepeatsInvalidOverride(ReturnsBase):
 
 ## Overrides with `Self` parameters
 
-When a method accepts another instance of `Self`, both the inherited and overriding signatures refer
-to the subclass. Explicitly annotating the receiver as `Self` does not change compatibility:
+Repeating `other: Self` in an override narrows the parameter's bound from the base class to the
+subclass. A call through a base-class reference can pass a base-class instance that the override
+does not accept. We currently miss this violation for both implicit and explicit receiver
+annotations. This is a known limitation tracked in
+[#2255](https://github.com/astral-sh/ty/issues/2255), related to the broader
+[generic override limitation](https://github.com/astral-sh/ty/issues/4133):
 
 ```pyi
 from typing_extensions import Self
@@ -1745,11 +1749,15 @@ class Base:
     def explicit(self: Self, other: Self) -> None: ...
 
 class PreservesSelf(Base):
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
     def implicit(self, other: Self) -> None: ...
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
     def explicit(self: Self, other: Self) -> None: ...
 
 class ChangesReceiverAnnotation(Base):
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
     def implicit(self: Self, other: Self) -> None: ...
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
     def explicit(self, other: Self) -> None: ...
 ```
 
@@ -1761,8 +1769,8 @@ class Incompatible(Base):
     def explicit(self: Self, other: int) -> None: ...  # error: [invalid-method-override]
 ```
 
-For generic superclasses, the override also uses the inherited specialization of the class's type
-parameters:
+For generic superclasses, we use the inherited specialization of the class's type parameters, but
+still miss the narrowing of `other: Self`:
 
 ```toml
 [environment]
@@ -1774,6 +1782,7 @@ class GenericBase[T]:
     def method(self, other: Self, value: T) -> Self: ...
 
 class Specialized(GenericBase[int]):
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
     def method(self, other: Self, value: int) -> Self: ...
 
 class IncompatibleSpecialization(GenericBase[int]):
@@ -2470,8 +2479,10 @@ class InvalidSwapEvent(Event):
 
 ## Classmethod overrides with `Self`
 
-In a class method, `Self` refers to an instance of the subclass, while `cls` is a class object. An
-override can preserve a `Self` parameter with or without an explicit `cls: type[Self]` annotation:
+In a class method, `Self` refers to an instance, while `cls` is a class object. A caller with a
+`type[Base]` reference can pass a `Base` instance as `other`, so narrowing that parameter to the
+subclass's `Self` is invalid. We currently miss this violation with or without an explicit
+`cls: type[Self]` annotation:
 
 ```pyi
 from typing_extensions import Self
@@ -2484,10 +2495,12 @@ class Base:
 
 class ImplicitReceiver(Base):
     @classmethod
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
     def compare(cls, other: Self) -> None: ...
 
 class ExplicitReceiver(Base):
     @classmethod
+    # TODO: Emit `invalid-method-override` for narrowing `other`.
     def compare(cls: type[Self], other: Self) -> None: ...
 ```
 
