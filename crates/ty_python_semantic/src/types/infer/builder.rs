@@ -10004,7 +10004,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Report the distinct deprecated targets of one operation in a single diagnostic.
-    /// Union alternatives can select the same source function or overload more than once.
+    /// Deduplicate by source function or overload, retaining separate source annotations for
+    /// distinct declarations. Include their messages in the primary annotation for concise output.
     fn report_deprecated_functions(
         &self,
         ranged: impl Ranged,
@@ -10070,13 +10071,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Check the accessor invoked by an attribute operation, using the property descriptors
-    /// retained by member lookup or assignment validation.
+    /// retained by member lookup or assignment validation. `access` describes the operation,
+    /// which may differ from the AST context: an augmented assignment also reads its target.
+    ///
+    /// ```python
+    /// from typing_extensions import deprecated
+    ///
+    /// class C:
+    ///     @property
+    ///     @deprecated("old getter")
+    ///     def value(self) -> int:
+    ///         return 0
+    ///
+    ///     @value.setter
+    ///     def value(self, new: int) -> None: ...
+    ///
+    /// c = C()
+    /// c.value = 1   # Only invokes the non-deprecated setter.
+    /// c.value += 1  # Also invokes the deprecated getter.
+    /// ```
     fn check_deprecated_property(
         &self,
         attribute: &ast::ExprAttribute,
         member: Type<'db>,
         access: ExprContext,
     ) {
+        /// Represent absent accessors and non-property members as `Unknown` to retain
+        /// non-deprecated intersection alternatives.
         fn accessors<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,

@@ -360,8 +360,7 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    /// Returns the instance and owner passed to a descriptor, when the super owner is known.
-    pub(super) fn descriptor_binding(
+    fn descriptor_binding(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -950,8 +949,8 @@ impl<'db> BoundSuperType<'db> {
         env: &ProgramEnvironment<'db>,
         attribute: PlaceAndQualifiers<'db>,
     ) -> Option<MemberLookupResult<'db>> {
-        // `super` delegates reads to the owner's descriptors, but not writes or deletions.
-        // Retain only the getters when carrying property accessors out of this lookup.
+        /// Retain only getters in the deprecation metadata: `super` delegates reads to the
+        /// owner's descriptors, but not writes or deletions.
         fn getters_only<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,

@@ -883,6 +883,7 @@ impl<'db> ResolvedMember<'db> {
         }
     }
 
+    /// Transform the member's value type without changing its deprecated property descriptors.
     fn map_type(self, db: &'db dyn Db, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self::new(
             db,
@@ -892,6 +893,8 @@ impl<'db> ResolvedMember<'db> {
     }
 }
 
+/// Combine deprecated descriptors from alternative lookup paths. A non-deprecated path (`None`)
+/// does not suppress deprecations from another possible path.
 fn union_deprecated_properties<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -4190,6 +4193,9 @@ impl<'db> Type<'db> {
 
     /// Whether this descriptor contains a property with a deprecated accessor implementation.
     /// Overload deprecations require a resolved call and do not apply to accessor references.
+    ///
+    /// This determines whether to retain deprecation metadata, not whether to report a diagnostic.
+    /// Reporting also accounts for the access kind and non-deprecated intersection alternatives.
     fn has_deprecated_property(self, db: &'db dyn Db) -> bool {
         fn deprecated(db: &dyn Db, ty: Type<'_>) -> bool {
             match ty {

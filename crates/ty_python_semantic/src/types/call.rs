@@ -160,6 +160,7 @@ impl<'db> Type<'db> {
 
     /// Memoize the return type and deprecations from binary dunder resolution, without retaining
     /// the full call bindings or repeating overload selection at each expression.
+    /// Returns `None` if resolution fails; callers remain responsible for call-site diagnostics.
     pub(crate) fn try_call_bin_op_result(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

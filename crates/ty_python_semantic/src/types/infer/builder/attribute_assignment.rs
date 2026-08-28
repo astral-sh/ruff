@@ -108,6 +108,7 @@ enum AttributeWriteEvaluation {
 
 /// The validity and deprecated accessors collected from one assignment requirement.
 struct AttributeWriteOutcome<'db> {
+    /// The validation result; not meaningful when only collecting deprecations.
     valid: bool,
     deprecated_properties: Option<Type<'db>>,
 }
@@ -188,6 +189,9 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
     }
 
     /// Resolve each alternative once, keeping accessor metadata even after validation stops.
+    /// A failed union alternative or successful intersection alternative decides validity; any
+    /// remaining alternatives contribute only deprecations, without re-inferring the value.
+    /// Deprecation collection depends on the enclosing assignment, even for silent trial branches.
     fn evaluate(
         &mut self,
         requirement: &AttributeWriteRequirement<'db>,
