@@ -22,6 +22,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
+use ty_python_core::definition::DefinitionKind;
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -135,7 +136,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 error.into_fallback_type(&self.context, annotation, self.inference_flags())
             });
-        self.check_for_unbound_type_variable(annotation, result_ty)
+        self.check_type_variable_scope(annotation, result_ty)
     }
 
     /// Infer the type of a type expression without storing the result.
@@ -3250,11 +3251,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Checks if the inferred type is an unbound type variable and reports a diagnostic if so.
+    /// Check whether a type variable can be used in the current type expression.
     ///
-    /// Returns `Unknown` as a fallback if the type variable is unbound, otherwise returns the
-    /// original type unchanged.
-    fn check_for_unbound_type_variable(&self, expression: &ast::Expr, ty: Type<'db>) -> Type<'db> {
+    /// Unbound variables fall back to `Unknown`. Bound variables retain their type so that an
+    /// invalid scope does not also make `Callable[P, R]` or `tuple[*Ts]` appear malformed.
+    fn check_type_variable_scope(&self, expression: &ast::Expr, ty: Type<'db>) -> Type<'db> {
+        let db = self.db();
+        // Legacy aliases introduce independent type parameters. PEP 695 aliases can instead
+        // capture their enclosing class's parameters.
+        if let Type::TypeVar(typevar) = ty
+            && self
+                .inference_flags()
+                .contains(InferenceFlags::IN_TYPE_ALIAS)
+            && self.typevar_binding_context.is_some_and(|definition| {
+                matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+            })
+            && let Some(owner) = typevar.binding_context(db).definition()
+            && matches!(owner.kind(db), DefinitionKind::Class(_))
+        {
+            self.report_invalid_type_expression(
+                expression,
+                format_args!(
+                    "Type alias cannot capture class-scoped type variable `{}`",
+                    typevar.name(db)
+                ),
+            );
+            return ty;
+        }
+
         if !self
             .inference_flags()
             .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS)

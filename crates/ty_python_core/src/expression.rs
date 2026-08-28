@@ -7,13 +7,14 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use salsa;
 
-/// Whether or not this expression should be inferred as a normal expression or
-/// a type expression. For example, in `self.x: <annotation> = <value>`, the
+/// How this expression should be inferred. For example, in `self.x: <annotation> = <value>`, the
 /// `<annotation>` is inferred as a type expression, while `<value>` is inferred
 /// as a normal expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum ExpressionKind {
     Normal,
+    /// The callable in a call expression, where type arguments cannot introduce type variables.
+    CallTarget,
     TypeExpression,
 }
 
@@ -59,7 +60,7 @@ pub struct Expression<'db> {
     #[returns(clone)]
     pub assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
 
-    /// Should this expression be inferred as a normal expression or a type expression?
+    /// The inference context for this expression.
     #[returns(copy)]
     pub kind: ExpressionKind,
 }
