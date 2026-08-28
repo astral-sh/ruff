@@ -156,78 +156,78 @@ extend-exclude = [
 preview = true
 select = [
     # E # pycodestyle (error)
-    "ambiguous-variable-name",  # pedantic
-    "module-import-not-at-top-of-file",  # pedantic
-    "ambiguous-function-name",  # pedantic
-    "unexpected-indentation",  # pedantic
-    "none-comparison",  # pedantic
-    "ambiguous-class-name",  # pedantic
-    "lambda-assignment",  # pedantic
-    "multiple-leading-hashes-for-block-comment",  # pedantic
-    "not-in-test",  # pedantic
-    "type-comparison",  # pedantic
-    "multiple-imports-on-one-line",  # pedantic
-    "true-false-comparison",  # pedantic
-    "no-indented-block",  # pedantic
-    "not-is-test",  # pedantic
+    "ambiguous-variable-name",
+    "module-import-not-at-top-of-file",
+    "ambiguous-function-name",
+    "unexpected-indentation",
+    "none-comparison",
+    "ambiguous-class-name",
+    "lambda-assignment",
+    "multiple-leading-hashes-for-block-comment",
+    "not-in-test",
+    "type-comparison",
+    "multiple-imports-on-one-line",
+    "true-false-comparison",
+    "no-indented-block",
+    "not-is-test",
     # F # pyflakes
-    "undefined-local-with-import-star",  # restriction
-    "forward-annotation-syntax-error",  # pedantic
-    "undefined-local-with-import-star-usage",  # restriction
+    "undefined-local-with-import-star",
+    "forward-annotation-syntax-error",
+    "undefined-local-with-import-star-usage",
     # B # bugbear
-    "batched-without-explicit-strict",  # pedantic
-    "map-without-explicit-strict",  # pedantic
-    "class-as-data-structure",  # pedantic
-    "no-explicit-stacklevel",  # pedantic
-    "unused-loop-control-variable",  # pedantic
-    "raise-without-from-inside-except",  # pedantic
-    "re-sub-positional-args",  # pedantic
-    "zip-without-explicit-strict",  # pedantic
+    "batched-without-explicit-strict",
+    "map-without-explicit-strict",
+    "class-as-data-structure",
+    "no-explicit-stacklevel",
+    "unused-loop-control-variable",
+    "raise-without-from-inside-except",
+    "re-sub-positional-args",
+    "zip-without-explicit-strict",
     # C4 # flake8-comprehensions
-    "unnecessary-comprehension",  # pedantic
+    "unnecessary-comprehension",
     # SIM # flake8-simplify
-    "uncapitalized-environment-variables",  # pedantic
-    "compare-with-tuple",  # pedantic
-    "if-else-block-instead-of-if-exp",  # pedantic
-    "yoda-conditions",  # pedantic
-    "suppressible-exception",  # pedantic
-    "dict-get-with-none-default",  # pedantic
-    "if-else-block-instead-of-dict-lookup",  # pedantic
-    "if-expr-with-twisted-arms",  # pedantic
+    "uncapitalized-environment-variables",
+    "compare-with-tuple",
+    "if-else-block-instead-of-if-exp",
+    "yoda-conditions",
+    "suppressible-exception",
+    "dict-get-with-none-default",
+    "if-else-block-instead-of-dict-lookup",
+    "if-expr-with-twisted-arms",
     # I # isort
-    "missing-required-import",  # pedantic
+    "missing-required-import",
     # UP # pyupgrade
-    "redundant-open-modes",  # pedantic
-    "convert-typed-dict-functional-to-class",  # pedantic
+    "redundant-open-modes",
+    "convert-typed-dict-functional-to-class",
     # PGH # pygrep-hooks
-    "blanket-noqa",  # pedantic
-    "blanket-type-ignore",  # restriction
+    "blanket-noqa",
+    "blanket-type-ignore",
     # PYI # flake8-pyi
-    "redundant-literal-union",  # pedantic
-    "docstring-in-stub",  # pedantic
-    "collections-named-tuple",  # pedantic
-    "unsupported-method-call-on-all",  # pedantic
-    "argument-default-in-stub",  # pedantic
-    "typed-argument-default-in-stub",  # pedantic
-    "numeric-literal-too-long",  # pedantic
-    "string-or-bytes-too-long",  # pedantic
+    "redundant-literal-union",
+    "docstring-in-stub",
+    "collections-named-tuple",
+    "unsupported-method-call-on-all",
+    "argument-default-in-stub",
+    "typed-argument-default-in-stub",
+    "numeric-literal-too-long",
+    "string-or-bytes-too-long",
     # RUF
-    "noqa-comments",  # pedantic
-    "ambiguous-unicode-character-docstring",  # security
-    "incorrectly-parenthesized-tuple-in-subscript",  # pedantic
-    "asyncio-dangling-task",  # pedantic
-    "used-dummy-variable",  # pedantic
-    "rule-codes-in-selectors",  # pedantic
-    "unused-async",  # pedantic
-    "ambiguous-unicode-character-comment",  # security
-    "non-empty-init-module",  # pedantic
-    "unraw-re-pattern",  # pedantic
-    "ambiguous-unicode-character-string",  # security
-    "parenthesize-chained-operators",  # pedantic
-    "unnecessary-assign-before-yield",  # pedantic
-    "collection-literal-concatenation",  # pedantic
+    "noqa-comments",
+    "ambiguous-unicode-character-docstring",
+    "incorrectly-parenthesized-tuple-in-subscript",
+    "asyncio-dangling-task",
+    "used-dummy-variable",
+    "rule-codes-in-selectors",
+    "unused-async",
+    "ambiguous-unicode-character-comment",
+    "non-empty-init-module",
+    "unraw-re-pattern",
+    "ambiguous-unicode-character-string",
+    "parenthesize-chained-operators",
+    "unnecessary-assign-before-yield",
+    "collection-literal-concatenation",
     # S
-    "subprocess-popen-with-shell-equals-true",  # security
+    "subprocess-popen-with-shell-equals-true",
     # Categories
     "correctness",
     "suspicious",
