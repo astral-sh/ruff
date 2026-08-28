@@ -960,6 +960,9 @@ fn collect_publish_diagnostic_notifications_with_versions(
 }
 
 mod uv_metadata {
+    #[cfg(feature = "test-uv")]
+    use std::process::Command;
+
     use anyhow::Result;
     use lsp_types::{Code, PublishDiagnosticsNotification};
     use ruff_db::system::SystemPath;
@@ -967,6 +970,64 @@ mod uv_metadata {
     use ty_project::UseUv;
 
     use crate::TestServerBuilder;
+
+    #[cfg(feature = "test-uv")]
+    #[test]
+    fn project_refresh_reports_progress_and_clears_errors() -> Result<()> {
+        let manifest = r#"
+[project]
+name = "example"
+version = "0.1.0"
+requires-python = ">=3.8"
+"#;
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(SystemPath::new("src"), None)?
+            .with_file(
+                "src/pyproject.toml",
+                format!(
+                    r#"{manifest}
+[tool.uv]
+package = "invalid"
+"#
+                ),
+            )?
+            .with_real_uv(UseUv::On)?
+            .enable_work_done_progress(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+        let event = lsp_types::FileEvent {
+            uri: server.file_uri("src/pyproject.toml"),
+            kind: lsp_types::FileChangeType::Changed,
+        };
+        let diagnostics = server.collect_publish_diagnostic_notifications(1);
+        assert_eq!(diagnostics[&event.uri].len(), 1);
+        assert_eq!(
+            diagnostics[&event.uri][0].code,
+            Some(Code::String("uv-metadata".into()))
+        );
+
+        server.write_file("src/pyproject.toml", manifest)?;
+        let output = Command::new("uv")
+            .current_dir(server.file_path("src"))
+            .args(["sync", "--offline"])
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "uv sync failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        server.did_change_watched_files(vec![event.clone()]);
+
+        server.assert_work_done_progress("Refreshing example metadata")?;
+
+        // The existing warning is republished while the refresh is pending, then cleared.
+        assert_eq!(
+            server.collect_publish_diagnostic_notifications(1),
+            diagnostics
+        );
+        assert!(server.collect_publish_diagnostic_notifications(1)[&event.uri].is_empty());
+        Ok(())
+    }
 
     #[test]
     fn untrusted_workspace_keeps_semantic_diagnostics() -> Result<()> {

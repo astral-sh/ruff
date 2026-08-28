@@ -27,7 +27,7 @@ use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{
     ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability,
-    SemanticDb as _, UseUv,
+    SemanticDb as _, UseUv, UvSyncChanges,
 };
 
 use index::DocumentError;
@@ -40,7 +40,8 @@ use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options}
 use crate::db::Db as _;
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
 use crate::server::{
-    Action, LazyWorkDoneProgress, publish_diagnostics_if_needed, publish_settings_diagnostics,
+    Action, LazyWorkDoneProgress, publish_all_document_diagnostics, publish_diagnostics_if_needed,
+    publish_settings_diagnostics,
 };
 use crate::session::client::Client;
 use crate::session::index::Document;
@@ -255,13 +256,11 @@ impl Session {
             });
     }
 
-    /// Returns each project's background script synchronization wakeups.
-    pub(crate) fn script_sync_wakeups(
-        &self,
-    ) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
+    /// Returns each project's background uv synchronization wakeups.
+    pub(crate) fn uv_sync_wakeups(&self) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
         self.projects
             .iter()
-            .map(|(root, state)| (root.clone(), state.db.script_environments().sync_wakeups()))
+            .map(|(root, state)| (root.clone(), state.db.uv_environments().sync_wakeups()))
             .collect()
     }
 
@@ -270,7 +269,7 @@ impl Session {
         let capabilities = self.resolved_client_capabilities;
         for state in self.projects.values_mut() {
             let db = &mut state.db;
-            for file in db.script_environments().files() {
+            for file in db.uv_environments().files() {
                 // Open documents are synchronized when opened or saved. Ignore watcher events
                 // for them because the file on disk may differ from the open document.
                 if db.is_open_file(file) {
@@ -288,29 +287,32 @@ impl Session {
         }
     }
 
-    /// Gives one project's script environments an opportunity to make progress.
-    pub(crate) fn poll_script_sync(&mut self, client: &Client, project_root: &SystemPath) {
+    /// Gives one project's uv environments an opportunity to make progress.
+    pub(crate) fn poll_uv_sync(&mut self, client: &Client, project_root: &SystemPath) {
         let Some(project) = self.projects.get_mut(project_root) else {
             tracing::debug!(
-                "Ignored script synchronization wakeup for removed project `{project_root}`"
+                "Ignored uv synchronization wakeup for removed project `{project_root}`"
             );
             return;
         };
         let db = &mut project.db;
-        let environments = db.script_environments().clone();
-        let changed_files = environments.poll_sync(db);
-
-        self.script_environments_changed(client, project_root, changed_files);
+        let environments = db.uv_environments().clone();
+        let changes = environments.poll_sync(db);
+        self.uv_environments_changed(client, project_root, changes);
     }
 
-    fn script_environments_changed(
+    fn uv_environments_changed(
         &mut self,
         client: &Client,
         project_root: &SystemPath,
-        changed_files: Vec<File>,
+        changes: UvSyncChanges,
     ) {
-        if changed_files.is_empty() {
+        if changes.is_empty() {
             return;
+        }
+
+        if changes.project.is_some() {
+            publish_settings_diagnostics(self, client, project_root.to_path_buf());
         }
 
         self.bump_revision();
@@ -320,8 +322,10 @@ impl Session {
         let capabilities = self.client_capabilities();
         if capabilities.supports_workspace_diagnostic_refresh() {
             client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
+        } else if changes.project.is_some() {
+            publish_all_document_diagnostics(self, client);
         } else if let Some(project) = self.projects.get(project_root) {
-            for file in changed_files {
+            for file in changes.scripts {
                 if let Some(document) = project.db.document(file) {
                     let document = DocumentHandle::from_document(document);
                     publish_diagnostics_if_needed(&document, self, client);
@@ -345,7 +349,7 @@ impl Session {
         capabilities: ResolvedClientCapabilities,
         availability: ScriptEnvironmentAvailability,
     ) {
-        let environments = db.script_environments().clone();
+        let environments = db.uv_environments().clone();
         environments.request_sync(db, file, availability, &|db, file| {
             let file_path = file.path(db);
             let display_path = file_path.as_system_path().map_or_else(
@@ -535,12 +539,21 @@ impl Session {
 
     pub(crate) fn apply_changes(
         &mut self,
+        client: &Client,
         path: &AnySystemPath,
         changes: &[ChangeEvent],
     ) -> ChangeResult {
         self.bump_revision();
 
-        self.project_db_mut(path).apply_changes(changes)
+        let capabilities = self.resolved_client_capabilities;
+        self.project_db_mut(path)
+            .apply_changes_with_progress(changes, &|db, project| {
+                Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                    client,
+                    &format!("Refreshing {} metadata", project.name(db)),
+                    capabilities,
+                )))
+            })
     }
 
     /// Returns a mutable iterator over all project databases.
@@ -1330,9 +1343,13 @@ impl Session {
     /// If a document is already open here, it will be overwritten.
     ///
     /// Returns a handle to the opened document.
-    pub(crate) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
+    pub(crate) fn open_notebook_document(
+        &mut self,
+        client: &Client,
+        document: NotebookDocument,
+    ) -> DocumentHandle {
         let handle = self.index_mut().open_notebook_document(document);
-        self.open_document_in_db(&handle, None);
+        self.open_document_in_db(client, &handle, None);
         handle
     }
 
@@ -1378,11 +1395,16 @@ impl Session {
             }
         }
         let handle = self.index_mut().open_text_document(document);
-        self.open_document_in_db(&handle, Some(language_id));
+        self.open_document_in_db(client, &handle, Some(language_id));
         handle
     }
 
-    fn open_document_in_db(&mut self, document: &DocumentHandle, language_id: Option<LanguageId>) {
+    fn open_document_in_db(
+        &mut self,
+        client: &Client,
+        document: &DocumentHandle,
+        language_id: Option<LanguageId>,
+    ) {
         let path = document.notebook_or_file_path();
 
         // When we know the document isn't a Python source file
@@ -1392,7 +1414,7 @@ impl Session {
 
         match path {
             AnySystemPath::System(system_path) => {
-                self.apply_changes(path, &[ChangeEvent::Opened(system_path.clone())]);
+                self.apply_changes(client, path, &[ChangeEvent::Opened(system_path.clone())]);
 
                 if is_not_python {
                     return;
@@ -1984,6 +2006,7 @@ impl DocumentHandle {
     pub(crate) fn update_text_document(
         &mut self,
         session: &mut Session,
+        client: &Client,
         content_changes: Vec<TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
     ) -> crate::Result<()> {
@@ -2006,7 +2029,7 @@ impl DocumentHandle {
             self.set_version(document.version());
         }
 
-        self.update_in_db(session);
+        self.update_in_db(session, client);
 
         Ok(())
     }
@@ -2014,6 +2037,7 @@ impl DocumentHandle {
     pub(crate) fn update_notebook_document(
         &mut self,
         session: &mut Session,
+        client: &Client,
         cells: Option<lsp_types::NotebookDocumentCellChanges>,
         metadata: Option<lsp_types::LspObject>,
         new_version: DocumentVersion,
@@ -2033,11 +2057,11 @@ impl DocumentHandle {
             self.set_version(new_version);
         }
 
-        self.update_in_db(session);
+        self.update_in_db(session, client);
         Ok(())
     }
 
-    fn update_in_db(&self, session: &mut Session) {
+    fn update_in_db(&self, session: &mut Session, client: &Client) {
         let path = self.notebook_or_file_path();
         let changes = match path {
             AnySystemPath::System(system_path) => {
@@ -2048,7 +2072,7 @@ impl DocumentHandle {
             }
         };
 
-        session.apply_changes(path, &changes);
+        session.apply_changes(client, path, &changes);
     }
 
     fn set_version(&mut self, version: DocumentVersion) {
