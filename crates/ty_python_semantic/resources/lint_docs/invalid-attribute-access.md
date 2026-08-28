@@ -1,10 +1,15 @@
 ## What it does
 
 Checks for assignments to class variables from instances and assignments to instance-only attributes
-from their class.
+from their class. Also checks for reads and writes of generic instance attributes through a class
+object.
 
 An "instance-only" variable is one which is only ever assigned to or declared when accessed via
 `self` in an instance method.
+
+A generic instance attribute has a type that depends on the class's type parameters. Specializing a
+generic class does not create separate class attribute storage, so these attributes must be accessed
+through an instance.
 
 ## Why is this bad?
 
@@ -41,4 +46,21 @@ C().class_var = 3  # error
 
 # Cannot assign to instance-only variable from class
 C.instance_only_var = 56  # error
+```
+
+```python
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+
+class Box(Generic[T]):
+    value: T
+
+
+Box[int].value = 1  # error
+Box.value  # error
+
+box = Box[int]()
+box.value = 1  # okay
 ```

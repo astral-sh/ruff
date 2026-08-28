@@ -778,11 +778,15 @@ reveal_type(Greatgrandchild[int]().x)  # revealed: int
 ```
 
 Attributes and static methods inherited by an unspecialized generic subclass use its default type
-arguments instead of exposing its class-scoped type variables.
+arguments instead of exposing its class-scoped type variables. Class access to generic instance
+attributes is invalid, but the recovery types still use those defaults.
 
 ```py
+# error: [invalid-attribute-access]
 reveal_type(Parent.x)  # revealed: Unknown
+# error: [invalid-attribute-access]
 reveal_type(Child.x)  # revealed: Unknown
+# error: [invalid-attribute-access]
 reveal_type(Grandchild.x)  # revealed: Unknown
 
 # revealed: def static(value: Unknown) -> Unknown
@@ -803,9 +807,12 @@ class PairParent[T, U]:
 
 class PartiallyFixed[T](PairParent[int, T]): ...
 
+# error: [invalid-attribute-access]
 reveal_type(DefaultChild.x)  # revealed: int
+# error: [invalid-attribute-access]
 reveal_type(DefaultChild[str].x)  # revealed: str
 reveal_type(PartiallyFixed.fixed)  # revealed: int
+# error: [invalid-attribute-access]
 reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
 ```
 
@@ -905,6 +912,54 @@ def preserve[T](container: Container[T], value: T) -> T:
 def cannot_choose_outer[T](container: Container[T]) -> T:
     # error: [invalid-argument-type]
     return container.replace(1)
+```
+
+## Generic instance attributes accessed through classes
+
+Class access cannot select a specialization of an instance attribute. This restriction applies to
+native type parameters just as it does to legacy `TypeVar` declarations.
+
+```py
+class Box[T]:
+    value: T
+
+# error: [invalid-attribute-access]
+Box[int].value = 1
+# error: [invalid-attribute-access]
+Box[int].value
+# error: [invalid-attribute-access]
+Box.value = 1
+# error: [invalid-attribute-access]
+Box.value
+
+box = Box[int]()
+box.value = 1
+reveal_type(box.value)  # revealed: Literal[1]
+```
+
+## Generic attributes using type aliases
+
+An alias can hide a dependency on a class type parameter, including inside a recursive alias. An
+unused alias argument does not make the attribute depend on that type parameter.
+
+```py
+type Identity[T] = T
+type Discard[T] = int
+type Recursive[T] = T | list[Recursive[list[T]]]
+type FixedRecursive = int | list[FixedRecursive]
+
+class Box[T]:
+    value: Identity[T]
+    recursive: Recursive[T]
+    constant: Discard[T]
+    fixed_recursive: FixedRecursive
+
+# error: [invalid-attribute-access]
+Box[int].value
+# error: [invalid-attribute-access]
+Box[int].recursive
+reveal_type(Box.constant)  # revealed: int
+Box.fixed_recursive
 ```
 
 ## Specializations propagate
