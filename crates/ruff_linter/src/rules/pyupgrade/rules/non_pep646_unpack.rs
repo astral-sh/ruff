@@ -3,6 +3,7 @@ use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -40,7 +41,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 646]: https://peps.python.org/pep-0646/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Complexity)]
 pub(crate) struct NonPEP646Unpack;
 
 impl Violation for NonPEP646Unpack {

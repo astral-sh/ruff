@@ -12,13 +12,9 @@ if sys.version_info >= (3, 13):
     __all__ += ["translate"]
 
 if sys.version_info < (3, 15):
-    @deprecated(
-        "Deprecated since Python 3.10; will be removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead."
-    )
+    @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead.")
     def glob0(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
-    @deprecated(
-        "Deprecated since Python 3.10; will be removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead."
-    )
+    @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `glob.glob()` with the *root_dir* argument instead.")
     def glob1(dirname: AnyStr, pattern: AnyStr) -> list[AnyStr]: ...
 
 if sys.version_info >= (3, 11):

@@ -3,10 +3,10 @@ use crate::server::{Server, api};
 use crate::session::client::{Client, ClientResponseHandler};
 use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
-use crossbeam::select;
 use lsp_server::Message;
 use lsp_types::Notification;
 use lsp_types::Uri;
+use ruff_db::system::SystemPathBuf;
 
 pub(crate) type ConnectionSender = crossbeam::channel::Sender<Message>;
 pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
@@ -157,6 +157,9 @@ impl Server {
                         // self.try_register_file_watcher(&client);
                     }
                 },
+                Event::PollUvEnvironments { project_root } => {
+                    self.session.poll_uv_sync(&client, &project_root);
+                }
             }
         }
 
@@ -185,13 +188,8 @@ impl Server {
             return Ok(Some(Event::Message(deferred)));
         }
 
-        select!(
-            recv(self.connection.receiver) -> msg => {
-                // Ignore disconnect errors, they're handled by the main loop (it will exit).
-                Ok(msg.ok().map(Event::Message))
-            },
-            recv(self.main_loop_receiver) -> event => event.map(Some),
-        )
+        let uv_sync = UvSyncWakeups(self.session.uv_sync_wakeups());
+        uv_sync.select(&self.connection.receiver, &self.main_loop_receiver)
     }
 
     fn initialize(&mut self, client: &Client) {
@@ -225,6 +223,10 @@ pub(crate) enum Event {
     Message(lsp_server::Message),
 
     Action(Action),
+
+    PollUvEnvironments {
+        project_root: SystemPathBuf,
+    },
 }
 
 pub(crate) struct SendRequest {
@@ -239,5 +241,42 @@ impl std::fmt::Debug for SendRequest {
             .field("method", &self.method)
             .field("params", &self.params)
             .finish_non_exhaustive()
+    }
+}
+
+/// Uv-environment wakeups for the currently active project databases.
+struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
+
+impl UvSyncWakeups {
+    /// Waits for a project wakeup, client message, or main-loop action.
+    fn select(
+        &self,
+        connection: &crossbeam::channel::Receiver<Message>,
+        main_loop: &MainLoopReceiver,
+    ) -> Result<Option<Event>, crossbeam::channel::RecvError> {
+        let mut select = crossbeam::channel::Select::new_biased();
+        for (_, receiver) in &self.0 {
+            select.recv(receiver);
+        }
+        let connection_index = select.recv(connection);
+        let main_loop_index = select.recv(main_loop);
+        let operation = select.select();
+        let index = operation.index();
+
+        if let Some((project_root, receiver)) = self.0.get(index) {
+            return operation.recv(receiver).map(|()| {
+                Some(Event::PollUvEnvironments {
+                    project_root: project_root.clone(),
+                })
+            });
+        }
+
+        if index == connection_index {
+            // Ignore disconnect errors, they're handled by the main loop (it will exit).
+            return Ok(operation.recv(connection).ok().map(Event::Message));
+        }
+
+        debug_assert_eq!(index, main_loop_index);
+        operation.recv(main_loop).map(Some)
     }
 }

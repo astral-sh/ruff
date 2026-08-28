@@ -1014,6 +1014,25 @@ def parameter_type(x: int) -> int | str:
     return 1
 ```
 
+An inconsistent implementation does not disable a consistently applied method decorator. Calls still
+use the overload signatures.
+
+```py
+class StaticMethod:
+    @overload
+    @staticmethod
+    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    def method(x: int) -> int: ...
+    @overload
+    @staticmethod
+    def method(x: str) -> int: ...
+    @staticmethod
+    def method(x: str) -> int:
+        return 0
+
+reveal_type(StaticMethod().method(1))  # revealed: int
+```
+
 Generic overloads are left to the full implementation-consistency check.
 
 ```py
@@ -1388,32 +1407,32 @@ from typing import Callable, overload
 
 class CheckStaticMethod:
     @overload
-    def method1(x: int) -> int: ...
+    def method1(self, x: int) -> int: ...
     @overload
-    def method1(x: str) -> str: ...
+    def method1(self, x: str) -> str: ...
     @staticmethod
     # error: [invalid-overload] "Overloaded function `method1` does not use the `@staticmethod` decorator consistently"
-    def method1(x: int | str) -> int | str:
+    def method1(self, x: int | str) -> int | str:
         return x
 
     @overload
-    def method2(x: int) -> int: ...
+    def method2(self, x: int) -> int: ...
     @overload
     @staticmethod
-    def method2(x: str) -> str: ...
+    def method2(self, x: str) -> str: ...
     @staticmethod
     # error: [invalid-overload]
-    def method2(x: int | str) -> int | str:
+    def method2(self, x: int | str) -> int | str:
         return x
 
     @overload
     @staticmethod
-    def method3(x: int) -> int: ...
+    def method3(self, x: int) -> int: ...
     @overload
     @staticmethod
-    def method3(x: str) -> str: ...
+    def method3(self, x: str) -> str: ...
     # error: [invalid-overload]
-    def method3(x: int | str) -> int | str:
+    def method3(self, x: int | str) -> int | str:
         return x
 
     @overload
@@ -1425,6 +1444,61 @@ class CheckStaticMethod:
     @staticmethod
     def method4(x: int | str) -> int | str:
         return x
+```
+
+An inconsistently applied `@staticmethod` decorator has no effect on method binding, including when
+it decorates the implementation. The consistent overload set remains a static method.
+
+```py
+instance = CheckStaticMethod()
+reveal_type(instance.method1(1))  # revealed: int
+reveal_type(instance.method2("a"))  # revealed: str
+reveal_type(instance.method3(1))  # revealed: int
+reveal_type(instance.method4("a"))  # revealed: str
+
+reveal_type(CheckStaticMethod.method1(instance, 1))  # revealed: int
+CheckStaticMethod.method1(1)  # error: [no-matching-overload]
+```
+
+#### Inconsistent `@staticmethod` decorators in stubs
+
+When a stub mixes static and instance overloads, calls bind the instance as the first argument.
+Overloads whose first parameter cannot accept that instance are filtered out. The order of the
+overloads does not affect this recovery.
+
+`widget.pyi`:
+
+```pyi
+from typing import overload
+
+class Widget:
+    @overload
+    @staticmethod
+    def method(source: str, index: int) -> int: ...
+    @overload
+    # error: [invalid-overload] "Overloaded function `method` does not use the `@staticmethod` decorator consistently"
+    def method(self, index: int) -> str: ...
+    @overload
+    def reversed(self, index: int) -> str: ...
+    @overload
+    @staticmethod
+    # error: [invalid-overload]
+    def reversed(source: str, index: int) -> int: ...
+```
+
+Accessing the method on the class leaves the receiver unbound, so its first parameter must be passed
+explicitly.
+
+`main.py`:
+
+```py
+from widget import Widget
+
+widget = Widget()
+reveal_type(widget.method(5))  # revealed: str
+reveal_type(widget.reversed(5))  # revealed: str
+reveal_type(Widget.method(widget, 5))  # revealed: str
+reveal_type(Widget.method("a", 5))  # revealed: int
 ```
 
 #### `@classmethod`
@@ -1490,7 +1564,26 @@ class CheckClassMethod:
         if isinstance(x, int):
             return cls(x)
         return None
+```
 
+Inconsistent `@classmethod` decorators likewise do not bind the class. Calls on an instance bind
+that instance, and calls on the class require an explicit receiver.
+
+```py
+instance = CheckClassMethod(1)
+reveal_type(instance.try_from1("a"))  # revealed: None
+reveal_type(instance.try_from2(1))  # revealed: CheckClassMethod
+reveal_type(CheckClassMethod.try_from3(CheckClassMethod, 1))  # revealed: CheckClassMethod
+reveal_type(CheckClassMethod.try_from1(instance, "a"))  # revealed: None
+CheckClassMethod.try_from1(1)  # error: [no-matching-overload]
+
+reveal_type(CheckClassMethod.try_from4(1))  # revealed: CheckClassMethod
+```
+
+Consistent classmethod overloads can restrict which subclasses accept each overload by annotating
+the receiver.
+
+```py
 class Base:
     @overload
     @classmethod
@@ -1510,6 +1603,43 @@ reveal_type(Child.from_value)  # revealed: Overload[(x: int) -> int, (x: str) ->
 good: Callable[[int], int] = Base.from_value
 # error: [invalid-assignment]
 bad: Callable[[str], str] = Base.from_value
+```
+
+#### Inconsistent `@classmethod` decorators in stubs
+
+An explicit class receiver annotation cannot accept an instance. Ignoring an inconsistent
+`@classmethod` decorator therefore filters out that overload when the method binds an instance,
+regardless of overload order.
+
+`factory.pyi`:
+
+```pyi
+from typing import overload
+
+class Factory:
+    @overload
+    @classmethod
+    def method(cls: type[Factory], value: int) -> int: ...
+    @overload
+    # error: [invalid-overload] "Overloaded function `method` does not use the `@classmethod` decorator consistently"
+    def method(self, value: int) -> str: ...
+    @overload
+    def reversed(self, value: int) -> str: ...
+    @overload
+    @classmethod
+    # error: [invalid-overload]
+    def reversed(cls: type[Factory], value: int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from factory import Factory
+
+factory = Factory()
+reveal_type(factory.method(1))  # revealed: str
+reveal_type(factory.reversed(1))  # revealed: str
+reveal_type(Factory.method(factory, 1))  # revealed: str
 ```
 
 #### `@final`

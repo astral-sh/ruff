@@ -285,7 +285,7 @@ class type:
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         """Call self as a function."""
 
-    def __subclasses__(self: _typeshed.Self) -> list[_typeshed.Self]:
+    def __subclasses__(self: type[_T]) -> list[type[_T]]:
         """Return a list of immediate subclasses."""
 
     # Note: the documentation doesn't specify what the return type is, the standard

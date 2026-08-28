@@ -7,6 +7,7 @@ use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::refurb::helpers::generate_method_call;
@@ -41,7 +42,7 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#mutable-sequence-types)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.290")]
+#[violation_metadata(preview_since = "v0.0.290", category = Category::Style)]
 pub(crate) struct SliceCopy;
 
 impl Violation for SliceCopy {

@@ -365,6 +365,9 @@ When a test has dependencies:
 are installed fresh for each test that specifies them, so tests with many dependencies may be slower
 to run.
 
+To test dependency checks with these packages, also
+[supply dependency metadata](#supplying-dependency-metadata).
+
 #### Lockfiles
 
 Each `.md` file with external dependencies has a corresponding `.lock` file of the same name.
@@ -438,6 +441,46 @@ The same placeholder can be used in `environment.extra-paths`:
 extra-paths = ["/.venv/<path-to-site-packages>"]
 ```
 ````
+
+### Supplying dependency metadata
+
+Tests for dependency checks can supply declarations and module ownership through a
+`[dependency-metadata]` fixture. This does not invoke uv or install packages. The imported modules
+can come from a [mock Python environment](#mocking-a-python-environment) or from
+[external dependencies](#testing-with-external-dependencies) installed through `[project]`.
+
+The two sections are independent: `[project]` supplies installed modules, while
+`[dependency-metadata]` describes the declarations and ownership used by dependency checks.
+Automatically deriving dependency metadata from `[project]` is deferred to future work.
+For now, tests with external dependencies must also supply `[dependency-metadata]` to exercise
+dependency checks. Explicit metadata also lets tests model nested projects and ambiguous module
+ownership using only mocked modules.
+
+````markdown
+```toml
+[environment]
+python = "/.venv"
+
+[dependency-metadata]
+projects = [{ path = "/src", distribution = "app", dependencies = ["requests"] }]
+
+[dependency-metadata.distributions]
+app = { name = "my-project" }
+requests = { name = "requests" }
+
+[dependency-metadata.module-owners]
+my_project = ["app"]
+requests = ["requests"]
+```
+````
+
+Distribution keys are opaque identifiers, and each distribution's `name` is used in diagnostics.
+A project can also specify `group-dependencies`. An editable distribution can specify an absolute
+`editable-path` in the test filesystem. Module-owner keys are validated as absolute Python module
+names, and their values list the distributions that provide each module.
+
+The fixture follows the same section inheritance as other mdtest configuration. Standalone PEP 723
+scripts do not inherit this project metadata.
 
 ## Documentation of tests
 

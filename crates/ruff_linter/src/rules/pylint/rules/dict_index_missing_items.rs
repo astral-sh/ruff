@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::{Checker, DiagnosticGuard};
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for dictionary iterations that extract the dictionary value
@@ -47,7 +48,7 @@ use crate::checkers::ast::{Checker, DiagnosticGuard};
 ///     print(f"{instrument}: {section}")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Complexity)]
 pub(crate) struct DictIndexMissingItems<'a> {
     key: &'a str,
     dict: &'a str,

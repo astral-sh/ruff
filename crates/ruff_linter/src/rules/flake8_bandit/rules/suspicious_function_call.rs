@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_suspicious_function_reference_enabled;
 
 /// ## What it does
@@ -53,7 +54,7 @@ use crate::preview::is_suspicious_function_reference_enabled;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousPickleUsage;
 
 impl Violation for SuspiciousPickleUsage {
@@ -105,7 +106,7 @@ impl Violation for SuspiciousPickleUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousMarshalUsage;
 
 impl Violation for SuspiciousMarshalUsage {
@@ -156,7 +157,7 @@ impl Violation for SuspiciousMarshalUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousInsecureHashUsage;
 
 impl Violation for SuspiciousInsecureHashUsage {
@@ -199,7 +200,7 @@ impl Violation for SuspiciousInsecureHashUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousInsecureCipherUsage;
 
 impl Violation for SuspiciousInsecureCipherUsage {
@@ -244,7 +245,7 @@ impl Violation for SuspiciousInsecureCipherUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousInsecureCipherModeUsage;
 
 impl Violation for SuspiciousInsecureCipherModeUsage {
@@ -294,7 +295,7 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousMktempUsage;
 
 impl Violation for SuspiciousMktempUsage {
@@ -335,7 +336,7 @@ impl Violation for SuspiciousMktempUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousEvalUsage;
 
 impl Violation for SuspiciousEvalUsage {
@@ -389,7 +390,7 @@ impl Violation for SuspiciousEvalUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousMarkSafeUsage;
 
 impl Violation for SuspiciousMarkSafeUsage {
@@ -442,7 +443,7 @@ impl Violation for SuspiciousMarkSafeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousURLOpenUsage;
 
 impl Violation for SuspiciousURLOpenUsage {
@@ -487,7 +488,7 @@ impl Violation for SuspiciousURLOpenUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousNonCryptographicRandomUsage;
 
 impl Violation for SuspiciousNonCryptographicRandomUsage {
@@ -532,7 +533,7 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousXMLCElementTreeUsage;
 
 impl Violation for SuspiciousXMLCElementTreeUsage {
@@ -579,7 +580,7 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousXMLElementTreeUsage;
 
 impl Violation for SuspiciousXMLElementTreeUsage {
@@ -626,7 +627,7 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousXMLExpatReaderUsage;
 
 impl Violation for SuspiciousXMLExpatReaderUsage {
@@ -673,7 +674,7 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousXMLExpatBuilderUsage;
 
 impl Violation for SuspiciousXMLExpatBuilderUsage {
@@ -720,7 +721,7 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousXMLSaxUsage;
 
 impl Violation for SuspiciousXMLSaxUsage {
@@ -767,7 +768,7 @@ impl Violation for SuspiciousXMLSaxUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousXMLMiniDOMUsage;
 
 impl Violation for SuspiciousXMLMiniDOMUsage {
@@ -814,7 +815,7 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousXMLPullDOMUsage;
 
 impl Violation for SuspiciousXMLPullDOMUsage {
@@ -858,7 +859,7 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// [preview]: https://docs.astral.sh/ruff/preview/
 /// [deprecated]: https://pypi.org/project/defusedxml/0.8.0rc2/#defusedxml-lxml
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.12.0")]
+#[violation_metadata(removed_since = "0.12.0", category = Category::Security)]
 pub(crate) struct SuspiciousXMLETreeUsage;
 
 impl Violation for SuspiciousXMLETreeUsage {
@@ -905,7 +906,7 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// [PEP 476]: https://peps.python.org/pep-0476/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousUnverifiedContextUsage;
 
 impl Violation for SuspiciousUnverifiedContextUsage {
@@ -934,7 +935,7 @@ impl Violation for SuspiciousUnverifiedContextUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousTelnetUsage;
 
 impl Violation for SuspiciousTelnetUsage {
@@ -960,7 +961,7 @@ impl Violation for SuspiciousTelnetUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
 pub(crate) struct SuspiciousFTPLibUsage;
 
 impl Violation for SuspiciousFTPLibUsage {

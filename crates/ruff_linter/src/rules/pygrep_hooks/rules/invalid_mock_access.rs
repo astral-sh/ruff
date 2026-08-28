@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq)]
 enum Reason {
@@ -33,7 +34,7 @@ enum Reason {
 /// my_mock.assert_called()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.266")]
+#[violation_metadata(stable_since = "v0.0.266", category = Category::Suspicious)]
 pub(crate) struct InvalidMockAccess {
     reason: Reason,
 }

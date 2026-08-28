@@ -1,6 +1,6 @@
 [package]
 name = "ruff_memory_usage"
-version = "0.0.10"
+version = "0.0.11"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }

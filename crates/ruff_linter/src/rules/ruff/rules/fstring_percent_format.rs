@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of the `%` operator on f-strings.
@@ -27,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// f"hello {first} {second}"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.8")]
+#[violation_metadata(preview_since = "0.15.8", category = Category::Suspicious)]
 pub(crate) struct FStringPercentFormat;
 
 impl Violation for FStringPercentFormat {

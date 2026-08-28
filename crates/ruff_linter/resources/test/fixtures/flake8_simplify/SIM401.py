@@ -153,3 +153,31 @@ var = "default-1" if key not in a_dict else a_dict[key]
 
 # OK (default contains effect)
 var = a_dict[key] if key in a_dict else val1 + val2
+
+###
+# Lambda parameter defaults
+###
+
+# SIM401: literal defaults have no side effects.
+if key in a_dict:
+    var = a_dict[key]
+else:
+    var = lambda x=0, /, y=1, *, z=2: (x, y, z)
+
+# OK: dict.get would evaluate the lambda's default even when the key exists.
+if key in a_dict:
+    var = a_dict[key]
+else:
+    var = lambda value=initialize(): value
+
+# OK: positional-only defaults are also evaluated when the lambda is created.
+if key in a_dict:
+    var = a_dict[key]
+else:
+    var = lambda value=initialize(), /: value
+
+# OK: keyword-only defaults can contain nested side effects.
+if key in a_dict:
+    var = a_dict[key]
+else:
+    var = lambda *, value=(initialize(),): value

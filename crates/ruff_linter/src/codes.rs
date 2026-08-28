@@ -1,12 +1,17 @@
 /// In this module we generate [`Rule`], an enum of all rules, and [`RuleCodePrefix`], an enum of
-/// all rules categories. A rule category is something like pyflakes or flake8-todos. Each rule
-/// category contains all rules and their common prefixes, i.e. everything you can specify in
-/// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
+/// all linter groups. A linter group is something like `pyflakes` or `flake8-todos`. Each linter
+/// group contains all rules and their common prefixes, i.e. everything you can specify in
+/// `--select`. For `pylint` this is e.g. `C0414` and `E0118` but also `C` and `E01`.
+///
+/// When [`crate::preview::is_rule_categories_enabled`] returns `true`, rules can also be selected by
+/// their [`Category`].
 use std::fmt::Formatter;
+use std::sync::LazyLock;
 
 use ruff_db::diagnostic::SecondaryCode;
 use serde::Serialize;
-use strum_macros::EnumIter;
+use strum::{IntoEnumIterator, VariantArray as _};
+use strum_macros::{Display, EnumIter, EnumMessage, EnumString, IntoStaticStr, VariantArray};
 
 use crate::registry::Linter;
 use crate::rules;
@@ -75,6 +80,132 @@ impl serde::Serialize for NoqaCode {
         S: serde::Serializer,
     {
         serializer.serialize_str(&self.to_string())
+    }
+}
+
+/// The category assigned to a lint rule.
+///
+/// These categories are similar to those found in [Clippy] and form much broader groupings than the
+/// linter-based groups. Categories are intended to be our primary classification mechanism for
+/// rules going forward, with the linter groups eventually being deprecated and removed, albeit in
+/// the relatively distant future. The categorization of a rule determines two important properties:
+/// - its default status, `style` and above are currently enabled by default
+/// - its default severity, in a future where we have multiple diagnostic severities
+///
+/// Assuming we continue to follow Clippy, `correctness` lints will have a severity of `error` by
+/// default, while the other on-by-default categories will have a severity of `warn` by default.
+///
+/// Secondary groups like the legacy linter groups are orthogonal selection mechanisms that have no
+/// impact on severity or default status, and may, and usually do, include rules from multiple
+/// categories. For example, many `F` rules are `correctness` lints, but `F` includes `suspicious`
+/// and even `pedantic` rules too. At some point in the future, we may support additional secondary
+/// groups that are not legacy linter groups as well.
+///
+/// The precedence between categories, linter groups, linter prefixes, and rules is determined by
+/// the [`crate::rule_selector::Specificity`] returned by
+/// [`crate::rule_selector::RuleSelector::specificity`], and currently follows this ordering:
+///
+/// ```text
+/// ALL < category < linter group < linter prefix < rule
+/// ```
+///
+/// The ordering of variants isn't currently used anywhere, but they should be kept in descending
+/// order of severity, with error categories first, followed by warning, and then by off-by-default
+/// categories.
+///
+/// See our [rule categorization guidelines] for more information on assigning categories.
+///
+/// [Clippy]: https://doc.rust-lang.org/clippy/lints.html
+/// [rule categorization guidelines]: https://docs.astral.sh/ruff/rule-proposals/#rule-categorization-guidelines
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumIter,
+    EnumString,
+    IntoStaticStr,
+    Display,
+    Serialize,
+    EnumMessage,
+    VariantArray,
+)]
+#[strum(serialize_all = "kebab-case", const_into_str)]
+#[serde(rename_all = "kebab-case")]
+pub enum Category {
+    /// Rules that flag outright wrong code
+    Correctness,
+
+    /// Rules that flag likely outright wrong code but that could be intentional
+    Suspicious,
+
+    /// Rules that suggest rewriting code in a shorter and more readable way
+    Complexity,
+
+    /// Rules that suggest rewriting code in a more efficient way
+    Performance,
+
+    /// Rules that suggest rewriting code in a more idiomatic way
+    Style,
+
+    /// Rules that flag potential security vulnerabilities but may be prone to false positives
+    Security,
+
+    /// Rules that flag formatting issues that do not affect semantics
+    Formatting,
+
+    /// Rules that are highly opinionated or prone to false positives
+    Pedantic,
+
+    /// Rules that restrict the use of basic language features
+    Restriction,
+
+    /// Internal testing rules that shouldn't be exposed to users.
+    #[cfg(any(feature = "test-rules", test))]
+    #[strum(disabled)]
+    Testing,
+}
+
+impl Category {
+    /// Return the description of the category, derived from its documentation.
+    #[cfg(any(feature = "clap", test))]
+    pub(crate) fn description(self) -> &'static str {
+        let Some(docs) =
+            strum::EnumMessage::get_documentation(&self).and_then(|docs| docs.lines().next())
+        else {
+            panic!("Category `{self}` missing required documentation");
+        };
+
+        docs
+    }
+
+    /// Return the rules in this category.
+    pub(crate) fn rules(self) -> &'static [Rule] {
+        static RULES_BY_CATEGORY: LazyLock<[Box<[Rule]>; Category::VARIANTS.len()]> =
+            LazyLock::new(|| {
+                let mut rules = [const { Vec::new() }; Category::VARIANTS.len()];
+
+                for rule in Rule::iter() {
+                    rules[rule.category() as usize].push(rule);
+                }
+
+                rules.map(Vec::into_boxed_slice)
+            });
+
+        &RULES_BY_CATEGORY[self as usize]
+    }
+
+    /// Return the categories that should be enabled by default.
+    pub const fn default_categories() -> [Category; 5] {
+        [
+            Self::Correctness,
+            Self::Suspicious,
+            Self::Complexity,
+            Self::Performance,
+            Self::Style,
+        ]
     }
 }
 
@@ -967,7 +1098,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8UsePathlib, "124") => rules::flake8_use_pathlib::violations::PyPath,
         (Flake8UsePathlib, "201") => rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory,
         (Flake8UsePathlib, "202") => rules::flake8_use_pathlib::rules::OsPathGetsize,
-        (Flake8UsePathlib, "202") => rules::flake8_use_pathlib::rules::OsPathGetsize,
         (Flake8UsePathlib, "203") => rules::flake8_use_pathlib::rules::OsPathGetatime,
         (Flake8UsePathlib, "204") => rules::flake8_use_pathlib::rules::OsPathGetmtime,
         (Flake8UsePathlib, "205") => rules::flake8_use_pathlib::rules::OsPathGetctime,
@@ -1083,7 +1213,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
-        (Ruff, "076") => rules::ruff::rules::PytestFixtureAutouse,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1227,6 +1356,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Logging, "014") => rules::flake8_logging::rules::ExcInfoOutsideExceptHandler,
         (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
 
+        // Rules that belong only to categories, without linter groups or codes.
+        () => rules::ruff::rules::PytestFixtureAutouse,
+
         _ => return None,
     })
 }
@@ -1241,4 +1373,46 @@ impl std::fmt::Display for Rule {
 pub enum FromNameError {
     #[error("unknown rule name")]
     Unknown,
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_snapshot;
+    use itertools::Itertools;
+    use strum::IntoEnumIterator;
+
+    use super::{Category, Rule};
+
+    #[test]
+    fn category_names_do_not_conflict_with_rule_names() {
+        for category in Category::iter() {
+            assert!(
+                Rule::from_name(category.into_str()).is_err(),
+                "category {category} conflicts with a rule name"
+            );
+        }
+    }
+
+    #[test]
+    fn category_descriptions() {
+        let snapshot = Category::iter().format_with("\n", |category, f| {
+            f(&format_args!(
+                "{name}: {description}",
+                name = category.into_str(),
+                description = category.description(),
+            ))
+        });
+
+        assert_snapshot!(snapshot, @"
+        correctness: Rules that flag outright wrong code
+        suspicious: Rules that flag likely outright wrong code but that could be intentional
+        complexity: Rules that suggest rewriting code in a shorter and more readable way
+        performance: Rules that suggest rewriting code in a more efficient way
+        style: Rules that suggest rewriting code in a more idiomatic way
+        security: Rules that flag potential security vulnerabilities but may be prone to false positives
+        formatting: Rules that flag formatting issues that do not affect semantics
+        pedantic: Rules that are highly opinionated or prone to false positives
+        restriction: Rules that restrict the use of basic language features
+        ");
+    }
 }

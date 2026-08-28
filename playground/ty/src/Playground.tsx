@@ -60,7 +60,7 @@ export default function Playground() {
   // This is safe as this is only called once on startup.
   // We need useRef to avoid duplicate initialization when
   // running locally due to react rendering
-  // eslint-disable-next-line
+  // oxlint-disable-next-line react/refs
   const sessionPromise = sessionPromiseRef.current;
 
   const fileName = useMemo(() => {
@@ -472,7 +472,7 @@ function filesReducer(
             : state.order[position + 1]) ?? null;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // oxlint-disable-next-line no-unused-vars
       const { [id]: _metadata, ...metadata } = state.metadata;
 
       return {
@@ -772,7 +772,7 @@ function restoreWorkspace(
   const workspace = session.workspace;
   let hasSettings = false;
 
-  // eslint-disable-next-line prefer-const
+  // oxlint-disable-next-line prefer-const
   for (let [name, content] of Object.entries(state.files)) {
     let handle = null;
 

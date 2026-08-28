@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -25,7 +26,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.199")]
+#[violation_metadata(stable_since = "v0.0.199", category = Category::Suspicious)]
 pub(crate) struct DeprecatedCElementTree;
 
 impl AlwaysFixableViolation for DeprecatedCElementTree {

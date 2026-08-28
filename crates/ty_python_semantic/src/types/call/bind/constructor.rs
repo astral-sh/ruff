@@ -398,7 +398,7 @@ impl<'db> ConstructorBinding<'db> {
             let self_parameter_specialization = static_class_literal.and_then(|lit| {
                 let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
                 let resolved_self_param_ty = overload
-                    .specialization(db)
+                    .merged_specialization(db)
                     .map_or(self_param_ty, |specialization| {
                         self_param_ty.apply_specialization(db, specialization)
                     });
@@ -434,7 +434,11 @@ impl<'db> ConstructorBinding<'db> {
             } else {
                 refined_self_parameter_specialization
                     .or(return_specialization)
-                    .or_else(|| overload.specialization(db)?.restrict(db, class_context))
+                    .or_else(|| {
+                        overload
+                            .merged_specialization(db)?
+                            .restrict(db, class_context)
+                    })
             };
             // end TODO
 
@@ -561,7 +565,7 @@ impl<'db> ConstructorBinding<'db> {
             .unspecialized_return_type(db)
             .apply_optional_specialization(
                 db,
-                overload.specialization(db).map(|specialization| {
+                overload.merged_specialization(db).map(|specialization| {
                     self.unspecialize_class_type_variables(db, env, specialization)
                 }),
             );

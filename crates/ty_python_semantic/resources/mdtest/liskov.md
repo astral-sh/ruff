@@ -1675,6 +1675,111 @@ class B4(A4):
     def method(self, x: int) -> int: ...
 ```
 
+## Overrides with `Self` return types
+
+An inherited `Self` return type refers to the subclass on which the method is called. An override
+can preserve that return type regardless of whether either method explicitly annotates `self`:
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    def implicit(self) -> Self: ...
+    def explicit(self: Self) -> Self: ...
+
+class PreservesSelf(Base):
+    def implicit(self) -> Self: ...
+    def explicit(self: Self) -> Self: ...
+
+class ChangesReceiverAnnotation(Base):
+    def implicit(self: Self) -> Self: ...
+    def explicit(self) -> Self: ...
+```
+
+Returning the superclass is incompatible: it does not satisfy the inherited promise to return an
+instance of the subclass. Adding or omitting `self: Self` does not change this:
+
+```pyi
+class ReturnsBase(Base):
+    def implicit(self) -> Base: ...  # snapshot: invalid-method-override
+    def explicit(self: Self) -> Base: ...  # error: [invalid-method-override]
+
+class ReturnsBaseWithChangedAnnotation(Base):
+    def implicit(self: Self) -> Base: ...  # error: [invalid-method-override]
+    def explicit(self) -> Base: ...  # error: [invalid-method-override]
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `implicit`
+  --> src/mdtest_snippet.pyi:15:9
+   |
+15 |     def implicit(self) -> Base: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.implicit`
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 4 |     def implicit(self) -> Self: ...
+   |         ---------------------- `Base.implicit` defined here
+info: incompatible return types: `Base` is not assignable to `ReturnsBase`
+info: This violates the Liskov Substitution Principle
+```
+
+Repeating an already invalid override does not produce another diagnostic on a subclass:
+
+```pyi
+class RepeatsInvalidOverride(ReturnsBase):
+    def implicit(self) -> Base: ...
+    def explicit(self: Self) -> Base: ...
+```
+
+## Overrides with `Self` parameters
+
+When a method accepts another instance of `Self`, both the inherited and overriding signatures refer
+to the subclass. Explicitly annotating the receiver as `Self` does not change compatibility:
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    def implicit(self, other: Self) -> None: ...
+    def explicit(self: Self, other: Self) -> None: ...
+
+class PreservesSelf(Base):
+    def implicit(self, other: Self) -> None: ...
+    def explicit(self: Self, other: Self) -> None: ...
+
+class ChangesReceiverAnnotation(Base):
+    def implicit(self: Self, other: Self) -> None: ...
+    def explicit(self, other: Self) -> None: ...
+```
+
+An override cannot replace the `Self` parameter with an unrelated type:
+
+```pyi
+class Incompatible(Base):
+    def implicit(self, other: int) -> None: ...  # error: [invalid-method-override]
+    def explicit(self: Self, other: int) -> None: ...  # error: [invalid-method-override]
+```
+
+For generic superclasses, the override also uses the inherited specialization of the class's type
+parameters:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+class GenericBase[T]:
+    def method(self, other: Self, value: T) -> Self: ...
+
+class Specialized(GenericBase[int]):
+    def method(self, other: Self, value: int) -> Self: ...
+
+class IncompatibleSpecialization(GenericBase[int]):
+    def method(self, other: Self, value: str) -> Self: ...  # error: [invalid-method-override]
+```
+
 ## Protocol annotations on mixin receivers
 
 A mixin can annotate `self` with a protocol that the mixin itself does not implement. An override
@@ -2361,6 +2466,37 @@ class InvalidSwapEvent(Event):
     @classmethod
     # error: [invalid-method-override]
     def deserialize(cls: type[InvalidSwapEvent], data: dict[str, int]) -> InvalidSwapEvent: ...
+```
+
+## Classmethod overrides with `Self`
+
+In a class method, `Self` refers to an instance of the subclass, while `cls` is a class object. An
+override can preserve a `Self` parameter with or without an explicit `cls: type[Self]` annotation:
+
+```pyi
+from typing_extensions import Self
+
+class Base:
+    @classmethod
+    def compare(cls, other: Self) -> None: ...
+    @classmethod
+    def copy(cls) -> Self: ...
+
+class ImplicitReceiver(Base):
+    @classmethod
+    def compare(cls, other: Self) -> None: ...
+
+class ExplicitReceiver(Base):
+    @classmethod
+    def compare(cls: type[Self], other: Self) -> None: ...
+```
+
+An override that returns the superclass does not satisfy the inherited `Self` return type:
+
+```pyi
+class ReturnsBase(Base):
+    @classmethod
+    def copy(cls) -> Base: ...  # error: [invalid-method-override]
 ```
 
 ## Overloaded methods with positional-only parameters with defaults

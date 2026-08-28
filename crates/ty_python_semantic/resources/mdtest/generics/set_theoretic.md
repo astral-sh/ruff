@@ -7,8 +7,14 @@ This test suite explores the interplay between generics and set theoretic gradua
 python-version = "3.14"
 ```
 
+## Derivations and general results
+
+This section concentrates on deriving the main results while the next section covers some more edge
+cases.
+
 ```pyi
-from typing import Any
+from typing import Any, Coroutine, Sequence
+from types import CoroutineType
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of
 ```
@@ -149,7 +155,7 @@ This result highlights a tension between a naive "replace `Any` with a more prec
 understanding of materialization, and the "interval" representation of gradual types. The type
 `Co[P] | Co[Any]` clearly has something like `Co[P] | Co[Q]` as a possible materialization. However,
 this is much less clear for `Co[P | Any]`. Following a strict "gradual types are intervals"
-approach, `Co[P | Any]` also needs to be able to materialize to to `Co[P] | Co[Q]`, though. It is a
+approach, `Co[P | Any]` also needs to be able to materialize to `Co[P] | Co[Q]`, though. It is a
 supertype of the bottom materialization `Co[P | Never] = Co[P]`, and a subtype of the top
 materialization `Co[P | object] = Co[object]`. See
 [this discussion](https://github.com/astral-sh/ruff/pull/26054/changes#r3429787797) for more
@@ -193,12 +199,19 @@ Contra[P] & Contra[Any] = Contra[P | Any]    (5b)
 We can encode all of these in ty assertions:
 
 ```pyi
-# TODO: all of these should pass
+# TODO: both should pass
 static_assert(is_equivalent_to(Co[P] | Co[Any], Co[P | Any]))  # error: [static-assert-error]
-static_assert(is_equivalent_to(Co[P] & Co[Any], Co[P & Any]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(Co[Any] | Co[P], Co[P | Any]))  # error: [static-assert-error]
 
+static_assert(is_equivalent_to(Co[P] & Co[Any], Co[P & Any]))
+static_assert(is_equivalent_to(Co[Any] & Co[P], Co[P & Any]))
+
+# TODO: both should pass
 static_assert(is_equivalent_to(Contra[P] | Contra[Any], Contra[P & Any]))  # error: [static-assert-error]
-static_assert(is_equivalent_to(Contra[P] & Contra[Any], Contra[P | Any]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(Contra[Any] | Contra[P], Contra[P & Any]))  # error: [static-assert-error]
+
+static_assert(is_equivalent_to(Contra[P] & Contra[Any], Contra[P | Any]))
+static_assert(is_equivalent_to(Contra[Any] & Contra[P], Contra[P | Any]))
 ```
 
 What about invariance? We can naively write `Invariant[Any]` in its interval representation:
@@ -242,7 +255,7 @@ If we use the interpretation where `Bottom[Invariant[Any]]` is a special bottom 
 `Invariant`. And so we get:
 
 ```ignore
-Invariant[P] & Invariant[Any] = Invariant[P]
+Invariant[P] & Invariant[Any] = Invariant[P]    (6)
 ```
 
 One seemingly problematic observation here is the following. If we compute the bottom
@@ -286,4 +299,402 @@ materializations of the gradual type `Invariant[P] | Invariant[Any]`. So we enco
 static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
+```
+
+In strict-mode `isinstance` narrowing, we intersect with the top-materialization of generic classes.
+Suppose `Sub[T]` is a subtype of `Base[T]`. There are two directions to consider, depending on which
+class is top-materialized. The first simplifies immediately:
+
+```ignore
+Sub[P] & Top[Base[Any]] = Sub[P]
+```
+
+This relation holds regardless of the variance of `Base` and `Sub`:
+
+```pyi
+from ty_extensions import Top
+
+class CoBase[T]:
+    def get(self) -> T: ...
+
+class CoSub[T](CoBase[T]): ...
+
+class ContraBase[T]:
+    def push(self, x: T) -> None: ...
+
+class ContraSub[T](ContraBase[T]): ...
+class InvariantBase[T](CoBase[T], ContraBase[T]): ...
+class InvariantSub[T](InvariantBase[T]): ...
+
+static_assert(is_equivalent_to(CoSub[P] & Top[CoBase[Any]], CoSub[P]))
+static_assert(is_equivalent_to(ContraSub[P] & Top[ContraBase[Any]], ContraSub[P]))
+static_assert(is_equivalent_to(InvariantSub[P] & Top[InvariantBase[Any]], InvariantSub[P]))
+```
+
+The other direction, `Base[P] & Top[Sub[Any]]`, is more interesting. It can only be simplified under
+the additional assumption that `Base` (and `Sub`) are nominal types. There are five cases to
+consider, depending on the variance of `Base` and `Sub` (variance can only be restricted further in
+subtypes):
+
+- `Base` is covariant and `Sub` is covariant
+- `Base` is covariant and `Sub` is invariant
+- `Base` is contravariant and `Sub` is contravariant
+- `Base` is contravariant and `Sub` is invariant
+- `Base` is invariant and `Sub` is invariant
+
+We look at the covariant `Base` case first (first two items):
+
+```ignore
+class CoBase[T]: ...  # covariant
+class Sub[T](CoBase[T]): ...  # covariant or invariant
+```
+
+Since `CoBase` is a nominal type, inhabitants of the intersection `CoBase[P] & Top[Sub[Any]]` need
+to have a consistent specialization of `CoBase` in their MRO. Inhabitants of that intersection are
+therefore instances of `Sub[P']` which cannot further (multiply) inherit from a `CoBase`
+specialization that is not `CoBase[P']`. Since these inhabitants further need to be a subtype of
+`CoBase[P]`, covariance requires `P' <: P`. Therefore the intersection consists of the possible
+`Sub` specializations whose type argument is upper-bounded by `P`. This type can be succinctly
+expressed as `Top[Sub[P & Any]]`:
+
+```ignore
+CoBase[P] & Top[Sub[Any]] = Top[Sub[P & Any]]    (7a)
+```
+
+If `Sub` is covariant, this relation further simplifies:
+
+```ignore
+CoBase[P] & Top[CoSub[Any]] = CoSub[P & object] = CoSub[P]    (7b)
+```
+
+Two practical examples of these relations are:
+
+```ignore
+Sequence[int] & Top[tuple[Any, ...]] = tuple[int, ...]    (covariant base, covariant subtype)
+Sequence[int] & Top[list[Any]] = Top[list[int & Any]]     (covariant base, invariant subtype)
+```
+
+The latter example is illustrative: When you have a `Sequence[int]` and narrow using
+`isinstance(.., list)`, you end up with the type `Top[list[int & Any]]`. When iterating over that
+type, we get elements of `Top[int & Any] = int`, which is what we expect by starting from
+`Sequence[int]`. However, if we try to `append` an element to that list, since the element type
+appears in contravariant position, we get `Bottom[int & Any] = Never`. This means that we cannot
+append any elements to that list. This is expected, since we could be dealing with a `list[int]` or
+a `list[bool]`, or a `list[Literal[False]]`, and so on. So whatever we want to append needs to be
+compatible with all of those types, which is impossible.
+
+We can encode these relations in ty assertions:
+
+```pyi
+class InvariantSubOfCoBase[T](CoBase[T]):
+    def push(self, x: T) -> None: ...
+
+static_assert(is_equivalent_to(CoBase[P] & Top[CoSub[Any]], CoSub[P]))
+static_assert(is_equivalent_to(Top[CoSub[Any]] & CoBase[P], CoSub[P]))
+
+static_assert(is_equivalent_to(CoBase[P] & Top[InvariantSubOfCoBase[Any]], Top[InvariantSubOfCoBase[P & Any]]))
+static_assert(is_equivalent_to(Top[InvariantSubOfCoBase[Any]] & CoBase[P], Top[InvariantSubOfCoBase[P & Any]]))
+
+static_assert(is_equivalent_to(Sequence[int] & Top[tuple[Any, ...]], tuple[int, ...]))
+static_assert(is_equivalent_to(Sequence[int] & Top[list[Any]], Top[list[int & Any]]))
+```
+
+Next, we look at the contravariant `Base` case (items 3 and 4). The reasoning is similar: subtypes
+of `ContraBase[P] & Top[Sub[Any]]` must be of the form `Sub[P']`, but now, `P'` needs to be a
+*supertype* of `P`. The intersection therefore consists of all `Sub` specializations whose type
+argument is lower-bounded by `P`:
+
+```ignore
+ContraBase[P] & Top[Sub[Any]] = Top[Sub[P | Any]]    (8a)
+```
+
+Again, this makes intuitive sense: If we have a `ContraBase[P]` and narrow using
+`isinstance(.., Sub)`, we can still `push` any elements of type `Bottom[P | Any] = P`, but we can
+only `get` out elements of type `Top[P | Any] = object`, which is what we would have expected from
+the `Top[Sub[Any]]` type that contributes the `get` method.
+
+If `Sub` is contravariant, (8a) further simplifies to:
+
+```ignore
+ContraBase[P] & Top[ContraSub[Any]] = ContraSub[P | Never] = ContraSub[P]    (8b)
+```
+
+An example of this relation would be:
+
+```ignore
+Coroutine[str, int, bytes] & Top[CoroutineType[str, Any, bytes]] = CoroutineType[str, int, bytes]    
+```
+
+where both `Coroutine` and `CoroutineType` are contravariant in their "Send" type parameter.
+
+Again, we can encode the results in ty assertions:
+
+```pyi
+class InvariantSubOfContraBase[T](ContraBase[T]):
+    def get(self) -> T: ...
+
+static_assert(is_equivalent_to(ContraBase[P] & Top[ContraSub[Any]], ContraSub[P]))
+static_assert(is_equivalent_to(Top[ContraSub[Any]] & ContraBase[P], ContraSub[P]))
+
+static_assert(is_equivalent_to(ContraBase[P] & Top[InvariantSubOfContraBase[Any]], Top[InvariantSubOfContraBase[P | Any]]))
+static_assert(is_equivalent_to(Top[InvariantSubOfContraBase[Any]] & ContraBase[P], Top[InvariantSubOfContraBase[P | Any]]))
+
+static_assert(is_equivalent_to(Coroutine[str, int, bytes] & Top[CoroutineType[str, Any, bytes]], CoroutineType[str, int, bytes]))
+```
+
+Finally, we look at the invariant `Base` case (item 5). Here, we need `P'` to be equal to `P`, and
+so we immediately get:
+
+```ignore
+InvariantBase[P] & Top[Sub[Any]] = Sub[P]    (9)
+```
+
+In ty assertions:
+
+```pyi
+class InvariantSubOfInvariantBase[T](InvariantBase[T]): ...
+
+static_assert(is_equivalent_to(InvariantBase[P] & Top[InvariantSubOfInvariantBase[Any]], InvariantSubOfInvariantBase[P]))
+static_assert(is_equivalent_to(Top[InvariantSubOfInvariantBase[Any]] & InvariantBase[P], InvariantSubOfInvariantBase[P]))
+```
+
+In summary, we have:
+
+```ignore
+Base[P] & Top[Sub[Any]] = Sub[P]               (Base and Sub have the same variance)
+Base[P] & Top[Sub[Any]] = Top[Sub[P & Any]]    (Base: covariant, Sub: invariant)
+Base[P] & Top[Sub[Any]] = Top[Sub[P | Any]]    (Base: contravariant, Sub: invariant)
+```
+
+## Edge cases
+
+### Multi-parameter and mixed-variance generics
+
+The same-class intersection relations (4b), (5b), and (6) can apply simultaneously to the covariant,
+contravariant, and invariant type parameters of a multi-parameter generic class:
+
+```pyi
+from typing import Any, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class P: ...
+class Q: ...
+class R: ...
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+T_invariant = TypeVar("T_invariant")
+
+class Mixed(Generic[T_co, T_contra, T_invariant]): ...
+
+static_assert(is_equivalent_to(Mixed[P, Q, R] & Mixed[Any, Any, Any], Mixed[P & Any, Q | Any, R]))
+```
+
+### Unrelated subclass type parameters
+
+Intersecting with a specialized base preserves gradual subclass arguments that do not specialize
+that base. Here, `U` is covariant, `V` is contravariant, and `W` is invariant:
+
+```pyi
+from typing import Any
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Base[T]:
+    def get(self) -> T: ...
+
+class Child[T, U, V, W](Base[T]):
+    def extra(self) -> U: ...
+    def consume(self, value: V) -> None: ...
+    item: W
+
+static_assert(is_equivalent_to(Base[int] & Child[object, Any, Any, Any], Child[int, Any, Any, Any]))
+```
+
+If the subclass is already top-materialized, the result retains that materialization:
+
+```pyi
+static_assert(is_equivalent_to(Base[int] & Top[Child[Any, Any, Any, Any]], Top[Child[int, Any, Any, Any]]))
+```
+
+### Tuples
+
+Tuple types are covariant in every type parameter, so the results derived for `Co[T]` above apply to
+`tuple` at every position:
+
+```pyi
+from typing import Any, Sequence, reveal_type
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
+
+class P: ...
+class Q: ...
+
+static_assert(is_equivalent_to(tuple[P] & tuple[Any], tuple[P & Any]))
+static_assert(is_equivalent_to(tuple[Any] & tuple[P], tuple[P & Any]))
+
+static_assert(is_equivalent_to(tuple[P, ...] & tuple[Any, ...], tuple[P & Any, ...]))
+
+static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Q], tuple[P & Any, Q]))
+static_assert(is_equivalent_to(tuple[Any, Q] & tuple[P, Q], tuple[P & Any, Q]))
+
+static_assert(is_equivalent_to(tuple[P, Q] & tuple[P, Any], tuple[P, Q & Any]))
+static_assert(is_equivalent_to(tuple[P, Any] & tuple[P, Q], tuple[P, Q & Any]))
+
+static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Any], tuple[P & Any, Q & Any]))
+static_assert(is_equivalent_to(tuple[Any, Any] & tuple[P, Q], tuple[P & Any, Q & Any]))
+```
+
+Intersecting a `Sequence` with a variable-length tuple retains its required prefix or suffix. These
+intersections currently remain unsimplified. The variable-length elements could be narrowed to
+`int`, but the required `bool` element must be preserved:
+
+```pyi
+type Prefix = tuple[bool, *tuple[object, ...]]
+type Suffix = tuple[*tuple[object, ...], bool]
+
+def _(prefix: Sequence[int] & Prefix, suffix: Sequence[int] & Suffix):
+    # TODO: Simplify to `tuple[bool, *tuple[int, ...]]`.
+    reveal_type(prefix)  # revealed: Sequence[int] & tuple[bool, *tuple[object, ...]]
+    # TODO: Simplify to `tuple[*tuple[int, ...], bool]`.
+    reveal_type(suffix)  # revealed: Sequence[int] & tuple[*tuple[object, ...], bool]
+```
+
+Required positions also preserve the minimum length, even when every element type is `object`:
+
+```pyi
+static_assert(not is_subtype_of(tuple[()], Sequence[int] & tuple[object, *tuple[object, ...]]))
+static_assert(not is_subtype_of(tuple[int], Sequence[int] & tuple[object, *tuple[object, ...], object]))
+```
+
+### `type[...]`
+
+`type[...]` is also a covariant type constructor, so the same intersection relation should apply.
+
+```pyi
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class P: ...
+
+# TODO: Support intersections inside `type[...]`.
+# error: [static-assert-error]
+static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
+```
+
+### Type var bounds and `NewTypes`
+
+The simplification preserves the identities of type variables and `NewType` instances:
+
+```pyi
+from typing import Any, NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class P: ...
+class Q: ...
+
+class Co[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+CoId = NewType("CoId", Co[P])
+
+def preserve_typevar[T: Co[P]](value: T & Co[Any]) -> T:
+    return value
+
+def preserve_newtype(value: CoId & Co[Any]) -> CoId:
+    return value
+```
+
+### Specializations with type variables
+
+Relations like (7b) also hold if they involve specializations using (non inferable) type variables:
+
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Co[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Child[T](Co[T]): ...
+
+def generic[T]() -> None:
+    static_assert(is_equivalent_to(Co[T] & Child[object], Child[T]))
+```
+
+### Specializations with indirect gradual types
+
+A type alias can introduce a gradual argument indirectly. Intersecting with a top-materialized
+subclass must not discard the base's gradual member types:
+
+```pyi
+from typing import Any, reveal_type
+from ty_extensions import Top
+
+class Co[T]:
+    def get(self) -> T: ...
+
+class Child[T](Co[T]):
+    def put(self, value: T) -> None: ...
+
+type Dynamic = Any
+
+def alias(value: Co[Dynamic] & Top[Child[Any]]) -> str:
+    reveal_type(value)  # revealed: Co[Dynamic] & Top[Child[Any]]
+    reveal_type(value.get())  # revealed: Any
+    return value.get()
+```
+
+### Specializations with recursive types
+
+Fully static recursive types still allow simplification. Evaluating protocol attributes and
+`TypedDict` fields can itself require simplifying intersections that refer back to those types:
+
+```pyi
+from typing import Protocol, TypedDict, reveal_type
+
+class Co[T]:
+    def get(self) -> T: ...
+
+class Child[T](Co[T]): ...
+
+type RecursiveAlias = int | list[RecursiveAlias]
+
+class RecursiveProtocol(Protocol):
+    child: Co[RecursiveProtocol] & Child[object]
+
+class RecursiveRecord(TypedDict):
+    child: Co[RecursiveRecord] & Child[object]
+
+def _(
+    alias: Co[RecursiveAlias] & Child[object],
+    protocol: Co[RecursiveProtocol] & Child[object],
+    record: Co[RecursiveRecord] & Child[object],
+):
+    reveal_type(alias)  # revealed: Child[int | list[RecursiveAlias]]
+    reveal_type(protocol)  # revealed: Child[RecursiveProtocol]
+    reveal_type(record)  # revealed: Child[RecursiveRecord]
+```
+
+Recursive generic specializations can grow on each step, so we conservatively leave these
+intersections unsimplified. Checking only for repeated specializations does not prevent infinite
+expansion:
+
+```pyi
+type GrowingAlias[T] = T | list[Co[GrowingAlias[list[T]]] & Child[object]]
+
+class GrowingRecord[T](TypedDict):
+    child: Co[GrowingRecord[list[T]]] & Child[object]
+
+def _(
+    alias: Co[GrowingAlias[int]] & Child[object],
+    record: Co[GrowingRecord[int]] & Child[object],
+):
+    reveal_type(alias)  # revealed: Co[GrowingAlias[int]] & Child[object]
+    reveal_type(record)  # revealed: Co[GrowingRecord[int]] & Child[object]
 ```

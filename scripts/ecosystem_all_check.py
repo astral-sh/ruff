@@ -81,6 +81,7 @@ def main() -> None:
                 cwd=project_dir,
                 capture_output=True,
                 text=True,
+                check=False,
             )
         except CalledProcessError as e:
             tqdm.write(f"Ruff failed on {project_dir}: {e}")

@@ -10,6 +10,7 @@ use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::preview::{
     is_annotated_assignment_redefinition_enabled, is_f811_shadowing_in_type_checking_enabled,
@@ -70,7 +71,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.171")]
+#[violation_metadata(stable_since = "v0.0.171", category = Category::Suspicious)]
 pub(crate) struct RedefinedWhileUnused {
     pub name: String,
     pub row: SourceRow,

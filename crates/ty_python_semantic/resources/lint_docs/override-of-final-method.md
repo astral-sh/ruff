@@ -4,8 +4,8 @@ Checks for methods on subclasses that override superclass methods decorated with
 
 ## Why is this bad?
 
-Decorating a method with `@final` declares to the type checker that it should not be
-overridden on any subclass.
+Decorating a method with `@final` declares to the type checker that it should not be overridden on
+any subclass.
 
 ## Example
 

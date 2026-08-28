@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for classes with too many public methods
@@ -83,7 +84,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-public-methods`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.290")]
+#[violation_metadata(preview_since = "v0.0.290", category = Category::Pedantic)]
 pub(crate) struct TooManyPublicMethods {
     methods: usize,
     max_methods: usize,

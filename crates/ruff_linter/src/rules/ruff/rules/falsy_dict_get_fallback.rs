@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Applicability, Fix, FixAvailability, Violation};
 
@@ -40,7 +41,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// [documentation]: https://docs.python.org/3/library/stdtypes.html#dict.get
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.5")]
+#[violation_metadata(preview_since = "0.8.5", category = Category::Complexity)]
 pub(crate) struct FalsyDictGetFallback;
 
 impl Violation for FalsyDictGetFallback {

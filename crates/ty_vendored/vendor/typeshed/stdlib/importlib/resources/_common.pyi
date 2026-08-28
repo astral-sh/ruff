@@ -12,9 +12,18 @@ if sys.version_info >= (3, 11):
 
     Package: TypeAlias = str | types.ModuleType
 
-    if sys.version_info >= (3, 12):
+    if sys.version_info >= (3, 15):
         Anchor: TypeAlias = Package
 
+        def files(anchor: Anchor | None = None) -> Traversable:
+            """
+            Get a Traversable resource for an anchor.
+            """
+
+    elif sys.version_info >= (3, 12):
+        Anchor: TypeAlias = Package
+
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.15.")
         def package_to_anchor(
             func: Callable[[Anchor | None], Traversable],
         ) -> Callable[[Anchor | None, Anchor | None], Traversable]:
@@ -36,7 +45,7 @@ if sys.version_info >= (3, 11):
             Get a Traversable resource for an anchor.
             """
         @overload
-        @deprecated("Deprecated since Python 3.12; will be removed in Python 3.15. Use `anchor` parameter instead.")
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.15. Use `anchor` parameter instead.")
         def files(package: Anchor | None = None) -> Traversable: ...
 
     else:

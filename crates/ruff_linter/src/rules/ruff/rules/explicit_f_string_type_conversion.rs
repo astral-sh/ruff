@@ -9,6 +9,7 @@ use ruff_python_ast::{self as ast, Expr, OperatorPrecedence};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::cst::helpers::space;
 use crate::cst::matchers::{
     match_call_mut, match_formatted_string, match_formatted_string_expression, transform_expression,
@@ -45,7 +46,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe if the call expression contains
 /// comments that would be deleted by applying the fix.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.267")]
+#[violation_metadata(stable_since = "v0.0.267", category = Category::Complexity)]
 pub(crate) struct ExplicitFStringTypeConversion;
 
 impl Violation for ExplicitFStringTypeConversion {
