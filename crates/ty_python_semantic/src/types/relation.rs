@@ -1469,7 +1469,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            (Type::TypeAlias(source_alias), _) if source_alias.contains_growing_alias(db) => {
+            (Type::TypeAlias(source_alias), _)
+                if source_alias.recursive_alias_kind(db).is_growing() =>
+            {
                 self.with_recursion_guard(db, source, target, || {
                     // A recursion-guarded `false` is not proof that the deferred remainder is
                     // absent, so force the sound `Unknown` fallback.
@@ -1497,15 +1499,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(db, source, target, || {
-                    let expanded = if union.has_recursive_aliases(db) {
-                        union.expand_recursive_aliases_structurally(
-                            db,
-                            env,
-                            |remainder, current| self.is_redundant_with(db, remainder, current),
-                        )
-                    } else {
-                        union.expand_aliases(db, env)
-                    };
+                    let expanded = union.expand_aliases_with_recursive_alias_remainder_check(
+                        db,
+                        env,
+                        |remainder, current| self.is_redundant_with(db, remainder, current),
+                    );
                     self.check_type_pair(db, source, expanded)
                 })
             }

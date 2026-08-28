@@ -126,13 +126,6 @@ impl<'db> UnionType<'db> {
             .any(|element| matches!(element, Type::TypeAlias(_)))
     }
 
-    /// Returns `true` if a direct alias element reaches a recursive alias.
-    pub(crate) fn has_recursive_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db).iter().any(|element| {
-            matches!(element, Type::TypeAlias(alias) if alias.contains_recursive_alias(db))
-        })
-    }
-
     /// Recursively expands aliases that expose top-level union elements.
     ///
     /// Aliases nested inside non-union elements remain part of those elements.
@@ -145,26 +138,35 @@ impl<'db> UnionType<'db> {
         Self::from_elements(db, env, self.elements(db).iter().copied())
     }
 
-    /// Expands recursive aliases without starting a nested type-relation query.
+    /// Expands aliases without starting a nested type-relation query for recursive aliases.
     ///
-    /// Aliases that do not reach recursion retain the normal relation-aware normalization. The
-    /// caller supplies the redundancy proof for a deferred growing alias because it already owns
-    /// the surrounding relation checker.
-    pub(crate) fn expand_recursive_aliases_structurally(
+    /// Non-recursive aliases retain the normal relation-aware normalization. The caller supplies
+    /// the redundancy proof for a deferred growing alias because it already owns the surrounding
+    /// relation checker.
+    pub(crate) fn expand_aliases_with_recursive_alias_remainder_check(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         is_redundant: impl FnMut(Type<'db>, Type<'db>) -> bool,
     ) -> Type<'db> {
-        let (recursive, non_recursive): (Vec<_>, Vec<_>) =
-            self.elements(db).iter().copied().partition(|element| {
-                matches!(element, Type::TypeAlias(alias) if alias.contains_recursive_alias(db))
-            });
+        let mut recursive = Vec::new();
+        let mut non_recursive = UnionBuilder::new(db, env);
 
-        let non_recursive = non_recursive
-            .into_iter()
-            .fold(UnionBuilder::new(db, env), UnionBuilder::add)
-            .build();
+        for element in self.elements(db).iter().copied() {
+            if matches!(
+                element,
+                Type::TypeAlias(alias) if alias.recursive_alias_kind(db).is_recursive()
+            ) {
+                recursive.push(element);
+            } else {
+                non_recursive.add_in_place(element);
+            }
+        }
+
+        let non_recursive = non_recursive.build();
+        if recursive.is_empty() {
+            return non_recursive;
+        }
 
         recursive
             .into_iter()

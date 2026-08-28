@@ -312,6 +312,29 @@ pub enum TypeAliasType<'db> {
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
 }
 
+/// Describes the recursive aliases reachable while expanding a type alias.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RecursiveAliasKind {
+    /// Expansion does not reach a recursive alias.
+    None,
+    /// Expansion reaches recursion, but no specialization grows without bound.
+    Finite,
+    /// Expansion reaches a recursion whose specializations can grow without bound.
+    Growing,
+}
+
+impl RecursiveAliasKind {
+    /// Returns whether expansion reaches any recursive alias.
+    pub(crate) const fn is_recursive(self) -> bool {
+        !matches!(self, Self::None)
+    }
+
+    /// Returns whether expansion reaches a recursion that can grow without bound.
+    pub(crate) const fn is_growing(self) -> bool {
+        matches!(self, Self::Growing)
+    }
+}
+
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: TypeAliasType<'db>,
@@ -398,27 +421,35 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    /// Returns whether expanding this alias reaches a recursive type alias.
-    pub(crate) fn contains_recursive_alias(self, db: &'db dyn Db) -> bool {
-        let env = ProgramEnvironment::from_definition(self.definition(db));
-        visitor::any_over_type_expanding_aliases(db, &env, Type::TypeAlias(self), |nested| {
-            matches!(
-                nested.to_type_identity(db),
-                TypeIdentity::GrowingTypeAlias(_)
-            )
-        })
-    }
+    /// Classifies the recursive aliases reachable while expanding this alias.
+    pub(crate) fn recursive_alias_kind(self, db: &'db dyn Db) -> RecursiveAliasKind {
+        enum PendingAlias<'db> {
+            Enter(TypeAliasType<'db>),
+            Exit(TypeAliasType<'db>),
+        }
 
-    /// Returns whether expanding this alias reaches a recursive alias whose specialization can
-    /// grow without bound.
-    pub(crate) fn contains_growing_alias(self, db: &'db dyn Db) -> bool {
-        let mut pending = vec![self];
+        let mut pending = vec![PendingAlias::Enter(self)];
         let mut seen = FxHashSet::default();
+        let mut active = FxHashSet::default();
+        let mut kind = RecursiveAliasKind::None;
 
-        while let Some(alias) = pending.pop() {
+        while let Some(pending_alias) = pending.pop() {
+            let alias = match pending_alias {
+                PendingAlias::Enter(alias) => alias,
+                PendingAlias::Exit(alias) => {
+                    let was_active = active.remove(&alias);
+                    debug_assert!(was_active);
+                    continue;
+                }
+            };
+
             // A growing recursive path is recognized before expansion. Every other path either
             // terminates or eventually repeats an exact alias, so visiting each alias once keeps
             // shared alias graphs linear.
+            if active.contains(&alias) {
+                kind = RecursiveAliasKind::Finite;
+                continue;
+            }
             if !seen.insert(alias) {
                 continue;
             }
@@ -427,9 +458,11 @@ impl<'db> TypeAliasType<'db> {
                 Type::TypeAlias(alias).to_type_identity(db),
                 TypeIdentity::GrowingTypeAlias(_)
             ) {
-                return true;
+                return RecursiveAliasKind::Growing;
             }
 
+            active.insert(alias);
+            pending.push(PendingAlias::Exit(alias));
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             let nested_aliases = RefCell::new(Vec::new());
             visitor::any_over_type(db, &env, alias.value_type(db), false, |nested| {
@@ -438,10 +471,15 @@ impl<'db> TypeAliasType<'db> {
                 }
                 false
             });
-            pending.extend(nested_aliases.into_inner());
+            pending.extend(
+                nested_aliases
+                    .into_inner()
+                    .into_iter()
+                    .map(PendingAlias::Enter),
+            );
         }
 
-        false
+        kind
     }
 
     /// Returns the alias without an applied specialization or pending materialization.
