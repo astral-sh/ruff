@@ -14,7 +14,7 @@ use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{Parameters, ParametersKind, SignatureRelationVisitor};
+use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
@@ -1775,14 +1775,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         signature.parameters().is_top() || signature.parameters().is_bottom()
                     }) =>
             {
-                let paramspec =
-                    Type::paramspec_value_callable(db, Parameters::paramspec(db, bound_typevar));
-                let (source, target) = if source.is_type_var() {
-                    (paramspec, target)
-                } else {
-                    (source, paramspec)
-                };
-                self.check_type_pair(db, source, target)
+                let other_is_top = other
+                    .signatures(db)
+                    .iter()
+                    .all(|signature| signature.parameters().is_top());
+                ConstraintSet::from_bool(self.constraints, source.is_type_var() == other_is_top)
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to

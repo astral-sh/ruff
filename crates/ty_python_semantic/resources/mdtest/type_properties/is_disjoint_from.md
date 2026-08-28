@@ -1220,6 +1220,30 @@ def compatible[T]():
     static_assert(not is_disjoint_from(list[list[Id[T]]], list[list[int]]))
 ```
 
+An upper bound can rule out equality even when the surrounding structure matches. A type variable
+bounded by `str` cannot specialize to `int`, but it can specialize to `str` or `Never`.
+
+```py
+from typing import Never
+
+def bounded[T: str]():
+    static_assert(is_disjoint_from(list[list[T]], list[list[int]]))
+    static_assert(is_disjoint_from(list[list[int]], list[list[T]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[str]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[Never]]))
+```
+
+A constrained type variable can only specialize to one of its constraints. Neither `str` nor `bytes`
+equals `int`; matching either constraint is enough to preserve a possible overlap.
+
+```py
+def constrained[T: (str, bytes)]():
+    static_assert(is_disjoint_from(list[list[T]], list[list[int]]))
+    static_assert(is_disjoint_from(list[list[int]], list[list[T]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[str]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[bytes]]))
+```
+
 ### NewTypes and overlapping types
 
 A `NewType` overlaps with any nominal or structural type that overlaps its concrete base. This

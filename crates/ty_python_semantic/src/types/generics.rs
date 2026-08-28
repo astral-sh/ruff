@@ -2176,7 +2176,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     // using a directional subtyping checker.
                     // Keep type-variable comparisons as constraints: `list[T]` can equal
                     // `list[int]` when `T = int`, but cannot equal `int` for any `T`. Disjointness
-                    // requires that no specialization satisfies the overlap constraints.
+                    // requires that no valid specialization satisfies the overlap constraints,
+                    // including the type variables' declared bounds and constraints.
                     let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
                     let overlap = checker.check_subtyping_in_invariant_position(
@@ -2188,7 +2189,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     );
                     ConstraintSet::from_bool(
                         self.constraints,
-                        overlap.is_never_satisfied(db, self.env),
+                        overlap.has_no_valid_solutions(db, self.env),
                     )
                 }
 

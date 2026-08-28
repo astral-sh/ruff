@@ -12,9 +12,10 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
     PathBoundSolution, PathBounds, Solution, SolutionPaths, Solutions, TypeVarSolution,
 };
-use crate::types::typevar::TypeVarSet;
+use crate::types::typevar::{TypeVarConstraints, TypeVarSet};
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
+    BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 
 type Paths<'db> = FxHashSet<Solution<'db>>;
@@ -138,6 +139,38 @@ fn path_limit_is_checked_before_solving() {
             assert_eq!(selected, 8);
         }
     }
+}
+
+#[test]
+fn satisfiability_respects_declared_bounds_and_constraints() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let bytes = known_instance(db, KnownClass::Bytes);
+    let bounded = create_typevar(db, "Bounded")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let constrained = create_typevar(db, "Constrained").map_bound_or_constraints(db, |_| {
+        Some(TypeVarBoundOrConstraints::Constraints(
+            TypeVarConstraints::new(db, [str, bytes].as_slice()),
+        ))
+    });
+    let builder = ConstraintSetBuilder::new();
+
+    assert!(!ConstraintSet::always(&builder).has_no_valid_solutions(db, &env));
+    assert!(ConstraintSet::never(&builder).has_no_valid_solutions(db, &env));
+
+    for typevar in [bounded, constrained] {
+        let invalid = exact(db, &builder, typevar, int);
+        assert!(!invalid.is_never_satisfied(db, &env));
+        assert!(invalid.has_no_valid_solutions(db, &env));
+        assert!(!exact(db, &builder, typevar, str).has_no_valid_solutions(db, &env));
+    }
+
+    assert!(!exact(db, &builder, bounded, Type::Never).has_no_valid_solutions(db, &env));
+    assert!(!exact(db, &builder, constrained, bytes).has_no_valid_solutions(db, &env));
+    assert!(exact(db, &builder, constrained, Type::Never).has_no_valid_solutions(db, &env));
 }
 
 #[test]

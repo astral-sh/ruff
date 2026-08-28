@@ -2935,7 +2935,9 @@ impl<'db> Type<'db> {
 
     /// If the type is a union, removes union elements that are disjoint from `target`.
     ///
-    /// Otherwise, returns the type unchanged.
+    /// Returns the type unchanged if it is not a union or every alternative is disjoint. Inference
+    /// must still visit incompatible alternatives to report bound errors instead of inferring from
+    /// `Never` and losing the failure.
     fn filter_disjoint_elements(
         self,
         db: &'db dyn Db,
@@ -2944,11 +2946,12 @@ impl<'db> Type<'db> {
         inferable: TypeVarSet<'db>,
     ) -> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
-        self.filter_union(db, env, |elem| {
+        let filtered = self.filter_union(db, env, |elem| {
             !elem
                 .when_disjoint_from(db, env, target, &constraints, inferable)
                 .is_always_satisfied(db, env)
-        })
+        });
+        if filtered.is_never() { self } else { filtered }
     }
 
     /// Returns the fallback instance type that a literal is an instance of, or `None` if the type

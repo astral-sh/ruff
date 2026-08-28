@@ -4694,6 +4694,7 @@ impl<'db> Parameters<'db> {
 
     /// Returns whether the parameters are `(*object, **object)`, which accepts every call.
     pub(crate) fn is_bottom(&self) -> bool {
+        // Top parameters store the same variadics; their kind distinguishes them from bottom.
         self.is_standard()
             && matches!(
                 self.as_slice(),

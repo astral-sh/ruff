@@ -509,7 +509,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         debug_assert!(std::ptr::eq(self.builder, builder));
     }
 
-    /// Returns whether this constraint set never holds.
+    /// Returns whether this constraint set never holds, without applying the type variables'
+    /// declared bounds or constraints. Use [`Self::has_no_valid_solutions`] to include those.
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         let mut storage = self.builder.storage.borrow_mut();
         self.node

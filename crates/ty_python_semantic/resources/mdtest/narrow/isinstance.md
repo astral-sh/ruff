@@ -1336,6 +1336,22 @@ def narrow[T](value: Nested[T]):
         assert_never(value)
 ```
 
+Bounds and constraints can also make two nested arguments incompatible. If `T` is bounded by `str`
+or constrained to `str` and `bytes`, `list[T]` cannot equal `list[int]`, so the positive branch is
+unreachable.
+
+```py
+class IntListBox(Box[list[int]]): ...
+
+def narrow_bounded[T: str](value: Nested[T]):
+    if isinstance(value, IntListBox):
+        assert_never(value)
+
+def narrow_constrained[T: (str, bytes)](value: Nested[T]):
+    if isinstance(value, IntListBox):
+        assert_never(value)
+```
+
 ## Narrowing recursively bounded generics (strict mode)
 
 An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
