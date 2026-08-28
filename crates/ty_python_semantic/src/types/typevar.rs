@@ -18,8 +18,8 @@ use crate::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
         Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type, binding_type,
-        definition_expression_type,
+        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        any_over_type_including_alias_arguments, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -83,17 +83,11 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         typevar_id: TypeVarIdentity<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| match ty {
+        any_over_type_including_alias_arguments(db, env, self, |ty| match ty {
             Type::TypeVar(typevar) => typevar_id == typevar.typevar(db).identity(db),
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
                 typevar_id == typevar.identity(db)
             }
-            Type::TypeAlias(alias) => alias.specialization(db).is_some_and(|specialization| {
-                specialization
-                    .types(db)
-                    .iter()
-                    .any(|ty| ty.references_typevar_through_aliases(db, env, typevar_id))
-            }),
             _ => false,
         })
     }

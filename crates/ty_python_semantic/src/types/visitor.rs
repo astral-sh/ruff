@@ -644,12 +644,13 @@ fn dynamic_content_impl<'db>(
     visitor.content.get()
 }
 
-/// Implementation for `any_over_type` and `find_over_type`.
+/// Shared implementation for type searches.
 fn any_over_type_impl<'db, F, T>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
+    visit_alias_arguments: bool,
     query: F,
 ) -> T
 where
@@ -662,6 +663,7 @@ where
         recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<U>,
         should_visit_lazy_type_attributes: bool,
+        visit_alias_arguments: bool,
     }
 
     impl<'db, U> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_, U>
@@ -687,7 +689,17 @@ where
             if new_value != default_value {
                 return;
             }
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            if self.visit_alias_arguments
+                && let Type::TypeAlias(alias) = ty
+            {
+                if !self.recursion_guard.type_was_already_seen(ty)
+                    && let Some(specialization) = alias.specialization(db)
+                {
+                    walk_specialization_types(db, specialization, self);
+                }
+            } else {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
         }
     }
 
@@ -697,6 +709,7 @@ where
         recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::default(),
         should_visit_lazy_type_attributes,
+        visit_alias_arguments,
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
@@ -717,7 +730,20 @@ pub(super) fn any_over_type<'db>(
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, false, query)
+}
+
+/// Searches through the arguments of [`Type::TypeAlias`] without evaluating alias bodies or other
+/// lazy attributes.
+/// This also visits arguments that the alias's value does not use.
+/// Shared arguments use the same recursion guard, so their descendants are not visited repeatedly.
+pub(super) fn any_over_type_including_alias_arguments<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_impl(db, env, ty, false, true, query)
 }
 
 /// Searches through type aliases without forcing other lazily inferred type attributes.
@@ -774,7 +800,7 @@ pub(super) fn find_over_type<'db, T>(
 where
     T: Copy + PartialEq,
 {
-    any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(db, env, ty, should_visit_lazy_type_attributes, false, query)
 }
 
 #[cfg(test)]

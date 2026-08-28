@@ -108,7 +108,9 @@ pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{any_over_type, dynamic_content};
+use crate::types::visitor::{
+    any_over_type, any_over_type_including_alias_arguments, dynamic_content,
+};
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
@@ -1921,19 +1923,10 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        any_over_type(db, env, self, false, |ty| match ty {
-            Type::TypeVar(typevar) => typevar.typevar(db).is_self(db),
-            Type::TypeAlias(alias) => {
-                // Type alias bodies cannot declare `Self`, but their explicit type arguments can
-                // contain the `Self` from an enclosing method or class.
-                alias.specialization(db).is_some_and(|specialization| {
-                    specialization
-                        .types(db)
-                        .iter()
-                        .any(|ty| ty.contains_self(db, env))
-                })
-            }
-            _ => false,
+        // Type alias bodies cannot declare `Self`, but their explicit type arguments can
+        // contain the `Self` from an enclosing method or class.
+        any_over_type_including_alias_arguments(db, env, self, |ty| {
+            ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
         })
     }
 

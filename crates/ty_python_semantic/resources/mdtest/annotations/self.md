@@ -1466,6 +1466,20 @@ ParameterOnly().consume(ParameterOnly())
 ParameterOnly().consume(object())  # error: [invalid-argument-type]
 ```
 
+Nested uses of the same alias still bind `Self` to the concrete receiver, including when a subclass
+inherits the method:
+
+```py
+class NestedAlias:
+    def copy(self, other: Identity[Identity[Self]]) -> Identity[Identity[Self]]:
+        return other
+
+class NestedChild(NestedAlias): ...
+
+# revealed: bound method NestedChild.copy(other: NestedChild) -> NestedChild
+reveal_type(NestedChild().copy)
+```
+
 In nested functions `self` binds to the method. So in the following example the `self` in `C.b` is
 bound at `C.f`.
 
