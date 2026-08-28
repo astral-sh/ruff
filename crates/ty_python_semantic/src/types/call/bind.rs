@@ -5874,10 +5874,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     return None;
                 }
 
-                let return_ty =
-                    return_ty.filter_disjoint_elements(db, self.env, tcx, self.inferable_typevars);
-                let tcx =
-                    tcx.filter_disjoint_elements(db, self.env, return_ty, self.inferable_typevars);
+                let return_ty = return_ty
+                    .discard_disjoint_union_elements(db, self.env, tcx, self.inferable_typevars)
+                    .or_never();
+                let tcx = tcx
+                    .discard_disjoint_union_elements(
+                        db,
+                        self.env,
+                        return_ty,
+                        self.inferable_typevars,
+                    )
+                    .or_never();
                 let path_bounds = return_ty.assignable_solutions_with_inferable(
                     db,
                     self.env,

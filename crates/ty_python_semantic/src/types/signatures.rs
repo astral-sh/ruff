@@ -4692,9 +4692,12 @@ impl<'db> Parameters<'db> {
         matches!(self.data.kind, ParametersKind::Top)
     }
 
-    /// Returns whether the parameters are `(*object, **object)`, which accepts every call.
+    /// Returns whether this is the bottom parameter list, `(*args: object, **kwargs: object)`,
+    /// which accepts every call.
     pub(crate) fn is_bottom(&self) -> bool {
-        // Top parameters store the same variadics; their kind distinguishes them from bottom.
+        // `Parameters::top()` stores the same parameter list, but `ParametersKind::Top`
+        // makes it reject every call. Bottom parameters use `ParametersKind::Standard`,
+        // so check the kind before checking the parameter types.
         self.is_standard()
             && matches!(
                 self.as_slice(),

@@ -1730,6 +1730,33 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+/// The result of discarding disjoint elements from a union.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum DiscardDisjointUnionElementsResult<'db> {
+    /// The remaining type, or the unchanged input if it is not a union.
+    Retained(Type<'db>),
+    /// Every union element is disjoint from the target.
+    AllDisjoint,
+}
+
+impl<'db> DiscardDisjointUnionElementsResult<'db> {
+    /// Returns the retained type, or `Never` if every union element was disjoint.
+    fn or_never(self) -> Type<'db> {
+        match self {
+            Self::Retained(ty) => ty,
+            Self::AllDisjoint => Type::Never,
+        }
+    }
+
+    /// Returns the retained type, or `original` if every union element was disjoint.
+    fn unless_all_disjoint(self, original: Type<'db>) -> Type<'db> {
+        match self {
+            Self::Retained(ty) => ty,
+            Self::AllDisjoint => original,
+        }
+    }
+}
+
 /// The result of projecting class-object types into the corresponding instance types.
 ///
 /// An exact projection preserves all class-object constraints relevant to a `type[T]` relation;
@@ -2935,23 +2962,27 @@ impl<'db> Type<'db> {
 
     /// If the type is a union, removes union elements that are disjoint from `target`.
     ///
-    /// Returns the type unchanged if it is not a union or every alternative is disjoint. Inference
-    /// must still visit incompatible alternatives to report bound errors instead of inferring from
-    /// `Never` and losing the failure.
-    fn filter_disjoint_elements(
+    /// Returns [`DiscardDisjointUnionElementsResult::AllDisjoint`] if every union element is removed.
+    /// Non-union inputs, including `Never`, are returned unchanged as
+    /// [`DiscardDisjointUnionElementsResult::Retained`].
+    fn discard_disjoint_union_elements(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
-    ) -> Type<'db> {
+    ) -> DiscardDisjointUnionElementsResult<'db> {
         let constraints = ConstraintSetBuilder::new();
         let filtered = self.filter_union(db, env, |elem| {
             !elem
                 .when_disjoint_from(db, env, target, &constraints, inferable)
                 .is_always_satisfied(db, env)
         });
-        if filtered.is_never() { self } else { filtered }
+        if filtered.is_never() && !self.is_never() {
+            DiscardDisjointUnionElementsResult::AllDisjoint
+        } else {
+            DiscardDisjointUnionElementsResult::Retained(filtered)
+        }
     }
 
     /// Returns the fallback instance type that a literal is an instance of, or `None` if the type

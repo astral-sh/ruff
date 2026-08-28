@@ -3791,8 +3791,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         //
         // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
         // specialize `T` to `int`, and so ignore the `None`.
-        let actual = actual.filter_disjoint_elements(db, self.env, formal, self.inferable);
-        let formal = formal.filter_disjoint_elements(db, self.env, actual, self.inferable);
+        //
+        // If no elements survive, keep the original union: inferring from `Never` would discard
+        // its type variables and skip the bound checks that reject the argument.
+        let actual = actual
+            .discard_disjoint_union_elements(db, self.env, formal, self.inferable)
+            .unless_all_disjoint(actual);
+        let formal = formal
+            .discard_disjoint_union_elements(db, self.env, actual, self.inferable)
+            .unless_all_disjoint(formal);
 
         // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
         // their entire inference context on the existing signature path, and use forward

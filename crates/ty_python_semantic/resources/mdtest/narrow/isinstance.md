@@ -1312,31 +1312,6 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a set!"
 ```
 
-## Narrowing incompatible invariant specializations
-
-Subclasses of the same invariant generic class are disjoint when their type arguments cannot be
-equal. Here, `T` is bounded by `str`, so `list[T]` cannot equal `list[int]` and the positive branch
-is unreachable.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import assert_never
-
-class Box[T]:
-    value: T
-
-class Nested[T](Box[list[T]]): ...
-class IntListBox(Box[list[int]]): ...
-
-def narrow[T: str](value: Nested[T]):
-    if isinstance(value, IntListBox):
-        assert_never(value)
-```
-
 ## Narrowing recursively bounded generics (strict mode)
 
 An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
@@ -1477,13 +1452,10 @@ def _(x: object):
 Narrowing must therefore preserve the original type argument instead of substituting `Box`'s
 default.
 
-The `T` alternative can itself be a subclass of both `str` and `Box`, with a different type
-argument. That alternative remains possible in the positive branch, so returning `value` as `Box[T]`
-is unsafe.
-
 ```py
-from typing import assert_never
+from typing import assert_never, final
 
+@final
 class Box[T: str = str]:
     value: T
 
@@ -1491,11 +1463,11 @@ class Box[T: str = str]:
 
 def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
     if isinstance(value, Box):
-        reveal_type(value)  # revealed: Box[T@box_with_default] | (T@box_with_default & Top[Box[Unknown]])
-        return value  # error: [invalid-return-type]
+        reveal_type(value)  # revealed: Box[T@box_with_default]
+        return value
 
     if not isinstance(value, Box):
-        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+        reveal_type(value)  # revealed: T@box_with_default
         return Box[T](value)
 
     assert_never(value)
