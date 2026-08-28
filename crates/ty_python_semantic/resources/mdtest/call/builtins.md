@@ -381,10 +381,11 @@ def accepts_truthy_constrained_typevar(x: T_constrained_a_b) -> bool:
     if isinstance(x, (A, B)):
         return True
 
-RecursiveA = TypeAliasType("RecursiveA", Union[A, "RecursiveB"])
-RecursiveB = TypeAliasType("RecursiveB", Union[B, "RecursiveA"])
-RecursivePartialA = TypeAliasType("RecursivePartialA", Union[A, "RecursivePartialB"])
-RecursivePartialB = TypeAliasType("RecursivePartialB", Union[bytes, "RecursivePartialA"])
+# Invalid alias cycles still recover the non-recursive members for narrowing.
+RecursiveA = TypeAliasType("RecursiveA", Union[A, "RecursiveB"])  # error: [cyclic-type-alias-definition]
+RecursiveB = TypeAliasType("RecursiveB", Union[B, "RecursiveA"])  # error: [cyclic-type-alias-definition]
+RecursivePartialA = TypeAliasType("RecursivePartialA", Union[A, "RecursivePartialB"])  # error: [cyclic-type-alias-definition]
+RecursivePartialB = TypeAliasType("RecursivePartialB", Union[bytes, "RecursivePartialA"])  # error: [cyclic-type-alias-definition]
 
 def accepts_mutually_recursive_alias(x: RecursiveA) -> bool:
     reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]

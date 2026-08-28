@@ -456,7 +456,7 @@
         },
         "cyclic-type-alias-definition": {
           "title": "detects cyclic type alias definitions",
-          "description": "## What it does\n\nChecks for type alias definitions that (directly or mutually) refer to themselves.\n\n## Why is it bad?\n\nAlthough it is permitted to define a recursive type alias, it is not meaningful to have a type alias\nwhose expansion can only result in itself, and is therefore not allowed.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\ntype Itself = Itself  # error\n\ntype A = B  # error\ntype B = A  # error\n```",
+          "description": "## What it does\n\nChecks for type alias definitions that are circular, either directly or through unions.\n\n## Why is it bad?\n\nRecursive aliases are valid when recursive references occur inside another type, such as\n`list[Tree]`. An alias cannot expand directly to itself or include itself as a union member. This\napplies to both `type` statements and aliases created with `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType\n\ntype Itself = Itself  # error\n\ntype A = B  # error\ntype B = A  # error\n\ntype IntOr = int | IntOr  # error\n\nCycle = TypeAliasType(\"Cycle\", \"Cycle\")  # error\n\ntype Tree = int | list[Tree]  # valid recursive alias\n```",
           "default": "error",
           "oneOf": [
             {

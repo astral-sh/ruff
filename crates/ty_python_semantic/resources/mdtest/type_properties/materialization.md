@@ -525,9 +525,9 @@ An alias cycle does not establish that the element is dynamic. Comparing these t
 terminates without treating either alias as `Any`.
 
 ```py
-Loop = TypeAliasType("Loop", "Loop")
-First = TypeAliasType("First", "Second")
-Second = TypeAliasType("Second", First)
+Loop = TypeAliasType("Loop", "Loop")  # error: [cyclic-type-alias-definition]
+First = TypeAliasType("First", "Second")  # error: [cyclic-type-alias-definition]
+Second = TypeAliasType("Second", First)  # error: [cyclic-type-alias-definition]
 
 static_assert(is_disjoint_from(list[tuple[int]], list[tuple[Loop, ...]]))
 static_assert(is_disjoint_from(list[tuple[int]], list[tuple[First, ...]]))

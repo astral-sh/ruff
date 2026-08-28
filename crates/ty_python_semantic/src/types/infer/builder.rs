@@ -1944,13 +1944,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
-        let db = self.db();
         let previous_check_unbound_typevars = self
             .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-        let value_ty = self.infer_type_expression(&type_alias.value);
+        self.infer_type_expression(&type_alias.value);
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_TYPE_ALIAS);
@@ -1959,34 +1958,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             previous_check_unbound_typevars,
         );
 
-        // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
-        // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
-        // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
-        // ```python
-        // type Itself = Itself  # error: "Cyclic definition of `Itself`"
-        // type A = B  # error: "Cyclic definition of `A`"
-        // type B = A  # error: "Cyclic definition of `B`"
-        // type G[T] = G[T]  # error: "Cyclic definition of `G`"
-        // type RecursiveList[T] = list[T | RecursiveList[T]]  # OK
-        // type RecursiveList2[T] = list[RecursiveList2[T]]  # It's not possible to create an element of this, but it's not an error for now
-        // type IntOr = int | IntOr  # It's redundant, but OK for now
-        // type IntOrStr = int | StrOrInt  # It's redundant, but OK
-        // type StrOrInt = str | IntOrStr  # It's redundant, but OK
-        // ```
+        if let Some(name) = type_alias.name.as_name_expr() {
+            self.check_type_alias_cycle(&name.id, &type_alias.value, type_alias);
+        }
+    }
+
+    /// Check both alias syntaxes, including union members that disappear during expansion.
+    fn check_type_alias_cycle(&mut self, name: &str, value: &ast::Expr, node: impl Ranged) {
+        let db = self.db();
+        let value_ty = self.expression_type(value);
         let expanded = value_ty.expand_eagerly(db, self.program_environment());
-        if expanded.is_divergent() {
-            if let Some(builder) = self
+        if (expanded.is_divergent() || value_ty.has_unguarded_alias_cycle(db))
+            && let Some(builder) = self
                 .context
-                .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, type_alias)
-            {
-                builder.into_diagnostic(format_args!(
-                    "Cyclic definition of `{}`",
-                    type_alias.name.as_name_expr().unwrap().id,
-                ));
-            }
-            // Replace with `Divergent`.
-            self.expressions
-                .insert(type_alias.value.as_ref().into(), expanded);
+                .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, node)
+        {
+            builder.into_diagnostic(format_args!("Cyclic definition of `{name}`"));
+        }
+        if expanded.is_divergent() {
+            // Preserve the dynamic recovery type for aliases that cannot be expanded at all.
+            // Union cycles retain their non-recursive members for recovery.
+            self.expressions.insert(value.into(), expanded);
         }
     }
 
@@ -3802,7 +3794,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(KnownClass::TypeAliasType | KnownClass::ExtensionsTypeAliasType),
                 InferenceRegion::Deferred(definition),
             ) => {
-                self.infer_typealiastype_assignment_deferred(definition, arguments);
+                self.infer_typealiastype_assignment_deferred(definition, target, arguments);
                 return;
             }
             (Some(KnownClass::Type), InferenceRegion::Deferred(definition)) => {
@@ -4039,6 +4031,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_typealiastype_assignment_deferred(
         &mut self,
         definition: Definition<'db>,
+        target: &ast::Expr,
         arguments: &ast::Arguments,
     ) {
         let db = self.db();
@@ -4202,6 +4195,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         self.typevar_binding_context = previous_context;
+        if let Some(name) = target.as_name_expr() {
+            self.check_type_alias_cycle(&name.id, &arguments.args[1], &arguments.args[1]);
+        }
     }
 
     fn is_valid_receiver_annotation_target(&self, target: &ast::Expr) -> bool {

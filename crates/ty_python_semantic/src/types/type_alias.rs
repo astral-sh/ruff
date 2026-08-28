@@ -6,7 +6,9 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext, KnownClass,
         KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypingModule, definition_expression_type,
+        TypingModule,
+        cyclic::CycleDetector,
+        definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::VarianceInferable,
@@ -22,6 +24,36 @@ use ty_python_core::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
+
+impl<'db> Type<'db> {
+    /// Returns whether expanding aliases and unions can return to the same alias without entering
+    /// another type. For example, `type A = int | A` is invalid, but
+    /// `type A = int | list[A]` is a valid recursive alias.
+    pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
+        self.has_unguarded_alias_cycle_impl(db, &CycleDetector::new(true))
+    }
+
+    fn has_unguarded_alias_cycle_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &CycleDetector<'db, (), Type<'db>, bool, 8>,
+    ) -> bool {
+        match self {
+            Type::TypeAlias(alias) => visitor.visit(db, self, || {
+                // Substitution can expose a cycle through an otherwise non-recursive alias,
+                // as in `type Identity[T] = T; type Cycle = Identity[Cycle]`.
+                alias
+                    .value_type(db)
+                    .has_unguarded_alias_cycle_impl(db, visitor)
+            }),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| element.has_unguarded_alias_cycle_impl(db, visitor)),
+            _ => self.is_divergent(),
+        }
+    }
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {

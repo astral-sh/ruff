@@ -3128,7 +3128,7 @@ type Left22 = Left21 | Right21
 def _(item: Left22) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 
-type RecursiveItem = A | RecursiveItem
+type RecursiveItem = A | RecursiveItem  # error: [cyclic-type-alias-definition]
 
 def _(item: RecursiveItem) -> None:
     # The common-constraint check must terminate when an alias refers back to its containing union.
