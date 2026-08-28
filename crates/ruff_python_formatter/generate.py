@@ -74,13 +74,12 @@ def group_for_node(node: str) -> str:
     for group in groups:
         if node.startswith(group.title().replace("_", "")):
             return group
-    else:
-        return "other"
+    return "other"
 
 
 def to_camel_case(node: str) -> str:
     """Converts PascalCase to camel_case"""
-    return re.sub("([A-Z])", r"_\1", node).lower().lstrip("_")
+    return re.sub(r"([A-Z])", r"_\1", node).lower().lstrip("_")
 
 
 for node in nodes:
