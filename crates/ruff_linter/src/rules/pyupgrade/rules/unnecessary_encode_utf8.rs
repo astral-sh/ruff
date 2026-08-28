@@ -13,20 +13,24 @@ use crate::fix::edits::{Parentheses, pad, remove_argument};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
-/// Checks for unnecessary calls to `encode` as UTF-8.
+/// Checks for unnecessary calls to `encode` as UTF-8 and unnecessary explicit
+/// UTF-8 encoding arguments.
 ///
 /// ## Why is this bad?
-/// UTF-8 is the default encoding in Python, so there is no need to call
-/// `encode` when UTF-8 is the desired encoding. Instead, use a bytes literal.
+/// UTF-8 is the default encoding in Python, so there is no need to pass an
+/// explicit UTF-8 encoding to `encode`. For ASCII literals, use a bytes literal
+/// instead; for other strings, omit the explicit encoding argument.
 ///
 /// ## Example
 /// ```python
 /// "foo".encode("utf-8")
+/// "unicode text©".encode(encoding="utf-8")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// b"foo"
+/// "unicode text©".encode()
 /// ```
 ///
 /// ## References
