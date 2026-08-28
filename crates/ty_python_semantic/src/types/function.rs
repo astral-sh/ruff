@@ -359,7 +359,7 @@ impl<'db> OverloadLiteral<'db> {
 
     /// Returns true if this overload is decorated with `@classmethod`, or if it is implicitly a
     /// classmethod.
-    fn is_classmethod(self, db: &dyn Db) -> bool {
+    pub(super) fn is_classmethod(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
             || is_implicit_classmethod(self.name(db))
     }

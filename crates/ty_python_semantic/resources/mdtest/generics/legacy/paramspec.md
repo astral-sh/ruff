@@ -303,14 +303,36 @@ class GenericMethods(Generic[P_co]):
 
 ### Variance with explicit receivers
 
-TODO: An explicit receiver can restrict which class specializations expose a method. We defer
-variance validation for these methods until receiver restrictions are taken into account.
+`Self` and the class's own `ParamSpec` do not restrict the receiver. A covariant `ParamSpec` in a
+returned callable's parameters still violates covariance.
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
-from typing import Callable, Generic, ParamSpec
+from typing import Callable, Generic, ParamSpec, Self
 
 P_co = ParamSpec("P_co", covariant=True)
 
+class Unrestricted(Generic[P_co]):
+    # error: [invalid-generic-class]
+    def method(self: Self) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls: type["Unrestricted[P_co]"]) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+    def accepts(self: "Unrestricted[P_co]", callback: Callable[P_co, None]) -> None: ...
+```
+
+TODO: A specialized receiver can restrict which class specializations expose a method. We defer
+variance validation for these methods until receiver restrictions are taken into account.
+
+```py
 class Restricted(Generic[P_co]):
     def method(self: "Restricted[[int]]") -> Callable[P_co, None]:
         raise NotImplementedError

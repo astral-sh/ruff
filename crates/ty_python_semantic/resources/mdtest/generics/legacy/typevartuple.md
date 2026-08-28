@@ -373,8 +373,8 @@ class GenericMethods(Generic[*Ts_contra]):
 
 ### Variance with explicit receivers
 
-TODO: An explicit receiver can restrict which class specializations expose a method. We defer
-variance validation for these methods until receiver restrictions are taken into account.
+`Self` and the class's own `TypeVarTuple` do not restrict the receiver. Consuming the covariant
+tuple still violates covariance.
 
 ```toml
 [environment]
@@ -382,10 +382,24 @@ python-version = "3.15"
 ```
 
 ```py
-from typing import Generic, TypeVarTuple
+from typing import Generic, Self, TypeVarTuple
 
 Ts_co = TypeVarTuple("Ts_co", covariant=True)
 
+class Unrestricted(Generic[*Ts_co]):
+    # error: [invalid-generic-class]
+    def method(self: "Unrestricted[*Ts_co]", value: tuple[*Ts_co]) -> None: ...
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls: type[Self], value: tuple[*Ts_co]) -> None: ...
+    def returns(self: Self) -> tuple[*Ts_co]:
+        raise NotImplementedError
+```
+
+TODO: A specialized receiver can restrict which class specializations expose a method. We defer
+variance validation for these methods until receiver restrictions are taken into account.
+
+```py
 class Restricted(Generic[*Ts_co]):
     def method(self: "Restricted[int]", value: tuple[*Ts_co]) -> None: ...
 ```

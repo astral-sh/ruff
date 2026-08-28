@@ -447,14 +447,43 @@ class Overloaded(Generic[T_co]):
 
 ## Variance with explicit receivers
 
-A specialized receiver restricts which specializations of the class can call a method. TODO: We
-defer variance checking for explicit receivers until we can account for these restrictions.
+Annotating the receiver with `Self` or the class's own type parameters does not restrict which
+specializations can call the method. These annotations do not affect variance checking, for either
+instance methods or class methods.
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
-from typing import Generic, TypeVar
+from typing import Generic, Self, TypeVar
 
 T_co = TypeVar("T_co", covariant=True)
 
+class Unrestricted(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def accepts_self(self: Self, value: T_co) -> None: ...
+    # error: [invalid-generic-class]
+    def accepts_identity(self: "Unrestricted[T_co]", value: T_co) -> None: ...
+    def returns(self: "Unrestricted[T_co]") -> T_co:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_accepts_self(cls: type[Self], value: T_co) -> None: ...
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_accepts_identity(cls: type["Unrestricted[T_co]"], value: T_co) -> None: ...
+    @classmethod
+    def class_returns(cls: type[Self]) -> T_co:
+        raise NotImplementedError
+```
+
+A specialized receiver restricts which specializations of the class can call a method. TODO: We
+defer variance checking for these receivers until we can account for their restrictions.
+
+```py
 class Restricted(Generic[T_co]):
     def accepts(self: "Restricted[int]", value: T_co) -> None: ...
     @classmethod

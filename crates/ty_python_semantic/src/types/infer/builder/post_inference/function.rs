@@ -1,7 +1,7 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownInstanceType, Signature, Type, TypeVarKind, TypeVarVariance,
+        KnownInstanceType, Signature, SubclassOfType, Type, TypeVarKind, TypeVarVariance,
         context::InferContext,
         diagnostic::{
             INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
@@ -105,10 +105,26 @@ fn check_method_typevar_variance<'db>(
     }
     let env = context.program_environment();
     let signature = if last_definition.has_implicit_receiver(db) {
-        // A specialized receiver can restrict which class specializations expose this method.
-        // Defer these signatures until variance checking accounts for receiver restrictions.
-        if signature.has_explicit_positional_receiver_annotation() {
-            return;
+        if signature.has_explicit_positional_receiver_annotation()
+            && let Some(receiver) = signature.parameters().get(0)
+        {
+            // `Self` and the class's identity specialization expose the method on every
+            // specialization. Other annotations can restrict the receiver; defer those until
+            // variance checking accounts for the restriction.
+            let class_type = class.identity_specialization(db);
+            let instance_type = Type::instance(db, env, class_type);
+            let receiver_type = if last_definition.is_classmethod(db) {
+                SubclassOfType::from(db, env, class_type)
+            } else {
+                instance_type
+            };
+            if !receiver
+                .annotated_type()
+                .bind_self_typevars(db, env, instance_type)
+                .is_equivalent_to(db, env, receiver_type)
+            {
+                return;
+            }
         }
         // The implicit receiver does not consume the class's type parameters.
         signature.bind_self(db, env, None)
