@@ -2,8 +2,7 @@
 //!
 //! Target declarations guide inference of nested source expressions and the fresh lists created
 //! for starred targets. The results retain individual expression types and contextual capture
-//! types for [`Unpacker`](crate::types::unpacker::Unpacker), which assigns types to each target
-//! and reports unpacking errors.
+//! types for [`Unpacker`], which assigns types to each target and reports unpacking errors.
 
 use itertools::Either;
 use ruff_python_ast as ast;
