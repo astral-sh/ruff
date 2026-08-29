@@ -632,6 +632,34 @@ error[missing-override-decorator]: Method `method` overrides `Parent.method` but
 info: Decorate the method with `@typing.override` to make the override explicit
 ```
 
+## Deleted methods
+
+A method deleted in the class body does not override a superclass member and does not need
+`@override`. A conditional deletion can leave the method exposed, so it still requires the
+decorator.
+
+```toml
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+class Parent:
+    def method(self) -> None: ...
+
+class Deleted(Parent):
+    def method(self) -> None: ...
+    del method
+
+def condition() -> bool:
+    return True
+
+class Conditional(Parent):
+    def method(self) -> None: ...  # error: [missing-override-decorator]
+    if condition():
+        del method
+```
+
 ## Possibly-unbound definitions
 
 ```py

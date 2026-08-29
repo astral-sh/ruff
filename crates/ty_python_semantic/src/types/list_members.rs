@@ -45,6 +45,19 @@ pub(crate) fn all_end_of_scope_members<'db>(
         .filter_map(move |(symbol_id, declarations)| {
             let place_result = place_from_declarations(db, &env, declarations);
             let first_reachable_definition = place_result.first_declaration?;
+            // A function declaration describes its binding, not an independently declared field.
+            // Deleting the binding removes the method from the class's exposed members.
+            if first_reachable_definition.kind(db).is_function_def()
+                && place_from_bindings(
+                    db,
+                    &env,
+                    use_def_map.end_of_scope_symbol_bindings(symbol_id),
+                )
+                .place
+                .is_undefined()
+            {
+                return None;
+            }
             let ty = place_result
                 .ignore_conflicting_declarations()
                 .place
@@ -772,9 +785,17 @@ impl<'db> Member<'db> {
         db: &'db dyn Db,
         scope: ScopeId<'db>,
     ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
+        let definitions = end_of_scope_definitions(db, scope, &self.name);
+        // Declarations can survive a deletion, but a deleted method is not exposed by the class.
+        if definitions.is_empty() {
+            return smallvec::smallvec![];
+        }
         let member_functions = self.local_functions_from_type(db, scope);
         let mut functions = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
-        for definition in end_of_scope_function_definitions(db, scope, &self.name) {
+        for definition in definitions
+            .into_iter()
+            .filter(|definition| definition.kind(db).is_function_def())
+        {
             let function = member_functions
                 .iter()
                 .copied()
@@ -824,8 +845,8 @@ impl<'db> PartialOrd for Member<'db> {
     }
 }
 
-/// Return reachable function definitions that bind `member_name` at the end of `subclass_scope`.
-fn end_of_scope_function_definitions<'db>(
+/// Return reachable definitions that bind `member_name` at the end of `subclass_scope`.
+fn end_of_scope_definitions<'db>(
     db: &'db dyn Db,
     subclass_scope: ScopeId<'db>,
     member_name: &Name,
@@ -844,7 +865,7 @@ fn end_of_scope_function_definitions<'db>(
             let definition = binding.binding.definition()?;
             let reachability =
                 reachability_constraints.evaluate(db, predicates, binding.reachability_constraint);
-            if reachability.is_always_false() || !definition.kind(db).is_function_def() {
+            if reachability.is_always_false() {
                 return None;
             }
 
