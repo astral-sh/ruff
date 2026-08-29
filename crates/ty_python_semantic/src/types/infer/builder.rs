@@ -11215,9 +11215,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         bool_op: &ast::ExprBoolOp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let db = self.db();
-        let env = self.program_environment();
-
         let ast::ExprBoolOp {
             range: _,
             node_index: _,
@@ -11228,7 +11225,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accumulating prior types cannot affect inference.
         let track_peer_types = is_empty_collection_type_context(tcx)
             && values.iter().skip(1).any(is_collection_literal);
-        let result = self.infer_chained_boolean_types(
+        self.infer_chained_boolean_types(
             *op,
             track_peer_types,
             values.iter().enumerate(),
@@ -11245,16 +11242,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 (ty, value.range())
             },
-        );
-
-        if self.should_check_condition_redundancy() {
-            for value in &values[..values.len() - 1] {
-                let ty = self.expression_type(value);
-                self.check_condition_redundancy(value, ty, ty.bool(db, env));
-            }
-        }
-
-        result.value_type
+        )
+        .value_type
     }
 
     /// Computes the output of a chain of (one) boolean operation, consuming as input an iterator

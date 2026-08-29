@@ -75,10 +75,9 @@ def test_my_data(data: list[int]):
     assert (item for item in data if item > 42)  # error: [redundant-condition]
 ```
 
-## Known issues and workarounds
+## Boolean operators used to compute values
 
-This rule can sometimes flag boolean expressions involving always-true objects that may not be
-buggy. For example, the following code is valid Python, but is flagged by the rule:
+The rule checks `and` and `or` operands when the expression is used as a condition: in an `if`, `elif`, `while`, or `assert` test, a conditional expression, a comprehension filter, a match guard, or as the operand of `not`. It does not flag `and` or `or` expressions used to compute values, such as selecting a function to call:
 
 ```py
 def f(): ...
@@ -86,21 +85,11 @@ def g(): ...
 
 
 def test(coinflip: bool):
-    func = coinflip and f or g  # error: [redundant-condition]
+    func = coinflip and f or g
     func()
 ```
 
-However, this code is far from idiomatic. To avoid the diagnostic being emitted, use an `if`/`else`
-conditional expression instead, which has the added benefit of being easier to read:
-
-```py
-def test(coinflip: bool):
-    func = f if coinflip else g
-    func()
-```
-
-In a similar vein, this rule can flag calls that are deliberately always truthy or always falsy,
-but are used in `and` or `or` expressions anyway for their side effects. For example:
+This also allows calls that are deliberately always falsy but are used for their side effects:
 
 ```py
 from unittest.mock import patch
@@ -114,7 +103,6 @@ def test_ask_to_continue():
     prompts = []
     with patch(
         "builtins.input",
-        # error: [redundant-condition] "`None` is always falsy"
         side_effect=lambda prompt: prompts.append(prompt) or "yes",
     ):
         assert ask_to_continue()
@@ -122,19 +110,4 @@ def test_ask_to_continue():
     assert prompts == ["Continue? "]
 ```
 
-Arguably code like this can also nearly always be rewritten to make the intent clearer, however,
-which avoids the `redundant-condition` diagnostic:
-
-```py
-def test_ask_to_continue():
-    prompts = []
-
-    def side_effect(prompt) -> str:
-        prompts.append(prompt)
-        return "yes"
-
-    with patch("builtins.input", side_effect=side_effect):
-        assert ask_to_continue()
-
-    assert prompts == ["Continue? "]
-```
+Unlike `and` and `or`, `not` explicitly converts its operand to a boolean, so the rule checks it in every context.

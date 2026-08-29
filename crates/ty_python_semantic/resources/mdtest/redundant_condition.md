@@ -425,8 +425,9 @@ def check(value: Record):
 ## Other boolean contexts
 
 Redundant conditions are not merely detected in `if`-statement tests. They are also detected in
-unary `not` operations, `while` loops, `if` expressions, `and` expressions, `or` expressions,
-`match` guards, and in comprehension `if` tests.
+unary `not` operations, `while` loops, `assert` statements, `if` expressions, `match` guards, and
+comprehension `if` tests. When an `and` or `or` expression is used as a condition, each operand is
+checked.
 
 ```py
 def coinflip() -> bool:
@@ -445,12 +446,12 @@ a = True if func else False  # error: [redundant-condition]
 if coinflip() if func else False:  # error: [redundant-condition]
     pass
 
-b = func and coinflip()  # error: [redundant-condition]
+b = func and coinflip()
 
 if func and coinflip():  # error: [redundant-condition]
     pass
 
-c = func or coinflip()  # error: [redundant-condition]
+c = func or coinflip()
 
 if func or coinflip():  # error: [redundant-condition]
     pass
@@ -884,14 +885,14 @@ def f(x: str, y: str | int, z: str | int | bytes):
     assert (isinstance(y, str) or isinstance(y, int)) and not not isinstance(x, str)
 ```
 
-The ordinary rule still applies inside assertion tests, and the strict rule still applies to
-assertion messages:
+The ordinary rule still applies inside assertion tests. An assertion message computes a value, so
+neither rule checks its `and` or `or` operands:
 
 ```py
 def func(): ...
 def assertion_boundaries(x: str, flag: bool):
     assert func and isinstance(x, str)  # error: [redundant-condition]
-    assert flag, isinstance(x, str) and flag  # error: [redundant-condition-strict]
+    assert flag, isinstance(x, str) and flag
 ```
 
 The strict rule can still fire in assertion tests if the assertion test uses a walrus expression

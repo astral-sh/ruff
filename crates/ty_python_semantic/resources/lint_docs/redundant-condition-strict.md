@@ -45,6 +45,8 @@ def trace(**kwargs: dict[str, str]) -> None:
 
 ## Exemptions
 
+Like `redundant-condition`, this rule checks `and` and `or` operands only when the expression is used as a condition. Expressions that compute values, such as assignments and return values, are exempt. The operand of `not` is checked in every context.
+
 A common pattern in Python code is to use defensive `assert`s to enforce behaviour at runtime, even
 when the asserted condition can be inferred statically to be always true. This rule applies an
 exemption for this pattern, since it's usually the case that this is deliberate:

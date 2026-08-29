@@ -54,6 +54,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             || self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT)
     }
 
+    /// Checks operands whose truthiness contributes directly to a compound condition.
+    ///
+    /// Every `and`/`or` operand matters here, including the final operand: in `if flag and func`,
+    /// the `if` tests `func` when `flag` is truthy. Recurse only through `and`/`or` so that value
+    /// expressions such as the argument in `if consume(func and flag)` are not checked.
+    /// Negated operands are checked separately during inference, regardless of their context.
+    fn check_condition_operands(&self, test: &ast::Expr) {
+        if let ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test {
+            for value in values {
+                let ty = self.expression_type(value);
+                self.check_condition_redundancy(
+                    value,
+                    ty,
+                    ty.bool(self.db(), self.program_environment()),
+                );
+            }
+        }
+    }
+
     /// Reports an unintentionally always-truthy or always-falsy condition.
     ///
     /// Whether `redundant-condition` or `redundant-condition-strict` is used depends on two
@@ -91,7 +110,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         test_type: Type<'db>,
         test_truthiness: Truthiness,
     ) -> Option<LintDiagnosticGuard<'a, 'a>> {
-        if test_truthiness == Truthiness::Ambiguous && !test.is_bool_op_expr() {
+        self.check_condition_operands(test);
+
+        if test_truthiness == Truthiness::Ambiguous {
             return None;
         }
 
@@ -110,35 +131,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ..
             }) => return None,
 
-            // Python checks the truthiness of all but the final `and`/`or` operand to decide
-            // whether to short-circuit. If evaluation reaches the final operand, its value is
-            // simply returned. Accordingly, `infer_boolean_expression` passes the earlier
-            // operands to this method, but never passes the complete expression it is inferring.
-            //
-            // Receiving the complete `ast::Expr::BoolOp` expression here means a surrounding
-            // context, such as an `if`, a `while`, or an outer `and`/`or`, is checking its
-            // truthiness. This distinction determines whether the final operand also needs
-            // checking:
-            //
-            // - In `result = flag and func`, `func` is merely a possible result. Its truthiness
-            //   is not checked, so it should not produce a diagnostic.
-            // - In `if flag and func`, the `if` checks `func` when `flag` is truthy, so the
-            //   uncalled function should produce a diagnostic even though the complete
-            //   condition has ambiguous truthiness.
-            //
-            // Check the final operand whenever the complete expression reaches this method;
-            // `infer_boolean_expression` has already checked the earlier operands. For values
-            // handled by `redundant-condition`, these operand checks are sufficient: checking the
-            // complete expression again would duplicate a diagnostic. Values assignable to `int`,
+            // For values handled by `redundant-condition`, the operand checks are sufficient:
+            // checking the complete expression again would duplicate a diagnostic. Values assignable to `int`,
             // including booleans, use `redundant-condition-strict` instead. That rule suppresses
             // diagnostics on subexpressions of conditions, so the complete expression still needs
             // to be checked.
-            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
-                if let Some(last) = values.last() {
-                    let ty = self.expression_type(last);
-                    self.check_condition_redundancy(last, ty, ty.bool(db, env));
-                }
-
+            ast::Expr::BoolOp(_) => {
                 if !test_type.is_assignable_to(db, env, int_instance) {
                     return None;
                 }
@@ -182,10 +180,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             _ => {}
-        }
-
-        if test_truthiness == Truthiness::Ambiguous {
-            return None;
         }
 
         let rule = if test_type.is_assignable_to(db, env, int_instance) {
@@ -580,6 +574,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     && is_strict_boolean_condition()
                     && self.is_deliberately_unreachable_suite(unreachable_suite)
                 {
+                    // Defensive exits exempt the complete boolean condition, but an operand
+                    // such as an uncalled function can still indicate a mistake.
+                    self.check_condition_operands(test);
                     continue;
                 }
 
