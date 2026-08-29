@@ -11,7 +11,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
@@ -345,6 +345,11 @@ pub struct SemanticIndex<'db> {
     /// Set of all asynchronous comprehensions in this file.
     async_comprehensions: FrozenSet<FileScopeId>,
 
+    /// Source ranges of syntactic annotations and the scopes enclosing their roots, sorted by
+    /// start offset. Annotations cannot contain other syntactic annotations, so these ranges
+    /// do not overlap.
+    annotation_scopes: Box<[(TextRange, FileScopeId)]>,
+
     /// Narrowing alias metadata for predicate leaf names.
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.
@@ -414,6 +419,27 @@ impl<'db> SemanticIndex<'db> {
         E: HasTrackedScope,
     {
         self.scopes_by_expression.try_get(expression)
+    }
+
+    /// Returns the scope enclosing the syntactic annotation containing `expression`, if any.
+    ///
+    /// ```python
+    /// from typing import Annotated
+    ///
+    /// def example(items: list[int]) -> None:
+    ///     result: Annotated[int, (item for item in items)]
+    /// ```
+    ///
+    /// The yielded `item` belongs to the generator's scope, and the iterable `items` belongs to
+    /// `example`'s scope. This method returns `example`'s scope for both, because both expressions
+    /// occur in the annotation on `result`.
+    pub fn annotation_parent_scope_id(&self, expression: &impl Ranged) -> Option<FileScopeId> {
+        let index = self
+            .annotation_scopes
+            .partition_point(|(range, _)| range.start() <= expression.start())
+            .checked_sub(1)?;
+        let (range, scope) = self.annotation_scopes[index];
+        range.contains_range(expression.range()).then_some(scope)
     }
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
@@ -1901,23 +1927,38 @@ class C[T]:
 
     #[test]
     fn expression_scope() {
-        let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
+        // Annotation tracking preserves lexical scope lookup, including for attribute identifiers
+        // inside annotations, which are not registered separately in the expression scope map.
+        // `annotation_parent_scope_id` returns the module scope for `module.Type`, the annotation
+        // on `x`. It returns `None` for `x` itself and for `y`, since neither is inside an annotation.
+        let TestCase { db, file } = test_case("x: module.Type = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, program_file(&db, file));
         let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
         let ast = module.syntax();
 
-        let x_stmt = ast.body[0].as_assign_stmt().unwrap();
-        let x = &x_stmt.targets[0];
+        let x_stmt = ast.body[0].as_ann_assign_stmt().unwrap();
+        let x = x_stmt.target.as_ref();
 
         assert_eq!(index.expression_scope(x).kind(), ScopeKind::Module);
         assert_eq!(index.expression_scope_id(x), FileScopeId::global());
+        assert_matches!(
+            x_stmt.annotation.as_ref(),
+            ast::Expr::Attribute(attribute)
+                if index.try_expression_scope_id(&attribute.attr) == Some(FileScopeId::global())
+        );
+        assert_eq!(index.annotation_parent_scope_id(x), None);
+        assert_eq!(
+            index.annotation_parent_scope_id(x_stmt.annotation.as_ref()),
+            Some(FileScopeId::global())
+        );
 
         let def = ast.body[1].as_function_def_stmt().unwrap();
         let y_stmt = def.body[0].as_assign_stmt().unwrap();
         let y = &y_stmt.targets[0];
 
         assert_eq!(index.expression_scope(y).kind(), ScopeKind::Function);
+        assert_eq!(index.annotation_parent_scope_id(y), None);
     }
 
     #[test]

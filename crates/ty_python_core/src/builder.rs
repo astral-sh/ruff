@@ -292,6 +292,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     generator_functions: FxHashSet<FileScopeId>,
     /// Hashset of all [`FileScopeId`]s that correspond to asynchronous comprehensions.
     async_comprehensions: FxHashSet<FileScopeId>,
+    /// Source ranges of syntactic annotations and the scopes enclosing their roots.
+    annotation_scopes: Vec<(TextRange, FileScopeId)>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
@@ -347,6 +349,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
             async_comprehensions: FxHashSet::default(),
+            annotation_scopes: Vec::new(),
 
             enclosing_snapshots: FxHashMap::default(),
 
@@ -3265,6 +3268,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
+        self.annotation_scopes
+            .sort_unstable_by_key(|(range, _)| range.start());
         let uses_by_collection = FrozenMap::from_entries(
             self.uses_by_collection
                 .into_iter()
@@ -3301,6 +3306,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
             async_comprehensions: FrozenSet::from(self.async_comprehensions),
+            annotation_scopes: self.annotation_scopes.into_boxed_slice(),
             narrowing_alias_predicates: FrozenMap::from(self.alias_predicates),
         }
     }
@@ -4240,7 +4246,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // not discard the declared type. The value is still bound only after the RHS
                 // completes, so a handler can observe an earlier binding (or an unbound name).
                 let pending = self.begin_annotated_assignment(node);
-                self.visit_expr(&node.annotation);
+                self.visit_annotation(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                     if self.is_method_or_eagerly_executed_in_method().is_some() {
@@ -5430,6 +5436,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 }
 
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
+    fn visit_annotation(&mut self, expression: &'ast ast::Expr) {
+        self.annotation_scopes
+            .push((expression.range(), self.current_scope()));
+        self.visit_expr(expression);
+    }
+
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.push_statement(CurrentStatement::default());
         self.visit_stmt_impl(stmt);
