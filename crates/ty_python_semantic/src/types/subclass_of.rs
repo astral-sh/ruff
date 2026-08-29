@@ -331,7 +331,7 @@ impl<'db> SubclassOfType<'db> {
     /// excluding the lookup-only typeshed fallback.
     /// For `type[T]` where `T` is a `TypeVar`, this computes the metatype based on the
     /// `TypeVar`'s bounds or constraints.
-    pub(crate) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         Type::SubclassOf(self).to_meta_type(db, env)
     }
 
