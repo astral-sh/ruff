@@ -983,6 +983,10 @@ pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
     );
 }
 
+pub(crate) fn suspicious_function_call_target(checker: &Checker, func: &Expr) {
+    suspicious_function(checker, func, None, func.range());
+}
+
 pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
     if !is_suspicious_function_reference_enabled(checker.settings()) {
         return;
@@ -1164,11 +1168,8 @@ fn suspicious_function(
         }
 
         // Exec
-        // Calls to `exec` are reported by [`exec_used`]; here we only flag
-        // non-call references (see `suspicious_function_reference`) to avoid
-        // duplicate diagnostics.
-        ["" | "builtins", "exec"] if arguments.is_none() => {
-            checker.report_diagnostic_if_enabled(ExecBuiltin, range)
+        ["" | "builtins", "exec"] => {
+            checker.report_diagnostic_if_enabled(ExecBuiltin, func.range())
         }
 
         // MarkSafe
