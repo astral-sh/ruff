@@ -107,3 +107,23 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
         })
         .unwrap_or_default()
 }
+
+/// Read the final bindings in a class body without treating declarations as initialized values.
+pub(super) fn class_member_bindings<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: &str,
+) -> Member<'db> {
+    let Some(symbol) = place_table(db, scope).symbol_id(name) else {
+        return Member::unbound();
+    };
+    Member {
+        inner: place_from_bindings(
+            db,
+            &ProgramEnvironment::from_scope(scope),
+            use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+        )
+        .place
+        .into(),
+    }
+}

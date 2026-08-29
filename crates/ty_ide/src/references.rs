@@ -1099,9 +1099,7 @@ impl<'a> LocalReferencesFinder<'a> {
             .any(|prior_binding| {
                 matches!(
                     prior_binding.binding,
-                    DefinitionState::Deleted
-                        | DefinitionState::Invalidated
-                        | DefinitionState::Undefined
+                    DefinitionState::Deleted | DefinitionState::Undefined
                 )
             })
     }

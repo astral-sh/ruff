@@ -194,15 +194,13 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
+use crate::types::narrow::NarrowedPlace;
 use std::cell::RefCell;
 
 use crate::{
     Db,
     dunder_all::dunder_all_names,
-    place::{
-        AttributePresence, DefinedPlace, Definedness, Place, RequiresExplicitReExport,
-        imported_symbol,
-    },
+    place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
@@ -856,46 +854,17 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     }
 }
 
-/// Project flow constraints onto a member's presence without inferring its value type.
-pub(crate) fn attribute_presence_by_constraint<'db>(
+pub(crate) fn narrow_place_by_constraint<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     evaluator: &NarrowingEvaluator<'_, 'db>,
+    base_ty: NarrowedPlace<'db>,
     place: ScopedPlaceId,
-) -> AttributePresence {
-    if evaluator.constraint() == ScopedNarrowingConstraint::ALWAYS_FALSE {
-        return AttributePresence::Unreachable;
-    }
-    if evaluator.constraint() == ScopedNarrowingConstraint::ALWAYS_TRUE
-        || !evaluator
-            .predicate_narrowing_targets()
-            .contains_place(place)
-    {
-        return AttributePresence::Unknown;
-    }
-    let mut projector = NarrowingProjector::new(
-        db,
-        env,
-        evaluator.narrowing_constraints(),
-        evaluator.predicates(),
-        evaluator.predicate_narrowing_targets(),
-        place,
-    );
-    let root = projector.project(evaluator.constraint());
-    projector.graph.presence(root)
-}
-
-pub(crate) fn narrow_type_by_constraint<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    evaluator: &NarrowingEvaluator<'_, 'db>,
-    base_ty: Type<'db>,
-    place: ScopedPlaceId,
-) -> Type<'db> {
+) -> NarrowedPlace<'db> {
     let id = evaluator.constraint();
     match id {
         ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
-        ScopedNarrowingConstraint::ALWAYS_FALSE => return Type::Never,
+        ScopedNarrowingConstraint::ALWAYS_FALSE => return NarrowedPlace::new(Type::Never),
         _ => {}
     }
 
@@ -919,7 +888,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     let projected_root = projector.project(id);
     match projected_root {
         ProjectedNarrowingNodeId::ALWAYS_TRUE => return base_ty,
-        ProjectedNarrowingNodeId::ALWAYS_FALSE => return Type::Never,
+        ProjectedNarrowingNodeId::ALWAYS_FALSE => return NarrowedPlace::new(Type::Never),
         _ => {}
     }
 
@@ -937,13 +906,17 @@ pub(crate) fn narrow_type_by_constraint<'db>(
 fn apply_accumulated_narrowing<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    base_ty: Type<'db>,
+    base_ty: NarrowedPlace<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
-) -> Type<'db> {
+) -> NarrowedPlace<'db> {
     match accumulated {
-        Some(constraint) => NarrowingConstraint::intersection(base_ty)
-            .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db, env),
+        Some(constraint) => {
+            let mut narrowed = NarrowingConstraint::intersection(base_ty.ty)
+                .merge_constraint_and(constraint)
+                .evaluate_place(db, env);
+            narrowed.constrain_presence(base_ty.presence);
+            narrowed
+        }
         None => base_ty,
     }
 }
@@ -989,47 +962,6 @@ struct ProjectedNarrowingGraph<'db> {
 }
 
 impl ProjectedNarrowingGraph<'_> {
-    fn presence(&self, root: ProjectedNarrowingNodeId) -> AttributePresence {
-        let mut values = FxHashMap::default();
-        values.insert(
-            ProjectedNarrowingNodeId::ALWAYS_TRUE,
-            AttributePresence::Unknown,
-        );
-        values.insert(
-            ProjectedNarrowingNodeId::ALWAYS_FALSE,
-            AttributePresence::Unreachable,
-        );
-        let mut pending = vec![(root, false)];
-        while let Some((id, visited)) = pending.pop() {
-            if values.contains_key(&id) {
-                continue;
-            }
-            let node = self.node(id);
-            if !visited {
-                pending.push((id, true));
-                pending.extend(
-                    [node.if_true, node.if_false, node.if_uncertain].map(|child| (child, false)),
-                );
-                continue;
-            }
-            let (positive, negative) = &self.predicate_constraints_cache[&node.atom];
-            let positive = positive
-                .as_ref()
-                .map_or(AttributePresence::Unknown, NarrowingConstraint::presence);
-            let negative = negative
-                .as_ref()
-                .map_or(AttributePresence::Unknown, NarrowingConstraint::presence);
-            values.insert(
-                id,
-                positive
-                    .and(values[&node.if_true])
-                    .or(negative.and(values[&node.if_false]))
-                    .or(values[&node.if_uncertain]),
-            );
-        }
-        values[&root]
-    }
-
     /// Returns an interior projected node by ID.
     fn node(&self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingNode {
         self.nodes[id.0]
@@ -1352,16 +1284,16 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
-/// Evaluates narrowed types over a projected narrowing graph.
+/// Evaluates value types and member presence together over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
-    base_ty: Type<'db>,
+    base_ty: NarrowedPlace<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
     /// Marks join boundaries in the projected DAG.
     joins: Vec<bool>,
-    /// Caches each join's narrowed suffix type from its boundary.
-    join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
+    /// Caches each join's narrowed value type and presence from its boundary.
+    join_cache: FxHashMap<ProjectedNarrowingNodeId, NarrowedPlace<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
@@ -1370,7 +1302,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
     }
 
     /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
-    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
+    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> NarrowedPlace<'db> {
         if let Some(cached) = self.join_cache.get(&id) {
             return *cached;
         }
@@ -1385,7 +1317,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         &mut self,
         id: ProjectedNarrowingNodeId,
         accumulated: Option<NarrowingConstraint<'db>>,
-    ) -> Type<'db> {
+    ) -> NarrowedPlace<'db> {
         let db = self.db;
         if self.is_join(id) {
             // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
@@ -1402,10 +1334,10 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         &mut self,
         id: ProjectedNarrowingNodeId,
         accumulated: Option<NarrowingConstraint<'db>>,
-    ) -> Type<'db> {
+    ) -> NarrowedPlace<'db> {
         let db = self.db;
         if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-            return Type::Never;
+            return NarrowedPlace::new(Type::Never);
         }
 
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
@@ -1434,9 +1366,8 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
-                let true_or_uncertain =
-                    UnionType::from_two_elements(db, self.env, true_ty, uncertain_ty);
-                UnionType::from_two_elements(db, self.env, true_or_uncertain, false_ty)
+                let true_or_uncertain = NarrowedPlace::union(db, self.env, true_ty, uncertain_ty);
+                NarrowedPlace::union(db, self.env, true_or_uncertain, false_ty)
             }
         }
     }

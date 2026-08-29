@@ -1013,6 +1013,11 @@ bitflags! {
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
         const REQUIRE_CONCRETE = 1 << 5;
+
+        /// Read bindings in class bodies, excluding declaration-only members and attributes
+        /// inferred from method assignments. Used when the static interface does not establish
+        /// that an attribute has been initialized.
+        const CLASS_BODY_BINDINGS = 1 << 6;
     }
 }
 
@@ -3598,6 +3603,12 @@ impl<'db> Type<'db> {
         if let Some(fallback) = ty.materialized_divergent_fallback() {
             return fallback.class_member_with_policy(db, env, name, policy);
         }
+        if policy.contains(MemberLookupPolicy::CLASS_BODY_BINDINGS)
+            && matches!(ty, Type::ProtocolInstance(_))
+        {
+            // A structural interface does not describe the implementing object's class namespace.
+            return Place::Undefined.into();
+        }
         if let Type::ProtocolInstance(protocol) = ty
             && let Some(origin) = protocol.materialized_origin(db)
         {
@@ -3731,6 +3742,9 @@ impl<'db> Type<'db> {
                 "Calling `class_object_member` on class literals and subclass-of types \
                 should always find an MRO",
             );
+        if policy.contains(MemberLookupPolicy::CLASS_BODY_BINDINGS) {
+            return class_attr;
+        }
 
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -3826,6 +3840,9 @@ impl<'db> Type<'db> {
         let class_attr = self
             .find_name_in_mro_with_policy(db, env, name, policy)
             .expect("The meta-type of an instance-like type should always have an MRO");
+        if policy.contains(MemberLookupPolicy::CLASS_BODY_BINDINGS) {
+            return class_attr;
+        }
         let Some(metaclass) = class
             .inferred_metaclass(db)
             .for_inheritance(db, env)

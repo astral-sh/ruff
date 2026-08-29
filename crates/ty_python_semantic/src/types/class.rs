@@ -35,7 +35,7 @@ use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::Member;
+use crate::types::member::{Member, class_member_bindings};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -2944,12 +2944,23 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         continue;
                     }
 
-                    let implicit = class.member_with_augmented_bindings(
-                        db,
-                        class.own_class_member(db, &self.env, inherited_generic_context, name),
-                        name,
-                        MethodDecorator::ClassMethod,
-                    );
+                    let implicit = if policy.contains(MemberLookupPolicy::CLASS_BODY_BINDINGS) {
+                        ImplicitAttribute {
+                            member: class
+                                .static_class_literal(db)
+                                .map_or_else(Member::unbound, |(class, _)| {
+                                    class_member_bindings(db, class.body_scope(db), name)
+                                }),
+                            augmented_bindings: None,
+                        }
+                    } else {
+                        class.member_with_augmented_bindings(
+                            db,
+                            class.own_class_member(db, &self.env, inherited_generic_context, name),
+                            name,
+                            MethodDecorator::ClassMethod,
+                        )
+                    };
                     if let Some(bindings) = implicit.augmented_bindings {
                         pending_augmented_bindings.push((class, bindings));
                     }

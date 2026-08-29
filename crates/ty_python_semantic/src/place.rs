@@ -56,41 +56,6 @@ impl Definedness {
     }
 }
 
-/// What control flow establishes about an attribute's presence, independently of its value type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub(crate) enum AttributePresence {
-    Unknown,
-    Present,
-    Absent,
-    Unreachable,
-}
-
-impl AttributePresence {
-    pub(crate) const fn from_bool(present: bool) -> Self {
-        if present { Self::Present } else { Self::Absent }
-    }
-
-    pub(crate) const fn and(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Unreachable, _) | (_, Self::Unreachable) => Self::Unreachable,
-            (Self::Unknown, other) | (other, Self::Unknown) => other,
-            (Self::Present, Self::Present) => Self::Present,
-            (Self::Absent, Self::Absent) => Self::Absent,
-            (Self::Present, Self::Absent) | (Self::Absent, Self::Present) => Self::Unreachable,
-        }
-    }
-
-    pub(crate) const fn or(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Unknown, _) | (_, Self::Unknown) => Self::Unknown,
-            (Self::Unreachable, other) | (other, Self::Unreachable) => other,
-            (Self::Present, Self::Present) => Self::Present,
-            (Self::Absent, Self::Absent) => Self::Absent,
-            (Self::Present, Self::Absent) | (Self::Absent, Self::Present) => Self::Unknown,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum TypeOrigin {
     Declared,
@@ -1597,9 +1562,7 @@ fn loop_header_reachability_impl<'db>(
             // necessary for prior uses in the loop to see it.
             // Discarded dictionary-key bindings also require a fallback to the receiver's
             // value type instead of contributing their assigned value.
-            DefinitionState::Defined(_)
-            | DefinitionState::Deleted
-            | DefinitionState::Invalidated => {
+            DefinitionState::Defined(_) | DefinitionState::Deleted => {
                 deleted_reachability = deleted_reachability.or(reachability);
                 deleted_narrowing_constraints.insert(live_binding.narrowing_constraint());
             }
@@ -1739,7 +1702,7 @@ fn place_from_bindings_impl<'db>(
                 DefinitionState::Undefined => {
                     return None;
                 }
-                DefinitionState::Deleted | DefinitionState::Invalidated => {
+                DefinitionState::Deleted => {
                     deleted_reachability = deleted_reachability.or_else(|| {
                         evaluate_reachability_with_cache(
                             db,
