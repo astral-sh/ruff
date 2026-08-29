@@ -1317,10 +1317,16 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 
 
 Checks for assignments to class variables from instances and assignments to instance-only attributes
-from their class.
+from their class. Also checks for reads and writes of generic instance attributes through a generic
+class or a specialized generic alias.
 
 An "instance-only" variable is one which is only ever assigned to or declared when accessed via
 `self` in an instance method.
+
+A generic instance attribute has a type that depends on the class's type parameters. Specializing a
+generic class does not create separate class attribute storage, so these attributes cannot be
+accessed through the generic class or a specialized alias. Access through a `type[...]` receiver is
+allowed because it can refer to a concrete subclass with its own class attributes.
 
 **Why is this bad?**
 
@@ -1359,6 +1365,23 @@ C().class_var = 3  # error
 
 # Cannot assign to instance-only variable from class
 C.instance_only_var = 56  # error
+```
+
+```python
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+
+class Box(Generic[T]):
+    value: T
+
+
+Box[int].value = 1  # error
+Box.value  # error
+
+box = Box[int]()
+box.value = 1  # okay
 ```
 
 ## `invalid-attribute-override`

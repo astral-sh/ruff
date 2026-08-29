@@ -782,6 +782,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     TypeContext::new(Some(*ty)),
                     matches!(inference, ContextualInference::Commit) && emit_diagnostics,
                 );
+                if !self.builder.validate_generic_class_attribute_access(
+                    self.target,
+                    object_ty,
+                    emit_diagnostics,
+                ) {
+                    return false;
+                }
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }

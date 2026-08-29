@@ -1079,12 +1079,17 @@ reveal_type(ImplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
 ```
 
 Implicitly generic subclasses, explicitly generic subclasses, and longer inheritance chains all
-replace an unresolved class type variable with `Unknown`.
+replace an unresolved class type variable with `Unknown`. Accessing a generic instance attribute
+through a class is invalid, but its recovery type still uses this specialization.
 
 ```py
+# error: [invalid-attribute-access]
 reveal_type(Parent.x)  # revealed: Unknown
+# error: [invalid-attribute-access]
 reveal_type(ExplicitlyGenericChild.x)  # revealed: Unknown
+# error: [invalid-attribute-access]
 reveal_type(ImplicitlyGenericChild.x)  # revealed: Unknown
+# error: [invalid-attribute-access]
 reveal_type(ImplicitlyGenericGrandchild.x)  # revealed: Unknown
 ```
 
@@ -1277,6 +1282,219 @@ def combine(left: T, right: T) -> None:
     # error: [invalid-argument-type] "Argument to bound method `A.combine` is incorrect"
     # error: [invalid-argument-type] "Argument to bound method `B.combine` is incorrect"
     left.combine(right)
+```
+
+## Generic instance attributes accessed through classes
+
+An attribute whose type depends on a class type variable belongs to instances, not to a particular
+specialization of the class. We reject reading or writing it through either the unspecialized class
+or a generic alias, but retain its type for error recovery.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Node(Generic[T]):
+    label: T
+
+    def __init__(self, label: T) -> None:
+        self.label = label
+
+# error: [invalid-attribute-access] "Cannot access generic instance attribute `label` through a class"
+Node[int].label = 1
+# error: [invalid-attribute-access]
+reveal_type(Node[int].label)  # revealed: int
+# error: [invalid-attribute-access]
+Node.label = 1
+# error: [invalid-attribute-access]
+Node.label
+
+node = Node(1)
+reveal_type(node.label)  # revealed: int
+node.label = 2
+reveal_type(Node[int](1).label)  # revealed: int
+```
+
+## Class attributes independent of type variables
+
+Generic classes can expose class variables, ordinary attributes whose types do not depend on their
+type parameters, and methods. A generic instance attribute remains restricted even when it has a
+default value in the class body.
+
+```py
+from typing import ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T | None = None
+    count: int = 0
+    shared: ClassVar[int] = 0
+
+    def get(self) -> T | None:
+        return self.value
+
+# error: [invalid-attribute-access]
+Box[int].value
+# error: [invalid-attribute-access]
+Box.value = None
+
+Box[int].count = 1
+reveal_type(Box.count)  # revealed: int
+Box.shared = 2
+reveal_type(Box[int].shared)  # revealed: int
+reveal_type(Box[int].get)  # revealed: def get(self) -> int | None
+```
+
+## Inherited generic instance attributes
+
+The restriction also applies to inherited attributes. A subclass that fixes the type argument can
+expose the inherited attribute without ambiguity.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Parent(Generic[T]):
+    value: list[T]
+
+class Child(Parent[T]): ...
+class Concrete(Parent[int]): ...
+
+# error: [invalid-attribute-access]
+Child.value
+# error: [invalid-attribute-access]
+Child[int].value = [1]
+reveal_type(Concrete.value)  # revealed: list[int]
+```
+
+Augmented assignments report the invalid access once. Deleting a generic instance attribute through
+the generic class or alias is also invalid.
+
+```py
+# error: [invalid-attribute-access]
+Child[int].value += [1]
+# error: [invalid-attribute-access]
+del Child[int].value
+```
+
+## Generic attributes accessed through subclass receivers
+
+A `type[Parent[int]]` receiver can refer to a concrete subclass with its own class attributes. We
+allow reads, writes, and deletion through these receivers, while still checking assignment types.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Parent(Generic[T]):
+    value: list[T]
+
+class Concrete(Parent[int]):
+    value = [1]
+
+def access(cls: type[Parent[int]], instance: Parent[int]) -> None:
+    reveal_type(cls.value)  # revealed: list[int]
+    reveal_type(type(instance).value)  # revealed: list[int]
+    cls.value = [1]
+    cls.value += [1]
+    del cls.value
+
+    # error: [invalid-assignment]
+    cls.value = ["wrong"]
+
+access(Concrete, Concrete())
+```
+
+The receiver can also retain an enclosing type variable, so the attribute has the specialization
+supplied by the caller.
+
+```py
+def generic_access(cls: type[Parent[T]]) -> list[T]:
+    return cls.value
+
+reveal_type(generic_access(Concrete))  # revealed: list[int]
+```
+
+## Descriptors on generic classes
+
+Descriptors define their own behavior for class access. A type variable in the descriptor's type
+does not make accessing its result an ambiguous read of instance storage.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type) -> int:
+        return 1
+
+class Box(Generic[T]):
+    field: Descriptor[T] = Descriptor()
+
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Box.field)  # revealed: int
+reveal_type(Box[int].field)  # revealed: int
+reveal_type(Box.value)  # revealed: property
+reveal_type(Box[int].value)  # revealed: property
+```
+
+When an attribute can be either a descriptor or an ordinary value, each alternative is checked
+separately. A descriptor does not make class access to a generic list safe.
+
+```py
+class Mixed(Generic[T]):
+    value: list[T] | Descriptor[T] = []
+
+# error: [invalid-attribute-access]
+Mixed[int].value = [1]
+# error: [invalid-attribute-access]
+reveal_type(Mixed[str].value)  # revealed: list[str] | int
+```
+
+If only the descriptor depends on the type variable, class access is still valid. The ordinary value
+has the same type for every specialization.
+
+```py
+class DescriptorOrInt(Generic[T]):
+    value: int | Descriptor[T] = 0
+
+reveal_type(DescriptorOrInt[str].value)  # revealed: int
+DescriptorOrInt[int].value = 1
+```
+
+## Metaclass descriptors shadow generic instance attributes
+
+A data descriptor on the metaclass governs class access even when instances have an attribute of the
+same name whose type depends on a type variable.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Meta(type):
+    @property
+    def value(cls) -> int:
+        return 1
+
+    @value.setter
+    def value(cls, value: int) -> None: ...
+
+class Box(Generic[T], metaclass=Meta):
+    value: T
+
+reveal_type(Box.value)  # revealed: int
+reveal_type(Box[str].value)  # revealed: int
+Box.value = 2
+reveal_type(Box[str]().value)  # revealed: str
 ```
 
 ## Specializations propagate
