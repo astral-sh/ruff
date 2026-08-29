@@ -4594,30 +4594,21 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.75">0.0.75</a
 
 
 Detects boolean conditions where the condition can be statically inferred to be always true or
-always false.
+always false due to the inferred type of the condition.
 
 This rule is enabled by default, and is deliberately not comprehensive. In order to avoid false
 positives, it excludes conditions that meet any of these criteria:
 
 - The boolean test is inferred as evaluating to `True` itself, `False` itself, or an exact integer
     such as `1` or `0`.
-- Short-circuit evaluation makes the condition always truthy or always falsy, but the inferred type
-    of the expression's value does not have fixed truthiness.
+- The boolean test can be inferred as always evaluating to `True` and `False`, but this inference
+    is due to boolean-test short-circuting in `if` conditions, `while` conditions or `assert` tests
+    rather than the inferred type of the boolean test.
 - The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
     when its result has fixed truthiness.
 
 These cases are covered by [`redundant-condition-strict`](#redundant-condition-strict), a sibling rule that is disabled by default
 and exclusively covers cases excluded by this rule.
-
-The short-circuit criterion distinguishes evaluating an expression directly as a condition from
-saving its result and testing that value later. For example, `if value < 1 < 0:` always skips its
-body: either the first comparison is falsy, or evaluation continues to `1 < 0`, which is false. This
-remains true even when the first comparison returns a non-boolean object.
-
-If the chain's result is saved, however, it can be that intermediate object. Testing the saved value
-calls its truthiness method again, which may return a different result. Its inferred type therefore
-need not be always falsy, even though the direct condition is always false. Diagnosing the direct
-condition requires the strict rule; this rule does not report it.
 
 **Why is this bad?**
 
@@ -4752,9 +4743,9 @@ This rule reports redundant conditions that meet any of these criteria:
 
 - The boolean test is inferred as evaluating to `True` itself, `False` itself, or an exact integer
     such as `1` or `0`.
-- Short-circuit evaluation makes the condition always truthy or always falsy, but the inferred type
-    of the expression's value does not have fixed truthiness. The short-circuit example below
-    illustrates why evaluating a condition directly can differ from testing its saved result.
+- Short-circuit evaluation means the condition can be guaranteed to be always truthy or always falsy
+    despite fixed truthiness not being guaranteed by the inferred type of the expression's value
+    (see "Short-circuiting boolean conditions" below for an example).
 - The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
     when its result has fixed truthiness.
 
@@ -4792,26 +4783,47 @@ def trace(**kwargs: dict[str, str]) -> None:
         print("Tracing task")
 ```
 
-Short-circuit evaluation can also make a condition always false even when its inferred value type
-has ambiguous truthiness. Consider a class whose comparison method has an `object` return type:
+**Short-circuiting boolean conditions**
+
+
+In some situations, ty can know that a condition will always be true, or it can know that a
+condition will always be false, even when this is not guaranteed by the inferred type of that
+condition. This is because of the way that Python short-circuits evaluation of conditions in the
+context of `if` tests, `while` tests and `assert` statements.
+
+Consider a class whose comparison method has an `object` return type:
 
 ```py
+from typing_extensions import reveal_type
+
+
 class Comparable:
     def __lt__(self, other: int) -> object: ...
 
 
 def check(value: Comparable):
-    if value < 1 < 0:  # error: [redundant-condition-strict]
+    reveal_type(value < 1 < 0)  # revealed: ~AlwaysTruthy
+
+    if value < 1 < 0:  # error: [redundant-condition-strict] "always false"
         pass
 ```
 
-When used directly as a condition, this chain always skips the body. If `value < 1` is falsy,
-evaluation short-circuits immediately. Otherwise, Python evaluates `1 < 0`, which is false.
+Outside the context of an `if` test, the revealed type of the condition here is `~AlwaysTruthy`: in
+other words, ty knows that this expression is not *always true*, but cannot guarantee that it is
+definitely *always false*. It could be an object that is sometimes true and sometimes false -- for
+example, a `list` (which is falsy when it is empty, and truthy otherwise).
 
-Saving the chain's result changes what Python evaluates. If the first comparison is falsy, the saved
-result can be the object returned by that comparison. Testing it again can call its `__bool__`
-method a second time, and that call may return a different result. We therefore do not report the
-saved result as always falsy:
+Nonetheless, when `value < 1 < 0` is used directly as a condition, ty knows that the condition will
+always be falsy and the `if` branch will never be taken. Python tests the truthiness of the object
+returned by `Comparable.__lt__` once: if it is falsy, the condition fails immediately. If it is
+truthy, Python evaluates `1 < 0`, which is false. There is no second truthiness test of the object
+returned by `__lt__`.
+
+If the chained comparison is saved as a variable first, its value can be the object returned by
+`__lt__`, if that object was falsy when first tested. The `if result` statement then tests that
+object's truthiness again. A user-defined `__bool__` method can return a different result on that
+second call, so ty cannot guarantee that the saved value is still falsy, and no diagnostic is
+emitted:
 
 ```py
 def check_saved(value: Comparable):

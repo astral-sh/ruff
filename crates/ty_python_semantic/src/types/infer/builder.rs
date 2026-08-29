@@ -2121,9 +2121,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if self.should_check_condition_redundancy() {
-            self.check_suite_for_redundant_if_statements(suite);
-        }
+        self.check_suite_for_redundant_if_statements(suite);
     }
 
     fn infer_statement(&mut self, statement: &ast::Stmt) {
@@ -2709,9 +2707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         err.fallback_truthiness()
                     });
 
-                if self.should_check_condition_redundancy() {
-                    self.check_condition_redundancy(guard, guard_ty, truthiness);
-                }
+                self.check_condition_redundancy(guard, guard_ty, truthiness);
             }
 
             self.infer_body(body);
@@ -5223,10 +5219,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_body(body);
         self.infer_body(orelse);
-
-        if self.should_check_condition_redundancy() {
-            self.check_condition_redundancy(test, test_ty, test_truthiness);
-        }
+        self.check_condition_redundancy(test, test_ty, test_truthiness);
     }
 
     fn infer_assert_statement(&mut self, assert: &ast::StmtAssert) {
@@ -5249,16 +5242,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.fallback_truthiness()
             });
 
-        if self.should_check_condition_redundancy() {
-            if test_ty.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
-                // Boolean and integer assertions are often deliberate runtime checks. Their
-                // operands can still contain mistakes such as `assert func and flag`.
-                self.check_condition_operands(test);
-            } else {
-                self.check_condition_redundancy(test, test_ty, truthiness);
-            }
-        }
-
+        self.check_assertion_redundancy(test, test_ty, truthiness);
         self.infer_optional_expression(msg.as_deref(), TypeContext::default());
     }
 
@@ -8361,8 +8345,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .homogeneous_element_type(db, env)
         });
 
-        let should_check_condition_redundancy = self.should_check_condition_redundancy();
-
         for expr in ifs {
             let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
 
@@ -8374,9 +8356,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     err.fallback_truthiness()
                 });
 
-            if should_check_condition_redundancy {
-                self.check_condition_redundancy(expr, test_ty, truthiness);
-            }
+            self.check_condition_redundancy(expr, test_ty, truthiness);
         }
     }
 
@@ -8528,9 +8508,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.report_diagnostic(&self.context, &**test);
                 err.fallback_truthiness()
             });
-        if self.should_check_condition_redundancy() {
-            self.check_condition_redundancy(test, test_ty, test_truthiness);
-        }
+
+        self.check_condition_redundancy(test, test_ty, test_truthiness);
 
         match test_truthiness {
             Truthiness::AlwaysTrue => body_ty,
@@ -11070,14 +11049,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     err.fallback_truthiness()
                 });
 
-                // Avoid diagnostics for `not obj` where `obj` is inferred as a `ConstraintSet` instance.
-                // Otherwise there are a huge number of `redundant-condition` diagnostics in our test suite
-                // for `static_assert(not is_assignable_to(foo, bar))` etc.
-                if self.should_check_condition_redundancy()
-                    && !matches!(ty, Type::KnownInstance(KnownInstanceType::ConstraintSet(_)))
-                {
-                    self.check_condition_redundancy(&unary.operand, ty, original_truthiness);
-                }
+                self.check_negation_redundancy(unary, ty, original_truthiness);
 
                 Type::from_truthiness(db, env, original_truthiness.negate())
             }

@@ -11,9 +11,9 @@ This rule reports redundant conditions that meet any of these criteria:
 
 - The boolean test is inferred as evaluating to `True` itself, `False` itself, or an exact integer
     such as `1` or `0`.
-- Short-circuit evaluation means the condition can be guaranteed to be always truthy or always
-    falsy despite fixed truthiness not being guaranteed by the inferred type of the expression's
-    value (see "Short-circuiting boolean conditions" below for an example).
+- Short-circuit evaluation means the condition can be guaranteed to be always truthy or always falsy
+    despite fixed truthiness not being guaranteed by the inferred type of the expression's value
+    (see "Short-circuiting boolean conditions" below for an example).
 - The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
     when its result has fixed truthiness.
 
@@ -73,21 +73,22 @@ def check(value: Comparable):
         pass
 ```
 
-Outside the context of an `if` test, the revealed type of the condition here is `~AlwaysTruthy`:
-in other words, ty knows that this expression is not *always true*, but cannot guarantee that it is
+Outside the context of an `if` test, the revealed type of the condition here is `~AlwaysTruthy`: in
+other words, ty knows that this expression is not *always true*, but cannot guarantee that it is
 definitely *always false*. It could be an object that is sometimes true and sometimes false -- for
 example, a `list` (which is falsy when it is empty, and truthy otherwise).
 
 Nonetheless, when `value < 1 < 0` is used directly as a condition, ty knows that the condition will
-always evaluate to `False` and the `if` branch will never be taken. This is because of Python's
-short-circuiting behaviour for `if` conditions: rather than evaluating the result of the whole
-chained comparison and then testing the truthiness of that evaluated result (which could result in
-multiple boolean tests of a `Comparable` instance), Python guarantees that `Comparable.__bool__`
-will only be called once over the course of executing the `if` condition.
+always be falsy and the `if` branch will never be taken. Python tests the truthiness of the object
+returned by `Comparable.__lt__` once: if it is falsy, the condition fails immediately. If it is
+truthy, Python evaluates `1 < 0`, which is false. There is no second truthiness test of the object
+returned by `__lt__`.
 
-The short-circuiting behaviour is only in effect if a chained expression is used *directly* in an
-`if` test. If it is saved as a variable first, Python may call `Comparable.__bool__` again, so ty
-cannot guarantee that the test has a definite truthiness, and no diagnostic is emitted:
+If the chained comparison is saved as a variable first, its value can be the object returned by
+`__lt__`, if that object was falsy when first tested. The `if result` statement then tests that
+object's truthiness again. A user-defined `__bool__` method can return a different result on that
+second call, so ty cannot guarantee that the saved value is still falsy, and no diagnostic is
+emitted:
 
 ```py
 def check_saved(value: Comparable):

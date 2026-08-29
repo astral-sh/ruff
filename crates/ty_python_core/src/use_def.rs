@@ -665,7 +665,7 @@ struct UseDefMapExtra {
     /// Completed loop headers in this scope.
     loop_headers: FrozenIndexVec<LoopHeaderId, LoopHeader>,
 
-    /// Non-overlapping assertion and compound conditional tests, in source order.
+    /// Outermost boolean tests in this scope, sorted in source order without overlaps.
     boolean_test_contexts: Box<[TextRange]>,
 }
 
@@ -995,12 +995,9 @@ impl<'db> UseDefMap<'db> {
             })
     }
 
-    /// Returns whether `range` is a proper subexpression of a recorded boolean test in this scope.
-    ///
-    /// The complete test is excluded, so callers can decide separately whether to check it.
-    /// The ranges do not overlap, allowing a binary search by end position.
-    pub(crate) fn is_boolean_test_subexpression(&self, range: TextRange) -> bool {
-        self.extra.as_ref().is_some_and(|extra| {
+    /// Returns the outermost boolean test containing `range`, including an exact match.
+    pub(crate) fn enclosing_boolean_test(&self, range: TextRange) -> Option<TextRange> {
+        self.extra.as_ref().and_then(|extra| {
             let index = extra
                 .boolean_test_contexts
                 .partition_point(|context| context.end() <= range.start());
@@ -1008,7 +1005,8 @@ impl<'db> UseDefMap<'db> {
             extra
                 .boolean_test_contexts
                 .get(index)
-                .is_some_and(|context| *context != range && context.contains_range(range))
+                .copied()
+                .filter(|context| context.contains_range(range))
         })
     }
 
@@ -2619,19 +2617,9 @@ impl<'db> UseDefMapBuilder<'db> {
         self.range_reachability.push((range, this_range_info));
     }
 
-    /// Records an assertion or compound statement test while preserving non-overlapping source order.
-    ///
-    /// An assertion's optional message lies outside this range and does not inherit its context.
-    ///
-    /// Statements cannot occur inside expressions, so test ranges in the same scope cannot
-    /// overlap. Recording them in source order allows context lookups to use a binary search.
+    /// Records a directly tested condition or the operand of `not`.
+    /// Nested tests are discarded when the map is finished: their outer test owns the analysis.
     pub(super) fn record_boolean_test_context(&mut self, range: TextRange) {
-        debug_assert!(
-            self.boolean_test_contexts
-                .last()
-                .is_none_or(|previous| previous.end() <= range.start()),
-            "boolean test contexts must be non-overlapping and recorded in source order"
-        );
         self.boolean_test_contexts.push(range);
     }
 
@@ -2963,7 +2951,12 @@ impl<'db> UseDefMapBuilder<'db> {
             Self::zip_place_states(end_of_scope_members, reachable_definitions_by_member);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
         let loop_headers = self.loop_headers;
-        let boolean_test_contexts = self.boolean_test_contexts;
+        let mut boolean_test_contexts = self.boolean_test_contexts;
+        // Conditional expressions visit their test before their body, which appears earlier in
+        // the source. Sort outer tests before nested tests, then retain only the outer tests.
+        boolean_test_contexts
+            .sort_unstable_by_key(|range| (range.start(), std::cmp::Reverse(range.end())));
+        boolean_test_contexts.dedup_by(|inner, outer| outer.contains_range(*inner));
         let extra = (!bindings_by_use.is_empty()
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()

@@ -281,11 +281,14 @@ if isinstance(x, str) and not isinstance(x, B):
 
 ## Narrowing Multiple Variables
 
+A contradictory condition makes its body unreachable, narrowing every variable to `Never` inside
+that body. We report the complete condition when no individual operand is reported.
+
 ```py
 from typing import Literal
 
 def f(x: Literal[0, 1], y: Literal["", "hello"]):
-    if x and y and not x and not y:
+    if x and y and not x and not y:  # error: [redundant-condition] "always falsy"
         reveal_type(x)  # revealed: Never
         reveal_type(y)  # revealed: Never
     else:

@@ -1,0 +1,338 @@
+//! Diagnostic messages and fixes for conditions selected by the redundant-condition checker.
+
+use std::borrow::Cow;
+
+use ruff_db::{
+    diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity},
+    parsed::parsed_module,
+    source::source_text,
+};
+use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_python_ast as ast;
+use ruff_source_file::find_newline;
+use ruff_text_size::Ranged;
+use ty_python_core::Truthiness;
+
+use crate::{
+    SemanticModel,
+    types::{
+        KnownClass, LintDiagnosticGuard, MemberLookupPolicy, Type, call::bind::CallableDescription,
+        function::KnownFunction, infer::TypeInferenceBuilder, tuple::TupleLength,
+    },
+};
+
+use super::RedundantCondition;
+
+impl<'db> TypeInferenceBuilder<'db, '_> {
+    pub(super) fn report_redundant_condition(&self, condition: RedundantCondition<'_, 'db>) {
+        let RedundantCondition {
+            expression: test,
+            value_type: test_type,
+            is_truthy,
+            kind,
+        } = condition;
+        let rule = kind.rule();
+        let db = self.db();
+        let env = self.program_environment();
+        let annotate_inferred_type = |diagnostic: &mut LintDiagnosticGuard| {
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Inferred type is `{}`",
+                test_type.display(db, env)
+            ));
+        };
+
+        let describe_condition = |diagnostic: &mut LintDiagnosticGuard| {
+            let source = source_text(db, self.file());
+            let condition = &source[test.range()];
+            let is_true = is_truthy;
+            if find_newline(condition).is_some() {
+                diagnostic.set_concise_message(format_args!("Condition is always {is_true}"));
+            } else {
+                diagnostic.set_concise_message(format_args!(
+                    "Condition `{condition}` is always {is_true}"
+                ));
+            }
+
+            if let ast::Expr::Compare(ast::ExprCompare {
+                left,
+                ops,
+                comparators,
+                ..
+            }) = test
+                && ops.len() == 1
+                && let [single_comparator] = &**comparators
+            {
+                for node in [left, single_comparator] {
+                    diagnostic.annotate(self.context.secondary(node).message(format_args!(
+                        "Has type `{}`",
+                        self.expression_type(node).display(db, env)
+                    )));
+                }
+            } else {
+                annotate_inferred_type(diagnostic);
+            }
+        };
+
+        // Short-circuit evaluation can determine a condition's truthiness even when its
+        // value type does not. In that case, describe the condition rather than the type.
+        let describe_as_condition =
+            test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env))
+                || test_type.bool(db, env) != Truthiness::from(is_truthy);
+
+        let Some(builder) = self.context.report_lint(rule, test) else {
+            return;
+        };
+        let _diagnostic = if is_truthy {
+            let describe_always_truthy_object = |diagnostic: &mut LintDiagnosticGuard| {
+                diagnostic.set_concise_message(format_args!(
+                    "Object of type `{}` is always truthy",
+                    test_type.display(db, env)
+                ));
+                annotate_inferred_type(diagnostic);
+            };
+
+            let function_info = match test_type {
+                Type::FunctionLiteral(function) => {
+                    Some((function.signature(db), Cow::Borrowed(&**function.name(db))))
+                }
+                Type::BoundMethod(method) => {
+                    let function = method.function(db);
+                    Some((
+                        method.bound_signatures(db),
+                        CallableDescription::defining_class(db, test_type)
+                            .map(|class| {
+                                Cow::Owned(format!("{}.{}", class.name(db), function.name(db)))
+                            })
+                            .unwrap_or(Cow::Borrowed(&**function.name(db))),
+                    ))
+                }
+                _ => None,
+            };
+
+            if let Some((signature, name)) = function_info {
+                let mut diagnostic = if test_type.is_function_literal() {
+                    builder.into_diagnostic(format_args!("Function `{name}` is always truthy"))
+                } else {
+                    builder.into_diagnostic(format_args!("Method `{name}` is always truthy"))
+                };
+
+                // Add a suggestion and fix that they might have meant to call this function.
+                //
+                // It's true that calling the function might not actually fix this diagnostic
+                // if the function returns something that is always truthy. They still probably
+                // meant to call the function, though, so it's still a useful suggestion/fix!
+
+                let kind = if test_type.is_function_literal() {
+                    "function"
+                } else {
+                    "method"
+                };
+
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Did you mean to call this {kind}?"
+                ));
+
+                if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                    let (call, applicability) = if signature.has_parameters() {
+                        ("(...)", Applicability::DisplayOnly)
+                    } else {
+                        ("()", Applicability::Unsafe)
+                    };
+                    let call_edit = Edit::insertion(call.to_string(), test.end());
+
+                    diagnostic.set_fix(Fix::applicable_edit(call_edit, applicability));
+                }
+
+                diagnostic
+            } else if let Some(tuple_spec) = test_type.tuple_instance_spec(db, env)
+                && tuple_spec.len().minimum() > 0
+            {
+                // This error message might not be 100% accurate for a tuple subclass
+                // that overrides `__len__` or `__bool__` in a way that's inconsistent
+                // with the tuple's inherited tuple spec, but you just shouldn't do that anyway.
+
+                let length = tuple_spec.len();
+                let mut diagnostic = match length {
+                    TupleLength::Fixed(size) => builder
+                        .into_diagnostic(format_args!("A {size}-element tuple is always truthy")),
+                    TupleLength::Variable(min, _) => builder.into_diagnostic(format_args!(
+                        "A tuple with >={min} element{maybe_s} is always truthy",
+                        maybe_s = if min == 1 { "" } else { "s" }
+                    )),
+                };
+                describe_always_truthy_object(&mut diagnostic);
+
+                diagnostic
+            } else if let Type::TypedDict(typed_dict) = test_type
+                && let Some(field) = typed_dict
+                    .items(db)
+                    .iter()
+                    .find_map(|(_, field)| field.is_required().then_some(field))
+            {
+                let num_required_keys = typed_dict
+                    .items(db)
+                    .iter()
+                    .filter(|(_, field)| field.is_required())
+                    .count();
+                let maybe_s = if num_required_keys == 1 { "" } else { "s" };
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "A TypedDict with {num_required_keys} required field{maybe_s} is always truthy"
+                ));
+                if let Some(class) = typed_dict.defining_class() {
+                    diagnostic.set_concise_message(format_args!(
+                            "TypedDict `{}` with {num_required_keys} required field{maybe_s} is always truthy",
+                            class.name(db)
+                        ));
+                } else {
+                    diagnostic.set_concise_message(format_args!(
+                            "A TypedDict with {num_required_keys} required field{maybe_s} is always truthy"
+                        ));
+                }
+                annotate_inferred_type(&mut diagnostic);
+                if let Some(defining_class) = typed_dict.defining_class()
+                    && let Some(typed_dict_definition) = defining_class.definition(db)
+                    && let Some(field_definition) = field.first_declaration()
+                {
+                    let typed_dict_module =
+                        parsed_module(db, typed_dict_definition.python_file(db)).load(db);
+                    let field_module = parsed_module(db, field_definition.python_file(db)).load(db);
+                    diagnostic.annotate(
+                        Annotation::secondary(Span::from(
+                            typed_dict_definition.focus_range(db, &typed_dict_module),
+                        ))
+                        .message(format_args!("`{}` defined here", defining_class.name(db))),
+                    );
+                    diagnostic.annotate(
+                        Annotation::secondary(Span::from(
+                            field_definition.full_range(db, &field_module),
+                        ))
+                        .message(if num_required_keys == 1 {
+                            "Required field declared here"
+                        } else {
+                            "First required field defined here"
+                        }),
+                    );
+                }
+                diagnostic
+            } else if test_type.as_nominal_instance().is_some_and(|instance| {
+                instance
+                    .class(db, env)
+                    .is_known(db, KnownClass::GeneratorType)
+            }) {
+                let mut diagnostic = builder.into_diagnostic("A generator is always truthy");
+                describe_always_truthy_object(&mut diagnostic);
+                diagnostic.help("Did you mean to collect the generator into a tuple?");
+                if SemanticModel::new(db, self.program_file())
+                    .definitely_has_builtin_binding("tuple", test.into())
+                {
+                    diagnostic.set_fix(Fix::display_only_edits(
+                        Edit::insertion("tuple(".to_string(), test.start()),
+                        [Edit::insertion(")".to_string(), test.end())],
+                    ));
+                }
+                diagnostic
+            } else if test_type.is_string_literal()
+                || test_type
+                    .as_union()
+                    .is_some_and(|union| union.elements(db).iter().all(Type::is_string_literal))
+            {
+                let mut diagnostic = builder.into_diagnostic("A nonempty string is always truthy");
+                describe_always_truthy_object(&mut diagnostic);
+                diagnostic
+            } else if describe_as_condition {
+                let message = "Condition is always true";
+                let mut diagnostic = builder.into_diagnostic(message);
+                describe_condition(&mut diagnostic);
+                diagnostic
+            } else {
+                let mut diagnostic = builder.into_diagnostic("Condition is always truthy");
+                describe_always_truthy_object(&mut diagnostic);
+                if let Type::NominalInstance(instance) = test_type {
+                    let class = instance.class(db, env);
+                    if class.is_final(db)
+                        && !class.is_known(db, KnownClass::CoroutineType)
+                        && ["__bool__", "__len__"].into_iter().all(|name| {
+                            test_type
+                                .member_lookup_with_policy(
+                                    db,
+                                    env,
+                                    name,
+                                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                                )
+                                .is_undefined()
+                        })
+                    {
+                        let class_name = class.name(db);
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!(
+                                "`{class_name}` instances are always truthy because \
+                                    `{class_name}` cannot be subclassed and does not define \
+                                    `__bool__` or `__len__`",
+                            ),
+                        );
+                        let class_literal = class.class_literal(db);
+                        let header_range = class_literal.header_range(db);
+
+                        let range = class_literal
+                            .as_static()
+                            .and_then(|static_class| {
+                                static_class.find_known_decorator_span(db, KnownFunction::Final)
+                            })
+                            .and_then(|span| span.range())
+                            .map(|decorator_range| header_range.cover(decorator_range))
+                            .unwrap_or(header_range);
+
+                        sub.annotate(
+                            Annotation::primary(
+                                Span::from(class_literal.file(db)).with_range(range),
+                            )
+                            .message(format_args!("`{class_name}` defined here")),
+                        );
+
+                        diagnostic.sub(sub);
+                    }
+                }
+                diagnostic
+            }
+        } else {
+            if test_type.is_none(db) {
+                builder.into_diagnostic("`None` is always falsy")
+            } else if let Some(tuple) = test_type.tuple_instance_spec(db, env)
+                && tuple.len() == TupleLength::Fixed(0)
+            {
+                // This error message might not be 100% accurate for a tuple subclass
+                // that overrides `__len__` or `__bool__` in a way that's inconsistent
+                // with the tuple's inherited tuple spec, but you just shouldn't do that anyway.
+                let message = "An empty tuple is always falsy";
+                let mut diagnostic = builder.into_diagnostic(message);
+                diagnostic.set_concise_message(message);
+                annotate_inferred_type(&mut diagnostic);
+                diagnostic
+            } else if test_type.is_string_literal() {
+                let message = "An empty string is always falsy";
+                let mut diagnostic = builder.into_diagnostic(message);
+                diagnostic.set_concise_message(message);
+                annotate_inferred_type(&mut diagnostic);
+                diagnostic
+            } else {
+                let message = if describe_as_condition {
+                    "Condition is always false"
+                } else {
+                    "Condition is always falsy"
+                };
+                let mut diagnostic = builder.into_diagnostic(message);
+                if describe_as_condition {
+                    describe_condition(&mut diagnostic);
+                } else {
+                    diagnostic.set_concise_message(format_args!(
+                        "Object of type `{}` is always falsy",
+                        test_type.display(db, env)
+                    ));
+                    annotate_inferred_type(&mut diagnostic);
+                }
+                diagnostic
+            }
+        };
+    }
+}

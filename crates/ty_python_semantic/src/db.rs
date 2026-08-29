@@ -289,6 +289,7 @@ pub(crate) mod tests {
 
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
             let mut db = TestDb::new();
+
             if let Some(selection) = self.rule_selection {
                 db.rule_selection = Arc::new(selection);
             }

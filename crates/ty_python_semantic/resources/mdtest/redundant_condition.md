@@ -574,6 +574,10 @@ class Comparable:
 
 def direct_condition(value: Comparable):
     assert value < 1 < 0  # error: [redundant-condition-strict] "Condition `value < 1 < 0` is always false"
+
+def negated_condition(value: Comparable):
+    if not (value < 1 < 0):  # error: [redundant-condition-strict] "Condition `not (value < 1 < 0)` is always true"
+        pass
 ```
 
 The defensive-exit exemption also applies when short-circuit evaluation makes a condition always
@@ -818,9 +822,9 @@ def negated_integer_return(value: Literal[1, 2]) -> bool:
     return not value  # error: [redundant-condition-strict] "Object of type `Literal[1, 2]` is always truthy"
 ```
 
-To avoid two diagnostics being emitted on compound tests such as the following statements, we
-suppress `redundant-condition-strict` on subexpressions of `if`-statement tests, `elif` tests and
-`while` tests. Only a single diagnostic is emitted on each of these:
+When the strict rule is needed because of a test's type or short-circuit behavior, we report the
+complete compound condition instead of its operands. Only a single diagnostic is emitted on each of
+these:
 
 ```py
 def compound_truthy(x: str):
@@ -846,6 +850,112 @@ def check(value: int, enabled: bool):
     # false positives is more important than avoiding false negatives.
     if enabled and value is not None:
         print(value)
+```
+
+## Compound conditions with mixed value types
+
+Reporting a subexpression under `redundant-condition` takes precedence over reporting the complete
+condition under `redundant-condition-strict`. Negating the condition does not add a second
+diagnostic for the same subexpression.
+
+```py
+def func(): ...
+def mixed_operands(value: object):
+    if func and False:  # error: [redundant-condition] "Function `func` is always truthy"
+        pass
+    if not (value or func):  # error: [redundant-condition] "Function `func` is always truthy"
+        pass
+```
+
+When neither operand is reported, the strict rule can report a fixed outcome established by
+short-circuit evaluation, even if the expression's value type has ambiguous truthiness.
+
+```py
+def short_circuit(value: object):
+    if value and False:  # error: [redundant-condition-strict] "Condition `value and False` is always false"
+        pass
+```
+
+## Boolean tests inside value expressions
+
+A call's arguments compute values, but can contain their own boolean tests. Those tests are checked
+even when the call itself has ambiguous truthiness.
+
+```py
+def func(): ...
+def accepts(value: object) -> bool:
+    return bool(value)
+
+def nested_tests():
+    if accepts(not func):  # error: [redundant-condition]
+        pass
+```
+
+`lambda` bodies and comprehension filters have their own scopes. `lambda` defaults and a
+comprehension's first iterable are evaluated in the enclosing scope. Each nested boolean test is
+reported once in either case.
+
+```py
+def nested_scopes():
+    if accepts(lambda: not func):  # error: [redundant-condition]
+        pass
+    if accepts(lambda value=not func: value):  # error: [redundant-condition]
+        pass
+    if accepts([item for item in (not func,)]):  # error: [redundant-condition]
+        pass
+    if accepts([item for item in range(2) if not func]):  # error: [redundant-condition]
+        pass
+```
+
+Compound conditions in conditional expressions and comprehension filters also report the complete
+condition once, rather than both the condition and its negated operand.
+
+```py
+def compound_expression_tests():
+    selected = 1 if not not (1 == 1) else 0  # error: [redundant-condition-strict] "Condition `not not (1 == 1)` is always true"
+    filtered = [
+        item
+        for item in range(2)
+        # error: [redundant-condition-strict] "Condition `not not (1 == 1)` is always true"
+        if not not (1 == 1)
+    ]
+```
+
+The selected values can also contain independent boolean tests, on either side of the condition in
+source order.
+
+```py
+def selected_values(flag: bool):
+    # snapshot: redundant-condition
+    # snapshot: redundant-condition
+    selected = not func if flag else not func
+```
+
+```snapshot
+warning[redundant-condition]: Function `func` is always truthy
+  --> src/mdtest_snippet.py:28:20
+   |
+28 |     selected = not func if flag else not func
+   |                    ^^^^ Did you mean to call this function?
+   |
+27 |     # snapshot: redundant-condition
+   -     selected = not func if flag else not func
+28 +     selected = not func() if flag else not func
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+warning[redundant-condition]: Function `func` is always truthy
+  --> src/mdtest_snippet.py:28:42
+   |
+28 |     selected = not func if flag else not func
+   |                                          ^^^^ Did you mean to call this function?
+   |
+27 |     # snapshot: redundant-condition
+   -     selected = not func if flag else not func
+28 +     selected = not func if flag else not func()
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Multiline conditions in concise diagnostics
@@ -1355,9 +1465,9 @@ with nullcontext((1,)) as fixed:
         pass
 ```
 
-## Environment references in called lambdas and consumed generators
+## Environment references in called `lambda` functions and consumed generators
 
-Calls can execute lambda bodies or consume generator expressions. Environment references inside
+Calls can execute `lambda` bodies or consume generator expressions. Environment references inside
 those bodies exempt the enclosing condition from both rules, including when the call's result is a
 non-boolean object whose truthiness is known.
 
@@ -1635,8 +1745,8 @@ if coinflip1() and (foo := ("bar",)) and coinflip2():  # error: [redundant-condi
     ...
 ```
 
-Walruses in lambda defaults or eager comprehensions can run while the condition is evaluated. These
-conditions also use the strict rule.
+Walruses in `lambda` defaults or eager comprehensions can run while the condition is evaluated.
+These conditions also use the strict rule.
 
 ```py
 def eager_walruses(items: list[int]):
@@ -1650,9 +1760,9 @@ def eager_walruses(items: list[int]):
         pass
 ```
 
-## Walrus expressions in called lambdas and consumed generators
+## Walrus expressions in called `lambda` functions and consumed generators
 
-Calling a lambda or consuming a generator can evaluate a walrus in its body. The nonempty tuples
+Calling a `lambda` or consuming a generator can evaluate a walrus in its body. The nonempty tuples
 returned here are always truthy, but the assignments run when evaluating the conditions. These
 conditions therefore use only the strict rule.
 
