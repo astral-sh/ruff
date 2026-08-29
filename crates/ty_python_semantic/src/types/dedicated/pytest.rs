@@ -234,8 +234,7 @@ impl<'db> FixtureBinding<'db> {
     }
 
     /// Returns the equally viable exposures through which the request reaches the fixture.
-    #[cfg_attr(not(test), expect(dead_code))]
-    fn exposures(&self) -> &[FixtureExposure<'db>] {
+    pub fn exposures(&self) -> &[FixtureExposure<'db>] {
         &self.exposures
     }
 }
@@ -286,8 +285,7 @@ impl<'db> FixtureBinding<'db> {
 ///     source_binding: Some(Definition(fixtures.resource)),
 /// }
 /// ```
-#[cfg_attr(not(test), expect(dead_code))]
-fn fixture_exposures_for_definition<'db>(
+pub fn fixture_exposures_for_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Vec<FixtureExposure<'db>> {
@@ -308,7 +306,7 @@ fn fixture_exposures_for_definition<'db>(
 }
 
 /// Returns the installed core pytest plugin files in registration order.
-fn pytest_global_plugin_files<'db>(
+pub fn pytest_global_plugin_files<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
 ) -> &'db [ProgramFile<'db>] {
@@ -727,7 +725,7 @@ struct FixtureDeclaration<'db> {
 /// The exposure contributed by `test_resource` points to `helper` as its immediate source and to
 /// `resource` as the canonical fixture declaration.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct FixtureExposure<'db> {
+pub struct FixtureExposure<'db> {
     /// The name used to request this fixture (`"test_resource"` in the example above).
     name: Name,
     /// The local Python binding that exposes the fixture (`test_resource` in the example above).
@@ -741,7 +739,6 @@ struct FixtureExposure<'db> {
     source_binding: Option<Definition<'db>>,
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 impl<'db> FixtureExposure<'db> {
     /// Exposes a declaration under its explicit fixture name or local Python binding name.
     fn new(
@@ -764,27 +761,27 @@ impl<'db> FixtureExposure<'db> {
     }
 
     /// Returns the public name that pytest uses to request this exposure.
-    fn name(&self) -> &Name {
+    pub fn name(&self) -> &Name {
         &self.name
     }
 
     /// Returns the local Python binding through which this fixture is exposed.
-    fn local_binding(&self) -> Definition<'db> {
+    pub fn local_binding(&self) -> Definition<'db> {
         self.local_binding
     }
 
     /// Returns the decorated function that declares the fixture.
-    fn fixture(&self) -> Definition<'db> {
+    pub fn fixture(&self) -> Definition<'db> {
         self.fixture
     }
 
     /// Returns the binding from which this exposure was imported, if any.
-    fn source_binding(&self) -> Option<Definition<'db>> {
+    pub fn source_binding(&self) -> Option<Definition<'db>> {
         self.source_binding
     }
 
     /// Returns the binding or decorator from which this exposure gets its public name.
-    fn name_source(&self, db: &'db dyn Db) -> FixtureNameSource<'db> {
+    pub fn name_source(&self, db: &'db dyn Db) -> FixtureNameSource<'db> {
         let Some(declaration) = fixture_declaration(db, self.fixture) else {
             return FixtureNameSource::Binding(self.local_binding);
         };
@@ -803,8 +800,7 @@ impl<'db> FixtureExposure<'db> {
 
 /// The source from which a fixture obtains its public name.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-#[cfg_attr(not(test), expect(dead_code))]
-enum FixtureNameSource<'db> {
+pub enum FixtureNameSource<'db> {
     /// The Python binding that supplies the fixture name.
     Binding(Definition<'db>),
     /// An explicit fixture name supplied by the decorated function.
