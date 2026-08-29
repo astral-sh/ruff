@@ -53,7 +53,7 @@ def rotating(value: Rotate[int, str]):
 ### Classes of recursive aliases with growing specializations
 
 Recursive specialization can introduce classes beyond the initial type argument. Class inference
-terminates even when the type arguments keep growing, conservatively returning `type`.
+retains the class exposed before recursion and uses `Unknown` for the unexpanded remainder.
 
 ```toml
 [environment]
@@ -64,7 +64,7 @@ python-version = "3.12"
 type Growing[T] = T | Growing[list[T]]
 
 def growing(value: Growing[int]):
-    reveal_type(type(value))  # revealed: type
+    reveal_type(type(value))  # revealed: type[int | Unknown]
 ```
 
 ## Three-argument form (dynamic class creation)

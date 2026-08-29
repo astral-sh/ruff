@@ -40,6 +40,7 @@ use std::hint::cold_path;
 
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
+use crate::types::cyclic::TypeIdentity;
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
@@ -500,6 +501,7 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -614,7 +616,11 @@ impl<'db> UnionBuilder<'db> {
         self.elements.push(UnionElement::Type(Type::object()));
     }
 
-    fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
+    fn widen_literal_types(
+        &mut self,
+        seen_aliases: &mut Vec<Type<'db>>,
+        active_aliases: &mut Vec<Type<'db>>,
+    ) {
         let db = self.db;
         let mut replace_with = vec![];
         for elem in &self.elements {
@@ -636,8 +642,28 @@ impl<'db> UnionBuilder<'db> {
             }
         }
         for ty in replace_with {
-            self.add_in_place_impl(ty, seen_aliases);
+            self.add_in_place_impl(ty, seen_aliases, active_aliases);
         }
+    }
+
+    /// Returns whether the type re-enters an active alias whose specialization can grow without
+    /// bound.
+    ///
+    /// Computing a recursive identity can require walking the alias definition. Check the cheap
+    /// definition-level candidate relation first, as `CycleDetector` does, so ordinary
+    /// non-recursive aliases do not pay for that walk.
+    fn is_growing_alias_reentry(&self, ty: Type<'db>, active_aliases: &[Type<'db>]) -> bool {
+        if !active_aliases
+            .iter()
+            .any(|active| ty.may_share_type_identity(self.db, *active))
+        {
+            return false;
+        }
+
+        matches!(
+            ty.to_type_identity(self.db),
+            TypeIdentity::GrowingTypeAlias(_)
+        )
     }
 
     /// Adds a type to this union.
@@ -648,10 +674,15 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
-        self.add_in_place_impl(ty, &mut vec![]);
+        self.add_in_place_impl(ty, &mut vec![], &mut vec![]);
     }
 
-    fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn add_in_place_impl(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+        active_aliases: &mut Vec<Type<'db>>,
+    ) {
         let db = self.db;
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
@@ -670,7 +701,7 @@ impl<'db> UnionBuilder<'db> {
                 let new_elements = union.elements(db);
                 self.elements.reserve(new_elements.len());
                 for element in new_elements {
-                    self.add_in_place_impl(*element, seen_aliases);
+                    self.add_in_place_impl(*element, seen_aliases, active_aliases);
                 }
                 self.recursively_defined =
                     self.recursively_defined.or(union.recursively_defined(db));
@@ -683,7 +714,7 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::Type(_) => acc,
                     });
                     if should_widen(literals, self.recursively_defined) {
-                        self.widen_literal_types(seen_aliases);
+                        self.widen_literal_types(seen_aliases, active_aliases);
                     }
                 }
             }
@@ -691,11 +722,23 @@ impl<'db> UnionBuilder<'db> {
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
                 if seen_aliases.contains(&ty) {
-                    // Union contains itself recursively via a type alias. This is an error, just
-                    // leave out the recursive alias. TODO surface this error.
+                    // An exact specialization was either fully expanded earlier in this build or
+                    // is already active. Expanding it again cannot expose a new union member.
+                } else if self.is_growing_alias_reentry(ty, active_aliases) {
+                    // This alias can produce infinitely many specializations, so another
+                    // expansion cannot establish an exact recursive fixed point. The unexpanded
+                    // remainder may contribute additional members, so cover it with `Unknown`.
+                    self.add_in_place_impl(Type::unknown(), seen_aliases, active_aliases);
                 } else {
                     seen_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(db), seen_aliases);
+                    active_aliases.push(ty);
+                    self.add_in_place_impl(
+                        alias.unguarded_value_type(db),
+                        seen_aliases,
+                        active_aliases,
+                    );
+                    let popped = active_aliases.pop();
+                    debug_assert_eq!(popped, Some(ty));
                 }
             }
             Type::LiteralValue(literal) => {
@@ -715,7 +758,11 @@ impl<'db> UnionBuilder<'db> {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with =
                                             KnownClass::Str.to_instance(db, &self.env);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        self.add_in_place_impl(
+                                            replace_with,
+                                            seen_aliases,
+                                            active_aliases,
+                                        );
                                         return;
                                     }
                                     found = Some(literals);
@@ -770,7 +817,11 @@ impl<'db> UnionBuilder<'db> {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with =
                                             KnownClass::Bytes.to_instance(db, &self.env);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        self.add_in_place_impl(
+                                            replace_with,
+                                            seen_aliases,
+                                            active_aliases,
+                                        );
                                         return;
                                     }
                                     found = Some(literals);
@@ -827,7 +878,11 @@ impl<'db> UnionBuilder<'db> {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with =
                                             KnownClass::Int.to_instance(db, &self.env);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        self.add_in_place_impl(
+                                            replace_with,
+                                            seen_aliases,
+                                            active_aliases,
+                                        );
                                         return;
                                     }
                                     found = Some(literals);
@@ -885,6 +940,7 @@ impl<'db> UnionBuilder<'db> {
                             self.add_in_place_impl(
                                 enum_member_to_add.enum_class_instance(db, &self.env),
                                 seen_aliases,
+                                active_aliases,
                             );
                             return;
                         }
@@ -904,7 +960,11 @@ impl<'db> UnionBuilder<'db> {
                                         let (literal, _) = literals.first().unwrap();
                                         let replace_with =
                                             literal.enum_class_instance(db, &self.env);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        self.add_in_place_impl(
+                                            replace_with,
+                                            seen_aliases,
+                                            active_aliases,
+                                        );
                                         return;
                                     }
                                     found = Some(literals);
@@ -946,6 +1006,7 @@ impl<'db> UnionBuilder<'db> {
                                         self.add_in_place_impl(
                                             enum_member_to_add.enum_class_instance(db, &self.env),
                                             seen_aliases,
+                                            active_aliases,
                                         );
                                         return;
                                     }
@@ -967,16 +1028,21 @@ impl<'db> UnionBuilder<'db> {
                             self.elements.swap_remove(index);
                         }
                     }
-                    _ => self.push_type(ty, seen_aliases),
+                    _ => self.push_type(ty, seen_aliases, active_aliases),
                 }
             }
             // Adding `object` to a union results in `object`.
             ty if ty.is_object() && !cycle_recovery => self.collapse_to_object(),
-            _ => self.push_type(ty, seen_aliases),
+            _ => self.push_type(ty, seen_aliases, active_aliases),
         }
     }
 
-    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn push_type(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+        active_aliases: &mut Vec<Type<'db>>,
+    ) {
         let db = self.db;
         let mut ty = ty;
         let bool_pair = |ty: Type<'db>| {
@@ -1059,7 +1125,11 @@ impl<'db> UnionBuilder<'db> {
                     .zip(bool_pair(ty))
                     .is_some_and(|(element, pair)| element == pair)
             {
-                self.add_in_place_impl(KnownClass::Bool.to_instance(db, &self.env), seen_aliases);
+                self.add_in_place_impl(
+                    KnownClass::Bool.to_instance(db, &self.env),
+                    seen_aliases,
+                    active_aliases,
+                );
                 return;
             }
 
@@ -1125,8 +1195,11 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
-        let db = self.db;
+        self.try_build_resolved()
+    }
 
+    fn try_build_resolved(self) -> Option<Type<'db>> {
+        let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
         let recursively_defined = self.recursively_defined;

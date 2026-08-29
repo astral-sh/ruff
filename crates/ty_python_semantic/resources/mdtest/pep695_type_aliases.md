@@ -1256,6 +1256,71 @@ def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     y = x
 ```
 
+### Growing recursive aliases in unions
+
+A recursive alias whose specialization grows on every expansion has no finite complete union. We
+retain the union members exposed before the recursive reference and use `Unknown` for the unexpanded
+remainder.
+
+```py
+type GrowingUnion[T] = int | GrowingUnion[list[T]]
+
+def growing_union(value: GrowingUnion[int]):
+    reveal_type(value)  # revealed: int | Unknown
+```
+
+Relations use the same `Unknown` fallback as the displayed expansion. As a source type, the fallback
+accepts the alias wherever `int | Unknown` is accepted.
+
+```py
+def growing_union_source(value: GrowingUnion[int]):
+    accepted: int = value
+```
+
+As a target type, the same fallback can accept values outside the union members exposed before
+recursion. This is the conservative result when the unexpanded remainder cannot be represented.
+
+```py
+type GrowingStr[T] = str | GrowingStr[list[T]]
+
+def growing_union_target():
+    value: GrowingStr[int] = 1
+```
+
+A non-recursive helper alias does not hide the growing recursive alias it expands to.
+
+```py
+type WrappedGrowingUnion[T] = GrowingUnion[T]
+
+def wrapped_growing_union(value: WrappedGrowingUnion[int]):
+    reveal_type(value)  # revealed: int | Unknown
+
+def wrapped_growing_union_assignability(value: WrappedGrowingUnion[int]):
+    accepted: int = value
+```
+
+Multiple growing recursive references still leave a single unknown remainder.
+
+```py
+type BranchingGrowingUnion[T] = int | BranchingGrowingUnion[list[T]] | BranchingGrowingUnion[set[T]]
+
+def branching_growing_union(value: BranchingGrowingUnion[int]):
+    reveal_type(value)  # revealed: int | Unknown
+```
+
+Operations that unfold the alias use the same guarded union instead of recursively expanding
+specializations without bound.
+
+```py
+def growing_union_operations(value: GrowingUnion[int]):
+    reveal_type(value.bit_length())  # revealed: int | Unknown
+    reveal_type(value == 1)  # revealed: bool | Unknown
+    for element in value:  # error: [not-iterable] "Object of type `GrowingUnion[int]` may not be iterable"
+        reveal_type(element)  # revealed: Unknown
+    if value:
+        reveal_type(value)  # revealed: (int & ~AlwaysFalsy) | (Unknown & ~AlwaysFalsy)
+```
+
 ### Subtyping of materializations of cyclic aliases
 
 ```py

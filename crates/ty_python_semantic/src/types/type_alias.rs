@@ -6,9 +6,12 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext, KnownClass,
         KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypingModule, definition_expression_type,
+        TypingModule,
+        cyclic::TypeIdentity,
+        definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
+        set_theoretic::UnionBuilder,
         variance::VarianceInferable,
         visitor,
     },
@@ -22,6 +25,7 @@ use ty_python_core::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
+use rustc_hash::FxHashSet;
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
@@ -47,7 +51,10 @@ pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized
     type_alias: PEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, TypeAliasType::PEP695(type_alias).value_type(db));
+    visitor.visit_type(
+        db,
+        TypeAliasType::PEP695(type_alias).unguarded_value_type(db),
+    );
 }
 
 #[salsa::tracked]
@@ -166,7 +173,10 @@ pub(super) fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> +
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, TypeAliasType::ManualPEP695(type_alias).value_type(db));
+    visitor.visit_type(
+        db,
+        TypeAliasType::ManualPEP695(type_alias).unguarded_value_type(db),
+    );
 }
 
 #[salsa::tracked]
@@ -353,7 +363,31 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Returns the alias body, widening an unbounded top-level recursive remainder to Unknown.
+    ///
+    /// Most consumers should use this method when they need to unfold an alias. Algorithms that
+    /// analyze recursive structure or have their own identity-aware recursion guard can use
+    /// `Self::unguarded_value_type` instead.
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let value_type = self.unguarded_value_type(db);
+        if !matches!(value_type, Type::TypeAlias(_) | Type::Union(_)) {
+            return value_type;
+        }
+
+        let env = ProgramEnvironment::from_definition(self.definition(db));
+        if self.contains_growing_alias(db) {
+            UnionBuilder::new(db, &env)
+                .add(Type::TypeAlias(self))
+                .build()
+        } else {
+            value_type
+        }
+    }
+
+    /// Returns the alias body without widening a growing recursive remainder.
+    ///
+    /// Callers must either analyze recursive structure or guard reentry by recursive identity.
+    pub(crate) fn unguarded_value_type(self, db: &'db dyn Db) -> Type<'db> {
         if let Some(materialization_kind) = self.materialization_kind(db) {
             return self.materialized_value_type(db, materialization_kind);
         }
@@ -379,7 +413,9 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
     ) -> Type<'db> {
-        let value_type = self.with_materialization_kind(db, None).value_type(db);
+        let value_type = self
+            .with_materialization_kind(db, None)
+            .unguarded_value_type(db);
         let env = ProgramEnvironment::from_definition(self.definition(db));
         value_type.materialize(
             db,
@@ -393,6 +429,44 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.raw_value_type(db),
         }
+    }
+
+    /// Returns whether top-level union expansion reaches recursion that can grow without bound.
+    fn contains_growing_alias(self, db: &'db dyn Db) -> bool {
+        let mut pending = vec![self];
+        let mut seen = FxHashSet::default();
+
+        while let Some(alias) = pending.pop() {
+            // A growing recursive path is recognized before expansion. Every other path either
+            // terminates or eventually repeats an exact alias, so visiting each alias once keeps
+            // shared alias graphs linear.
+            if !seen.insert(alias) {
+                continue;
+            }
+
+            if matches!(
+                Type::TypeAlias(alias).to_type_identity(db),
+                TypeIdentity::GrowingTypeAlias(_)
+            ) {
+                return true;
+            }
+
+            match alias.unguarded_value_type(db) {
+                Type::TypeAlias(nested_alias) => pending.push(nested_alias),
+                Type::Union(union) => {
+                    pending.extend(union.elements(db).iter().filter_map(|element| {
+                        if let Type::TypeAlias(nested_alias) = element {
+                            Some(*nested_alias)
+                        } else {
+                            None
+                        }
+                    }));
+                }
+                _ => {}
+            }
+        }
+
+        false
     }
 
     /// Returns the alias without an applied specialization or pending materialization.
@@ -522,7 +596,7 @@ impl<'db> TypeAliasType<'db> {
     ) -> TypeVarVariance {
         let env = ProgramEnvironment::from_definition(self.definition(db));
         let Some(generic_context) = self.generic_context(db) else {
-            return self.value_type(db).variance_of(db, &env, typevar);
+            return self.unguarded_value_type(db).variance_of(db, &env, typevar);
         };
 
         // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
