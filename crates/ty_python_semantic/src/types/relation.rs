@@ -652,6 +652,14 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        // A generic implicit alias node is a backedge whose target is fixed only when the
+        // enclosing recursive type is folded. Redundancy checks must not remove it before then.
+        if self.contains_generic_implicit_alias(db, env)
+            || other.contains_generic_implicit_alias(db, env)
+        {
+            return false;
+        }
+
         let program = env.program(db);
         is_redundant_with_impl(db, TypePair::new(db, program, self, other))
     }

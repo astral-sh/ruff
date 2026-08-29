@@ -522,7 +522,7 @@ pub struct FieldInstance<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FieldInstance<'_> {}
 
-impl<'db> FieldInstance<'db> {}
+impl FieldInstance<'_> {}
 
 /// Contains information about a `types.UnionType` instance built from a PEP 604
 /// union or a legacy `typing.Union[…]` annotation in a value expression context,
@@ -690,4 +690,4 @@ pub struct InternedType<'db> {
 
 impl get_size2::GetSize for InternedType<'_> {}
 
-impl<'db> InternedType<'db> {}
+impl InternedType<'_> {}

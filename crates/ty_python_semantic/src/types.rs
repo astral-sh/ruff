@@ -1606,7 +1606,7 @@ pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     /// An anonymous recursive type created by a structural inference cycle.
     Recursive(RecursiveType<'db>),
     /// The empty set of values
@@ -1890,7 +1890,7 @@ impl<'db> Type<'db> {
     pub(crate) fn recursive(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binder: DivergentType,
+        binder: DivergentType<'db>,
         body: Type<'db>,
     ) -> Self {
         Self::recursive_with_origin(db, env, binder, RecursiveTypeOrigin::Structural, body)
@@ -1899,7 +1899,7 @@ impl<'db> Type<'db> {
     pub(crate) fn recursive_with_origin(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binder: DivergentType,
+        binder: DivergentType<'db>,
         origin: RecursiveTypeOrigin<'db>,
         body: Type<'db>,
     ) -> Self {
@@ -2158,7 +2158,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binders: &[DivergentType],
+        binders: &[DivergentType<'db>],
     ) -> bool {
         any_over_type(db, env, self, false, |ty| match ty {
             Type::Divergent(divergent) => divergent.in_cycle_scc(binders),
@@ -2171,7 +2171,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binder: DivergentType,
+        binder: DivergentType<'db>,
     ) -> Option<RecursiveType<'db>> {
         find_over_type(db, env, self, false, |ty| {
             let Type::Recursive(recursive) = ty else {
@@ -2218,7 +2218,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binder: Option<DivergentType>,
+        binder: Option<DivergentType<'db>>,
     ) -> Self {
         self.apply_type_mapping(
             db,
@@ -2233,7 +2233,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         previous: Self,
-        binder: DivergentType,
+        binder: DivergentType<'db>,
         include_previous: bool,
         origin: Option<RecursiveTypeOrigin<'db>>,
     ) -> Self {
@@ -2314,7 +2314,22 @@ impl<'db> Type<'db> {
     pub(crate) fn is_recursive_generic_implicit_alias(self, db: &'db dyn Db) -> bool {
         matches!(
             self,
-            Type::Recursive(recursive) if recursive.origin(db).generic_context().is_some()
+            Type::Recursive(recursive)
+                if recursive.origin(db).is_generic_implicit_alias_constructor()
+        )
+    }
+
+    pub(crate) fn contains_generic_implicit_alias(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        any_over_type(
+            db,
+            env,
+            self,
+            false,
+            |ty| matches!(ty, Type::Divergent(divergent) if divergent.generic_implicit_alias().is_some()),
         )
     }
 
@@ -8085,7 +8100,13 @@ impl<'db> Type<'db> {
                     typevar_binding_context,
                     inference_flags,
                 )?;
-                Ok(Type::recursive(db, env, *recursive.binder(db), body))
+                Ok(Type::recursive_with_origin(
+                    db,
+                    env,
+                    *recursive.binder(db),
+                    *recursive.origin(db),
+                    body,
+                ))
             }
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
@@ -8576,10 +8597,19 @@ impl<'db> Type<'db> {
                 // Same-binder recursive nodes are recursive boundaries, even if they are not the
                 // exact interned target. Chasing through them re-expands self-nested recursive
                 // callables during structural fold/unfold.
-                TypeMapping::Structural(
-                    StructuralTypeMapping::UnfoldRecursive { recursive: target }
-                    | StructuralTypeMapping::FoldRecursive { recursive: target },
-                ) if recursive.binder(db).same_marker(*target.binder(db)) => self,
+                TypeMapping::Structural(StructuralTypeMapping::UnfoldRecursive {
+                    recursive: target,
+                }) if recursive.binder(db).same_marker(*target.binder(db)) => self,
+                TypeMapping::Structural(StructuralTypeMapping::FoldRecursive {
+                    recursive: target,
+                }) if recursive.binder(db).same_marker(*target.binder(db))
+                    && target.may_have_unbounded_specialization(db) =>
+                {
+                    Type::Recursive(*target)
+                }
+                TypeMapping::Structural(StructuralTypeMapping::FoldRecursive {
+                    recursive: target,
+                }) if recursive.binder(db).same_marker(*target.binder(db)) => self,
                 _ => {
                     let body = recursive.body(db).apply_type_mapping_impl(
                         db,
@@ -8587,13 +8617,20 @@ impl<'db> Type<'db> {
                         tcx,
                         visitor,
                     );
-                    RecursiveType::build(
-                        db,
-                        visitor.env,
-                        *recursive.binder(db),
-                        *recursive.origin(db),
-                        body,
-                    )
+                    let origin = *recursive.origin(db);
+                    let origin = if origin.is_generic_implicit_alias_constructor()
+                        && type_mapping
+                            .as_specialization()
+                            .is_some_and(|specialization| {
+                                origin.generic_context().is_some_and(|generic_context| {
+                                    specialization.restrict(db, generic_context).is_some()
+                                })
+                            }) {
+                        origin.applied(recursive.may_have_unbounded_specialization(db))
+                    } else {
+                        origin
+                    };
+                    RecursiveType::build(db, visitor.env, *recursive.binder(db), origin, body)
                 }
             },
 
@@ -9003,6 +9040,10 @@ impl<'db> Type<'db> {
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
             // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
+            Type::Divergent(divergent) if let Some(alias) = divergent.generic_implicit_alias() => {
+                alias.apply_type_mapping_impl(db, divergent, child_type_mapping, tcx, visitor)
+            }
+
             Type::Divergent(divergent) => match type_mapping {
                 TypeMapping::Structural(StructuralTypeMapping::UnfoldRecursive { recursive })
                     if divergent.same_marker(*recursive.binder(db)) =>
@@ -9118,7 +9159,19 @@ impl<'db> Type<'db> {
                     typevars.insert(bound_typevar);
                 }
             }
-            Type::Divergent(_) => {}
+            Type::Divergent(divergent) => {
+                if let Some(alias) = divergent.generic_implicit_alias() {
+                    for argument in alias.arguments(db) {
+                        argument.find_legacy_typevars_impl(
+                            db,
+                            env,
+                            binding_context,
+                            typevars,
+                            visitor,
+                        );
+                    }
+                }
+            }
 
             Type::Recursive(recursive) => visitor.visit(db, self, || {
                 if let Some(generic_context) = recursive.origin(db).generic_context() {
@@ -10282,7 +10335,7 @@ pub enum StructuralTypeMapping<'db> {
     /// Widens tuple shapes that grow during recursive inference.
     WidenRecursiveTuples {
         /// The canonical cycle binder, if the mapping is running in cycle recovery.
-        binder: Option<DivergentType>,
+        binder: Option<DivergentType<'db>>,
     },
 }
 
@@ -10290,6 +10343,20 @@ impl<'db> TypeMapping<'_, 'db> {
     pub(crate) const fn as_structural(&self) -> Option<StructuralTypeMapping<'db>> {
         match self {
             TypeMapping::Structural(mapping) => Some(*mapping),
+            _ => None,
+        }
+    }
+
+    fn as_specialization(&self) -> Option<Specialization<'db>> {
+        let (TypeMapping::ApplySpecialization(specialization)
+        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }) = self
+        else {
+            return None;
+        };
+
+        match specialization {
+            ApplySpecialization::Specialization { specialization, .. }
+            | ApplySpecialization::TypeAlias(specialization) => Some(*specialization),
             _ => None,
         }
     }
@@ -10488,7 +10555,6 @@ impl<'db> Foldable<'db> for () {
         _env: &ProgramEnvironment<'db>,
         _recursive: RecursiveType<'db>,
     ) -> Self {
-        self
     }
 }
 
@@ -10650,6 +10716,11 @@ pub enum RecursiveTypeOrigin<'db> {
         definition: Definition<'db>,
         generic_context: GenericContext<'db>,
     },
+    GenericImplicitAliasApplication {
+        definition: Definition<'db>,
+        generic_context: GenericContext<'db>,
+        growing: bool,
+    },
 }
 
 impl<'db> RecursiveTypeOrigin<'db> {
@@ -10658,15 +10729,51 @@ impl<'db> RecursiveTypeOrigin<'db> {
             Self::GenericImplicitAlias {
                 generic_context, ..
             } => Some(generic_context),
+            Self::GenericImplicitAliasApplication {
+                generic_context, ..
+            } => Some(generic_context),
             Self::Structural => None,
         }
+    }
+
+    pub(crate) const fn definition(self) -> Option<Definition<'db>> {
+        match self {
+            Self::GenericImplicitAlias { definition, .. }
+            | Self::GenericImplicitAliasApplication { definition, .. } => Some(definition),
+            Self::Structural => None,
+        }
+    }
+
+    const fn applied(self, growing: bool) -> Self {
+        match self {
+            Self::GenericImplicitAlias {
+                definition,
+                generic_context,
+            } => Self::GenericImplicitAliasApplication {
+                definition,
+                generic_context,
+                growing,
+            },
+            Self::Structural | Self::GenericImplicitAliasApplication { .. } => self,
+        }
+    }
+
+    const fn growing(self) -> Option<bool> {
+        match self {
+            Self::GenericImplicitAliasApplication { growing, .. } => Some(growing),
+            Self::Structural | Self::GenericImplicitAlias { .. } => None,
+        }
+    }
+
+    const fn is_generic_implicit_alias_constructor(self) -> bool {
+        matches!(self, Self::GenericImplicitAlias { .. })
     }
 }
 
 /// An anonymous recursive type introduced by structural type inference.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
-    pub(crate) binder: DivergentType,
+    pub(crate) binder: DivergentType<'db>,
     pub(crate) origin: RecursiveTypeOrigin<'db>,
     pub(crate) body: Type<'db>,
 }
@@ -10674,11 +10781,25 @@ pub struct RecursiveType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for RecursiveType<'_> {}
 
+/// A recursive reference to a generic implicit alias with type arguments.
+///
+/// This is carried by a [`DivergentType`] while the recursive body is inferred. Unfolding the
+/// enclosing recursive type uses the arguments to create another specialization of the same
+/// recursive family.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct GenericImplicitAlias<'db> {
+    pub(crate) definition: Definition<'db>,
+    pub(crate) arguments: Box<[Type<'db>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for GenericImplicitAlias<'_> {}
+
 impl<'db> RecursiveType<'db> {
     pub(crate) fn build(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binder: DivergentType,
+        binder: DivergentType<'db>,
         origin: RecursiveTypeOrigin<'db>,
         mut body: Type<'db>,
     ) -> Type<'db> {
@@ -10691,7 +10812,10 @@ impl<'db> RecursiveType<'db> {
             let mut retained = false;
 
             for element in union.elements(db) {
-                if matches!(element, Type::Divergent(divergent) if divergent.same_marker(binder)) {
+                if matches!(element, Type::Divergent(divergent)
+                    if divergent.same_marker(binder)
+                        && divergent.generic_implicit_alias().is_none())
+                {
                     removed_binder = true;
                 } else {
                     retained = true;
@@ -10723,6 +10847,22 @@ impl<'db> RecursiveType<'db> {
             env,
             &TypeMapping::Structural(StructuralTypeMapping::UnfoldRecursive { recursive: self }),
             TypeContext::default(),
+        )
+    }
+
+    fn apply_generic_implicit_alias_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        Self::build(
+            db,
+            env,
+            *self.binder(db),
+            self.origin(db)
+                .applied(self.may_have_unbounded_specialization(db)),
+            self.body(db).apply_specialization(db, specialization),
         )
     }
 
@@ -10774,20 +10914,94 @@ impl<'db> RecursiveType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         body: Type<'db>,
-        binder: DivergentType,
+        binder: DivergentType<'db>,
     ) -> bool {
-        any_over_type(
-            db,
-            env,
-            body,
-            false,
-            |ty| matches!(ty, Type::Divergent(divergent) if divergent.same_marker(binder)),
-        )
+        any_over_type(db, env, body, false, |ty| match ty {
+            Type::Divergent(divergent) => divergent.same_marker(binder),
+            _ => false,
+        })
     }
 
     /// Whether this recursive type is identity, i.e. `μa.a`.
     pub(crate) fn is_identity(self, db: &'db dyn Db) -> bool {
         *self.body(db) == Type::Divergent(*self.binder(db))
+    }
+
+    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        if let Some(growing) = self.origin(db).growing() {
+            return growing;
+        }
+
+        matches!(
+            Type::Recursive(self).to_type_identity(db),
+            TypeIdentity::GrowingTypeAlias(_)
+        )
+    }
+}
+
+impl<'db> GenericImplicitAlias<'db> {
+    fn specialization(
+        self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> Option<Specialization<'db>> {
+        let generic_context = recursive.origin(db).generic_context()?;
+        (generic_context.len(db) == self.arguments(db).len()).then(|| {
+            generic_context.specialize_recursive(db, self.arguments(db).iter().copied().map(Some))
+        })
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        binder: DivergentType<'db>,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if let TypeMapping::Structural(mapping) = type_mapping {
+            match mapping {
+                StructuralTypeMapping::UnfoldRecursive { recursive }
+                    if binder.same_marker(*recursive.binder(db)) =>
+                {
+                    let Some(specialization) = self.specialization(db, *recursive) else {
+                        return Type::Divergent(*recursive.binder(db));
+                    };
+                    return recursive.apply_generic_implicit_alias_specialization(
+                        db,
+                        visitor.env,
+                        specialization,
+                    );
+                }
+                StructuralTypeMapping::FoldRecursive { recursive }
+                    if binder.same_marker(*recursive.binder(db)) =>
+                {
+                    return if recursive.may_have_unbounded_specialization(db) {
+                        Type::Divergent(binder.with_generic_implicit_alias(self))
+                    } else {
+                        Type::Divergent(*recursive.binder(db))
+                    };
+                }
+                StructuralTypeMapping::ReplaceRecursiveWithBinder { recursive, .. }
+                    if binder.same_marker(*recursive.binder(db)) =>
+                {
+                    return Type::Divergent(binder.with_generic_implicit_alias(self));
+                }
+                _ => {}
+            }
+        }
+
+        let arguments: Box<[Type<'db>]> = self
+            .arguments(db)
+            .iter()
+            .copied()
+            .map(|argument| argument.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            .collect();
+        Type::Divergent(binder.with_generic_implicit_alias(Self::new(
+            db,
+            *self.definition(db),
+            arguments,
+        )))
     }
 }
 
@@ -10848,8 +11062,8 @@ impl get_size2::GetSize for TypeInferenceSlot {}
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DivergentType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub struct DivergentType<'db> {
     /// The tracked query function that caused the cycle.
     query: CycleQuery,
     /// The query key ID that caused the cycle.
@@ -10859,18 +11073,21 @@ pub struct DivergentType {
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
+    /// A recursive alias application whose arguments change during fixed-point iteration.
+    generic_implicit_alias: Option<GenericImplicitAlias<'db>>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for DivergentType {}
+impl get_size2::GetSize for DivergentType<'_> {}
 
-impl DivergentType {
+impl<'db> DivergentType<'db> {
     pub(in crate::types) const fn new(query: CycleQuery, id: salsa::Id) -> Self {
         Self {
             query,
             id,
             type_inference_slot: None,
             materialization: None,
+            generic_implicit_alias: None,
         }
     }
 
@@ -10890,6 +11107,7 @@ impl DivergentType {
             id: self.id,
             type_inference_slot: self.type_inference_slot,
             materialization: Some(kind),
+            generic_implicit_alias: self.generic_implicit_alias,
         }
     }
 
@@ -10903,7 +11121,22 @@ impl DivergentType {
             id: self.id,
             type_inference_slot: slot,
             materialization: self.materialization,
+            generic_implicit_alias: self.generic_implicit_alias,
         }
+    }
+
+    const fn with_generic_implicit_alias(self, alias: GenericImplicitAlias<'db>) -> Self {
+        Self {
+            query: self.query,
+            id: self.id,
+            type_inference_slot: self.type_inference_slot,
+            materialization: self.materialization,
+            generic_implicit_alias: Some(alias),
+        }
+    }
+
+    const fn generic_implicit_alias(self) -> Option<GenericImplicitAlias<'db>> {
+        self.generic_implicit_alias
     }
 
     const fn materialization_kind(self) -> Option<MaterializationKind> {

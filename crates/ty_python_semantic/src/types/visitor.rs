@@ -347,6 +347,15 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
     visitor: &impl TypeVisitor<'db>,
     recursion_guard: &TypeCollector<'db>,
 ) {
+    if let Type::Divergent(divergent) = ty
+        && let Some(alias) = divergent.generic_implicit_alias()
+    {
+        for argument in alias.arguments(db) {
+            visitor.visit_type(db, *argument);
+        }
+        return;
+    }
+
     match TypeKind::from(ty) {
         TypeKind::Atomic => {}
         TypeKind::NonAtomic(non_atomic_type) => {

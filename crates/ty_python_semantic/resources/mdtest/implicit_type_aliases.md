@@ -2154,10 +2154,10 @@ def _(
     annotated_nested_list_int: AnnotatedNestedList[int],
     annotated_nested_tuple_str: AnnotatedNestedTuple[str],
 ):
-    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent | int]
-    reveal_type(nested_list_str)  # revealed: list[Divergent | None]
-    reveal_type(annotated_nested_list_int)  # revealed: list[int | Divergent]
-    reveal_type(annotated_nested_tuple_str)  # revealed: tuple[str, Divergent]
+    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent[int] | int]
+    reveal_type(nested_list_str)  # revealed: list[Divergent[str] | None]
+    reveal_type(annotated_nested_list_int)  # revealed: list[int | Divergent[int]]
+    reveal_type(annotated_nested_tuple_str)  # revealed: tuple[str, Divergent[str]]
 ```
 
 ### Materialization of self-referential generic implicit type aliases

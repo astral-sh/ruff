@@ -1050,7 +1050,20 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     }
                     f.write_str(")")
                 } else {
-                    f.with_type(self.ty).write_str("Divergent")
+                    let mut f = f.with_type(self.ty);
+                    f.write_str("Divergent")?;
+                    if let Some(alias) = divergent.generic_implicit_alias() {
+                        f.write_char('[')?;
+                        DisplayTypeArray {
+                            types: alias.arguments(db),
+                            db,
+                            env: self.env,
+                            settings: self.settings.clone(),
+                        }
+                        .fmt_detailed(&mut f)?;
+                        f.write_char(']')?;
+                    }
+                    Ok(())
                 }
             }
             Type::Recursive(recursive) => {

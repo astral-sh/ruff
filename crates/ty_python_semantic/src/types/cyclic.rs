@@ -36,8 +36,8 @@ use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, StaticClassLiteral, Type,
-    TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
+    StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -76,6 +76,10 @@ impl<'db> Type<'db> {
             }
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
             (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
+            (Type::Recursive(a), Type::Recursive(b)) => {
+                a.origin(db).definition() == b.origin(db).definition()
+                    && a.origin(db).definition().is_some()
+            }
             _ => false,
         }
     }
@@ -98,7 +102,17 @@ impl<'db> Type<'db> {
             // that visits stop even though no exact type repeats. Recursion that revisits one
             // exact specialization (e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`) needs
             // no definition-level identity: the detectors stop on the repeated type itself.
-            Type::TypeAlias(_) | Type::ProtocolInstance(_) | Type::TypedDict(_) => {
+            Type::TypeAlias(_)
+            | Type::ProtocolInstance(_)
+            | Type::TypedDict(_)
+            | Type::Recursive(_) => {
+                if let Type::Recursive(recursive) = self
+                    && let Some(growing) = recursive.origin(db).growing()
+                {
+                    let definition = recursive.origin(db).definition()?;
+                    return growing.then_some(TypeIdentity::GrowingTypeAlias(definition));
+                }
+
                 let target = RecursiveDefinition::from_type(db, self)?.target;
                 if !target.may_have_unbounded_specialization(db) {
                     return None;
@@ -108,6 +122,9 @@ impl<'db> Type<'db> {
                     RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
                     RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
                     RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
+                    RecursiveDefinition::GenericImplicitAlias { .. } => {
+                        TypeIdentity::GrowingTypeAlias(definition)
+                    }
                 })
             }
             _ => None,
@@ -121,6 +138,10 @@ enum RecursiveDefinition<'db> {
     TypeAlias(TypeAliasType<'db>),
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
+    GenericImplicitAlias {
+        definition: Definition<'db>,
+        recursive: RecursiveType<'db>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -207,6 +228,7 @@ struct SpecializationFlowGraph<'db> {
 ///
 /// Referenced definitions are queued for a separate walk instead of being expanded here.
 struct SpecializationFlowVisitor<'db> {
+    source: RecursiveDefinition<'db>,
     source_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
     env: ProgramEnvironment<'db>,
     visited_types: TypeCollector<'db>,
@@ -241,6 +263,13 @@ impl<'db> RecursiveDefinition<'db> {
                     typed_dict.defining_class()?.static_class_literal(db)?;
                 (Self::TypedDict(origin), specialization)
             }
+            Type::Recursive(recursive) => (
+                Self::GenericImplicitAlias {
+                    definition: recursive.origin(db).definition()?,
+                    recursive,
+                },
+                None,
+            ),
             _ => return None,
         };
 
@@ -261,6 +290,7 @@ impl<'db> RecursiveDefinition<'db> {
         match self {
             Self::TypeAlias(alias) => alias.definition(db),
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.definition(db),
+            Self::GenericImplicitAlias { definition, .. } => definition,
         }
     }
 
@@ -268,6 +298,7 @@ impl<'db> RecursiveDefinition<'db> {
         match self {
             Self::TypeAlias(alias) => alias.generic_context(db),
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.generic_context(db),
+            Self::GenericImplicitAlias { recursive, .. } => recursive.origin(db).generic_context(),
         }
     }
 
@@ -277,10 +308,20 @@ impl<'db> RecursiveDefinition<'db> {
         generic_context: GenericContext<'db>,
     ) -> Specialization<'db> {
         let known_class = match self {
-            Self::TypeAlias(_) => None,
+            Self::TypeAlias(_) | Self::GenericImplicitAlias { .. } => None,
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.known(db),
         };
         generic_context.default_specialization(db, known_class)
+    }
+
+    fn specialization_from_arguments(
+        self,
+        db: &'db dyn Db,
+        arguments: &[Type<'db>],
+    ) -> Option<Specialization<'db>> {
+        let generic_context = self.generic_context(db)?;
+        (generic_context.len(db) == arguments.len())
+            .then(|| generic_context.specialize_recursive(db, arguments.iter().copied().map(Some)))
     }
 
     fn parameter_identity(
@@ -536,6 +577,7 @@ impl<'db> SpecializationFlowGraph<'db> {
 impl<'db> SpecializationFlowVisitor<'db> {
     fn new(db: &'db dyn Db, source: RecursiveDefinition<'db>) -> Option<Self> {
         Some(Self {
+            source,
             source_parameters: source.source_parameters(db)?,
             env: ProgramEnvironment::from_definition(source.definition(db)),
             visited_types: TypeCollector::default(),
@@ -574,6 +616,9 @@ impl<'db> SpecializationFlowVisitor<'db> {
                 if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
                     self.visit_type(db, extra_items.declared_ty);
                 }
+            }
+            RecursiveDefinition::GenericImplicitAlias { recursive, .. } => {
+                self.visit_type(db, *recursive.body(db));
             }
         }
         true
@@ -635,6 +680,29 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
             if !self.source_parameters.contains(&identity) {
                 // Nested definitions can capture a type variable from an outer generic scope.
                 // Specialization does not yet retain the parent mapping needed to model it.
+                self.inconclusive.set(true);
+            }
+            return;
+        }
+
+        if let Type::Divergent(divergent) = ty
+            && let Some(alias) = divergent.generic_implicit_alias()
+        {
+            if *alias.definition(db) == self.source.definition(db) {
+                let Some(specialization) = self
+                    .source
+                    .specialization_from_arguments(db, alias.arguments(db))
+                else {
+                    self.inconclusive.set(true);
+                    return;
+                };
+                let reference = DefinitionUse {
+                    target: self.source,
+                    specialization: Some(specialization),
+                };
+                self.record_reference(db, reference);
+                reference.walk_arguments(db, self);
+            } else {
                 self.inconclusive.set(true);
             }
             return;

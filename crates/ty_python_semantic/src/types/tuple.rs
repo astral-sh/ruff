@@ -2511,7 +2511,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binder: Option<DivergentType>,
+        binder: Option<DivergentType<'db>>,
     ) -> Self {
         let tuple = if let Some(binder) = binder {
             self.reduce_recursive_tuple_elements(db, env, binder)
@@ -2563,13 +2563,13 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binder: DivergentType,
+        binder: DivergentType<'db>,
     ) -> Self {
         fn reduce<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             element: Type<'db>,
-            binder: DivergentType,
+            binder: DivergentType<'db>,
         ) -> Type<'db> {
             if element.exact_tuple_instance_spec(db).is_some()
                 && element.contains_cycle_binder(db, env, &[binder])

@@ -357,14 +357,14 @@ NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
 def _(nested: NestedDict[str, int]):
     # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: dict[str, int | Divergent]
+    reveal_type(nested)  # revealed: dict[str, int | Divergent[str, int]]
 
 RecursiveList: TypeAlias = list[T | "RecursiveList[T]"]
 RecursivePair: TypeAlias = tuple[T, "RecursivePair[T]"]
 
 def _(recursive_list: RecursiveList[int], recursive_pair: RecursivePair[str]):
-    reveal_type(recursive_list)  # revealed: list[int | Divergent]
-    reveal_type(recursive_pair)  # revealed: tuple[str, Divergent]
+    reveal_type(recursive_list)  # revealed: list[int | Divergent[int]]
+    reveal_type(recursive_pair)  # revealed: tuple[str, Divergent[str]]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
@@ -375,6 +375,25 @@ my_isinstance(1, (int, (str | float)))
 my_isinstance(1, 1)
 # error: [invalid-argument-type]
 my_isinstance(1, (int, (str, 1)))
+```
+
+## Recursive aliases with growing type arguments
+
+When a recursive reference changes a type argument, each repeated expansion can produce a new
+specialization. We retain the recursive alias application instead of expanding those specializations
+without bound.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+Qux: TypeAlias = "list[T] | Qux[list[T]]"
+
+def _(value: Qux[int]) -> None:
+    reveal_type(value)  # revealed: list[int] | Divergent[list[int]]
+    reveal_type(value[0])  # revealed: int | list[int] | Divergent[list[int]]
+    value[0][0]  # error: [not-subscriptable]
 ```
 
 ## Materialization of self-referential generic PEP 613 type aliases

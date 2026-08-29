@@ -29,10 +29,10 @@ use crate::types::typed_dict::{
 use crate::types::typevar::{BindingContext, TypeVarSet};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
-    DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionType, UnionTypeInstance, any_over_type, todo_type,
+    DisplaySettings, DynamicType, GenericImplicitAlias, InternedType, KnownClass,
+    KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, Parameter, Parameters,
+    SpecialFormType, StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -515,10 +515,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        let slice_ty = self.infer_expression(&subscript.slice, TypeContext::default());
-        let generic_context = self.generic_context_from_typevars(slice_ty);
+        let argument_tys = match &*subscript.slice {
+            ast::Expr::Tuple(tuple) if !tuple.parenthesized => tuple
+                .elts
+                .iter()
+                .map(|argument| self.infer_type_expression(argument))
+                .collect::<Vec<_>>(),
+            slice => vec![self.infer_type_expression(slice)],
+        };
+        let generic_context = argument_tys
+            .iter()
+            .copied()
+            .map(|argument| self.generic_context_from_typevars(argument))
+            .reduce(|left, right| left.merge(db, right))?;
         self.record_cycle_recovery_generic_context(definition, generic_context);
-        Some(value_ty)
+
+        let binder = match value_ty {
+            Type::Divergent(binder) => binder,
+            Type::Recursive(recursive) => *recursive.binder(db),
+            _ => return Some(value_ty),
+        };
+
+        let alias = GenericImplicitAlias::new(db, definition, argument_tys.into_boxed_slice());
+        Some(Type::Divergent(binder.with_generic_implicit_alias(alias)))
     }
 
     pub(super) fn infer_explicit_class_specialization(
