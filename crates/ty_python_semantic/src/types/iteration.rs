@@ -1,9 +1,9 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
-    AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-    LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionType,
+    AwaitError, Bindings, CallArguments, CallDunderError, Foldable, KnownClass,
+    LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, RecursiveType, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionType,
     call::CallErrorKind,
     context::InferContext,
     diagnostic::NOT_ITERABLE,
@@ -277,6 +277,15 @@ impl<'db> Type<'db> {
             }
         }
 
+        if let Type::Recursive(recursive) = self {
+            return recursive.map_or_else(
+                db,
+                env,
+                || Ok(Cow::Owned(TupleSpec::homogeneous(self))),
+                |unfolded| unfolded.try_iterate_with_mode(db, env, mode),
+            );
+        }
+
         if mode.is_async() {
             if let Type::Intersection(_) = self {
                 let flattened = self.flatten_typevars(db, env);
@@ -519,6 +528,67 @@ pub(super) enum IterationError<'db> {
 
     /// The asynchronous iterable has no `__aiter__` method.
     UnboundAiterError,
+}
+
+impl<'db> Foldable<'db> for Cow<'db, TupleSpec<'db>> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Cow::Owned(self.into_owned().fold(db, env, recursive))
+    }
+}
+
+impl<'db> Foldable<'db> for IterationError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::IterCallError {
+                kind,
+                bindings,
+                mode,
+            } => Self::IterCallError {
+                kind,
+                bindings,
+                mode,
+            },
+            Self::IterReturnsInvalidIterator {
+                iterator,
+                dunder_error,
+                mode,
+            } => Self::IterReturnsInvalidIterator {
+                iterator: iterator.fold(db, env, recursive),
+                dunder_error: dunder_error.fold(db, env, recursive),
+                mode,
+            },
+            Self::PossiblyUnboundIterAndGetitemError {
+                dunder_next_return,
+                unbound_on_iter,
+                dunder_getitem_error,
+            } => Self::PossiblyUnboundIterAndGetitemError {
+                dunder_next_return: dunder_next_return.fold(db, env, recursive),
+                unbound_on_iter: unbound_on_iter.map(|types| {
+                    types
+                        .into_iter()
+                        .map(|ty| ty.fold(db, env, recursive))
+                        .collect()
+                }),
+                dunder_getitem_error: dunder_getitem_error.fold(db, env, recursive),
+            },
+            Self::UnboundIterAndGetitemError {
+                dunder_getitem_error,
+            } => Self::UnboundIterAndGetitemError {
+                dunder_getitem_error: dunder_getitem_error.fold(db, env, recursive),
+            },
+            Self::UnboundAiterError => Self::UnboundAiterError,
+        }
+    }
 }
 
 impl<'db> IterationError<'db> {

@@ -719,6 +719,46 @@ struct MemberLookupError<'db> {
 
 impl get_size2::GetSize for MemberLookupError<'_> {}
 
+impl<'db> Foldable<'db> for MemberLookupError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        let kind = match self.kind(db) {
+            MemberLookupErrorKind::DescriptorGet(context) => {
+                MemberLookupErrorKind::DescriptorGet(DescriptorGetCallContext::new(
+                    db,
+                    context.descriptor_type(db).fold(db, env, recursive),
+                    context.callable_type(db).fold(db, env, recursive),
+                    context
+                        .instance(db)
+                        .map(|instance| instance.fold(db, env, recursive)),
+                    context.owner(db).fold(db, env, recursive),
+                ))
+            }
+            MemberLookupErrorKind::GetAttr { receiver, name } => MemberLookupErrorKind::GetAttr {
+                receiver: receiver.fold(db, env, recursive),
+                name: name.fold(db, env, recursive),
+            },
+            MemberLookupErrorKind::ModuleGetAttr { callable, name } => {
+                MemberLookupErrorKind::ModuleGetAttr {
+                    callable: callable.fold(db, env, recursive),
+                    name: name.fold(db, env, recursive),
+                }
+            }
+            MemberLookupErrorKind::GetAttribute { receiver, name } => {
+                MemberLookupErrorKind::GetAttribute {
+                    receiver: receiver.fold(db, env, recursive),
+                    name: name.fold(db, env, recursive),
+                }
+            }
+        };
+        Self::new(db, self.fallback_member(db).fold(db, env, recursive), kind)
+    }
+}
+
 impl<'db> MemberLookupError<'db> {
     /// Reports the failed implicit call unless the lookup is shadowed or used for deletion.
     fn report_diagnostic(
@@ -3422,9 +3462,14 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
-                Some(Place::bound(self).into())
-            }
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || Some(Place::bound(*self).into()),
+                |unfolded| unfolded.find_name_in_mro_with_policy(db, env, name, policy),
+            ),
+
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, env, None, name, policy))
@@ -3995,9 +4040,14 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, env, *complement, name)
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
-                Place::bound(self).into()
-            }
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || Place::bound(*self).into(),
+                |unfolded| unfolded.instance_member(db, env, name),
+            ),
+
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
             Type::NominalInstance(instance) => {
                 instance.class(db, env).instance_member(db, env, name)
@@ -5145,9 +5195,18 @@ impl<'db> Type<'db> {
                         .into()
                 }
 
-                Type::Dynamic(..) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
-                    Place::bound(this).into()
-                }
+                Type::Recursive(recursive) => recursive.map_or_else(
+                    db,
+                    env,
+                    || Place::bound(this).into(),
+                    |unfolded| {
+                        unfolded.member_lookup_with_policy_and_receiver(
+                            db, env, name_str, policy, receiver,
+                        )
+                    },
+                ),
+
+                Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -10093,6 +10152,47 @@ impl<'db> Foldable<'db> for Type<'db> {
     }
 }
 
+impl<'db, T> Foldable<'db> for Option<T>
+where
+    T: Foldable<'db>,
+{
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        self.map(|value| value.fold(db, env, recursive))
+    }
+}
+
+impl<'db, T, E> Foldable<'db> for Result<T, E>
+where
+    T: Foldable<'db>,
+    E: Foldable<'db>,
+{
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        self.map(|value| value.fold(db, env, recursive))
+            .map_err(|error| error.fold(db, env, recursive))
+    }
+}
+
+impl<'db> Foldable<'db> for PlaceAndQualifiers<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        self.map_type(|ty| ty.fold(db, env, recursive))
+    }
+}
+
 impl<'db> RecursiveType<'db> {
     /// Construct an anonymous recursive type, returning its body when the binder is unused.
     pub(crate) fn build(
@@ -10140,7 +10240,7 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Replace this recursive type binder with the recursive type itself.
-    pub(crate) fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         self.body(db).apply_type_mapping(
             db,
             env,

@@ -31,7 +31,7 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionType,
+    Foldable, IntersectionType, RecursiveType, Type, TypeContext, TypeMapping, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
@@ -871,6 +871,45 @@ fn to_class_type_cycle_initial<'db>(
 
 /// A tuple spec describes the contents of a tuple type, which might be fixed- or variable-length.
 pub(crate) type TupleSpec<'db> = Tuple<Type<'db>, VariableSegment<'db>>;
+
+impl<'db> Foldable<'db> for TupleSpec<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Tuple::Fixed(tuple) => Tuple::Fixed(FixedLengthTuple::from_elements(
+                tuple
+                    .owned_elements()
+                    .into_iter()
+                    .map(|ty| ty.fold(db, env, recursive)),
+            )),
+            Tuple::Variable(tuple) => {
+                let variable = match tuple.variable() {
+                    VariableSegment::Homogeneous(ty) => {
+                        VariableSegment::Homogeneous(ty.fold(db, env, recursive))
+                    }
+                    VariableSegment::TypeVarTuple(typevar) => {
+                        VariableSegment::TypeVarTuple(typevar)
+                    }
+                };
+                VariableLengthTuple::mixed(
+                    tuple
+                        .prefix_elements()
+                        .iter()
+                        .map(|ty| ty.fold(db, env, recursive)),
+                    variable,
+                    tuple
+                        .suffix_elements()
+                        .iter()
+                        .map(|ty| ty.fold(db, env, recursive)),
+                )
+            }
+        }
+    }
+}
 
 /// The variable-length portion of a [`TupleSpec`].
 ///

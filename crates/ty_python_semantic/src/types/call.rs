@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{ClassType, Signature, Type, TypeContext, UnionType};
+use super::{ClassType, Foldable, RecursiveType, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
@@ -420,6 +420,34 @@ pub(super) enum CallDunderError<'db> {
 
     /// The dunder method with the specified name is missing.
     MethodNotAvailable,
+}
+
+impl<'db> Foldable<'db> for CallDunderError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::CallError(kind, bindings, provenance) => {
+                Self::CallError(kind, bindings, provenance)
+            }
+            Self::PossiblyUnbound {
+                bindings,
+                unbound_on,
+            } => Self::PossiblyUnbound {
+                bindings,
+                unbound_on: unbound_on.map(|types| {
+                    types
+                        .into_iter()
+                        .map(|ty| ty.fold(db, env, recursive))
+                        .collect()
+                }),
+            },
+            Self::MethodNotAvailable => Self::MethodNotAvailable,
+        }
+    }
 }
 
 impl<'db> CallDunderError<'db> {

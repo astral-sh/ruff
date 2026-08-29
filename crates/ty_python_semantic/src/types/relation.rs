@@ -1370,6 +1370,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         if self.relation.can_safely_assume_reflexivity(source) && source == target {
             return self.always();
         }
+        if source == target && matches!(source, Type::Recursive(_)) {
+            return self.always();
+        }
 
         let env = self.env;
 
@@ -1448,11 +1451,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
+            (Type::Recursive(source_recursive), Type::Recursive(target_recursive)) => self
+                .with_recursion_guard(db, source, target, || {
+                    let source_unfolded = source_recursive.unfold(db, env);
+                    let target_unfolded = target_recursive.unfold(db, env);
+                    if source_unfolded == source || target_unfolded == target {
+                        self.never()
+                    } else {
+                        self.check_type_pair(db, source_unfolded, target_unfolded)
+                    }
+                }),
+
+            (Type::Recursive(recursive), _) => {
+                self.with_recursion_guard(db, source, target, || {
+                    let unfolded = recursive.unfold(db, env);
+                    if unfolded == source {
+                        self.never()
+                    } else {
+                        self.check_type_pair(db, unfolded, target)
+                    }
+                })
+            }
+
+            (_, Type::Recursive(recursive)) => {
+                self.with_recursion_guard(db, source, target, || {
+                    let unfolded = recursive.unfold(db, env);
+                    if unfolded == target {
+                        self.never()
+                    } else {
+                        self.check_type_pair(db, source, unfolded)
+                    }
+                })
+            }
+
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
-            (Type::Divergent(_) | Type::Recursive(_), _)
-            | (_, Type::Divergent(_) | Type::Recursive(_)) => {
+            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
@@ -3041,8 +3076,40 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
-            (Type::Divergent(_) | Type::Recursive(_), _)
-            | (_, Type::Divergent(_) | Type::Recursive(_)) => self.never(),
+            (Type::Recursive(left_recursive), Type::Recursive(right_recursive)) => {
+                nontrivial_check(self, || {
+                    self.with_recursion_guard(db, left, right, || {
+                        let left_unfolded = left_recursive.unfold(db, env);
+                        let right_unfolded = right_recursive.unfold(db, env);
+                        if left_unfolded == left || right_unfolded == right {
+                            self.never()
+                        } else {
+                            self.check_type_pair(db, left_unfolded, right_unfolded)
+                        }
+                    })
+                })
+            }
+            (Type::Recursive(recursive), _) => nontrivial_check(self, || {
+                self.with_recursion_guard(db, left, right, || {
+                    let unfolded = recursive.unfold(db, env);
+                    if unfolded == left {
+                        self.never()
+                    } else {
+                        self.check_type_pair(db, unfolded, right)
+                    }
+                })
+            }),
+            (_, Type::Recursive(recursive)) => nontrivial_check(self, || {
+                self.with_recursion_guard(db, left, right, || {
+                    let unfolded = recursive.unfold(db, env);
+                    if unfolded == right {
+                        self.never()
+                    } else {
+                        self.check_type_pair(db, left, unfolded)
+                    }
+                })
+            }),
+            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
             (Type::TypeAlias(alias), _) => nontrivial_check(self, || {
                 let left_alias_ty = alias.value_type(db);

@@ -530,6 +530,134 @@ fn recursive_type_fold_and_unfold() {
 }
 
 #[test]
+fn recursive_type_operations_unfold_and_fold() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(db, &env);
+    let element = Type::Union(UnionType::new(
+        db,
+        vec![int, Type::Divergent(binder)].into_boxed_slice(),
+        RecursivelyDefined::No,
+    ));
+    let body = KnownClass::List.to_specialized_instance(db, &env, &[element]);
+    let Type::Recursive(recursive) =
+        RecursiveType::build(db, &env, binder, RecursiveTypeOrigin::Implicit, body)
+    else {
+        panic!("a body containing the binder should remain recursive");
+    };
+    let recursive_list = Type::Recursive(recursive);
+    let projected = UnionType::from_elements(db, &env, [int, recursive_list]);
+    assert!(any_over_type(db, &env, recursive_list, false, |ty| ty == int));
+
+    assert_eq!(
+        recursive_list
+            .subscript(db, &env, Type::int_literal(0), ast::ExprContext::Load)
+            .expect("a recursive list should be subscriptable"),
+        projected
+    );
+    assert_eq!(
+        recursive_list
+            .try_iterate(db, &env)
+            .expect("a recursive list should be iterable")
+            .homogeneous_element_type(db, &env),
+        projected
+    );
+    assert!(!matches!(
+        recursive_list
+            .member(db, &env, "append")
+            .place
+            .expect_type(),
+        Type::Recursive(_)
+    ));
+    assert!(
+        recursive_list
+            .instance_member(db, &env, "append")
+            .place
+            .is_undefined()
+    );
+    assert!(!recursive_list.is_assignable_to(
+        db,
+        &env,
+        KnownClass::List.to_specialized_instance(db, &env, &[Type::object()]),
+    ));
+    assert!(recursive_list.is_disjoint_from(db, &env, KnownClass::Int.to_instance(db, &env),));
+
+    let tuple_binder = DivergentType::new(salsa::plumbing::Id::from_bits(2));
+    let tuple_body = Type::heterogeneous_tuple(db, &env, [Type::Divergent(tuple_binder)]);
+    let recursive_tuple = RecursiveType::build(
+        db,
+        &env,
+        tuple_binder,
+        RecursiveTypeOrigin::Implicit,
+        tuple_body,
+    );
+    assert_eq!(
+        recursive_tuple
+            .try_bool(db, &env)
+            .expect("a recursive tuple should be boolable"),
+        Truthiness::AlwaysTrue
+    );
+    assert!(!recursive_list.is_assignable_to(db, &env, recursive_tuple));
+    assert!(recursive_list.is_disjoint_from(db, &env, recursive_tuple));
+
+    let class_binder = DivergentType::new(salsa::plumbing::Id::from_bits(4));
+    let class_body = Type::GenericAlias(list_alias(db, &env, Type::Divergent(class_binder)));
+    let Type::Recursive(recursive_class) = RecursiveType::build(
+        db,
+        &env,
+        class_binder,
+        RecursiveTypeOrigin::Implicit,
+        class_body,
+    ) else {
+        panic!("a generic alias containing the binder should remain recursive");
+    };
+    assert!(!matches!(
+        Type::Recursive(recursive_class)
+            .find_name_in_mro(db, &env, "append")
+            .expect("a recursive generic alias should expose its class member")
+            .place
+            .expect_type(),
+        Type::Recursive(_)
+    ));
+
+    let identity_binder = DivergentType::new(salsa::plumbing::Id::from_bits(3));
+    let Type::Recursive(identity_recursive) = RecursiveType::build(
+        db,
+        &env,
+        identity_binder,
+        RecursiveTypeOrigin::Implicit,
+        Type::Divergent(identity_binder),
+    ) else {
+        panic!("an identity body should preserve the recursive binder");
+    };
+    let identity = Type::Recursive(identity_recursive);
+    assert_eq!(identity_recursive.unfold(db, &env), identity);
+    assert_eq!(
+        identity
+            .subscript(db, &env, Type::int_literal(0), ast::ExprContext::Load)
+            .expect("an identity recursive type uses the conservative subscript fallback"),
+        identity
+    );
+    assert_eq!(
+        identity
+            .try_iterate(db, &env)
+            .expect("an identity recursive type uses the conservative iteration fallback")
+            .homogeneous_element_type(db, &env),
+        identity
+    );
+    assert_eq!(
+        identity
+            .try_bool(db, &env)
+            .expect("an identity recursive type uses the conservative truthiness fallback"),
+        Truthiness::Ambiguous
+    );
+    assert!(identity.is_assignable_to(db, &env, identity));
+    assert!(!identity.is_assignable_to(db, &env, int));
+}
+
+#[test]
 fn recursive_type_mapping_preserves_intersection_aliases() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;

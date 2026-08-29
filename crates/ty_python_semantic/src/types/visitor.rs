@@ -323,7 +323,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::NewTypeInstance(newtype) => {
             visitor.visit_newtype_instance_type(db, newtype);
         }
-        NonAtomicType::Recursive(recursive) => visitor.visit_type(db, recursive.body(db)),
+        NonAtomicType::Recursive(recursive) => {
+            visitor.visit_type(db, recursive.unfold(db, visitor.program_environment()));
+        }
     }
 }
 

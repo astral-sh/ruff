@@ -4,10 +4,11 @@ use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::{
-    CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
-    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    CallArguments, CallDunderError, ClassType, CycleDetector, Foldable, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, PropertyInstanceClass, RecursiveType, SubclassOfInner,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
+    constraints::ConstraintSetBuilder, context::InferContext,
+    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -243,9 +244,17 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
+            Type::Recursive(recursive) => {
+                return recursive.map_or_else(
+                    db,
+                    env,
+                    || Ok(Truthiness::Ambiguous),
+                    |unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor),
+                );
+            }
+
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::Recursive(_)
             | Type::Never
             | Type::Callable(_)
             | Type::TypeIs(_)
@@ -424,6 +433,59 @@ pub(crate) enum BoolError<'db> {
     /// E.g. because calling `__bool__` returns in a union type and not all variants support `__bool__` or
     /// because `__bool__` points to a type that has a possibly missing `__call__` method.
     Other { not_boolable_type: Type<'db> },
+}
+
+impl<'db> Foldable<'db> for Truthiness {
+    fn fold(
+        self,
+        _db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        _recursive: RecursiveType<'db>,
+    ) -> Self {
+        self
+    }
+}
+
+impl<'db> Foldable<'db> for BoolError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::NotCallable { not_boolable_type } => Self::NotCallable {
+                not_boolable_type: not_boolable_type.fold(db, env, recursive),
+            },
+            Self::IncorrectArguments {
+                not_boolable_type,
+                truthiness,
+            } => Self::IncorrectArguments {
+                not_boolable_type: not_boolable_type.fold(db, env, recursive),
+                truthiness,
+            },
+            Self::IncorrectReturnType {
+                not_boolable_type,
+                return_type,
+            } => Self::IncorrectReturnType {
+                not_boolable_type: not_boolable_type.fold(db, env, recursive),
+                return_type: return_type.fold(db, env, recursive),
+            },
+            Self::Union { union, truthiness } => {
+                let folded = Type::Union(union).fold(db, env, recursive);
+                if let Type::Union(union) = folded {
+                    Self::Union { union, truthiness }
+                } else {
+                    Self::Other {
+                        not_boolable_type: folded,
+                    }
+                }
+            }
+            Self::Other { not_boolable_type } => Self::Other {
+                not_boolable_type: not_boolable_type.fold(db, env, recursive),
+            },
+        }
+    }
 }
 
 impl<'db> BoolError<'db> {

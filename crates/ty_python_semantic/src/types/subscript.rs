@@ -23,8 +23,9 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
+    ClassLiteral, Foldable, IntersectionBuilder, IntersectionType, KnownInstanceType,
+    RecursiveType, Type, TypeAliasType, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
+    todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -184,6 +185,79 @@ impl<'db> SubscriptError<'db> {
         let slice_node = subscript.slice.as_ref();
         for error in &self.errors {
             error.report_diagnostic(context, subscript, value_node, slice_node);
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for SubscriptError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        let errors = self
+            .errors
+            .into_iter()
+            .map(|error| match error {
+                SubscriptErrorKind::IndexOutOfBounds {
+                    kind,
+                    tuple_ty,
+                    length,
+                    index,
+                } => SubscriptErrorKind::IndexOutOfBounds {
+                    kind,
+                    tuple_ty: tuple_ty.fold(db, env, recursive),
+                    length,
+                    index,
+                },
+                SubscriptErrorKind::DunderPossiblyUnbound { method, value_ty } => {
+                    SubscriptErrorKind::DunderPossiblyUnbound {
+                        method,
+                        value_ty: value_ty.fold(db, env, recursive),
+                    }
+                }
+                SubscriptErrorKind::DunderCallError {
+                    method,
+                    value_ty,
+                    slice_ty,
+                    kind,
+                    bindings,
+                } => SubscriptErrorKind::DunderCallError {
+                    method,
+                    value_ty: value_ty.fold(db, env, recursive),
+                    slice_ty: slice_ty.fold(db, env, recursive),
+                    kind,
+                    bindings,
+                },
+                SubscriptErrorKind::InvalidTypedDictKey {
+                    typed_dict,
+                    slice_ty,
+                    full_object_ty,
+                } => SubscriptErrorKind::InvalidTypedDictKey {
+                    typed_dict,
+                    slice_ty: slice_ty.fold(db, env, recursive),
+                    full_object_ty: full_object_ty.map(|ty| ty.fold(db, env, recursive)),
+                },
+                SubscriptErrorKind::NotSubscriptable { value_ty, method } => {
+                    SubscriptErrorKind::NotSubscriptable {
+                        value_ty: value_ty.fold(db, env, recursive),
+                        method,
+                    }
+                }
+                SubscriptErrorKind::InvalidLegacyGenericArgument {
+                    origin,
+                    argument_ty,
+                } => SubscriptErrorKind::InvalidLegacyGenericArgument {
+                    origin,
+                    argument_ty: argument_ty.fold(db, env, recursive),
+                },
+                error => error,
+            })
+            .collect();
+        Self {
+            result_ty: self.result_ty.fold(db, env, recursive),
+            errors,
         }
     }
 }
@@ -575,9 +649,14 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never, _) => {
-                Some(Ok(value_ty))
-            }
+            (Type::Recursive(recursive), _) => Some(recursive.map_or_else(
+                db,
+                env,
+                || Ok(value_ty),
+                |unfolded| unfolded.subscript(db, env, slice_ty, expr_context),
+            )),
+
+            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
             (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
                 db,
