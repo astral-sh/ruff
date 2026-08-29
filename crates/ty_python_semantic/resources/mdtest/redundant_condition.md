@@ -603,6 +603,52 @@ def saved_condition(value: Comparable):
 
 ## Conditional expressions used as conditions
 
+When a conditional expression is tested for truthiness, its selected branch is also tested. We
+report uncalled functions in either branch, even when the complete condition has ambiguous
+truthiness. Reporting a branch also suppresses a redundant diagnostic on the complete condition.
+
+```py
+def ready() -> bool:
+    return False
+
+def uncalled_functions(flag: bool):
+    if ready if flag else False:  # error: [redundant-condition] "Function `ready` is always truthy"
+        pass
+    if False if flag else ready:  # error: [redundant-condition] "Function `ready` is always truthy"
+        pass
+    if ready if flag else True:  # error: [redundant-condition] "Function `ready` is always truthy"
+        pass
+    assert ready if flag else False  # error: [redundant-condition] "Function `ready` is always truthy"
+```
+
+Negating a conditional expression also tests the selected branch's truthiness, even outside a
+statement condition.
+
+```py
+def negated_selection(flag: bool) -> bool:
+    return not (ready if flag else False)  # error: [redundant-condition] "Function `ready` is always truthy"
+```
+
+Selecting a function as a value does not test its truthiness, even inside a larger condition. The
+`callable()` call below tests whether the selected value can be called:
+
+```py
+def selected_value(flag: bool):
+    if callable(ready if flag else None):
+        pass
+```
+
+Boolean branches retain the exemptions for compound-condition operands and defensive assertions. An
+always-true conditional expression is reported as a whole outside an assertion:
+
+```py
+def boolean_branches(value: int, flag: bool):
+    assert isinstance(value, int) if flag else True
+    # error: [redundant-condition-strict] "Condition `isinstance(value, int) if flag else True` is always true"
+    if isinstance(value, int) if flag else True:
+        pass
+```
+
 Both branches of this conditional expression are truthy when evaluated directly as conditions. Even
 if `value` has mutable truthiness, `value or True` short-circuits directly to the loop body when
 `value` is truthy and evaluates `True` otherwise.

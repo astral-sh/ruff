@@ -356,7 +356,7 @@ impl RedundantConditionContext {
 /// a diagnostic that is disabled or ignored can still suppress a diagnostic on a larger expression.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ConditionCheckResult {
-    /// The containing `and`, `or`, or `not` expression can still be reported.
+    /// The containing boolean or conditional expression can still be reported.
     ///
     /// For example, the boolean result of `isinstance()` is exempt when checked as a subexpression,
     /// so we can report the complete `not` expression instead:
@@ -368,7 +368,7 @@ enum ConditionCheckResult {
     /// ```
     CheckEnclosingCondition,
 
-    /// The containing `and`, `or`, or `not` expression should not be reported.
+    /// The containing boolean or conditional expression should not be reported.
     ///
     /// For example, reporting that `ready` is always truthy suppresses a second diagnostic saying
     /// that `not ready` is always false. This also applies if the diagnostic on `ready` is ignored
@@ -633,9 +633,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 /// scope. The redundant-condition checker reads those results to decide which boolean tests to
 /// report.
 ///
-/// The redundant-condition checker examines the operands of `and`, `or`, and `not` before deciding
-/// whether to report the expression containing them. This ensures that the same mistake is not
-/// reported twice.
+/// The redundant-condition checker examines the operands of `and`, `or`, and `not`, and the branches
+/// of conditional expressions, before deciding whether to report the expression containing them.
+/// This ensures that the same mistake is not reported twice.
 ///
 /// The [`diagnostic`] module constructs diagnostic messages and fixes.
 struct RedundantConditionChecker<'a, 'db> {
@@ -731,8 +731,8 @@ impl<'db> RedundantConditionChecker<'_, 'db> {
 
     /// Check `test` and its operands for redundancy, and report diagnostics where appropriate.
     ///
-    /// Return [`ConditionCheckResult::SuppressEnclosingCondition`] if a caller checking an `and`,
-    /// `or`, or `not` expression containing `test` should suppress the diagnostic on that larger
+    /// Return [`ConditionCheckResult::SuppressEnclosingCondition`] if a caller checking a boolean
+    /// or conditional expression containing `test` should suppress the diagnostic on that larger
     /// expression. For example, the code below receives a diagnostic on `ready` because the
     /// function object is always truthy. It does not also receive a diagnostic saying that
     /// `not ready` is always false:
@@ -792,6 +792,33 @@ impl<'db> RedundantConditionChecker<'_, 'db> {
                     evaluation_strategy,
                     RedundantConditionContext::CompoundOperand,
                 );
+            }
+
+            ast::Expr::If(ast::ExprIf {
+                test, body, orelse, ..
+            }) => {
+                // This test chooses a branch independently of the enclosing truthiness check.
+                // The selected branch supplies the value tested by the enclosing condition.
+                self.check(
+                    test,
+                    self.builder.expression_type(test),
+                    self.builder.condition_truthiness(test),
+                    ExpressionEvaluationStrategy::Condition,
+                    condition_context.nested_test(),
+                );
+
+                for branch in [body, orelse] {
+                    if self.check(
+                        branch,
+                        self.builder.expression_type(branch),
+                        self.expression_truthiness(branch, evaluation_strategy),
+                        evaluation_strategy,
+                        RedundantConditionContext::CompoundOperand,
+                    ) == ConditionCheckResult::SuppressEnclosingCondition
+                    {
+                        operand_result = ConditionCheckResult::SuppressEnclosingCondition;
+                    }
+                }
             }
 
             _ => self.check_nested_conditions(test, condition_context.nested_test()),
