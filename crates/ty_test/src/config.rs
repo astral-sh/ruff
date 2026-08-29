@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use ty_module_resolver::ModuleName;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_semantic::dependency::{
-    DependencyDistribution, DependencyMetadata, DependencyProject,
+    DependencyDistribution, DependencyMetadata, DependencyProject, DependencyProjectKind,
 };
 use ty_python_semantic::lint::Level;
 
@@ -91,6 +91,7 @@ impl MarkdownTestConfig {
 pub(crate) struct ScriptOptions {
     pub(crate) rules: Option<Rules>,
     pub(crate) analysis: Option<Analysis>,
+    pub(crate) dependency_metadata: Option<DependencyMetadataFixture>,
 }
 
 impl ScriptOptions {
@@ -98,7 +99,14 @@ impl ScriptOptions {
         let tag = ScriptTag::parse(source.as_bytes())?;
         let metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
 
-        Some(metadata.tool.and_then(|tool| tool.ty).unwrap_or_default())
+        let mut options = metadata.tool.and_then(|tool| tool.ty).unwrap_or_default();
+        if let Some(fixture) = &mut options.dependency_metadata {
+            for project in &mut fixture.metadata.projects {
+                project.kind = DependencyProjectKind::Script;
+            }
+        }
+
+        Some(options)
     }
 }
 
@@ -236,6 +244,7 @@ impl TryFrom<DependencyMetadataOptions> for DependencyMetadataFixture {
                     .into_iter()
                     .map(|project| DependencyProject {
                         path: project.path,
+                        kind: DependencyProjectKind::Project,
                         distribution: project.distribution,
                         dependencies: project.dependencies.into_iter().collect(),
                         group_dependencies: project.group_dependencies.into_iter().collect(),

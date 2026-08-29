@@ -480,7 +480,30 @@ A project can also specify `group-dependencies`. An editable distribution can sp
 names, and their values list the distributions that provide each module.
 
 The fixture follows the same section inheritance as other mdtest configuration. Standalone PEP 723
-scripts do not inherit this project metadata.
+scripts do not inherit this project metadata. Instead, a script can supply its own fixture under
+`[tool.ty.dependency-metadata]` in its inline metadata block. Each project entry uses the script's
+exact absolute path, not its containing directory:
+
+````markdown
+`script.py`:
+
+```py
+# /// script
+# dependencies = ["requests"]
+# [tool.ty.dependency-metadata]
+# projects = [{ path = "/src/script.py", dependencies = ["requests"] }]
+# [tool.ty.dependency-metadata.distributions]
+# requests = { name = "requests" }
+# [tool.ty.dependency-metadata.module-owners]
+# requests = ["requests"]
+# ///
+
+import requests
+```
+````
+
+`tool.ty.dependency-metadata` is available only in tests. The script's `dependencies` field does not
+automatically populate the fixture, and a script without a fixture has no dependency metadata.
 
 ## Documentation of tests
 

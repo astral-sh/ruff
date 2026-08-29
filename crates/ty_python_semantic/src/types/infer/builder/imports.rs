@@ -7,7 +7,7 @@ use ty_module_resolver::{
 
 use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
-    dependency::missing_direct_dependency,
+    dependency::{DependencyProjectKind, missing_direct_dependency},
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
@@ -63,14 +63,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             module.name(db),
             missing.distribution_name,
         ));
-        diagnostic.help(format_args!(
-            "Declare `{}` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`",
-            missing.distribution_name,
-        ));
+        match missing.project_kind {
+            DependencyProjectKind::Project => diagnostic.help(format_args!(
+                "Declare `{}` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`",
+                missing.distribution_name,
+            )),
+            DependencyProjectKind::Script => diagnostic.help(format_args!(
+                "Declare `{}` in the script's inline `dependencies` metadata",
+                missing.distribution_name,
+            )),
+        }
         if missing.group_dependency {
             diagnostic.info("Dependency groups are only available to non-package files");
         }
-        diagnostic.info("See https://docs.astral.sh/uv/concepts/projects/dependencies/");
+        diagnostic.info(match missing.project_kind {
+            DependencyProjectKind::Project => {
+                "See https://docs.astral.sh/uv/concepts/projects/dependencies/"
+            }
+            DependencyProjectKind::Script => {
+                "See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies"
+            }
+        });
     }
 
     fn report_unresolved_import(

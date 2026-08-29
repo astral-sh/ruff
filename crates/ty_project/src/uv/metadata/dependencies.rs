@@ -8,7 +8,7 @@ use ruff_db::system::SystemPathBuf;
 use thiserror::Error;
 use ty_module_resolver::ModuleName;
 use ty_python_semantic::dependency::{
-    DependencyDistribution, DependencyMetadata, DependencyProject,
+    DependencyDistribution, DependencyMetadata, DependencyProject, DependencyProjectKind,
 };
 
 use super::{NodeKind, ResolutionNode, UvMetadata};
@@ -120,6 +120,30 @@ impl UvMetadata {
         };
 
         let mut projects = Vec::new();
+        if let Some(script) = &self.script {
+            if !script.path.is_absolute() {
+                return Err(DependencyMetadataError::RelativePath {
+                    kind: "script",
+                    id: script.id.clone(),
+                    path: script.path.clone(),
+                });
+            }
+            let node = self.node(&script.id)?;
+            if node.kind != NodeKind::Script {
+                return Err(DependencyMetadataError::UnexpectedNodeKind {
+                    id: script.id.clone(),
+                    expected: "script",
+                });
+            }
+            projects.push(DependencyProject {
+                path: script.path.clone(),
+                kind: DependencyProjectKind::Script,
+                distribution: None,
+                dependencies: dependencies(node)?,
+                group_dependencies: BTreeSet::new(),
+            });
+        }
+
         let mut member_paths = BTreeSet::new();
         for member in &self.members {
             if !member.path.is_absolute() {
@@ -157,6 +181,7 @@ impl UvMetadata {
 
             projects.push(DependencyProject {
                 path: member.path.clone(),
+                kind: DependencyProjectKind::Project,
                 distribution: Some(member.id.clone()),
                 dependencies: direct,
                 group_dependencies: groups,
@@ -170,6 +195,7 @@ impl UvMetadata {
         {
             projects.push(DependencyProject {
                 path: root.to_path_buf(),
+                kind: DependencyProjectKind::Project,
                 distribution: None,
                 dependencies: BTreeSet::new(),
                 group_dependencies: workspace_groups,
@@ -282,7 +308,7 @@ pub(crate) enum DependencyMetadataError {
 }
 
 impl DependencyMetadataError {
-    pub(crate) fn to_diagnostic(&self) -> Diagnostic {
+    pub(crate) fn to_diagnostic(&self, kind: DependencyProjectKind) -> Diagnostic {
         let mut diagnostic = Diagnostic::new(
             DiagnosticId::UvMetadata,
             Severity::Warning,
@@ -298,7 +324,9 @@ impl DependencyMetadataError {
         match self {
             Self::MissingModuleOwnership
             | Self::MissingEnvironment
-            | Self::MissingSelectedEnvironment => {
+            | Self::MissingSelectedEnvironment
+                if kind == DependencyProjectKind::Project =>
+            {
                 diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Help,
                     "Synchronize the environment with `uv sync` or run ty through `uv check`",

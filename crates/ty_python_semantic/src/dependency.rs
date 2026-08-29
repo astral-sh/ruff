@@ -41,9 +41,9 @@ pub struct DependencyMetadata {
 impl DependencyMetadata {
     /// Check whether `importing_file` is allowed to import `imported_module`.
     ///
-    /// Use the nearest containing project's declarations. Imports of its own distribution
-    /// and its runtime or optional dependencies are allowed. Dependency groups are also
-    /// allowed for files not identified as package code.
+    /// Use the script's own declarations or the nearest containing project's declarations.
+    /// Imports of its own distribution and its runtime or optional dependencies are allowed.
+    /// Dependency groups are also allowed for files not identified as package code.
     ///
     /// Return the missing dependency, or `None` if the import is allowed or its project or
     /// owning distribution cannot be identified.
@@ -57,7 +57,10 @@ impl DependencyMetadata {
         let project = self
             .projects
             .iter()
-            .filter(|project| path.starts_with(&project.path))
+            .filter(|project| match project.kind {
+                DependencyProjectKind::Project => path.starts_with(&project.path),
+                DependencyProjectKind::Script => path == project.path.as_path(),
+            })
             .max_by_key(|project| project.path.as_str().len())?;
 
         // Stubs can belong to a different distribution, so prefer the runtime module.
@@ -86,6 +89,7 @@ impl DependencyMetadata {
         Some(MissingDependency {
             distribution_name: self.distributions.get(id)?.name.clone(),
             group_dependency,
+            project_kind: project.kind,
         })
     }
 
@@ -194,13 +198,21 @@ impl DependencyMetadata {
     }
 }
 
-/// The direct dependency declarations of a workspace member or a virtual workspace root.
+/// The direct dependency declarations of a workspace member, virtual workspace root, or script.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct DependencyProject {
+    /// The project directory or the exact path of a standalone script.
     pub path: SystemPathBuf,
+    pub kind: DependencyProjectKind,
     pub distribution: Option<CompactString>,
     pub dependencies: BTreeSet<CompactString>,
     pub group_dependencies: BTreeSet<CompactString>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+pub enum DependencyProjectKind {
+    Project,
+    Script,
 }
 
 /// A distribution's display name and, for editable installs, its source directory.
@@ -214,4 +226,5 @@ pub struct DependencyDistribution {
 pub(crate) struct MissingDependency {
     pub(crate) distribution_name: CompactString,
     pub(crate) group_dependency: bool,
+    pub(crate) project_kind: DependencyProjectKind,
 }

@@ -607,8 +607,8 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
-        if Script::for_file(self, file).is_some() {
-            return None;
+        if let Some(script) = Script::for_file(self, file) {
+            return script.dependency_metadata(self).as_ref().ok()?.as_deref();
         }
 
         self.project()
@@ -882,8 +882,8 @@ pub(crate) mod testing {
         }
 
         fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
-            if Script::for_file(self, file).is_some() {
-                return None;
+            if let Some(script) = Script::for_file(self, file) {
+                return script.dependency_metadata(self).as_ref().ok()?.as_deref();
             }
 
             self.project()

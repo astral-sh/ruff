@@ -22,6 +22,7 @@ pub(crate) struct UvMetadata {
     python_version: Option<RangedValue<SupportedPythonVersion>>,
     schema: Schema,
     workspace: Option<NodeReference>,
+    script: Option<PathNodeReference>,
     resolution: BTreeMap<CompactString, ResolutionNode>,
     module_owners: BTreeMap<CompactString, Box<[ModuleOwner]>>,
 }
@@ -73,6 +74,7 @@ impl UvMetadata {
             python_version,
             schema: metadata.schema,
             workspace: metadata.workspace,
+            script: metadata.script,
             resolution: metadata.resolution,
             module_owners: metadata.module_owners,
         })
@@ -160,6 +162,7 @@ struct WorkspaceMetadata {
     environment: Option<WorkspaceEnvironment>,
     schema: Schema,
     workspace: Option<NodeReference>,
+    script: Option<PathNodeReference>,
     #[serde(default)]
     resolution: BTreeMap<CompactString, ResolutionNode>,
     #[serde(default)]
@@ -186,6 +189,12 @@ struct Schema {
 #[serde(rename_all = "snake_case")]
 enum SchemaVersion {
     Preview,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct PathNodeReference {
+    path: SystemPathBuf,
+    id: CompactString,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]

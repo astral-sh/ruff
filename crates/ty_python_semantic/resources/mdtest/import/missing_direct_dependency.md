@@ -811,6 +811,258 @@ import devtool
 import indirect  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
+## Script dependency declarations
+
+A PEP 723 script declares runtime dependencies in its inline `dependencies` list. It can import
+`direct-dependency`, but importing the installed `indirect-distribution` requires its own
+declaration. Imports guarded by `TYPE_CHECKING` do not count. Each runtime import of an undeclared
+dependency is reported.
+
+```toml
+[environment]
+python = "/.venv"
+```
+
+`/.venv/<path-to-site-packages>/direct/__init__.py`:
+
+```py
+```
+
+`/.venv/<path-to-site-packages>/indirect/__init__.py`:
+
+```py
+```
+
+`script.py`:
+
+```py
+# /// script
+# dependencies = ["direct-dependency"]
+# [tool.ty.rules]
+# missing-direct-dependency = "warn"
+# [tool.ty.dependency-metadata]
+# projects = [{ path = "/src/script.py", dependencies = ["direct"] }]
+# [tool.ty.dependency-metadata.distributions]
+# direct = { name = "direct-dependency" }
+# indirect = { name = "indirect-distribution" }
+# [tool.ty.dependency-metadata.module-owners]
+# direct = ["direct"]
+# indirect = ["indirect"]
+# ///
+
+from typing import TYPE_CHECKING
+
+import direct
+
+if TYPE_CHECKING:
+    import indirect
+
+# snapshot: missing-direct-dependency
+import indirect
+import indirect as alias  # error: [missing-direct-dependency] "Import of `indirect` requires a direct dependency on `indirect-distribution`"
+```
+
+```snapshot
+warning[missing-direct-dependency]: Import of `indirect` requires a direct dependency on `indirect-distribution`
+  --> src/script.py:23:8
+   |
+23 | import indirect
+   |        ^^^^^^^^
+help: Declare `indirect-distribution` in the script's inline `dependencies` metadata
+info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+```
+
+## Script and workspace isolation
+
+The project and two scripts have different declarations. An import is allowed only when the file's
+own declarations include its distribution.
+
+```toml
+[environment]
+python = "/.venv"
+
+[rules]
+missing-direct-dependency = "warn"
+
+[dependency-metadata]
+projects = [{ path = "/src", dependencies = ["project"] }]
+
+[dependency-metadata.distributions]
+project = { name = "project-dependency" }
+script = { name = "script-dependency" }
+
+[dependency-metadata.module-owners]
+project_dep = ["project"]
+script_dep = ["script"]
+```
+
+`/.venv/<path-to-site-packages>/project_dep/__init__.py`:
+
+```py
+```
+
+`/.venv/<path-to-site-packages>/script_dep/__init__.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import project_dep
+import script_dep  # error: [missing-direct-dependency] "direct dependency on `script-dependency`"
+```
+
+The first script declares only `script-dependency`. The project's declaration of
+`project-dependency` does not apply to it.
+
+`first.py`:
+
+```py
+# /// script
+# dependencies = ["script-dependency"]
+# [tool.ty.rules]
+# missing-direct-dependency = "warn"
+# [tool.ty.dependency-metadata]
+# projects = [{ path = "/src/first.py", dependencies = ["script"] }]
+# [tool.ty.dependency-metadata.distributions]
+# project = { name = "project-dependency" }
+# script = { name = "script-dependency" }
+# [tool.ty.dependency-metadata.module-owners]
+# project_dep = ["project"]
+# script_dep = ["script"]
+# ///
+
+import script_dep
+import project_dep  # error: [missing-direct-dependency] "direct dependency on `project-dependency`"
+```
+
+The second script declares only `project-dependency`. It cannot use the first script's declaration
+of `script-dependency`.
+
+`second.py`:
+
+```py
+# /// script
+# dependencies = ["project-dependency"]
+# [tool.ty.rules]
+# missing-direct-dependency = "warn"
+# [tool.ty.dependency-metadata]
+# projects = [{ path = "/src/second.py", dependencies = ["project"] }]
+# [tool.ty.dependency-metadata.distributions]
+# project = { name = "project-dependency" }
+# script = { name = "script-dependency" }
+# [tool.ty.dependency-metadata.module-owners]
+# project_dep = ["project"]
+# script_dep = ["script"]
+# ///
+
+import project_dep
+import script_dep  # error: [missing-direct-dependency] "direct dependency on `script-dependency`"
+```
+
+## Dependencies imported by local modules
+
+Script dependency checks currently cover imports in the script itself. They do not check imports in
+local modules against the script's declarations, a limitation tracked in
+[ty#4417](https://github.com/astral-sh/ty/issues/4417). Here, the project declares `attrs`, but the
+script declares no dependencies.
+
+```toml
+[environment]
+python = "/.venv"
+
+[rules]
+missing-direct-dependency = "warn"
+
+[dependency-metadata]
+projects = [{ path = "/src", dependencies = ["attrs"] }]
+
+[dependency-metadata.distributions]
+attrs = { name = "attrs" }
+
+[dependency-metadata.module-owners]
+attrs = ["attrs"]
+```
+
+`/.venv/<path-to-site-packages>/attrs/__init__.py`:
+
+```py
+```
+
+`b.py`:
+
+```py
+import attrs
+```
+
+Importing `b` does not report its dependency on `attrs` as missing from the script. Importing
+`attrs` directly does report the missing declaration.
+
+`script.py`:
+
+```py
+# /// script
+# dependencies = []
+# [tool.ty.rules]
+# missing-direct-dependency = "warn"
+# [tool.ty.dependency-metadata]
+# projects = [{ path = "/src/script.py" }]
+# [tool.ty.dependency-metadata.distributions]
+# attrs = { name = "attrs" }
+# [tool.ty.dependency-metadata.module-owners]
+# attrs = ["attrs"]
+# ///
+
+import b
+import attrs  # error: [missing-direct-dependency] "Import of `attrs` requires a direct dependency on `attrs`"
+```
+
+## Unavailable script metadata
+
+Without metadata for a script's environment, the rule cannot establish module ownership. It skips
+that script even when the enclosing project has dependency metadata.
+
+```toml
+[environment]
+python = "/.venv"
+
+[rules]
+missing-direct-dependency = "warn"
+
+[dependency-metadata]
+projects = [{ path = "/src" }]
+
+[dependency-metadata.distributions]
+indirect = { name = "indirect-distribution" }
+
+[dependency-metadata.module-owners]
+indirect = ["indirect"]
+```
+
+`/.venv/<path-to-site-packages>/indirect/__init__.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import indirect  # error: [missing-direct-dependency]
+```
+
+`script.py`:
+
+```py
+# /// script
+# dependencies = []
+# [tool.ty.rules]
+# missing-direct-dependency = "warn"
+# ///
+
+import indirect
+```
+
 ## Disabled rule
 
 Dependency metadata does not make the rule mandatory. It can be disabled through rule selection.
