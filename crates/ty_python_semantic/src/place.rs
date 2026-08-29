@@ -1819,6 +1819,7 @@ fn place_from_bindings_impl<'db>(
                             predicates,
                             narrowing_constraint.predicate_narrowing_targets(),
                             binding.place(db),
+                            binding_ty,
                         )
                     })
                     .narrow(constraint, binding_ty),
