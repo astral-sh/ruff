@@ -1865,6 +1865,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Returns `true` when the value is assignable, even if the stricter `unsound-assignment`
     /// rule reports that it is not a subtype. Returns `false` when the value is not assignable,
     /// in which case `invalid-assignment` is reported instead.
+    ///
+    /// The `unsound-assignment` rule is deliberately limited to name bindings; assignments to
+    /// attributes and subscripts are outside its scope.
     fn validate_assignment_type(
         &self,
         target_node: AnyNodeRef,
