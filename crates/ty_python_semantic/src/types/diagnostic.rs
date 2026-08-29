@@ -188,10 +188,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     // Pytest
     registry.register_lint(&PYTEST_INVALID_ARGNAMES_LITERAL);
     registry.register_lint(&PYTEST_REQUEST_KEYWORD);
-    registry.register_lint(&PYTEST_TEST_PARAMETER_WRONG_KIND);
-    registry.register_lint(&PYTEST_TEST_OPTIONAL_PARAMETER);
     registry.register_lint(&PYTEST_DUPLICATE_ARGNAME);
-    registry.register_lint(&PYTEST_PARAM_MISMATCHED_TYPE);
 }
 
 declare_lint! {
@@ -1374,48 +1371,9 @@ declare_lint! {
         rustdoc::invalid_codeblock_attributes,
         reason = "`data-mdtest` is an mdtest-specific code-block attribute"
     )]
-    #[doc = include_str!("../../resources/lint_docs/pytest-test-parameter-wrong-kind.md")]
-    pub(crate) static PYTEST_TEST_PARAMETER_WRONG_KIND = {
-        summary: "Pytest tests only use keyword arguments",
-        status: LintStatus::stable("unknown"),
-        default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    #[allow(
-        rustdoc::invalid_codeblock_attributes,
-        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
-    )]
-    #[doc = include_str!("../../resources/lint_docs/pytest-test-optional-parameter.md")]
-    pub(crate) static PYTEST_TEST_OPTIONAL_PARAMETER = {
-        summary: "Pytest ignores optional arguments",
-        status: LintStatus::stable("unknown"),
-        default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    #[allow(
-        rustdoc::invalid_codeblock_attributes,
-        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
-    )]
     #[doc = include_str!("../../resources/lint_docs/pytest-duplicate-argname.md")]
     pub(crate) static PYTEST_DUPLICATE_ARGNAME = {
         summary: "Same argname used multiple times in `pytest.mark.parametrize`",
-        status: LintStatus::stable("unknown"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    #[allow(
-        rustdoc::invalid_codeblock_attributes,
-        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
-    )]
-    #[doc = include_str!("../../resources/lint_docs/pytest-param-mismatched-type.md")]
-    pub(crate) static PYTEST_PARAM_MISMATCHED_TYPE = {
-        summary: "`pytest.mark.parametrize` contains arvalue with wrong type.",
         status: LintStatus::stable("unknown"),
         default_level: Level::Error,
     }

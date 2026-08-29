@@ -1,8 +1,6 @@
 mod argnames;
 mod parametrization;
-mod partial_signature;
 mod pytest_test;
-mod request;
 
 use crate::db::Db;
 use ruff_python_ast::{self as ast};
@@ -21,7 +19,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         if let Some(test) = self.build_pytest_test(node, ty) {
             test.check_duplicate_argnames(&self.context);
-            self.check_pytest_argvalues(&test);
         }
     }
 }
