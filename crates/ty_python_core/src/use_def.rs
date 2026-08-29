@@ -691,6 +691,7 @@ enum DefinitionEntry<'db> {
     Used(Definition<'db>),
     Undefined,
     Deleted,
+    Invalidated,
 }
 
 impl<'db> DefinitionEntry<'db> {
@@ -701,6 +702,7 @@ impl<'db> DefinitionEntry<'db> {
             | Self::Used(definition) => DefinitionState::Defined(definition),
             Self::Undefined => DefinitionState::Undefined,
             Self::Deleted => DefinitionState::Deleted,
+            Self::Invalidated => DefinitionState::Invalidated,
         }
     }
 }
@@ -908,7 +910,8 @@ impl<'db> UseDefMap<'db> {
                 DefinitionEntry::Used(definition) => Some((id, definition, true)),
                 DefinitionEntry::DeclarationPart(_)
                 | DefinitionEntry::Undefined
-                | DefinitionEntry::Deleted => None,
+                | DefinitionEntry::Deleted
+                | DefinitionEntry::Invalidated => None,
             })
     }
 
@@ -2449,7 +2452,15 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
-        let def_id = self.push_definition(DefinitionEntry::Deleted);
+        self.clear_binding(place, DefinitionEntry::Deleted);
+    }
+
+    pub(super) fn invalidate_binding(&mut self, place: ScopedPlaceId) {
+        self.clear_binding(place, DefinitionEntry::Invalidated);
+    }
+
+    fn clear_binding(&mut self, place: ScopedPlaceId, state: DefinitionEntry<'db>) {
+        let def_id = self.push_definition(state);
         let pending = self.pending_reachability.current;
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);

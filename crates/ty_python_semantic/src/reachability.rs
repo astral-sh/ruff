@@ -199,7 +199,10 @@ use std::cell::RefCell;
 use crate::{
     Db,
     dunder_all::dunder_all_names,
-    place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
+    place::{
+        AttributePresence, DefinedPlace, Definedness, Place, RequiresExplicitReExport,
+        imported_symbol,
+    },
     types::{
         CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
@@ -853,6 +856,35 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     }
 }
 
+/// Project flow constraints onto a member's presence without inferring its value type.
+pub(crate) fn attribute_presence_by_constraint<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    evaluator: &NarrowingEvaluator<'_, 'db>,
+    place: ScopedPlaceId,
+) -> AttributePresence {
+    if evaluator.constraint() == ScopedNarrowingConstraint::ALWAYS_FALSE {
+        return AttributePresence::Unreachable;
+    }
+    if evaluator.constraint() == ScopedNarrowingConstraint::ALWAYS_TRUE
+        || !evaluator
+            .predicate_narrowing_targets()
+            .contains_place(place)
+    {
+        return AttributePresence::Unknown;
+    }
+    let mut projector = NarrowingProjector::new(
+        db,
+        env,
+        evaluator.narrowing_constraints(),
+        evaluator.predicates(),
+        evaluator.predicate_narrowing_targets(),
+        place,
+    );
+    let root = projector.project(evaluator.constraint());
+    projector.graph.presence(root)
+}
+
 pub(crate) fn narrow_type_by_constraint<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -957,6 +989,47 @@ struct ProjectedNarrowingGraph<'db> {
 }
 
 impl ProjectedNarrowingGraph<'_> {
+    fn presence(&self, root: ProjectedNarrowingNodeId) -> AttributePresence {
+        let mut values = FxHashMap::default();
+        values.insert(
+            ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            AttributePresence::Unknown,
+        );
+        values.insert(
+            ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            AttributePresence::Unreachable,
+        );
+        let mut pending = vec![(root, false)];
+        while let Some((id, visited)) = pending.pop() {
+            if values.contains_key(&id) {
+                continue;
+            }
+            let node = self.node(id);
+            if !visited {
+                pending.push((id, true));
+                pending.extend(
+                    [node.if_true, node.if_false, node.if_uncertain].map(|child| (child, false)),
+                );
+                continue;
+            }
+            let (positive, negative) = &self.predicate_constraints_cache[&node.atom];
+            let positive = positive
+                .as_ref()
+                .map_or(AttributePresence::Unknown, NarrowingConstraint::presence);
+            let negative = negative
+                .as_ref()
+                .map_or(AttributePresence::Unknown, NarrowingConstraint::presence);
+            values.insert(
+                id,
+                positive
+                    .and(values[&node.if_true])
+                    .or(negative.and(values[&node.if_false]))
+                    .or(values[&node.if_uncertain]),
+            );
+        }
+        values[&root]
+    }
+
     /// Returns an interior projected node by ID.
     fn node(&self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingNode {
         self.nodes[id.0]

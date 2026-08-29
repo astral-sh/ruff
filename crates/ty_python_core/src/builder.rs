@@ -1569,9 +1569,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         definition
     }
 
-    fn delete_associated_bindings(&mut self, place: ScopedPlaceId) {
+    fn invalidate_associated_bindings(&mut self, place: ScopedPlaceId) {
         let scope = self.current_scope();
-        // Don't delete associated bindings if the scope is a class scope & place is a name (it's never visible to nested scopes)
+        // A name in a class scope is never visible to nested scopes.
         if self.scopes[scope].kind() == ScopeKind::Class && place.is_symbol() {
             return;
         }
@@ -1580,7 +1580,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .iter()
             .copied()
         {
-            self.use_def_maps[scope].delete_binding(associated_place.into());
+            self.use_def_maps[scope].invalidate_binding(associated_place.into());
         }
     }
 
@@ -1743,7 +1743,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         record(self.current_use_def_map_mut(), place);
 
         if !is_loop_header {
-            self.delete_associated_bindings(place);
+            self.invalidate_associated_bindings(place);
         }
 
         if let Some(id) = place.as_symbol() {
@@ -3537,7 +3537,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.mark_current_comprehension_async();
                 }
             }
-            ast::Expr::Call(_) | ast::Expr::BinOp(_) => {
+            ast::Expr::Call(call) => {
+                walk_expr(self, expr);
+                self.record_exception_checkpoint();
+
+                // The callee is resolved later. Record a possible member read for any call
+                // with the shape of `hasattr`, including aliases of the builtin.
+                if let [base, ast::Expr::StringLiteral(name)] = &*call.arguments.args
+                    && call.arguments.keywords.is_empty()
+                    && let Some(member) = PlaceExpr::attribute(base.into(), name.value.to_str())
+                {
+                    let place = self.add_place(member);
+                    self.record_place_use(place, expr);
+                }
+            }
+            ast::Expr::BinOp(_) => {
                 walk_expr(self, expr);
                 self.record_exception_checkpoint();
             }

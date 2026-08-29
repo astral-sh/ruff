@@ -214,6 +214,16 @@ pub(super) struct MemberExprBuilder {
 }
 
 impl MemberExprBuilder {
+    pub(super) fn attribute(expr: ast::ExprRef<'_>, name: &str) -> Option<Self> {
+        let mut builder = Self::visit_expr(expr)?;
+        let start = builder.path.as_str().text_len();
+        builder.path = CharStr::concat(&[builder.path.as_str(), name]);
+        builder
+            .segments
+            .push(SegmentInfo::new(SegmentKind::Attribute, start));
+        Some(builder)
+    }
+
     pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
         match expr {
             ast::ExprRef::Name(name) => {

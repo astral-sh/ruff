@@ -35,12 +35,12 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
-    explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    AttributePresence, ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place,
+    PlaceAndQualifiers, RequiresExplicitReExport, TypeOrigin, builtins_module_scope,
+    class_body_implicit_symbol, explicit_global_symbol, implicit_builtins_symbol,
+    loop_header_reachability, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place_by_id, place_from_bindings_with_reachability_cache,
+    place_from_declarations_with_reachability_cache, typing_extensions_symbol,
 };
 use crate::place_load::{
     ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
@@ -8855,7 +8855,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let callable_type =
             self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
 
-        self.infer_call_expression_impl(call_expression, callable_type, tcx)
+        let result = self.infer_call_expression_impl(call_expression, callable_type, tcx);
+        if let Type::FunctionLiteral(function) = callable_type
+            && function.is_known(self.db(), KnownFunction::HasAttr)
+            && let [base, ast::Expr::StringLiteral(name)] = &*call_expression.arguments.args
+            && call_expression.arguments.keywords.is_empty()
+            && let Some(member) = PlaceExpr::attribute(base.into(), name.value.to_str())
+            && !result.is_never()
+        {
+            let receiver = self.expression_type(base);
+            let name = name.value.to_str();
+            return match self.member_presence_at_use(
+                &member,
+                call_expression.into(),
+                receiver,
+                name,
+            ) {
+                AttributePresence::Present => Type::bool_literal(true),
+                AttributePresence::Absent => Type::bool_literal(false),
+                AttributePresence::Unreachable => Type::Never,
+                AttributePresence::Unknown
+                    if receiver.attribute_presence_from_class(
+                        self.db(),
+                        self.program_environment(),
+                        name,
+                    ) == AttributePresence::Present =>
+                {
+                    Type::bool_literal(true)
+                }
+                AttributePresence::Unknown => result,
+            };
+        }
+        result
     }
 
     fn infer_empty_list_or_set_constructor(
@@ -9905,7 +9936,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             DefinitionState::Defined(_)
                             | DefinitionState::Undefined
-                            | DefinitionState::Deleted => {
+                            | DefinitionState::Deleted
+                            | DefinitionState::Invalidated => {
                                 union.add_in_place(
                                     binding.narrowing_constraint.narrow(db, env, ty, place),
                                 );
@@ -10429,6 +10461,78 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Combine preceding assignments and guards for one member occurrence. Assignments supersede
+    /// earlier presence constraints; deleting an instance attribute can expose a class attribute.
+    /// An unbound or invalidated member has unknown presence, leaving ordinary lookup unchanged.
+    fn member_presence_at_use(
+        &self,
+        member: &PlaceExpr,
+        expression: ast::ExprRef<'_>,
+        receiver: Type<'db>,
+        attribute: &str,
+    ) -> AttributePresence {
+        if self.is_deferred() {
+            return AttributePresence::Unknown;
+        }
+        let db = self.db();
+        let env = self.program_environment();
+        let scope = self.scope().file_scope_id(db);
+        let Some(place) = self.index.place_table(scope).place_id(member) else {
+            return AttributePresence::Unknown;
+        };
+        let use_id = expression.scoped_use_id(db, self.program_file());
+        let bindings = self.index.use_def_map(scope).bindings_at_use(use_id);
+        let predicates = bindings.predicates();
+        let reachability = bindings.reachability_constraints();
+        bindings.fold(AttributePresence::Unreachable, |result, binding| {
+            if evaluate_reachability_with_cache(
+                db,
+                Some(self.reachability_cache()),
+                reachability,
+                predicates,
+                binding.reachability_constraint,
+            )
+            .is_always_false()
+            {
+                return result;
+            }
+            let presence = match binding.binding {
+                DefinitionState::Defined(definition) if definition.kind(db).is_loop_header() => {
+                    AttributePresence::Unknown
+                }
+                DefinitionState::Defined(_) | DefinitionState::Deleted
+                    if receiver
+                        .class_member_with_policy(
+                            db,
+                            env,
+                            attribute,
+                            MemberLookupPolicy::REQUIRE_CONCRETE,
+                        )
+                        .place
+                        .ignore_possibly_undefined()
+                        .is_some_and(|ty| {
+                            ty.may_be_data_descriptor(db, env)
+                                && !matches!(ty, Type::SlotDescriptor(_))
+                        }) =>
+                {
+                    AttributePresence::Unknown
+                }
+                DefinitionState::Defined(_) => AttributePresence::Present,
+                DefinitionState::Undefined | DefinitionState::Invalidated => {
+                    AttributePresence::Unknown
+                }
+                DefinitionState::Deleted => {
+                    receiver.attribute_presence_from_class(db, env, attribute)
+                }
+            };
+            result.or(presence.and(binding.narrowing_constraint.presence(
+                db,
+                self.program_environment(),
+                place,
+            )))
+        })
+    }
+
     /// Infer an attribute load, returning its recovery type if lookup fails.
     fn infer_attribute_load(
         &mut self,
@@ -10522,7 +10626,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type
+        let mut fallback_place = value_type
             .try_member_lookup(db, env, &attr.id)
             .unwrap_or_else(|error| {
                 error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
@@ -10531,6 +10635,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map_type(|ty| {
                 self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
             });
+
+        if let Some(member) = PlaceExpr::try_from_expr(attribute) {
+            match self.member_presence_at_use(&member, attribute.into(), value_type, &attr.id) {
+                AttributePresence::Present => {
+                    fallback_place.place = match fallback_place.place {
+                        Place::Defined(defined) => {
+                            Place::Defined(defined.with_definedness(Definedness::AlwaysDefined))
+                        }
+                        Place::Undefined => Place::bound(Type::object()),
+                    };
+                }
+                AttributePresence::Absent => fallback_place.place = Place::Undefined,
+                AttributePresence::Unreachable => fallback_place.place = Place::bound(Type::Never),
+                AttributePresence::Unknown => {}
+            }
+        }
 
         // An augmented assignment also loads its target, but its write validation reports this
         // error. Avoid reporting the same invalid access twice.
@@ -10560,10 +10680,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 SubclassOfInner::Class(class) => {
                                     !class.instance_member(db, env, attr).is_undefined()
                                 }
-                                SubclassOfInner::Dynamic(_) => unreachable!(
-                                    "Attribute lookup on a dynamic `SubclassOf` type \
-                                    should always return a bound symbol"
-                                ),
+                                SubclassOfInner::Dynamic(_) => false,
                                 SubclassOfInner::Protocol(_) => false,
                                 SubclassOfInner::TypeVar(_) => false,
                             }

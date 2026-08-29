@@ -90,7 +90,7 @@ class _:
 a = A()
 # error: [unresolved-attribute]
 a.dynamically_added = 0
-# error: [unresolved-attribute]
+# The assignment is invalid, but establishes the attribute's presence for subsequent reads.
 reveal_type(a.dynamically_added)  # revealed: Literal[0]
 
 # error: [unresolved-reference]

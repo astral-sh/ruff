@@ -314,9 +314,11 @@ pub enum DefinitionState<'db> {
     Defined(Definition<'db>),
     /// Represents the implicit "unbound"/"undeclared" definition of every place.
     Undefined,
-    /// Represents a definition that has been deleted.
-    /// This used when an attribute/subscript definition (such as `x.y = ...`, `x[0] = ...`) becomes obsolete due to a reassignment of the root place.
+    /// Represents an explicit deletion of a binding.
     Deleted,
+    /// A member binding made obsolete by reassignment of its receiver. This forgets its value
+    /// without establishing that the member is absent on the new receiver.
+    Invalidated,
 }
 
 impl<'db> DefinitionState<'db> {
@@ -333,7 +335,9 @@ impl<'db> DefinitionState<'db> {
     pub fn definition(self) -> Option<Definition<'db>> {
         match self {
             DefinitionState::Defined(def) => Some(def),
-            DefinitionState::Deleted | DefinitionState::Undefined => None,
+            DefinitionState::Deleted
+            | DefinitionState::Invalidated
+            | DefinitionState::Undefined => None,
         }
     }
 }

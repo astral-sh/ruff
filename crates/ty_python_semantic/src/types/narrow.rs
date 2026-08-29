@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
-use crate::place::loop_header_reachability;
+use crate::place::{AttributePresence, Place, loop_header_reachability, place_from_bindings};
 use crate::reachability::{
     binding_reachability, narrow_type_by_constraint, type_narrowed_by_previous_patterns,
 };
@@ -15,9 +15,9 @@ use crate::types::unpacker::collected_list_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
-    callable_pattern_type, class_pattern_positional_sources,
+    MemberLookupPolicy, Parameter, Parameters, Signature, SpecialFormType, StringLiteralType,
+    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
+    UnionBuilder, binding_type, callable_pattern_type, class_pattern_positional_sources,
     definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
     mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
     singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
@@ -35,7 +35,9 @@ use ty_python_core::predicate::{
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::symbol::Symbol;
-use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
+use ty_python_core::{
+    ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index, use_def_map,
+};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
@@ -723,12 +725,17 @@ enum NarrowingOperation<'db> {
     Intersection(Type<'db>),
     /// Narrow to this generic type while preserving type arguments already known about the subject.
     GenericFiltering(Type<'db>),
+    /// Filter the receiver using a runtime member check instead of a static subtype relation.
+    AttributePresence(StringLiteralType<'db>, bool),
+    /// Presence of the member place itself, independently of its value type.
+    MemberPresence(bool),
 }
 
 impl<'db> NarrowingOperation<'db> {
     const fn ty(self) -> Type<'db> {
         match self {
             Self::Intersection(ty) | Self::GenericFiltering(ty) => ty,
+            Self::AttributePresence(..) | Self::MemberPresence(_) => Type::object(),
         }
     }
 }
@@ -739,6 +746,26 @@ struct Conjunctions<'db> {
 }
 
 impl<'db> Conjunctions<'db> {
+    fn attribute_presence(attribute: StringLiteralType<'db>, present: bool) -> Self {
+        Self {
+            conjuncts: smallvec![NarrowingOperation::AttributePresence(attribute, present)],
+        }
+    }
+
+    fn presence(&self) -> AttributePresence {
+        self.conjuncts
+            .iter()
+            .fold(AttributePresence::Unknown, |presence, operation| {
+                presence.and(match *operation {
+                    NarrowingOperation::MemberPresence(present) => {
+                        AttributePresence::from_bool(present)
+                    }
+                    NarrowingOperation::Intersection(Type::Never) => AttributePresence::Unreachable,
+                    _ => AttributePresence::Unknown,
+                })
+            })
+    }
+
     fn singleton(ty: Type<'db>) -> Self {
         Self {
             conjuncts: smallvec![NarrowingOperation::Intersection(ty)],
@@ -773,7 +800,9 @@ impl<'db> Conjunctions<'db> {
     }
 
     fn evaluate_constraint_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        if self.conjuncts.len() == 1 {
+        if self.conjuncts.len() == 1
+            && !matches!(self.conjuncts[0], NarrowingOperation::AttributePresence(..))
+        {
             return self.conjuncts[0].ty();
         }
 
@@ -787,7 +816,152 @@ impl<'db> Conjunctions<'db> {
                 NarrowingOperation::GenericFiltering(ty) => {
                     filter_generic_narrowing_constraint(db, env, accumulated, ty)
                 }
+                NarrowingOperation::AttributePresence(attribute, present) => {
+                    narrow_by_attribute_presence(db, env, accumulated, attribute.value(db), present)
+                }
+                NarrowingOperation::MemberPresence(_) => accumulated,
             })
+    }
+}
+
+/// Filter the receiver using runtime member presence without inferring its instance assignments.
+/// An instance assignment establishes an attribute's value type, but does not prove that the
+/// assignment has executed before a presence guard.
+fn narrow_by_attribute_presence<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    subject: Type<'db>,
+    attribute: &str,
+    present: bool,
+) -> Type<'db> {
+    if present {
+        let protocol = Type::protocol_with_readonly_members(db, env, [(attribute, Type::object())]);
+        return IntersectionType::from_two_elements(db, env, subject, protocol);
+    }
+    if let Some(union) = subject.as_union() {
+        return union.map(db, env, |element| {
+            narrow_by_attribute_presence(db, env, *element, attribute, present)
+        });
+    }
+    if subject.attribute_presence_from_class(db, env, attribute) == AttributePresence::Present {
+        Type::Never
+    } else {
+        subject
+    }
+}
+
+impl<'db> Type<'db> {
+    /// Presence guaranteed by the receiver's class, without using instance assignments as evidence.
+    pub(crate) fn attribute_presence_from_class(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        attribute: &str,
+    ) -> AttributePresence {
+        match self.resolve_type_alias(db) {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::ProtocolInstance(_) => {
+                AttributePresence::Unknown
+            }
+            Type::Never => AttributePresence::Unreachable,
+            Type::Union(union) => union.elements(db).iter().fold(
+                AttributePresence::Unreachable,
+                |presence, element| {
+                    presence.or(element.attribute_presence_from_class(db, env, attribute))
+                },
+            ),
+            Type::TypeVar(typevar) => typevar
+                .typevar(db)
+                .upper_bound(db, env)
+                .map_or(AttributePresence::Unknown, |bound| {
+                    bound.attribute_presence_from_class(db, env, attribute)
+                }),
+            Type::Intersection(intersection) => intersection.positive(db).iter().fold(
+                AttributePresence::Absent,
+                |presence, element| {
+                    let element = element.attribute_presence_from_class(db, env, attribute);
+                    if presence == AttributePresence::Present
+                        || element == AttributePresence::Present
+                    {
+                        AttributePresence::Present
+                    } else {
+                        presence.or(element)
+                    }
+                },
+            ),
+            receiver if let Some(class) = receiver.nominal_class(db, env) => {
+                // Ordinary member lookup trusts declarations and assignments in methods. Only
+                // bindings in the class body can establish presence before an instance initializer.
+                for base in class.iter_mro(db) {
+                    let base = match base {
+                        ClassBase::Class(base) => base,
+                        ClassBase::Generic | ClassBase::Protocol => continue,
+                        _ => return AttributePresence::Unknown,
+                    };
+                    let Some((class, _)) = base.static_class_literal(db) else {
+                        return AttributePresence::Unknown;
+                    };
+                    let scope = class.body_scope(db);
+                    if let Some(symbol) = place_table(db, scope).symbol_id(attribute)
+                        && let Place::Defined(binding) = place_from_bindings(
+                            db,
+                            env,
+                            use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+                        )
+                        .place
+                    {
+                        // A descriptor can raise AttributeError even when it exists in the class
+                        // namespace. Function descriptors only bind the receiver and are safe here.
+                        return if binding.is_definitely_defined()
+                            && (binding.ty.is_function_literal()
+                                || !binding.ty.is_dynamic()
+                                    && binding
+                                        .ty
+                                        .class_member_with_policy(
+                                            db,
+                                            env,
+                                            "__get__",
+                                            MemberLookupPolicy::REQUIRE_CONCRETE,
+                                        )
+                                        .is_undefined())
+                        {
+                            AttributePresence::Present
+                        } else {
+                            AttributePresence::Unknown
+                        };
+                    }
+                }
+                if receiver
+                    .class_member_with_policy(
+                        db,
+                        env,
+                        "__getattr__",
+                        MemberLookupPolicy::REQUIRE_CONCRETE,
+                    )
+                    .is_undefined()
+                {
+                    AttributePresence::Absent
+                } else {
+                    AttributePresence::Unknown
+                }
+            }
+            receiver => {
+                if receiver
+                    .member_lookup_with_policy(
+                        db,
+                        env,
+                        attribute,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                            | MemberLookupPolicy::REQUIRE_CONCRETE,
+                    )
+                    .place
+                    .is_definitely_bound()
+                {
+                    AttributePresence::Present
+                } else {
+                    AttributePresence::Unknown
+                }
+            }
+        }
     }
 }
 
@@ -1092,6 +1266,31 @@ pub(crate) struct NarrowingConstraint<'db> {
 }
 
 impl<'db> NarrowingConstraint<'db> {
+    fn attribute_presence(attribute: StringLiteralType<'db>, present: bool) -> Self {
+        Self {
+            intersection_disjuncts: smallvec![Conjunctions::attribute_presence(attribute, present)],
+            replacement_disjuncts: smallvec![],
+        }
+    }
+
+    fn member_presence(present: bool) -> Self {
+        Self {
+            intersection_disjuncts: smallvec![Conjunctions {
+                conjuncts: smallvec![NarrowingOperation::MemberPresence(present)]
+            }],
+            replacement_disjuncts: smallvec![],
+        }
+    }
+
+    pub(crate) fn presence(&self) -> AttributePresence {
+        self.intersection_disjuncts
+            .iter()
+            .chain(&self.replacement_disjuncts)
+            .fold(AttributePresence::Unreachable, |presence, conjunction| {
+                presence.or(conjunction.presence())
+            })
+    }
+
     /// Create an "intersection" constraint: the previous type will be
     /// intersected with this constraint
     pub(crate) fn intersection(constraint: Type<'db>) -> Self {
@@ -4333,31 +4532,26 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let place = self.expect_place(&first_arg);
 
                 if function == KnownFunction::HasAttr {
-                    let attr = inference
-                        .expression_type(second_arg)
-                        .as_string_literal()?
-                        .value(db);
+                    let attr = inference.expression_type(second_arg).as_string_literal()?;
 
-                    if !is_identifier(attr) {
+                    if !is_identifier(attr.value(db)) {
                         return None;
                     }
 
-                    // Since `hasattr` only checks if an attribute is readable,
-                    // the type of the protocol member should be a read-only property that returns `object`.
-                    let constraint = Type::protocol_with_readonly_members(
-                        db,
-                        &self.env,
-                        [(attr, Type::object())],
-                    );
-
-                    return Some(NarrowingConstraints::from_iter([(
+                    let mut constraints = NarrowingConstraints::from_iter([(
                         place,
-                        NarrowingConstraint::intersection(constraint.negate_if(
-                            db,
-                            &self.env,
-                            !is_positive,
-                        )),
-                    )]));
+                        NarrowingConstraint::attribute_presence(attr, is_positive),
+                    )]);
+                    if let Some(member) =
+                        PlaceExpr::attribute((&expr_call.arguments.args[0]).into(), attr.value(db))
+                        && let Some(member_place) = self.places().place_id(&member)
+                    {
+                        constraints.insert(
+                            member_place,
+                            NarrowingConstraint::member_presence(is_positive),
+                        );
+                    }
+                    return Some(constraints);
                 }
 
                 let function = function.into_classinfo_constraint_function()?;
@@ -5345,6 +5539,12 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
 }
 
 pub(crate) trait NarrowingEvaluatorExtension<'db> {
+    fn presence(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        place: ScopedPlaceId,
+    ) -> AttributePresence;
     fn narrow(
         &self,
         db: &'db dyn Db,
@@ -5355,6 +5555,15 @@ pub(crate) trait NarrowingEvaluatorExtension<'db> {
 }
 
 impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
+    fn presence(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        place: ScopedPlaceId,
+    ) -> AttributePresence {
+        crate::reachability::attribute_presence_by_constraint(db, env, self, place)
+    }
+
     fn narrow(
         &self,
         db: &'db dyn Db,
