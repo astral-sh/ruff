@@ -985,6 +985,51 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 }
 
 #[test]
+fn undefined_reveal_fix_updates_after_source_changes() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .build()?;
+
+    // Recheck the same file after changing its imports and line endings. Both function
+    // scopes should use the current file's import locations and formatting.
+    for (prefix, line_ending, fixed_prefix) in [
+        (
+            "from typing import Any\n\n",
+            "\n",
+            "from typing import Any, reveal_type\n\n",
+        ),
+        (
+            "from __future__ import annotations\r\n\r\n",
+            "\r\n",
+            "from __future__ import annotations\r\nfrom typing import reveal_type\r\n\r\n",
+        ),
+        ("", "\n", "from typing import reveal_type\n"),
+    ] {
+        let body = "def f():\n    reveal_type(1)\ndef g():\n    reveal_type(2)\n"
+            .replace('\n', line_ending);
+        let source = format!("{prefix}{body}");
+        db.write_file("/src/main.py", &source)?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        let fixes: Vec<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.id() == DiagnosticId::lint("undefined-reveal"))
+            .filter_map(Diagnostic::fix)
+            .collect();
+        assert_eq!(fixes.len(), 2);
+        for fix in fixes {
+            let [edit] = fix.edits() else {
+                anyhow::bail!("expected a single import edit");
+            };
+            let mut fixed = source.clone();
+            fixed.replace_range(edit.range().to_std_range(), edit.content().unwrap_or(""));
+            assert_eq!(fixed, format!("{fixed_prefix}{body}"));
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(

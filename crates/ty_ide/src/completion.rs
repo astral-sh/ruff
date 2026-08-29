@@ -12,7 +12,6 @@ use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_codegen::Stylist;
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
@@ -21,6 +20,7 @@ use ty_module_resolver::{
 };
 use ty_python_core::{ProgramFile, semantic_index};
 use ty_python_semantic::HasType;
+use ty_python_semantic::importer::{ImportRequest, Importer};
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
@@ -29,7 +29,6 @@ use ty_python_semantic::{
 
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
-use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols, signature_help};
 
@@ -2383,9 +2382,7 @@ fn add_unimported_completions<'db>(
     }
 
     let source_file = file.file(db);
-    let source = source_text(db, source_file);
-    let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
+    let importer = Importer::new(db, file, parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
     let importing_file = ImportingFile::File(source_file, file.resolver_environment(db));
 

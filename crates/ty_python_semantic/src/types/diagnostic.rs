@@ -6,6 +6,7 @@ use super::{
     ModuleLiteralType, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::diagnostic::{did_you_mean, format_enumeration};
+use crate::importer::{ImportRequest, MembersInScope};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
@@ -44,7 +45,7 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, StringFlags};
+use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, StringFlags};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -3047,6 +3048,31 @@ pub(super) fn report_possibly_missing_attribute(
             object_ty.display(db, env),
         )),
     };
+}
+
+pub(super) fn report_undefined_reveal(context: &InferContext, name: &ast::ExprName) {
+    let Some(builder) = context.report_lint(&UNDEFINED_REVEAL, name) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic("`reveal_type` used without importing it");
+    diagnostic.info("This is allowed for debugging convenience but will fail at runtime");
+
+    let db = context.db();
+    let module = if context.program_environment().python_version(db) >= PythonVersion::PY311 {
+        "typing"
+    } else {
+        "typing_extensions"
+    };
+    // `reveal_type` is unbound. Force a `from` import to avoid introducing a module name
+    // that might be shadowed, without querying inferred types while emitting a diagnostic.
+    let action = context.importer().import(
+        ImportRequest::import_from(module, "reveal_type").force(),
+        &MembersInScope::empty(name.start()),
+    );
+    if let Some(edit) = action.import() {
+        diagnostic.help(format_args!("Import `reveal_type` from `{module}`"));
+        diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+    }
 }
 
 /// Add an autofix to `diagnostic` that replaces the given node with `NotImplementedError`
