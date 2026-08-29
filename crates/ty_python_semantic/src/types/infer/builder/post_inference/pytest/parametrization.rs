@@ -5,8 +5,6 @@ use crate::types::{
 use itertools::Itertools;
 use ruff_python_ast::{self as ast};
 
-use crate::types::infer::builder::post_inference::pytest::argnames::Argnames;
-
 /// Representation of a `pytest.mark.parametrize` call.
 /// Only calls that will be checked are recorded.
 pub(crate) struct Parametrization<'ast> {
@@ -45,7 +43,7 @@ impl<'ast> TypeInferenceBuilder<'_, 'ast> {
                 == KnownClass::PytestParametrizeMarkDecorator
                     .to_instance(self.db(), self.program_environment())
             && let Some(argnames) = decorator_call.arguments.find_argument("argnames", 0)
-            && let Argnames::Known(argnames) = self.parse_argnames_expression(argnames.value())
+            && let Some(argnames) = self.parse_argnames_expression(argnames.value())
             && let Some(argvalues) = decorator_call.arguments.find_argument("argvalues", 1)
             // If there are extra arguments, they are ignored in case of edge cases like indirect fixtures.
             // These edge cases may be handled in the future.

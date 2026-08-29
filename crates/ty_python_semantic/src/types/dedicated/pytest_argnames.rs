@@ -1,4 +1,4 @@
-use derive_more::{Constructor, From};
+use derive_more::{Constructor, From, IntoIterator};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -17,15 +17,28 @@ pub(crate) enum Argname {
 #[derive(Debug, Constructor)]
 /// A special case where argnames is a string literal with a single argname.
 pub(crate) struct SingleArgname {
-    argname: Argname,
-    range: TextRange,
+    pub(crate) argname: Argname,
+    pub(crate) range: TextRange,
 }
 
-#[derive(Debug, Constructor)]
+#[derive(Debug, Constructor, IntoIterator)]
+#[into_iterator(ref)]
 /// Argnames passed either by comma separated values or a sequence of strings.
 /// This handles all cases except the special case above.
 pub(crate) struct MultipleArgnames {
-    argnames: Vec<SingleArgname>,
+    pub(crate) argnames: Vec<SingleArgname>,
+}
+
+impl MultipleArgnames {
+    pub(crate) fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+}
+
+impl FromIterator<SingleArgname> for MultipleArgnames {
+    fn from_iter<T: IntoIterator<Item = SingleArgname>>(iter: T) -> Self {
+        Self::new(Vec::from_iter(iter))
+    }
 }
 
 #[derive(Debug, From)]
@@ -93,21 +106,14 @@ impl SequenceArgnames {
 
 impl MultipleArgnames {
     fn from_exprs<'a>(exprs: impl IntoIterator<Item = &'a ast::Expr>) -> Self {
-        Self::new(
-            exprs
-                .into_iter()
-                .map(SingleArgname::from_expr)
-                .collect_vec(),
-        )
+        exprs.into_iter().map(SingleArgname::from_expr).collect()
     }
 
     fn from_strs<'a>(argnames: impl IntoIterator<Item = (&'a str, TextRange)>) -> Self {
-        Self::new(
-            argnames
-                .into_iter()
-                .map(|(name, range)| SingleArgname::from_str(name, range))
-                .collect_vec(),
-        )
+        argnames
+            .into_iter()
+            .map(|(name, range)| SingleArgname::from_str(name, range))
+            .collect()
     }
 }
 

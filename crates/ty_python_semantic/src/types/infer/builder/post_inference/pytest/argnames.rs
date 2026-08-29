@@ -1,23 +1,25 @@
-use std::{convert, slice};
-
 use derive_more::{Constructor, From, IntoIterator};
 use itertools::Itertools;
-use ruff_python_ast::{self as ast};
-use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast as ast;
+use ruff_text_size::TextRange;
+use std::iter::FromIterator;
+use std::slice;
 
 use crate::types::{
+    dedicated::pytest_argnames::{
+        Argname, Argnames, MultipleArgnames, SequenceArgnames, SingleArgname, StringLiteralArgnames,
+    },
     diagnostic::{PYTEST_INVALID_ARGNAMES_LITERAL, PYTEST_REQUEST_KEYWORD},
     infer::TypeInferenceBuilder,
 };
 
 #[derive(Debug)]
-pub(crate) struct SingleArgname {
+pub(crate) struct SingleKnownArgname {
     name: String,
     range: TextRange,
 }
 
-impl SingleArgname {
+impl SingleKnownArgname {
     pub(crate) fn new(argname: impl Into<String>, range: TextRange) -> Self {
         Self {
             name: argname.into(),
@@ -43,32 +45,32 @@ impl SingleArgname {
 // ```
 #[derive(Debug, From, Constructor, IntoIterator)]
 #[into_iterator(ref)]
-pub(crate) struct MultipleArgnames {
-    argnames: Vec<SingleArgname>,
+pub(crate) struct MultipleKnownArgnames {
+    argnames: Vec<SingleKnownArgname>,
 }
 
-impl MultipleArgnames {
+impl MultipleKnownArgnames {
     pub(crate) fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
         self.into_iter()
     }
 }
 
-impl FromIterator<SingleArgname> for MultipleArgnames {
-    fn from_iter<I: IntoIterator<Item = SingleArgname>>(iter: I) -> Self {
+impl FromIterator<SingleKnownArgname> for MultipleKnownArgnames {
+    fn from_iter<I: IntoIterator<Item = SingleKnownArgname>>(iter: I) -> Self {
         Self::new(Vec::from_iter(iter))
     }
 }
 
 #[derive(Debug, From)]
 pub(crate) enum KnownArgnames {
-    Single(SingleArgname),
-    Multiple(MultipleArgnames),
+    Single(SingleKnownArgname),
+    Multiple(MultipleKnownArgnames),
 }
 
 impl<'a> IntoIterator for &'a KnownArgnames {
-    type Item = &'a SingleArgname;
+    type Item = &'a SingleKnownArgname;
 
-    type IntoIter = slice::Iter<'a, SingleArgname>;
+    type IntoIter = slice::Iter<'a, SingleKnownArgname>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -78,107 +80,74 @@ impl<'a> IntoIterator for &'a KnownArgnames {
     }
 }
 
-#[derive(Debug, Default)]
-pub(crate) enum Argnames {
-    Known(KnownArgnames),
-    #[default]
-    Unknown,
-}
-
-impl<T: Into<KnownArgnames>> From<T> for Argnames {
-    fn from(value: T) -> Self {
-        Self::Known(value.into())
-    }
-}
-
+// todo: could take context
 impl TypeInferenceBuilder<'_, '_> {
-    pub(crate) fn parse_argnames_expression(&self, argnames_argument: &ast::Expr) -> Argnames {
-        let db = self.db();
-        if let Some(literal) = self.expression_type(argnames_argument).as_string_literal() {
-            self.parse_argnames_string(literal.value(db), argnames_argument.range())
-        } else if let Some(list_expr) = argnames_argument.as_list_expr() {
-            self.parse_argnames_sequence(&list_expr.elts)
-        } else if let Some(tuple_expr) = argnames_argument.as_tuple_expr() {
-            self.parse_argnames_sequence(&tuple_expr.elts)
-        } else {
-            Argnames::Unknown
+    pub(crate) fn parse_argnames_expression(&self, argnames: &ast::Expr) -> Option<KnownArgnames> {
+        let argnames = Argnames::from_expr(argnames);
+        self.convert_and_check_argnames(argnames)
+    }
+
+    /// Convert argnames from the model (which may have errors) into `KnownArgnames` if possible.
+    /// While doing this, any errors from invalid argnames are raised.
+    /// If `None` is returned, it may be because of an error or because the argnames are unknown.
+    pub(crate) fn convert_and_check_argnames(&self, argnames: Argnames) -> Option<KnownArgnames> {
+        match &argnames {
+            Argnames::StringLiteral(StringLiteralArgnames::Single(argname)) => {
+                Some(self.convert_and_check_single_argname(argname)?.into())
+            }
+            Argnames::StringLiteral(StringLiteralArgnames::Multiple(argnames))
+            | Argnames::Sequence(SequenceArgnames::Multiple(argnames)) => {
+                Some(self.convert_and_check_multiple_argnames(argnames)?.into())
+            }
+            Argnames::Unknown => None,
         }
     }
 
-    /// Converts a known string into `Argnames`, generating a diagnostic if it is not valid.
-    fn parse_argnames_string(&self, value: &str, range: TextRange) -> Argnames {
-        let separated_names = value.split(',').map(str::trim);
-        let filtered_names = separated_names
-            .filter(|name| !name.is_empty())
-            .collect_vec();
-        if self.contains_invalid_identifiers(&filtered_names, range) {
-            return Argnames::Unknown;
-        }
-        match &filtered_names[..] {
-            [name] => SingleArgname::new(*name, range).into(),
-            _ => filtered_names
-                .into_iter()
-                .map(|name| SingleArgname::new(name, range))
-                .collect::<MultipleArgnames>()
-                .into(),
-        }
-    }
-
-    fn contains_invalid_identifiers(&self, filtered_names: &Vec<&str>, range: TextRange) -> bool {
-        // Collect checks to ensure that multiple errors are reported.
-        let checks = filtered_names
+    fn convert_and_check_multiple_argnames(
+        &self,
+        argnames: &MultipleArgnames,
+    ) -> Option<MultipleKnownArgnames> {
+        // Collect to Vec to process all diagnostics.
+        let converted_argnames = argnames
             .iter()
-            .map(|name| !self.check_valid_identifier(name, range))
+            .map(|argname| self.convert_and_check_single_argname(argname))
             .collect_vec();
-        checks.into_iter().any(convert::identity)
+        FromIterator::from_iter(converted_argnames)
     }
 
-    /// Converts the sequence (list or tuple elements) into multiple argnames.
-    /// If there is an error, `Argnames::Unknown` is returned and a diagnostic is generated.
-    fn parse_argnames_sequence(&self, sequence: &[ast::Expr]) -> Argnames {
-        self.parse_multiple_argnames_sequence(sequence)
-            .map(Into::into)
-            .unwrap_or_default()
+    fn convert_and_check_single_argname(
+        &self,
+        argname: &SingleArgname,
+    ) -> Option<SingleKnownArgname> {
+        let range = argname.range;
+        match &argname.argname {
+            Argname::Valid(argname) => Some(SingleKnownArgname::new(argname, range)),
+            Argname::Request => {
+                self.generate_request_keyword_diagnostic(range);
+                None
+            }
+            Argname::Error(invalid_argname) => {
+                self.generate_invalid_argname_diagnostic(invalid_argname, range);
+                None
+            }
+            Argname::Unknown => None,
+        }
     }
 
-    fn parse_multiple_argnames_sequence(&self, sequence: &[ast::Expr]) -> Option<MultipleArgnames> {
-        // Collect so that all errors are reported.
-        let identifiers = sequence
-            .iter()
-            .map(|element| {
-                let range = element.range();
-                if let Some(literal_type) = self.expression_type(element).as_string_literal() {
-                    let name = literal_type.value(self.db());
-                    self.check_valid_identifier(name, range)
-                        .then(|| SingleArgname::new(name, range))
-                } else {
-                    None
-                }
-            })
-            .collect_vec();
-        Option::from_iter(identifiers)
+    fn generate_request_keyword_diagnostic(&self, range: TextRange) {
+        if let Some(builder) = self.context.report_lint(&PYTEST_REQUEST_KEYWORD, range) {
+            builder.into_diagnostic(
+                "`request` is a reserved Pytest keyword and cannot be used during parametrization.",
+            );
+        }
     }
 
-    /// Checks whether an individual argname is valid as a Python identifier.
-    /// It generates a diagnostic if this is not the case.
-    /// `request` is not treated as a valid identifier.
-    fn check_valid_identifier(&self, name: &str, range: TextRange) -> bool {
-        let is_identifier = is_identifier(name);
-        if !is_identifier
-            && let Some(builder) = self
-                .context
-                .report_lint(&PYTEST_INVALID_ARGNAMES_LITERAL, range)
+    fn generate_invalid_argname_diagnostic(&self, name: &str, range: TextRange) {
+        if let Some(builder) = self
+            .context
+            .report_lint(&PYTEST_INVALID_ARGNAMES_LITERAL, range)
         {
             builder.into_diagnostic(format!("`{name}` is not a valid Python identifier."));
         }
-        if name == "request" {
-            if let Some(builder) = self.context.report_lint(&PYTEST_REQUEST_KEYWORD, range) {
-                builder.into_diagnostic(
-                    "`request` is a reserved Pytest keyword and cannot be used during parametrization.",
-                );
-            }
-            return false;
-        }
-        is_identifier
     }
 }
