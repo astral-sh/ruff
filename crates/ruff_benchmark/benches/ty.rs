@@ -1481,6 +1481,89 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     }
 }
 
+/// Exercises repeated control-flow gates with and without interleaved statement-call predicates.
+///
+/// Each suppressing context manager merges the old binding with a reassigned binding. Repeating
+/// this pattern can accumulate unnecessary narrowing gates and repeatedly evaluate the same
+/// reachability suffixes, while interleaved calls can make simple checkpoint selection miss every
+/// suppression predicate.
+fn benchmark_repeated_suppressing_context_managers(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let cases = [
+        (
+            "ty_micro[repeated_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        value = may_raise(value)\n",
+            320,
+        ),
+        (
+            "ty_micro[repeated_suppressing_context_managers_interleaved_calls]",
+            "    with suppress(ValueError):\n        value = may_raise(value)\n    may_raise(value)\n",
+            160,
+        ),
+    ];
+
+    for (name, statement, repetitions) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f() -> int:\n    value = 0\n",
+        );
+        code.push_str(&statement.repeat(repetitions));
+        code.push_str("    return value\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
+/// Exercises overlapping narrowing histories for repeated conditional assignments.
+///
+/// Every `isinstance` check narrows the same place, while each conditional assignment preserves
+/// the earlier binding on another path. Suppressing context managers add additional path gates to
+/// the same narrowing histories.
+fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let cases = [
+        (
+            "ty_micro[repeated_narrowed_assignments]",
+            "    if isinstance(value, int):\n        value = may_raise(value)\n",
+        ),
+        (
+            "ty_micro[repeated_narrowed_assignments_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        if isinstance(value, int):\n            value = may_raise(value)\n",
+        ),
+    ];
+
+    for (name, statement) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f(value: int | str) -> int | str:\n",
+        );
+        code.push_str(&statement.repeat(320));
+        code.push_str("    return value\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -1703,6 +1786,8 @@ criterion_group!(
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
+    benchmark_repeated_suppressing_context_managers,
+    benchmark_repeated_narrowed_assignments,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

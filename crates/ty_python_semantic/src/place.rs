@@ -10,9 +10,9 @@ use ty_module_resolver::{
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    ReachabilityEvaluationCache, evaluate_reachability, evaluate_reachability_with_cache,
+    NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
+    evaluate_reachability_with_cache,
 };
-use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
@@ -1681,6 +1681,7 @@ fn place_from_bindings_impl<'db>(
     let mut provenance = Provenance::Unknown;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
+    let mut narrowing_projector = None;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1806,10 +1807,24 @@ fn place_from_bindings_impl<'db>(
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
             let binding_ty = binding_type(db, binding);
-            Some((
-                narrowing_constraint.narrow(db, env, binding_ty, binding.place(db)),
-                static_reachability,
-            ))
+            let narrowed = match narrowing_constraint.constraint() {
+                ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
+                ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
+                constraint => narrowing_projector
+                    .get_or_insert_with(|| {
+                        NarrowingProjector::new(
+                            db,
+                            env,
+                            narrowing_constraint.narrowing_constraints(),
+                            predicates,
+                            narrowing_constraint.predicate_narrowing_targets(),
+                            binding.place(db),
+                            binding_ty,
+                        )
+                    })
+                    .narrow(constraint, binding_ty),
+            };
+            Some((narrowed, static_reachability))
         },
     );
 
