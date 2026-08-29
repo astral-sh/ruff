@@ -1,4 +1,4 @@
-//! Attribute-write resolution shared by assignment inference and protocol compatibility.
+//! Attribute-write resolution shared by assignment inference, protocol compatibility, and variance.
 //!
 //! This module resolves the Python lookup semantics for `object.attribute = value` into an
 //! [`AttributeWriteRequirement`]. The requirement retains alternatives such as union elements,

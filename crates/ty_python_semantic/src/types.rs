@@ -9521,10 +9521,9 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 function_type.variance_of(db, typevar)
             }
 
-            Type::BoundMethod(method_type) => {
-                // TODO: do we need to replace self?
-                method_type.function(db).variance_of(db, typevar)
-            }
+            Type::BoundMethod(method_type) => method_type
+                .bound_signatures(db)
+                .variance_of(db, env, typevar),
 
             Type::NominalInstance(nominal_instance_type) => {
                 nominal_instance_type.variance_of(db, env, typevar)

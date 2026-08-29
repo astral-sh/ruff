@@ -1,16 +1,20 @@
 use crate::{
+    Db,
     diagnostic::format_enumeration,
     types::{
-        KnownInstanceType, Signature, Type, TypeVarKind, TypeVarVariance,
+        BindingContext, BoundTypeVarInstance, KnownInstanceType, Signature, StaticClassLiteral,
+        Type, TypeVarKind, TypeVarVariance,
+        attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         context::InferContext,
         diagnostic::{
             INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
             INVALID_TYPE_VARIABLE_DEFAULT, UNBOUND_TYPE_VARIABLE,
         },
-        function::{FunctionDecorators, OverloadLiteral},
+        function::{FunctionDecorators, FunctionType, OverloadLiteral},
         generics::GenericContext,
-        infer::nearest_enclosing_class,
         infer_definition_types,
+        list_members::all_end_of_scope_members,
+        member::class_member,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
         variance::VarianceInferable,
@@ -24,7 +28,7 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::{definition::Definition, semantic_index};
+use ty_python_core::definition::Definition;
 
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
@@ -49,45 +53,26 @@ pub(crate) fn check_function_definition<'db>(
     check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
-    // Variance depends on the complete overload set: a broader overload can cover an otherwise
-    // incompatible signature.
-    // TODO: Account for that coverage in shared variance inference before
-    // checking overloaded methods here.
-    if !function_type.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-        check_method_typevar_variance(context, last_definition, &signature);
-    }
 }
 
-/// Check that a method respects the declared variance of its class's type parameters.
+/// Check that a nominal class's exposed methods respect its declared type-parameter variance.
 /// Constructors are excluded because their parameters establish the class specialization.
 /// Recursively checks type variables nested in containers, unions, and callables as well as bare uses.
-fn check_method_typevar_variance<'db>(
+pub(super) fn check_class_method_typevar_variance<'db>(
     context: &InferContext<'db, '_>,
-    last_definition: OverloadLiteral<'db>,
-    signature: &Signature<'db>,
+    class: StaticClassLiteral<'db>,
 ) {
     let db = context.db();
-    let body_scope = last_definition.body_scope(db);
-    if !context.is_lint_enabled(&INVALID_GENERIC_CLASS)
-        || !body_scope.is_method_scope(db)
-        || matches!(last_definition.name(db).as_str(), "__init__" | "__new__")
-    {
+    if !context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
         return;
     }
 
-    let index = semantic_index(db, body_scope.program_file(db));
-    let Some(class) = nearest_enclosing_class(db, index, body_scope) else {
-        return;
-    };
     // Protocols require declared variance to match the inferred variance, including for explicitly
     // invariant type variables. Nominal classes can be more conservative, so they only reject uses
     // incompatible with a declared covariance or contravariance. Both checks share recursive
     // variance inference, but only nominal classes currently skip overloads and independently
     // generic methods to avoid false positives.
     // TODO: Handle these cases in shared variance inference so both checks can account for them.
-    if class.is_protocol(db) {
-        return;
-    }
     let Some(generic_context) = class.generic_context(db) else {
         return;
     };
@@ -100,29 +85,132 @@ fn check_method_typevar_variance<'db>(
         return;
     }
 
+    let env = context.program_environment();
+    // Keep `Self` symbolic when checking the class declaration. Binding it to `C[T]` would
+    // incorrectly treat a parameter annotated as `Self` as consuming the class's `T`.
+    let instance = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+        db,
+        Type::instance(db, env, class.identity_specialization(db)),
+        BindingContext::Definition(class.definition(db)),
+    ));
+    for member in all_end_of_scope_members(db, class.body_scope(db))
+        .unique_by(|member| member.member.name.clone())
+    {
+        let mut member = member.member;
+        if matches!(member.name.as_str(), "__init__" | "__new__") {
+            continue;
+        }
+        // The iterator lists declarations and bindings separately; lookup combines their types.
+        let Some(ty) =
+            class_member(db, class.body_scope(db), &member.name).ignore_possibly_undefined()
+        else {
+            continue;
+        };
+        member.ty = ty.resolve_type_alias(db);
+        if member.ty.is_property_instance() {
+            // Each retained accessor has its own exclusions. Checking bound accessor signatures
+            // includes the setter's input, which an ordinary property read would not expose.
+            for function in member.local_functions_from_type(db, class.body_scope(db)) {
+                if !exclude_from_variance(db, function)
+                    && let Some(accessor) = Type::FunctionLiteral(function)
+                        .try_call_dunder_get(
+                            db,
+                            env,
+                            Some(instance),
+                            instance.to_meta_type(db, env),
+                        )
+                        .unwrap_or_else(|error| Some(error.fallback()))
+                {
+                    check_method_typevar_variance(
+                        context,
+                        generic_context,
+                        function,
+                        accessor.return_type,
+                        None,
+                    );
+                }
+            }
+            continue;
+        }
+        let functions = member.local_functions(db, class.body_scope(db));
+        let Some(&function) = functions.first() else {
+            continue;
+        };
+        // A combined member type does not retain the association between each alternative and its
+        // source definition. If any source is exempt, defer checking the combined type.
+        if functions
+            .iter()
+            .any(|function| exclude_from_variance(db, *function))
+        {
+            continue;
+        }
+        let Some(read_ty) = instance
+            .member(db, env, &member.name)
+            .place
+            .ignore_possibly_undefined()
+        else {
+            continue;
+        };
+        let write_ty = match descriptor_setter_domain(db, env, member.ty, instance) {
+            DescriptorSetterDomain::Missing => None,
+            DescriptorSetterDomain::Known(ty) => Some(ty),
+            DescriptorSetterDomain::Deferred => continue,
+        };
+        check_method_typevar_variance(context, generic_context, function, read_ty, write_ty);
+    }
+}
+
+/// Whether a source method is exempt from declared-variance validation.
+fn exclude_from_variance<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> bool {
+    let last_definition = function.literal(db).last_definition;
+    // Variance depends on the complete overload set: a broader overload can cover an otherwise
+    // incompatible signature.
+    // TODO: Account for that coverage in shared variance inference before
+    // checking overloaded methods here.
+    if function.has_known_decorator(db, FunctionDecorators::OVERLOAD)
+        || last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK)
+    {
+        return true;
+    }
+
     // Independent method type parameters can make an occurrence of a class parameter redundant.
     // TODO: Account for those relationships instead of just composing each occurrence's variance.
     // Use the lexical context so that type parameters moved into a returned callable also count.
     let lexical_signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Lexical);
-    if lexical_signature.generic_context.is_some_and(|context| {
+    lexical_signature.generic_context.is_some_and(|context| {
         context
             .variables(db)
             .any(|typevar| !typevar.typevar(db).is_self(db))
-    }) {
-        return;
-    }
+    })
+}
+
+fn check_method_typevar_variance<'db>(
+    context: &InferContext<'db, '_>,
+    generic_context: GenericContext<'db>,
+    function: FunctionType<'db>,
+    read_ty: Type<'db>,
+    write_ty: Option<Type<'db>>,
+) {
+    let db = context.db();
     let env = context.program_environment();
-    let signature = if last_definition.has_implicit_receiver(db) {
-        // The implicit receiver does not consume the class's type parameters.
-        // TODO: Account for specialized receivers that make an otherwise incompatible occurrence
-        // redundant, such as `self: C[int]` with a parameter annotated as `T_co | int`.
-        signature.bind_self(db, env, None)
-    } else {
-        signature.clone()
+    let last_definition = function.literal(db).last_definition;
+    let signatures = match read_ty {
+        Type::FunctionLiteral(function) => Some(function.signature(db)),
+        Type::BoundMethod(method) => Some(method.bound_signatures(db)),
+        Type::Callable(callable) => Some(callable.signatures(db)),
+        _ => None,
+    };
+    let signature = match signatures {
+        Some(signatures) => {
+            let [signature] = signatures.overloads.as_slice() else {
+                return;
+            };
+            Some(signature)
+        }
+        None => None,
     };
 
-    // TODO: Validate the final class interface: decorators can replace a method, and later
-    // statements in the class body can delete or overwrite it.
+    let definition = function.definition(db);
     for typevar in generic_context.variables(db) {
         let Some(declared_variance) = typevar.typevar(db).explicit_variance(db) else {
             continue;
@@ -130,45 +218,56 @@ fn check_method_typevar_variance<'db>(
         if declared_variance == TypeVarVariance::Invariant {
             continue;
         }
-        let required_variance = (&signature).variance_of(db, env, typevar.identity(db));
+        let required_variance =
+            read_ty
+                .variance_of(db, env, typevar.identity(db))
+                .join(write_ty.map_or(TypeVarVariance::Bivariant, |ty| {
+                    ty.with_polarity(TypeVarVariance::Contravariant)
+                        .variance_of(db, env, typevar.identity(db))
+                }));
         if declared_variance.join(required_variance) == declared_variance {
             continue;
         }
         let node = last_definition.node(db, context.file(), context.module());
         let range = signature
-            .parameters()
-            .iter()
-            .find_map(|parameter| {
-                // `P.args` and `P.kwargs` both consume `P`, despite having distinct identities.
-                let parameter_type = match parameter.annotated_type() {
-                    Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some() => {
-                        Type::TypeVar(typevar.without_paramspec_attr(db))
-                    }
-                    ty => ty,
-                };
-                let variance = parameter_type
-                    .with_polarity(TypeVarVariance::Contravariant)
-                    .variance_of(db, env, typevar.identity(db));
-                if declared_variance.join(variance) == declared_variance {
-                    return None;
-                }
-                node.parameters
+            .as_ref()
+            .filter(|signature| signature.definition() == Some(definition))
+            .and_then(|signature| {
+                signature
+                    .parameters()
                     .iter()
-                    .nth(parameter.source_parameter_index()?)?
-                    .annotation()
-                    .map(Ranged::range)
-            })
-            .or_else(|| {
-                node.returns
-                    .as_deref()
-                    .filter(|_| {
-                        declared_variance.join(signature.return_ty.variance_of(
-                            db,
-                            env,
-                            typevar.identity(db),
-                        )) != declared_variance
+                    .find_map(|parameter| {
+                        // `P.args` and `P.kwargs` both consume `P`, despite having distinct identities.
+                        let parameter_type = match parameter.annotated_type() {
+                            Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some() => {
+                                Type::TypeVar(typevar.without_paramspec_attr(db))
+                            }
+                            ty => ty,
+                        };
+                        let variance = parameter_type
+                            .with_polarity(TypeVarVariance::Contravariant)
+                            .variance_of(db, env, typevar.identity(db));
+                        if declared_variance.join(variance) == declared_variance {
+                            return None;
+                        }
+                        node.parameters
+                            .iter()
+                            .nth(parameter.source_parameter_index()?)?
+                            .annotation()
+                            .map(Ranged::range)
                     })
-                    .map(Ranged::range)
+                    .or_else(|| {
+                        node.returns
+                            .as_deref()
+                            .filter(|_| {
+                                declared_variance.join(signature.return_ty.variance_of(
+                                    db,
+                                    env,
+                                    typevar.identity(db),
+                                )) != declared_variance
+                            })
+                            .map(Ranged::range)
+                    })
             })
             .unwrap_or_else(|| node.name.range());
         if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, range) {

@@ -213,10 +213,10 @@ class ContravariantForwarder(Generic[P_contra]):
 
 ```snapshot
 error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `call`
-  --> src/mdtest_snippet.py:21:27
+  --> src/mdtest_snippet.py:21:9
    |
 21 |     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
-   |                           ^^^^^^^^^
+   |         ^^^^
 info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
 ```
 
