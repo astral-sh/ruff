@@ -199,18 +199,15 @@ fn check_method_typevar_variance<'db>(
         Type::BoundMethod(method) => Some(method.bound_signatures(db)),
         Type::Callable(callable) => Some(callable.signatures(db)),
         _ => None,
-    };
+    }
+    .map(|signatures| signatures.overloads.as_slice());
     let signature = match signatures {
-        Some(signatures) => {
-            let [signature] = signatures.overloads.as_slice() else {
-                return;
-            };
-            Some(signature)
-        }
+        Some([signature]) => Some(signature),
+        Some(_) => return,
         None => None,
-    };
+    }
+    .filter(|signature| signature.definition() == Some(function.definition(db)));
 
-    let definition = function.definition(db);
     for typevar in generic_context.variables(db) {
         let Some(declared_variance) = typevar.typevar(db).explicit_variance(db) else {
             continue;
@@ -230,44 +227,38 @@ fn check_method_typevar_variance<'db>(
         }
         let node = last_definition.node(db, context.file(), context.module());
         let range = signature
-            .as_ref()
-            .filter(|signature| signature.definition() == Some(definition))
             .and_then(|signature| {
-                signature
-                    .parameters()
-                    .iter()
-                    .find_map(|parameter| {
-                        // `P.args` and `P.kwargs` both consume `P`, despite having distinct identities.
-                        let parameter_type = match parameter.annotated_type() {
-                            Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some() => {
-                                Type::TypeVar(typevar.without_paramspec_attr(db))
-                            }
-                            ty => ty,
-                        };
-                        let variance = parameter_type
-                            .with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of(db, env, typevar.identity(db));
-                        if declared_variance.join(variance) == declared_variance {
-                            return None;
+                let parameters = signature.parameters().iter().filter_map(|parameter| {
+                    let annotation = node
+                        .parameters
+                        .iter()
+                        .nth(parameter.source_parameter_index()?)?
+                        .annotation()?;
+                    // `P.args` and `P.kwargs` both consume `P`, despite having distinct identities.
+                    let parameter_type = match parameter.annotated_type() {
+                        Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some() => {
+                            Type::TypeVar(typevar.without_paramspec_attr(db))
                         }
-                        node.parameters
-                            .iter()
-                            .nth(parameter.source_parameter_index()?)?
-                            .annotation()
-                            .map(Ranged::range)
-                    })
-                    .or_else(|| {
-                        node.returns
-                            .as_deref()
-                            .filter(|_| {
-                                declared_variance.join(signature.return_ty.variance_of(
-                                    db,
-                                    env,
-                                    typevar.identity(db),
-                                )) != declared_variance
-                            })
-                            .map(Ranged::range)
-                    })
+                        ty => ty,
+                    };
+                    Some((
+                        annotation.range(),
+                        parameter_type
+                            .with_polarity(TypeVarVariance::Contravariant)
+                            .variance_of(db, env, typevar.identity(db)),
+                    ))
+                });
+                let returns = node.returns.iter().map(|annotation| {
+                    (
+                        annotation.range(),
+                        signature
+                            .return_ty
+                            .variance_of(db, env, typevar.identity(db)),
+                    )
+                });
+                parameters.chain(returns).find_map(|(range, variance)| {
+                    (declared_variance.join(variance) != declared_variance).then_some(range)
+                })
             })
             .unwrap_or_else(|| node.name.range());
         if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, range) {
