@@ -406,7 +406,7 @@
         },
         "call-non-callable": {
           "title": "detects calls to non-callable objects",
-          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```",
+          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\nThis includes attempts to instantiate classes with unimplemented abstract methods, whether those\nmethods are explicitly decorated with `abstractmethod` or implicitly abstract protocol members.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\nAbstract methods describe behavior that a subclass must implement before it can be instantiated.\nClasses using `ABCMeta` enforce this at runtime; the type checker also enforces it for classes\nwithout `ABCMeta`.\n\n## Examples\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Abstract(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n# `method` has not been implemented.\nAbstract()  # error\n\n\nclass Concrete(Abstract):\n    def method(self) -> int:\n        return 42\n\n\nConcrete()  # OK\n```",
           "default": "error",
           "oneOf": [
             {
