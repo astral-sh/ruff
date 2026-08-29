@@ -13,7 +13,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
-use crate::types::set_theoretic::{RecursivelyDefined, UnionBuilder};
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::{
@@ -1454,15 +1454,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 if self.relation.is_assignability() && source.inherits_from_explicit_any() =>
             {
                 self.always()
-            }
-
-            (Type::TypeAlias(source_alias), _)
-                if source_alias.recursive_alias_kind(db).is_growing() =>
-            {
-                self.with_recursion_guard(db, source, target, || {
-                    let expanded = UnionBuilder::new(db, env).add(source).build();
-                    self.check_type_pair(db, expanded, target)
-                })
             }
 
             (Type::TypeAlias(source_alias), _) => {

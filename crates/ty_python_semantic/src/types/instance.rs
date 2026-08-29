@@ -923,7 +923,7 @@ fn non_recursive_protocol_interface<'db>(
             self.active_aliases.visit(
                 &Type::TypeAlias(type_alias).to_type_identity(db),
                 || self.found.set(true),
-                || self.visit_type(db, type_alias.value_type(db)),
+                || self.visit_type(db, type_alias.unguarded_value_type(db)),
             );
         }
 

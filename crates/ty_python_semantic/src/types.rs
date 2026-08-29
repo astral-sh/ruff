@@ -8310,7 +8310,9 @@ impl<'db> Type<'db> {
                 match type_mapping {
                     TypeMapping::Materialize(_) if alias.materialization_kind(db).is_some() => self,
                     TypeMapping::EagerExpansion if alias.materialization_kind(db).is_some() => {
-                        alias.value_type(db).expand_eagerly(db, visitor.env)
+                        alias
+                            .unguarded_value_type(db)
+                            .expand_eagerly(db, visitor.env)
                     }
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                     // detection rather than the visitor's cycle detection, because the visitor tracks
@@ -8352,7 +8354,7 @@ impl<'db> Type<'db> {
                         // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                         // will detect the cycle and return the fallback value.
                         let mapped = visitor.visit(db, self, type_mapping, || {
-                            alias.value_type(db).apply_type_mapping_impl(
+                            alias.unguarded_value_type(db).apply_type_mapping_impl(
                                 db,
                                 type_mapping,
                                 tcx,
@@ -8363,7 +8365,7 @@ impl<'db> Type<'db> {
                         // If the type mapping does not result in any change to this type alias, keep the
                         // alias node instead of eagerly expanding it. A recursive backedge also returns
                         // the alias itself, and fully static aliases must retain their original identity.
-                        if mapped == self || alias.value_type(db) == mapped {
+                        if mapped == self || alias.unguarded_value_type(db) == mapped {
                             self
                         } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
                             && alias.is_recursive(db)
@@ -8662,7 +8664,7 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 visitor.visit(db, self, || {
-                    alias.value_type(db).find_legacy_typevars_impl(
+                    alias.unguarded_value_type(db).find_legacy_typevars_impl(
                         db,
                         env,
                         binding_context,
@@ -8951,7 +8953,7 @@ impl<'db> Type<'db> {
                 )),
             },
 
-            Self::TypeAlias(alias) => alias.value_type(db).definition(db, env),
+            Self::TypeAlias(alias) => alias.unguarded_value_type(db).definition(db, env),
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
 
             Self::PropertyInstance(property) => property

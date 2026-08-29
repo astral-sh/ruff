@@ -732,7 +732,11 @@ impl<'db> UnionBuilder<'db> {
                 } else {
                     seen_aliases.push(ty);
                     active_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(db), seen_aliases, active_aliases);
+                    self.add_in_place_impl(
+                        alias.unguarded_value_type(db),
+                        seen_aliases,
+                        active_aliases,
+                    );
                     let popped = active_aliases.pop();
                     debug_assert_eq!(popped, Some(ty));
                 }

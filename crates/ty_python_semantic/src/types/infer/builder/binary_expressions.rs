@@ -350,11 +350,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
+            // The visitor compares recursive identities, so binary expressions can preserve
+            // results from terminating union arms without widening a growing remainder first.
             (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
-                    alias.value_type(db),
+                    alias.unguarded_value_type(db),
                     rhs,
                     op,
                     visitor,
@@ -366,7 +368,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     node,
                     emitted_division_by_zero_diagnostic,
                     lhs,
-                    alias.value_type(db),
+                    alias.unguarded_value_type(db),
                     op,
                     visitor,
                 )

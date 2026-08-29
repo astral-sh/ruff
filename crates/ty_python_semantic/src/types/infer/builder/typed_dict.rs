@@ -43,7 +43,7 @@ fn contains_generic_typed_dict<'db>(
         Type::TypeAlias(alias) => active_aliases.visit(
             &alias.definition(db),
             || true,
-            || contains_generic_typed_dict(db, env, alias.value_type(db), active_aliases),
+            || contains_generic_typed_dict(db, env, alias.unguarded_value_type(db), active_aliases),
         ),
         _ => false,
     })

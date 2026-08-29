@@ -743,7 +743,13 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
                 || matches!(nested, Type::TypeAlias(alias) if active_aliases.visit(
                     &Type::TypeAlias(alias).to_type_identity(db),
                     || true,
-                    || search(db, env, alias.value_type(db), query, active_aliases),
+                    || search(
+                        db,
+                        env,
+                        alias.unguarded_value_type(db),
+                        query,
+                        active_aliases,
+                    ),
                 ))
         })
     }

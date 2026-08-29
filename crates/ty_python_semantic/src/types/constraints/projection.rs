@@ -99,7 +99,7 @@ impl ProjectionTypeBudget {
                 }
             }
             Type::TypeAlias(alias) if seen_aliases.insert(ty) => {
-                self.charge_type_inner(db, alias.value_type(db), seen_aliases)?;
+                self.charge_type_inner(db, alias.unguarded_value_type(db), seen_aliases)?;
             }
             _ => {}
         }

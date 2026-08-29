@@ -1043,7 +1043,7 @@ pub(super) fn is_same_enum_domain<'db>(
                     visitor.active_definitions.visit(
                         &alias.definition(db),
                         || false,
-                        || visit(db, env, alias.value_type(db), right, visitor),
+                        || visit(db, env, alias.unguarded_value_type(db), right, visitor),
                     )
                 },
             ),

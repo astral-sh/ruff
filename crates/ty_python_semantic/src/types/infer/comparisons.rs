@@ -306,6 +306,14 @@ pub(super) fn infer_binary_type_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
     let env = &context.program_environment();
+    let left = match left {
+        Type::TypeAlias(alias) => alias.value_type(db),
+        _ => left,
+    };
+    let right = match right {
+        Type::TypeAlias(alias) => alias.value_type(db),
+        _ => right,
+    };
 
     let op = match op {
         ast::CmpOp::Is | ast::CmpOp::IsNot => {
@@ -517,28 +525,6 @@ fn infer_binary_type_comparison_inner<'db>(
                 right_ty: right,
             }),
         ),
-
-        (Type::TypeAlias(alias), right) => Some(visitor.visit(db, (left, op, right), || {
-            infer_binary_type_comparison_inner(
-                context,
-                alias.value_type(db),
-                op,
-                right,
-                range,
-                visitor,
-            )
-        })),
-
-        (left, Type::TypeAlias(alias)) => Some(visitor.visit(db, (left, op, right), || {
-            infer_binary_type_comparison_inner(
-                context,
-                left,
-                op,
-                alias.value_type(db),
-                range,
-                visitor,
-            )
-        })),
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
         // `complex`, where the concrete base type is a union. In that case it turns out the
