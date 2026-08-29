@@ -717,26 +717,20 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-/// A place's value type and the presence established by its narrowing constraints.
-/// `None` leaves ordinary member lookup's definedness unchanged; `Never` represents an
+/// A place's value type and positive evidence that it is present.
+/// Without that evidence, ordinary member lookup determines definedness. `Never` represents an
 /// unreachable path, which contributes neither a value type nor presence at a control-flow join.
 #[derive(Clone, Copy)]
 pub(crate) struct NarrowedPlace<'db> {
     pub(crate) ty: Type<'db>,
-    pub(crate) presence: Option<bool>,
+    pub(crate) known_present: bool,
 }
 
 impl<'db> NarrowedPlace<'db> {
     pub(crate) fn new(ty: Type<'db>) -> Self {
-        Self { ty, presence: None }
-    }
-
-    pub(crate) fn constrain_presence(&mut self, presence: Option<bool>) {
-        if let Some(present) = presence {
-            if self.presence.is_some_and(|previous| previous != present) {
-                self.ty = Type::Never;
-            }
-            self.presence = presence;
+        Self {
+            ty,
+            known_present: false,
         }
     }
 
@@ -748,11 +742,10 @@ impl<'db> NarrowedPlace<'db> {
     ) -> Self {
         Self {
             ty: UnionType::from_two_elements(db, env, left.ty, right.ty),
-            presence: match (left.ty.is_never(), right.ty.is_never()) {
-                (true, _) => right.presence,
-                (_, true) => left.presence,
-                _ if left.presence == right.presence => left.presence,
-                _ => None,
+            known_present: match (left.ty.is_never(), right.ty.is_never()) {
+                (true, _) => right.known_present,
+                (_, true) => left.known_present,
+                _ => left.known_present && right.known_present,
             },
         }
     }
@@ -760,14 +753,13 @@ impl<'db> NarrowedPlace<'db> {
     /// Apply flow facts after ordinary lookup, preserving its qualifiers and error recovery.
     pub(crate) fn apply_to(self, mut member: PlaceAndQualifiers<'db>) -> PlaceAndQualifiers<'db> {
         member = member.map_type(|_| self.ty);
-        member.place = match (self.ty, self.presence, member.place) {
+        member.place = match (self.ty, self.known_present, member.place) {
             (Type::Never, _, _) => Place::bound(Type::Never),
-            (_, Some(false), _) => Place::Undefined,
-            (_, Some(true), Place::Defined(defined)) => {
+            (_, true, Place::Defined(defined)) => {
                 Place::Defined(defined.with_definedness(Definedness::AlwaysDefined))
             }
-            (_, Some(true), Place::Undefined) => Place::bound(self.ty),
-            (_, None, place) => place,
+            (_, true, Place::Undefined) => Place::bound(self.ty),
+            (_, false, place) => place,
         };
         member
     }
@@ -776,24 +768,21 @@ impl<'db> NarrowedPlace<'db> {
 /// Join value types and retain only presence facts shared by all reachable alternatives.
 pub(crate) struct NarrowedPlaceBuilder<'db> {
     types: UnionBuilder<'db>,
-    presence: Option<bool>,
+    known_present: bool,
 }
 
 impl<'db> NarrowedPlaceBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         Self {
             types: UnionBuilder::new(db, env),
-            presence: None,
+            known_present: false,
         }
     }
 
     pub(crate) fn add(&mut self, place: NarrowedPlace<'db>) {
         if !place.ty.is_never() {
-            self.presence = if self.types.is_empty() || self.presence == place.presence {
-                place.presence
-            } else {
-                None
-            };
+            self.known_present =
+                (self.types.is_empty() || self.known_present) && place.known_present;
         }
         self.types.add_in_place(place.ty);
     }
@@ -801,7 +790,7 @@ impl<'db> NarrowedPlaceBuilder<'db> {
     pub(crate) fn build(self) -> NarrowedPlace<'db> {
         NarrowedPlace {
             ty: self.types.build(),
-            presence: self.presence,
+            known_present: self.known_present,
         }
     }
 }
@@ -814,15 +803,15 @@ enum NarrowingOperation<'db> {
     GenericFiltering(Type<'db>),
     /// Filter the receiver using a runtime member check instead of a static subtype relation.
     AttributePresence(StringLiteralType<'db>, bool),
-    /// Presence of the member place itself, independently of its value type.
-    MemberPresence(bool),
+    /// Establish presence of the member place itself, independently of its value type.
+    MemberPresent,
 }
 
 impl<'db> NarrowingOperation<'db> {
     const fn ty(self) -> Type<'db> {
         match self {
             Self::Intersection(ty) | Self::GenericFiltering(ty) => ty,
-            Self::AttributePresence(..) | Self::MemberPresence(_) => Type::object(),
+            Self::AttributePresence(..) | Self::MemberPresent => Type::object(),
         }
     }
 }
@@ -897,8 +886,8 @@ impl<'db> Conjunctions<'db> {
                         present,
                     );
                 }
-                NarrowingOperation::MemberPresence(present) => {
-                    place.constrain_presence(Some(present));
+                NarrowingOperation::MemberPresent => {
+                    place.known_present = true;
                 }
             }
         }
@@ -1261,10 +1250,10 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
-    fn member_presence(present: bool) -> Self {
+    fn member_present() -> Self {
         Self {
             intersection_disjuncts: smallvec![Conjunctions {
-                conjuncts: smallvec![NarrowingOperation::MemberPresence(present)]
+                conjuncts: smallvec![NarrowingOperation::MemberPresent]
             }],
             replacement_disjuncts: smallvec![],
         }
@@ -4528,14 +4517,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         place,
                         NarrowingConstraint::attribute_presence(attr, is_positive),
                     )]);
-                    if let Some(member) =
-                        PlaceExpr::attribute((&expr_call.arguments.args[0]).into(), attr.value(db))
+                    if is_positive
+                        && let Some(member) = PlaceExpr::attribute(
+                            (&expr_call.arguments.args[0]).into(),
+                            attr.value(db),
+                        )
                         && let Some(member_place) = self.places().place_id(&member)
                     {
-                        constraints.insert(
-                            member_place,
-                            NarrowingConstraint::member_presence(is_positive),
-                        );
+                        constraints.insert(member_place, NarrowingConstraint::member_present());
                     }
                     return Some(constraints);
                 }

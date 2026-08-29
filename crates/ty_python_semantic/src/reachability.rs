@@ -914,7 +914,7 @@ fn apply_accumulated_narrowing<'db>(
             let mut narrowed = NarrowingConstraint::intersection(base_ty.ty)
                 .merge_constraint_and(constraint)
                 .evaluate_place(db, env);
-            narrowed.constrain_presence(base_ty.presence);
+            narrowed.known_present |= base_ty.known_present;
             narrowed
         }
         None => base_ty,

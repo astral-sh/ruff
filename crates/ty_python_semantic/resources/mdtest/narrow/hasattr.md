@@ -3,8 +3,9 @@
 ## Basic guards
 
 The builtin function `hasattr()` can be used to narrow nominal and structural types. Positive checks
-can add a synthesized protocol to the receiver type. Negative checks record the absence of the
-member separately from its declared or inferred value type:
+can add a synthesized protocol to the receiver type and establish that the member is present.
+Negative checks filter receiver types without overriding ordinary member lookup with an absence
+fact:
 
 ```py
 from typing import final
@@ -83,8 +84,8 @@ def _(obj: MaybeWithSpam):
     else:
         reveal_type(obj)  # revealed: MaybeWithSpam
 
-        # error: [unresolved-attribute]
-        reveal_type(obj.spam)  # revealed: Unknown
+        # error: [possibly-missing-attribute]
+        reveal_type(obj.spam)  # revealed: int
 ```
 
 All attribute available on `object` are still available on these synthesized protocols, but
@@ -104,8 +105,7 @@ def f(x: object):
 ## Union receivers
 
 A negative check eliminates union members with an initialized class attribute, but retains members
-whose attribute is only declared. The retained declaration still does not make the missing member
-readable in that branch.
+whose attribute is only declared. Reads of the remaining member use its declared type.
 
 ```py
 class WithValue:
@@ -117,6 +117,18 @@ class DeclaredValue:
 def f(obj: WithValue | DeclaredValue):
     if not hasattr(obj, "value"):
         reveal_type(obj)  # revealed: DeclaredValue
+        reveal_type(obj.value)  # revealed: int
+```
+
+If the remaining receiver has no declaration for the member, ordinary lookup still reports the
+missing attribute.
+
+```py
+class WithoutValue: ...
+
+def g(obj: WithValue | WithoutValue):
+    if not hasattr(obj, "value"):
+        reveal_type(obj)  # revealed: WithoutValue
         obj.value  # error: [unresolved-attribute]
 ```
 
@@ -140,8 +152,9 @@ reveal_type(Cached().number)  # revealed: int
 
 ## Presence before and after assignment
 
-The negative guard establishes absence. An assignment supersedes that fact, so subsequent reads use
-the assigned value. This also applies to slots, which reserve storage without initializing it.
+Before an assignment, reads use the declared member type even after a failed guard. We do not
+diagnose the known absence. An assignment establishes presence and narrows subsequent reads to the
+assigned value. This also applies to slots, which reserve storage without initializing it.
 
 ```py
 class Cached:
@@ -150,7 +163,7 @@ class Cached:
 
     def initialize(self):
         if not hasattr(self, "value"):
-            self.value  # error: [unresolved-attribute]
+            reveal_type(self.value)  # revealed: int
             self.value = 1
             reveal_type(self.value)  # revealed: Literal[1]
 ```
@@ -177,18 +190,17 @@ class Cached:
 
 ## Receiver reassignment
 
-Reassigning the receiver forgets the guard's presence information. The new object has the member's
-ordinary declared type, rather than the absence established for the previous object.
+Reassigning the receiver forgets the successful guard's presence information. The new object does
+not inherit the member established for the previous object.
 
 ```py
-class Item:
-    value: int
+class Item: ...
 
 def f(item: Item, other: Item):
-    if not hasattr(item, "value"):
-        item.value  # error: [unresolved-attribute]
+    if hasattr(item, "value"):
+        reveal_type(item.value)  # revealed: object
         item = other
-        reveal_type(item.value)  # revealed: int
+        item.value  # error: [unresolved-attribute]
 ```
 
 ## Compound guards and aliases
@@ -207,7 +219,7 @@ class Cached:
 
 ## Eager nested scopes
 
-An eagerly evaluated comprehension retains the enclosing guard's presence information.
+A failed guard also leaves declared member types unchanged inside eagerly evaluated comprehensions.
 
 ```py
 class Item:
@@ -215,13 +227,13 @@ class Item:
 
 def f(item: Item):
     if not hasattr(item, "value"):
-        [item.value for _ in range(1)]  # error: [unresolved-attribute]
+        reveal_type([item.value for _ in range(1)])  # revealed: list[int]
 ```
 
 ## Dynamic receivers
 
 A dynamic type does not prove that a member exists. A successful guard leaves its value type
-unrestricted, while a failed guard establishes absence.
+unrestricted, and a failed guard does not introduce a missing-attribute diagnostic.
 
 ```py
 from typing import Any
@@ -230,11 +242,46 @@ def f(value: Any):
     if hasattr(value, "field"):
         reveal_type(value.field)  # revealed: Any
     else:
-        value.field  # error: [unresolved-attribute]
+        reveal_type(value.field)  # revealed: Any
 
 def g(value: type[Any]):
     if not hasattr(value, "field"):
-        value.field  # error: [unresolved-attribute]
+        reveal_type(value.field)  # revealed: Any
+```
+
+## Calls after failed guards
+
+A method can initialize an attribute after a failed `hasattr` check. We do not infer the method's
+effects on the receiver, but the failed guard does not prevent later reads from using the declared
+member type.
+
+```py
+class Estimator:
+    n_features: int
+
+    def fit(self) -> None:
+        self.n_features = 1
+
+def f(estimator: Estimator):
+    assert not hasattr(estimator, "n_features")
+    estimator.fit()
+    reveal_type(estimator.n_features)  # revealed: int
+```
+
+The same sequence preserves ordinary attribute lookup for dynamic receivers.
+
+```py
+from typing import Any
+
+def g(estimator: Any):
+    assert not hasattr(estimator, "n_features")
+    estimator.fit()
+    reveal_type(estimator.n_features)  # revealed: Any
+
+def h(estimator):
+    assert not hasattr(estimator, "n_features")
+    estimator.fit()
+    reveal_type(estimator.n_features)  # revealed: Unknown
 ```
 
 ## Properties

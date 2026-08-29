@@ -9899,7 +9899,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                                 let mut bound = NarrowedPlace::new(binding_ty);
                                 if !definition.kind(db).is_loop_header() {
-                                    bound.presence = Some(true);
+                                    bound.known_present = true;
                                 }
                                 union.add(
                                     binding
